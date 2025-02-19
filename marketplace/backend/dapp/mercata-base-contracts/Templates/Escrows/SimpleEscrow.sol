@@ -8,7 +8,8 @@ contract SimpleEscrow is Escrow {
         uint _collateralQuantity,
         decimal _assetPrice,
         uint _loanToValueRatio,
-        uint _liquidationRatio
-    ) Escrow(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio, _liquidationRatio) {
+        uint _liquidationRatio,
+        string _version
+    ) Escrow(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio, _liquidationRatio, _version) {
     }
 }

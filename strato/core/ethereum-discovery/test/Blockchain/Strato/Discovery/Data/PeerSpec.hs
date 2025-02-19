@@ -1,9 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.Strato.Discovery.Data.PeerSpec
   ( spec,
   )
 where
 
+import Blockchain.Strato.Discovery.Data.Host as H
 import Blockchain.Strato.Discovery.Data.Peer
+import Data.String
 import Test.Hspec
 
 publicKey :: String
@@ -12,17 +16,17 @@ publicKey = take 128 (repeat '1')
 port :: Int
 port = 30303
 
-mkAddress :: String -> String
+mkAddress :: Host -> String
 mkAddress host = mkAddress' (Just publicKey) host port
 
-mkIPv6Address :: String -> String
-mkIPv6Address host = mkAddress' (Just publicKey) ("[" <> host <> "]") port
+mkIPv6Address :: Host -> String
+mkIPv6Address host = mkAddress' (Just publicKey) (fromString $ "[" <> hostToString host <> "]") port
 
-mkAddress' :: Maybe String -> String -> Int -> String
+mkAddress' :: Maybe String -> Host -> Int -> String
 mkAddress' mPubKey host portNum =
   case mPubKey of
-    Nothing -> "enode://" <> host <> ":" <> show portNum
-    (Just key) -> "enode://" <> key <> "@" <> host <> ":" <> show portNum
+    Nothing -> "enode://" <> hostToString host <> ":" <> show portNum
+    (Just key) -> "enode://" <> key <> "@" <> hostToString host <> ":" <> show portNum
 
 spec :: Spec
 spec = do

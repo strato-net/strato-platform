@@ -32,8 +32,7 @@ import BlockApps.Solidity.Value
 import qualified BlockApps.SolidityVarReader as SVR
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.ChainId
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
@@ -93,8 +92,8 @@ matters AggregateAction {..} =
     && (resolvedCodePtrToSHA actionCodeHash /= emptyHash)
 
 
-splitActions :: [AggregateAction] -> [(Account, [AggregateAction])]
-splitActions = partitionWith actionAccount
+splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
+splitActions = partitionWith actionAddress
 
 data ABIID = ABIID
   { aiName :: Text,
@@ -109,7 +108,7 @@ processedContract ::
   E.ProcessedContract
 processedContract ABIID {..} state AggregateAction {..} =
   E.ProcessedContract
-    { address = actionAccount ^. accountAddress,
+    { address = actionAddress,
       codehash = actionCodeHash,
       creator = actionCreator,
       cc_creator = actionCCCreator,
@@ -122,7 +121,7 @@ processedContract ABIID {..} state AggregateAction {..} =
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       transactionHash = actionTxHash,
-      transactionSender = actionTxSender ^. accountAddress
+      transactionSender = actionTxSender
     }
 
 -- readPreviousSolidVMState ::
@@ -185,7 +184,7 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid creg
 processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
   ProcessedCollectionRow
-    { address = actionAccount ^. accountAddress,
+    { address = actionAddress,
       -- codehash = actionCodeHash,
       creator = actionCreator,
       cc_creator = cregator,
@@ -199,7 +198,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       transactionHash = actionTxHash,
-      transactionSender = actionTxSender ^. accountAddress,
+      transactionSender = actionTxSender,
       collectionDataKey = k,
       collectionDataValue = v 
     }
@@ -217,7 +216,7 @@ processArrayDynamic mName row abiid cregator (index, value) =
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-parseActions :: [VME.VMEvent] -> [(Account, [AggregateAction])]
+parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
 parseActions events' =
   sortOn withSourceFirst
     . splitActions
@@ -237,7 +236,7 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
+          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAddress e) $ Action._actionData a,
           eventEvent = e, 
           eventIndex = idx
         }
@@ -388,14 +387,13 @@ processTheMessages env conn messages = do
         case actionStorage row of
           Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
           Action.SolidVMDiff {} -> do
-            let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-                name = case actionCodeHash row of
+            let name = case actionCodeHash row of
                   SolidVMCode name' _ -> name'
                   _ -> error "internal error: contract should be SolidVM for SolidVM"
                 abiid =
                   ABIID
                     { aiName = T.pack name,
-                      aiChain = cid
+                      aiChain = ""
                     }
                 cont = error "internal error: contract should be unused for SolidVM"
             $logInfoLS "Contract name is: " $ T.pack $ show name

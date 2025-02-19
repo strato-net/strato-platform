@@ -5,22 +5,15 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Blockchain.Strato.Model.Account
-  ( Account (..),
-    AccountPayable,
-    accountChainId,
-    accountAddress,
-    OnNamedChain (..),
+  ( OnNamedChain (..),
     NamedAccount (..),
     namedAccountChainId,
     namedAccountAddress,
-    namedAccountToAccount,
-    accountToNamedAccount,
-    accountToNamedAccount',
-    accountOnUnspecifiedChain,
     unspecifiedChain,
     mainChain,
     explicitChain,
@@ -39,159 +32,42 @@ import Data.Aeson.Types
 import Data.Binary
 import Data.Data
 import Data.Hashable
-import Data.Swagger hiding (Format, format, get, put)
-import qualified Data.Swagger as Sw
 import qualified Data.Text as T
-import Database.Persist.TH
 import GHC.Generics
-import Servant.API
-import Servant.Docs
 import Test.QuickCheck (Arbitrary (..), oneof)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
 import Text.Read (readMaybe)
 import Text.ShortDescription
-import Web.FormUrlEncoded
 
-type AccountPayable = Account --type synonym, irrelevant at runtime, but matters for typechecking during complilation
-
-data Account = Account
-  { _accountAddress :: Address,
-    _accountChainId :: Maybe Word256
-  }
-  deriving (Eq, Ord, Generic, Data, Hashable, Binary)
-
-makeLenses ''Account
-
-instance RLPSerializable Account where
-  rlpEncode (Account a Nothing) = rlpEncode a
-  rlpEncode (Account a (Just cid)) = RLPArray [rlpEncode a, rlpEncode cid]
-  rlpDecode (RLPArray [a, cid]) = Account (rlpDecode a) (Just $ rlpDecode cid)
-  rlpDecode a = Account (rlpDecode a) Nothing
-
-instance Show Account where
-  show (Account a Nothing) = printf "%040x" a
-  show (Account a (Just cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
-
-instance Read Account where
-  readsPrec _ s = case span (/= ':') s of
-    (mAddr, mRem) -> case stringAddress mAddr of
-      Nothing -> []
-      Just addr -> case mRem of
-        (':' : rem') -> case splitAt 64 rem' of
-          (mCid, mRem2) -> case fromInteger <$> readMaybe ("0x" ++ mCid) of
-            Nothing -> [(Account addr Nothing, mRem)]
-            Just cid -> [(Account addr (Just cid), mRem2)]
-        _ -> [(Account addr Nothing, mRem)]
-
-{-
- make into a string rather than an object
--}
-instance AS.ToJSON Account where
-  toJSON = String . T.pack . show
-
-instance AS.ToJSONKey Account where
-  toJSONKey = ToJSONKeyText f (Enc.text . t)
-    where
-      f = DAK.fromText . T.pack . show
-      t = T.pack . show
-
-instance AS.FromJSON Account where
-  parseJSON (String s) = case readMaybe (T.unpack s) of
-    Nothing -> typeMismatch "Account" (String s)
-    Just a -> pure a
-  parseJSON x = typeMismatch "Account" x
-
-instance FromJSONKey Account where
-  fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
-
-instance Format Account where
-  format = CL.yellow . show
-
-instance ShortDescription Account where
-  shortDescription = CL.yellow . show
-
-fromJSONEither :: AS.FromJSON a => AS.Value -> Either T.Text a
-fromJSONEither v = case AS.fromJSON v of
-  AS.Error s -> Left (T.pack s)
-  AS.Success a -> Right a
-
-derivePersistField "Account"
-
-instance FromHttpApiData Account where
-  parseQueryParam = fromJSONEither . String
-
-instance ToForm Account where
-  toForm account = [("account", toQueryParam account)]
-
-instance FromForm Account where fromForm = parseUnique "account"
-
-instance ToSample Account where
-  toSamples _ = samples [Account 0xdeadbeef Nothing, Account 0x12345678 (Just 0xabcdef)]
-
-instance ToCapture (Capture "account" Account) where
-  toCapture _ = DocCapture "account" "a STRATO account"
-
-instance ToCapture (Capture "contractAccount" Account) where
-  toCapture _ = DocCapture "contractAccount" "a STRATO account"
-
-
-instance ToCapture (Capture "userAccount" Account) where
-  toCapture _ = DocCapture "userAccount" "a STRATO account"
-
-instance ToParamSchema Account where
-  toParamSchema _ =
-    mempty
-      & type_ ?~ SwaggerString
-      & Sw.format ?~ "hex string"
-
-instance ToSchema Account where
-  declareNamedSchema _ =
-    return $
-      NamedSchema
-        (Just "Account")
-        ( mempty
-            & type_ ?~ SwaggerString
-            & example ?~ "account=abcdef:deadbeef"
-            & description ?~ "STRATO Account, 32 byte hex encoded chain ID, followed by a 20 byte hex encoded address"
-        )
-
-instance ToHttpApiData Account where
-  toUrlPiece = T.pack . show
-
-instance NFData Account
-
-instance Arbitrary Account where
-  arbitrary = Account <$> arbitrary <*> arbitrary
 
 data OnNamedChain a = UnspecifiedChain | MainChain | ExplicitChain a
-  deriving (Read, Eq, Ord, Generic, Data, Hashable, Binary)
+  deriving (Read, Generic, Data, Binary)
 
 data NamedAccount = NamedAccount
   { _namedAccountAddress :: Address,
     _namedAccountChainId :: OnNamedChain Word256
   }
-  deriving (Eq, Ord, Generic, Data, Hashable, Binary)
+  deriving (Generic, Data, Binary)
 
 makeLenses ''NamedAccount
 
-namedAccountToAccount :: Maybe Word256 -> NamedAccount -> Account
-namedAccountToAccount cid (NamedAccount a UnspecifiedChain) = Account a cid
-namedAccountToAccount _ (NamedAccount a MainChain) = Account a Nothing
-namedAccountToAccount _ (NamedAccount a (ExplicitChain cid)) = Account a (Just cid)
+instance Eq (OnNamedChain Word256) where
+  MainChain == MainChain = True
+  MainChain == UnspecifiedChain = True
+  UnspecifiedChain == MainChain = True
+  UnspecifiedChain == UnspecifiedChain = True
 
-accountToNamedAccount :: Maybe Word256 -> Account -> NamedAccount
-accountToNamedAccount c (Account a c')
-  | c == c' = NamedAccount a UnspecifiedChain
-  | otherwise = NamedAccount a (maybe MainChain ExplicitChain c')
+  ExplicitChain v1 == ExplicitChain v2 = v1 == v2
+  _ == _ = False
 
-accountToNamedAccount' :: Account -> NamedAccount
-accountToNamedAccount' (Account a Nothing) = NamedAccount a MainChain
-accountToNamedAccount' (Account a (Just cid)) = NamedAccount a (ExplicitChain cid)
+deriving instance Hashable (OnNamedChain Word256)
+deriving instance Ord (OnNamedChain Word256)
 
-accountOnUnspecifiedChain :: Account -> NamedAccount
-accountOnUnspecifiedChain (Account a _) = NamedAccount a UnspecifiedChain
+deriving instance Eq NamedAccount
+deriving instance Ord NamedAccount
+deriving instance Hashable NamedAccount
 
 unspecifiedChain :: Address -> NamedAccount
 unspecifiedChain = flip NamedAccount UnspecifiedChain

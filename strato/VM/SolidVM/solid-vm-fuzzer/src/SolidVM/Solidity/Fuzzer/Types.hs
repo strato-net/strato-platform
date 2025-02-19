@@ -5,7 +5,7 @@
 module SolidVM.Solidity.Fuzzer.Types where
 
 import Blockchain.MemVMContext
-import Blockchain.SolidVM.Simple
+import Blockchain.Strato.Model.Address
 import Control.Lens
 import Control.Monad.Trans.Reader
 import Data.Aeson (FromJSON, ToJSON)
@@ -37,7 +37,7 @@ data FuzzerTx = FuzzerTx
 makeLenses ''FuzzerTx
 
 data FuzzerFailureDetails = FuzzerFailureDetails
-  { _failureContractAddress :: Account,
+  { _failureContractAddress :: Address,
     _failureContractName :: SolidString,
     _failureCreateArgs :: Text,
     _failureTxs :: [FuzzerTx]

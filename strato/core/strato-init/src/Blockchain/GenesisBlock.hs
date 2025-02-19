@@ -25,7 +25,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
@@ -48,7 +47,6 @@ import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
-import qualified Blockchain.Strato.Model.Account as Ac
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
@@ -117,7 +115,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Ac.Account `Alters` AddressState) m,
+    (Ad.Address `Alters` AddressState) m,
     HasRedis m
   ) =>
   String ->
@@ -162,8 +160,8 @@ initializeGenesisBlock ::
     HasStorageDB m,
     HasMemStorageDB m,
     MonadLogger m,
-    (Ac.Account `Alters` AddressState) m,
-    Selectable Ac.Account AddressState m
+    (Ad.Address `Alters` AddressState) m,
+    Selectable Ad.Address AddressState m
   ) =>
   String ->
   m ()
@@ -217,7 +215,7 @@ populateStorageDBs ::
     HasCodeDB m,
     HasStateDB m,
     HasHashDB m,
-    Selectable Ac.Account AddressState m
+    Selectable Ad.Address AddressState m
   ) =>
   (Keccak256 -> Maybe (Map Text Text)) ->
   Block ->
@@ -236,7 +234,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
     --since this contract has giant arrays that would choke strato
     --(yes, this temprary feature is hardcoded into the whole platform for one client)
-    let acct = Ac.Account address genesisChainId
+    let acct = address
         fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
         filteredAddressState =
           if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
@@ -250,8 +248,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._blockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock,
               A._blockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock,
               A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
-              A._transactionChainId = genesisChainId,
-              A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId,
+              A._transactionSender = Ad.Address 0,
               A._actionData =
                 OMap.singleton (a,
                   A.ActionData
@@ -287,7 +284,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
         squashMap f = map (uncurry f) . Map.toList
 
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
-    filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
+    filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList $ filteredAddrStates
 
     let statediff ad =
           StateDiff

@@ -31,7 +31,7 @@ module SolidVM.Model.CodeCollection.Contract
   )
 where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Lens
@@ -72,7 +72,7 @@ data ContractF a = Contract
     _modifiers :: Map SolidString (ModifierF a),
     _usings :: Map SolidString [UsingF a],
     _contractType :: ContractType,
-    _importedFrom :: Maybe Account,
+    _importedFrom :: Maybe Address,
     _contractContext :: a
   }
   deriving (Eq, Generic, NFData, Functor, Foldable, Traversable)

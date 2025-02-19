@@ -30,15 +30,13 @@ module Blockchain.Data.AddressStateDB
   )
 where
 
-import Blockchain.Data.ChainInfo (ParentChainIds, isAncestorChainOf)
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
-import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.Change.Alter
 import Control.Monad.IO.Class
@@ -73,16 +71,13 @@ newtype MainChainT m a = MainChainT {runMainChainT :: m a}
 instance MonadTrans MainChainT where
   lift = MainChainT
 
-instance (Account `Alters` AddressState) m => (Account `Alters` AddressState) (MainChainT m) where
+instance (Address `Alters` AddressState) m => (Address `Alters` AddressState) (MainChainT m) where
   lookup p = lift . lookup p
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance Selectable Account AddressState m => Selectable Account AddressState (MainChainT m) where
+instance Selectable Address AddressState m => Selectable Address AddressState (MainChainT m) where
   select p = lift . select p
-
-instance Monad m => Selectable Word256 ParentChainIds (MainChainT m) where
-  select _ _ = pure Nothing
 
 instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where
   {-# INLINE withRunInIO #-}
@@ -148,42 +143,36 @@ instance RLPSerializable AddressState where
     possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
 --}
 resolveCodePtr' ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Account AddressState m
+  ( Selectable Address AddressState m
   ) =>
   Set.Set CodePtr ->
-  Maybe Word256 ->
   CodePtr ->
   m (Maybe CodePtr)
-resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
-  select Proxy acct >>= \case
+resolveCodePtr' visited (CodeAtAccount address name) = do
+  select Proxy address >>= \case
     Nothing -> pure Nothing
     Just AddressState {..} -> do
-      let codeAccountChainId = (acct ^. accountChainId)
-      isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
-      if isAccessibleChain && (Set.notMember addressStateCodeHash visited)
+      if Set.notMember addressStateCodeHash visited
         then
-          resolveCodePtr' (Set.insert addressStateCodeHash visited) codeAccountChainId addressStateCodeHash >>= \case
+          resolveCodePtr' (Set.insert addressStateCodeHash visited) addressStateCodeHash >>= \case
             Just e@(ExternallyOwned _) -> pure $ Just e
             Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
             _ -> pure Nothing
         else pure Nothing
-resolveCodePtr' _ cid cp = resolveCodePtr cid cp
+resolveCodePtr' _ cp = resolveCodePtr cp
 
 resolveCodePtr ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Account AddressState m
+  ( Selectable Address AddressState m
   ) =>
-  Maybe Word256 ->
   CodePtr ->
   m (Maybe CodePtr)
-resolveCodePtr chainId coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty chainId coa
+resolveCodePtr coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty coa
 -- for solidVM/EVM code
-resolveCodePtr _ cp = pure $ Just cp
+resolveCodePtr cp = pure $ Just cp
 
-unsafeResolveCodePtr :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtr (CodeAtAccount acct name) =
-  select Proxy acct >>= \case
+unsafeResolveCodePtr :: Selectable Address AddressState m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtr (CodeAtAccount address name) =
+  select Proxy address >>= \case
     Nothing -> pure Nothing
     Just AddressState {..} ->
       unsafeResolveCodePtr addressStateCodeHash >>= \case
@@ -192,40 +181,24 @@ unsafeResolveCodePtr (CodeAtAccount acct name) =
         _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
 
-resolveCodePtrParent ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Account AddressState m
-  ) =>
-  Maybe Word256 ->
-  CodePtr ->
-  m (Maybe CodePtr)
-resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
-  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
-  if isAccessibleChain
-    then unsafeResolveCodePtrParent cp
-    else pure Nothing
-resolveCodePtrParent _ cp = unsafeResolveCodePtrParent cp
-
-unsafeResolveCodePtrParent :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtrParent (CodeAtAccount acct _) =
-  select Proxy acct >>= \case
+resolveCodePtrParent :: Selectable Address AddressState m => CodePtr -> m (Maybe CodePtr)
+resolveCodePtrParent (CodeAtAccount address _) =
+  select Proxy address >>= \case
     Nothing -> pure Nothing
     Just AddressState {..} ->
-      unsafeResolveCodePtrParent addressStateCodeHash >>= \case
+      resolveCodePtrParent addressStateCodeHash >>= \case
         Just e@(ExternallyOwned _) -> pure $ Just e
         Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
         _ -> pure Nothing
-unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
+resolveCodePtrParent codePtr = pure $ Just codePtr
 
 codePtrToSHA ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Account AddressState m
+  ( Selectable Address AddressState m
   ) =>
-  Maybe Word256 ->
   CodePtr ->
   m (Maybe Keccak256)
-codePtrToSHA chainId =
-  resolveCodePtr chainId >=> \case
+codePtrToSHA =
+  resolveCodePtr >=> \case
     Just (ExternallyOwned hsh) -> pure $ Just hsh
     Just (SolidVMCode _ hsh) -> pure $ Just hsh
     _ -> pure Nothing -- CodeAtAccount cannot happen here
@@ -236,38 +209,30 @@ resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
 codePtrToCodeKind ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Account AddressState m
+  ( Selectable Address AddressState m
   ) =>
-  Maybe Word256 ->
   CodePtr ->
   m CodeKind
-codePtrToCodeKind chainId =
-  resolveCodePtr chainId >=> \case
+codePtrToCodeKind =
+  resolveCodePtr >=> \case
     Just (SolidVMCode _ _) -> pure SolidVM
     _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
 
-unsafeCodePtrToCodeKind :: Selectable Account AddressState m => CodePtr -> m CodeKind
+unsafeCodePtrToCodeKind :: Selectable Address AddressState m => CodePtr -> m CodeKind
 unsafeCodePtrToCodeKind =
   unsafeResolveCodePtr >=> \case
     Just (SolidVMCode _ _) -> pure SolidVM
     _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
 
 getAppAccount ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Account AddressState m
+  ( Selectable Address AddressState m
   ) =>
-  Maybe Word256 ->
-  Account ->
-  m (Maybe Account)
-getAppAccount chainId acct = do
-  select Proxy acct >>= \case
+  Address ->
+  m (Maybe Address)
+getAppAccount address = do
+  select Proxy address >>= \case
     Nothing -> pure Nothing
     Just AddressState {..} -> do
-      let codeAccountChainId = (acct ^. accountChainId)
-      isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
-      if isAccessibleChain
-        then case addressStateCodeHash of
-          (CodeAtAccount pAcct _) -> getAppAccount codeAccountChainId pAcct
-          _ -> pure $ Just acct
-        else pure Nothing
+      case addressStateCodeHash of
+        (CodeAtAccount pAcct _) -> getAppAccount pAcct
+        _ -> pure $ Just address

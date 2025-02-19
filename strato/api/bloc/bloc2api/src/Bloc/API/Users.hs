@@ -48,7 +48,6 @@ import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.SolidityValue
 import Blockchain.Data.Json (RawTransaction', UnsignedRawTransaction')
 import Blockchain.Data.TransactionResult
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Gas
@@ -104,7 +103,7 @@ data BlocTransactionData
 
 data UploadContractDetails = UploadContractDetails
   { contractName :: Text,
-    contractAccount :: Maybe Account
+    contractAddress :: Maybe Address
   }
   deriving (Show, Eq, Generic)
 
@@ -112,20 +111,14 @@ instance ToJSON UploadContractDetails where
   toJSON UploadContractDetails {..} =
     object $
       [ "name" .= contractName,
-        "address" .= fmap _accountAddress contractAccount,
-        "chainId" .= fmap _accountChainId contractAccount
+        "address" .= contractAddress
       ]
 
 instance FromJSON UploadContractDetails where
   parseJSON = withObject "UploadContractDetails" $ \obj ->
     UploadContractDetails
       <$> obj .: "name"
-      <*> ( do
-              mAddr <- obj .:? "address"
-              case mAddr of
-                Nothing -> pure Nothing
-                Just addr -> Just . Account addr <$> (obj .:? "chainId")
-          )
+      <*> obj .:? "address"
 
 instance ToSample UploadContractDetails where toSamples _ = noSamples
 
@@ -143,7 +136,7 @@ instance ToSchema UploadContractDetails where
       ex =
         UploadContractDetails
           { contractName = "Example",
-            contractAccount = Just $ Account (Address 0xdeadbeef) Nothing
+            contractAddress = Just $ Address 0xdeadbeef
           }
 
 instance Arbitrary BlocTransactionData where
@@ -197,7 +190,7 @@ instance ToSample BlocTransactionData where
         Upload
           UploadContractDetails
             { contractName = "Example",
-              contractAccount = Just $ Account (Address 0xdeadbeef) Nothing
+              contractAddress = Just $ Address 0xdeadbeef
             },
         Call [] -- probably make a better Call sample
       ]

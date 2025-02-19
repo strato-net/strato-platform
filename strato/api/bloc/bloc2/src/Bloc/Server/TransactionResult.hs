@@ -46,7 +46,7 @@ import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
@@ -83,7 +83,6 @@ import SolidVM.Solidity.Parse.ParserTypes (initialParserState)
 import SolidVM.Solidity.Parse.Statement
 import Text.Format
 import Text.Parsec (runParser)
-import Text.Read (readMaybe)
 import UnliftIO
 
 --import           Debug.Trace
@@ -96,7 +95,7 @@ data TRD = TRD -- transaction resolution data
   }
 
 data BatchState = BatchState
-  { _functionXabiMap :: Map.Map (Account, Text) Contract
+  { _functionXabiMap :: Map.Map (Address, Text) Contract
   }
 
 makeLenses ''BatchState
@@ -110,7 +109,7 @@ emptyBatchState = BatchState Map.empty
 getBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -133,7 +132,7 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
 getBlocTransactionResult ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -145,7 +144,7 @@ getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults
 getBatchBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -160,7 +159,7 @@ getBatchBlocTransactionResult' hashes resolve =
 postBlocTransactionResults ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -238,7 +237,7 @@ rawTx2PostTx RawTransaction {..} =
 evalAndReturn ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -253,7 +252,7 @@ evalAndReturn list = forStateT emptyBatchState list $
       Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
         (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
         (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
-        (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
+        (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) addr
 
 nth :: Integer -> Text
 nth n
@@ -275,46 +274,40 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
     Just md -> case Map.lookup "name" md of
       Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
       Just n -> pure n
-  let accountMaybe = do
-        str <-
-          listToMaybe $
-            Text.splitOn "," (Text.pack $ transactionResultContractsCreated)
-        readMaybe (Text.unpack str)
+  let accountMaybe = listToMaybe transactionResultContractsCreated
   case accountMaybe of
     Nothing -> case transactionResultMessage of
       "Success!" -> do
-        let mDelAddr =
-              readMaybe @Account . Text.unpack
-                =<< (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
+        let mDelAddr = listToMaybe transactionResultContractsDeleted
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
-          Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+          Nothing -> lift . throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, transactionResultContractsDeleted=" ++ show transactionResultContractsDeleted ++ ", transactionResultContractsCreated=" ++ show transactionResultContractsCreated
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
       -- Checks if account exists in the address state ref table before returning results
       details <- lift $ go acct name 0
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
   where
-    go :: HasSQL m => Account -> Text -> Integer -> m UploadContractDetails
-    go acct name num = do
+    go :: HasSQL m => Address -> Text -> Integer -> m UploadContractDetails
+    go address name num = do
       if num >= 100 
-        then throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+        then throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, num=" ++ show num
         else do
           void . liftIO $ threadDelay 100000
           addressRefs <- 
             getAccount' 
               accountsFilterParams
-                { _qaAddress = Just $ _accountAddress acct,
+                { _qaAddress = Just address,
                   _qaContractName = Just name,
                   _qaIgnoreChain = Just True
                 }
           case addressRefs of
-            [] -> go acct name (num + 1)
-            _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+            [] -> go address name (num + 1)
+            _ -> return $ UploadContractDetails {contractName = name, contractAddress = Just address}
 
 
 functionResult ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
@@ -324,9 +317,9 @@ functionResult ::
   Keccak256 ->
   TransactionResult ->
   Maybe (Map Text Text) ->
-  Account ->
+  Address ->
   StateT BatchState m BlocTransactionResult
-functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
+functionResult i txHash txResult@TransactionResult {..} mmd toAddress = do
   case transactionResultKind of
     -- Check if it is a solidVm first
     -- If it is, we can reduce calls to get Contract
@@ -345,19 +338,19 @@ functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
         Just md -> case Map.lookup "funcName" md of
           Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
           Just funcName -> pure funcName
-      mxabi <- use $ functionXabiMap . at (toAccount, funcName)
+      mxabi <- use $ functionXabiMap . at (toAddress, funcName)
       contract <- case mxabi of
         Just contract' -> return contract'
         Nothing -> do
-          mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
+          mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAddress
           contract' <- case mch of
-            Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
+            Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAddress)
             Just ch ->
               lift $
                 getContractDetailsByCodeHash ch >>= \case
                   Left e -> throwIO $ UserError e
                   Right d -> pure $ snd d
-          functionXabiMap . at (toAccount, funcName) <?= contract'
+          functionXabiMap . at (toAddress, funcName) <?= contract'
       let resultXabiTypes = maybe [] (map (indexedTypeToEvmIndexedType . snd) . _funcVals) . Map.lookup (Text.unpack funcName) $ _functions contract
           orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex $ catMaybes resultXabiTypes
       orderedResultTypes <- lift $

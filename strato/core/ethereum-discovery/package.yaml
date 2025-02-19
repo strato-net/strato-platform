@@ -15,6 +15,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.Strato.Discovery.Data.MemPeerDB
+    - Blockchain.Strato.Discovery.Data.Host
     - Blockchain.Strato.Discovery.Data.Peer
     - Blockchain.Strato.Discovery.Data.PeerIOWiring
     - Blockchain.Strato.Discovery.ContextLite
@@ -48,6 +49,7 @@ library:
     - hedis
     - hflags
     - http-client
+    - iproute
     - labeled-error
     - lens
     - monad-alter

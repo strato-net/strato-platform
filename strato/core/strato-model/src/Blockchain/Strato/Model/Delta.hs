@@ -21,7 +21,6 @@ module Blockchain.Strato.Model.Delta
 where
 
 import BlockApps.X509.Certificate
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (DummyCertRevocation (..))
 import Blockchain.Strato.Model.CodePtr ()
@@ -66,12 +65,12 @@ type CertDelta = Delta X509Certificate DummyCertRevocation
 
 getDeltasFromEvents :: [Event] -> (ValidatorDelta, CertDelta)
 getDeltasFromEvents = foldr go (mempty, mempty)
-  where go e ds@(vd@(Delta va vr), cd@(Delta ca cr)) = case evContractAccount e of
-          Account 0x100 Nothing -> case evName e of -- MercataGovernance
+  where go e ds@(vd@(Delta va vr), cd@(Delta ca cr)) = case evContractAddress e of
+          0x100 -> case evName e of -- MercataGovernance
             "ValidatorAdded" -> maybe ds (\v -> (Delta ((v:) . va) vr, cd)) $ extractCommonName e
             "ValidatorRemoved" -> maybe ds (\v -> (Delta va ((v:) . vr), cd)) $ extractCommonName e
             _ -> ds
-          Account 0x509 Nothing -> case evName e of -- CertificateRegistry
+          0x509 -> case evName e of -- CertificateRegistry
             "CertificateRegistered" -> maybe ds (\c -> (vd, Delta ((c:) . ca) cr)) $ registration e
             "CertificateRevoked" -> maybe ds (\c -> (vd, Delta ca ((c:) . cr))) $ revocation e
             _ -> ds

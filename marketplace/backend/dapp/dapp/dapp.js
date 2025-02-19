@@ -2103,17 +2103,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.repay = async function (args, options = defaultOptions) {
-    const { escrow, reserve } = args;
+    const { escrow, reserve, value } = args;
 
     // Fetch user's USDST asset origin address
     const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
 
     // Retrieve escrow data associated with the escrow address
     const escrowData = await escrowJs.get(rawAdmin, escrow, options);
-    const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
-    if (orderTotal === 0) {
+    const totalLoan = escrowData ? escrowData.borrowedAmount : 0;
+    if (totalLoan === 0) {
       return;
     }
+
+    // Convert totalLoan and the desired repayment value into BigNumber instances.
+    const bnTotalLoan = new BigNumber(totalLoan);
+    const bnValue = new BigNumber(value);
+
+    // Compute the actual repayment amount as the minimum of bnValue and bnOrderTotal.
+    const actualRepayment = bnValue.isGreaterThan(bnTotalLoan) ? bnTotalLoan : bnValue;
 
     // Get user's active USDST assets with non-zero quantities
     const userUSDSTAssets = await inventoryJs.getAll(
@@ -2133,11 +2140,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // Accumulate USDST asset addresses to cover the order total
     const { addressesToUse } = userUSDSTAssets.reduce(
       (acc, asset) => {
-        if (
-          acc.accumulatedTotal.isGreaterThanOrEqualTo(
-            new BigNumber(orderTotal).multipliedBy(new BigNumber(10).pow(18))
-          )
-        ) {
+        if (acc.accumulatedTotal.isGreaterThanOrEqualTo(actualRepayment)) {
           return acc;
         }
 
@@ -2149,12 +2152,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return acc;
       },
       { addressesToUse: [], accumulatedTotal: new BigNumber(0) }
-    ) //.addressesToUse; //Remove this...
+    )
 
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(
       rawAdmin,
-      { USDSTAssetAddresses: addressesToUse, escrowAddress: escrow, reserve },
+      {
+        USDSTAssetAddresses: addressesToUse,
+        escrowAddress: escrow,
+        amountToRepay: value,
+        reserve,
+      },
       options
     );
   };

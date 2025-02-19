@@ -1,6 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
 import Blockchain.Strato.Model.Address

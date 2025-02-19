@@ -53,7 +53,7 @@ where
 import BlockApps.X509.Keys
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember hiding (commonName, orgName, orgUnit)
+import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Control.DeepSeq
@@ -96,6 +96,7 @@ import Servant.Docs
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
+import Text.Tools
 import Time.System
 
 -- import           Blockchain.Data.PubKey
@@ -146,6 +147,10 @@ data X509CertInfoState = X509CertInfoState
   }
   deriving (Show, Eq, Generic)
 
+instance RLPSerializable X509CertInfoState where
+  rlpEncode = rlpEncode . C8.toStrict . Data.Binary.encode
+  rlpDecode = Data.Binary.decode . C8.fromStrict . rlpDecode
+
 instance Ord X509CertInfoState where
     compare a b = compare (certificate a) (certificate b)
 
@@ -154,7 +159,16 @@ instance Binary X509CertInfoState where
     get = x509CertToCertInfoState <$> (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 instance Format X509CertInfoState where
-  format = show
+  format X509CertInfoState{..} =
+    "X509CertInfoState\n" ++ tab (
+    "userAddress: " ++ format userAddress ++ "\n"
+    ++ "certificate: " ++ show certificate ++ "\n"
+    ++ "isValid: " ++ show isValid ++ "\n"
+    ++ "children: " ++ format children ++ "\n"
+    ++ "orgName: " ++ orgName ++ "\n"
+    ++ "orgUnit: " ++ show orgUnit ++ "\n"
+    ++ "commonName: " ++ commonName
+    )
 
 instance Arbitrary X509Certificate where
   arbitrary = pure . X509Certificate $ CertificateChain []

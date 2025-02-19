@@ -22,7 +22,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Control.Monad.Change.Alter (Alters)
 import Data.Bifunctor (second)
@@ -39,10 +39,10 @@ type FullStorage m =
     HasMemStorageDB m,
     HasStateDB m,
     HasHashDB m,
-    (Account `Alters` AddressState) m
+    (Address `Alters` AddressState) m
   )
 
-toKey :: Account -> Word256 -> RawStorageKey
+toKey :: Address -> Word256 -> RawStorageKey
 toKey = curry $ fmap word256ToBytes
 
 toVal :: Word256 -> RawStorageValue
@@ -51,13 +51,13 @@ toVal = rlpSerialize . rlpEncode
 fromVal :: RawStorageValue -> Word256
 fromVal = rlpDecode . rlpDeserialize
 
-putStorageKeyVal' :: HasStorageDB m => Account -> Word256 -> Word256 -> m ()
+putStorageKeyVal' :: HasStorageDB m => Address -> Word256 -> Word256 -> m ()
 putStorageKeyVal' acct key val = putRawStorageKeyVal' (toKey acct key) (toVal val)
 
-getStorageKeyVal' :: HasStorageDB m => Account -> Word256 -> m Word256
+getStorageKeyVal' :: HasStorageDB m => Address -> Word256 -> m Word256
 getStorageKeyVal' acct key = fromVal <$> getRawStorageKeyVal' (toKey acct key)
 
-getAllStorageKeyVals' :: FullStorage m => Account -> m [(MP.Key, Word256)]
+getAllStorageKeyVals' :: FullStorage m => Address -> m [(MP.Key, Word256)]
 getAllStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
 
 flushMemStorageTxDBToBlockDB :: FullStorage m => m ()

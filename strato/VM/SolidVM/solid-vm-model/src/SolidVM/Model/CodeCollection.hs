@@ -74,7 +74,7 @@ import SolidVM.Model.CodeCollection.VariableDecl
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
-import qualified Text.Colors as CL
+--import qualified Text.Colors as CL
 
 data CodeCollectionF a = CodeCollection
   { _contracts :: Map SolidString (ContractF a),
@@ -86,8 +86,8 @@ data CodeCollectionF a = CodeCollection
     _pragmas :: [(String, String)],
     _imports :: [FileImportF a]
   }
-  deriving (Eq, Generic, NFData, Functor)
-
+  deriving (Show, Eq, Generic, NFData, Functor)
+{-
 instance (Show a) => Show (CodeCollectionF a) where
   show (CodeCollection {..}) = 
     (CL.underline "\nCodeCollectionF") 
@@ -99,7 +99,7 @@ instance (Show a) => Show (CodeCollectionF a) where
     ++ CL.yellow "\nCodeCollection._flErrors\t" ++ show _flErrors 
     ++ CL.yellow "\nCodeCollection._pragmas\t" ++ show _pragmas
     ++ CL.yellow "\nCodeCollection._imports\t" ++ show _imports
-
+-}
 instance Binary a => Binary (CodeCollectionF a)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)

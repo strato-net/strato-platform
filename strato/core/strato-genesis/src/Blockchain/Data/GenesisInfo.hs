@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -11,11 +12,14 @@ module Blockchain.Data.GenesisInfo
     defaultGenesisInfo,
     genesisParser,
     getGenesisInfoFromFile,
+    module Blockchain.Data.AccountInfo,
+    module Blockchain.Data.CodeInfo
   )
 where
 
 import Blockchain.Data.ArbitraryInstances ()
-import Blockchain.Data.ChainInfo
+import Blockchain.Data.AccountInfo
+import Blockchain.Data.CodeInfo
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
@@ -30,6 +34,8 @@ import Data.Time
 import Data.Word
 import GHC.Generics (Generic)
 import qualified LabeledError
+import Text.Format
+import Text.Tools
 
 data GenesisInfo = GenesisInfo
   { genesisInfoParentHash :: Keccak256,
@@ -52,6 +58,31 @@ data GenesisInfo = GenesisInfo
   deriving (Show, Read, Eq, Generic)
 
 makeLenses ''GenesisInfo
+
+instance Format GenesisInfo where
+  format GenesisInfo{..} =
+    "GenesisInfo\n" ++ tab (
+    "genesisInfoParentHash: " ++ format genesisInfoParentHash ++ "\n"
+    ++ "genesisInfoUnclesHash: " ++ format genesisInfoUnclesHash ++ "\n"
+    ++ "genesisInfoCoinbase: " ++ format genesisInfoCoinbase ++ "\n"
+    ++ "genesisInfoAccountInfo:\n"
+    ++  tab (unlines $ map format genesisInfoAccountInfo) ++ "\n"
+    ++ "genesisInfoCodeInfo:\n"
+    ++  tab (unlines $ map format genesisInfoCodeInfo) ++ "\n"
+    ++ "genesisInfoTransactionRoot: " ++ format genesisInfoTransactionRoot ++ "\n"
+    ++ "genesisInfoReceiptsRoot: " ++ format genesisInfoReceiptsRoot ++ "\n"
+    ++ "genesisInfoLogBloom: " ++ format genesisInfoLogBloom ++ "\n"
+    ++ "genesisInfoDifficulty: " ++ show genesisInfoDifficulty ++ "\n"
+    ++ "genesisInfoNumber: " ++ show genesisInfoNumber ++ "\n"
+    ++ "genesisInfoGasLimit: " ++ show genesisInfoGasLimit ++ "\n"
+    ++ "genesisInfoGasUsed: " ++ show genesisInfoGasUsed ++ "\n"
+    ++ "genesisInfoTimestamp: " ++ show genesisInfoTimestamp ++ "\n"
+    ++ "genesisInfoExtraData: " ++ show genesisInfoExtraData ++ "\n"
+    ++ "genesisInfoMixHash: " ++ format genesisInfoMixHash ++ "\n"
+    ++ "genesisInfoNonce: " ++ show genesisInfoNonce
+    )
+
+
 
 nullStateRoot :: StateRoot
 nullStateRoot =

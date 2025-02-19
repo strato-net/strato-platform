@@ -249,8 +249,10 @@ async function fetchAndSubmitERC20TokenPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap / (metal === "BTC" ? 1e8 : metal === "USDT" ? 1e6 : 1e18),
-      timestamp: currentTimestamp,
+      price: twap / ((metal === "USDT" || metal === "USDC") ? 1e6 : (metal === "BTC" ? 1e8 : 1e18)),
+
+      
+timestamp: currentTimestamp,
     });
 
     console.log(
@@ -299,7 +301,8 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
     }
 
     try {
-      if (oracle.metal === "ETH" || oracle.metal === "BTC" || oracle.metal === "USDT" || oracle.metal === "USDC" || oracle.metal === "PAXG") {
+      if (oracle.metal === "ETH" || oracle.metal === "BTC" || oracle.metal === "USDT" 
+        || oracle.metal === "USDC" || oracle.metal === "PAXG") { //TODO: check this logic
         await fetchAndSubmitERC20TokenPrice(
           oracle.metal,
           process.env.ALCHEMY_API_KEY,

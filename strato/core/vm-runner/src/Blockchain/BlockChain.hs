@@ -62,7 +62,6 @@ import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
 -- import Blockchain.SolidVM.SM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -86,7 +85,6 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
-import Control.Lens.Operators
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -167,7 +165,6 @@ addBlocks unfiltered = do
               ++ (show . number . obBlockData $ firstBlock)
           )
       didReplaceBest <- newIORef False
-      ranPrivateTxs <- newIORef M.empty
       replacedBest <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
       let go block = do
             let !blockNo = number $ obBlockData block
@@ -175,7 +172,7 @@ addBlocks unfiltered = do
             timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
               failures <- lift $ addBlock block
               when (null failures) $ do
-                (didReplaceThisTime, ranPriv, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
+                (didReplaceThisTime, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True
                   writeIORef replacedBest replacedBits
@@ -184,10 +181,6 @@ addBlocks unfiltered = do
                   -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
                   -- the diff between them, which is estimated by the number of transactions.
                   State.put $! Just (stateRoot $ obBlockData block, hsh, num)
-                unless (M.null ranPriv) $
-                  modifyIORef' ranPrivateTxs $
-                    flip M.unionWith ranPriv $
-                      \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
               pure failures
           loop [] = pure []
           loop (b:bs) = go b >>= \case
@@ -199,7 +192,6 @@ addBlocks unfiltered = do
         _ -> do
           $logDebugLS "addBlocks/srLog" srLog
           didReplaceBest' <- readIORef didReplaceBest
-          ranPrivateTxs' <- readIORef ranPrivateTxs
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
@@ -207,7 +199,6 @@ addBlocks unfiltered = do
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
             yield . OutIndexEvent $ NewBestBlock nbb
-          when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
 setParentStateRoot ::
   (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
@@ -415,7 +406,6 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
 
   let isHomestead = blockIsHomestead $ number b
       intrinsicGas' = intrinsicGas isHomestead t
-      tAcct = Account tAddr chainId
       bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
 
   when flags_debug $ do
@@ -427,7 +417,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+  acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
@@ -439,12 +429,12 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
 
-  lift $ incrementNonce tAcct
+  lift $ incrementNonce tAddr
 
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
   $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
-  faucetSuccess <- lift $ addToBalance tAcct txCost
+  faucetSuccess <- lift $ addToBalance tAddr txCost
   unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   when flags_debug $ $logDebugS "addTx" "running code"
@@ -454,7 +444,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
   when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t proposer
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAddr t proposer
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of
@@ -475,11 +465,11 @@ runCodeForTransaction ::
   Bool -> -- add address here
   BlockHeader ->
   Gas ->
-  Account ->
+  Address ->
   OutputTx ->
   Address ->
   ExceptT TransactionFailureCause m ExecResults
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t proposer =
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t proposer =
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
    in if isContractCreationTX ut
         then do
@@ -487,18 +477,17 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
 
           let create =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-                  Just "EVM" -> (\a bro c d e f g _ i j k l m n o p -> EVM.create a bro c d e f g i j k l m n o p)
+                  Just "EVM" -> (\a bro c d e f g _ i j k l m n o -> EVM.create a bro c d e f g i j k l m n o)
                   Just "SolidVM" -> SolidVM.create
-                  Nothing -> (\a bro c d e f g _ i j k l m n o p -> EVM.create a bro c d e f g i j k l m n o p)
+                  Nothing -> (\a bro c d e f g _ i j k l m n o -> EVM.create a bro c d e f g i j k l m n o)
                   Just vmName ->
                     -- Return a dummy VM that just complains that the requested VM doesn't exist
-                    \_ _ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
+                    \_ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->
                       return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-          nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
-          let newAddress = getNewAddress_unsafe (tAcct ^. accountAddress) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
-              newAccount = Account newAddress (txChainId ut)
+          nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
+          let newAddress = getNewAddress_unsafe (tAddr) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
           lift $
             create
@@ -507,24 +496,23 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
               S.empty
               b
               0
-              tAcct
-              tAcct
+              tAddr
+              tAddr
               proposer
               (transactionValue ut)
               (fromInteger $ transactionGasPrice ut)
               availableGas
-              newAccount
+              newAddress
               (transactionInit ut)
               (txHash ut)
-              (txChainId ut)
               (txMetadata ut)
         else do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAcct ++ ", address: " ++ format (transactionTo ut)
+          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
 
-          let owner = Account (transactionTo ut) (txChainId ut)
+          let owner = transactionTo ut
 
           codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
-          resolvedCodeHash <- lift $ resolveCodePtr (owner ^. accountChainId) codeHash
+          resolvedCodeHash <- lift $ resolveCodePtr codeHash
 
           let eCall =
                 case codeHash of
@@ -550,15 +538,14 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
                   0
                   owner
                   owner
-                  tAcct
+                  tAddr
                   proposer
                   (fromInteger $ transactionValue ut)
                   (fromInteger $ transactionGasPrice ut)
                   (transactionData ut)
                   (fromIntegral availableGas)
-                  tAcct
+                  tAddr
                   (txHash ut)
-                  (txChainId ut)
                   (txMetadata ut)
 
 ----------------
@@ -602,7 +589,7 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
   let isMod ASModification {} = True
       isMod ASDeleted = False
 
-      split :: M.Map Account AddressStateModification -> (S.Set Account, S.Set Account)
+      split :: M.Map Address AddressStateModification -> (S.Set Address, S.Set Address)
       split = bimap (S.fromList . M.keys) (S.fromList . M.keys) . M.partition isMod
       (beforeAddresses, beforeDeletes) = split before
       (afterAddresses, afterDeletes) = split after
@@ -612,14 +599,14 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
   case result of
     Left {} -> return trr
     Right erResult -> do
-      unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAccount erResult
+      unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAddress erResult
       return trr {trrNewAddresses = unseen}
 
-mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
-mkLogEntry bHash tHash chainId Log {..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
+mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
-mkEventEntry :: Maybe Word256 -> Event -> EventDB
-mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAccount chainId evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry :: Event -> EventDB
+mkEventEntry Event {..} = EventDB evBlockHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>
@@ -640,7 +627,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
-      chainId = txChainId t
       beforeAddresses = S.fromList [x | (x, ASModification _) <- M.toList beforeMap]
       beforeDeletes = S.fromList [x | (x, ASDeleted) <- M.toList beforeMap]
       afterAddresses = S.fromList [x | (x, ASModification _) <- M.toList afterMap]
@@ -652,8 +638,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           Right r ->
             (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
-  yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
-  yield . OutEvent $ mkEventEntry chainId <$> theEvents
+  yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
+  yield . OutEvent $ mkEventEntry <$> theEvents
   yield . OutTXR $
     TransactionResult
       { transactionResultBlockHash = ranBlockHash,
@@ -663,14 +649,13 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultTrace = theTrace',
         transactionResultGasUsed = gasUsed,
         transactionResultEtherUsed = etherUsed,
-        transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
-        transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
+        transactionResultContractsCreated = newAddresses,
+        transactionResultContractsDeleted = S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
         transactionResultStateDiff = "",
         transactionResultTime = realToFrac deltaT,
         transactionResultNewStorage = "",
         transactionResultDeletedStorage = "",
         transactionResultStatus = Just txrStatus,
-        transactionResultChainId = chainId,
         transactionResultKind = erKind <$> eitherToMaybe result,
         transactionResultCreator = creator,
         transactionResultAppName = appName
@@ -703,7 +688,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
       extra =
         if isMessageTX t
           then ""
-          else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAccount results
+          else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAddress results
 
   multilineLog "printTx/ok" $
     boringBox
@@ -723,9 +708,8 @@ indexMaybe (_ : rest) i = indexMaybe rest (i - 1)
 
 ----------------
 
-replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer))
+replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, (Keccak256, Integer))
 replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs} = do
-  let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
   bbi <- getContextBestBlockInfo
 
   case bbi of
@@ -743,7 +727,6 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
             newNumber == 0
               || (newNumber > oldNumber)
               || ((newNumber == oldNumber) && (newTxCount > oldTxCount))
-          ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txPayloads
 
       $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (number oldBestBlock)
 
@@ -769,7 +752,7 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
           bestSha = if shouldReplace then bH else oldBestSha
           bestNum = if shouldReplace then newNumber else oldNumber
 
-      return (shouldReplace, ranPriv, bbi')
+      return (shouldReplace, bbi')
 
 calculateAndEmitStateDiffs ::
   VMBase m =>
@@ -780,16 +763,6 @@ calculateAndEmitStateDiffs Nothing _ = pure ()
 calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =
   let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
    in completeDiff base next hsh num
-
-calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, Keccak256) -> ConduitT a VmOutEvent m ()
-calculateAndEmitChainDiffs chainMap = do
-  let chainList = M.toList chainMap
-      chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
-  multilineLog "calculateAndEmitChainDiffs" $ "Calculating ChainDiffs for:\n" ++ boringBox chainIds
-  runConduit $
-    yieldMany chainList
-      .| awaitForever (\(cId, (newNumber, newHash)) -> withCurrentBlockHash newHash $ SD.chainDiff (Just cId) newNumber newHash)
-      .| mapM_C (yield . OutStateDiff)
 
 diffMaxCost :: Int
 diffMaxCost = 500
@@ -826,8 +799,8 @@ completeDiff ::
     Mod.Modifiable BestBlockRoot m,
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (Account `A.Alters` AddressState) m,
-    A.Selectable Account AddressState m,
+    (Address `A.Alters` AddressState) m,
+    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m
