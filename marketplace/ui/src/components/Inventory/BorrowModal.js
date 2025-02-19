@@ -232,11 +232,11 @@ const BorrowModal = ({
 
   const marketValueDisplay = (collateralValue / Math.pow(10, 18)).toFixed(2);
   const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
-  const loanableAmountDisplay = ((Math.floor(maxLoanAmount / Math.pow(10, 18)).toFixed(2)) - borrowedAmountDisplay).toFixed(2);
+  const loanableAmountDisplay = (Math.floor(maxLoanAmount / Math.pow(10, 18) - borrowedAmountDisplay)).toFixed(2);
 
   // Desired loan amount in USDST
   const [desiredLoanAmount, setDesiredLoanAmount] = useState(
-    (Math.floor(maxLoanAmount / Math.pow(10, 18)).toFixed(2)) - borrowedAmountDisplay || 0
+    (Math.floor(maxLoanAmount / Math.pow(10, 18) - borrowedAmountDisplay)).toFixed(2) || 0
   );
 
   useEffect(() => {
