@@ -376,7 +376,9 @@ const updateSalePricePeriodically = async () => {
         }
 
         const metalResult = await fetchMetalPrice(
-          asset.name.toLowerCase(),
+          asset.name.toLowerCase().includes("gold")
+            ? "gold"
+            : asset.name.toLowerCase(),
           process.env.METALS_API_KEY
         );
 
