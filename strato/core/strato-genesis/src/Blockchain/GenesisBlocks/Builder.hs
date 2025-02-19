@@ -3,11 +3,9 @@ module Blockchain.GenesisBlocks.Builder where
 
 import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.Generation
-  ( insertCertRegistryContract,
-    insertMercataGovernanceContract,
-    insertUserRegistryContract,
-  )
+import Blockchain.GenesisBlocks.Contracts.CertRegistry
+import Blockchain.GenesisBlocks.Contracts.Governance
+import Blockchain.GenesisBlocks.Contracts.UserRegistry
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 

@@ -6,7 +6,8 @@ module Blockchain.GenesisBlocks.ProductionGenesisBlock (
 
 import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.Generation
+import Blockchain.GenesisBlocks.Contracts.CertRegistry
+import Blockchain.GenesisBlocks.Contracts.Governance
 import Blockchain.Strato.Model.ChainMember
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
