@@ -132,7 +132,7 @@ function computeEscrows(inventory) {
 
 /**
  * Applies 1e18 scaling if the root is in the provided array.
- * This matches the logic done in the StakeModal for 18 decimal places.
+ * This matches the logic done in the StakeModal for decimal places.
  */
 function applyDecimalScaling(
   inventory,
@@ -165,6 +165,8 @@ const BorrowModal = ({
   productDetailPage,
   assetsWithEighteenDecimalPlaces,
 }) => {
+  
+  const decimal = inventory?.decimals
   const { isReservesLoading, reserves, isBorrowing } = useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -229,12 +231,12 @@ const BorrowModal = ({
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
-  const marketValueDisplay = (collateralValue / Math.pow(10,18)).toFixed(2)
-  const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
+  const marketValueDisplay = (collateralValue / Math.pow(10,decimal)).toFixed(2)
+  const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, decimal)).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount / Math.pow(10,decimal)).toFixed(2);
 
   // Desired loan amount in USDST
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState(((loanableAmount/Math.pow(10,18)).toFixed(2) || 0));
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState(((loanableAmount/Math.pow(10,decimal)).toFixed(2) || 0));
 
   useEffect(() => {
     if (
@@ -326,7 +328,7 @@ const BorrowModal = ({
 
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toFixed(0),
+      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(decimal)).toFixed(0),
       reserve: matchedReserve?.address,
     };
 
