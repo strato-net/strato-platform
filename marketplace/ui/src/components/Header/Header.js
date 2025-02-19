@@ -102,8 +102,12 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const USDSTBalance = Object.keys(USDST).length > 0 ? USDST : 0;
-  const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
+  const USDSTBalance = USDST
+    ? new BigNumber(USDST).dividedBy(new BigNumber(10).pow(18))
+    : 0;
+  const cataBalance = cata
+    ? new BigNumber(cata).dividedBy(new BigNumber(10).pow(18))
+    : 0;
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);

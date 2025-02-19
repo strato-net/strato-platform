@@ -119,6 +119,7 @@ const TransactionResponsive = ({
             redemptionService,
             block_timestamp,
             assetOriginAddress,
+            redemption_id
           },
           index
         ) => {
@@ -139,8 +140,8 @@ const TransactionResponsive = ({
               type,
             },
           ];
-          if (assetOriginAddress === stratAddress) {
-            quantity = (quantity / 100).toLocaleString('en-US', {
+          if (redemption_id) {
+            quantity = (quantity).toLocaleString('en-US', {
               maximumFractionDigits: 6,
               minimumFractionDigits: 0,
             });

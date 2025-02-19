@@ -100,11 +100,7 @@ const RepayModal = ({
               )
             );
 
-      // Assume USDST is provided as a token balance (in tokens) and convert it to its smallest unit.
-      const USDSTBalance =
-        Object.keys(USDST).length > 0
-          ? new BigNumber(USDST).multipliedBy(new BigNumber(10).pow(18))
-          : new BigNumber(0);
+      const USDSTBalance = USDST ? new BigNumber(USDST) : new BigNumber(0);
 
       // Set the outstanding loan amount.
       setRepayAmount(borrowedAmount);

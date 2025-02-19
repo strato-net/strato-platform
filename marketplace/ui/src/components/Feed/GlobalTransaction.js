@@ -255,20 +255,27 @@ const GlobalTransaction = ({
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (_, { quantity, assetOriginAddress, decimals }) => {
+      render: (
+        _,
+        { quantity, assetOriginAddress, decimals, redemption_id }
+      ) => {
         let formattedQuantity = '--';
 
-        if (quantity) {
-          const value = assetsWithEighteenDecimalPlaces.includes(
-            assetOriginAddress
-          )
-            ? quantity / Math.pow(10, 18)
-            : quantity / Math.pow(10, decimals || 0);
+        if (redemption_id) {
+          formattedQuantity = quantity;
+        } else {
+          if (quantity) {
+            const value = assetsWithEighteenDecimalPlaces.includes(
+              assetOriginAddress
+            )
+              ? quantity / Math.pow(10, 18)
+              : quantity / Math.pow(10, decimals || 0);
 
-          formattedQuantity = value.toLocaleString('en-US', {
-            maximumFractionDigits: 6,
-            minimumFractionDigits: 0,
-          });
+            formattedQuantity = value.toLocaleString('en-US', {
+              maximumFractionDigits: 6,
+              minimumFractionDigits: 0,
+            });
+          }
         }
 
         return <span>{formattedQuantity}</span>;

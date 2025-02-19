@@ -91,7 +91,7 @@ const TransferModal = ({
       ...prevTransfers,
       {
         id: prevTransfers.length + 1,
-        quantity: remainingQuantity, // TODO: cast to string for testing big numbers to remove trailing zeros
+        quantity: remainingQuantity,
         price: 0.01,
         recipient: undefined,
         openDropdown: false,
