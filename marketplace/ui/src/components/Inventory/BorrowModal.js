@@ -224,19 +224,26 @@ const BorrowModal = ({
       matchedReserve?.name.toLowerCase().includes('ethst') ||
       matchedReserve?.name.toLowerCase().includes('wbtcst')
     ) {
-      return Math.floor(collateralValue ? collateralValue * LTV : 0);
+      return collateralValue ? collateralValue * LTV : 0;
     } else {
       return computeMaxLoanAmount(inventory);
     }
   }, [inventory, collateralValue]);
 
   const marketValueDisplay = (collateralValue / Math.pow(10, 18)).toFixed(2);
-  const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
-  const loanableAmountDisplay = (Math.floor(maxLoanAmount / Math.pow(10, 18) - borrowedAmountDisplay)).toFixed(2);
+  // the extra math on borrowedAmountDisplay and roundedMaxLoanAmount is to round down to 2 decimal places
+  const borrowedAmountDisplay = (
+    Math.floor((borrowedAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
+  const roundedMaxLoanAmount =
+    Math.floor((maxLoanAmount / Math.pow(10, 18)) * 100) / 100;
+  const loanableAmountDisplay = (
+    roundedMaxLoanAmount - borrowedAmountDisplay
+  ).toFixed(2);
 
   // Desired loan amount in USDST
   const [desiredLoanAmount, setDesiredLoanAmount] = useState(
-    (Math.floor(maxLoanAmount / Math.pow(10, 18) - borrowedAmountDisplay)).toFixed(2) || 0
+    loanableAmountDisplay || 0
   );
 
   useEffect(() => {

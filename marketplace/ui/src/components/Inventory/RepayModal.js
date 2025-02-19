@@ -135,7 +135,7 @@ const RepayModal = ({
         <div className="flex -mr-1">
           {logo} &nbsp;
           {Number(repayAmount).toLocaleString('en-US', {
-            maximumFractionDigits: 6,
+            maximumFractionDigits: 2,
             minimumFractionDigits: 2,
           })}
         </div>
@@ -149,7 +149,7 @@ const RepayModal = ({
           <InputNumber
             // Convert BigNumber to a native number for display.
             value={Number(repayValue).toLocaleString('en-US', {
-              maximumFractionDigits: 6,
+              maximumFractionDigits: 2,
               minimumFractionDigits: 2,
             })}
             onChange={(value) => {
