@@ -11,36 +11,41 @@ const config = fsUtil.getYaml(`../config.yaml`);
  * @param {string} message - The error message or context.
  * @param {Error|any} error - The error object or error details.
  */
-function logError(message, error) {
-  let errorDetails;
-  try {
-    // Try to stringify the error object for a more detailed view.
-    errorDetails = JSON.stringify(error, null, 2);
-  } catch (jsonError) {
-    // Fallback in case JSON.stringify fails.
-    errorDetails = error.toString();
-  }
-  const errorLog = `[${new Date().toISOString()}] ${message}: ${errorDetails}\n`;
+function logError(message, details = {}) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    message,
+    ...details,
+  };
+
+  // Convert to string with pretty-printing for readability.
+  const errorLog = JSON.stringify(logEntry, null, 2) + '\n';
   fs.appendFileSync('error.log', errorLog, { flag: 'a' });
 }
-
 /**
- * Sums quantities by owner from a response array.
+ * Sums quantities by owner (and preserves ownerCommonName) from a response array.
  *
- * @param {Array<Object>} responseData - Array of objects with owner and quantity.
- * @returns {Array} - An array of [owner, totalQuantity] pairs.
+ * @param {Array<Object>} responseData - Array of objects with owner, ownerCommonName, and quantity.
+ * @returns {Array} - An array of tuples: [owner, ownerCommonName, totalQuantity].
  */
 function transformResponseToTupleList(responseData) {
-  const ownerQuantities = new Map();
+  const ownerMap = new Map();
   for (const item of responseData) {
     const owner = item.owner;
-    const quantity = Number(item.quantity);
-    ownerQuantities.set(
-      owner,
-      BigInt(ownerQuantities.get(owner) ?? 0) + BigInt(quantity)
-    );
+    const ownerCommonName = item.ownerCommonName;
+    const quantity = BigInt(item.quantity);
+    if (ownerMap.has(owner)) {
+      const record = ownerMap.get(owner);
+      record.quantity += quantity;
+    } else {
+      ownerMap.set(owner, { ownerCommonName, quantity });
+    }
   }
-  return Array.from(ownerQuantities.entries());
+  return Array.from(ownerMap.entries()).map(([owner, data]) => [
+    owner,
+    data.ownerCommonName,
+    data.quantity,
+  ]);
 }
 
 /**
@@ -58,6 +63,12 @@ const batchArray = (arr, batchSize) => {
   return batches;
 };
 
+const TOKEN_LIFE_THRESHOLD_SECONDS = 30;
+let CACHED_DATA = {
+  token: null,
+  tokenExpiresAt: null,
+};
+
 /**
  * Obtains a user token using OAuth resource owner credentials.
  *
@@ -66,12 +77,6 @@ const batchArray = (arr, batchSize) => {
  * @param {Object|null} req - Optional request object.
  * @returns {Promise<string>} - The access token.
  */
-const TOKEN_LIFE_THRESHOLD_SECONDS = 30;
-let CACHED_DATA = {
-  token: null,
-  tokenExpiresAt: null,
-};
-
 const getToken = async (username, password, req = null) => {
   let token = CACHED_DATA.token;
   const expiresAt = CACHED_DATA.tokenExpiresAt;
@@ -87,6 +92,7 @@ const getToken = async (username, password, req = null) => {
   }
   return token;
 };
+
 const getUserToken = async (username, password, req = null) => {
   const oauth = req
     ? req.app.oauth
@@ -101,7 +107,7 @@ const getUserToken = async (username, password, req = null) => {
  * Generates call arguments for the automaticTransfer function.
  *
  * @param {string} address - The new owner address.
- * @param {number} balance - The balance to transfer.
+ * @param {number|string|BigInt} balance - The balance to transfer.
  * @returns {Object} - The call argument object.
  */
 function generateCallArgs(address, balance) {
@@ -149,6 +155,23 @@ const callListAndWait = async (token, callListArgs) => {
   return finalResults;
 };
 
+/**
+ * Writes the CSV file from the balancesMap.
+ *
+ * @param {Map} balancesMap - Map with key as owner and value as an object containing owner, ownerCommonName, stratBalance, usdstBalance.
+ */
+function writeCsvFile(balancesMap) {
+  const header = 'owner,ownerCommonName,stratBalance,usdstBalance\n';
+  const rows = [];
+  for (const [owner, data] of balancesMap) {
+    const strat = data.stratBalance.toString();
+    const usdst = data.usdstBalance;
+    rows.push(`${owner},${data.ownerCommonName},${strat},${usdst}`);
+  }
+  const content = header + rows.join('\n');
+  fs.writeFileSync('balances.csv', content);
+}
+
 async function main() {
   try {
     const { USERNAME, PASSWORD, STRAT_TOKEN, USDST_TOKEN } = process.env;
@@ -166,55 +189,80 @@ async function main() {
     }
     let token = { token: tokenString };
 
-    // 2. Build the query to fetch balances.
+    // 2. Build the query to fetch STRAT token balances.
     const balancesQuery = {
-      select: 'owner,quantity',
+      select: 'owner,ownerCommonName,quantity',
       root: 'eq.' + STRAT_TOKEN,
       ownerCommonName: 'neq.' + USERNAME,
       quantity: 'gt.0',
     };
 
-    // Use rest.search to query the asset balances.
+    // Query the asset balances.
     const balancesResult = await rest.search(
       token,
       { name: 'BlockApps-Mercata-Asset' },
       { config, query: balancesQuery }
     );
-    const balances = transformResponseToTupleList(balancesResult);
+    const stratBalances = transformResponseToTupleList(balancesResult);
 
-    if (balances.length === 0) {
-      console.log('No balances found.');
+    if (stratBalances.length === 0) {
+      console.log('No STRAT balances found.');
       return;
     }
 
-    // 3. Process balances in chunks.
-    const chunkSize = 20;
-    const batches = batchArray(balances, chunkSize);
+    // Create an in-memory map to store CSV row data.
+    const balancesMap = new Map();
+    for (const [owner, ownerCommonName, stratBalance] of stratBalances) {
+      balancesMap.set(owner, {
+        owner,
+        ownerCommonName,
+        stratBalance,
+        usdstBalance: '', // initially empty
+      });
+    }
 
-    for (let i = 0; i < batches.length; i++) {
+    // Write the initial CSV file with the first three columns populated.
+    writeCsvFile(balancesMap);
+
+    // 3. Process STRAT balances in chunks for transfer.
+    const chunkSize = 20;
+    const batches = batchArray(stratBalances, chunkSize);
+
+    for (let i = 0; i < 1; i++) {
       const chunk = batches[i];
-      // Build a list of call arguments for each transfer.
-      const callListArgs = chunk.map(([address, balance]) =>
-        generateCallArgs(address, balance)
+      // Prepare batch info: for each record in the chunk, store owner and computed transferQuantity.
+      const batchInfo = chunk.map(([owner, ownerCommonName, stratBalance]) => {
+        const transferQuantity = (
+          BigInt(stratBalance) * BigInt(10 ** 14)
+        ).toString();
+        return { owner, ownerCommonName, stratBalance, transferQuantity };
+      });
+      // Build call arguments for each transfer.
+      const callListArgs = batchInfo.map((info) =>
+        generateCallArgs(info.owner, info.stratBalance)
       );
 
-      // Execute the batch of calls and wait for confirmation.
+      // Refresh token before each batch.
       token = { token: await getToken(USERNAME, PASSWORD) };
       const finalResults = await callListAndWait(token, callListArgs);
-      const hasErrors = finalResults.some(
-        (result) => result.status !== 'Success'
-      );
 
-      if (hasErrors) {
-        console.error(`Error in chunk ${i + 1}:`, finalResults);
-        const errors = finalResults.filter(
-          (result) => result.status !== 'Success'
-        );
-        logError(`Error in chunk ${i + 1}`, errors);
-      } else {
-        console.log(`Chunk ${i + 1} posted successfully.`);
-        console.log(chunk);
+      // Update the CSV map based on the results for this batch.
+      for (let j = 0; j < batchInfo.length; j++) {
+        const { owner, transferQuantity } = batchInfo[j];
+        if (finalResults[j] && finalResults[j].status === 'Success') {
+          balancesMap.get(owner).usdstBalance = transferQuantity;
+        } else {
+          balancesMap.get(owner).usdstBalance = 'failure';
+          logError(`Error in chunk ${i + 1}`, {
+            txResult: finalResults[j],
+            callArgs: callListArgs[j],
+          });
+        }
       }
+
+      // Update CSV file in real time after processing this batch.
+      writeCsvFile(balancesMap);
+      console.log(`Batch ${i + 1} processed and CSV updated.`);
     }
   } catch (error) {
     console.error('Fatal error:', error);
