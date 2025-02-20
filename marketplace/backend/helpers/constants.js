@@ -38,12 +38,12 @@ export default {
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodUSDSTAddress: '',
-  testnetUSDSTAddress: '2f6c3848a75aa075d054fe84b780cbdebd77ec61',
+  testnetUSDSTAddress: '8c19bb0eb787a9a4acaaf07cde9c96dd4168d148',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: 'fa4e951fdb86f10394a23efc89ddeef83a0b1c17',
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
-  testnetWBTCSTAddress: '65978aada9f5c2a1c462d1458f590bb54f447b7c',
+  testnetWBTCSTAddress: 'ae20770679fe2012ff7a0a3a0b6a939d29c64da7',
   prodWBTCSTAddress: '',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
@@ -78,6 +78,8 @@ export default {
   testTokenServerUrl: 'https://campaigns-test.blockapps.net',
   prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
+
+export const DECIMAL_FACTOR_18 = Math.pow(10, 18);
 
 export const unitOfMeasurement = {};
 unitOfMeasurement[(unitOfMeasurement['LB'] = 1)] = 'LB';

@@ -122,17 +122,17 @@ async function main() {
 
     // 5. Poll until the new contract appears in the database.
     const predicate = (results) =>
-      results.filter((r) => r.status === rest.PENDING).length === 0;
-    const action = async () =>
+      results.filter((r) => r.status === 'Pending').length === 0;
+    const action = async (options) =>
       rest.getBlocResults(
         token,
         responseArray.map((r) => r.hash),
-        { config }
+        options
       );
     const finalResults = await util.until(
       predicate,
       action,
-      { config },
+      { config, isAsync: true },
       3600000
     );
     const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;

@@ -91,6 +91,7 @@ const GlobalTransactionResponsive = ({
                 price,
                 redemptionService,
                 block_timestamp,
+                redemption_id,
               },
               index
             ) => {
@@ -252,7 +253,9 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {(is18DecimalPlaces
+                      {(redemption_id
+                        ? quantity
+                        : is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
                         : quantity / Math.pow(10, decimals || 0)
                       ).toLocaleString('en-US', {

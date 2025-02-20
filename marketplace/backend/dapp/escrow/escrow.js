@@ -1,5 +1,5 @@
 import { util, rest } from '/blockapps-rest-plus';
-import constants from '../../helpers/constants';
+import constants, { DECIMAL_FACTOR_18 } from '../../helpers/constants';
 import { searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'BlockApps-Mercata-Escrow';
@@ -329,7 +329,7 @@ async function userCataRewards(user, userCommonName, options) {
   const totalCurrentColleteralValue = dailyCataRewardResult[0].sum
     ? dailyCataRewardResult[0].sum
     : 0;
-  const dailyCataReward = totalCurrentColleteralValue / Math.pow(10, 18) / 365;
+  const dailyCataReward = totalCurrentColleteralValue / DECIMAL_FACTOR_18 / 365;
 
   return { totalCataReward, dailyCataReward };
 }

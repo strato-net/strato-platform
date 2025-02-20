@@ -37,7 +37,9 @@ import { useInventoryState } from '../../contexts/inventory';
 import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />;
+const USDSTIcon = (
+  <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
+);
 
 const InventoryCard = ({
   inventory,
@@ -204,10 +206,7 @@ const InventoryCard = ({
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    let category = allSubcategories?.find(
-      (c) => c.contract === contractName
-    )?.name;
-    return category;
+    return contractName;
   };
 
   /**
@@ -379,7 +378,7 @@ const InventoryCard = ({
                   inventory.address === inventory.originAddress ||
                   !isActive() ||
                   disableSADDOGS(inventory) ||
-                  decimals === 18
+                  getCategory()?.includes('Tokens')
                 }
               >
                 <SendOutlined /> Redeem
@@ -438,7 +437,7 @@ const InventoryCard = ({
                       inventory.address === inventory.originAddress ||
                       !isActive() ||
                       disableSADDOGS(inventory) ||
-                      decimals === 18
+                      getCategory()?.includes('Tokens')
                     }
                   >
                     <SendOutlined /> Redeem

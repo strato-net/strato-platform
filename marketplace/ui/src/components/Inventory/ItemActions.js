@@ -81,7 +81,7 @@ const ItemActions = ({
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    return allSubcategories?.find((c) => c.contract === contractName)?.name;
+    return contractName;
   };
 
   function isEditSellDisabled() {
@@ -210,6 +210,56 @@ const ItemActions = ({
     setBridgeModalOpen(false);
   };
 
+  // Calculate collateralQuantity
+  const uniqueEscrows = new Set();
+  let collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+
+  if (decimals > 0) {
+    collateralQuantity /= Math.pow(10, decimals);
+  }
+
+  // Calculate borrowedAmount
+  const uniqueBorrowedAddresses = new Set();
+  let borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
+
+  // Calculate maxLoanAmount
+  const uniqueEscrowsThree = new Set();
+  let maxLoanAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const maxLoanValue = item?.escrow?.maxLoanAmount || 0;
+        if (escrowAddress && !uniqueEscrowsThree.has(escrowAddress)) {
+          uniqueEscrowsThree.add(escrowAddress);
+          return sum + maxLoanValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.maxLoanAmount || 0;
+  maxLoanAmount =
+    Math.floor(maxLoanAmount / Math.pow(10, 18)) * Math.pow(10, 18);
+
   return (
     <div className="flex justify-center">
       {(!stakeable || (!inventory?.escrow && stakeable)) && (
@@ -252,7 +302,7 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            decimals === 18
+            getCategory()?.includes('Tokens')
           }
         >
           <SendOutlined /> Redeem
@@ -284,7 +334,7 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
-            disabled={inventory?.escrow?.borrowedAmount > 0}
+            disabled={borrowAmount >= maxLoanAmount || collateralQuantity <= 0}
           >
             <BankOutlined /> Borrow
           </Button>
@@ -316,7 +366,7 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    decimals === 18
+                    getCategory()?.includes('Tokens')
                   }
                 >
                   <SendOutlined /> Redeem

@@ -340,8 +340,8 @@ const StakeModal = ({
         body
       );
       if (isStaked) {
-        await refreshDataAfterAction();
         handleCancel();
+        refreshDataAfterAction();
       }
     }
 
@@ -359,8 +359,8 @@ const StakeModal = ({
         body
       );
       if (isUnstaked) {
-        await refreshDataAfterAction();
         handleCancel();
+        refreshDataAfterAction();
       }
     }
   };

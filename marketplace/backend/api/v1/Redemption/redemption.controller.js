@@ -209,6 +209,7 @@ class RedemptionController {
       assetName: Joi.string().required(),
       status: Joi.number().integer().min(1).max(1).required(),
       quantity: Joi.number().integer().greater(0).required(),
+      decimals: Joi.number().integer().min(0).max(18).required(),
       shippingAddressId: Joi.number().integer().required(),
       ownerCommonName: Joi.string().required(),
       issuerCommonName: Joi.string().required(),

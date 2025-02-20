@@ -57,6 +57,12 @@ describe("Oracle - deactivate contracts", function () {
     }
   })
 
+  it('Deactivate GoldSTOracleService', async () => {
+    if (deployment.contracts.goldstOracle) {
+      await deactivate(token, deployment.contracts.goldstOracle)
+    }
+  })
+
   it('Deactivate USDOracleService', async () => {
     if (deployment.contracts.usdOracle) {
       await deactivate(token, deployment.contracts.usdOracle)
