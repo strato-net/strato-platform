@@ -167,6 +167,7 @@ describe("Payment Server - deploy contracts", function () {
       goldOracle,
       ethOracle,
       btcOracle,
+      goldstOracle,
       usdOracle,
     };
     const deployment = deploy(deployArgs, config);
