@@ -312,6 +312,23 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
           price: 1 / 1e18,
           timestamp: Math.floor(Date.now() / 1000),
         });
+      } else if (oracle.metal === "GOLDST") {
+        const metalResult = await fetchMetalPrice(
+          "gold",
+          process.env.METALS_API_KEY
+        );
+
+        if (metalResult) {
+          await submitPrice(token, oracle, {
+            price: (metalResult.price / 1e18),
+            timestamp: metalResult.timestampInSeconds,
+          });
+          console.log(
+            `[Oracle Update] Price submitted for ${
+              oracle.metal
+            } at ${new Date().toISOString()}`
+          );
+        }
       } else {
         const metalResult = await fetchMetalPrice(
           oracle.metal.toLowerCase(),
