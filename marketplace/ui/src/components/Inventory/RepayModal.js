@@ -135,7 +135,7 @@ const RepayModal = ({
         <div className="flex -mr-1">
           {logo} &nbsp;
           {Number(repayAmount).toLocaleString('en-US', {
-            maximumFractionDigits: 6,
+            maximumFractionDigits: 2,
             minimumFractionDigits: 2,
           })}
         </div>
@@ -145,12 +145,11 @@ const RepayModal = ({
       label: `Loan to pay off in USDST`,
       description: 'The amount of USDST you want to pay toward the loan',
       value: (
-        <div className="flex -mr-1 items-center">
-          {logo} &nbsp;
+        <>
           <InputNumber
             // Convert BigNumber to a native number for display.
             value={Number(repayValue).toLocaleString('en-US', {
-              maximumFractionDigits: 6,
+              maximumFractionDigits: 2,
               minimumFractionDigits: 2,
             })}
             onChange={(value) => {
@@ -159,17 +158,21 @@ const RepayModal = ({
                 return;
               }
               const newValue = new BigNumber(value);
-              // Prevent entering a value greater than the outstanding amount.
-              if (newValue.gt(repayAmount)) {
-                setRepayValue(repayAmount);
-              } else {
-                setRepayValue(newValue);
-              }
+              setRepayValue(newValue);
             }}
+            prefix={logo}
+            className="w-full"
             min={0}
-            max={repayAmount.toNumber()}
+            precision={2}
+            step={1}
+            controls={false}
           />
-        </div>
+          {repayValue > parseFloat(repayAmount.toNumber()) && (
+            <p className="text-xs" style={{ color: '#f56565' }}>
+              *Quantity exceeds available quantity of {(repayAmount.toNumber()).toFixed(2)}
+            </p>
+          )}
+        </>
       ),
     },
   ];
@@ -250,7 +253,7 @@ const RepayModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isRepaying}
-              disabled={disableButton}
+              disabled={disableButton || repayValue > parseFloat(repayAmount.toNumber()) || repayValue.lte(0)}
             >
               Repay
             </Button>

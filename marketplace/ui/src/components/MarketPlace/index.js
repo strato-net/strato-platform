@@ -141,7 +141,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           navigate(url);
           sessionStorage.setItem('scrollPosition', 0);
         }}
-        className="gradient-button border-0  md:h-11 min-h-[44px] border-primary bg-white text-primary hover:text-white"
+        className="gradient-button border-0  md:h-11 min-h-[40px] mt-2 border-primary bg-white text-primary hover:text-white"
       >
         <div className="flex items-center">
           <div className="hidden sm:block font-semibold text-lg banner-btn-text">
