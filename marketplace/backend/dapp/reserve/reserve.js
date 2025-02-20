@@ -255,7 +255,7 @@ async function getAll(user, options) {
       ...options,
       query: {
         creator: CREATOR,
-        reserve: `eq.${reserve.address}`,
+        assetRootAddress: `like.${reserve.assetRootAddress}*`,
         select: 'totalCataReward.sum()',
       },
     };

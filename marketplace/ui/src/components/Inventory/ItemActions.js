@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button, Popover } from 'antd';
 import BigNumber from 'bignumber.js';
 import {
@@ -230,6 +230,20 @@ const ItemActions = ({
     collateralQuantity /= Math.pow(10, decimals);
   }
 
+  // Calculate collateralValue
+  const uniqueEscrowsPrime = new Set();
+  let collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateralValue = item?.escrow?.collateralValue || 0;
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateralValue;
+        }
+        return sum;
+      }, 0)
+    : 0;
+
   // Calculate borrowedAmount
   const uniqueBorrowedAddresses = new Set();
   let borrowAmount = inventory?.inventories
@@ -257,8 +271,31 @@ const ItemActions = ({
         return sum;
       }, 0)
     : inventory?.escrow?.maxLoanAmount || 0;
-  maxLoanAmount =
-    Math.floor(maxLoanAmount / Math.pow(10, 18)) * Math.pow(10, 18);
+
+  const matchedReserve = useMemo(() => {
+    if (reserves?.length && inventory?.root) {
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
+    }
+    return null;
+  }, [reserves, inventory?.root]);
+
+  const LTV =
+    matchedReserve?.name.toLowerCase().includes('ethst') ||
+    matchedReserve?.name.toLowerCase().includes('wbtcst')
+      ? 0.3
+      : 0.5;
+  const finalMaxLoanAmount = useMemo(() => {
+    if (
+      matchedReserve?.name.toLowerCase().includes('ethst') ||
+      matchedReserve?.name.toLowerCase().includes('wbtcst')
+    ) {
+      return collateralValue ? collateralValue * LTV : 0;
+    } else {
+      return maxLoanAmount;
+    }
+  }, [inventory, collateralValue, maxLoanAmount]);
 
   return (
     <div className="flex justify-center">
@@ -334,7 +371,9 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
-            disabled={borrowAmount >= maxLoanAmount || collateralQuantity <= 0}
+            disabled={
+              borrowAmount >= finalMaxLoanAmount || collateralQuantity <= 0
+            }
           >
             <BankOutlined /> Borrow
           </Button>

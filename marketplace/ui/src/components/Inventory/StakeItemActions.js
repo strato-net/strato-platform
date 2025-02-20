@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from 'antd';
 import {
   RiseOutlined,
@@ -61,7 +61,6 @@ const StakeItemActions = ({
     ? inventory?.quantity / 1e18
     : inventory?.quantity / Math.pow(10, inventory?.decimals || 0);
 
-  // stakeQuantity = quantity - collateralQuantity - quantityNotAvailable (will recompute after scaling)
   // Calculate collateralValue
   const uniqueEscrowsPrime = new Set();
   let collateralValue = inventory?.inventories
@@ -103,8 +102,31 @@ const StakeItemActions = ({
         return sum;
       }, 0)
     : inventory?.escrow?.maxLoanAmount || 0;
-  maxLoanAmount =
-    Math.floor(maxLoanAmount / Math.pow(10, 18)) * Math.pow(10, 18);
+
+  const matchedReserve = useMemo(() => {
+    if (reserves?.length && inventory?.root) {
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
+    }
+    return null;
+  }, [reserves, inventory?.root]);
+
+  const LTV =
+    matchedReserve?.name.toLowerCase().includes('ethst') ||
+    matchedReserve?.name.toLowerCase().includes('wbtcst')
+      ? 0.3
+      : 0.5;
+  const finalMaxLoanAmount = useMemo(() => {
+    if (
+      matchedReserve?.name.toLowerCase().includes('ethst') ||
+      matchedReserve?.name.toLowerCase().includes('wbtcst')
+    ) {
+      return collateralValue ? collateralValue * LTV : 0;
+    } else {
+      return maxLoanAmount;
+    }
+  }, [inventory, collateralValue, maxLoanAmount]);
 
   /**
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
@@ -172,7 +194,9 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal()}
-          disabled={borrowAmount >= maxLoanAmount || collateralQuantity <= 0}
+          disabled={
+            borrowAmount >= finalMaxLoanAmount || collateralQuantity <= 0
+          }
         >
           <BankOutlined /> Borrow
         </Button>

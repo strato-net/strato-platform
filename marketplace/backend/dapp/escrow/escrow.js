@@ -266,8 +266,8 @@ async function userCataRewards(user, userCommonName, options) {
   const searchOptions = {
     ...options,
     query: {
-      isActive: 'eq.true',
-      select: `address`,
+      select: `address,isActive`,
+      creator: 'eq.BlockApps',
     },
   };
 
@@ -306,13 +306,16 @@ async function userCataRewards(user, userCommonName, options) {
     ? totalCataRewardResult[0].sum / 10 ** 18
     : 0;
 
+  const activeReserveAddresses = reserves
+    .filter((reserve) => reserve.isActive)
+    .map((reserve) => reserve.address);
   const searchOptionsDailyCataReward = {
     ...options,
     query: {
       borrowerCommonName: `eq.${userCommonName}`,
       isActive: 'eq.true',
       select: `collateralValue.sum()`,
-      reserve: `in.(${reserveAddresses.join(',')})`,
+      reserve: `in.(${activeReserveAddresses.join(',')})`,
     },
   };
 
