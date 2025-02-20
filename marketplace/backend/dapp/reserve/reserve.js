@@ -179,6 +179,32 @@ async function get(user, address, options) {
 }
 
 /**
+ * Retrieve all CATA rewards issued for active and inactive reserves.
+ * @param {*} user - User context for the request.
+ * @param {*} options - Search options including chainId.
+ * @returns {integer} - Total CATA rewards issued.
+ * @throws {Error} - Throws if no reserves are found.
+ */
+async function fetchTotalCataRewards(user, options) {
+  // Fetch escrows for creator BlockApps
+  const totalCataRewardIssued = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      select: 'totalCataReward.sum()',
+    },
+  }
+
+  const allEscrows = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Escrow' },
+    totalCataRewardIssued
+  );
+
+  return allEscrows[0].sum / DECIMAL_FACTOR_18;
+}
+
+/**
  * Retrieve contract states via Cirrus.
  * @param {Object} user - User context for the request.
  * @param {Object} options - Search options including chainId.
@@ -610,6 +636,7 @@ export default {
   contractName,
   get,
   getAll,
+  fetchTotalCataRewards,
   getStakeCreatedEvents,
   getUnstakeEvents,
   marshalIn,

@@ -32,6 +32,18 @@ class ReserveController {
     }
   }
 
+  // Fetch total Cata rewards
+  static async fetchTotalCataRewards(req, res, next) {
+    try {
+      const { dapp } = req;
+      const result = await dapp.fetchTotalCataRewards();
+      rest.response.status200(res, result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
   // Calculate borrow preview
   static async oraclePrice(req, res, next) {
     try {

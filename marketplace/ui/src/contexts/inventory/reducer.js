@@ -258,6 +258,24 @@ const reducer = (state, action) => {
           error: action.error,
           isReservesLoading: false
         };
+
+    case actionDescriptors.fetchTotalCataRewards:
+        return {
+          ...state,
+          isFetchingTotalCataRewards: true
+        };
+    case actionDescriptors.fetchTotalCataRewardsSuccessful:
+        return {
+          ...state,
+          totalCataRewards: action.payload,
+          isFetchingTotalCataRewards: false
+        };
+    case actionDescriptors.fetchTotalCataRewardsFailed:
+        return {
+          ...state,
+          error: action.error,
+          isFetchingTotalCataRewards: false
+        };
     
     case actionDescriptors.getEscrowForAsset:
         return {
