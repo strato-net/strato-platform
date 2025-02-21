@@ -273,8 +273,9 @@ const NewTrendingCard = ({
         </div>
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            topSellingProduct.originAddress === ethstAddress ||
-            topSellingProduct.originAddress === wbtcstAddress
+            (topSellingProduct.originAddress === ethstAddress ||
+            topSellingProduct.originAddress === wbtcstAddress) &&
+            reserve
               ? 'invisible'
               : ''
           }`}
