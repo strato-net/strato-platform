@@ -44,7 +44,7 @@ const NewTrendingCard = ({
     ? 19
     : topSellingProduct.decimals || 0;
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const [quantity, setQuantity] = useState(saleQuantity || 1);
+  const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity : 1);
 
   const ownerSameAsUser = () => {
     if (user?.commonName === topSellingProduct?.ownerCommonName) {
