@@ -192,6 +192,7 @@ const updateOldEscrowBorrowDataBatch = async (
  */
 async function transferCATAToNewReserve(
   token,
+  token2,
   OLD_RESERVE_ADDRESS,
   NEW_RESERVE_ADDRESS
 ) {
@@ -270,7 +271,7 @@ async function transferCATAToNewReserve(
       newCataToken: newTokenAddress,
     }),
   };
-  const updateResult = await callAndWait(token, callListArgs);
+  const updateResult = await callAndWait(token2, callListArgs);
   final = Array.isArray(updateResult) ? updateResult[0] : updateResult;
   if (final.status !== 'Success') {
     throw new Error(
@@ -283,7 +284,7 @@ async function transferCATAToNewReserve(
 async function main() {
   try {
     // Validate required environment variables.
-    const { USERNAME, PASSWORD, OLD_RESERVE_ADDRESS, NEW_RESERVE_ADDRESS } =
+    const { USERNAME, PASSWORD, USERNAME_NEW, PASSWORD_NEW, OLD_RESERVE_ADDRESS, NEW_RESERVE_ADDRESS } =
       process.env;
     if (!USERNAME || !PASSWORD) {
       throw new Error(
@@ -341,6 +342,14 @@ async function main() {
     const batches = batchArray(escrowAddresses, 10);
     console.log(`Partitioned escrows into ${batches.length} batch(es).`);
 
+    // Get second user token
+    const tokenString2 = await getUserToken(USERNAME_NEW, PASSWORD_NEW);
+    if (!tokenString2) {
+      throw new Error('Failed to acquire token.');
+    }
+    console.log('Token acquired:', tokenString2);
+    const token2 = { token: tokenString2 };
+
     // 4. For each batch, perform migration and call the two update functions.
     for (const batch of batches) {
       // Migrate the batch on the old reserve.
@@ -352,15 +361,16 @@ async function main() {
       );
 
       // On the new reserve, update the escrow data.
-      await updateOldEscrowDataBatch(token, NEW_RESERVE_ADDRESS, batch);
+      await updateOldEscrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
 
       // On the new reserve, update the escrow borrow data.
-      await updateOldEscrowBorrowDataBatch(token, NEW_RESERVE_ADDRESS, batch);
+      await updateOldEscrowBorrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
     }
 
     // On the old reserve, transfer CATA back to owner
     await transferCATAToNewReserve(
       token,
+      token2,
       OLD_RESERVE_ADDRESS,
       NEW_RESERVE_ADDRESS
     );
