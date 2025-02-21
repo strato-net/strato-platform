@@ -37,14 +37,14 @@ export default {
   testnetNetworkId: '7596898649924658542',
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
-  prodUSDSTAddress: '',
+  prodUSDSTAddress: '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
   testnetUSDSTAddress: '8c19bb0eb787a9a4acaaf07cde9c96dd4168d148',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: 'fa4e951fdb86f10394a23efc89ddeef83a0b1c17',
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
   testnetWBTCSTAddress: 'ae20770679fe2012ff7a0a3a0b6a939d29c64da7',
-  prodWBTCSTAddress: '',
+  prodWBTCSTAddress: '7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
