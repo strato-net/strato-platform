@@ -89,6 +89,7 @@ const HeaderComponent = ({
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
       marketplaceActions.fetchUSDSTAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
+      marketplaceActions.fetchStratsAddress(marketplaceDispatch);
     }
   }, [user]);
 

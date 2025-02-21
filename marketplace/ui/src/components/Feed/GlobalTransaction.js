@@ -44,6 +44,7 @@ const GlobalTransaction = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
+  stratsAddress,
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -243,11 +244,12 @@ const GlobalTransaction = ({
           formattedQuantity = quantity;
         } else {
           if (quantity) {
-            const value = assetsWithEighteenDecimalPlaces.includes(
-              assetOriginAddress
-            )
-              ? quantity / Math.pow(10, 18)
-              : quantity / Math.pow(10, decimals || 0);
+            const value =
+              assetOriginAddress === stratsAddress
+                ? (quantity / 100).toFixed(2)
+                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                ? quantity / Math.pow(10, 18)
+                : quantity / Math.pow(10, decimals || 0);
 
             formattedQuantity = value.toLocaleString('en-US', {
               maximumFractionDigits: 6,
@@ -270,7 +272,11 @@ const GlobalTransaction = ({
           <p className="text-base flex justify-end items-center">
             {price
               ? formattedNum(
-                  assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                  assetOriginAddress === stratsAddress
+                    ? (price * 100).toFixed(2)
+                    : assetsWithEighteenDecimalPlaces.includes(
+                        assetOriginAddress
+                      )
                     ? (price * Math.pow(10, 18)).toFixed(2)
                     : (price * Math.pow(10, decimals || 0)).toFixed(2)
                 )
@@ -280,7 +286,11 @@ const GlobalTransaction = ({
           <p className="text-xs">
             {price
               ? `$ ${formattedNum(
-                  assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                  assetOriginAddress === stratsAddress
+                    ? (price * 100).toFixed(2)
+                    : assetsWithEighteenDecimalPlaces.includes(
+                        assetOriginAddress
+                      )
                     ? (price * Math.pow(10, 18)).toFixed(2)
                     : (price * Math.pow(10, decimals || 0)).toFixed(2)
                 )}`
@@ -461,6 +471,7 @@ const GlobalTransaction = ({
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
               wbtcstAddress={wbtcstAddress}
+              stratsAddress={stratsAddress}
             />
           </Row>
         </div>
