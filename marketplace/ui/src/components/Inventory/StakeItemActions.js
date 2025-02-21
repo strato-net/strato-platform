@@ -10,7 +10,6 @@ import { ASSET_STATUS } from '../../helpers/constants';
 import StakeModal from './StakeModal';
 import BorrowModal from './BorrowModal';
 import RepayModal from './RepayModal';
-import BigNumber from 'bignumber.js';
 
 const StakeItemActions = ({
   inventory,
@@ -128,9 +127,12 @@ const StakeItemActions = ({
       return maxLoanAmount;
     }
   }, [inventory, collateralValue, maxLoanAmount]);
-  const roundedMaxLoanAmount = new BigNumber(
+  const roundedMaxLoanAmount = (
     Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
-  );
+  ).toFixed(2);
+  const roundedBorrowedAmount = (
+    Math.floor((borrowAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
 
   /**
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
@@ -199,7 +201,8 @@ const StakeItemActions = ({
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal()}
           disabled={
-            roundedMaxLoanAmount.lte(borrowAmount) || collateralQuantity <= 0
+            parseFloat(roundedBorrowedAmount) >=
+              parseFloat(roundedMaxLoanAmount) || collateralQuantity <= 0
           }
         >
           <BankOutlined /> Borrow
