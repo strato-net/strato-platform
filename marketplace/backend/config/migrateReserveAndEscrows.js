@@ -311,7 +311,7 @@ async function main() {
       query: {
         reserve: 'eq.' + OLD_RESERVE_ADDRESS,
         isActive: 'eq.true',
-        creator: 'eq.BlockApps',
+        creator: 'in.(Blockapps,mercata_usdst)',
         select: 'address',
       },
     };

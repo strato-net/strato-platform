@@ -42,7 +42,7 @@ async function main() {
     const reserveQuery = {
       config,
       query: {
-        creator: "eq.BlockApps",
+        creator: "in.(Blockapps,mercata_usdst)",
         stratsToken: "neq.null",
         select: "address,name,assetRootAddress"
       }

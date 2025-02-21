@@ -98,7 +98,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   const reserveSearchOptions = {
     config,
     query: {
-      creator: "eq.BlockApps",
+      creator: "in.(BlockApps,mercata_usdst)",
       isActive: "eq.true",
       oracle: "eq." + oracleContract.address,
     },
@@ -123,7 +123,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     const searchOptions = {
       config,
       query: {
-        creator: "eq.BlockApps",
+        creator: "in.(BlockApps,mercata_usdst)",
         isActive: "eq.true",
         reserve: "eq." + reserveAddress,
       },
