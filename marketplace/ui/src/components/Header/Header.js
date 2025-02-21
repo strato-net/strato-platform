@@ -103,12 +103,14 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const USDSTBalance = USDST
-    ? new BigNumber(USDST).dividedBy(new BigNumber(10).pow(18))
-    : 0;
-  const cataBalance = cata
-    ? new BigNumber(cata).dividedBy(new BigNumber(10).pow(18))
-    : 0;
+  const USDSTBalance =
+    Object.keys(USDST).length !== 0
+      ? new BigNumber(USDST).dividedBy(new BigNumber(10).pow(18))
+      : 0;
+  const cataBalance =
+    Object.keys(cata).length !== 0
+      ? new BigNumber(cata).dividedBy(new BigNumber(10).pow(18))
+      : 0;
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
@@ -562,8 +564,11 @@ const HeaderComponent = ({
                   style={{ backgroundColor: '#13188A' }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
                   count={
-                    parseFloat(cataBalance).toString().includes('.') &&
-                    parseFloat(cataBalance).toString().split('.')[1].length > 4
+                    cataBalance === 0
+                      ? `0.00`
+                      : parseFloat(cataBalance).toString().includes('.') &&
+                        parseFloat(cataBalance).toString().split('.')[1]
+                          .length > 4
                       ? `${parseFloat(cataBalance).toFixed(4)}`
                       : parseFloat(cataBalance)
                           .toFixed(4)
