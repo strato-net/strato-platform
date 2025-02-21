@@ -382,7 +382,8 @@ const TransactionTable = ({
       render: (_, { quantity, assetOriginAddress, decimals, redemption_id }) => (
         <span>
           {quantity
-            ? (redemption_id
+            ? (stratAddress === assetOriginAddress ? (quantity / 100).toFixed(2) :
+              redemption_id
                 ? quantity 
                 : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
