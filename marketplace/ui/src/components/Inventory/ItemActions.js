@@ -296,8 +296,9 @@ const ItemActions = ({
       return maxLoanAmount;
     }
   }, [inventory, collateralValue, maxLoanAmount]);
-  const roundedMaxLoanAmount =
-    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100;
+  const roundedMaxLoanAmount = new BigNumber(
+    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
+  );
 
   return (
     <div className="flex justify-center">
@@ -374,7 +375,7 @@ const ItemActions = ({
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
             disabled={
-              borrowAmount >= roundedMaxLoanAmount || collateralQuantity <= 0
+              roundedMaxLoanAmount.lte(borrowAmount) || collateralQuantity <= 0
             }
           >
             <BankOutlined /> Borrow
