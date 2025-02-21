@@ -41,7 +41,7 @@ const NewTrendingCard = ({
   const decimals = assetsWithEighteenDecimalPlaces.includes(
     topSellingProduct.originAddress
   )
-    ? 19
+    ? 18
     : topSellingProduct.decimals || 0;
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
   const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity : 1);
