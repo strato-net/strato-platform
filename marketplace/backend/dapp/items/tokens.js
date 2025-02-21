@@ -128,7 +128,7 @@ function bindAddress(user, address, options) {
 }
 
 async function addHash(user, args, options) {
-  const CREATOR = 'in.(Blockapps,mercata_usdst)';
+  const CREATOR = 'in.(BlockApps,mercata_usdst)';
   const IS_ACTIVE = 'eq.true';
   const { txHash, userAddress, amount, tokenName } = args;
   const contractName = 'MercataETHBridge';
