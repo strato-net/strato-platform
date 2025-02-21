@@ -286,7 +286,7 @@ const ItemActions = ({
     matchedReserve?.name.toLowerCase().includes('wbtcst')
       ? 0.3
       : 0.5;
-  const finalMaxLoanAmount = useMemo(() => {
+  const newMaxLoanAmount = useMemo(() => {
     if (
       matchedReserve?.name.toLowerCase().includes('ethst') ||
       matchedReserve?.name.toLowerCase().includes('wbtcst')
@@ -296,6 +296,9 @@ const ItemActions = ({
       return maxLoanAmount;
     }
   }, [inventory, collateralValue, maxLoanAmount]);
+  const roundedMaxLoanAmount = new BigNumber(
+    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
+  );
 
   return (
     <div className="flex justify-center">
@@ -372,7 +375,7 @@ const ItemActions = ({
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
             disabled={
-              borrowAmount >= finalMaxLoanAmount || collateralQuantity <= 0
+              roundedMaxLoanAmount.lte(borrowAmount) || collateralQuantity <= 0
             }
           >
             <BankOutlined /> Borrow

@@ -10,6 +10,7 @@ import { ASSET_STATUS } from '../../helpers/constants';
 import StakeModal from './StakeModal';
 import BorrowModal from './BorrowModal';
 import RepayModal from './RepayModal';
+import BigNumber from 'bignumber.js';
 
 const StakeItemActions = ({
   inventory,
@@ -117,7 +118,7 @@ const StakeItemActions = ({
     matchedReserve?.name.toLowerCase().includes('wbtcst')
       ? 0.3
       : 0.5;
-  const finalMaxLoanAmount = useMemo(() => {
+  const newMaxLoanAmount = useMemo(() => {
     if (
       matchedReserve?.name.toLowerCase().includes('ethst') ||
       matchedReserve?.name.toLowerCase().includes('wbtcst')
@@ -127,6 +128,9 @@ const StakeItemActions = ({
       return maxLoanAmount;
     }
   }, [inventory, collateralValue, maxLoanAmount]);
+  const roundedMaxLoanAmount = new BigNumber(
+    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
+  );
 
   /**
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
@@ -195,7 +199,7 @@ const StakeItemActions = ({
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal()}
           disabled={
-            borrowAmount >= finalMaxLoanAmount || collateralQuantity <= 0
+            roundedMaxLoanAmount.lte(borrowAmount) || collateralQuantity <= 0
           }
         >
           <BankOutlined /> Borrow
