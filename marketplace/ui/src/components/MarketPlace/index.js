@@ -47,16 +47,16 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const ethDispatch = useEthDispatch();
   const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
-  const { reserves } = useInventoryState();
+  const { reserves, totalCataRewards } = useInventoryState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
   const [totalTvl, setTotalTvl] = useState(0);
   const [averageApy, setAverageApy] = useState(0);
-  const [totalCataRewards, setTotalCataRewards] = useState(0);
+  const [totalCataReward, setTotalCataReward] = useState(0);
 
   useEffect(() => {
-    if (reserves) {
+    if (reserves && totalCataRewards) {
       const totalTvl = reserves.reduce(
         (sum, reserves) => sum + reserves.tvl,
         0
@@ -65,18 +65,15 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         reserves.reduce((sum, reserves) => sum + reserves.cataAPYRate, 0) /
         reserves.length;
 
-      const totalCataRewards = reserves.reduce(
-        (sum, reserves) => sum + reserves.totalCataRewardIssued,
-        0
-      );
       setAverageApy(Math.floor(averageApy));
       setTotalTvl(Math.floor(totalTvl));
-      setTotalCataRewards(Math.floor(totalCataRewards));
+      setTotalCataReward(Math.floor(totalCataRewards));
     }
-  }, [reserves]);
+  }, [reserves, totalCataRewards]);
 
   useEffect(() => {
     inventoryActions.getAllReserve(inventoryDispatch);
+    inventoryActions.fetchTotalCataRewards(inventoryDispatch);
     ethActions.fetchETHSTAddress(ethDispatch)
     ethActions.fetchWBTCSTAddress(ethDispatch)
   }, []);
@@ -167,7 +164,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         </div>
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            {totalCataRewards}
+            {totalCataReward}
           </div>
           <div className="stake-banner-stats-title text-white">
             Rewards Issued (CATA)
