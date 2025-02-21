@@ -11,17 +11,17 @@ const actionDescriptors = {
   fetchWBTCSTAddressSuccessful: 'fetch_wbtcst_address_successful',
   fetchWBTCSTAddressFailed: 'fetch_wbtcst_address_failed',
 
-  fetchUSDTAddress: 'fetch_usdt_address',
-  fetchUSDTAddressSuccessful: 'fetch_usdt_address_successful',
-  fetchUSDTAddressFailed: 'fetch_usdt_address_failed',
+  fetchUSDTSTAddress: 'fetch_usdtst_address',
+  fetchUSDTSTAddressSuccessful: 'fetch_usdtst_address_successful',
+  fetchUSDTSTAddressFailed: 'fetch_usdtst_address_failed',
 
-  fetchUSDCAddress: 'fetch_usdc_address',
-  fetchUSDCAddressSuccessful: 'fetch_usdc_address_successful',
-  fetchUSDCAddressFailed: 'fetch_usdc_address_failed',
+  fetchUSDCSTAddress: 'fetch_usdcst_address',
+  fetchUSDCSTAddressSuccessful: 'fetch_usdcst_address_successful',
+  fetchUSDCSTAddressFailed: 'fetch_usdcst_address_failed',
 
-  fetchPAXGAddress: 'fetch_paxg_address',
-  fetchPAXGAddressSuccessful: 'fetch_paxg_address_successful',
-  fetchPAXGAddressFailed: 'fetch_paxg_address_failed',
+  fetchPAXGSTAddress: 'fetch_paxgst_address',
+  fetchPAXGSTAddressSuccessful: 'fetch_paxgst_address_successful',
+  fetchPAXGSTAddressFailed: 'fetch_paxgst_address_failed',
 
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
@@ -121,10 +121,10 @@ const actions = {
     }
   },
 
-  fetchUSDTAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchUSDTAddress });
+  fetchUSDTSTAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUSDTSTAddress });
     try {
-      let response = await fetch(`${apiUrl}/tokens/usdtAddress`, {
+      let response = await fetch(`${apiUrl}/tokens/usdtstAddress`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -135,38 +135,38 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchUSDTAddressFailed,
-          payload: 'Error while fetching USDT address',
+          type: actionDescriptors.fetchUSDTSTAddressFailed,
+          payload: 'Error while fetching USDTST address',
         });
         return null;
       }
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchUSDTAddressSuccessful,
+          type: actionDescriptors.fetchUSDTSTAddressSuccessful,
           payload: body?.data,
         });
         return body.data;
       }
 
       dispatch({
-        type: actionDescriptors.fetchUSDTAddressFailed,
-        payload: 'Error while fetching USDT address',
+        type: actionDescriptors.fetchUSDTSTAddressFailed,
+        payload: 'Error while fetching USDTST address',
       });
       return null;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchUSDTAddressFailed,
-        payload: 'Error while fetching USDT address',
+        type: actionDescriptors.fetchUSDTSTAddressFailed,
+        payload: 'Error while fetching USDTST address',
       });
       return null;
     }
   },
 
-  fetchUSDCAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchUSDCAddress });
+  fetchUSDCSTAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUSDCSTAddress });
     try {
-      let response = await fetch(`${apiUrl}/tokens/usdcAddress`, {
+      let response = await fetch(`${apiUrl}/tokens/usdcstAddress`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -177,38 +177,38 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchUSDCAddressFailed,
-          payload: 'Error while fetching USDC address',
+          type: actionDescriptors.fetchUSDCSTAddressFailed,
+          payload: 'Error while fetching USDCST address',
         });
         return null;
       }
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchUSDCAddressSuccessful,
+          type: actionDescriptors.fetchUSDCSTAddressSuccessful,
           payload: body?.data,
         });
         return body.data;
       }
 
       dispatch({
-        type: actionDescriptors.fetchUSDCAddressFailed,
+        type: actionDescriptors.fetchUSDCSTAddressFailed,
         payload: 'Error while fetching USDC address',
       });
       return null;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchUSDCAddressFailed,
+        type: actionDescriptors.fetchUSDCSTAddressFailed,
         payload: 'Error while fetching USDC address',
       });
       return null;
     }
   },
 
-  fetchPAXGAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchPAXGAddress });
+  fetchPAXGSTAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchPAXGSTAddress });
     try {
-      let response = await fetch(`${apiUrl}/tokens/paxgAddress`, {
+      let response = await fetch(`${apiUrl}/tokens/paxgstAddress`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -219,7 +219,7 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchPAXGAddressFailed,
+          type: actionDescriptors.fetchPAXGSTAddressFailed,
           payload: 'Error while fetching PAXG address',
         });
         return null;
@@ -227,20 +227,20 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchPAXGAddressSuccessful,
+          type: actionDescriptors.fetchPAXGSTAddressSuccessful,
           payload: body?.data,
         });
         return body.data;
       }
 
       dispatch({
-        type: actionDescriptors.fetchPAXGAddressFailed,
+        type: actionDescriptors.fetchPAXGSTAddressFailed,
         payload: 'Error while fetching PAXG address',
       });
       return null;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchPAXGAddressFailed,
+        type: actionDescriptors.fetchPAXGSTAddressFailed,
         payload: 'Error while fetching PAXG address',
       });
       return null;

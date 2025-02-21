@@ -31,7 +31,7 @@ const NewTrendingCard = ({
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
-  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -59,9 +59,9 @@ const NewTrendingCard = ({
 
   const isEthst = topSellingProduct.originAddress === ethstAddress;
   const isWbtcst = topSellingProduct.originAddress === wbtcstAddress;
-  const isUsdt = topSellingProduct.originAddress === usdtAddress;  
-  const isUsdc = topSellingProduct.originAddress === usdcAddress;
-  const isPaxg = topSellingProduct.originAddress === paxgAddress;
+  const isUsdtst = topSellingProduct.originAddress === usdtstAddress;  
+  const isUsdcst = topSellingProduct.originAddress === usdcstAddress;
+  const isPaxgst = topSellingProduct.originAddress === paxgstAddress;
 
   const isDisabled =
   !isEthst && !isWbtcst && //TODO: ? add logic for other assets
@@ -177,18 +177,18 @@ const NewTrendingCard = ({
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
-              }else if (isUsdt) {
-                const url = routes.UsdtProductDetail.url;
+              }else if (isUsdtst) {
+                const url = routes.UsdtstProductDetail.url;
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
-              } else if (isUsdc) {
-                const url = routes.UsdcProductDetail.url;
+              } else if (isUsdcst) {
+                const url = routes.UsdcstProductDetail.url;
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
-              } else if (isPaxg) {
-                const url = routes.PaxgProductDetail.url;
+              } else if (isPaxgst) {
+                const url = routes.PaxgstProductDetail.url;
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
@@ -402,18 +402,18 @@ const NewTrendingCard = ({
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
-              }else if (isUsdt) {
-                const url = routes.UsdtProductDetail.url;
+              }else if (isUsdtst) {
+                const url = routes.UsdtstProductDetail.url;
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
-              } else if (isUsdc) {
-                const url = routes.UsdcProductDetail.url;
+              } else if (isUsdcst) {
+                const url = routes.UsdcstProductDetail.url;
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });
-              } else if (isPaxg) {
-                const url = routes.PaxgProductDetail.url;
+              } else if (isPaxgst) {
+                const url = routes.PaxgstProductDetail.url;
                 navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
                   state: { isCalledFromInventory: false },
                 });

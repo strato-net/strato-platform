@@ -15,14 +15,14 @@ goldOracle:
 ethOracle:
   name: <eth_oracle_name_value>
 
-usdtOracle:
-  name: <usdt_oracle_name_value> 
+usdtstOracle:
+  name: <usdtst_oracle_name_value> 
 
-usdcOracle:
-  name: <usdc_oracle_name_value> 
+usdcstOracle:
+  name: <usdcst_oracle_name_value> 
 
-paxgOracle:
-  name: <paxg_oracle_name_value>      
+paxgstOracle:
+  name: <paxgst_oracle_name_value>      
 btcOracle:
   name: <btc_oracle_name_value>
 

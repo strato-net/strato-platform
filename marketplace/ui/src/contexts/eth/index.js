@@ -12,9 +12,9 @@ const EthProvider = ({ children }) => {
     ethstAddress: null,
     isAddingHash: false,
     wbtcstAddress: null,
-    usdtAddress: null,
-    usdcAddress: null,
-    paxgAddress: null,
+    usdtstAddress: null,
+    usdcstAddress: null,
+    paxgstAddress: null,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

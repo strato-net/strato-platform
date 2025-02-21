@@ -39,9 +39,9 @@ const Transaction = ({ user }) => {
         );
       await ethAcions.fetchETHSTAddress(ethDispatch);
       await ethAcions.fetchWBTCSTAddress(ethDispatch);
-      await ethAcions.fetchUSDTAddress(ethDispatch);
-      await ethAcions.fetchUSDCAddress(ethDispatch);
-      await ethAcions.fetchPAXGAddress(ethDispatch);
+      await ethAcions.fetchUSDTSTAddress(ethDispatch);
+      await ethAcions.fetchUSDCSTAddress(ethDispatch);
+      await ethAcions.fetchPAXGSTAddress(ethDispatch);
       setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };

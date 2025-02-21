@@ -24,9 +24,9 @@ import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
 import EthstProductDetails from './components/ETHST/EthstProductDetails';
 import WbtcstProductDetails from './components/ETHST/WbtcstProductDetails';
-import UsdtProductDetails from './components/ETHST/usdtProductDetails';
-import UsdcProductDetails from './components/ETHST/usdcProductDetails';
-import PaxgProductDetails from './components/ETHST/paxgProductDetails';
+import UsdtstProductDetails from './components/ETHST/usdtstProductDetails';
+import UsdcstProductDetails from './components/ETHST/usdcstProductDetails';
+import PaxgstProductDetails from './components/ETHST/paxgstProductDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
@@ -239,7 +239,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
 
       <Route
         exact
-        path={routes.UsdtProductDetail.url}
+        path={routes.UsdtstProductDetail.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -249,7 +249,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <EthProvider>
-                          <UsdtProductDetails user={user} users={users} />
+                          <UsdtstProductDetails user={user} users={users} />
                         </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>
@@ -263,7 +263,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
 
       <Route
         exact
-        path={routes.UsdcProductDetail.url}
+        path={routes.UsdcstProductDetail.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -273,7 +273,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <EthProvider>
-                          <UsdcProductDetails user={user} users={users} />
+                          <UsdcstProductDetails user={user} users={users} />
                         </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>
@@ -287,7 +287,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
 
       <Route
         exact
-        path={routes.PaxgProductDetail.url}
+        path={routes.PaxgstProductDetail.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -297,7 +297,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <EthProvider>
-                          <PaxgProductDetails user={user} users={users} />
+                          <PaxgstProductDetails user={user} users={users} />
                         </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>

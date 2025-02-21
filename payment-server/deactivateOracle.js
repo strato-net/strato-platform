@@ -51,21 +51,21 @@ describe("Oracle - deactivate contracts", function () {
     }
   })
 
-  it('Deactivate USDTOracleService', async () => {
-    if (deployment.contracts.usdtOracle) {
-      await deactivate(token, deployment.contracts.usdtOracle)
+  it('Deactivate USDTSTOracleService', async () => {
+    if (deployment.contracts.usdtstOracle) {
+      await deactivate(token, deployment.contracts.usdtstOracle)
     }
   })  
 
-  it('Deactivate USDCOracleService', async () => {
-    if (deployment.contracts.usdcOracle) {
-      await deactivate(token, deployment.contracts.usdcOracle)
+  it('Deactivate USDCSTOracleService', async () => {
+    if (deployment.contracts.usdcstOracle) {
+      await deactivate(token, deployment.contracts.usdcstOracle)
     }
   })  
 
-  it('Deactivate PAXGOracleService', async () => {
-    if (deployment.contracts.paxgOracle) {
-      await deactivate(token, deployment.contracts.paxgOracle)
+  it('Deactivate PAXGSTOracleService', async () => {
+    if (deployment.contracts.paxgstOracle) {
+      await deactivate(token, deployment.contracts.paxgstOracle)
     }
   })  
   it('Deactivate BTCOracleService', async () => {
@@ -74,21 +74,21 @@ describe("Oracle - deactivate contracts", function () {
     }
   })
 
-  it('Deactivate USDTOracleService', async () => {
-    if (deployment.contracts.usdtOracle) {
-      await deactivate(token, deployment.contracts.usdtOracle)
+  it('Deactivate USDTSTOracleService', async () => {
+    if (deployment.contracts.usdtstOracle) {
+      await deactivate(token, deployment.contracts.usdtstOracle)
     }
   })
 
-  it('Deactivate USDCOracleService', async () => {
-    if (deployment.contracts.usdcOracle) {
-      await deactivate(token, deployment.contracts.usdcOracle)
+  it('Deactivate USDCSTOracleService', async () => {
+    if (deployment.contracts.usdcstOracle) {
+      await deactivate(token, deployment.contracts.usdcstOracle)
     }
   })
 
-  it('Deactivate PAXGOracleService', async () => {
-    if (deployment.contracts.paxgOracle) {
-      await deactivate(token, deployment.contracts.paxgOracle)
+  it('Deactivate PAXGSTOracleService', async () => {
+    if (deployment.contracts.paxgstOracle) {
+      await deactivate(token, deployment.contracts.paxgstOracle)
     }
   })
 

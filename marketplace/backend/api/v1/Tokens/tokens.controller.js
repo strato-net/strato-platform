@@ -40,9 +40,9 @@ class TokensController {
     }
   }
 
-  static async getUSDTAddress(_, res, next) {
+  static async getUSDTSTAddress(_, res, next) {
     try {
-      const address = await tokensJs.getUSDTAddress();
+      const address = await tokensJs.getUSDTSTAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {
@@ -50,9 +50,9 @@ class TokensController {
     }
   }
 
-  static async getUSDCAddress(_, res, next) {
+  static async getUSDCSTAddress(_, res, next) {
     try {
-      const address = await tokensJs.getUSDCAddress();
+      const address = await tokensJs.getUSDCSTAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {
@@ -60,9 +60,9 @@ class TokensController {
     }
   }
 
-  static async getPAXGAddress(_, res, next) {
+  static async getPAXGSTAddress(_, res, next) {
     try {
-      const address = await tokensJs.getPAXGAddress();
+      const address = await tokensJs.getPAXGSTAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {

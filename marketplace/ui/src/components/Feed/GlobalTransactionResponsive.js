@@ -19,9 +19,9 @@ const GlobalTransactionResponsive = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
-  usdtAddress,
-  usdcAddress,
-  paxgAddress
+  usdtstAddress,
+  usdcstAddress,
+  paxgstAddress
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -147,9 +147,9 @@ const GlobalTransactionResponsive = ({
               const handleAssetRedirection = () => {
                 const isEthst = assetOriginAddress === ethstAddress;
                 const isWbtcst = assetOriginAddress === wbtcstAddress;
-                const isUsdt = assetOriginAddress === usdtAddress;
-                const isUsdc = assetOriginAddress === usdcAddress;
-                const isPaxg = assetOriginAddress === paxgAddress;
+                const isUsdtst = assetOriginAddress === usdtstAddress;
+                const isUsdcst = assetOriginAddress === usdcstAddress;
+                const isPaxgst = assetOriginAddress === paxgstAddress;
                 if (isEthst) {
                   const url = routes.EthstProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress)}`, {
@@ -160,18 +160,18 @@ const GlobalTransactionResponsive = ({
                   navigate(`${url.replace(':address', assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });
-                }else if (isUsdt) {
-                  const url = routes.UsdtProductDetail.url;
+                }else if (isUsdtst) {
+                  const url = routes.UsdtstProductDetail.url;
                   navigate(`${url.replace(':address', data.assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });
-                } else if (isUsdc) {
-                  const url = routes.UsdcProductDetail.url;
+                } else if (isUsdcst) {
+                  const url = routes.UsdcstProductDetail.url;
                   navigate(`${url.replace(':address', data.assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });
-                } else if (isPaxg) {
-                  const url = routes.PaxgProductDetail.url;
+                } else if (isPaxgst) {
+                  const url = routes.PaxgstProductDetail.url;
                   navigate(`${url.replace(':address', data.assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });

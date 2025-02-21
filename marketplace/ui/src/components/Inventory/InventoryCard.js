@@ -68,7 +68,7 @@ const InventoryCard = ({
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [popoverVisible, setPopoverVisible] = useState({});
-  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -106,9 +106,9 @@ const InventoryCard = ({
     reserves.some((reserve) => inventory.root === reserve.assetRootAddress);
 
   const isWbtcst = inventory.originAddress === wbtcstAddress;
-  const isUsdt = inventory.originAddress === usdtAddress;
-  const isUsdc = inventory.originAddress === usdcAddress;
-  const isPaxg = inventory.originAddress === paxgAddress;
+  const isUsdtst = inventory.originAddress === usdtstAddress;
+  const isUsdcst = inventory.originAddress === usdcstAddress;
+  const isPaxgst = inventory.originAddress === paxgstAddress;
 
   const handleCancel = () => {
     setOpen(false);
@@ -197,18 +197,18 @@ const InventoryCard = ({
       navigate(`${url.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
-    }else if (isUsdt) {
-      const url = routes.UsdtProductDetail.url;
+    }else if (isUsdtst) {
+      const url = routes.UsdtstProductDetail.url;
       navigate(`${url.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (isUsdc) {
-      const url = routes.UsdcProductDetail.url;
+    } else if (isUsdcst) {
+      const url = routes.UsdcstProductDetail.url;
       navigate(`${url.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (isPaxg) {
-      const url = routes.PaxgProductDetail.url;
+    } else if (isPaxgst) {
+      const url = routes.PaxgstProductDetail.url;
       navigate(`${url.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });

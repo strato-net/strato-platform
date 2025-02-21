@@ -46,12 +46,12 @@ export default {
   testnetWBTCSTAddress: 'ae20770679fe2012ff7a0a3a0b6a939d29c64da7',
   prodWBTCSTAddress: '',
 // TODO: add these address
-  testnetUSDTAddress: '8c6715611dc8c72de354c13016318bf1009eea48',
-  prodUSDTAddress: '',
-  testnetUSDCAddress: '',
-  prodUSDCAddress: '',
-  testnetPAXGAddress: '',
-  prodPAXGAddress: '',
+  testnetUSDTSTAddress: '8c6715611dc8c72de354c13016318bf1009eea48',
+  prodUSDTSTAddress: '',
+  testnetUSDCSTAddress: '',
+  prodUSDCSTAddress: '',
+  testnetPAXGSTAddress: '',
+  prodPAXGSTAddress: '',
   // TODO: add these address
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
@@ -78,7 +78,7 @@ export default {
     '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
     '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
-    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
+    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTSTEMP
     'bbb0e060f3f43c533d5b5f0250ff473de831e5e4', //testnetUSDSTAddress
   ],
   localHost: 'http://localhost',

@@ -62,14 +62,11 @@ describe("Payment Server - deploy contracts", function () {
   let silverOracle;
   let goldOracle;
   let ethOracle;
-  let usdtOracle;
-  let usdcOracle;
-  let paxgOracle;
+  let usdtstOracle;
+  let usdcstOracle;
+  let paxgstOracle;
   let btcOracle;
-  let usdtOracle;
   let usdOracle;
-  let usdcOracle;
-  let paxgOracle;
 
   before(async () => {
     assert.isDefined(
@@ -147,19 +144,19 @@ describe("Payment Server - deploy contracts", function () {
     ethOracle = await uploadContract(token, "Oracle", { name: ethOracleName });
   });
 
-  it("Deploy Usdt Oracle", async () => {
-    const usdtOracleName = config.usdtOracle.name;
-    usdtOracle = await uploadContract(token, "Oracle", { name: usdtOracleName });
+  it("Deploy Usdtst Oracle", async () => {
+    const usdtstOracleName = config.usdtstOracle.name;
+    usdtstOracle = await uploadContract(token, "Oracle", { name: usdtstOracleName });
   });
 
-  it("Deploy Usdc Oracle", async () => {
-    const usdcOracleName = config.usdcOracle.name;
-    usdcOracle = await uploadContract(token, "Oracle", { name: usdcOracleName });
+  it("Deploy Usdcst Oracle", async () => {
+    const usdcstOracleName = config.usdcstOracle.name;
+    usdcstOracle = await uploadContract(token, "Oracle", { name: usdcstOracleName });
   });
 
-  it("Deploy Paxg Oracle", async () => {
-    const paxgOracleName = config.paxgOracle.name;
-    paxgOracle = await uploadContract(token, "Oracle", { name: paxgOracleName });
+  it("Deploy Paxgst Oracle", async () => {
+    const paxgstOracleName = config.paxgstOracle.name;
+    paxgstOracle = await uploadContract(token, "Oracle", { name: paxgstOracleName });
   });
   
   it("Deploy Btc Oracle", async () => {
@@ -167,19 +164,19 @@ describe("Payment Server - deploy contracts", function () {
     btcOracle = await uploadContract(token, "Oracle", { name: btcOracleName });
   });
 
-  it("Deploy Usdt Oracle", async () => {
-    const usdtOracleName = config.usdtOracle.name;
-    usdtOracle = await uploadContract(token, "Oracle", { name: usdtOracleName });
+  it("Deploy Usdtst Oracle", async () => {
+    const usdtstOracleName = config.usdtstOracle.name;
+    usdtstOracle = await uploadContract(token, "Oracle", { name: usdtstOracleName });
   });
 
-  it("Deploy Usdc Oracle", async () => {
-    const usdcOracleName = config.usdcOracle.name;
-    usdcOracle = await uploadContract(token, "Oracle", { name: usdcOracleName });
+  it("Deploy Usdcst Oracle", async () => {
+    const usdcstOracleName = config.usdcstOracle.name;
+    usdcstOracle = await uploadContract(token, "Oracle", { name: usdcstOracleName });
   });
 
-  it("Deploy Paxg Oracle", async () => {
-    const paxgOracleName = config.paxgOracle.name;
-    paxgOracle = await uploadContract(token, "Oracle", { name: paxgOracleName });
+  it("Deploy Paxgst Oracle", async () => {
+    const paxgstOracleName = config.paxgstOracle.name;
+    paxgstOracle = await uploadContract(token, "Oracle", { name: paxgstOracleName });
   });
 
   it("Deploy USD Oracle", async () => {
@@ -194,14 +191,14 @@ describe("Payment Server - deploy contracts", function () {
       silverOracle,
       goldOracle,
       ethOracle,
-      usdtOracle,
-      usdcOracle,
-      paxgOracle,
+      usdtstOracle,
+      usdcstOracle,
+      paxgstOracle,
       btcOracle,
-      usdtOracle,
+      usdtstOracle,
       usdOracle,
-      usdcOracle,
-      paxgOracle
+      usdcstOracle,
+      paxgstOracle
     };
     const deployment = deploy(deployArgs, config);
     assert.isDefined(deployment);

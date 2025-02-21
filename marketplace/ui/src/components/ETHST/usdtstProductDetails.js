@@ -88,7 +88,7 @@ const ERC20_ABI = [
   },
 ];
 
-const UsdtProductDetails = ({ user, users }) => {
+const UsdtstProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
@@ -142,7 +142,7 @@ const UsdtProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.UsdtProductDetail.url,
+    path: routes.UsdtstProductDetail.url,
     strict: true,
   });
 
@@ -194,32 +194,32 @@ const UsdtProductDetails = ({ user, users }) => {
   const appKit = useAppKit();
   const { address } = useAppKitAccount();
   const { chainId } = useAppKitNetwork();
-  const [usdtBalance, setUsdtBalance] = useState(0);
+  const [usdtstBalance, setUsdtstBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
   useEffect(() => {
     const fetchBalance = async () => {
       if (address) {
-        const usdtAddress = fileServerUrl.includes("test")
-          ? "0x29f2D40B0605204364af54EC677bD022dA425d03" // USDT testnet contract
-          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // USDT mainnet contract
+        const usdtstAddress = fileServerUrl.includes("test")
+          ? "0x29f2D40B0605204364af54EC677bD022dA425d03" // USDTST testnet contract
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // USDTST mainnet contract
   
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         setSigner(signer);
   
-        // Create USDT contract instance
-        const usdtContract = new ethers.Contract(usdtAddress, ERC20_ABI, provider);
+        // Create USDTST contract instance
+        const usdtstContract = new ethers.Contract(usdtstAddress, ERC20_ABI, provider);
   
         try {
-          // Get USDT balance
-          const usdtBalances = await usdtContract.balanceOf(address);
+          // Get USDTST balance
+          const usdtstBalances = await usdtstContract.balanceOf(address);
   
-          // USDT has 8 decimals (like BTC), format accordingly
-          const formattedBalance = ethers.utils.formatUnits(usdtBalances, 8); // 8 decimals for USDT
-          setUsdtBalance(formattedBalance); // Set USDT balance
+          // USDTST has 8 decimals (like BTC), format accordingly
+          const formattedBalance = ethers.utils.formatUnits(usdtstBalances, 8); // 8 decimals for USDTST
+          setUsdtstBalance(formattedBalance); // Set USDTST balance
         } catch (error) {
-          console.error("Failed to fetch USDT balance:", error);
+          console.error("Failed to fetch USDTST balance:", error);
         }
       }
     };
@@ -534,7 +534,7 @@ const UsdtProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <StakeSteps AssteName={'USDT'} />
+          <StakeSteps AssteName={'USDTST'} />
           <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
             <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
@@ -900,9 +900,9 @@ const UsdtProductDetails = ({ user, users }) => {
           signer={signer}
           accountDetails={{
             walletAddress: address,
-            balance: usdtBalance,
+            balance: usdtstBalance,
           }}
-          tokenName="USDT"
+          tokenName="USDTST"
         />
       )}
       {borrowModalOpen && (
@@ -928,4 +928,4 @@ const UsdtProductDetails = ({ user, users }) => {
   );
 };
 
-export default UsdtProductDetails;
+export default UsdtstProductDetails;

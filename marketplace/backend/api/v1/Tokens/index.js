@@ -28,24 +28,24 @@ router.get(
 );
 
 router.get(
-  Tokens.getUSDTAddress,
+  Tokens.getUSDTSTAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
-  TokensController.getUSDTAddress
+  TokensController.getUSDTSTAddress
 );
 
 router.get(
-  Tokens.getUSDCAddress,
+  Tokens.getUSDCSTAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
-  TokensController.getUSDCAddress
+  TokensController.getUSDCSTAddress
 );
 
 router.get(
-  Tokens.getPAXGAddress,
+  Tokens.getPAXGSTAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
-  TokensController.getPAXGAddress
+  TokensController.getPAXGSTAddress
 );
 
 router.post(

@@ -44,9 +44,9 @@ const GlobalTransaction = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
-  usdtAddress,
-  usdcAddress,
-  paxgAddress
+  usdtstAddress,
+  usdcstAddress,
+  paxgstAddress
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -167,9 +167,9 @@ const GlobalTransaction = ({
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
     const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    const isUsdt = data?.assetOriginAddress === usdtAddress;
-    const isUsdc = data?.assetOriginAddress === usdcAddress;
-    const isPaxg = data?.assetOriginAddress === paxgAddress;
+    const isUsdtst = data?.assetOriginAddress === usdtstAddress;
+    const isUsdcst = data?.assetOriginAddress === usdcstAddress;
+    const isPaxgst = data?.assetOriginAddress === paxgstAddress;
     //TODO: add redirection condition if required.
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
@@ -181,18 +181,18 @@ const GlobalTransaction = ({
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
-    }else if (isUsdt) {
-      const url = routes.UsdtProductDetail.url;
+    }else if (isUsdtst) {
+      const url = routes.UsdtstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (isUsdc) {
-      const url = routes.UsdcProductDetail.url;
+    } else if (isUsdcst) {
+      const url = routes.UsdcstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (isPaxg) {
-      const url = routes.PaxgProductDetail.url;
+    } else if (isPaxgst) {
+      const url = routes.PaxgstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
@@ -483,9 +483,9 @@ const GlobalTransaction = ({
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
               wbtcstAddress={wbtcstAddress}
-              usdtAddress={usdtAddress}
-              usdcAddress={usdcAddress}
-              paxgAddress={paxgAddress}
+              usdtstAddress={usdtstAddress}
+              usdcstAddress={usdcstAddress}
+              paxgstAddress={paxgstAddress}
             />
           </Row>
         </div>
