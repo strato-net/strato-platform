@@ -267,7 +267,7 @@ async function userCataRewards(user, userCommonName, options) {
     ...options,
     query: {
       select: `address,isActive`,
-      creator: 'eq.BlockApps',
+      creator: 'in.(BlockApps,mercata_usdst)',
     },
   };
 

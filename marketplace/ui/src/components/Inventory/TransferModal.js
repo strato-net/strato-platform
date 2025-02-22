@@ -28,11 +28,17 @@ const TransferModal = ({
   reserves,
   assetsWithEighteenDecimalPlaces,
 }) => {
+  const {
+    message: marketplaceMsg,
+    success: marketplaceSuccess,
+    stratsAddress,
+  } = useMarketplaceState();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    inventory.originAddress
-  )
+  const isStrat = inventory.originAddress === stratsAddress;
+  const decimals = isStrat
+    ? 2
+    : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
     ? 18
     : inventory.decimals || 0;
   const availableQuantity = new BigNumber(inventory.quantity).dividedBy(
@@ -45,8 +51,6 @@ const TransferModal = ({
   const { user } = useAuthenticateState();
   const { users } = useUsersState();
   const { isTransferring } = useInventoryState();
-  const { message: marketplaceMsg, success: marketplaceSuccess } =
-    useMarketplaceState();
 
   // Notification context
   const [api, contextHolder] = notification.useNotification();
@@ -294,6 +298,7 @@ const TransferModal = ({
           onChange={(value) =>
             handleQuantityChange(record.id, new BigNumber(value))
           }
+          precision={isStrat ? 2 : 0}
           disabled={index !== transfers.length - 1}
           formatter={(val) => {
             if (val === undefined || val === null) return record.quantity;

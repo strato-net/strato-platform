@@ -13,7 +13,7 @@ import GlobalTransaction from './GlobalTransaction';
 
 const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces, stratsAddress } =
     useMarketplaceState();
   const { ethstAddress, wbtcstAddress } = useEthState();
 
@@ -53,6 +53,7 @@ const Feed = ({ user }) => {
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           ethstAddress={ethstAddress}
           wbtcstAddress={wbtcstAddress}
+          stratsAddress={stratsAddress}
         />
       )}
     </div>

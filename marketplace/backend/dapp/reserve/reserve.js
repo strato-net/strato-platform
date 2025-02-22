@@ -9,7 +9,7 @@ const contractEvents = {
   STAKE_CREATED: 'StakeCreated',
   STAKE_UNLOCKED: 'StakeUnlocked',
 };
-const CREATOR = 'eq.BlockApps';
+const CREATOR = 'in.(BlockApps,mercata_usdst)';
 const IS_ACTIVE = 'eq.true';
 
 /**
