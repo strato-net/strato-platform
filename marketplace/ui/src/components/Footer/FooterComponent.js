@@ -24,15 +24,15 @@ const navigation = {
     },
   ],
   company: [
-    { name: 'About', href: 'https://blockapps.net/company/about-us/' },
-    { name: 'Blog', href: 'https://blockapps.net/blog/' },
+    { name: 'About', href: 'https://stratomercata.com/company/about-us/' },
+    { name: 'Blog', href: 'https://stratomercata.com/blog/' },
     {
       name: 'Careers',
       href: 'https://blockapps.net/company/about-us/careers/',
     },
     {
       name: 'Press',
-      href: 'https://blockapps.net/blog/category/press-release/',
+      href: 'https://stratomercata.com/blog/category/press-release/',
     },
   ],
   legal: [

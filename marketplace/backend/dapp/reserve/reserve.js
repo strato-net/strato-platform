@@ -1,5 +1,5 @@
 import { util, rest } from '/blockapps-rest-plus';
-import constants from '../../helpers/constants';
+import constants, { DECIMAL_FACTOR_18 } from '../../helpers/constants';
 import { searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'BlockApps-Mercata-Reserve';
@@ -110,7 +110,7 @@ async function get(user, address, options) {
   // Calculate TVL: Total Value Locked in Dollars
   const tvl =
     activeEscrows && activeEscrows.length > 0
-      ? activeEscrows[0].sum / 10000
+      ? activeEscrows[0].sum / DECIMAL_FACTOR_18
       : 0;
 
   // Total Cata Reward Issued in CATA
@@ -132,7 +132,7 @@ async function get(user, address, options) {
   // Calculate total Cata reward issued
   const totalCataRewardIssued =
     allEscrows && allEscrows.length > 0
-      ? allEscrows[0].sum / Math.pow(10, 18)
+      ? allEscrows[0].sum / DECIMAL_FACTOR_18
       : 0;
 
   // Fetch associated assets and tokens in one query
@@ -176,6 +176,32 @@ async function get(user, address, options) {
     cataTokenObject: cataToken ? marshalOut(cataToken) : null,
     USDSTTokenObject: USDSTToken ? marshalOut(USDSTToken) : null,
   };
+}
+
+/**
+ * Retrieve all CATA rewards issued for active and inactive reserves.
+ * @param {*} user - User context for the request.
+ * @param {*} options - Search options including chainId.
+ * @returns {integer} - Total CATA rewards issued.
+ * @throws {Error} - Throws if no reserves are found.
+ */
+async function fetchTotalCataRewards(user, options) {
+  // Fetch escrows for creator BlockApps
+  const totalCataRewardIssued = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      select: 'totalCataReward.sum()',
+    },
+  }
+
+  const allEscrows = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Escrow' },
+    totalCataRewardIssued
+  );
+
+  return allEscrows[0].sum / DECIMAL_FACTOR_18;
 }
 
 /**
@@ -248,14 +274,14 @@ async function getAll(user, options) {
 
     const tvl =
       activeEscrows && activeEscrows.length > 0
-        ? activeEscrows[0].sum / Math.pow(10, 18)
+        ? activeEscrows[0].sum / DECIMAL_FACTOR_18
         : 0;
 
     const escrowTotalCataRewardSearchOptions = {
       ...options,
       query: {
         creator: CREATOR,
-        reserve: `eq.${reserve.address}`,
+        assetRootAddress: `like.${reserve.assetRootAddress}*`,
         select: 'totalCataReward.sum()',
       },
     };
@@ -268,7 +294,7 @@ async function getAll(user, options) {
 
     const totalCataRewardIssued =
       allEscrows && allEscrows.length > 0
-        ? allEscrows[0].sum / Math.pow(10, 18)
+        ? allEscrows[0].sum / DECIMAL_FACTOR_18
         : 0;
 
     return { tvl, totalCataRewardIssued };
@@ -407,7 +433,10 @@ async function unstake(user, args, options) {
     for (const escrow of escrows) {
       if (remainingQuantity <= 0) break;
 
-      const unstakeAmount = Math.min(escrow.collateralQuantity, remainingQuantity);
+      const unstakeAmount = Math.min(
+        escrow.collateralQuantity,
+        remainingQuantity
+      );
 
       // Only proceed if unstakeAmount is greater than 0
       if (unstakeAmount > 0) {
@@ -475,10 +504,15 @@ async function borrow(user, args, options) {
     }
 
     // Step 2: Calculate total collateralQuantity
-    const totalCollateral = escrows.reduce((acc, escrow) => acc + Number(escrow.collateralQuantity || 0), 0);
+    const totalCollateral = escrows.reduce(
+      (acc, escrow) => acc + Number(escrow.collateralQuantity || 0),
+      0
+    );
 
     if (totalCollateral <= 0) {
-      throw new Error('Total collateral quantity is zero or negative. Cannot proceed with borrowing.');
+      throw new Error(
+        'Total collateral quantity is zero or negative. Cannot proceed with borrowing.'
+      );
     }
 
     // Step 3: Distribute borrowAmount proportionally based on collateralQuantity
@@ -490,7 +524,9 @@ async function borrow(user, args, options) {
 
       if (i < escrows.length - 1) {
         // Calculate proportional amount and floor it to ensure integer value
-        amountToBorrow = Math.floor((Number(escrow.collateralQuantity) / totalCollateral) * borrowAmount);
+        amountToBorrow = Math.floor(
+          (Number(escrow.collateralQuantity) / totalCollateral) * borrowAmount
+        );
         distributedAmount += amountToBorrow;
       } else {
         // Assign the remaining amount to the last escrow to handle any remainder
@@ -529,7 +565,11 @@ async function repay(user, args, options) {
   const callArgs = {
     contract: { address: reserve },
     method: 'repayLoan',
-    args: util.usc({ escrowAddress, usdstAssetAddresses:USDSTAssetAddresses, amountToRepay }),
+    args: util.usc({
+      escrowAddress,
+      usdstAssetAddresses: USDSTAssetAddresses,
+      amountToRepay,
+    }),
   };
 
   const reponse = await rest.call(user, callArgs, options);
@@ -596,6 +636,7 @@ export default {
   contractName,
   get,
   getAll,
+  fetchTotalCataRewards,
   getStakeCreatedEvents,
   getUnstakeEvents,
   marshalIn,

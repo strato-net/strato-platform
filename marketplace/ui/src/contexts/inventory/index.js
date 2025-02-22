@@ -31,6 +31,8 @@ const InventoriesProvider = ({ children }) => {
     isFetchingOracle: false,
     reserves: null,
     reserve: null,
+    totalCataRewards: 0,
+    isFetchingTotalCataRewards: false,
     escrow: null,
     isReserveLoading: false,
     oracle : null,
