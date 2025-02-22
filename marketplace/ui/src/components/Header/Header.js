@@ -104,13 +104,13 @@ const HeaderComponent = ({
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const USDSTBalance =
-    Object.keys(USDST).length !== 0
-      ? new BigNumber(USDST).dividedBy(new BigNumber(10).pow(18))
-      : 0;
+    !USDST || (typeof USDST === 'object' && Object.keys(USDST).length === 0)
+      ? 0
+      : new BigNumber(USDST).dividedBy(new BigNumber(10).pow(18));
   const cataBalance =
-    Object.keys(cata).length !== 0
-      ? new BigNumber(cata).dividedBy(new BigNumber(10).pow(18))
-      : 0;
+    !cata || (typeof cata === 'object' && Object.keys(cata).length === 0)
+      ? 0
+      : new BigNumber(cata).dividedBy(new BigNumber(10).pow(18));
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
