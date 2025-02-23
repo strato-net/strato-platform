@@ -297,7 +297,7 @@ instance RLPSerializable ChainMemberParsedSet where
   rlpDecode (RLPArray [a, b]) = Org (rlpDecode a) (rlpDecode b)
   rlpDecode (RLPArray [a, b, c]) = OrgUnit (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode (RLPArray [a, b, c, d]) = CommonName (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode d)
-  rlpDecode _ = error ("Error in rlpDecode for ChainMemberParsedSet: bad RLPObject")
+  rlpDecode v = error $ "Error in rlpDecode for ChainMemberParsedSet: bad RLPObject: " ++ show v
   
 instance Arbitrary ChainMembers where
   arbitrary = genericArbitrary
