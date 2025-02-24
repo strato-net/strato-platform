@@ -7,6 +7,7 @@ import {
   Radio,
   Button,
   Tooltip,
+  Checkbox,
 } from 'antd';
 import {
   useMarketplaceState,
@@ -67,6 +68,12 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   useEffect(() => {
     setCartData(data);
   }, [data]);
+
+  const [stakeChecked, setStakeChecked] = useState(true);
+
+  const changeChecked = (e) => {
+    setStakeChecked(e.target.checked);
+  };
 
   const countDown = () => {
     modal.info({
@@ -181,9 +188,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
         ? 18
         : item.decimals || 0;
 
-      const quantity = new BigNumber(item.qty)
-        .multipliedBy(new BigNumber(10).pow(decimals))
-        .toFixed(0);
+      const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);
 
       orderList.push({
@@ -405,6 +410,13 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       {totalAmount}{' '}
                     </span>
                   </div>
+                  {reserve && (
+                    <div className="mb-6">
+                      <Checkbox defaultChecked onChange={changeChecked}>
+                        Stake and earn rewards!
+                      </Checkbox>
+                    </div>
+                  )}
                   <Button
                     type="primary"
                     disabled={
@@ -412,31 +424,17 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       activePaymentProviders?.length === 0
                     }
                     className="w-full bg-blue-800 text-white h-10 text-lg"
-                    onClick={handlePlaceOrder}
-                  >
-                    Place Order
-                  </Button>
-                  <Tooltip title={!reserve ? 'Asset not stakeable' : ''}>
-                    <span className="w-full">
-                      <Button
-                        type="primary"
-                        disabled={
-                          !activePaymentProviders ||
-                          activePaymentProviders?.length === 0 ||
-                          !reserve
-                        }
-                        className="w-full bg-blue-800 text-white h-10 text-lg my-4"
-                        onClick={() =>
-                          handlePlaceOrder(
+                    onClick={() =>
+                      reserve && stakeChecked
+                        ? handlePlaceOrder(
                             reserve?.address,
                             reserve?.assetRootAddress
                           )
-                        }
-                      >
-                        Place Order & Stake Immediately
-                      </Button>
-                    </span>
-                  </Tooltip>
+                        : handlePlaceOrder()
+                    }
+                  >
+                    Place Order
+                  </Button>
                 </div>
               </Col>
             </Row>

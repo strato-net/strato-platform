@@ -13,7 +13,7 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
-  DECIMAL_FACTOR_18
+  DECIMAL_FACTOR_18,
 } from '/helpers/constants';
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from '/helpers/config';
 import { pollingHelper } from '/helpers/utils';
@@ -1774,7 +1774,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
-      const quantities = orderList.map((o) => new BigNumber(o.quantity).toFixed(0));
+      const quantities = orderList.map((o) =>
+        new BigNumber(o.quantity).toFixed(0)
+      );
       const decimals = orderList.map((o) => o.decimals);
 
       const assets = await inventoryJs.getAll(
@@ -1950,8 +1952,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
     );
 
-    console.log('Order event123:', orderEvent);
-
     if (reserve) {
       // Step 1: Find the escrow associated with the reserve (if any)
       const escrowQueryArgs = {
@@ -1968,7 +1968,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const escrowAddress =
         escrows && escrows.length > 0
           ? escrows[0].address
-          : '0000000000000000000000000000000000000000';
+          : constants.zeroAddress;
 
       // Step 2: Find the user's assets
       const assetQueryArgs = {
@@ -2150,7 +2150,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.fetchTotalCataRewards = async function (options = defaultOptions) {
     return await reserveJs.fetchTotalCataRewards(rawAdmin, options);
-  }
+  };
 
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;

@@ -47,8 +47,7 @@ const Checkout = () => {
   const { reserves, isReservesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
