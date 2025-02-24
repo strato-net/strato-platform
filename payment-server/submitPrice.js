@@ -192,6 +192,34 @@ async function fetchMetalPrice(metal, apiKey) {
   }
 }
 
+// Function to fetch  and submit price
+async function fetchLBMAMetalPrice(metal, apiKey) {
+  try {
+    const apiUrl = `https://api.metals.dev/v1/metal/authority?api_key=${apiKey}&authority=lbma&currency=USD&unit=toz`;
+    const response = await axios.get(apiUrl);
+    const rates = response.data.rates;
+    let metalPrice;
+
+    if (metal.toLowerCase() === "gold") {
+      metalPrice = rates.lbma_gold_am;
+    } else if (metal.toLowerCase() === "silver") {
+      metalPrice = rates.lbma_silver;
+    } else {
+      throw new Error(`Metal ${metal} not supported`);
+    }
+
+    console.log(`Current ${metal} Price: $${metalPrice} per ounce`);
+
+    const timestampInSeconds = Math.floor(Date.now() / 1000);
+    console.log(`Current Timestamp: ${timestampInSeconds}`);
+
+    return { price: metalPrice, timestampInSeconds };
+  } catch (error) {
+    console.error(`ERROR: Failed to fetch price for ${metal}:`, error);
+    await flagFile.appendToErrorFile(`Failed to fetch price for ${metal}: ${error}`);
+  }
+}
+
 // Function to fetch and submit ETH price
 async function fetchAndSubmitERC20TokenPrice(
   metal,
@@ -392,7 +420,7 @@ const updateSalePricePeriodically = async () => {
           continue;
         }
 
-        const metalResult = await fetchMetalPrice(
+        const metalResult = await fetchLBMAMetalPrice(
           asset.name.toLowerCase().includes("gold")
             ? "gold"
             : asset.name.toLowerCase(),
@@ -436,8 +464,8 @@ async function main() {
   );
 
   const oracleInterval = Number(config.oracleInterval) || 60000; // Default: 1 minute
-  const saleInterval = Number(config.saleInterval) || 60000; // Default: 1 minute
-  const totalRunInterval = 60 * 1000; // 1 minutes
+  const saleUpdateTime = Number(config.saleUpdateTime) || 11; // Default: 6 am UTC
+  const totalRunInterval = 600 * 1000; // 10 minutes
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   let lastOracleRun = 0;
@@ -467,23 +495,27 @@ async function main() {
   const runTasks = async () => {
     while (true) {
       try {
+        const now = new Date();
+        const currentDate = now.toISOString().split("T")[0]; // e.g., "2025-02-24"
+
         // Check if it's time to run the oracle update
-        if (Date.now() - lastOracleRun >= oracleInterval) {
-          console.log("[Oracle] Running submitOraclePricePeriodically...");
-          await submitOraclePricePeriodically(oracleInterval);
-          lastOracleRun = Date.now();
-        } else {
-          console.log("[Oracle] Skipping since interval not reached.");
-        }
+        // if (Date.now() - lastOracleRun >= oracleInterval) {
+        //   console.log("[Oracle] Running submitOraclePricePeriodically...");
+        //   await submitOraclePricePeriodically(oracleInterval);
+        //   lastOracleRun = Date.now();
+        // } else {
+        //   console.log("[Oracle] Skipping since interval not reached.");
+        // }
 
         // Check if it's time to run the sale price update
         if (
-          Date.now() - lastSaleRun >= saleInterval &&
-          process.env.SALE_UPDATE === "true"
+          process.env.SALE_UPDATE === "true" &&
+          now.getHours() === parseInt(saleUpdateTime, 10) &&
+          lastSaleRun !== currentDate
         ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
-          lastSaleRun = Date.now();
+          lastSaleRun = currentDate;
         } else {
           console.log("[Sale] Skipping since interval not reached.");
         }
