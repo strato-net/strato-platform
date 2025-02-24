@@ -332,7 +332,8 @@ handleEvents peer = awaitForever $ \case
         $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
         yieldR $ Transactions [otBaseTx tx]
         
-    P2pBlockstanbul msg ->
+    P2pBlockstanbul msg -> do
+      {-
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
         Nothing ->
           $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $
@@ -351,6 +352,7 @@ handleEvents peer = awaitForever $ \case
                     " is not a validator"
                   ]
             True -> do
+-}
               let outbound = Blockstanbul msg
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
               let !msgHash = rlpHash msg

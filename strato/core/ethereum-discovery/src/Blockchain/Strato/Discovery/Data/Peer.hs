@@ -1,6 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Strato.Discovery.Data.Peer
@@ -57,6 +59,7 @@ import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
 import Blockchain.Data.PersistTypes ()
 import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
+import BlockApps.Logging
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Metrics
 import Blockchain.Strato.Discovery.Data.PeerDefinition
@@ -357,7 +360,8 @@ pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle 
 pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
 getPeersClosestTo ::
-  ( A.Selectable Point ClosestPeers m
+  ( MonadLogger m
+  , A.Selectable Point ClosestPeers m
   , Mod.Accessible ValidatorAddresses m
   ) =>
   NodeID ->
@@ -365,7 +369,9 @@ getPeersClosestTo ::
   m [PPeer]
 getPeersClosestTo targetNID requesterPubkey = do 
     peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) requesterPubkey
+    $logInfoS "getPeersClosestTo" $ T.pack $ "peer list: " ++ show peers
     ValidatorAddresses valAdds <- Mod.access (Mod.Proxy @ValidatorAddresses)
+    $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show valAdds
     let targetPt = nodeIDToPoint targetNID
         (vals, nonvals) = Set.partition (\p -> (fromPublicKey . pointToSecPubKey . fromJust $ pPeerPubkey p) `elem` valAdds) peers
     return $

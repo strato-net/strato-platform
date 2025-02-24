@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button, Popover } from 'antd';
 import BigNumber from 'bignumber.js';
 import {
@@ -81,7 +81,7 @@ const ItemActions = ({
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    return allSubcategories?.find((c) => c.contract === contractName)?.name;
+    return contractName;
   };
 
   function isEditSellDisabled() {
@@ -210,6 +210,99 @@ const ItemActions = ({
     setBridgeModalOpen(false);
   };
 
+  // Calculate collateralQuantity
+  const uniqueEscrows = new Set();
+  let collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+
+  if (decimals > 0) {
+    collateralQuantity /= Math.pow(10, decimals);
+  }
+
+  // Calculate collateralValue
+  const uniqueEscrowsPrime = new Set();
+  let collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateralValue = item?.escrow?.collateralValue || 0;
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateralValue;
+        }
+        return sum;
+      }, 0)
+    : 0;
+
+  // Calculate borrowedAmount
+  const uniqueBorrowedAddresses = new Set();
+  let borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
+
+  // Calculate maxLoanAmount
+  const uniqueEscrowsThree = new Set();
+  let maxLoanAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const maxLoanValue = item?.escrow?.maxLoanAmount || 0;
+        if (escrowAddress && !uniqueEscrowsThree.has(escrowAddress)) {
+          uniqueEscrowsThree.add(escrowAddress);
+          return sum + maxLoanValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.maxLoanAmount || 0;
+
+  const matchedReserve = useMemo(() => {
+    if (reserves?.length && inventory?.root) {
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
+    }
+    return null;
+  }, [reserves, inventory?.root]);
+
+  const LTV =
+    matchedReserve?.name.toLowerCase().includes('ethst') ||
+    matchedReserve?.name.toLowerCase().includes('wbtcst')
+      ? 0.3
+      : 0.5;
+  const newMaxLoanAmount = useMemo(() => {
+    if (
+      matchedReserve?.name.toLowerCase().includes('ethst') ||
+      matchedReserve?.name.toLowerCase().includes('wbtcst')
+    ) {
+      return collateralValue ? collateralValue * LTV : 0;
+    } else {
+      return maxLoanAmount;
+    }
+  }, [inventory, collateralValue, maxLoanAmount]);
+  const roundedMaxLoanAmount = (
+    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
+  const roundedBorrowedAmount = (
+    Math.floor((borrowAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
+
   return (
     <div className="flex justify-center">
       {(!stakeable || (!inventory?.escrow && stakeable)) && (
@@ -252,7 +345,7 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            decimals === 18
+            getCategory()?.includes('Tokens')
           }
         >
           <SendOutlined /> Redeem
@@ -284,7 +377,10 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
-            disabled={inventory?.escrow?.borrowedAmount > 0}
+            disabled={
+              parseFloat(roundedBorrowedAmount) >=
+                parseFloat(roundedMaxLoanAmount) || collateralQuantity <= 0
+            }
           >
             <BankOutlined /> Borrow
           </Button>
@@ -316,7 +412,7 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    decimals === 18
+                    getCategory()?.includes('Tokens')
                   }
                 >
                   <SendOutlined /> Redeem

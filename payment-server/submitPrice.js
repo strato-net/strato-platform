@@ -22,7 +22,7 @@ async function submitPrice(token, contract, args) {
 }
 
 // Function to update the price of the Asset Sale price
-async function updateMetalPrice(assetName, token, contractAddress, price) {
+async function updateMetalPrice(assetName, token, contractAddress, price, decimals) {
   const parsedPriceMarkup = parseFloat(
     process.env[
       assetName.toLowerCase().includes("gold")
@@ -37,7 +37,7 @@ async function updateMetalPrice(assetName, token, contractAddress, price) {
     method: "update",
     args: {
       _quantity: 0,
-      _price: Math.round(price * parsedPriceMarkup * 100) / 100,
+      _price: (Math.round(price * parsedPriceMarkup * 100) / 100) / Math.pow(10, decimals),
       _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
@@ -69,14 +69,14 @@ async function runDistributeRewardsCalls(token) {
       });
       // wait until there are no more PENDING results
       const predicate = (results) =>
-        results.filter((r) => r.status === rest.PENDING).length === 0;
-      const action = async () =>
+        results.filter((r) => r.status === "Pending").length === 0;
+      const action = async (options) =>
         rest.getBlocResults(
           token,
           res.map((r) => r.hash),
-          { config }
+          options
         );
-      await util.until(predicate, action, { config }, 3600000);
+      await util.until(predicate, action, { config, isAsync: true }, 3600000);
       console.log("Batch distributeRewards calls completed.");
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
@@ -98,7 +98,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   const reserveSearchOptions = {
     config,
     query: {
-      creator: "eq.BlockApps",
+      creator: "in.(BlockApps,mercata_usdst)",
       isActive: "eq.true",
       oracle: "eq." + oracleContract.address,
     },
@@ -123,7 +123,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     const searchOptions = {
       config,
       query: {
-        creator: "eq.BlockApps",
+        creator: "in.(BlockApps,mercata_usdst)",
         isActive: "eq.true",
         reserve: "eq." + reserveAddress,
       },
@@ -312,6 +312,23 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
           price: 1 / 1e18,
           timestamp: Math.floor(Date.now() / 1000),
         });
+      } else if (oracle.metal === "GOLDST") {
+        const metalResult = await fetchMetalPrice(
+          "gold",
+          process.env.METALS_API_KEY
+        );
+
+        if (metalResult) {
+          await submitPrice(token, oracle, {
+            price: (metalResult.price / 1e18),
+            timestamp: metalResult.timestampInSeconds,
+          });
+          console.log(
+            `[Oracle Update] Price submitted for ${
+              oracle.metal
+            } at ${new Date().toISOString()}`
+          );
+        }
       } else {
         const metalResult = await fetchMetalPrice(
           oracle.metal.toLowerCase(),
@@ -376,7 +393,9 @@ const updateSalePricePeriodically = async () => {
         }
 
         const metalResult = await fetchMetalPrice(
-          asset.name.toLowerCase(),
+          asset.name.toLowerCase().includes("gold")
+            ? "gold"
+            : asset.name.toLowerCase(),
           process.env.METALS_API_KEY
         );
 
@@ -386,7 +405,8 @@ const updateSalePricePeriodically = async () => {
           asset.name.toLowerCase(),
           token,
           assetResult[0]?.sale,
-          metalResult.price / Math.pow(10, decimals)
+          metalResult.price,
+          decimals
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`

@@ -34,7 +34,7 @@ import {
   usePaymentServiceState,
 } from '../../contexts/payment';
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
-import Decimal from 'decimal.js';
+import BigNumber from 'bignumber.js';
 
 const { Title, Text } = Typography;
 
@@ -47,7 +47,8 @@ const Checkout = () => {
   const { reserves, isReservesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
@@ -58,11 +59,13 @@ const Checkout = () => {
     )
       ? 18
       : item.product.decimals || 0;
-    let price = new Decimal(item.product.price * Math.pow(10, decimals));
-    let tax = new Decimal(CHARGES.TAX);
-    let result = price.mul(tax).div(100);
+    let price = new BigNumber(item.product.price).multipliedBy(
+      new BigNumber(10).pow(decimals)
+    );
+    let tax = new BigNumber(CHARGES.TAX);
+    let result = price.multipliedBy(tax).dividedBy(100);
 
-    return parseFloat(result);
+    return result;
   };
 
   const calculateAmount = (item) => {
@@ -71,11 +74,13 @@ const Checkout = () => {
     )
       ? 18
       : item.product.decimals || 0;
-    let price = new Decimal(item.product.price * Math.pow(10, decimals));
+    let price = new BigNumber(item.product.price).multipliedBy(
+      new BigNumber(10).pow(decimals)
+    );
     let tax = calculateTax(item);
-    let result = price.mul(item.qty).plus(tax);
+    let result = price.multipliedBy(new BigNumber(item.qty)).plus(tax);
 
-    return parseFloat(result);
+    return result;
   };
 
   useEffect(() => {
@@ -114,7 +119,9 @@ const Checkout = () => {
           : item.product.decimals || 0;
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
-        let quantity = item.product.saleQuantity / Math.pow(10, decimals);
+        let quantity = new BigNumber(item.product.saleQuantity).dividedBy(
+          new BigNumber(10).pow(decimals)
+        );
 
         modifiedValue.push({
           key: item.product.address,
@@ -132,7 +139,9 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: item.product.price * Math.pow(10, decimals),
+          unitPrice: new BigNumber(item.product.price).multipliedBy(
+            new BigNumber(10).pow(decimals)
+          ),
           quantity,
           decimals,
           saleAddress: item.product.saleAddress,

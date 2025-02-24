@@ -41,10 +41,10 @@ const NewTrendingCard = ({
   const decimals = assetsWithEighteenDecimalPlaces.includes(
     topSellingProduct.originAddress
   )
-    ? 19
+    ? 18
     : topSellingProduct.decimals || 0;
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity : 1);
 
   const ownerSameAsUser = () => {
     if (user?.commonName === topSellingProduct?.ownerCommonName) {
@@ -273,8 +273,9 @@ const NewTrendingCard = ({
         </div>
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            topSellingProduct.originAddress === ethstAddress ||
-            topSellingProduct.originAddress === wbtcstAddress
+            (topSellingProduct.originAddress === ethstAddress ||
+            topSellingProduct.originAddress === wbtcstAddress) &&
+            reserve
               ? 'invisible'
               : ''
           }`}
@@ -299,7 +300,7 @@ const NewTrendingCard = ({
               bordered={false}
               value={quantity}
               max={saleQuantity}
-              min={1/Math.pow(10, topSellingProduct.decimals || 0)}
+              min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
               onChange={(e) => {
                 setQuantity(parseFloat(e || 0));
               }}
@@ -371,7 +372,7 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if (topSellingProduct.originAddress === ethstAddress) {
+              if (topSellingProduct.originAddress === ethstAddress && reserve) {
                 navigate(
                   `${ethNaviroute.replace(
                     ':address',
@@ -379,7 +380,7 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
-              } else if (topSellingProduct.originAddress === wbtcstAddress) {
+              } else if (topSellingProduct.originAddress === wbtcstAddress && reserve) {
                 navigate(
                   `${routes.WbtcstProductDetail.url.replace(
                     ':address',
@@ -397,8 +398,9 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {topSellingProduct.originAddress === ethstAddress ||
-            topSellingProduct.originAddress === wbtcstAddress
+            {(topSellingProduct.originAddress === ethstAddress ||
+              topSellingProduct.originAddress === wbtcstAddress) &&
+            reserve
               ? 'Bridge'
               : 'Buy Now'}
           </Button>

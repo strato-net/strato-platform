@@ -38,9 +38,9 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
     success,
     isCreatePaymentSubmitting,
   } = useOrderState();
-  const [tax, setTax] = useState(0);
-  const [subTotal, setSubTotal] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [tax, setTax] = useState(new BigNumber(0));
+  const [subTotal, setSubTotal] = useState(new BigNumber(0));
+  const [total, setTotal] = useState(new BigNumber(0));
   const {
     success: marketplaceSuccess,
     message: marketplaceMessage,
@@ -90,15 +90,16 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   };
 
   useEffect(() => {
-    let t = 0;
-    let sum = 0;
+    let t = new BigNumber(0);
+    let sum = new BigNumber(0);
     cartData.forEach((item) => {
-      t += item.tax;
-      sum += item.amount;
+      t = t.plus(new BigNumber(item.tax));
+      sum = sum.plus(new BigNumber(item.amount));
     });
+
     setTax(t.toFixed(2));
-    setSubTotal(sum);
-    setTotal((sum + t).toFixed(2));
+    setSubTotal(sum.toString());
+    setTotal(sum.plus(t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const openToastOrder = (placement, message) => {
@@ -186,8 +187,10 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       const unitPrice = new BigNumber(item.unitPrice);
 
       orderList.push({
-        quantity,
-        decimals,
+        quantity: quantity
+          .multipliedBy(new BigNumber(10).pow(decimals))
+          .toFixed(0),
+        decimals: decimals,
         assetAddress: item.key,
         firstSale: item.firstSale,
         unitPrice: unitPrice
@@ -321,7 +324,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${new BigNumber(subTotal.toFixed(2)).toString()} USDST`
+      ? `${new BigNumber(subTotal).toString()} USDST`
       : selectedProvider?.serviceName === 'Stripe'
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;

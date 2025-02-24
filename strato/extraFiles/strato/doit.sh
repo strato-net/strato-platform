@@ -148,7 +148,7 @@ function newnode {
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
      --averageTxsPerBlock=${averageTxsPerBlock:-40} \
-     --connectionTimeout=${connectionTimeout:-30} \
+     --connectionTimeout=${connectionTimeout:-3600} \
      --debugFail=${debugFail:-true}  \
      --maxConn=${maxConn:-1000} \
      --maxReturnedHeaders=${maxReturnedHeaders:-500} \

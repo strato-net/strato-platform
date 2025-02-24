@@ -13,6 +13,7 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
+  DECIMAL_FACTOR_18
 } from '/helpers/constants';
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from '/helpers/config';
 import { pollingHelper } from '/helpers/utils';
@@ -408,11 +409,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    const { assetAddresses, redemptionService, quantity, ...restArgs } = args;
+    const {
+      assetAddresses,
+      redemptionService,
+      quantity,
+      decimals,
+      ...restArgs
+    } = args;
 
     const contract = { address: assetAddresses[0] };
     const redemptionId = util.uid();
-    const contractArgs = { quantity, redemptionId };
+    const contractArgs = {
+      redemptionId,
+      quantity: new BigNumber(quantity)
+        .multipliedBy(Math.pow(10, decimals))
+        .toFixed(0),
+    };
     const [requestRedemptionStatus, assetAddress] =
       await inventoryJs.requestRedemption(
         rawAdmin,
@@ -1175,7 +1187,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
+    return balance[0].sum || 0;
   };
 
   contract.getCataBalance = async function (_, options = defaultOptions) {
@@ -1189,7 +1201,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
+    return balance[0].sum || 0;
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
@@ -1762,7 +1774,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
-      const quantities = orderList.map((o) => new BigNumber(o.quantity));
+      const quantities = orderList.map((o) => new BigNumber(o.quantity).toFixed(0));
       const decimals = orderList.map((o) => o.decimals);
 
       const assets = await inventoryJs.getAll(
@@ -2135,6 +2147,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getAllReserve = async function (options = defaultOptions) {
     return await reserveJs.getAll(rawAdmin, options);
   };
+
+  contract.fetchTotalCataRewards = async function (options = defaultOptions) {
+    return await reserveJs.fetchTotalCataRewards(rawAdmin, options);
+  }
 
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
