@@ -298,7 +298,6 @@ const TransferModal = ({
           onChange={(value) =>
             handleQuantityChange(record.id, new BigNumber(value))
           }
-          precision={isStrat ? 2 : 0}
           disabled={index !== transfers.length - 1}
           formatter={(val) => {
             if (val === undefined || val === null) return record.quantity;
