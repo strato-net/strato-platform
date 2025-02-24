@@ -13,7 +13,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
-import Data.Either
 import Data.Foldable (foldlM)
 import Data.Hourglass
 import Data.Maybe
@@ -75,7 +74,7 @@ options =
           ( \s opts -> do
               subStr <- B.readFile s
               let eSub = Ae.eitherDecodeStrict subStr :: Either String Subject
-                  !sub = fromRight (error "invalid subject JSON") eSub
+                  !sub = either (\e -> error $ "invalid subject JSON: " ++ e) id eSub
               return opts {optSubjectInfo = sub}
           )
           "Subject"
