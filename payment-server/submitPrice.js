@@ -465,7 +465,7 @@ async function main() {
 
   const oracleInterval = Number(config.oracleInterval) || 60000; // Default: 1 minute
   const saleUpdateTime = Number(config.saleUpdateTime) || 11; // Default: 6 am UTC
-  const totalRunInterval = 600 * 1000; // 10 minutes
+  const totalRunInterval = 60 * 1000; // 1 minutes
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   let lastOracleRun = 0;
@@ -499,13 +499,13 @@ async function main() {
         const currentDate = now.toISOString().split("T")[0]; // e.g., "2025-02-24"
 
         // Check if it's time to run the oracle update
-        // if (Date.now() - lastOracleRun >= oracleInterval) {
-        //   console.log("[Oracle] Running submitOraclePricePeriodically...");
-        //   await submitOraclePricePeriodically(oracleInterval);
-        //   lastOracleRun = Date.now();
-        // } else {
-        //   console.log("[Oracle] Skipping since interval not reached.");
-        // }
+        if (Date.now() - lastOracleRun >= oracleInterval) {
+          console.log("[Oracle] Running submitOraclePricePeriodically...");
+          await submitOraclePricePeriodically(oracleInterval);
+          lastOracleRun = Date.now();
+        } else {
+          console.log("[Oracle] Skipping since interval not reached.");
+        }
 
         // Check if it's time to run the sale price update
         if (
