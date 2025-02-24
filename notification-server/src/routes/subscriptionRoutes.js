@@ -13,6 +13,8 @@ router.put('/subscribe', async (req, res) => {
     const { username } = req.body;
     const email = decodedToken.email;
 
+    const { telegramUsername = null, referrerUsername = null } = req.query;
+
     if (!token) {
       return res.status(401).json({ error: 'Authorization token missing' });
     }
@@ -33,7 +35,7 @@ router.put('/subscribe', async (req, res) => {
     }
 
     // Subscribe the user
-    const success = await subscribe(username, email);
+    const success = await subscribe(username, email, telegramUsername, referrerUsername);
 
     if (success) {
       return res.status(200).send('User subscribed successfully');
