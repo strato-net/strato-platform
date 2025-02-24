@@ -26,6 +26,9 @@ paxgstOracle:
 btcOracle:
   name: <btc_oracle_name_value>
 
+goldstOracle:
+  name: <goldst_oracle_name_value>
+
 usdOracle:
   name: <usd_oracle_name_value>
 

@@ -205,6 +205,7 @@ export const Reserve = {
   prefix: '/reserve',
   get: '/:address',
   getAll: '/',
+  fetchTotalCataRewards: '/fetchTotalCataRewards',
   oraclePrice: '/oraclePrice/:address',
   stake: '/stake',
   unstake: '/unstake',

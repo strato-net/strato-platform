@@ -192,6 +192,7 @@ const updateOldEscrowBorrowDataBatch = async (
  */
 async function transferCATAToNewReserve(
   token,
+  token2,
   OLD_RESERVE_ADDRESS,
   NEW_RESERVE_ADDRESS
 ) {
@@ -233,86 +234,57 @@ async function transferCATAToNewReserve(
   }
   const assetRecord = assetResults[0];
   const assetQuantity = assetRecord.quantity;
-  const assetRoot = assetRecord.root;
 
-  // 3. Initiate the transfer of the CATA token to the new reserve.
-  const transferCallArgs = {
+  // 3. Call transferCATAtoAnotherReserve
+  let callListArgs = {
     contract: { address: OLD_RESERVE_ADDRESS },
     method: 'transferCATAtoAnotherReserve',
-    args: util.usc({ newOwner: NEW_RESERVE_ADDRESS, amount: assetQuantity }),
+    args: util.usc({
+      newOwner: NEW_RESERVE_ADDRESS,
+      amount: assetQuantity,
+    }),
   };
-
-  console.log(
-    `Initiating transferCATAToNewReserve with callArgs: ${JSON.stringify(
-      transferCallArgs
-    )}`
-  );
-
-  const transferRes = await callAndWait(token, transferCallArgs);
-  const transferFinal = Array.isArray(transferRes)
-    ? transferRes[0]
-    : transferRes;
-
-  if (transferFinal.status !== 'Success') {
-    const errorDetails = { transferCallArgs, result: transferFinal };
+  const finalResults = await callAndWait(token, callListArgs);
+  let final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+  if (final.status !== 'Success') {
     throw new Error(
-      `Error: transferCATAToNewReserve failed for callArgs: ${JSON.stringify(
-        errorDetails
-      )}`
+      `Error: transferCATAtoAnotherReserve failed ${JSON.stringify(final)}`
     );
   }
 
-  // 4. Verify the transfer by querying the new reserve's asset record.
-  const newAssetQuery = {
-    query: {
-      owner: 'eq.' + NEW_RESERVE_ADDRESS,
-      root: 'eq.' + assetRoot,
-      select: 'address',
-    },
-    config,
-  };
-
-  const newAssetResults = await rest.search(
-    token,
-    { name: 'BlockApps-Mercata-Asset' },
-    newAssetQuery
-  );
-  if (!newAssetResults || newAssetResults.length === 0) {
-    throw new Error(`No asset found for new reserve ${NEW_RESERVE_ADDRESS}`);
+  // Extract NEW_USDST_ADDRESS from the result.
+  // This mimics: jq -r '.[0].txResult.contractsCreated'
+  if (!Array.isArray(finalResults) || finalResults.length === 0) {
+    throw new Error('Invalid automaticTransfer result');
   }
-  const newAssetRecord = newAssetResults[0];
-  const newAssetAddress = newAssetRecord.address;
+  const newTokenAddress = finalResults[0]?.txResult?.contractsCreated[0];
+  console.log(
+    'New CATA token address (from transferCATAtoAnotherReserve):',
+    newTokenAddress
+  );
 
-  // 5. Update the new reserve with the new CATA token address.
-  const setCATACallArgs = {
+  // 4. Call transferCATAtoAnotherReserve
+  callListArgs = {
     contract: { address: NEW_RESERVE_ADDRESS },
     method: 'setCataToken',
-    args: util.usc({ newCataToken: newAssetAddress }),
+    args: util.usc({
+      newCataToken: newTokenAddress,
+    }),
   };
-
-  console.log(
-    `Setting CATA token address in new reserve with callArgs: ${JSON.stringify(
-      setCATACallArgs
-    )}`
-  );
-
-  const setCataRes = await callAndWait(token, setCATACallArgs);
-  const setCataFinal = Array.isArray(setCataRes) ? setCataRes[0] : setCataRes;
-
-  if (setCataFinal.status !== 'Success') {
-    const errorDetails = { setCATACallArgs, result: setCataFinal };
+  const updateResult = await callAndWait(token2, callListArgs);
+  final = Array.isArray(updateResult) ? updateResult[0] : updateResult;
+  if (final.status !== 'Success') {
     throw new Error(
-      `Error: setCataToken failed for callArgs: ${JSON.stringify(errorDetails)}`
+      `Error: setCataToken failed ${JSON.stringify(final)}`
     );
   }
-
-  console.log('transferCATAToNewReserve completed successfully.');
+  console.log(`CATA transferred successfully.`);
 }
 
 async function main() {
   try {
     // Validate required environment variables.
-    const { USERNAME, PASSWORD, OLD_RESERVE_ADDRESS, NEW_RESERVE_ADDRESS } =
+    const { USERNAME, PASSWORD, USERNAME_NEW, PASSWORD_NEW, OLD_RESERVE_ADDRESS, NEW_RESERVE_ADDRESS } =
       process.env;
     if (!USERNAME || !PASSWORD) {
       throw new Error(
@@ -340,7 +312,7 @@ async function main() {
       query: {
         reserve: 'eq.' + OLD_RESERVE_ADDRESS,
         isActive: 'eq.true',
-        creator: 'eq.BlockApps',
+        creator: 'in.(BlockApps,mercata_usdst)',
         select: 'address',
       },
     };
@@ -370,6 +342,14 @@ async function main() {
     const batches = batchArray(escrowAddresses, 10);
     console.log(`Partitioned escrows into ${batches.length} batch(es).`);
 
+    // Get second user token
+    const tokenString2 = await getUserToken(USERNAME_NEW, PASSWORD_NEW);
+    if (!tokenString2) {
+      throw new Error('Failed to acquire token.');
+    }
+    console.log('Token acquired:', tokenString2);
+    const token2 = { token: tokenString2 };
+
     // 4. For each batch, perform migration and call the two update functions.
     for (const batch of batches) {
       // Migrate the batch on the old reserve.
@@ -381,15 +361,16 @@ async function main() {
       );
 
       // On the new reserve, update the escrow data.
-      await updateOldEscrowDataBatch(token, NEW_RESERVE_ADDRESS, batch);
+      await updateOldEscrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
 
       // On the new reserve, update the escrow borrow data.
-      await updateOldEscrowBorrowDataBatch(token, NEW_RESERVE_ADDRESS, batch);
+      await updateOldEscrowBorrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
     }
 
     // On the old reserve, transfer CATA back to owner
     await transferCATAToNewReserve(
       token,
+      token2,
       OLD_RESERVE_ADDRESS,
       NEW_RESERVE_ADDRESS
     );

@@ -35,9 +35,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export USDCST_ORACLE_NAME_VALUE=${USDCST_ORACLE_NAME_VALUE:-'USDCST'}
   export PAXGST_ORACLE_NAME_VALUE=${PAXGST_ORACLE_NAME_VALUE:-'PAXGST'}
   export BTC_ORACLE_NAME_VALUE=${BTC_ORACLE_NAME_VALUE:-'BTC'}
-  export USDTST_ORACLE_NAME_VALUE=${USDTST_ORACLE_NAME_VALUE:-'USDTST'}
-  export USDCST_ORACLE_NAME_VALUE=${USDCST_ORACLE_NAME_VALUE:-'USDCST'}
-  export PAXGST_ORACLE_NAME_VALUE=${PAXGST_ORACLE_NAME_VALUE:-'PAXGST'}
+  export GOLDST_ORACLE_NAME_VALUE=${GOLDST_ORACLE_NAME_VALUE:-'GOLDST'}
   export USD_ORACLE_NAME_VALUE=${USD_ORACLE_NAME_VALUE:-'USD'}
   export SILVER_ASSET_ADDRESSES=${SILVER_ASSET_ADDRESSES:-''}
   export GOLD_ASSET_ADDRESSES=${GOLD_ASSET_ADDRESSES:-''}
@@ -80,9 +78,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
     sed -i 's*<usdcst_oracle_name_value>*'"${USDCST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<paxgst_oracle_name_value>*'"${PAXGST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<btc_oracle_name_value>*'"${BTC_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<usdtst_oracle_name_value>*'"${USDTST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<usdcst_oracle_name_value>*'"${USDCST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<paxgst_oracle_name_value>*'"${PAXGST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<goldst_oracle_name_value>*'"${GOLDST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<silver_asset_addresses_value>*'"${SILVER_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_asset_addresses_value>*'"${GOLD_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml

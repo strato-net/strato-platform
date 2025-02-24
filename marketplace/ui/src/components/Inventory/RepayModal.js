@@ -157,7 +157,7 @@ const RepayModal = ({
                 setRepayValue(new BigNumber(0));
                 return;
               }
-              const newValue = new BigNumber(value);
+              const newValue = new BigNumber(parseFloat(value).toFixed(2));
               setRepayValue(newValue);
             }}
             prefix={logo}

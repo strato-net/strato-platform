@@ -119,7 +119,7 @@ const TransactionResponsive = ({
             redemptionService,
             block_timestamp,
             assetOriginAddress,
-            redemption_id
+            redemption_id,
           },
           index
         ) => {
@@ -141,19 +141,29 @@ const TransactionResponsive = ({
             },
           ];
           if (redemption_id) {
-            quantity = (quantity).toLocaleString('en-US', {
+            quantity = quantity.toLocaleString('en-US', {
               maximumFractionDigits: 6,
               minimumFractionDigits: 0,
             });
             price = (price * 100).toFixed(2);
           } else if (
-            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress) || decimals
+            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress) ||
+            decimals ||
+            assetOriginAddress === stratAddress
           ) {
-            const assetDecimals = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress) ? 18 : decimals || 0;
-            quantity = (quantity / Math.pow(10, assetDecimals)).toLocaleString('en-US', {
-              maximumFractionDigits: 4,
-              minimumFractionDigits: 0,
-            });
+            const assetDecimals =
+              assetOriginAddress === stratAddress
+                ? 2
+                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                ? 18
+                : decimals || 0;
+            quantity = (quantity / Math.pow(10, assetDecimals)).toLocaleString(
+              'en-US',
+              {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              }
+            );
             price = (price * Math.pow(10, assetDecimals)).toFixed(2);
           }
 

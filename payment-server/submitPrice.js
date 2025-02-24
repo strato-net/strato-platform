@@ -98,7 +98,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   const reserveSearchOptions = {
     config,
     query: {
-      creator: "eq.BlockApps",
+      creator: "in.(BlockApps,mercata_usdst)",
       isActive: "eq.true",
       oracle: "eq." + oracleContract.address,
     },
@@ -123,7 +123,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     const searchOptions = {
       config,
       query: {
-        creator: "eq.BlockApps",
+        creator: "in.(BlockApps,mercata_usdst)",
         isActive: "eq.true",
         reserve: "eq." + reserveAddress,
       },
@@ -315,6 +315,23 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
           price: 1 / 1e18,
           timestamp: Math.floor(Date.now() / 1000),
         });
+      } else if (oracle.metal === "GOLDST") {
+        const metalResult = await fetchMetalPrice(
+          "gold",
+          process.env.METALS_API_KEY
+        );
+
+        if (metalResult) {
+          await submitPrice(token, oracle, {
+            price: (metalResult.price / 1e18),
+            timestamp: metalResult.timestampInSeconds,
+          });
+          console.log(
+            `[Oracle Update] Price submitted for ${
+              oracle.metal
+            } at ${new Date().toISOString()}`
+          );
+        }
       } else {
         const metalResult = await fetchMetalPrice(
           oracle.metal.toLowerCase(),

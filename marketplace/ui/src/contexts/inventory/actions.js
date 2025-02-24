@@ -48,6 +48,10 @@ const actionDescriptors = {
   getReserveSuccessful: 'get_reserve_address_successful',
   getReserveFailed: 'get_reserve_address_failed',
 
+  fetchTotalCataRewards: 'fetch_total_cata_rewards',
+  fetchTotalCataRewardsSuccessful: 'fetch_total_cata_rewards_successful',
+  fetchTotalCataRewardsFailed: 'fetch_total_cata_rewards_failed',
+
   getEscrowForAsset: 'get_escrow_for_asset',
   getEscrowForAssetSuccessful: 'get_escrow_for_asset_successful',
   getEscrowForAssetFailed: 'get_escrow_for_asset_failed',
@@ -1038,6 +1042,63 @@ const actions = {
         error: 'Error while fetching the reserve Address',
       });
       actions.setMessage(dispatch, 'Error while fetching the reserve Address');
+    }
+  },
+
+  fetchTotalCataRewards: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchTotalCataRewards });
+
+    try {
+      const response = await fetch(`${apiUrl}/reserve/fetchTotalCataRewards`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchTotalCataRewardsSuccessful,
+          payload: body.data,
+        });
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.fetchTotalCataRewardsFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchTotalCataRewardsFailed,
+          error: 'Error while fetching the total CATA rewards',
+        });
+        actions.setMessage(dispatch, 'Errorwhile fetching the total CATA rewards');
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchTotalCataRewardsFailed,
+          error: 'Unauthorized while fetching the total CATA rewards',
+        });
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchTotalCataRewardsFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchTotalCataRewardsFailed,
+        error: 'Error while fetching the total CATA rewards',
+      });
+      actions.setMessage(dispatch, 'Error while fetching the total CATA rewards');
     }
   },
 

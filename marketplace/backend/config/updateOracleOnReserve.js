@@ -103,7 +103,7 @@ async function main() {
       config,
       query: {
         isActive: 'eq.true',
-        creator: 'eq.BlockApps',
+        creator: 'in.(BlockApps,mercata_usdst)',
         address: `eq.${NEW_RESERVE_ADDRESS}`,
       },
     };

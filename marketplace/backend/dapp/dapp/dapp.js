@@ -2082,6 +2082,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await reserveJs.getAll(rawAdmin, options);
   };
 
+  contract.fetchTotalCataRewards = async function (options = defaultOptions) {
+    return await reserveJs.fetchTotalCataRewards(rawAdmin, options);
+  }
+
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
     const queryArgs = {

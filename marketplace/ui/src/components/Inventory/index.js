@@ -40,10 +40,7 @@ import { actions as redemptionActions } from '../../contexts/redemption/actions'
 import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { actions as ethActions } from '../../contexts/eth/actions';
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from '../../contexts/marketplace';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import { useEthDispatch, useEthState } from '../../contexts/eth';
 import {
   useRedemptionDispatch,
@@ -86,14 +83,9 @@ const Inventory = ({ user }) => {
   const metaImg = SEO.IMAGE_META;
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-  const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const {
-    USDSTAddress,
-    assetsWithEighteenDecimalPlaces,
-  } = useMarketplaceState();
-  const formatter = new Intl.NumberFormat('en-US');
-  const formattedNum = (num) => formatter.format(num);
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -463,7 +455,9 @@ const Inventory = ({ user }) => {
           record.originAddress
         );
         const price = record.price
-          ? is18DecimalPlaces
+          ? stratsAddress === record.originAddress
+            ? parseFloat(record.price * 100).toFixed(2)
+            : is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
             : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
           : 'N/A';
@@ -492,7 +486,9 @@ const Inventory = ({ user }) => {
           record.originAddress
         );
         const quantity = (
-          is18DecimalPlaces
+          stratsAddress === record.originAddress
+            ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
+            : is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
@@ -516,7 +512,9 @@ const Inventory = ({ user }) => {
           record.originAddress
         );
         const saleQuantity = (
-          is18DecimalPlaces
+          stratsAddress === record.originAddress
+            ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
+            : is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
