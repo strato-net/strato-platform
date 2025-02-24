@@ -60,8 +60,8 @@ insertMercataGovernanceContract validators admins gi =
           --          , addrToCertIdx . show $ adminAddr i)) adminIx
           ++ map
             ( \case
-                (i, CommonName o u c True) ->
-                  ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">",
+                (i, CommonName _ _ c True) ->
+                  ( encodeUtf8 $ ".validatorMap<\"" <> c <> "\">",
                     addrToCertIdx . show $ validatorAddr i
                   )
                 _ -> error "Invalid validator cert"
@@ -69,8 +69,8 @@ insertMercataGovernanceContract validators admins gi =
             valIx
           ++ map
             ( \case
-                (i, CommonName o u c True) ->
-                  ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">",
+                (i, CommonName _ _ c True) ->
+                  ( encodeUtf8 $ ".adminMap<\"" <> c <> "\">",
                     addrToCertIdx . show $ adminAddr i
                   )
                 _ -> error "Invalid admin cert"
@@ -79,14 +79,12 @@ insertMercataGovernanceContract validators admins gi =
     validatorAccts =
       map
         ( \case
-            (i, CommonName o u c True) ->
+            (i, CommonName _ _ c True) ->
               SolidVMContractWithStorage
                 (validatorAddr i)
                 0
                 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
                 [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".org", BString $ encodeUtf8 o),
-                  (".orgUnit", BString $ encodeUtf8 u),
                   (".commonName", BString $ encodeUtf8 c),
                   (".isActive", BBool True)
                 ]
@@ -96,14 +94,12 @@ insertMercataGovernanceContract validators admins gi =
     adminAccts =
       map
         ( \case
-            (i, CommonName o u c True) ->
+            (i, CommonName _ _ c True) ->
               SolidVMContractWithStorage
                 (adminAddr i)
                 0
                 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance))
                 [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".org", BString $ encodeUtf8 o),
-                  (".orgUnit", BString $ encodeUtf8 u),
                   (".commonName", BString $ encodeUtf8 c),
                   (".isActive", BBool True)
                 ]
@@ -117,8 +113,6 @@ mercataGovernanceContract =
 contract MercataValidator {
     address public owner;
 
-    string public org;
-    string public orgUnit;
     string public commonName;
 
     bool public isActive;
@@ -126,10 +120,8 @@ contract MercataValidator {
     uint public votedInTime;
     uint public votedOutTime;
 
-    constructor(string _org, string _orgUnit, string _commonName) {
+    constructor(string _commonName) {
         owner = msg.sender;
-        org = _org;
-        orgUnit = _orgUnit;
         commonName = _commonName;
         isActive = true;
         votedInTime = block.timestamp;
@@ -145,8 +137,6 @@ contract MercataValidator {
 contract MercataAdmin {
     address public owner;
 
-    string public org;
-    string public orgUnit;
     string public commonName;
 
     bool public isActive;
@@ -154,10 +144,8 @@ contract MercataAdmin {
     uint public votedInTime;
     uint public votedOutTime;
 
-    constructor(string _org, string _orgUnit, string _commonName) {
+    constructor(string _commonName) {
         owner = msg.sender;
-        org = _org;
-        orgUnit = _orgUnit;
         commonName = _commonName;
         isActive = true;
         votedInTime = block.timestamp;
@@ -174,12 +162,8 @@ contract MercataValidatorVote {
 
     address public owner;
 
-    string public recipientOrg;
-    string public recipientOrgUnit;
     string public recipientCommonName;
 
-    string public voterOrg;
-    string public voterOrgUnit;
     string public voterCommonName;
 
     bool public voteDirection;
@@ -191,15 +175,11 @@ contract MercataValidatorVote {
     uint public deactivationTimestamp;
     uint public finalizationTimestamp;
 
-    constructor(string _voterOrg, string _voterOrgUnit, string _voterCommonName,
-                string _recipientOrg, string _recipientOrgUnit, string _recipientCommonName,
+    constructor(string _voterCommonName,
+                string _recipientCommonName,
                 bool _voteDirection) {
         owner = msg.sender;
-        voterOrg = _voterOrg;
-        voterOrgUnit = _voterOrgUnit;
         voterCommonName = _voterCommonName;
-        recipientOrg = _recipientOrg;
-        recipientOrgUnit = _recipientOrgUnit;
         recipientCommonName = _recipientCommonName;
         voteDirection = _voteDirection;
         isActive = true;
@@ -231,12 +211,8 @@ contract MercataAdminVote {
 
     address public owner;
 
-    string public recipientOrg;
-    string public recipientOrgUnit;
     string public recipientCommonName;
 
-    string public voterOrg;
-    string public voterOrgUnit;
     string public voterCommonName;
 
     bool public voteDirection;
@@ -248,15 +224,11 @@ contract MercataAdminVote {
     uint public deactivationTimestamp;
     uint public finalizationTimestamp;
 
-    constructor(string _voterOrg, string _voterOrgUnit, string _voterCommonName,
-                string _recipientOrg, string _recipientOrgUnit, string _recipientCommonName,
+    constructor(string _voterCommonName,
+                string _recipientCommonName,
                 bool _voteDirection) {
         owner = msg.sender;
-        voterOrg = _voterOrg;
-        voterOrgUnit = _voterOrgUnit;
         voterCommonName = _voterCommonName;
-        recipientOrg = _recipientOrg;
-        recipientOrgUnit = _recipientOrgUnit;
         recipientCommonName = _recipientCommonName;
         voteDirection = _voteDirection;
         isActive = true;
@@ -279,191 +251,175 @@ contract MercataAdminVote {
 }
 
 contract MercataGovernance {
-    mapping (string => mapping (string => mapping (string => MercataValidator))) validatorMap;
+    mapping (string => MercataValidator) validatorMap;
     uint validatorCount;
 
-    mapping (string => mapping (string => mapping (string => MercataAdmin))) adminMap;
+    mapping (string => MercataAdmin) adminMap;
     uint adminCount;
 
-    mapping (string => mapping (string => mapping (string => mapping (string => mapping (string => mapping (string => uint)))))) validatorVoteMap;
-    mapping (string => mapping (string => mapping (string => MercataValidatorVote[]))) validatorVotes;
-    mapping (string => mapping (string => mapping (string => uint))) validatorVoteCountMap;
+    mapping (string => mapping (string => uint)) validatorVoteMap;
+    mapping (string => MercataValidatorVote[]) validatorVotes;
+    mapping (string => uint) validatorVoteCountMap;
 
-    mapping (string => mapping (string => mapping (string => mapping (string => mapping (string => mapping (string => uint)))))) adminVoteMap;
-    mapping (string => mapping (string => mapping (string => MercataAdminVote[]))) adminVotes;
-    mapping (string => mapping (string => mapping (string => uint))) adminVoteCountMap;
+    mapping (string => mapping (string => uint)) adminVoteMap;
+    mapping (string => MercataAdminVote[]) adminVotes;
+    mapping (string => uint) adminVoteCountMap;
 
     address public owner;
 
-    event ValidatorAdded(string org, string orgUnit, string commonName);
-    event ValidatorRemoved(string org, string orgUnit, string commonName);
+    event ValidatorAdded(string commonName);
+    event ValidatorRemoved(string commonName);
     
-    function voteToAddValidator(string _org, string _orgUnit, string _commonName) {
+    function voteToAddValidator(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a validator requires having a valid X.509 certificate");
         require(c.isValid(), "Voting to add a validator requires having a valid X.509 certificate");
-        string originOrg = c.organization();
-        string originUnit = c.organizationalUnit();
         string originName = c.commonName();
 
-        MercataAdmin a = adminMap[originOrg][originUnit][originName];
+        MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for validators");
         require(a.isActive(), "Only registered network admins can vote for validators");
         
-        MercataValidator v = validatorMap[_org][_orgUnit][_commonName];
+        MercataValidator v = validatorMap[_commonName];
         require(address(v) == address(0), "Votes to add cannot be counted for current validators");
         
-        uint voteIndex = validatorVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
-        require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
-        MercataValidatorVote newVote = new MercataValidatorVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, true);
-        uint voteCount = validatorVoteCountMap[_org][_orgUnit][_commonName] + 1;
-        validatorVoteCountMap[_org][_orgUnit][_commonName] = voteCount;
-        validatorVotes[_org][_orgUnit][_commonName].push(newVote);
-        validatorVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName] = validatorVotes[_org][_orgUnit][_commonName].length;
+        uint voteIndex = validatorVoteMap[_commonName][originName];
+        require(voteIndex == 0, "Vote to add already cast for " + _commonName);
+        MercataValidatorVote newVote = new MercataValidatorVote(originName, _commonName, true);
+        uint voteCount = validatorVoteCountMap[_commonName] + 1;
+        validatorVoteCountMap[_commonName] = voteCount;
+        validatorVotes[_commonName].push(newVote);
+        validatorVoteMap[_commonName][originName] = validatorVotes[_commonName].length;
 
-        uint newVoteCount = validatorVoteCountMap[_org][_orgUnit][_commonName];
+        uint newVoteCount = validatorVoteCountMap[_commonName];
         if (newVoteCount >= ((2 * adminCount) / 3) + 1) {
-            MercataValidatorVote[] votes = validatorVotes[_org][_orgUnit][_commonName];
+            MercataValidatorVote[] votes = validatorVotes[_commonName];
             for (uint i = 0; i < votes.length; i++) {
                 votes[i].finalize();
-                string voteOrg = votes[i].voterOrg();
-                string voteUnit = votes[i].voterOrgUnit();
                 string voteName = votes[i].voterCommonName();
-                validatorVoteMap[_org][_orgUnit][_commonName][voteOrg][voteUnit][voteName] = 0;
+                validatorVoteMap[_commonName][voteName] = 0;
                 votes[i] = MercataValidatorVote(address(0));
             }
-            validatorVotes[_org][_orgUnit][_commonName].length = 0;
-            validatorVoteCountMap[_org][_orgUnit][_commonName] = 0;
-            MercataValidator newValidator = new MercataValidator(_org, _orgUnit, _commonName);
-            validatorMap[_org][_orgUnit][_commonName] = newValidator;
+            validatorVotes[_commonName].length = 0;
+            validatorVoteCountMap[_commonName] = 0;
+            MercataValidator newValidator = new MercataValidator(_commonName);
+            validatorMap[_commonName] = newValidator;
             validatorCount++;
-            emit ValidatorAdded(_org, _orgUnit, _commonName);
+            emit ValidatorAdded(_commonName);
         }
     }
     
-    function voteToRemoveValidator(string _org, string _orgUnit, string _commonName) {
+    function voteToRemoveValidator(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a validator requires having a valid X.509 certificate");
         require(c.isValid(), "Voting to add a validator requires having a valid X.509 certificate");
-        string originOrg = c.organization();
-        string originUnit = c.organizationalUnit();
         string originName = c.commonName();
 
-        MercataAdmin a = adminMap[originOrg][originUnit][originName];
+        MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for validators");
         require(a.isActive(), "Only registered network admins can vote for validators");
         
-        MercataValidator v = validatorMap[_org][_orgUnit][_commonName];
+        MercataValidator v = validatorMap[_commonName];
         require(address(v) != address(0), "Votes to remove can only be counted for current validators");
         
-        uint voteIndex = validatorVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
-        require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
-        MercataValidatorVote newVote = new MercataValidatorVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, false);
-        uint voteCount = validatorVoteCountMap[_org][_orgUnit][_commonName] + 1;
-        validatorVoteCountMap[_org][_orgUnit][_commonName] = voteCount;
-        validatorVotes[_org][_orgUnit][_commonName].push(newVote);
-        validatorVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName] = validatorVotes[_org][_orgUnit][_commonName].length;
+        uint voteIndex = validatorVoteMap[_commonName][originName];
+        require(voteIndex == 0, "Vote to add already cast for " + _commonName);
+        MercataValidatorVote newVote = new MercataValidatorVote(originName, _commonName, false);
+        uint voteCount = validatorVoteCountMap[_commonName] + 1;
+        validatorVoteCountMap[_commonName] = voteCount;
+        validatorVotes[_commonName].push(newVote);
+        validatorVoteMap[_commonName][originName] = validatorVotes[_commonName].length;
 
-        uint newVoteCount = validatorVoteCountMap[_org][_orgUnit][_commonName];
+        uint newVoteCount = validatorVoteCountMap[_commonName];
         if (newVoteCount >= ((2 * adminCount) / 3) + 1) {
-            MercataValidatorVote[] votes = validatorVotes[_org][_orgUnit][_commonName];
+            MercataValidatorVote[] votes = validatorVotes[_commonName];
             for (uint i = 0; i < votes.length; i++) {
                 votes[i].finalize();
-                string voteOrg = votes[i].voterOrg();
-                string voteUnit = votes[i].voterOrgUnit();
                 string voteName = votes[i].voterCommonName();
-                validatorVoteMap[_org][_orgUnit][_commonName][voteOrg][voteUnit][voteName] = 0;
+                validatorVoteMap[_commonName][voteName] = 0;
                 votes[i] = MercataValidatorVote(address(0));
             }
-            validatorVotes[_org][_orgUnit][_commonName].length = 0;
-            validatorVoteCountMap[_org][_orgUnit][_commonName] = 0;
+            validatorVotes[_commonName].length = 0;
+            validatorVoteCountMap[_commonName] = 0;
             v.deactivate();
-            validatorMap[_org][_orgUnit][_commonName] = MercataValidator(address(0));
+            validatorMap[_commonName] = MercataValidator(address(0));
             validatorCount--;
-            emit ValidatorRemoved(_org, _orgUnit, _commonName);
+            emit ValidatorRemoved(_commonName);
         }
     }
     
-    function voteToAddAdmin(string _org, string _orgUnit, string _commonName) {
+    function voteToAddAdmin(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a network admin requires having a valid X.509 certificate");
         require(c.isValid(), "Voting to add an admin requires having a valid X.509 certificate");
-        string originOrg = c.organization();
-        string originUnit = c.organizationalUnit();
         string originName = c.commonName();
 
-        MercataAdmin a = adminMap[originOrg][originUnit][originName];
+        MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for admins");
         require(a.isActive(), "Only registered network admins can vote for admins");
         
-        MercataAdmin v = adminMap[_org][_orgUnit][_commonName];
+        MercataAdmin v = adminMap[_commonName];
         require(address(v) == address(0), "Votes to add cannot be counted for current admins");
         
-        uint voteIndex = adminVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
-        require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
-        MercataAdminVote newVote = new MercataAdminVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, true);
-        uint voteCount = adminVoteCountMap[_org][_orgUnit][_commonName] + 1;
-        adminVoteCountMap[_org][_orgUnit][_commonName] = voteCount;
-        adminVotes[_org][_orgUnit][_commonName].push(newVote);
-        adminVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName] = adminVotes[_org][_orgUnit][_commonName].length;
+        uint voteIndex = adminVoteMap[_commonName][originName];
+        require(voteIndex == 0, "Vote to add already cast for " + _commonName);
+        MercataAdminVote newVote = new MercataAdminVote(originName, _commonName, true);
+        uint voteCount = adminVoteCountMap[_commonName] + 1;
+        adminVoteCountMap[_commonName] = voteCount;
+        adminVotes[_commonName].push(newVote);
+        adminVoteMap[_commonName][originName] = adminVotes[_commonName].length;
 
-        uint newVoteCount = adminVoteCountMap[_org][_orgUnit][_commonName];
+        uint newVoteCount = adminVoteCountMap[_commonName];
         if (newVoteCount >= ((2 * adminCount) / 3) + 1) {
-            MercataAdminVote[] votes = adminVotes[_org][_orgUnit][_commonName];
+            MercataAdminVote[] votes = adminVotes[_commonName];
             for (uint i = 0; i < votes.length; i++) {
                 votes[i].finalize();
-                string voteOrg = votes[i].voterOrg();
-                string voteUnit = votes[i].voterOrgUnit();
                 string voteName = votes[i].voterCommonName();
-                adminVoteMap[_org][_orgUnit][_commonName][voteOrg][voteUnit][voteName] = 0;
+                adminVoteMap[_commonName][voteName] = 0;
                 votes[i] = MercataAdminVote(address(0));
             }
-            adminVotes[_org][_orgUnit][_commonName].length = 0;
-            adminVoteCountMap[_org][_orgUnit][_commonName] = 0;
-            MercataAdmin newAdmin = new MercataAdmin(_org, _orgUnit, _commonName);
-            adminMap[_org][_orgUnit][_commonName] = newAdmin;
+            adminVotes[_commonName].length = 0;
+            adminVoteCountMap[_commonName] = 0;
+            MercataAdmin newAdmin = new MercataAdmin(_commonName);
+            adminMap[_commonName] = newAdmin;
             adminCount++;
         }
     }
     
-    function voteToRemoveAdmin(string _org, string _orgUnit, string _commonName) {
+    function voteToRemoveAdmin(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add an admin requires having a valid X.509 certificate");
         require(c.isValid(), "Voting to add an admin requires having a valid X.509 certificate");
-        string originOrg = c.organization();
-        string originUnit = c.organizationalUnit();
         string originName = c.commonName();
 
-        MercataAdmin a = adminMap[originOrg][originUnit][originName];
+        MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for admins");
         require(a.isActive(), "Only registered network admins can vote for admins");
         
-        MercataAdmin v = adminMap[_org][_orgUnit][_commonName];
+        MercataAdmin v = adminMap[_commonName];
         require(address(v) != address(0), "Votes to remove can only be counted for current admins");
         
-        uint voteIndex = adminVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
-        require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
-        MercataAdminVote newVote = new MercataAdminVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, false);
-        uint voteCount = adminVoteCountMap[_org][_orgUnit][_commonName] + 1;
-        adminVoteCountMap[_org][_orgUnit][_commonName] = voteCount;
-        adminVotes[_org][_orgUnit][_commonName].push(newVote);
-        adminVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName] = adminVotes[_org][_orgUnit][_commonName].length;
+        uint voteIndex = adminVoteMap[_commonName][originName];
+        require(voteIndex == 0, "Vote to add already cast for " + _commonName);
+        MercataAdminVote newVote = new MercataAdminVote(originName, _commonName, false);
+        uint voteCount = adminVoteCountMap[_commonName] + 1;
+        adminVoteCountMap[_commonName] = voteCount;
+        adminVotes[_commonName].push(newVote);
+        adminVoteMap[_commonName][originName] = adminVotes[_commonName].length;
 
-        uint newVoteCount = adminVoteCountMap[_org][_orgUnit][_commonName];
+        uint newVoteCount = adminVoteCountMap[_commonName];
         if (newVoteCount >= ((2 * adminCount) / 3) + 1) {
-            MercataAdminVote[] votes = adminVotes[_org][_orgUnit][_commonName];
+            MercataAdminVote[] votes = adminVotes[_commonName];
             for (uint i = 0; i < votes.length; i++) {
                 votes[i].finalize();
-                string voteOrg = votes[i].voterOrg();
-                string voteUnit = votes[i].voterOrgUnit();
                 string voteName = votes[i].voterCommonName();
-                adminVoteMap[_org][_orgUnit][_commonName][voteOrg][voteUnit][voteName] = 0;
+                adminVoteMap[_commonName][voteName] = 0;
                 votes[i] = MercataAdminVote(address(0));
             }
-            adminVotes[_org][_orgUnit][_commonName].length = 0;
-            adminVoteCountMap[_org][_orgUnit][_commonName] = 0;
+            adminVotes[_commonName].length = 0;
+            adminVoteCountMap[_commonName] = 0;
             v.deactivate();
-            adminMap[_org][_orgUnit][_commonName] = MercataAdmin(address(0));
+            adminMap[_commonName] = MercataAdmin(address(0));
             adminCount--;
         }
     }
