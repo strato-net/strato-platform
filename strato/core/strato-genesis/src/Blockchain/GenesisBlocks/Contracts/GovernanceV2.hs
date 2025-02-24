@@ -11,9 +11,9 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
+import Blockchain.Strato.Model.Validator
 import Data.Maybe
 import Data.Text (Text)
 import Data.Text.Encoding
@@ -21,7 +21,7 @@ import SolidVM.Model.Storable hiding (size)
 import Text.RawString.QQ
 
 -- | Inserts a Governance contract into the genesis block with the BlockApps root cert as owner
-insertMercataGovernanceContract :: [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
+insertMercataGovernanceContract :: [Validator] -> [Text] -> GenesisInfo -> GenesisInfo
 insertMercataGovernanceContract validators admins gi =
   gi
     { genesisInfoAccountInfo = initialAccounts ++ govAcct : (validatorAccts ++ adminAccts),
@@ -60,50 +60,46 @@ insertMercataGovernanceContract validators admins gi =
           --          , addrToCertIdx . show $ adminAddr i)) adminIx
           ++ map
             ( \case
-                (i, CommonName _ _ c True) ->
+                (i, Validator c) ->
                   ( encodeUtf8 $ ".validatorMap<\"" <> c <> "\">",
                     addrToCertIdx . show $ validatorAddr i
                   )
-                _ -> error "Invalid validator cert"
             )
             valIx
           ++ map
             ( \case
-                (i, CommonName _ _ c True) ->
+                (i, c) ->
                   ( encodeUtf8 $ ".adminMap<\"" <> c <> "\">",
                     addrToCertIdx . show $ adminAddr i
                   )
-                _ -> error "Invalid admin cert"
             )
             adminIx
     validatorAccts =
       map
         ( \case
-            (i, CommonName _ _ c True) ->
+            (i, Validator validator) ->
               SolidVMContractWithStorage
                 (validatorAddr i)
                 0
                 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
                 [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".commonName", BString $ encodeUtf8 c),
+                  (".commonName", BString $ encodeUtf8 validator),
                   (".isActive", BBool True)
                 ]
-            _ -> error "Invalid validator cert"
         )
         valIx
     adminAccts =
       map
         ( \case
-            (i, CommonName _ _ c True) ->
+            (i, admin) ->
               SolidVMContractWithStorage
                 (adminAddr i)
                 0
                 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance))
                 [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".commonName", BString $ encodeUtf8 c),
+                  (".commonName", BString $ encodeUtf8 admin),
                   (".isActive", BBool True)
                 ]
-            _ -> error "Invalid admin cert"
         )
         adminIx
 

@@ -10,8 +10,10 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Validator
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.Text (Text)
 import Text.RawString.QQ
 
 genesisBlock :: GenesisInfo
@@ -205,19 +207,17 @@ N8txKc8G9R27ZYAUuz15zF0=
 extraCerts :: [X509Certificate]
 extraCerts = map (\s -> either (error $ "can't parse cert: " ++ show s) id $ bytesToCert $ BC.pack s) certStrings
 
-validators :: [ChainMemberParsedSet]
+validators :: [Validator]
 validators = [
-  CommonName "" "" "bluecabinet" True
---  CommonName "BlockApps" "Mercata" "NodeOne" True,
---  CommonName "BlockApps" "Mercata" "NodeTwo" True,
---  CommonName "BlockApps" "Mercata" "NodeThree" True,
---  CommonName "BlockApps" "Mercata" "NodeFour" True
+  "bluecabinet"
+--  "marketplace.mercata-beta.blockapps.net",
+--  "blockchainhaberdasher.com"
   ]
 
-admins :: [ChainMemberParsedSet]
+admins :: [Text]
 admins = [
---  CommonName "BlockApps" "Mercata" "Kieren James-Lubin" True,
---  CommonName "BlockApps" "Mercata" "Victor Wong" True,
-  CommonName "BlockApps" "Mercata" "James Hormuzdiar" True
+--  "Kieren James-Lubin",
+--  "Victor Wong",
+  "James Hormuzdiar"
   ]
 
