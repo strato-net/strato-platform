@@ -14,7 +14,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.Validator
-import Data.Maybe
 import Data.Text (Text)
 import Data.Text.Encoding
 import SolidVM.Model.Storable hiding (size)
@@ -35,8 +34,8 @@ insertMercataGovernanceContract validators admins gi =
     encodedGovernance = encodeUtf8 governanceSrc
 
     rootAddress' = fromPublicKey rootPubKey
-    rootAddress = BAccount (NamedAccount rootAddress' MainChain)
-    addrToCertIdx ad = BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+    rootAddress = BAccount (NamedAccount rootAddress' UnspecifiedChain)
+    addrToCertIdx ad = BAccount (NamedAccount ad UnspecifiedChain)
     valIx = zip [0 ..] validators
     adminIx = zip [0 ..] admins
     validatorOffset = 0x56616c696461746f7273
@@ -62,7 +61,7 @@ insertMercataGovernanceContract validators admins gi =
             ( \case
                 (i, Validator c) ->
                   ( encodeUtf8 $ ".validatorMap<\"" <> c <> "\">",
-                    addrToCertIdx . show $ validatorAddr i
+                    addrToCertIdx $ validatorAddr i
                   )
             )
             valIx
@@ -70,7 +69,7 @@ insertMercataGovernanceContract validators admins gi =
             ( \case
                 (i, c) ->
                   ( encodeUtf8 $ ".adminMap<\"" <> c <> "\">",
-                    addrToCertIdx . show $ adminAddr i
+                    addrToCertIdx $ adminAddr i
                   )
             )
             adminIx
@@ -82,7 +81,7 @@ insertMercataGovernanceContract validators admins gi =
                 (validatorAddr i)
                 0
                 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
-                [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                [ (".owner", BAccount (NamedAccount 100 UnspecifiedChain)),
                   (".commonName", BString $ encodeUtf8 validator),
                   (".isActive", BBool True)
                 ]
@@ -96,7 +95,7 @@ insertMercataGovernanceContract validators admins gi =
                 (adminAddr i)
                 0
                 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance))
-                [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                [ (".owner", BAccount (NamedAccount 100 UnspecifiedChain)),
                   (".commonName", BString $ encodeUtf8 admin),
                   (".isActive", BBool True)
                 ]
