@@ -19,6 +19,7 @@ const GlobalTransactionResponsive = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
+  stratsAddress,
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -234,7 +235,9 @@ const GlobalTransactionResponsive = ({
                       <p className={`text-right flex justify-end items-center`}>
                         $
                         {formattedNum(
-                          is18DecimalPlaces
+                          assetOriginAddress === stratsAddress
+                            ? (price * 100).toFixed(2)
+                            : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : (price * Math.pow(10, decimals || 0)).toFixed(2)
                         )}{' '}
@@ -253,7 +256,9 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {(redemption_id
+                      {(assetOriginAddress === stratsAddress
+                        ? (quantity / 100).toFixed(2)
+                        : redemption_id
                         ? quantity
                         : is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
