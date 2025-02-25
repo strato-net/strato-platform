@@ -1,10 +1,20 @@
 import React from 'react';
 import './Statistics.css';
-const Statistics = ({ priceHistory, decimals }) => {
+const Statistics = ({ priceHistory }) => {
   // Origin Asset Statistics
   const originFluctuation = priceHistory.records.originFluctuation;
-  const originVolume = priceHistory.records.originVolume;
-  const originAveragePrice = priceHistory.records.originAveragePrice.toFixed(2);
+  const originVolume = priceHistory.records.originVolume.toLocaleString(
+    'en-US',
+    {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    }
+  );
+  const originAveragePrice =
+    priceHistory.records.originAveragePrice.toLocaleString('en-US', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    });
 
   return (
     <div className="container">
@@ -13,8 +23,16 @@ const Statistics = ({ priceHistory, decimals }) => {
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
             <p className="statistics-title text-2xl font-semibold">
-              ${originFluctuation.min * Math.pow(10, decimals)}- $
-              {originFluctuation.max * Math.pow(10, decimals)}
+              $
+              {originFluctuation.min.toLocaleString('en-US', {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 0,
+              })}{' '}
+              - $
+              {originFluctuation.max.toLocaleString('en-US', {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 0,
+              })}
             </p>
             <p className="subtitle text-gray-600">12-Month Price Range</p>
           </div>
@@ -24,7 +42,7 @@ const Statistics = ({ priceHistory, decimals }) => {
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
             <p className="statistics-title text-2xl font-semibold">
-              {(originVolume / Math.pow(10, decimals)).toFixed(0)}
+              {originVolume}
             </p>
             <p className="subtitle text-gray-600">Number Of Units Sold</p>
           </div>

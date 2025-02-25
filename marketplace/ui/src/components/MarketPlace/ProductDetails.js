@@ -1074,7 +1074,6 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        decimals={decimals}
                       />
                     </>
                   )}
