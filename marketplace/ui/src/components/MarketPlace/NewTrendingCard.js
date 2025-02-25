@@ -174,22 +174,22 @@ const NewTrendingCard = ({
                 );
               } else if (isWbtcst) {
                 const url = routes.WbtcstProductDetail.url;
-                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                navigate(`${url.replace(':address', topSellingProduct.address)}`, {
                   state: { isCalledFromInventory: false },
                 });
               }else if (isUsdtst) {
                 const url = routes.UsdtstProductDetail.url;
-                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                navigate(`${url.replace(':address', topSellingProduct.address)}`, {
                   state: { isCalledFromInventory: false },
                 });
               } else if (isUsdcst) {
                 const url = routes.UsdcstProductDetail.url;
-                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                navigate(`${url.replace(':address', topSellingProduct.address)}`, {
                   state: { isCalledFromInventory: false },
                 });
               } else if (isPaxgst) {
                 const url = routes.PaxgstProductDetail.url;
-                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                navigate(`${url.replace(':address', topSellingProduct.address)}`, {
                   state: { isCalledFromInventory: false },
                 });
               } else {
