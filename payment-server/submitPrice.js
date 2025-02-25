@@ -22,7 +22,7 @@ async function submitPrice(token, contract, args) {
 }
 
 // Function to update the price of the Asset Sale price
-async function updateMetalPrice(assetName, token, contractAddress, price) {
+async function updateMetalPrice(assetName, token, contractAddress, price, decimals) {
   const parsedPriceMarkup = parseFloat(
     process.env[
       assetName.toLowerCase().includes("gold")
@@ -37,7 +37,7 @@ async function updateMetalPrice(assetName, token, contractAddress, price) {
     method: "update",
     args: {
       _quantity: 0,
-      _price: Math.round(price * parsedPriceMarkup * 100) / 100,
+      _price: (Math.round(price * parsedPriceMarkup * 100) / 100) / Math.pow(10, decimals),
       _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
@@ -69,14 +69,14 @@ async function runDistributeRewardsCalls(token) {
       });
       // wait until there are no more PENDING results
       const predicate = (results) =>
-        results.filter((r) => r.status === rest.PENDING).length === 0;
-      const action = async () =>
+        results.filter((r) => r.status === "Pending").length === 0;
+      const action = async (options) =>
         rest.getBlocResults(
           token,
           res.map((r) => r.hash),
-          { config }
+          options
         );
-      await util.until(predicate, action, { config }, 3600000);
+      await util.until(predicate, action, { config, isAsync: true }, 3600000);
       console.log("Batch distributeRewards calls completed.");
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
@@ -98,7 +98,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   const reserveSearchOptions = {
     config,
     query: {
-      creator: "eq.BlockApps",
+      creator: "in.(BlockApps,mercata_usdst)",
       isActive: "eq.true",
       oracle: "eq." + oracleContract.address,
     },
@@ -123,7 +123,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     const searchOptions = {
       config,
       query: {
-        creator: "eq.BlockApps",
+        creator: "in.(BlockApps,mercata_usdst)",
         isActive: "eq.true",
         reserve: "eq." + reserveAddress,
       },
@@ -189,6 +189,34 @@ async function fetchMetalPrice(metal, apiKey) {
     await flagFile.appendToErrorFile(
       `Failed to fetch price for ${metal}: ${error}`
     );
+  }
+}
+
+// Function to fetch  and submit price
+async function fetchLBMAMetalPrice(metal, apiKey) {
+  try {
+    const apiUrl = `https://api.metals.dev/v1/metal/authority?api_key=${apiKey}&authority=lbma&currency=USD&unit=toz`;
+    const response = await axios.get(apiUrl);
+    const rates = response.data.rates;
+    let metalPrice;
+
+    if (metal.toLowerCase() === "gold") {
+      metalPrice = rates.lbma_gold_am;
+    } else if (metal.toLowerCase() === "silver") {
+      metalPrice = rates.lbma_silver;
+    } else {
+      throw new Error(`Metal ${metal} not supported`);
+    }
+
+    console.log(`Current ${metal} Price: $${metalPrice} per ounce`);
+
+    const timestampInSeconds = Math.floor(Date.now() / 1000);
+    console.log(`Current Timestamp: ${timestampInSeconds}`);
+
+    return { price: metalPrice, timestampInSeconds };
+  } catch (error) {
+    console.error(`ERROR: Failed to fetch price for ${metal}:`, error);
+    await flagFile.appendToErrorFile(`Failed to fetch price for ${metal}: ${error}`);
   }
 }
 
@@ -312,6 +340,23 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
           price: 1 / 1e18,
           timestamp: Math.floor(Date.now() / 1000),
         });
+      } else if (oracle.metal === "GOLDST") {
+        const metalResult = await fetchMetalPrice(
+          "gold",
+          process.env.METALS_API_KEY
+        );
+
+        if (metalResult) {
+          await submitPrice(token, oracle, {
+            price: (metalResult.price / 1e18),
+            timestamp: metalResult.timestampInSeconds,
+          });
+          console.log(
+            `[Oracle Update] Price submitted for ${
+              oracle.metal
+            } at ${new Date().toISOString()}`
+          );
+        }
       } else {
         const metalResult = await fetchMetalPrice(
           oracle.metal.toLowerCase(),
@@ -375,8 +420,10 @@ const updateSalePricePeriodically = async () => {
           continue;
         }
 
-        const metalResult = await fetchMetalPrice(
-          asset.name.toLowerCase(),
+        const metalResult = await fetchLBMAMetalPrice(
+          asset.name.toLowerCase().includes("gold")
+            ? "gold"
+            : asset.name.toLowerCase(),
           process.env.METALS_API_KEY
         );
 
@@ -386,7 +433,8 @@ const updateSalePricePeriodically = async () => {
           asset.name.toLowerCase(),
           token,
           assetResult[0]?.sale,
-          metalResult.price / Math.pow(10, decimals)
+          metalResult.price,
+          decimals
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`
@@ -416,7 +464,7 @@ async function main() {
   );
 
   const oracleInterval = Number(config.oracleInterval) || 60000; // Default: 1 minute
-  const saleInterval = Number(config.saleInterval) || 60000; // Default: 1 minute
+  const saleUpdateTime = Number(config.saleUpdateTime) || 11; // Default: 6 am UTC
   const totalRunInterval = 60 * 1000; // 1 minutes
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -447,6 +495,9 @@ async function main() {
   const runTasks = async () => {
     while (true) {
       try {
+        const now = new Date();
+        const currentDate = now.toISOString().split("T")[0]; // e.g., "2025-02-24"
+
         // Check if it's time to run the oracle update
         if (Date.now() - lastOracleRun >= oracleInterval) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
@@ -458,12 +509,13 @@ async function main() {
 
         // Check if it's time to run the sale price update
         if (
-          Date.now() - lastSaleRun >= saleInterval &&
-          process.env.SALE_UPDATE === "true"
+          process.env.SALE_UPDATE === "true" &&
+          now.getHours() === parseInt(saleUpdateTime, 10) &&
+          lastSaleRun !== currentDate
         ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
-          lastSaleRun = Date.now();
+          lastSaleRun = currentDate;
         } else {
           console.log("[Sale] Skipping since interval not reached.");
         }

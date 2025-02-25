@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Typography, Tooltip, Popover } from 'antd';
+import { Button, Typography, Tooltip } from 'antd';
 import { BigNumber } from 'bignumber.js';
 import {
   DollarOutlined,
@@ -13,7 +13,6 @@ import {
   RiseOutlined,
   SolutionOutlined,
   BankOutlined,
-  MoreOutlined,
 } from '@ant-design/icons';
 import PreviewInventoryModal from './PreviewInventoryModal';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +28,7 @@ import {
   ASSET_STATUS,
   OLD_SADDOG_ORIGIN_ADDRESS,
 } from '../../helpers/constants';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
@@ -37,7 +37,9 @@ import { useInventoryState } from '../../contexts/inventory';
 import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />;
+const USDSTIcon = (
+  <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
+);
 
 const InventoryCard = ({
   inventory,
@@ -72,11 +74,13 @@ const InventoryCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    inventory.originAddress
-  )
-    ? 18
-    : inventory.decimals || 0;
+  const { stratsAddress } = useMarketplaceState();
+  const decimals =
+    stratsAddress === inventory.originAddress
+      ? 2
+      : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
+      ? 18
+      : inventory.decimals || 0;
   const quantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );
@@ -204,10 +208,7 @@ const InventoryCard = ({
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    let category = allSubcategories?.find(
-      (c) => c.contract === contractName
-    )?.name;
-    return category;
+    return contractName;
   };
 
   /**
@@ -379,7 +380,7 @@ const InventoryCard = ({
                   inventory.address === inventory.originAddress ||
                   !isActive() ||
                   disableSADDOGS(inventory) ||
-                  decimals === 18
+                  getCategory()?.includes('Tokens')
                 }
               >
                 <SendOutlined /> Redeem
@@ -438,7 +439,7 @@ const InventoryCard = ({
                       inventory.address === inventory.originAddress ||
                       !isActive() ||
                       disableSADDOGS(inventory) ||
-                      decimals === 18
+                      getCategory()?.includes('Tokens')
                     }
                   >
                     <SendOutlined /> Redeem

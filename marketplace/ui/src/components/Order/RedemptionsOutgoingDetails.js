@@ -158,7 +158,9 @@ const RedemptionsOutgoingDetails = ({ user }) => {
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', record.address).replace(':name', encodeURIComponent(record.name))}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', record.address)
+                .replace(':name', encodeURIComponent(record.name))}`
             );
           }}
         >
@@ -171,7 +173,9 @@ const RedemptionsOutgoingDetails = ({ user }) => {
       dataIndex: 'quantity',
       key: 'quantity',
       align: 'center',
-      render: (text) => <p>{text}</p>,
+      render: (text, record) => (
+        <p>{record.quantity / Math.pow(10, record.decimals)}</p>
+      ),
     },
   ];
 

@@ -37,14 +37,14 @@ export default {
   testnetNetworkId: '7596898649924658542',
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
-  prodUSDSTAddress: '',
-  testnetUSDSTAddress: '2f6c3848a75aa075d054fe84b780cbdebd77ec61',
+  prodUSDSTAddress: '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
+  testnetUSDSTAddress: '3aea6a1bd049bbf57f2e64a4f68a264ebfafcba9',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: 'fa4e951fdb86f10394a23efc89ddeef83a0b1c17',
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
-  testnetWBTCSTAddress: '65978aada9f5c2a1c462d1458f590bb54f447b7c',
-  prodWBTCSTAddress: '',
+  testnetWBTCSTAddress: 'ae20770679fe2012ff7a0a3a0b6a939d29c64da7',
+  prodWBTCSTAddress: '7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
@@ -78,6 +78,8 @@ export default {
   testTokenServerUrl: 'https://campaigns-test.blockapps.net',
   prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
+
+export const DECIMAL_FACTOR_18 = Math.pow(10, 18);
 
 export const unitOfMeasurement = {};
 unitOfMeasurement[(unitOfMeasurement['LB'] = 1)] = 'LB';

@@ -27,11 +27,12 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS:-false}
 
   export ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL:-60000}
-  export SALE_UPDATE_INTERVAL=${SALE_UPDATE_INTERVAL:-60000}
+  export SALE_UPDATE_TIME=${SALE_UPDATE_TIME:-11} # 11:00 UTC
   export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
   export GOLD_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Gold'}
   export ETH_ORACLE_NAME_VALUE=${ETH_ORACLE_NAME_VALUE:-'ETH'}
   export BTC_ORACLE_NAME_VALUE=${BTC_ORACLE_NAME_VALUE:-'BTC'}
+  export GOLDST_ORACLE_NAME_VALUE=${GOLDST_ORACLE_NAME_VALUE:-'GOLDST'}
   export USD_ORACLE_NAME_VALUE=${USD_ORACLE_NAME_VALUE:-'USD'}
   export SILVER_ASSET_ADDRESSES=${SILVER_ASSET_ADDRESSES:-''}
   export GOLD_ASSET_ADDRESSES=${GOLD_ASSET_ADDRESSES:-''}
@@ -66,11 +67,12 @@ if [ "$ORACLE_MODE" = "true" ]; then
   
     # Replace placeholders in Oracle config template
     sed -i 's*<oracleFetchInterval_value>*'"${ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<saleUpdateInterval_value>*'"${SALE_UPDATE_INTERVAL}"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<saleUpdateTime_value>*'"${SALE_UPDATE_TIME}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_oracle_name_value>*'"${GOLD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<eth_oracle_name_value>*'"${ETH_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<btc_oracle_name_value>*'"${BTC_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<goldst_oracle_name_value>*'"${GOLDST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<silver_asset_addresses_value>*'"${SILVER_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_asset_addresses_value>*'"${GOLD_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml

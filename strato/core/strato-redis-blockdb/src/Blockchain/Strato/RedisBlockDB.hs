@@ -151,7 +151,7 @@ getValidatorAddresses :: Redis [Address]
 getValidatorAddresses = do 
   smembers (namespaceToKeyPrefix Validators) >>= \case 
     Left _ -> pure []
-    Right keysBS -> (fmap userAddress . catMaybes) <$> (sequence $ (getCertFromParsedSet . fromValue) <$> keysBS)
+    Right keysBS -> (fmap userAddress . catMaybes) <$> (sequence $ (getCertFromValidator . fromValue) <$> keysBS)
 
 addValidators ::
   [Validator] ->
@@ -219,14 +219,13 @@ insertRootCertificate = do
       TxAborted -> Left . SingleLine $ "insertRootCertificate - Aborted"
       TxError e -> Left . SingleLine $ "insertRootCertificate - Error " <> S8.pack e
 
-getCertFromParsedSet :: CM.ChainMemberParsedSet -> Redis (Maybe X509CertInfoState)
-getCertFromParsedSet (CM.CommonName o u c _) =
-  getInNamespace ParsedSetToX509 (CM.CommonName o u c True) >>= \case
+getCertFromValidator :: Validator -> Redis (Maybe X509CertInfoState)
+getCertFromValidator (Validator v) =
+  getInNamespace ParsedSetToX509 (CM.CommonName "" "" v True) >>= \case
     Right (Just state) ->
       let certInfoState = fromValue state
        in pure $ Just certInfoState
     _ -> pure $ Nothing
-getCertFromParsedSet _ = pure $ Nothing
 
 addParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
 addParsedSet (X509CertInfoState _ _ _ _ o u c) = do

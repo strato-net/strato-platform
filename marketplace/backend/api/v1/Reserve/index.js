@@ -7,6 +7,13 @@ import loadDapp from '../../middleware/loadDappHandler';
 const router = express.Router();
 
 router.get(
+  Reserve.fetchTotalCataRewards,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  ReserveController.fetchTotalCataRewards
+);
+
+router.get(
   Reserve.get,
   authHandler.authorizeRequest(true),
   loadDapp,

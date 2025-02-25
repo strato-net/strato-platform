@@ -28,7 +28,7 @@ abstract contract LendingToken is Mintable, MinterAuthorization {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity > 0, "Quantity must be greater than 0");
-        require(MinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
+        require(getCommonName(msg.sender) == minterCommonName || MinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minters can mint new units");
         emit OwnershipTransfer(
             originAddress,
             address(0),
