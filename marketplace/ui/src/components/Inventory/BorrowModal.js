@@ -239,12 +239,13 @@ const BorrowModal = ({
   }, [inventory, collateralValue]);
 
   const marketValueDisplay = (collateralValue / Math.pow(10, decimal)).toFixed(2);
+  
   // the extra math on borrowedAmountDisplay and roundedMaxLoanAmount is to round down to 2 decimal places
   const borrowedAmountDisplay = (
     Math.floor((borrowedAmount / Math.pow(10, decimal)) * 100) / 100
   ).toFixed(2);
   const roundedMaxLoanAmount = (
-    Math.floor((maxLoanAmount / Math.pow(10, 18)) * 100) / 100
+    Math.floor((maxLoanAmount / Math.pow(10, decimal)) * 100) / 100
   ).toFixed(2);
   const loanableAmountDisplay = (
     roundedMaxLoanAmount - borrowedAmountDisplay

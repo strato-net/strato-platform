@@ -127,22 +127,25 @@ const StakeItemActions = ({
       return maxLoanAmount;
     }
   }, [inventory, collateralValue, maxLoanAmount]);
+
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
+    inventory?.root || ''
+  )
+    ? 18
+    : inventory?.decimals || 0;
+
   const roundedMaxLoanAmount = (
-    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
+    Math.floor((newMaxLoanAmount / Math.pow(10, decimals)) * 100) / 100
   ).toFixed(2);
   const roundedBorrowedAmount = (
-    Math.floor((borrowAmount / Math.pow(10, 18)) * 100) / 100
+    Math.floor((borrowAmount / Math.pow(10, decimals)) * 100) / 100
   ).toFixed(2);
 
   /**
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
    * This matches the logic used in StakeModal and BorrowModal.
    */
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    inventory?.root || ''
-  )
-    ? 18
-    : inventory?.decimals || 0;
+  
 
   if (decimals > 0) {
     collateralQuantity /= Math.pow(10, decimals);
