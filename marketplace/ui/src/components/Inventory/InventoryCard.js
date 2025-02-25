@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Typography, Tooltip, Popover } from 'antd';
+import { Button, Typography, Tooltip } from 'antd';
 import { BigNumber } from 'bignumber.js';
 import {
   DollarOutlined,
@@ -13,7 +13,6 @@ import {
   RiseOutlined,
   SolutionOutlined,
   BankOutlined,
-  MoreOutlined,
 } from '@ant-design/icons';
 import PreviewInventoryModal from './PreviewInventoryModal';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +28,7 @@ import {
   ASSET_STATUS,
   OLD_SADDOG_ORIGIN_ADDRESS,
 } from '../../helpers/constants';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
@@ -75,11 +75,13 @@ const InventoryCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    inventory.originAddress
-  )
-    ? 18
-    : inventory.decimals || 0;
+  const { stratsAddress } = useMarketplaceState();
+  const decimals =
+    stratsAddress === inventory.originAddress
+      ? 2
+      : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
+      ? 18
+      : inventory.decimals || 0;
   const quantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );

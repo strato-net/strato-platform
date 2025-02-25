@@ -1,8 +1,5 @@
-import { Button, Image, Typography, Spin, notification } from 'antd';
-import CategoryCard from './CategoryCard';
-import TopSellingProductCard from './TopSellingProductCard';
+import { Button, Spin, notification } from 'antd';
 import StakeableProductCards from './StakeableProductCards';
-import { Images } from '../../images';
 import React, { useEffect, useState } from 'react';
 import { actions } from '../../contexts/category/actions';
 import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
@@ -10,7 +7,6 @@ import useDebounce from '../UseDebounce';
 import { useNavigate } from 'react-router-dom';
 import routes from '../../helpers/routes';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-import { Carousel } from 'react-responsive-carousel';
 import { Fade } from 'react-awesome-reveal';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
@@ -47,16 +43,16 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const ethDispatch = useEthDispatch();
   const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
-  const { reserves } = useInventoryState();
+  const { reserves, totalCataRewards } = useInventoryState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
   const [totalTvl, setTotalTvl] = useState(0);
   const [averageApy, setAverageApy] = useState(0);
-  const [totalCataRewards, setTotalCataRewards] = useState(0);
+  const [totalCataReward, setTotalCataReward] = useState(0);
 
   useEffect(() => {
-    if (reserves) {
+    if (reserves && totalCataRewards) {
       const totalTvl = reserves.reduce(
         (sum, reserves) => sum + reserves.tvl,
         0
@@ -65,15 +61,11 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         reserves.reduce((sum, reserves) => sum + reserves.cataAPYRate, 0) /
         reserves.length;
 
-      const totalCataRewards = reserves.reduce(
-        (sum, reserves) => sum + reserves.totalCataRewardIssued,
-        0
-      );
       setAverageApy(Math.floor(averageApy));
       setTotalTvl(Math.floor(totalTvl));
-      setTotalCataRewards(Math.floor(totalCataRewards));
+      setTotalCataReward(Math.floor(totalCataRewards));
     }
-  }, [reserves]);
+  }, [reserves, totalCataRewards]);
 
   useEffect(() => {
     inventoryActions.getAllReserve(inventoryDispatch);
@@ -82,6 +74,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
     ethActions.fetchUSDTSTAddress(ethDispatch)
     ethActions.fetchUSDCSTAddress(ethDispatch)
     ethActions.fetchPAXGSTAddress(ethDispatch)
+    inventoryActions.fetchTotalCataRewards(inventoryDispatch);
   }, []);
 
   useEffect(() => {
@@ -170,7 +163,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         </div>
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            {totalCataRewards}
+            {totalCataReward}
           </div>
           <div className="stake-banner-stats-title text-white">
             Rewards Issued (CATA)
@@ -275,9 +268,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       ) : (
         <>
           <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
-            {/* <CategoryCard /> */}
             <StakeableProductCards />
-            <TopSellingProductCard />
           </div>
           <h3 className="text-center text-gray-500 mt-8 mb-4">
             Is there an item you would like to see on the marketplace?

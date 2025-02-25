@@ -243,8 +243,9 @@ const BorrowModal = ({
   const borrowedAmountDisplay = (
     Math.floor((borrowedAmount / Math.pow(10, decimal)) * 100) / 100
   ).toFixed(2);
-  const roundedMaxLoanAmount =
-    Math.floor((maxLoanAmount / Math.pow(10, decimal)) * 100) / 100;
+  const roundedMaxLoanAmount = (
+    Math.floor((maxLoanAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
   const loanableAmountDisplay = (
     roundedMaxLoanAmount - borrowedAmountDisplay
   ).toFixed(2);

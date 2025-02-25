@@ -228,7 +228,7 @@ async function main() {
     const chunkSize = 20;
     const batches = batchArray(stratBalances, chunkSize);
 
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < batches.length; i++) {
       const chunk = batches[i];
       // Prepare batch info: for each record in the chunk, store owner and computed transferQuantity.
       const batchInfo = chunk.map(([owner, ownerCommonName, stratBalance]) => {

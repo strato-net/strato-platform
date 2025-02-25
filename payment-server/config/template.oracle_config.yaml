@@ -4,7 +4,7 @@ configDirPath: <configDirPath_value>
 serverHost: <serverHost_value>
 dockerized: true
 oracleInterval: <oracleFetchInterval_value>
-saleInterval: <saleUpdateInterval_value>
+saleUpdateTime: <saleUpdateTime_value>
 
 silverOracle:
   name: <silver_oracle_name_value>
@@ -25,6 +25,9 @@ paxgstOracle:
   name: <paxgst_oracle_name_value>      
 btcOracle:
   name: <btc_oracle_name_value>
+
+goldstOracle:
+  name: <goldst_oracle_name_value>
 
 usdOracle:
   name: <usd_oracle_name_value>
