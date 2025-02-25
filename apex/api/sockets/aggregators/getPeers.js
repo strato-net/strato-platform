@@ -10,6 +10,7 @@ function getPeers() {
   Peer
     .findAll({
       attributes: [
+        'host',
         'ip',
         'tcp_port',
         'pubkey',

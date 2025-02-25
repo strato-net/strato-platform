@@ -8,6 +8,9 @@ const Peer = db.sequelize.define('p_peer', {
   pubkey: {
     type: db.Sequelize.STRING
   },
+  host: {
+    type: db.Sequelize.STRING
+  },
   ip: {
     type: db.Sequelize.STRING
   },
