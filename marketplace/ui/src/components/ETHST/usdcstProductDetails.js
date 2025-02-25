@@ -142,7 +142,7 @@ const UsdcProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.UsdcProductDetail.url,
+    path: routes.UsdcstProductDetail.url,
     strict: true,
   });
 

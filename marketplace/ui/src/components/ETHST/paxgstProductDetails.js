@@ -142,7 +142,7 @@ const PaxgProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.PaxgProductDetail.url,
+    path: routes.PaxgstProductDetail.url,
     strict: true,
   });
 
