@@ -1507,11 +1507,11 @@ def replaceServerPortsDocker() {
       exit 1
     fi
 
-    sed -i "s/-443/-44300/" $1
-    sed -i "s/-80/-8081/" $1
+    sed -i "s/PORT:-443/PORT:-44300/" $1
+    sed -i "s/PORT:-80/PORT:-8081/" $1
 
-    sed -i "s/-443/-44301/" $2
-    sed -i "s/-80/-8082/" $2
+    sed -i "s/PORT:-443/PORT:-44301/" $2
+    sed -i "s/PORT:-80/PORT:-8082/" $2
 
     if [ $? -ne 0 ]; then
       echo "Error occurred while modifying the file."
