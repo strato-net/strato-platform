@@ -70,7 +70,7 @@ const ProcessingOrder = () => {
       effectCallCounter.current += 1;
       orderActions.waitForOrderEvent(orderDispatch, orderHash, reserve, asset);
     } else {
-      const timer = setTimeout(() => navigate(routes.Marketplace.url), 10000);
+      const timer = setTimeout(() => navigate(routes.Marketplace.url), 60000);
       return () => clearTimeout(timer); // Cleanup timeout
     }
   }, [orderHash, assetAddresses, orderDispatch, navigate]);

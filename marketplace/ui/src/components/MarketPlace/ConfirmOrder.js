@@ -39,6 +39,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
     success,
     isCreatePaymentSubmitting,
   } = useOrderState();
+  const [isLoading, setIsLoading] = useState(false);
   const [tax, setTax] = useState(new BigNumber(0));
   const [subTotal, setSubTotal] = useState(new BigNumber(0));
   const [total, setTotal] = useState(new BigNumber(0));
@@ -267,6 +268,8 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
           }`
         );
       }
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -299,6 +302,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
             'The minimum order amount is $0.50. Please increase the item quantity to account for this.'
           );
         } else {
+          setIsLoading(true);
           await handlePaymentConfirm(selectedProvider, reserve, asset);
         }
       } else {
@@ -342,7 +346,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       <div className="">
         {contextHolder}
         {contextHolderForModal}
-        {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
+        {isCreateOrderSubmitting || isCreatePaymentSubmitting || isLoading ? (
           <div className="h-screen flex justify-center items-center">
             <Spin
               spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting}
