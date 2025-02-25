@@ -1,8 +1,5 @@
-import { Button, Image, Typography, Spin, notification } from 'antd';
-import CategoryCard from './CategoryCard';
-import TopSellingProductCard from './TopSellingProductCard';
+import { Button, Spin, notification } from 'antd';
 import StakeableProductCards from './StakeableProductCards';
-import { Images } from '../../images';
 import React, { useEffect, useState } from 'react';
 import { actions } from '../../contexts/category/actions';
 import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
@@ -10,7 +7,6 @@ import useDebounce from '../UseDebounce';
 import { useNavigate } from 'react-router-dom';
 import routes from '../../helpers/routes';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-import { Carousel } from 'react-responsive-carousel';
 import { Fade } from 'react-awesome-reveal';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
@@ -74,8 +70,8 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   useEffect(() => {
     inventoryActions.getAllReserve(inventoryDispatch);
     inventoryActions.fetchTotalCataRewards(inventoryDispatch);
-    ethActions.fetchETHSTAddress(ethDispatch)
-    ethActions.fetchWBTCSTAddress(ethDispatch)
+    ethActions.fetchETHSTAddress(ethDispatch);
+    ethActions.fetchWBTCSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {
@@ -269,9 +265,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       ) : (
         <>
           <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
-            {/* <CategoryCard /> */}
             <StakeableProductCards />
-            <TopSellingProductCard />
           </div>
           <h3 className="text-center text-gray-500 mt-8 mb-4">
             Is there an item you would like to see on the marketplace?
