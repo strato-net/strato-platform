@@ -427,7 +427,7 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {(isEthst || isWbtcst || isUsdcst && isUsdtst && isPaxgst) && reserve //TODO: ? add condition for other stakeable assets
+            {(isEthst || isWbtcst || isUsdcst || isUsdtst || isPaxgst) && reserve //TODO: ? add condition for other stakeable assets
               ? 'Bridge'
               : 'Buy Now'}
           </Button>
