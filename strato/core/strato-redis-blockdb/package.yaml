@@ -19,21 +19,14 @@ library:
   - base16-bytestring
   - binary
   - bytestring
-  - common-log
   - ethereum-rlp
   - format
   - hedis
-  - lens-family
-  - lens-family-th
   - monad-alter
   - mtl
-  - partitioner
-  - random
-  - seqevents
   - strato-conf
   - strato-model
   - text
-  - Ranged-sets
   
 # I am removing this executable because the package `diagrams-html5` has not been upgraded, and
 # won't work with newer stack lts' versions.
@@ -51,22 +44,3 @@ library:
 #      - optparse-applicative
 #      - strato-redis-blockdb
 #    ghc-options: -threaded -Wall -Werror
-
-
-tests:
-  strato-redis-blockdb-test:
-    source-dirs: test
-    main: Test.hs
-    dependencies:
-      - QuickCheck
-      - containers
-      - format
-      - hedis
-      - HUnit
-      - hspec
-      - lens-family
-      - seqevents
-      - strato-model
-      - strato-redis-blockdb
-    # We use -O0 here, since GHC takes *very* long to compile so many constants
-    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic

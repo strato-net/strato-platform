@@ -35,6 +35,7 @@ import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDP (processDataStream')
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.ValidatorDB
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
 import Control.Exception hiding (catch)
@@ -91,7 +92,7 @@ instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) wher
   access _ = asks redisBlockDB
   
 instance MonadIO m => Accessible ValidatorAddresses (ReaderT ContextLite m) where
-  access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> RBDB.getValidatorAddresses
+  access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> getValidatorAddresses
 
 instance MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
   replace _ host peer = do

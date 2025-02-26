@@ -37,11 +37,9 @@ library:
   - format
   - generic-arbitrary
   - generic-random
-  - json-stream
   - labeled-error
   - lens
   - merkle-patricia-db
-  - monad-alter
   - monad-logger
   - network
   - persistent
@@ -57,10 +55,8 @@ library:
   - text
   - time
   - transformers
-  - type-lits
   - unliftio
   - unliftio-core
-  - vector
 
 tests:
   blockapps-data-test:

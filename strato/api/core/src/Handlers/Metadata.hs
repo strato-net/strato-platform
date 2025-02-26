@@ -24,13 +24,14 @@ module Handlers.Metadata
 where
 
 import BlockApps.Logging
+import Blockchain.BlockDB (getSyncStatusNow)
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
-import Blockchain.Strato.RedisBlockDB (getSyncStatusNow, runStratoRedisIO)
+import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Control.Lens
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL

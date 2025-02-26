@@ -47,7 +47,6 @@ library:
     - fast-keccak256
     - format
     - generic-arbitrary
-    - generic-deriving
     - hashable
     - hflags
     - hourglass

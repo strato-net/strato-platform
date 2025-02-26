@@ -21,6 +21,7 @@ library:
     - blockapps-mpdbs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
+    - blockDB
     - bytestring
     - cache
     - clock
@@ -28,7 +29,6 @@ library:
     - conduit
     - containers
     - core-api2
-    - cryptonite
     - deepseq
     - esqueleto
     - ethereum-rlp
@@ -59,7 +59,6 @@ library:
     - text
     - time
     - transformers
-    - type-lits
     - unliftio
     - vault-monad
     - vector

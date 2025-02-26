@@ -1,0 +1,51 @@
+name:                blockDB
+
+dependencies:
+- base >= 4.7 && < 5
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  dependencies:
+  - blockapps-data
+  - bytestring
+  - common-log
+  - containers
+  - hedis
+  - mtl
+  - random
+  - seqevents
+  - strato-model
+  - strato-redis-blockdb
+  - text
+  
+
+tests:
+  strato-redis-blockdb-test:
+    source-dirs: test
+    main: Test.hs
+    dependencies:
+      - QuickCheck
+      - blockapps-data
+      - blockDB
+      - containers
+      - format
+      - hedis
+      - HUnit
+      - hspec
+      - lens-family
+      - seqevents
+      - strato-model
+      - strato-redis-blockdb
+    # We use -O0 here, since GHC takes *very* long to compile so many constants
+    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic

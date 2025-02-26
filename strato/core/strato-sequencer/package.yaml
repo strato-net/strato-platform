@@ -22,27 +22,22 @@ library:
     - blockapps-init
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
+    - blockDB
     - blockstanbul
     - bytestring
     - clock
     - common-log
-    - composable-monads-base
     - conduit
-    - data-default
     - directory
-    - ethereum-rlp
-    - extra
     - format
     - http-client
     - kafka-monad
     - labeled-error
     - lens
     - leveldb-haskell
-    - lifted-async
     - monad-alter
     - prometheus-client
     - seqevents
-    - stm
     - stm-conduit
     - strato-conf
     - strato-model
@@ -50,14 +45,10 @@ library:
     - servant-client
     - text
     - time
-    - transformers
     - classy-prelude
     - containers
     - mtl
-    - partitioner
-    - resourcet
     - stm-chans
-    - unliftio
 
 executables:
   strato-sequencer:
@@ -70,16 +61,13 @@ executables:
       - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-client
       - blockstanbul
-      - bytestring
       - common-log
       - format
       - hedis
       - hflags
       - http-client
-      - kafka-monad
       - process-monitor
       - prometheus-client
-      - safe
       - seqevents
       - servant-client
       - stm

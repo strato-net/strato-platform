@@ -23,6 +23,7 @@ library:
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
+  - blockDB
   - bytestring
   - common-log
   - conduit
@@ -60,12 +61,11 @@ library:
   - strato-sequencer
   - strato-statediff
   # - strato-p2p
-  - temporary
   - text
   - transformers
   - turtle
   - unliftio
-  - unliftio-core
+  - validatorDB
   - vm-tools
   - yaml
   - ordered-containers

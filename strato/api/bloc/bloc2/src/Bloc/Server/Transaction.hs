@@ -40,6 +40,7 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
+import Blockchain.BlockDB
 import Blockchain.DB.CodeDB
 import qualified Blockchain.DB.SQLDB as SQLDB
 import Blockchain.Data.AddressStateDB
@@ -57,7 +58,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
-import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
+import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
 import Control.Applicative ((<|>))
 import Control.Arrow

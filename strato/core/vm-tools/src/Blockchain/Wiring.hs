@@ -27,6 +27,7 @@ import BlockApps.Init ()
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Bagger.BaggerState (BaggerState)
+import Blockchain.BlockDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
@@ -294,7 +295,7 @@ instance HasContext m => Mod.Accessible RBDB.RedisConnection m where
 
 instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (Maybe WorldBestBlock) m where
   access _ = do
-    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
+    mRBB <- RBDB.withRedisBlockDB getWorldBestBlockInfo
     for mRBB $ \(RedisBestBlock sha num) ->
       return . WorldBestBlock $ BestBlock sha num
 

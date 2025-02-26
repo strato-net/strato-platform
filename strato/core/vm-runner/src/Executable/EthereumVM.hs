@@ -22,6 +22,7 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.BlockChain
+import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB

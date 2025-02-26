@@ -3,14 +3,14 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 {-# OPTIONS -fno-warn-deprecations #-}
-module Main where
+module Main (main) where
 
+import qualified Blockchain.BlockDB as RDB
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.RedisBlockDB as RDB
 import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.RedisBlockDB.Test.Chain
 import Control.Exception (bracket)
@@ -18,7 +18,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
 import Data.Foldable
-import Data.List
+import Data.List (sortBy)
 import Data.Maybe
 import Data.Ord
 import Data.Tree
@@ -201,8 +201,8 @@ prettyBlock b = return (number b, showHash . parentHash $ b, showHash . blockHea
 
 callCommonAncestor :: [BlockHeader] -> [BlockHeader] -> Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 callCommonAncestor old new =
-  let oldNumber = (fromIntegral . number . last) old
-      newNumber = (fromIntegral . number . last) new
+  let oldNumber = (number . last) old
+      newNumber = (number . last) new
       oldSha = (blockHeaderHash . last) old
       newSha = (blockHeaderHash . last) new
    in RDB.commonAncestorHelper oldNumber newNumber oldSha newSha

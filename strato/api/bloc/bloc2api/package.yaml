@@ -37,7 +37,6 @@ library:
   - strato-model
   - swagger2
   - text
-  - type-lits
 
 tests:
   blockapps-strato-api-test:

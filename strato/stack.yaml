@@ -8,6 +8,7 @@ packages:
 - core/blockapps-data
 - core/blockapps-datadefs
 - core/blockapps-mpdbs
+- core/blockDB
 - core/blockstanbul
 - core/ethereum-discovery
 - core/ethereum-encryption
@@ -25,6 +26,7 @@ packages:
 - core/strato-redis-blockdb
 - core/strato-sequencer
 - core/strato-statediff
+- core/validatorDB
 - core/vm-runner/
 - core/vm-tools/
 

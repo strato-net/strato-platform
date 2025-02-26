@@ -16,20 +16,14 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - bytestring
   - common-log
-  - conduit
   - containers
-  - extra
   - format
   - kafka-monad
   - monad-alter
-  - redis-monad
   - seqevents
-  - sql-monad
   - strato-conf
   - strato-model
-  - strato-redis-blockdb
   - text
 
 executables:
@@ -38,8 +32,8 @@ executables:
     source-dirs: exec_src
     dependencies:
       - blockapps-data
-      - blockapps-datadefs
       - blockapps-init
+      - blockDB
       - common-log
       - containers
       - evm-solidity
@@ -52,7 +46,6 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
-      - strato-redis-blockdb
     other-modules:
       - Wiring
 
@@ -61,8 +54,8 @@ executables:
     source-dirs: exec_src
     dependencies:
       - blockapps-data
-      - blockapps-datadefs
       - blockapps-init
+      - blockDB
       - common-log
       - containers
       - evm-solidity
@@ -74,6 +67,5 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
-      - strato-redis-blockdb
     other-modules:
       - Wiring

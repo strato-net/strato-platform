@@ -14,6 +14,7 @@ where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
+import Blockchain.BlockDB
 import Blockchain.DB.AddressStateDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
@@ -61,6 +62,7 @@ import Blockchain.Strato.StateDiff.Database
 import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
+import Blockchain.ValidatorDB
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
 import Control.Monad.Composable.Redis
@@ -143,7 +145,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       )
       certs'
 
-  insertValidators <- execRedis $ RBDB.addValidators validators
+  insertValidators <- execRedis $ addValidators validators
   case insertValidators of
     Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
     Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
@@ -180,12 +182,12 @@ initializeGenesisBlock genesisBlockName = do
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
   void . execRedis $ do
-    RBDB.forceBestBlockInfo
+    forceBestBlockInfo
       (blockHash genesisBlock)
       (number . blockBlockData $ genesisBlock)
 
   void . execRedis $
-    RBDB.putBlock OutputBlock
+    putBlock OutputBlock
     { obOrigin = Origin.Direct,
       obBlockData = blockBlockData genesisBlock,
       obReceiptTransactions = [],

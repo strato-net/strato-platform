@@ -76,6 +76,7 @@ import           GHC.Exts                              (Constraint)
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 
+import           Blockchain.BlockDB
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
@@ -99,6 +100,7 @@ import           Blockchain.Strato.Model.Secp256k1
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
+import           Blockchain.ValidatorDB
 import           Control.Monad                         (void)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
@@ -221,66 +223,66 @@ instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
   access _ = asks configPubKey
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
-  lookup _ = RBDB.withRedisBlockDB . RBDB.getHeader
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
-  delete _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
+  lookup _ = RBDB.withRedisBlockDB . getHeader
+  insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
+  delete _ = void . RBDB.withRedisBlockDB . deleteHeader
   lookupMany _ =
     fmap (M.fromList . catMaybes . map sequenceA)
       . RBDB.withRedisBlockDB
-      . RBDB.getHeaders
-  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
-  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
+      . getHeaders
+  insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
+  deleteMany _ = void . RBDB.withRedisBlockDB . deleteHeaders
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Config m) where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
+    RBDB.withRedisBlockDB getWorldBestBlockInfo <&> \case
       Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
       Just (RedisBestBlock s n) -> WorldBestBlock $ BestBlock s n
   put _ (WorldBestBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB (updateWorldBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
       Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
       Right True -> return ()
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config m) where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
+    RBDB.withRedisBlockDB getBestBlockInfo <&> \case
       Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
       Just (RedisBestBlock s n) -> BestBlock s n
   put _ (BestBlock s n) =
-    RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB (putBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo >>= \case
+    RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> BestSequencedBlock <$> Mod.get (Mod.Proxy @BestBlock)
       Just (RedisBestBlock s n) -> pure . BestSequencedBlock $ BestBlock s n
   put _ (BestSequencedBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
 instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
-  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
+  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
-  lookup _ = RBDB.withRedisBlockDB . RBDB.getBlock
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
-  delete _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
+  lookup _ = RBDB.withRedisBlockDB . getBlock
+  insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
+  delete _ = void . RBDB.withRedisBlockDB . deleteBlock
   lookupMany _ =
     fmap (M.fromList . catMaybes . map sequenceA)
       . RBDB.withRedisBlockDB
-      . RBDB.getBlocks
-  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
-  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
+      . getBlocks
+  insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
+  deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
   
 instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
-  select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
+  select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . isValidator
 
 instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
   lookup _ k = do

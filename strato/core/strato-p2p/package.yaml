@@ -39,6 +39,7 @@ library:
     - blockapps-datadefs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
+    - blockDB
     - blockstanbul
     - bytestring
     - composable-monads-base
@@ -47,15 +48,12 @@ library:
     - containers
     - cross-monitoring
     - crypto-pubkey-types
-    - data-default
-    - dlist
     - dns
     - either
     - ethereum-discovery
     - ethereum-encryption
     - ethereum-rlp
     - format
-    - ghc
     - hedis
     - hflags
     - http-client
@@ -71,8 +69,6 @@ library:
     - ordered-containers
     - persistent
     - prometheus-client
-    - random
-    - Ranged-sets
     - resourcet
     - seqevents
     - servant-client
@@ -83,10 +79,10 @@ library:
     - strato-model
     - strato-redis-blockdb
     - text
-    - these
     - time
     - unliftio-core
-    - unliftio 
+    - unliftio
+    - validatorDB
     - warp
 
 #removing p2p tests for now, it is more work to keep updating this than the reward it is giving

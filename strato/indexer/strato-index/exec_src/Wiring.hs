@@ -9,6 +9,7 @@
 
 module Wiring where
 
+import Blockchain.BlockDB
 import Blockchain.DBM
 import Blockchain.Data.Block (BestBlock (..))
 import Blockchain.Data.BlockDB
@@ -17,7 +18,6 @@ import Blockchain.DB.SQLDB
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Exception
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -44,7 +44,7 @@ instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
 
 instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
-  put _ (P2P (BestBlock s n)) = void . execRedis $ RBDB.putBestBlockInfo s n
+  put _ (P2P (BestBlock s n)) = void . execRedis $ putBestBlockInfo s n
 
 instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
@@ -52,6 +52,6 @@ instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m whe
   insert _ _ =
     void
       . execRedis
-      . RBDB.putBlock
+      . putBlock
       . unP2P
 
