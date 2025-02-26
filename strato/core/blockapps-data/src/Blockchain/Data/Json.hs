@@ -1,12 +1,23 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
---TODO : Take this next line out
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Data.Json where
+module Blockchain.Data.Json (
+  UnsignedRawTransaction'(..),
+  RawTransaction'(..),
+  Transaction'(..),
+  Block'(..),
+  BlockData',
+  AddressStateRef'(..),
+  tPrimeToT,
+  bPrimeToB,
+  rtPrimeToRt,
+  rtToRtPrime,
+  rtToRtPrime',
+  blockDataRefToBlock,
+  asrToAsrPrime
+  ) where
 
 import BlockApps.X509
 import Blockchain.Data.Block
@@ -38,10 +49,10 @@ import Data.Word
 import GHC.Generics
 import qualified LabeledError
 import Numeric
-
+{-
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
-
+-}
 data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
 
 data UnsignedRawTransaction' = UnsignedRawTransaction' RawTransaction deriving (Eq, Show, Generic)
@@ -509,10 +520,10 @@ instance ToJSON BlockDataRef' where
         "isConfirmed" .= isConf,
         "version" .= v
       ]
-
+{-
 bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
-
+-}
 bvr2v :: BlockValidatorRef -> Validator
 bvr2v (BlockValidatorRef _ cn) = Validator cn
 
@@ -578,34 +589,6 @@ instance FromJSON AddressStateRef' where
               )
   parseJSON _ = fail "JSON not an object"
 
-showHexSimple :: (Integral a) => a -> String
-showHexSimple t = showHex t ""
-
-instance ToJSON LogDB where
-  toJSON
-    ( LogDB
-        bh
-        th
-        x
-        maybeTopic1
-        maybeTopic2
-        maybeTopic3
-        maybeTopic4
-        dataBS
-        bloomW512
-      ) =
-      object $
-        [ "hash" .= th,
-          "blockHash" .= bh,
-          "address" .= x,
-          "topic1" .= (maybe "" showHexSimple maybeTopic1 :: String),
-          "topic2" .= (maybe "" showHexSimple maybeTopic2 :: String),
-          "topic3" .= (maybe "" showHexSimple maybeTopic3 :: String),
-          "topic4" .= (maybe "" showHexSimple maybeTopic4 :: String),
-          "data" .= dataBS,
-          "bloom" .= showHexSimple bloomW512
-        ]
-
 asrToAsrPrime :: (String, AddressStateRef) -> AddressStateRef'
 asrToAsrPrime (s, x) = AddressStateRef' x s
 
@@ -613,10 +596,10 @@ asrToAsrPrime' :: AddressStateRef -> AddressStateRef'
 asrToAsrPrime' x = AddressStateRef' x ""
 
 data Address' = Address' Address String deriving (Eq, Show)
-
+{-
 adToAdPrime :: Address -> Address'
 adToAdPrime x = Address' x ""
-
+-}
 --instance ToJSON Address' where
 --  toJSON (Address' x) = object [ "address" .= (showHex x "") ]
 
