@@ -181,7 +181,6 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
           wbtcAmount
         );
   
-        console.log("WBTC transfer transaction hash:", tx.hash);
       }else if (tokenName === "USDT") { //TODO: based on the decimal values change the value in the below conditions
         // USDT contract address based on environment
         const usdtAddress = fileServerUrl.includes("test")
@@ -222,7 +221,6 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
           usdcAmount
         );
   
-        console.log("usdc transfer transaction hash:", tx.hash);
       }else if (tokenName === "PAXG") {
         // PAXG contract address based on environment
         const paxgAddress = fileServerUrl.includes("test")
@@ -243,7 +241,6 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
           paxgAmount
         );
   
-        console.log("paxg transfer transaction hash:", tx.hash);
       } else {
         // ETH transfer logic (native transfer)
         tx = await signer.sendTransaction({
@@ -253,7 +250,6 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
           value: ethers.utils.parseEther(quantity.toString()), // Convert ETH to wei
         });
   
-        console.log("ETH transfer transaction hash:", tx.hash);
       }
   
       const body = {
