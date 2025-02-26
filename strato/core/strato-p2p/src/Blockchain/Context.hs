@@ -78,6 +78,7 @@ import           BlockApps.X509.Certificate
 
 import           Blockchain.BlockDB
 import           Blockchain.Blockstanbul               (WireMessage)
+import           Blockchain.CertificateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.PubKey
@@ -268,7 +269,7 @@ instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Conf
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
+  select _ = RBDB.withRedisBlockDB . getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _ = RBDB.withRedisBlockDB . getBlock

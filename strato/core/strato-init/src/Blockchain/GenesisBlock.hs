@@ -15,6 +15,7 @@ where
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.BlockDB
+import Blockchain.CertificateDB
 import Blockchain.DB.AddressStateDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
@@ -55,7 +56,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util
 import Blockchain.Strato.Model.Validator
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
 import Blockchain.Strato.StateDiff.Database
@@ -129,7 +129,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
   -- Need to insert the X509 certificates INTO Redis
-  void . execRedis $ RBDB.insertRootCertificate
+  void . execRedis $ insertRootCertificate
   $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
 
   extraCertInfoStates <-
@@ -137,7 +137,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       ( \c -> do
           let c' = x509CertToCertInfoState c
               ua' = userAddress c'
-          insertCert <- execRedis $ RBDB.registerCertificate ua' c'
+          insertCert <- execRedis $ registerCertificate ua' c'
           case insertCert of
             Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
             Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e

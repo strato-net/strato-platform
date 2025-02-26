@@ -25,6 +25,7 @@ library:
   - blockapps-vault-wrapper-client
   - blockDB
   - bytestring
+  - certificateDB
   - common-log
   - conduit
   - containers
@@ -57,7 +58,6 @@ library:
   - strato-index
   - strato-model
   - strato-networks
-  - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
   # - strato-p2p
