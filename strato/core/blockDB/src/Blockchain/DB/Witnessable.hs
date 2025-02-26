@@ -1,4 +1,6 @@
-module Blockchain.Sequencer.DB.Witnessable where
+module Blockchain.DB.Witnessable (
+  Witnessable(..)
+  ) where
 
 import Blockchain.Strato.Model.Keccak256
 

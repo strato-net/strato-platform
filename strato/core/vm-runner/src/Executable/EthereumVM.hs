@@ -32,6 +32,7 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch

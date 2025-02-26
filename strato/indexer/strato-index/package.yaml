@@ -16,6 +16,7 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockDB
   - common-log
   - containers
   - format
@@ -41,7 +42,6 @@ executables:
       - monad-alter
       - process-monitor
       - redis-monad
-      - seqevents
       - sql-monad
       - strato-conf
       - strato-index
@@ -63,7 +63,6 @@ executables:
       - monad-alter
       - process-monitor
       - redis-monad
-      - seqevents
       - strato-conf
       - strato-index
       - strato-model

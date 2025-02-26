@@ -86,6 +86,7 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Model.WrappedBlock
 import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event

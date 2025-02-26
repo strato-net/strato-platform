@@ -33,7 +33,8 @@ import Blockchain.Data.Json
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.EthConf (runKafkaMConfigured)
-import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..), Timestamp)
+import Blockchain.Model.WrappedBlock
+import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId

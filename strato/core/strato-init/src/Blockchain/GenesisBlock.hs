@@ -43,8 +43,8 @@ import Blockchain.Generation
     readCertsFromGenesisInfo,
     readValidatorsFromGenesisInfo,
   )
+import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
-import Blockchain.Sequencer.Event (OutputBlock(..))
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka

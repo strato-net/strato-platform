@@ -15,7 +15,7 @@ import Blockchain.Data.Block (BestBlock (..))
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Transaction (insertTX)
 import Blockchain.DB.SQLDB
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Model.Keccak256
 import Control.Exception

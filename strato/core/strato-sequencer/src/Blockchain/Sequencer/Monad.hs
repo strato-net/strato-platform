@@ -32,6 +32,7 @@ import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Data.Block
 import Blockchain.EthConf
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB

@@ -5,6 +5,7 @@ import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.ChainInfo as CI
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.Transaction as TX
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Data.Binary
 import Test.Hspec

@@ -6,19 +6,15 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - QuickCheck
 
 library:
   source-dirs: src/
   ghc-options: -fconstraint-solver-iterations=8
   dependencies:
-    - aeson
+    - blockDB
     - blockstanbul
     - bytestring
-    - deepseq
-    - ethereum-rlp
     - format
-    - generic-arbitrary
     - kafka-monad
     - merkle-patricia-db
     - monad-alter
@@ -33,5 +29,7 @@ tests:
     main: EventSpec.hs
     ghc-options: -dynamic
     dependencies:
+      - blockDB
       - hspec
       - seqevents
+      - QuickCheck

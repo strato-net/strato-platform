@@ -78,6 +78,7 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
+      - blockDB
       - bytestring
       - common-log
       - composable-monads-base

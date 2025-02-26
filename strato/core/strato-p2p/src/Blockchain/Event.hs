@@ -33,6 +33,7 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.Wire
 import Blockchain.EventException
 import Blockchain.EventModel
+import Blockchain.Model.WrappedBlock
 import Blockchain.Options
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer

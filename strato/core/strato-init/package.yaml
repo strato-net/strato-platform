@@ -48,7 +48,6 @@ library:
   - persistent-postgresql
   - redis-monad
   - resourcet
-  - seqevents
   - servant-client
   - solid-vm-compiler
   - solid-vm-model

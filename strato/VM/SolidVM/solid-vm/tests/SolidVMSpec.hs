@@ -37,7 +37,7 @@ import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.SQLDB
 import Blockchain.GenesisBlock
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account

@@ -12,6 +12,7 @@ import Blockchain.Data.Json
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Data.Transaction
 import Blockchain.EthConf
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256

@@ -16,19 +16,26 @@ ghc-options:
 
 library:
   source-dirs: src
+  ghc-options: -fconstraint-solver-iterations=8
   dependencies:
+  - QuickCheck
+  - binary
   - blockapps-data
+  - blockapps-datadefs
+  - blockstanbul
   - bytestring
   - common-log
   - containers
+  - deepseq
+  - ethereum-rlp
+  - format
+  - generic-arbitrary
   - hedis
   - mtl
   - random
-  - seqevents
   - strato-model
   - strato-redis-blockdb
   - text
-  
 
 tests:
   strato-redis-blockdb-test:
@@ -44,7 +51,6 @@ tests:
       - HUnit
       - hspec
       - lens-family
-      - seqevents
       - strato-model
       - strato-redis-blockdb
     # We use -O0 here, since GHC takes *very* long to compile so many constants

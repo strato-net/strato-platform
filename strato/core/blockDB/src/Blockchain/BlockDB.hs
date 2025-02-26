@@ -46,7 +46,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.BlockHeader
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB.Models as Models

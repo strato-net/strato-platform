@@ -24,9 +24,10 @@ import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
+import Blockchain.DB.Witnessable
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
-import Blockchain.Sequencer.DB.Witnessable
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
