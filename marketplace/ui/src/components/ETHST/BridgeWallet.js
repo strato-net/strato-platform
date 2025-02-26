@@ -202,7 +202,6 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
           usdtAmount
         );
   
-        console.log("usdt transfer transaction hash:", tx.hash);
       }else if (tokenName === "USDC") {
         // USDC contract address based on environment
         const usdcAddress = fileServerUrl.includes("test")

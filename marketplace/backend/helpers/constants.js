@@ -78,7 +78,7 @@ export default {
     '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
     '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
-    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTSTEMP
+    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
     'bbb0e060f3f43c533d5b5f0250ff473de831e5e4', //testnetUSDSTAddress
   ],
   localHost: 'http://localhost',

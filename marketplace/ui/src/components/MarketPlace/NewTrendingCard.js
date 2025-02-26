@@ -64,7 +64,7 @@ const NewTrendingCard = ({
   const isPaxgst = topSellingProduct.originAddress === paxgstAddress;
 
   const isDisabled =
-  !isEthst && !isWbtcst && //TODO: ? add logic for other assets
+  !isEthst && !isWbtcst && !isUsdtst && !isUsdcst && !isPaxgst && //TODO: ? add logic for other assets
     (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
@@ -427,7 +427,7 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {(isEthst || isWbtcst) && reserve //TODO: ? add condition for other stakeable assets
+            {(isEthst || isWbtcst || isUsdcst && isUsdtst && isPaxgst) && reserve //TODO: ? add condition for other stakeable assets
               ? 'Bridge'
               : 'Buy Now'}
           </Button>

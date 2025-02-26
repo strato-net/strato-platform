@@ -2,6 +2,10 @@ import React from 'react';
 import { useAuthenticateState } from '../../contexts/authentication';
 
 const StakeSteps = ({AssteName}) => {
+  let newAssetName = AssteName
+  if (AssteName.endsWith("ST")) {
+    newAssetName = AssteName.slice(0, -2); 
+  }
   const { loginUrl } = useAuthenticateState();
 
   return (
@@ -73,9 +77,7 @@ const StakeSteps = ({AssteName}) => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Connect to your Ethereum wallet and bridge your {AssteName} to Mercata’s
-              equivalent token {AssteName} to begin staking!
-            </p>
+              Connect to your Ethereum wallet and bridge your {newAssetName} to Mercata's equivalent token {AssteName}            </p>
           </div>
         </div>
 
