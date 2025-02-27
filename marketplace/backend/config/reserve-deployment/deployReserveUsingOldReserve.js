@@ -4,7 +4,7 @@ require('dotenv').config();
 const { rest, util, importer, fsUtil, oauthUtil } = require('blockapps-rest');
 
 // Load configuration from a YAML file.
-const config = fsUtil.getYaml(`../config.yaml`);
+const config = fsUtil.getYaml(`../../config.yaml`);
 
 /**
  * Obtains a user token using the OAuth resource owner credentials.
@@ -45,6 +45,12 @@ async function main() {
     }
     if (!OLD_RESERVE_ADDRESS) {
       throw new Error('OLD_RESERVE_ADDRESS environment variable is required.');
+    }
+
+    if (!USDST_TOKEN || !USDST_PRICE || !STRATS_TO_USDST_FACTOR) {
+      throw new Error(
+        'USDST_TOKEN, USDST_PRICE, and STRATS_TO_USDST_FACTOR environment variables are required.'
+      );
     }
 
     // 1. Obtain the user token via OAuth.
@@ -110,8 +116,6 @@ async function main() {
       cacheNonce: true,
       isAsync: true,
     };
-    console.log('Contract args:', contractArgs);
-    console.log('Deployment options:', options);
     console.log(
       'Deploying new SimpleReserve contract via rest.createContract...'
     );
