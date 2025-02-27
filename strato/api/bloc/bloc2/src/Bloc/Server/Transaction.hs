@@ -45,10 +45,10 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
 import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code

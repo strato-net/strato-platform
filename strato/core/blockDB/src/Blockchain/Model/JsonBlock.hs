@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Blockchain.Data.Json (
+module Blockchain.Model.JsonBlock (
   UnsignedRawTransaction'(..),
   RawTransaction'(..),
   Transaction'(..),

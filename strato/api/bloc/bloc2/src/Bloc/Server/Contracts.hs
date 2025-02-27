@@ -30,7 +30,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
+import Blockchain.Model.JsonBlock
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId

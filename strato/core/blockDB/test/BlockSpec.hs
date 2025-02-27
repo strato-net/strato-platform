@@ -8,9 +8,9 @@ module BlockSpec (spec, main) where
 
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.Enode
-import Blockchain.Data.Json
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class

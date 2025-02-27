@@ -8,10 +8,10 @@ module BlockApps.Tools.InsertSeq where
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Data.Transaction
 import Blockchain.EthConf
+import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka

@@ -29,10 +29,10 @@ where
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.EthConf (runKafkaMConfigured)
+import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
