@@ -3,7 +3,7 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 {-# OPTIONS -fno-warn-deprecations #-}
-module Main (main) where
+module BlockDBSpec (spec) where
 
 import qualified Blockchain.BlockDB as RDB
 import Blockchain.Data.BlockHeader
@@ -31,7 +31,7 @@ import Text.Format
 -- Main and helpers
 --
 main :: IO ()
-main = hspec specTest
+main = hspec spec
 
 openConn :: Integer -> IO Connection
 openConn num = do
@@ -58,8 +58,8 @@ flushDB = it "Should flush the db" $ \conn -> do
 -----------------------------------------------------------------------------
 -- Tests
 --
-specTest :: Spec
-specTest = around (withConn 1) $ do
+spec :: Spec
+spec = around (withConn 1) $ do
   describe "BlockData" $ do
     flushDB
 

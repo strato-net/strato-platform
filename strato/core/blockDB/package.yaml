@@ -19,6 +19,7 @@ library:
   ghc-options: -fconstraint-solver-iterations=8
   dependencies:
   - QuickCheck
+  - aeson
   - binary
   - blockapps-data
   - blockapps-datadefs
@@ -30,27 +31,40 @@ library:
   - format
   - generic-arbitrary
   - hedis
+  - labeled-error
   - mtl
   - random
   - strato-model
   - strato-redis-blockdb
+  - swagger2
+  - time
   - text
 
 tests:
-  strato-redis-blockdb-test:
+  blockdb-test:
     source-dirs: test
-    main: Test.hs
+    main: Main.hs
     dependencies:
       - QuickCheck
+      - aeson
+      - aeson-diff
+      - binary
       - blockapps-data
       - blockDB
+      - bytestring
       - containers
+      - ethereum-rlp
       - format
       - hedis
+      - http-api-data
       - HUnit
       - hspec
+      - labeled-error
       - lens-family
+      - secp256k1-haskell
       - strato-model
       - strato-redis-blockdb
+      - text
+      - vector
     # We use -O0 here, since GHC takes *very* long to compile so many constants
     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic

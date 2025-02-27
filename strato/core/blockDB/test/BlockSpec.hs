@@ -4,6 +4,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 
+module BlockSpec (spec, main) where
+
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.Enode
 import Blockchain.Data.Json
@@ -49,7 +51,10 @@ predicate (_, _) = True
 predicate _ = False
 
 main :: IO ()
-main = hspecWith (configAddFilter predicate defaultConfig) $ do
+main = hspecWith (configAddFilter predicate defaultConfig) spec
+
+spec :: Spec  
+spec = do
   describe "ExtraData txcounts" $ do
     it "does not parse a legacy extradata" $
       example $ do
