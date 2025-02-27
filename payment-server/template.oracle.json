@@ -1,0 +1,21 @@
+{
+  "oracleUpdateTime": 12,
+  "oracles": [
+    {
+      "name": "OracleA",
+      "decimals": 18,
+      "type": "ERC20"
+    },
+    {
+      "name": "OracleB",
+      "decimals": 8,
+      "type": "Metal"
+    },
+    {
+      "name": "OracleB",
+      "decimals": 0,
+      "type": "Constant",
+      "price": 1
+    }
+  ]
+}

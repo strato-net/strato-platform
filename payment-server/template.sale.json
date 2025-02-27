@@ -1,0 +1,15 @@
+{
+  "saleUpdateTime": 13,
+  "assets": [
+    {
+      "address": "addressA",
+      "name": "assetA",
+      "markUp": 1.02
+    },
+    {
+      "address": "addressB",
+      "name": "assetB",
+      "markUp": 1.05
+    }
+  ]
+}

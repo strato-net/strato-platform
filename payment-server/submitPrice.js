@@ -1,3 +1,4 @@
+import fs from "fs";
 import axios from "axios";
 import { assert } from "chai";
 import { rest, util } from "blockapps-rest";
@@ -7,6 +8,34 @@ import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 import flagFile from "./helpers/flagFile.js";
+
+// Read the oracle configuration from /tmp/oracle.json
+const oracleConfigPath = "/tmp/oracle.json";
+if (!fs.existsSync(oracleConfigPath)) {
+  throw new Error("Oracle configuration file not found at " + oracleConfigPath);
+}
+const oracleConfig = JSON.parse(fs.readFileSync(oracleConfigPath, "utf8"));
+if (!oracleConfig.oracleUpdateTime) {
+  await flagFile.appendToErrorFile(
+    `No oracleUpdateTime found in oracle.json file, defaulting to 1 day but please update the file.`
+  );
+}
+const oracleUpdateTime =
+  Number(oracleConfig.oracleUpdateTime) || 24 * 60 * 60 * 1000; // Default: 1 day in ms;
+
+// Read the oracle configuration from /tmp/sale.json
+const saleConfigPath = "/tmp/sale.json";
+if (!fs.existsSync(saleConfigPath)) {
+  throw new Error("Sale configuration file not found at " + saleConfigPath);
+}
+const saleConfig = JSON.parse(fs.readFileSync(saleConfigPath, "utf8"));
+if (!saleConfig.saleUpdateTime) {
+  await flagFile.appendToErrorFile(
+    `No saleUpdateTime found in sale.json file, defaulting to 13:00 UTC but please update the file.`
+  );
+}
+const saleUpdateTime = Number(oracleConfig.saleUpdateTime) || 13; // Default: 13:00 UTC
+const assets = saleConfig.assets || [];
 
 // Global array to store all distributeRewards calls
 const distributeRewardsCallList = [];
@@ -22,14 +51,15 @@ async function submitPrice(token, contract, args) {
 }
 
 // Function to update the price of the Asset Sale price
-async function updateMetalPrice(assetName, token, contractAddress, price, decimals) {
-  const parsedPriceMarkup = parseFloat(
-    process.env[
-      assetName.toLowerCase().includes("gold")
-        ? "GOLD_PRICE_MARKUP"
-        : "SILVER_PRICE_MARKUP"
-    ] || "1"
-  );
+async function updateMetalPrice(
+  assetName,
+  assetMarkUp,
+  token,
+  contractAddress,
+  price,
+  decimals
+) {
+  const parsedPriceMarkup = parseFloat(assetMarkUp) || 1;
   const callArgs = {
     contract: {
       address: contractAddress,
@@ -37,7 +67,10 @@ async function updateMetalPrice(assetName, token, contractAddress, price, decima
     method: "update",
     args: {
       _quantity: 0,
-      _price: (Math.round(price * parsedPriceMarkup * 100) / 100) / Math.pow(10, decimals),
+      _price:
+        Math.round(price * parsedPriceMarkup * 100) /
+        100 /
+        Math.pow(10, decimals),
       _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
@@ -200,9 +233,9 @@ async function fetchLBMAMetalPrice(metal, apiKey) {
     const rates = response.data.rates;
     let metalPrice;
 
-    if (metal.toLowerCase() === "gold") {
+    if (metal.toLowerCase().includes("gold")) {
       metalPrice = rates.lbma_gold_am;
-    } else if (metal.toLowerCase() === "silver") {
+    } else if (metal.toLowerCase().includes("silver")) {
       metalPrice = rates.lbma_silver;
     } else {
       throw new Error(`Metal ${metal} not supported`);
@@ -216,28 +249,31 @@ async function fetchLBMAMetalPrice(metal, apiKey) {
     return { price: metalPrice, timestampInSeconds };
   } catch (error) {
     console.error(`ERROR: Failed to fetch price for ${metal}:`, error);
-    await flagFile.appendToErrorFile(`Failed to fetch price for ${metal}: ${error}`);
+    await flagFile.appendToErrorFile(
+      `Failed to fetch price for ${metal}: ${error}`
+    );
   }
 }
 
 // Function to fetch and submit ETH price
 async function fetchAndSubmitERC20TokenPrice(
-  metal,
+  name,
+  oracleAddress,
+  decimals,
   apiKey,
-  oracleContract,
-  token,
-  oracleInterval
+  token
 ) {
   try {
     const apiUrl = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/historical`;
 
     // Current time in milliseconds
     const currentTimeMs = Date.now();
+    const OneDayHoursInMs = 24 * 60 * 60 * 1000;
 
     // Define the request body
     const requestBody = {
-      symbol: metal,
-      startTime: Math.floor((currentTimeMs - oracleInterval) / 1000),
+      symbol: name,
+      startTime: Math.floor((currentTimeMs - OneDayHoursInMs) / 1000),
       endTime: Math.floor(currentTimeMs / 1000),
       interval: "1h",
     };
@@ -276,10 +312,14 @@ async function fetchAndSubmitERC20TokenPrice(
     console.log(`Calculated TWAP: $${twap}`);
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
-    await submitPrice(token, oracleContract, {
-      price: twap / (metal === "BTC" ? 1e8 : 1e18),
-      timestamp: currentTimestamp,
-    });
+    await submitPrice(
+      token,
+      { address: oracleAddress },
+      {
+        price: twap / Math.pow(10, decimals),
+        timestamp: currentTimestamp,
+      }
+    );
 
     console.log(
       `TWAP submitted: $${twap.toFixed(2)} at ${new Date(
@@ -321,59 +361,42 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
   for (const [key, oracle] of Object.entries(deployment.contracts)) {
     console.log(`[Oracle Update] Processing oracle: ${key}`);
 
-    if (!oracle.metal || !oracle.address) {
+    if (!oracle.name || !oracle.address || !oracle.decimals || !oracle.type) {
       console.warn(`[Oracle WARN] Skipping invalid oracle ${key}`);
       continue;
     }
 
     try {
-      if (oracle.metal === "ETH" || oracle.metal === "BTC") {
+      if (oracle.type === "ERC20") {
         await fetchAndSubmitERC20TokenPrice(
-          oracle.metal,
+          oracle.name,
+          oracle.address,
           process.env.ALCHEMY_API_KEY,
-          oracle,
-          token,
-          oracleInterval
+          token
         );
-      } else if (oracle.metal === "USD") {
+      } else if (oracle.type === "Metal") {
+        const metalResult = await fetchMetalPrice(
+          oracle.name.toLowerCase().replace(/st$/, ""),
+          process.env.METALS_API_KEY
+        );
+        if (metalResult) {
+          await submitPrice(token, oracle, {
+            price: metalResult.price / Math.pow(10, oracle.decimals),
+            timestamp: metalResult.timestampInSeconds,
+          });
+          console.log(
+            `[Oracle Update] Price submitted for ${
+              oracle.name
+            } at ${new Date().toISOString()}`
+          );
+        }
+      } else if (oracle.type === "Constant") {
         await submitPrice(token, oracle, {
-          price: 1 / 1e18,
+          price: oracle.price / Math.pow(10, oracle.decimals),
           timestamp: Math.floor(Date.now() / 1000),
         });
-      } else if (oracle.metal === "GOLDST") {
-        const metalResult = await fetchMetalPrice(
-          "gold",
-          process.env.METALS_API_KEY
-        );
-
-        if (metalResult) {
-          await submitPrice(token, oracle, {
-            price: (metalResult.price / 1e18),
-            timestamp: metalResult.timestampInSeconds,
-          });
-          console.log(
-            `[Oracle Update] Price submitted for ${
-              oracle.metal
-            } at ${new Date().toISOString()}`
-          );
-        }
       } else {
-        const metalResult = await fetchMetalPrice(
-          oracle.metal.toLowerCase(),
-          process.env.METALS_API_KEY
-        );
-
-        if (metalResult) {
-          await submitPrice(token, oracle, {
-            price: metalResult.price,
-            timestamp: metalResult.timestampInSeconds,
-          });
-          console.log(
-            `[Oracle Update] Price submitted for ${
-              oracle.metal
-            } at ${new Date().toISOString()}`
-          );
-        }
+        console.warn(`[Oracle WARN] Skipping unsupported oracle type ${key}`);
       }
 
       await fetchAndSubmitEscrowAddresses(oracle, token);
@@ -394,60 +417,55 @@ const updateSalePricePeriodically = async () => {
     process.env.METALS_USERNAME,
     process.env.METALS_PASSWORD
   );
-  for (const asset of config.assets) {
-    const addresses =
-      asset && typeof asset.addresses === "string" && asset.addresses.trim()
-        ? asset.addresses.split(",")
-        : [];
-    for (const address of addresses) {
-      try {
-        const searchOptions = {
-          config,
-          query: {
-            address: "eq." + address,
-            select: "sale,name,decimals",
-          },
-        };
+  for (const asset of assets) {
+    try {
+      const searchOptions = {
+        config,
+        query: {
+          address: "eq." + asset.address,
+          select: "sale,name,decimals",
+        },
+      };
 
-        const assetResult = await rest.search(
-          token,
-          { name: "BlockApps-Mercata-Asset" },
-          searchOptions
-        );
+      const assetResult = await rest.search(
+        token,
+        { name: "BlockApps-Mercata-Asset" },
+        searchOptions
+      );
 
-        if (!assetResult[0]?.sale) {
-          console.warn(`[Sale Update] Skipping invalid asset ${address}`);
-          continue;
-        }
-
-        const metalResult = await fetchLBMAMetalPrice(
-          asset.name.toLowerCase().includes("gold")
-            ? "gold"
-            : asset.name.toLowerCase(),
-          process.env.METALS_API_KEY
-        );
-
-        const decimals = assetResult[0].decimals || 0;
-
-        await updateMetalPrice(
-          asset.name.toLowerCase(),
-          token,
-          assetResult[0]?.sale,
-          metalResult.price,
-          decimals
-        );
-        console.log(
-          `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`
-        );
-      } catch (error) {
-        console.error(
-          `[Sale ERROR] Failed to update sale price for asset ${address}:`,
-          error
-        );
-        await flagFile.appendToErrorFile(
-          `Failed to update sale price for asset ${address}: ${error}`
-        );
+      if (!assetResult[0]?.sale) {
+        console.warn(`[Sale Update] Skipping invalid asset ${asset.address}`);
+        continue;
       }
+
+      const metalResult = await fetchLBMAMetalPrice(
+        asset.name.toLowerCase().replace(/st$/, ""),
+        process.env.METALS_API_KEY
+      );
+
+      const decimals = assetResult[0].decimals || 0;
+
+      await updateMetalPrice(
+        asset.name.toLowerCase().replace(/st$/, ""),
+        asset.markUp,
+        token,
+        assetResult[0]?.sale,
+        metalResult.price,
+        decimals
+      );
+      console.log(
+        `[Sale Update] Price updated for asset: ${
+          asset.address
+        } at ${new Date().toISOString()}`
+      );
+    } catch (error) {
+      console.error(
+        `[Sale ERROR] Failed to update sale price for asset ${asset.address}:`,
+        error
+      );
+      await flagFile.appendToErrorFile(
+        `Failed to update sale price for asset ${asset.address}: ${error}`
+      );
     }
   }
 };
@@ -463,8 +481,6 @@ async function main() {
     "API key for Alchemy API is missing. Set in .env"
   );
 
-  const oracleInterval = Number(config.oracleInterval) || 60000; // Default: 1 minute
-  const saleUpdateTime = Number(config.saleUpdateTime) || 11; // Default: 6 am UTC
   const totalRunInterval = 60 * 1000; // 1 minutes
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -499,10 +515,13 @@ async function main() {
         const currentDate = now.toISOString().split("T")[0]; // e.g., "2025-02-24"
 
         // Check if it's time to run the oracle update
-        if (Date.now() - lastOracleRun >= oracleInterval) {
+        if (
+          now.getHours() === parseInt(oracleUpdateTime, 10) &&
+          lastOracleRun !== currentDate
+        ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
           await submitOraclePricePeriodically(oracleInterval);
-          lastOracleRun = Date.now();
+          lastOracleRun = currentDate;
         } else {
           console.log("[Oracle] Skipping since interval not reached.");
         }
