@@ -18,7 +18,7 @@ const isSubscribed = async (username) => {
 const subscribe = async (username, email, telegramUsername, referrerUsername) => {
   try {
     await client.query(
-      "INSERT INTO contact_info (username, email, referrer_id, telegram_id) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO contact_info (username, email, telegram_id, referrer_id) VALUES ($1, $2, $3, $4)",
       [username, email, telegramUsername, referrerUsername]
     );
     return true;
