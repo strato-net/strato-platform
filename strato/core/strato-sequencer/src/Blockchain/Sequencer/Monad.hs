@@ -27,10 +27,9 @@ where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
-import Blockchain.BlockDB
 import Blockchain.Blockstanbul
 import Blockchain.Constants
-import Blockchain.Data.Block
+import Blockchain.Model.SyncState
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -38,11 +37,11 @@ import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.SyncDB
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import qualified Blockchain.Strato.RedisBlockDB.Models as RBDB
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent (threadDelay)
@@ -217,7 +216,7 @@ instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
       Nothing -> BestSequencedBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RBDB.RedisBestBlock s n) -> BestSequencedBlock $ BestBlock s n
+      Just (RedisBestBlock s n) -> BestSequencedBlock $ BestBlock s n
   put _ (BestSequencedBlock (BestBlock s n)) =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"

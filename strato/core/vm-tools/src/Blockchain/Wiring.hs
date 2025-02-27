@@ -27,7 +27,6 @@ import BlockApps.Init ()
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Bagger.BaggerState (BaggerState)
-import Blockchain.BlockDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
@@ -36,18 +35,18 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.Strato.RedisBlockDB.Models
+import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq

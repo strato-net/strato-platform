@@ -86,6 +86,7 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Model.SyncState
 import           Blockchain.Model.WrappedBlock
 import           Blockchain.Options
 import           Blockchain.P2PUtil
@@ -101,7 +102,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
+import           Blockchain.SyncDB
 import           Blockchain.ValidatorDB
 import           Control.Monad                         (void)
 import           Control.Monad.Composable.Base

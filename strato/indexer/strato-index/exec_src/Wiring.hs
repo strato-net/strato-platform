@@ -11,13 +11,14 @@ module Wiring where
 
 import Blockchain.BlockDB
 import Blockchain.DBM
-import Blockchain.Data.Block (BestBlock (..))
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Transaction (insertTX)
 import Blockchain.DB.SQLDB
+import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.SyncDB
 import Control.Exception
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A

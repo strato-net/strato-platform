@@ -20,11 +20,11 @@ module Blockchain.Sequencer (
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul 
-import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.DB.Witnessable
+import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
@@ -261,8 +261,8 @@ blockstanbulSend' msg = do
       now <- liftIO getCurrentTime
       when (now < tNext) $
         liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-      Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
-        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
+      Mod.put (Mod.Proxy @BestSequencedBlock) . BestSequencedBlock $
+        BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   forM_ ckpts (A.insert (A.Proxy @Checkpoint) ())

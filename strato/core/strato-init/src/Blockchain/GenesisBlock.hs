@@ -62,6 +62,7 @@ import Blockchain.Strato.StateDiff.Database
 import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
+import Blockchain.SyncDB
 import Blockchain.ValidatorDB
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)

@@ -6,11 +6,12 @@
 module BlockDBSpec (spec) where
 
 import qualified Blockchain.BlockDB as RDB
+import qualified Blockchain.SyncDB as RDB
 import Blockchain.Data.BlockHeader
+import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.RedisBlockDB.Test.Chain
 import Control.Exception (bracket)
 import Control.Monad
@@ -182,7 +183,7 @@ spec = around (withConn 1) $ do
           forM chains $ \chain -> do
             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
             res <- RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
-            return $ bestBlockHash <$> res
+            return $ redisBestBlockHash <$> res
 
         let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb)
         HUnit.assertBool

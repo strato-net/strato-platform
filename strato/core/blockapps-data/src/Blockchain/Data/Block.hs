@@ -6,9 +6,6 @@
 
 module Blockchain.Data.Block
   ( Block (..),
-    BestBlock (..),
-    BestSequencedBlock (..),
-    WorldBestBlock (..),
     Canonical (..),
     Private (..),
     setBlockNo,
@@ -30,7 +27,6 @@ import GHC.Generics
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
-import Text.Format.Template
 import Text.Tools
 
 
@@ -92,20 +88,6 @@ instance BlockLike BlockHeader Transaction Block where
   blockUncleHeaders = blockBlockUncles
 
   buildBlock bd txs us = Block bd txs us
-
-data BestBlock = BestBlock
-  { bestBlockHash :: Keccak256,
-    bestBlockNumber :: Integer
-  }
-  deriving (Eq, Show)
-
-$(deriveFormat ''BestBlock)
-
-newtype BestSequencedBlock = BestSequencedBlock {unBestSequencedBlock :: BestBlock} deriving (Eq, Show)
-
-$(deriveFormat ''BestSequencedBlock)
-
-newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving (Eq, Show)
 
 newtype Canonical a = Canonical {unCanonical :: a} deriving (Functor)
 

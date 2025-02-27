@@ -38,7 +38,6 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
-import Blockchain.BlockDB
 import Blockchain.DB.CodeDB
 import qualified Blockchain.DB.SQLDB as SQLDB
 import Blockchain.Data.AddressStateDB
@@ -49,6 +48,7 @@ import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
 import Blockchain.Model.JsonBlock
+import Blockchain.Model.SyncState (RedisBestBlock (..))
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
@@ -57,7 +57,7 @@ import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
-import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
+import Blockchain.SyncDB
 import Control.Applicative ((<|>))
 import Control.Arrow
 import Control.Lens hiding (from, ix)
@@ -1438,8 +1438,8 @@ checkIsSynced = do
   status <- runStratoRedisIO getSyncStatus
   nodeBestBlock <- runStratoRedisIO getBestBlockInfo
   worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
-  let nodeNumber = bestBlockNumber <$> nodeBestBlock
-      worldNumber = bestBlockNumber <$> worldBestBlock
+  let nodeNumber = redisBestBlockNumber <$> nodeBestBlock
+      worldNumber = redisBestBlockNumber <$> worldBestBlock
 
   case (status, worldNumber, nodeNumber) of
     (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd

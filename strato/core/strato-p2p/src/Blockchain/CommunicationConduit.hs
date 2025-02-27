@@ -18,7 +18,6 @@ where
 import BlockApps.Logging
 import Blockchain.Constants hiding (ethVersion)
 import Blockchain.Context
-import Blockchain.Data.Block
 import Blockchain.Data.Control (P2PCNC (..))
 import Blockchain.Data.RLP
 import Blockchain.Data.Wire as W
@@ -26,6 +25,7 @@ import Blockchain.Event
 import Blockchain.EventException
 import Blockchain.Frame
 import Blockchain.Metrics
+import Blockchain.Model.SyncState
 import Blockchain.Options
 import Blockchain.Participation
 import Blockchain.Sequencer.Event

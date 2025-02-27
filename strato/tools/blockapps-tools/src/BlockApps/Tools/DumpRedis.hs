@@ -1,7 +1,7 @@
 module BlockApps.Tools.DumpRedis where
 
-import Blockchain.BlockDB
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
+import Blockchain.SyncDB
 import Database.Redis
 import Text.Format
 

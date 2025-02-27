@@ -32,6 +32,7 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
+import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
@@ -41,12 +42,12 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
+import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
@@ -138,7 +139,7 @@ ethereumVM d = runResourceT $ do
 
 initializeBestBlock :: (HasContext m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
-  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
+  maybeRedisBestBlockHash <- fmap (fmap redisBestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
     case maybeRedisBestBlockHash of
       Nothing -> error "no best block hash in redisdb"
