@@ -6,7 +6,6 @@
 module Main (main) where
 
 import qualified Blockchain.BlockDB as RDB
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Class

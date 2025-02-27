@@ -22,7 +22,6 @@ module Blockchain.Model.WrappedBlock (
   outputBlockHash
   ) where
 
-import Blockchain.Blockstanbul ()
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP

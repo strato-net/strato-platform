@@ -22,7 +22,6 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockstanbul
   - bytestring
   - common-log
   - containers

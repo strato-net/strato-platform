@@ -11,7 +11,6 @@
 module Blockchain.Blockstanbul.Messages where
 
 import BlockApps.Logging
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP

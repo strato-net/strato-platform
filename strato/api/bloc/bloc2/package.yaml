@@ -26,7 +26,6 @@ library:
     - cache
     - clock
     - common-log
-    - conduit
     - containers
     - core-api2
     - deepseq
@@ -52,7 +51,6 @@ library:
     - solid-vm-parser
     - source-tools
     - sql-monad
-    - stm-conduit
     - strato-model
     - strato-redis-blockdb
     - swagger2

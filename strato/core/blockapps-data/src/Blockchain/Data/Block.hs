@@ -27,9 +27,11 @@ import Control.DeepSeq
 import Data.Binary
 import Data.List
 import GHC.Generics
+import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
+
 
 data Block = Block
   { blockBlockData :: BlockHeader,
@@ -72,6 +74,16 @@ instance {-# OVERLAPPING #-} RLPHashable Block where
 instance HasIstanbulExtra Block where
   getIstanbulExtra     = getIstanbulExtra . blockBlockData
   putIstanbulExtra i b = b{blockBlockData = putIstanbulExtra i $ blockBlockData b}
+
+instance Arbitrary Block where
+  arbitrary = do
+    txCount <- choose (0, 20)
+    uncleCount <- choose (0, 2)
+    bData <- arbitrary
+    bTransactions <- vectorOf txCount arbitrary
+    bUncles <- vectorOf uncleCount arbitrary
+
+    return $ Block bData bTransactions bUncles
 
 instance BlockLike BlockHeader Transaction Block where
   blockHeader = blockBlockData

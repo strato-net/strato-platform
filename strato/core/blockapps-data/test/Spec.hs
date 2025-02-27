@@ -4,7 +4,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.Enode
 import Blockchain.Data.Json
