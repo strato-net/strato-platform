@@ -30,6 +30,7 @@ import GHC.Generics
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
+import Text.Format.Template
 import Text.Tools
 
 
@@ -98,7 +99,11 @@ data BestBlock = BestBlock
   }
   deriving (Eq, Show)
 
+$(deriveFormat ''BestBlock)
+
 newtype BestSequencedBlock = BestSequencedBlock {unBestSequencedBlock :: BestBlock} deriving (Eq, Show)
+
+$(deriveFormat ''BestSequencedBlock)
 
 newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving (Eq, Show)
 
