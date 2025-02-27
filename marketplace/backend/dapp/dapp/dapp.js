@@ -1004,6 +1004,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         { originAddress: originAddress },
         options
       );
+      const decimals = assetsOfOriginAsset[0].decimals
+        ? assetsOfOriginAsset[0].decimals
+        : constants.AssetsWithEighteenDecimalPlaces.includes(originAddress)
+        ? 18
+        : 0;
       const assetsAddressArr = assetsOfOriginAsset.map((item) => item.address);
       // Aggregate sales for all associated assets
 
@@ -1109,7 +1114,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Only send price, timestamp as a part of the record
       const originRecords = originRecordsSorted
         ? Object.values(originRecordsSorted).map(
-            ({ price, block_timestamp }) => ({ price, block_timestamp })
+            ({ price, block_timestamp }) => ({
+              price: price * Math.pow(10, decimals),
+              block_timestamp,
+            })
           )
         : [];
 
@@ -1124,13 +1132,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Only send Range, Units Sold, Average Price as the stats record
       const records = {
         originFluctuation: calculatePriceFluctuation(
-          Object.values(twelveMonthHistoryRecords)
+          Object.values(twelveMonthHistoryRecords), decimals
         ),
         originVolume: calculateVolumeTraded(
-          Object.values(twelveMonthHistoryRecords)
+          Object.values(twelveMonthHistoryRecords), decimals
         ),
         originAveragePrice: calculateAverageSalePrice(
-          Object.values(twelveMonthHistoryRecords)
+          Object.values(twelveMonthHistoryRecords), decimals
         ),
       };
 

@@ -71,7 +71,6 @@ export default {
     '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
     '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
-    'bbb0e060f3f43c533d5b5f0250ff473de831e5e4', //testnetUSDSTAddress
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
@@ -140,7 +139,7 @@ SERVICE_PROVIDERS[(SERVICE_PROVIDERS['STRIPE'] = 1)] = 'STRIPE';
 SERVICE_PROVIDERS[(SERVICE_PROVIDERS['PAYPAL'] = 2)] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS);
 
-export const calculateAverageSalePrice = (records) => {
+export const calculateAverageSalePrice = (records, decimals) => {
   // Track the last seen effective quantity (quantity + totalLockedQuantity)
   const lastSeenEffectiveQuantities = {};
 
@@ -172,7 +171,7 @@ export const calculateAverageSalePrice = (records) => {
   }
 
   const totalPrice = filteredRecords.reduce(
-    (sum, record) => sum + record.price,
+    (sum, record) => sum + record.price * Math.pow(10, decimals),
     0
   );
   const averagePrice = totalPrice / filteredRecords.length;
@@ -180,12 +179,12 @@ export const calculateAverageSalePrice = (records) => {
   return averagePrice;
 };
 
-export const calculatePriceFluctuation = (records) => {
+export const calculatePriceFluctuation = (records, decimals) => {
   const prices = records.map((record) => record.price);
-  return { min: Math.min(...prices), max: Math.max(...prices) };
+  return { min: Math.min(...prices) * Math.pow(10, decimals), max: Math.max(...prices) * Math.pow(10, decimals) };
 };
 
-export const calculateVolumeTraded = (records) => {
+export const calculateVolumeTraded = (records, decimals) => {
   // Create a map to track the latest combined quantity for each address
   const addressQuantityMap = new Map();
 
@@ -206,7 +205,7 @@ export const calculateVolumeTraded = (records) => {
 
     // Only add to the accumulator if there's a decrease in quantity
     if (quantityDecrease > 0) {
-      acc += quantityDecrease;
+      acc += quantityDecrease/Math.pow(10, decimals);
     }
 
     return acc;
