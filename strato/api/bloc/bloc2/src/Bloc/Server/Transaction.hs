@@ -48,7 +48,7 @@ import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
 import Blockchain.Model.JsonBlock
-import Blockchain.Model.SyncState (RedisBestBlock (..))
+import Blockchain.Model.SyncState (BestBlock (..))
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
@@ -1438,8 +1438,8 @@ checkIsSynced = do
   status <- runStratoRedisIO getSyncStatus
   nodeBestBlock <- runStratoRedisIO getBestBlockInfo
   worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
-  let nodeNumber = redisBestBlockNumber <$> nodeBestBlock
-      worldNumber = redisBestBlockNumber <$> worldBestBlock
+  let nodeNumber = bestBlockNumber <$> nodeBestBlock
+      worldNumber = bestBlockNumber <$> worldBestBlock
 
   case (status, worldNumber, nodeNumber) of
     (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd

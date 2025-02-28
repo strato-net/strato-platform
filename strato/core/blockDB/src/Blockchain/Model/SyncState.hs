@@ -3,8 +3,7 @@
 module Blockchain.Model.SyncState (
   BestBlock(..),
   BestSequencedBlock(..),
-  WorldBestBlock(..),
-  RedisBestBlock(..)
+  WorldBestBlock(..)
   ) where
 
 import Blockchain.Data.RLP
@@ -20,22 +19,15 @@ data BestBlock = BestBlock
 
 $(deriveFormat ''BestBlock)
 
+instance RLPSerializable BestBlock where
+  rlpEncode (BestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
+  rlpDecode (RLPArray [sha, num]) = BestBlock (rlpDecode sha) (rlpDecode num)
+  rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"
+
+
 newtype BestSequencedBlock = BestSequencedBlock {unBestSequencedBlock :: BestBlock} deriving (Eq, Show)
 
 $(deriveFormat ''BestSequencedBlock)
 
+
 newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving (Eq, Show)
-
-data RedisBestBlock = RedisBestBlock
-  { redisBestBlockHash :: Keccak256,
-    redisBestBlockNumber :: Integer -- todo: BlockNumber
-  }
-  deriving (Eq, Read, Show)
-
-$(deriveFormat ''RedisBestBlock)
-
-instance RLPSerializable RedisBestBlock where
-  rlpEncode (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
-  rlpDecode (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
-  rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"
-

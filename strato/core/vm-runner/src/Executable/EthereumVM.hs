@@ -139,7 +139,7 @@ ethereumVM d = runResourceT $ do
 
 initializeBestBlock :: (HasContext m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
-  maybeRedisBestBlockHash <- fmap (fmap redisBestBlockHash) (withRedisBlockDB getBestBlockInfo)
+  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
     case maybeRedisBestBlockHash of
       Nothing -> error "no best block hash in redisdb"

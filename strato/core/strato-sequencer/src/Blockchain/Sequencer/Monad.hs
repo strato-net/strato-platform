@@ -216,7 +216,7 @@ instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
       Nothing -> BestSequencedBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RedisBestBlock s n) -> BestSequencedBlock $ BestBlock s n
+      Just (BestBlock s n) -> BestSequencedBlock $ BestBlock s n
   put _ (BestSequencedBlock (BestBlock s n)) =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"

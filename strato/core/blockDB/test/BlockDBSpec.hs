@@ -160,10 +160,10 @@ spec = around (withConn 1) $ do
           bbn = number bb
       r <- runRedis conn $ do
         void $ RDB.forceBestBlockInfo bbh bbn
-        RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
+        RDB.getBestBlockInfo :: Redis (Maybe BestBlock)
       HUnit.assertEqual
         "Couldn't get back best block"
-        (Just (RedisBestBlock bbh bbn))
+        (Just (BestBlock bbh bbn))
         r
 
   describe "ReplaceBestBlock" $ do
@@ -182,8 +182,8 @@ spec = around (withConn 1) $ do
           forM_ allblocks RDB.putHeader
           forM chains $ \chain -> do
             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
-            res <- RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
-            return $ redisBestBlockHash <$> res
+            res <- RDB.getBestBlockInfo :: Redis (Maybe BestBlock)
+            return $ bestBlockHash <$> res
 
         let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb)
         HUnit.assertBool

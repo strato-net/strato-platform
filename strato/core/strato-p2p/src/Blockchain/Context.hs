@@ -240,7 +240,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Co
   get _ =
     RBDB.withRedisBlockDB getWorldBestBlockInfo <&> \case
       Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RedisBestBlock s n) -> WorldBestBlock $ BestBlock s n
+      Just (BestBlock s n) -> WorldBestBlock $ BestBlock s n
   put _ (WorldBestBlock (BestBlock s n)) =
     RBDB.withRedisBlockDB (updateWorldBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
@@ -251,7 +251,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
   get _ =
     RBDB.withRedisBlockDB getBestBlockInfo <&> \case
       Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RedisBestBlock s n) -> BestBlock s n
+      Just (BestBlock s n) -> BestBlock s n
   put _ (BestBlock s n) =
     RBDB.withRedisBlockDB (putBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
@@ -261,7 +261,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> BestSequencedBlock <$> Mod.get (Mod.Proxy @BestBlock)
-      Just (RedisBestBlock s n) -> pure . BestSequencedBlock $ BestBlock s n
+      Just (BestBlock s n) -> pure . BestSequencedBlock $ BestBlock s n
   put _ (BestSequencedBlock (BestBlock s n)) =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"

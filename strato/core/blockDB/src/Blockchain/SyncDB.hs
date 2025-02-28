@@ -72,7 +72,7 @@ putBestBlockInfo newSha newNumber = do
   oldBBI' <- getBestBlockInfo
   case oldBBI' of
     Nothing -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-    Just (RedisBestBlock oldSha oldNumber) -> do
+    Just (BestBlock oldSha oldNumber) -> do
       --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
       helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
       case helper' of
@@ -93,22 +93,22 @@ putBestBlockInfo newSha newNumber = do
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
 forceBestBlockInfo sha i =
-  forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i) --`totalRecall` (,,)
+  forceBestBlockInfo' bestBlockInfoKey (BestBlock sha i) --`totalRecall` (,,)
 
-forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
+forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> BestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
 
-getBestBlockInfo :: Redis (Maybe RedisBestBlock)
+getBestBlockInfo :: Redis (Maybe BestBlock)
 getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 
-getBestSequencedBlockInfo :: Redis (Maybe RedisBestBlock)
+getBestSequencedBlockInfo :: Redis (Maybe BestBlock)
 getBestSequencedBlockInfo = getBestBlockInfo' bestSequencedBlockInfoKey
 
 putBestSequencedBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
 putBestSequencedBlockInfo sha i =
-  forceBestBlockInfo' bestSequencedBlockInfoKey (RedisBestBlock sha i)
+  forceBestBlockInfo' bestSequencedBlockInfoKey (BestBlock sha i)
 
-getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
+getBestBlockInfo' :: S8.ByteString -> Redis (Maybe BestBlock)
 getBestBlockInfo' key =
   get key >>= \case
     Left x -> do
@@ -116,9 +116,9 @@ getBestBlockInfo' key =
       return Nothing
     Right r -> case r of
       Nothing -> return Nothing -- return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-      Just bs -> return . Just $ RedisBestBlock sha num
+      Just bs -> return . Just $ BestBlock sha num
         where
-          RedisBestBlock sha num = fromValue bs
+          BestBlock sha num = fromValue bs
 
 releaseRedlockScript :: S8.ByteString
 releaseRedlockScript =
@@ -167,7 +167,7 @@ worldBestBlockKey :: S8.ByteString
 worldBestBlockKey = "<worldbest>"
 {-# INLINE worldBestBlockKey #-}
 
-getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
+getWorldBestBlockInfo :: Redis (Maybe BestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
 updateWorldBestBlockInfo :: Keccak256 -> Integer -> Redis (Either Reply Bool)
@@ -188,16 +188,16 @@ updateWorldBestBlockInfo sha num = withRetryCount 0
           case maybeExistingWBBI of
             Nothing -> do
               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num)
+              void $ forceBestBlockInfo' worldBestBlockKey (BestBlock sha num)
               checkAndUpdateSyncStatus
               releaseAndFinalize lockID True
-            Just (RedisBestBlock _ oldNumber) -> do
+            Just (BestBlock _ oldNumber) -> do
               liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ("oldNumber = " ++ show oldNumber ++ "; newNumber = " ++ show num)
               let willUpdate = oldNumber <= num
               if willUpdate
                 then do
                   liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                  void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num)
+                  void $ forceBestBlockInfo' worldBestBlockKey (BestBlock sha num)
                   checkAndUpdateSyncStatus
                 else liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
               releaseAndFinalize lockID willUpdate
@@ -216,8 +216,8 @@ checkAndUpdateSyncStatus = do
   status <- getSyncStatus
   nodeBestBlock <- getBestBlockInfo
   worldBestBlock <- getWorldBestBlockInfo
-  let nodeNumber = redisBestBlockNumber <$> nodeBestBlock
-      worldNumber = redisBestBlockNumber <$> worldBestBlock
+  let nodeNumber = bestBlockNumber <$> nodeBestBlock
+      worldNumber = bestBlockNumber <$> worldBestBlock
 
   case (status, nodeNumber, worldNumber) of
     (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
@@ -233,8 +233,8 @@ getSyncStatusNow = do
     else do
       nodeBestBlock <- getBestBlockInfo
       worldBestBlock <- getWorldBestBlockInfo
-      let nodeNumber = redisBestBlockNumber <$> nodeBestBlock
-          worldNumber = redisBestBlockNumber <$> worldBestBlock
+      let nodeNumber = bestBlockNumber <$> nodeBestBlock
+          worldNumber = bestBlockNumber <$> worldBestBlock
       pure $
         Just $ case (status, nodeNumber, worldNumber) of
           (Just False, Just ntd, Just wtd) -> ntd >= wtd

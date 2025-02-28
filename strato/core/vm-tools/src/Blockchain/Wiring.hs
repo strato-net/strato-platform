@@ -295,7 +295,7 @@ instance HasContext m => Mod.Accessible RBDB.RedisConnection m where
 instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (Maybe WorldBestBlock) m where
   access _ = do
     mRBB <- RBDB.withRedisBlockDB getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num) ->
+    for mRBB $ \(BestBlock sha num) ->
       return . WorldBestBlock $ BestBlock sha num
 
 instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where
