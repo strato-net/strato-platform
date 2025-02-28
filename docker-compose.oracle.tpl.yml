@@ -28,7 +28,7 @@ services:
       - 8080:8018 # healthcheck ping only
     volumes:
       - oracleconfig:/config:rw
-      - ./oracle_file.json:/mnt/oracle_file.json:ro
+      - ./oracle.json:/mnt/oracle.json:ro
       - ./sale.json:/mnt/sale.json:ro
     tmpfs:
       - /tmp
