@@ -25,7 +25,10 @@ instance RLPSerializable BestBlock where
   rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"
 
 
-newtype BestSequencedBlock = BestSequencedBlock {unBestSequencedBlock :: BestBlock} deriving (Eq, Show)
+data BestSequencedBlock = BestSequencedBlock {
+  bestSequencedBlockHash :: Keccak256,
+  bestSequencedBlockNumber :: Integer
+  } deriving (Eq, Show)
 
 $(deriveFormat ''BestSequencedBlock)
 

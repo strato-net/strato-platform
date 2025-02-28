@@ -260,9 +260,11 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
-      Nothing -> BestSequencedBlock <$> Mod.get (Mod.Proxy @BestBlock)
-      Just (BestBlock s n) -> pure . BestSequencedBlock $ BestBlock s n
-  put _ (BestSequencedBlock (BestBlock s n)) =
+      Nothing -> do
+        BestBlock s n <- Mod.get (Mod.Proxy @BestBlock)
+        return $ BestSequencedBlock s n
+      Just (BestBlock s n) -> pure $ BestSequencedBlock s n
+  put _ (BestSequencedBlock s n) =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()

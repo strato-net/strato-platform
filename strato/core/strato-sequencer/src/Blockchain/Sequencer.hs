@@ -261,8 +261,10 @@ blockstanbulSend' msg = do
       now <- liftIO getCurrentTime
       when (now < tNext) $
         liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-      Mod.put (Mod.Proxy @BestSequencedBlock) . BestSequencedBlock $
-        BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
+      Mod.put (Mod.Proxy @BestSequencedBlock) $
+        BestSequencedBlock
+            (BDB.blockHeaderHash bh)
+            (BDB.blockHeaderBlockNumber bh)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   forM_ ckpts (A.insert (A.Proxy @Checkpoint) ())
