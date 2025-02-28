@@ -380,7 +380,7 @@ function calculateTWAP(prices) {
 }
 
 // Function to submit oracle prices periodically
-const submitOraclePricePeriodically = async (oracleInterval) => {
+const submitOraclePricePeriodically = async () => {
   const token = await oauthHelper.getServiceToken();
 
   for (const [key, oracle] of Object.entries(deployment.contracts)) {
@@ -545,7 +545,7 @@ async function main() {
           lastOracleRun !== currentDate
         ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
-          await submitOraclePricePeriodically(oracleInterval);
+          await submitOraclePricePeriodically();
           lastOracleRun = currentDate;
         } else {
           console.log("[Oracle] Skipping since interval not reached.");
