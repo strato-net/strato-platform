@@ -396,6 +396,7 @@ const submitOraclePricePeriodically = async () => {
         await fetchAndSubmitERC20TokenPrice(
           oracle.name,
           oracle.address,
+          oracle.decimals,
           process.env.ALCHEMY_API_KEY,
           token
         );
