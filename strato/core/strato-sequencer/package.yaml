@@ -60,6 +60,7 @@ executables:
       - blockapps-init
       - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-client
+      - blockDB
       - blockstanbul
       - common-log
       - format

@@ -32,7 +32,6 @@ import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.Data.ValidatorRef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
 import Blockchain.EthConf
@@ -44,6 +43,7 @@ import Blockchain.Generation
     readValidatorsFromGenesisInfo,
   )
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
+import Blockchain.Model.SyncState
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
@@ -178,7 +178,7 @@ initializeGenesisBlock genesisBlockName = do
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
-  void $ addRemoveValidator ([], validators)
+  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators 
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
