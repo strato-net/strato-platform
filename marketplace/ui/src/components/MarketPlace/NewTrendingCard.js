@@ -304,6 +304,7 @@ const NewTrendingCard = ({
               onChange={(e) => {
                 setQuantity(parseFloat(e || 0));
               }}
+              precision={2}
               onPressEnter={(e) => {
                 const newValue = parseFloat(e.target.value, 10);
                 if (newValue <= saleQuantity) {

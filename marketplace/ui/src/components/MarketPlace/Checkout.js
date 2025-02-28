@@ -333,6 +333,7 @@ const Checkout = () => {
               onChange={(e) => {
                 ValueQty(product, e);
               }}
+              precision={2}
             />
             <div
               onClick={() => {

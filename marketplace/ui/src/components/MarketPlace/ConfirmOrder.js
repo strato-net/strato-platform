@@ -338,6 +338,10 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+    const amountWithoutSymbol = totalAmount.split(' ');
+    
+    const isDisabled = !activePaymentProviders || activePaymentProviders?.length === 0 || amountWithoutSymbol[0] < 10;
+
   return (
     <>
       <div>
@@ -427,7 +431,6 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       !activePaymentProviders ||
                       activePaymentProviders?.length === 0
                     }
-                    className="w-full bg-blue-800 text-white h-10 text-lg"
                     onClick={() =>
                       reserve && stakeChecked
                         ? handlePlaceOrder(
@@ -436,6 +439,11 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                           )
                         : handlePlaceOrder()
                     }
+                    className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
+                      isDisabled
+                        ? '!bg-[#808080] cursor-not-allowed'
+                        : '!bg-[#13188A] cursor-pointer'
+                    }`}
                   >
                     Place Order
                   </Button>

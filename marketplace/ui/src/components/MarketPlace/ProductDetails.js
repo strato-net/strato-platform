@@ -736,6 +736,7 @@ const ProductDetails = ({ user, users }) => {
                           : inventoryDetails.quantity /
                             Math.pow(10, inventoryDetails.decimals || 0)
                       }
+                      precision={2}
                       defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
