@@ -386,7 +386,7 @@ const submitOraclePricePeriodically = async () => {
   for (const [key, oracle] of Object.entries(deployment.contracts)) {
     console.log(`[Oracle Update] Processing oracle: ${key}`);
 
-    if (!oracle.name || !oracle.address || !oracle.decimals || !oracle.type) {
+    if (!oracle.name || !oracle.address || oracle.decimals == null || !oracle.type) {
       console.warn(`[Oracle WARN] Skipping invalid oracle ${key}`);
       continue;
     }
