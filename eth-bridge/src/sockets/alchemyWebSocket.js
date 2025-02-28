@@ -28,6 +28,7 @@ const setupAlchemyWebSocket = async () => {
       await handleBridgeIn({
         hash: log.transactionHash,
         value: 0,
+        tx: log,
       });
     }
   );

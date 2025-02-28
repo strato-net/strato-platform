@@ -134,7 +134,18 @@ async function runDistributeRewardsCalls(token) {
           res.map((r) => r.hash),
           options
         );
-      await util.until(predicate, action, { config, isAsync: true }, 3600000);
+      const waitResult = await util.until(predicate, action, { config, isAsync: true }, 3600000);
+      for (const r of waitResult) {
+        if (r.status !== "Success") {
+          console.error(
+            `Error executing distributeRewards for: ${r.hash}`,
+            r
+          );
+          await flagFile.appendToErrorFile(
+            `Error executing distributeRewards for: ${r}`
+          );
+        }
+      }
       console.log("Batch distributeRewards calls completed.");
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
