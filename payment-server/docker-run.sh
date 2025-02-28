@@ -21,6 +21,36 @@ if [ "$ORACLE_MODE" = "true" ]; then
   echo "oracle.json copied to /tmp:"
   ls -l /tmp
 
+   # Validate the env vars
+  if [ -z "$METALS_API_KEY" ]; then
+    echo 'Error: METALS_API_KEY is not set. submit-price script will not run. Exiting.'
+    exit 11
+  fi
+  if [ -z "$ALCHEMY_API_KEY" ]; then
+    echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
+    exit 12
+  fi
+  if [ "${SALE_UPDATE}" = "true" ]; then
+    if [ -z "$METALS_USERNAME" ]; then
+      echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
+      exit 13
+    fi
+    if [ -z "$METALS_PASSWORD" ]; then
+      echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
+      exit 14
+    fi
+    if [ ! -f /mnt/sale.json ]; then
+      echo "Error: /mnt/sale.json not found. Exiting."
+      exit 1
+    fi
+
+    # Copy the file to /tmp
+    cp /mnt/sale.json /tmp/sale.json || exit 2
+
+    echo "sale.json copied to /tmp:"
+    ls -l /tmp
+  fi
+
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
   export STRATO_HOST=${STRATO_HOST}
@@ -43,37 +73,6 @@ if [ "$ORACLE_MODE" = "true" ]; then
     # Running container for the first time
   
     cp ./config/template.oracle_config.yaml /tmp/tmp.oracle_config.yaml
-  
-    # Validate the env vars
-    if [ -z "$METALS_API_KEY" ]; then
-      echo 'Error: METALS_API_KEY is not set. submit-price script will not run. Exiting.'
-      exit 11
-    fi
-    if [ -z "$ALCHEMY_API_KEY" ]; then
-      echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
-      exit 12
-    fi
-    if [ "${SALE_UPDATE}" = "true" ]; then
-      if [ -z "$METALS_USERNAME" ]; then
-        echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
-        exit 13
-      fi
-      if [ -z "$METALS_PASSWORD" ]; then
-        echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
-        exit 14
-      fi
-      if [ ! -f /mnt/sale.json ]; then
-        echo "Error: /mnt/sale.json not found. Exiting."
-        exit 1
-      fi
-
-      # Copy the file to /tmp
-      cp /mnt/sale.json /tmp/sale.json || exit 2
-
-      echo "sale.json copied to /tmp:"
-      ls -l /tmp
-    fi
-    # TODO: in future we can check the other env vars here
   
     # Replace placeholders in Oracle config template
     sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.oracle_config.yaml
