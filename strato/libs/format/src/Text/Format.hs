@@ -16,6 +16,9 @@ class Format a where
 instance Format Integer where
   format = show
 
+instance Format Bool where
+  format = show
+
 instance Format B.ByteString where
   format = BC.unpack . B16.encode
 
