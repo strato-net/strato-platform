@@ -4,7 +4,7 @@ require('dotenv').config();
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 
 // Load configuration from a YAML file.
-const config = fsUtil.getYaml(`../config.yaml`);
+const config = fsUtil.getYaml(`../../config.yaml`);
 
 /**
  * Obtains a user token using OAuth resource owner credentials.
@@ -284,7 +284,7 @@ async function transferCATAToNewReserve(
 async function main() {
   try {
     // Validate required environment variables.
-    const { USERNAME, PASSWORD, USERNAME_NEW, PASSWORD_NEW, OLD_RESERVE_ADDRESS, NEW_RESERVE_ADDRESS } =
+    const { USERNAME, PASSWORD, USERNAME_NEW, PASSWORD_NEW, OLD_RESERVE_ADDRESS, NEW_RESERVE_ADDRESS, UPDATE_ESCROWS } =
       process.env;
     if (!USERNAME || !PASSWORD) {
       throw new Error(
@@ -296,6 +296,16 @@ async function main() {
     }
     if (!NEW_RESERVE_ADDRESS) {
       throw new Error('NEW_RESERVE_ADDRESS environment variable is required.');
+    }
+
+    if (!USERNAME_NEW || !PASSWORD_NEW) {
+      throw new Error(
+        'USERNAME_NEW and PASSWORD_NEW environment variables are required.'
+      );
+    }
+
+    if (!UPDATE_ESCROWS) {
+      throw new Error('UPDATE_ESCROWS environment variable is required.');
     }
 
     // 1. Obtain the user token.
@@ -360,11 +370,13 @@ async function main() {
         batch
       );
 
-      // On the new reserve, update the escrow data.
-      await updateOldEscrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
+      if (UPDATE_ESCROWS === 'true') {
+        // On the new reserve, update the escrow data.
+        await updateOldEscrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
 
-      // On the new reserve, update the escrow borrow data.
-      await updateOldEscrowBorrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
+        // On the new reserve, update the escrow borrow data.
+        await updateOldEscrowBorrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
+      }
     }
 
     // On the old reserve, transfer CATA back to owner

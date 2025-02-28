@@ -89,7 +89,7 @@ async function main() {
     // 4. Set up contract details for deployment.
     const contractName = 'SimpleReserve';
     const contractFilename =
-      '../dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol';
+      '../../dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol';
     const source = await importer.combine(contractFilename);
 
     // Build the constructor arguments.

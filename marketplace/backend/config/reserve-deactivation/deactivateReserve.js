@@ -87,6 +87,9 @@ async function main() {
       3600000
     );
 
+    if (!finalResults || finalResults.length === 0 || finalResults[0].status !== 'Success') { 
+      throw new Error('Failed to deactivate reserve.');
+    }
     console.log(
       `Reserve at address ${RESERVE_ADDRESS} has been deactivated.`
     );
