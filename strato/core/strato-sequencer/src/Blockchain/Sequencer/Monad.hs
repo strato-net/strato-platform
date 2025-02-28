@@ -222,11 +222,6 @@ instance Mod.Modifiable BestSequencedBlock SequencerM where
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
-instance (() `A.Alters` Checkpoint) SequencerM where
-  lookup = lookupInLDB
-  insert p k v = insertInLDB p k v
-  delete p k = deleteInLDB p k
-
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
 -- easier than making a whole new SequencerM definition just to get a different HasVault instance
