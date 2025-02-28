@@ -10,19 +10,16 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export DOCKERIZED="true"
   export SALE_UPDATE=${SALE_UPDATE:-false}
 
-  export ORACLES_INFO=$(cat "${ORACLES_INFO}")
-  if [ -z "$ORACLES_INFO" ]; then
-    echo "ORACLES_INFO is empty"
-    exit 11
+  if [ ! -f /mnt/oracle.json ]; then
+    echo "Error: /mnt/oracle.json not found. Exiting."
+    exit 1
   fi
-  PARSED_JSON=$(echo "$ORACLES_INFO" | jq '.' 2>/dev/null)
-  if [ $? -ne 0 ]; then
-    echo "Error: The content of ORACLES_INFO is not valid JSON."
-    exit 12
-  fi
-  TMP_JSON="/tmp/oracle.json"
-  echo "$PARSED_JSON" > "$TMP_JSON"
-  echo "oracle.json file has been created at: $TMP_JSON"
+
+  # Copy the file to /tmp
+  cp /mnt/oracle.json /tmp/oracle.json
+
+  echo "oracle.json copied to /tmp:"
+  ls -l /tmp
 
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
@@ -65,18 +62,16 @@ if [ "$ORACLE_MODE" = "true" ]; then
         echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
         exit 14
       fi
-      if [ -z "$SALE_INFO" ]; then
-        echo 'Error: SALE_INFO is not set. Metal Sale price update script will not run. Exiting'
-        exit 15
+      if [ ! -f /mnt/sale.json ]; then
+        echo "Error: /mnt/sale.json not found. Exiting."
+        exit 1
       fi
-      PARSED_JSON=$(echo "$SALE_INFO" | jq '.' 2>/dev/null)
-      if [ $? -ne 0 ]; then
-        echo "Error: The content of SALE_INFO is not valid JSON."
-        exit 12
-      fi
-      TMP_JSON="/tmp/sale.json"
-      echo "$PARSED_JSON" > "$TMP_JSON"
-      echo "sale.json file has been created at: $TMP_JSON"
+
+      # Copy the file to /tmp
+      cp /mnt/sale.json /tmp/sale.json
+
+      echo "sale.json copied to /tmp:"
+      ls -l /tmp
     fi
     # TODO: in future we can check the other env vars here
   

@@ -15,13 +15,11 @@ services:
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
     - ORACLE_MODE=true
-    - ORACLES_INFO=${ORACLES_INFO}
     - METALS_API_KEY=${METALS_API_KEY}
     - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
     - UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS}
     - SKIP_ORACLE_DEPLOYMENT=${SKIP_ORACLE_DEPLOYMENT}
     - SALE_UPDATE=${SALE_UPDATE}
-    - SALE_INFO=${SALE_INFO}
     - METALS_USERNAME=${METALS_USERNAME}
     - METALS_PASSWORD=${METALS_PASSWORD}
     build: .
@@ -30,6 +28,10 @@ services:
       - 8080:8018 # healthcheck ping only
     volumes:
       - oracleconfig:/config:rw
+      - ./oracle_file.json:/mnt/oracle_file.json:ro
+      - ./sale.json:/mnt/sale.json:ro
+    tmpfs:
+      - /tmp
     restart: unless-stopped
     logging:
       driver: "json-file"
