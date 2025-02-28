@@ -26,12 +26,14 @@ where
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
+import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
-import Blockchain.SyncDB (getSyncStatusNow)
+import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
 import Control.Lens
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
@@ -57,7 +59,7 @@ type UrlMap = Map String String
 data MetadataResponse = MetadataResponse
   { nodePubKey :: V.PublicKey,
     nodeAddress :: Address,
-    validators :: [ChainMemberParsedSet],
+    validators :: [Validator],
     isSynced :: Bool,
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
@@ -90,7 +92,7 @@ exMetadataRespone =
    in MetadataResponse
         pubKey
         (fromPublicKey pubKey)
-        [CommonName "BlockApps" "Engineering" "Admin" True]
+        ["admin.blockapps.net"]
         True
         True
         "0"
@@ -110,14 +112,13 @@ metadataSchemaOptions =
 getMetaData ::
   ( MonadLogger m,
     HasVault m,
-    Accessible [ChainMemberParsedSet] m,
     Accessible UrlMap m,
     HasSQL m
   ) =>
   m MetadataResponse
 getMetaData =
   do
-    validators <- access (Proxy @[ChainMemberParsedSet])
+    validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> runStratoRedisIO getBestSequencedBlockInfo
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
     urlMap <- access (Proxy @UrlMap)

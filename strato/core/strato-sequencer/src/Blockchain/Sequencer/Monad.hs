@@ -215,10 +215,10 @@ instance HasBlockstanbulContext SequencerM where
 instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
-      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (BestBlock s n) -> BestSequencedBlock s n
-  put _ (BestSequencedBlock s n) =
-    RBDB.withRedisBlockDB (putBestSequencedBlockInfo s n) >>= \case
+      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) []
+      Just v -> v
+  put _ bestSequencedBlock =
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 

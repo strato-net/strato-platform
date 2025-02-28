@@ -101,12 +101,14 @@ forceBestBlockInfo' key = set key . toValue
 getBestBlockInfo :: Redis (Maybe BestBlock)
 getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 
-getBestSequencedBlockInfo :: Redis (Maybe BestBlock)
-getBestSequencedBlockInfo = getBestBlockInfo' bestSequencedBlockInfoKey
+getBestSequencedBlockInfo :: Redis (Maybe BestSequencedBlock)
+getBestSequencedBlockInfo =
+  get bestSequencedBlockInfoKey >>= \case
+    Left e -> error $ "error trying to get BestSequencedBlock: " ++ show e
+    Right r ->  return $ fmap fromValue r
 
-putBestSequencedBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
-putBestSequencedBlockInfo sha i =
-  forceBestBlockInfo' bestSequencedBlockInfoKey (BestBlock sha i)
+putBestSequencedBlockInfo :: RedisCtx m f => BestSequencedBlock -> m (f Status)
+putBestSequencedBlockInfo = set bestSequencedBlockInfoKey . toValue
 
 getBestBlockInfo' :: S8.ByteString -> Redis (Maybe BestBlock)
 getBestBlockInfo' key =

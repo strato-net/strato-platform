@@ -265,6 +265,7 @@ blockstanbulSend' msg = do
         BestSequencedBlock
             (BDB.blockHeaderHash bh)
             (BDB.blockHeaderBlockNumber bh)
+            (BDB.blockHeaderValidators bh)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   forM_ ckpts (A.insert (A.Proxy @Checkpoint) ())
