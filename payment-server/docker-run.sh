@@ -16,7 +16,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   fi
 
   # Copy the file to /tmp
-  cp /mnt/oracle.json /tmp/oracle.json
+  cp /mnt/oracle.json /tmp/oracle.json || exit 2
 
   echo "oracle.json copied to /tmp:"
   ls -l /tmp
@@ -68,7 +68,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
       fi
 
       # Copy the file to /tmp
-      cp /mnt/sale.json /tmp/sale.json
+      cp /mnt/sale.json /tmp/sale.json || exit 2
 
       echo "sale.json copied to /tmp:"
       ls -l /tmp
