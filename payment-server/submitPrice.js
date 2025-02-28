@@ -76,8 +76,8 @@ async function runDistributeRewardsCalls(token) {
           res.map((r) => r.hash),
           options
         );
-      await util.until(predicate, action, { config, isAsync: true }, 3600000);
-      console.log("Batch distributeRewards calls completed.");
+      const response = await util.until(predicate, action, { config, isAsync: true }, 3600000);
+      console.log("Batch distributeRewards calls completed with: ", response);
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
       console.log(
