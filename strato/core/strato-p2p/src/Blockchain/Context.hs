@@ -15,7 +15,6 @@ module Blockchain.Context
     ( MonadP2P
     , Inbound(..)
     , Outbound(..)
-    , IsValidator(..)
     , Context(..)
     , Config(..)
     , peerSource
@@ -136,8 +135,6 @@ type family All2 (ks :: [DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constrain
 newtype Inbound a = Inbound {unInbound :: a}
 
 newtype Outbound a = Outbound {unOutbound :: a}
-
-newtype IsValidator = IsValidator {unIsValidator :: Bool}
 
 data Config = Config
   { configSQLDB :: SQLDB,
