@@ -63,7 +63,6 @@ import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
-import Blockchain.ValidatorDB
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
 import Control.Monad.Composable.Redis
@@ -145,11 +144,6 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
           pure (ua', c')
       )
       certs'
-
-  insertValidators <- execRedis $ addValidators validators
-  case insertValidators of
-    Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
-    Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
 
   (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo genesisBlockName extraAccounts
 

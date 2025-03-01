@@ -64,7 +64,6 @@ library:
   - transformers
   - turtle
   - unliftio
-  - validatorDB
   - vm-tools
   - yaml
   - ordered-containers

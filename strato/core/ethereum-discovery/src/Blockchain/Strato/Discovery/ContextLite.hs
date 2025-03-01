@@ -31,12 +31,14 @@ import Blockchain.DB.SQLDB
 import Blockchain.DBM
 import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDP (processDataStream')
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.ValidatorDB
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import Blockchain.SyncDB
 import Control.Concurrent (threadDelay)
 import Control.Exception hiding (catch)
 import Control.Monad (void)
@@ -52,7 +54,7 @@ import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import Data.IP
 import Data.List
-import Data.Maybe (listToMaybe)
+import Data.Maybe
 import qualified Data.Text as T
 import qualified Database.Persist.Postgresql as SQL
 import qualified Database.Redis as Redis
@@ -91,8 +93,10 @@ instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
 instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
   access _ = asks redisBlockDB
   
-instance MonadIO m => Accessible ValidatorAddresses (ReaderT ContextLite m) where
-  access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> getValidatorAddresses
+instance MonadIO m => Accessible [Validator] (ReaderT ContextLite m) where
+  access _ = do
+    bestSequencedBlock <- fromMaybe (error "missing BestSequencedBlock in redis") <$> RBDB.withRedisBlockDB getBestSequencedBlockInfo
+    return $ bestSequencedBlockValidators bestSequencedBlock
 
 instance MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
   replace _ host peer = do
@@ -205,7 +209,7 @@ type MonadDiscovery m =
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
-    Mod.Accessible ValidatorAddresses m,
+    Mod.Accessible [Validator] m,
     A.Selectable (Maybe Host, UDPPort) SockAddr m
   )
 

@@ -83,7 +83,6 @@ library:
     - time
     - unliftio-core
     - unliftio
-    - validatorDB
     - warp
 
 #removing p2p tests for now, it is more work to keep updating this than the reward it is giving

@@ -103,7 +103,6 @@ import           Blockchain.Strato.Model.Secp256k1
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.SyncDB
-import           Blockchain.ValidatorDB
 import           Control.Monad                         (void)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
@@ -285,9 +284,6 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
       . getBlocks
   insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
-  
-instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
-  select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . isValidator
 
 instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
   lookup _ k = do
@@ -487,8 +483,7 @@ type MonadP2P m =
          '(Address, X509CertInfoState),
          '((Host, UDPPort, B.ByteString), Point),
          '(Host, PPeer),
-         '(Point, PPeer),
-         '(ChainMemberParsedSet, IsValidator)
+         '(Point, PPeer)
        ]
       m,
     All2

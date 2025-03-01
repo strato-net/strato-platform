@@ -64,10 +64,11 @@ import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Metrics
 import Blockchain.Strato.Discovery.Data.PeerDefinition
 import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Model.Address (Address, fromPublicKey)
+import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util (byteString2Integer)
+import Blockchain.Strato.Model.Validator
 import Control.Exception hiding (try)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -77,7 +78,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.IP
 import Data.List (sortBy)
-import Data.Maybe (fromJust)
 import qualified Data.Set as Set
 import Data.String
 import qualified Data.Text as T
@@ -362,7 +362,7 @@ pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256To
 getPeersClosestTo ::
   ( MonadLogger m
   , A.Selectable Point ClosestPeers m
-  , Mod.Accessible ValidatorAddresses m
+  , Mod.Accessible [Validator] m
   ) =>
   NodeID ->
   Point ->
@@ -370,10 +370,11 @@ getPeersClosestTo ::
 getPeersClosestTo targetNID requesterPubkey = do 
     peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) requesterPubkey
     $logInfoS "getPeersClosestTo" $ T.pack $ "peer list: " ++ show peers
-    ValidatorAddresses valAdds <- Mod.access (Mod.Proxy @ValidatorAddresses)
-    $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show valAdds
+    validators <- Mod.access (Mod.Proxy @[Validator])
+    $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show validators
     let targetPt = nodeIDToPoint targetNID
-        (vals, nonvals) = Set.partition (\p -> (fromPublicKey . pointToSecPubKey . fromJust $ pPeerPubkey p) `elem` valAdds) peers
+        hostToValidator (Host v) = Validator v
+        (vals, nonvals) = Set.partition (\p -> hostToValidator (pPeerHost p) `elem` validators) peers
     return $
       Set.toList vals ++
       (take 20 . 
