@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Row,
   Breadcrumb,
@@ -71,6 +71,7 @@ import {
   useDisconnect,
   useAppKitNetwork,
   createAppKit,
+  useAppKitProvider,
 } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
@@ -98,9 +99,6 @@ const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
-  const initialPath = useRef(pathname);
-
-
   const navigate = useNavigate();
 
   const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
@@ -199,12 +197,13 @@ const ProductDetails = ({ user, users }) => {
       emailShowWallets: false,
     },
     excludeWalletIds: [
-      'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393'
+      'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393',
     ],
-    allWallets: "HIDE",
+    allWallets: 'HIDE',
   });
 
   const appKit = useAppKit();
+  const { walletProvider } = useAppKitProvider('eip155');
   const disconnect = useDisconnect();
   const { address } = useAppKitAccount();
   const { chainId } = useAppKitNetwork();
@@ -213,25 +212,58 @@ const ProductDetails = ({ user, users }) => {
 
   // *** New useEffect: Listen for wallet account changes ***
   useEffect(() => {
-    const handleAccountsChanged = async (accounts) => {
+    if (!walletProvider) return;
+  
+    // Handler for account changes
+    const handleAccountsChanged = (accounts) => {
       if (!accounts || accounts.length === 0) {
-        await disconnect.disconnect();
+        // Disconnect if no accounts are available
+        disconnect.disconnect();
       }
     };
+  
+    // Attach the event listener
+    walletProvider.on("accountsChanged", handleAccountsChanged);
+  
+    // Function to fetch balance using the same provider
+    const fetchBalance = async () => {
+      if (address && chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id) {
+        const wbtcAddress = fileServerUrl.includes('test')
+          ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
+          : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
 
-    if (window.ethereum && window.ethereum.on) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-    }
+        const provider = new ethers.providers.Web3Provider(walletProvider);
+        const signer = provider.getSigner();
+        setSigner(signer);
 
-    return () => {
-      if (window.ethereum && window.ethereum.removeListener) {
-        window.ethereum.removeListener(
-          'accountsChanged',
-          handleAccountsChanged
+        // Create WBTC contract instance
+        const wbtcContract = new ethers.Contract(
+          wbtcAddress,
+          ERC20_ABI,
+          provider
         );
+
+        try {
+          // Get WBTC balance
+          const wbtcBalance = await wbtcContract.balanceOf(address);
+
+          // WBTC has 8 decimals (like BTC), format accordingly
+          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
+          setWbtcBalance(formattedBalance); // Set WBTC balance
+        } catch (error) {
+          console.error('Failed to fetch WBTC balance:', error);
+        }
       }
     };
-  }, []);
+  
+    // Fetch balance when the account changes
+    fetchBalance();
+  
+    // Cleanup: remove event listener on unmount
+    return () => {
+      walletProvider.removeListener("accountsChanged", handleAccountsChanged);
+    };
+  }, [walletProvider, address, chainId]);
 
   useEffect(() => {
     return () => {
@@ -246,7 +278,7 @@ const ProductDetails = ({ user, users }) => {
           ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
           : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
 
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const provider = new ethers.providers.Web3Provider(walletProvider);
         const signer = provider.getSigner();
         setSigner(signer);
 
@@ -912,9 +944,7 @@ const ProductDetails = ({ user, users }) => {
                       <h2 className="w-full text-center font-bold text-2xl">
                         12-Month Historical Data
                       </h2>
-                      <Statistics
-                        priceHistory={priceHistory}
-                      />
+                      <Statistics priceHistory={priceHistory} />
                     </>
                   )}
                 </div>

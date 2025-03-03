@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Row,
   Breadcrumb,
@@ -70,6 +70,8 @@ import {
   useAppKitAccount,
   useDisconnect,
   createAppKit,
+  useAppKitProvider,
+  useAppKitNetwork,
 } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
@@ -185,62 +187,59 @@ const ProductDetails = ({ user, users }) => {
       emailShowWallets: false,
     },
     excludeWalletIds: [
-      'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393'
+      'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393',
     ],
-    allWallets: "HIDE",
+    allWallets: 'HIDE',
   });
 
   const appKit = useAppKit();
-  const rawAccount = useAppKitAccount();
+  const { walletProvider } = useAppKitProvider('eip155');
+  const { address } = useAppKitAccount();
   const disconnect = useDisconnect();
+  const { chainId } = useAppKitNetwork();
   const [ethBalance, setEthBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
-  const account = useMemo(() => {
-    return rawAccount && rawAccount.address ? rawAccount : null;
-  }, [rawAccount?.address]);
-
   // *** New useEffect: Listen for wallet account changes ***
   useEffect(() => {
-    const handleAccountsChanged = async (accounts) => {
+    if (!walletProvider) return;
+  
+    // Handler for account changes
+    const handleAccountsChanged = (accounts) => {
       if (!accounts || accounts.length === 0) {
-        await disconnect.disconnect();
+        // Disconnect if no accounts are available
+        disconnect.disconnect();
       }
     };
-
-    if (window.ethereum && window.ethereum.on) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-    }
-
+  
+    // Attach the event listener
+    walletProvider.on("accountsChanged", handleAccountsChanged);
+  
+    // Function to fetch balance using the same provider
+    const fetchBalance = async () => {
+      if (address && chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id) {
+        const ethersProvider = new ethers.providers.Web3Provider(walletProvider);
+        const balanceWei = await ethersProvider.getBalance(address);
+        const currentSigner = ethersProvider.getSigner();
+        setSigner(currentSigner);
+        setEthBalance(ethers.utils.formatEther(balanceWei));
+      }
+    };
+  
+    // Fetch balance when the account changes
+    fetchBalance();
+  
+    // Cleanup: remove event listener on unmount
     return () => {
-      if (window.ethereum && window.ethereum.removeListener) {
-        window.ethereum.removeListener(
-          'accountsChanged',
-          handleAccountsChanged
-        );
-      }
+      walletProvider.removeListener("accountsChanged", handleAccountsChanged);
     };
-  }, []);
+  }, [walletProvider, address, chainId]);
 
   useEffect(() => {
     return () => {
       disconnect.disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (account?.address) {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const balanceWei = await provider.getBalance(account.address);
-        const signer = provider.getSigner();
-        setSigner(signer);
-        setEthBalance(ethers.utils.formatEther(balanceWei));
-      }
-    };
-
-    fetchBalance();
-  }, [account]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -666,7 +665,7 @@ const ProductDetails = ({ user, users }) => {
                           if (!isAuthenticated || !user) {
                             setIsModalVisible(true);
                           } else {
-                            if (account?.address) {
+                            if (address) {
                               showBridgeWalletModal();
                             } else {
                               appKit.open();
@@ -674,10 +673,10 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }}
                       >
-                        {account?.address ? 'Bridge' : 'Connect Wallet'}
+                        {address ? 'Bridge' : 'Connect Wallet'}
                       </Button>
                     </div>
-                    {account?.address && (
+                    {address && (
                       <div className="bg-[#13188A] rounded-full mt-2">
                         <appkit-account-button />
                       </div>
@@ -908,7 +907,7 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleBridgeWalletModalClose}
           signer={signer}
           accountDetails={{
-            walletAddress: account?.address,
+            walletAddress: address,
             balance: ethBalance,
           }}
           tokenName="ETH"
