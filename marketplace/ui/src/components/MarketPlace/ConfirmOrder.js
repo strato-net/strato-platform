@@ -425,7 +425,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       </Checkbox>
                     </div>
                   )}
-                  <Tooltip title={isDisabled ? "The minimum cart value required is $10. Please add more items to proceed." : ""}>
+                  <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
                     <Button
                       type="primary"
                       disabled={
