@@ -223,6 +223,12 @@ const ProductDetails = ({ user, users }) => {
   }, []);
 
   useEffect(() => {
+    return () => {
+      disconnect.disconnect();
+    };
+  }, [disconnect]);
+
+  useEffect(() => {
     const fetchBalance = async () => {
       if (account?.address) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);

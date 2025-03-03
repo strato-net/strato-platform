@@ -231,6 +231,12 @@ const ProductDetails = ({ user, users }) => {
   }, []);
 
   useEffect(() => {
+    return () => {
+      disconnect.disconnect();
+    };
+  }, [disconnect]);
+
+  useEffect(() => {
     const fetchBalance = async () => {
       if (address) {
         const wbtcAddress = fileServerUrl.includes('test')
