@@ -42,7 +42,7 @@ const createTransactionObject = async (method, toAddress, value, txHash, contrac
       params: {
         address: `eq.${contractAddress}`,
         isActive: `eq.true`,
-        creator: `eq.BlockApps`,
+        creator: `in.(BlockApps,mercata_usdst)`,
         ["data->>isMint"]: `eq.True`,
       },
     }
