@@ -251,11 +251,12 @@ blockstanbulSend' msg = do
       now <- liftIO getCurrentTime
       when (now < tNext) $
         liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+      ctx <- fmap (fromMaybe $ error "BlockstanbulContext missing") $ getBlockstanbulContext
       Mod.put (Mod.Proxy @BestSequencedBlock) $
         BestSequencedBlock
             (BDB.blockHeaderHash bh)
             (BDB.blockHeaderBlockNumber bh)
-            (BDB.blockHeaderValidators bh)
+            (S.toList $ _validators ctx)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   _ <- writeSeqP2pEvents p2pevs
