@@ -905,7 +905,6 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </>
                   )}

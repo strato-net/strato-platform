@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -37,6 +38,7 @@ import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Text.Format
+import Text.Format.Template
 
 data BlockDBNamespace
   = Headers
@@ -153,6 +155,8 @@ data RedisBestBlock = RedisBestBlock
     bestBlockNumber :: Integer -- todo: BlockNumber
   }
   deriving (Eq, Read, Show)
+
+$(deriveFormat ''RedisBestBlock)
 
 instance RLPSerializable RedisBestBlock where
   rlpEncode (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]

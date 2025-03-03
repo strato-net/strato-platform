@@ -535,12 +535,12 @@ const actions = {
     }
   },
 
-  waitForOrderEvent: async (dispatch, orderHash) => {
+  waitForOrderEvent: async (dispatch, orderHash, reserve, asset) => {
     dispatch({ type: actionDescriptors.waitForOrderEvent });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/wait/event?orderHash=${orderHash}`,
+        `${apiUrl}/order/wait/event?orderHash=${orderHash}&reserve=${reserve}&asset=${asset}`,
         {
           method: HTTP_METHODS.GET,
         }

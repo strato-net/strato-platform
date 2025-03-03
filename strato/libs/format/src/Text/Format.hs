@@ -13,6 +13,9 @@ import qualified Data.ByteString.Char8 as BC
 class Format a where
   format :: a -> String
 
+instance Format Integer where
+  format = show
+  
 instance Format B.ByteString where
   format = BC.unpack . B16.encode
 
