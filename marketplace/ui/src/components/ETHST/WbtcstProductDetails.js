@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Row,
   Breadcrumb,
@@ -98,6 +98,9 @@ const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
+  const initialPath = useRef(pathname);
+
+
   const navigate = useNavigate();
 
   const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
@@ -234,7 +237,7 @@ const ProductDetails = ({ user, users }) => {
     return () => {
       disconnect.disconnect();
     };
-  }, [disconnect]);
+  }, []);
 
   useEffect(() => {
     const fetchBalance = async () => {

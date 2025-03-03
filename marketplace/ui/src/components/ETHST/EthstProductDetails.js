@@ -226,7 +226,7 @@ const ProductDetails = ({ user, users }) => {
     return () => {
       disconnect.disconnect();
     };
-  }, [disconnect]);
+  }, []);
 
   useEffect(() => {
     const fetchBalance = async () => {
