@@ -8,6 +8,11 @@ Paste the following to planttext.com to see the sequence diagram of docker-run.s
 @startuml
 start
 :Container started (similar for ORACLE_MODE=true|false);
+if (Env vars valid and oracle.json provided(for Oracle)?) then (yes)
+else (no)
+#pink:Unexpected case - exit 2;
+kill
+endif
 if (config.yaml exists in docker volume?) then (yes)
   if (deploy.yaml exists in docker volume?) then (yes)
     if (.deployed file exists?) then (yes)
@@ -38,7 +43,6 @@ endif;
 stop
 @enduml
 ```
-
 ## Endpoints
 
 ##### GET `/ping`
