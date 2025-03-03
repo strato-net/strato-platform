@@ -9,56 +9,54 @@ import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 import flagFile from "./helpers/flagFile.js";
 
-// Read the oracle configuration from /tmp/oracle.json
 const oracleConfigPath = "/tmp/oracle.json";
 if (!fs.existsSync(oracleConfigPath)) {
-  throw new Error("Oracle configuration file not found at " + oracleConfigPath);
+  throw new Error(`Oracle configuration file not found at ${oracleConfigPath}`);
 }
-const oracleConfig = JSON.parse(fs.readFileSync(oracleConfigPath, "utf8"));
-if (!oracleConfig.oracleUpdateTime) {
-  await flagFile.appendToErrorFile(
-    `No oracleUpdateTime found in oracle.json file, defaulting to 1 day but please update the file.`
-  );
-}
-const oracleUpdateTime =
-  Number(oracleConfig.oracleUpdateTime) || 24 * 60 * 60 * 1000; // Default: 1 day in ms;
 
-// Read the oracle configuration from /tmp/sale.json
-// Set global defaults
+let oracleConfig;
+try {
+  oracleConfig = JSON.parse(fs.readFileSync(oracleConfigPath, "utf8"));
+} catch (error) {
+  // Log error to flag file and/or throw an error with a clear message
+  await flagFile.appendToErrorFile(
+    `Failed to parse oracle.json file: ${error.message}`
+  );
+  throw new Error(`Failed to parse oracle.json file: ${error.message}`);
+}
+
+// Destructure with defaults
+const {
+  oracleUpdateTime: rawOracleUpdateTime,
+  saleUpdateTime: rawSaleUpdateTime,
+  assets: configAssets = [],
+} = oracleConfig;
+
+// Set defaults
 let saleUpdateTime = 13; // Default: 13:00 UTC
 let assets = [];
+let oracleUpdateTime = 24 * 60 * 60 * 1000; // 1 day in ms
 
-// Only try to load and override these if SALE_UPDATE is enabled
+if (!rawOracleUpdateTime) {
+  await flagFile.appendToErrorFile(
+    "No oracleUpdateTime found in oracle.json file, defaulting to 1 day but please update the file."
+  );
+}
+oracleUpdateTime = Number(rawOracleUpdateTime) || 24 * 60 * 60 * 1000; // 1 day in ms
+
+
+
 if (process.env.SALE_UPDATE === "true") {
-  const saleConfigPath = "/tmp/sale.json";
-  let saleConfig = {};
-  
-  if (fs.existsSync(saleConfigPath)) {
-    try {
-      saleConfig = JSON.parse(fs.readFileSync(saleConfigPath, "utf8"));
-    } catch (err) {
-      await flagFile.appendToErrorFile(
-        `Error parsing sale configuration file: ${err.message}. Using default sale configuration.`
-      );
-    }
+  if (rawSaleUpdateTime) {
+    saleUpdateTime = Number(rawSaleUpdateTime);
   } else {
     await flagFile.appendToErrorFile(
-      `Sale configuration file not found at ${saleConfigPath}. Using default sale configuration.`
+      "No saleUpdateTime found in oracle.json file, defaulting to 13:00 UTC but please update the file."
     );
   }
   
-  // Override saleUpdateTime if provided
-  if (saleConfig.saleUpdateTime) {
-    saleUpdateTime = Number(saleConfig.saleUpdateTime);
-  } else {
-    await flagFile.appendToErrorFile(
-      `No saleUpdateTime found in sale.json file, defaulting to 13:00 UTC but please update the file.`
-    );
-  }
-  
-  // Override assets if provided and valid
-  if (Array.isArray(saleConfig.assets)) {
-    assets = saleConfig.assets;
+  if (Array.isArray(configAssets)) {
+    assets = configAssets;
   }
 }
 

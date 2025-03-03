@@ -29,7 +29,6 @@ services:
     volumes:
       - oracleconfig:/config:rw
       - ./oracle.json:/mnt/oracle.json:ro
-      - ./sale.json:/mnt/sale.json:ro
     tmpfs:
       - /tmp
     restart: unless-stopped

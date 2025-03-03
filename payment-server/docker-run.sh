@@ -17,6 +17,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   # Copy the file to /tmp
   cp /mnt/oracle.json /tmp/oracle.json || exit 2
+  chmod 444 /tmp/oracle.json
 
   echo "oracle.json copied to /tmp:"
   ls -l /tmp
@@ -39,16 +40,6 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
       exit 14
     fi
-    if [ ! -f /mnt/sale.json ]; then
-      echo "Error: /mnt/sale.json not found. Exiting."
-      exit 1
-    fi
-
-    # Copy the file to /tmp
-    cp /mnt/sale.json /tmp/sale.json || exit 2
-
-    echo "sale.json copied to /tmp:"
-    ls -l /tmp
   fi
 
   export CONFIG_DIR_PATH=/config
