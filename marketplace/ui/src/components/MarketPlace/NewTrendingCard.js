@@ -295,25 +295,37 @@ const NewTrendingCard = ({
               -
             </Typography>
             <InputNumber
-              className="w-10"
+              className="w-12"
               size="small"
               bordered={false}
               value={quantity}
               max={saleQuantity}
               min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
               onChange={(e) => {
-                setQuantity(parseFloat(e || 0));
+                if (!isNaN(e)) {
+                  setQuantity(parseFloat(e || 0));
+                }
               }}
-              precision={2}
+              precision={topSellingProduct.decimals !== null ? 2 : 0}
               onPressEnter={(e) => {
                 const newValue = parseFloat(e.target.value, 10);
-                if (newValue <= saleQuantity) {
+                if (!isNaN(newValue) && newValue <= saleQuantity) {
                   setQuantity(newValue);
                 } else {
                   api.error({
                     message: 'Cannot add more than available quantity',
                     placement: 'bottom',
                   });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (topSellingProduct.decimals === null) {
+                  if (e.key === "." || e.key === ",") {
+                    e.preventDefault();
+                  }
+                }
+                if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete") {
+                  e.preventDefault();
                 }
               }}
               controls={false}

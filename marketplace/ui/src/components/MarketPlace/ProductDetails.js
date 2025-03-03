@@ -736,7 +736,7 @@ const ProductDetails = ({ user, users }) => {
                           : inventoryDetails.quantity /
                             Math.pow(10, inventoryDetails.decimals || 0)
                       }
-                      precision={2}
+                      precision={inventoryDetails.decimals !== null ? 2 : 0}
                       defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
@@ -744,6 +744,16 @@ const ProductDetails = ({ user, users }) => {
                           setQty(parseFloat(e || 0));
                         } else {
                           setQty(availableQuantity);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (inventoryDetails.decimals === null) {
+                          if (e.key === "." || e.key === ",") {
+                            e.preventDefault();
+                          }
+                        }
+                        if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete") {
+                          e.preventDefault();
                         }
                       }}
                     />

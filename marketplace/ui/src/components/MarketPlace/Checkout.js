@@ -333,7 +333,17 @@ const Checkout = () => {
               onChange={(e) => {
                 ValueQty(product, e);
               }}
-              precision={2}
+              precision={product.decimals !== 0 ? 2 : 0}
+              onKeyDown={(e) => {
+                if (product.decimals === 0) {
+                  if (e.key === "." || e.key === ",") {
+                    e.preventDefault();
+                  }
+                }
+                if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete") {
+                  e.preventDefault();
+                }
+              }}
             />
             <div
               onClick={() => {
