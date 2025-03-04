@@ -36,6 +36,10 @@ const actionDescriptors = {
   stakeInventorySuccessful: 'stake_inventory_successful',
   stakeInventoryFailed: 'stake_inventory_failed',
 
+  stakeAfterBridge: 'stake_after_bridge',
+  stakeAfterBridgeSuccessful: 'stake_after_bridge_successful',
+  stakeAfterBridgeFailed: 'stake_after_bridge_failed',
+
   unstakeInventory: 'unstake_inventory',
   unstakeInventorySuccessful: 'unstake_inventory_successful',
   unstakeInventoryFailed: 'unstake_inventory_failed',
@@ -870,6 +874,45 @@ const actions = {
     }
   },
 
+  stakeAfterBridge: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.stakeAfterBridge });
+
+    try {
+      const response = await fetch(`${apiUrl}/reserve/stakeAfterBridge`, {
+        method: HTTP_METHODS.POST,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.stakeAfterBridgeSuccessful,
+          payload: body.data,
+        });
+        // actions.setMessage(dispatch, 'Item has been Staked Successfully', true);
+        return true;
+      } 
+      dispatch({
+        type: actionDescriptors.stakeAfterBridgeFailed,
+        error: body.error,
+      });
+      // actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.stakeAfterBridgeFailed,
+        error: 'Error while Staking Item After Bridge',
+      });
+      // actions.setMessage(dispatch, 'Error while Staking Item');
+    }
+  },
+
   UnstakeInventory: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.unstakeInventory });
 
@@ -1078,7 +1121,10 @@ const actions = {
           type: actionDescriptors.fetchTotalCataRewardsFailed,
           error: 'Error while fetching the total CATA rewards',
         });
-        actions.setMessage(dispatch, 'Errorwhile fetching the total CATA rewards');
+        actions.setMessage(
+          dispatch,
+          'Errorwhile fetching the total CATA rewards'
+        );
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
@@ -1098,7 +1144,10 @@ const actions = {
         type: actionDescriptors.fetchTotalCataRewardsFailed,
         error: 'Error while fetching the total CATA rewards',
       });
-      actions.setMessage(dispatch, 'Error while fetching the total CATA rewards');
+      actions.setMessage(
+        dispatch,
+        'Error while fetching the total CATA rewards'
+      );
     }
   },
 
@@ -1226,7 +1275,7 @@ const actions = {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-        }
+        },
       });
 
       const body = await response.json();
