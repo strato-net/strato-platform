@@ -126,7 +126,7 @@ class TokensController {
   static validateBridgeOutArgs(args) {
     const burnETHSTSchema = Joi.object({
       quantity: Joi.string().required(),
-      baseAddress: Joi.string().required(),
+      externalChainWalletAddress: Joi.string().required(),
       tokenAssetRootAddress: Joi.string().required(),
     });
 

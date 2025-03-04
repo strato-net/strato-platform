@@ -1223,7 +1223,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const burnETHSTArgs = {
       tokenAssetRootAddress,
-      quantity: actualRepayment,
+      quantity: bnQauntity,
       baseAddress: externalChainWalletAddress,
       ethstAddresses: addressesToUse,
     };
