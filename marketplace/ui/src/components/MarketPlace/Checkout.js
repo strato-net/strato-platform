@@ -162,15 +162,23 @@ const Checkout = () => {
   }, [marketplaceDispatch, cartList]);
 
   const MinusQty = (qty, product) => {
-    if (qty <= 1) {
+    if (qty <= 0) {
       return;
     }
-
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-        items[index].qty -= 1;
-        actions.addItemToCart(marketplaceDispatch, items);
+        if (items[index].qty - 0.01 >= 0) {
+          if (product.decimals === 0) {
+            items[index].qty -= 1;
+          }
+          else {
+            if (items[index].qty > 0) {
+              items[index].qty -= 0.01;
+            }
+          }
+          actions.addItemToCart(marketplaceDispatch, items);
+        }
       }
     });
   };
@@ -181,7 +189,12 @@ const Checkout = () => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
         if (items[index].qty + 1 <= availableQuantity) {
-          items[index].qty += 1;
+          if (product.decimals === 0) {
+            items[index].qty += 1;
+          }
+          else {
+            items[index].qty += 0.01;
+          }
           actions.addItemToCart(marketplaceDispatch, items);
         }
       }
@@ -256,6 +269,34 @@ const Checkout = () => {
     }
   };
 
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct.decimals === null) {
+      // Prevent decimals
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (!/^[0-9]$/.test(e.key) && 
+          e.key !== "Backspace" && 
+          e.key !== "Delete" && 
+          e.key !== "ArrowLeft" && 
+          e.key !== "ArrowRight") {
+        e.preventDefault();
+      }
+    } else {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight"
+      ) {
+        e.preventDefault();
+      }
+    }
+  };
+
   const columns = [
     {
       title: (
@@ -326,28 +367,21 @@ const Checkout = () => {
             </div>
             <InputNumber
               className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
-              min={1 / Math.pow(10, product.decimals)}
+              min={1 / Math.pow(10, product.decimals || 0)}
               value={qty}
               defaultValue={qty}
               controls={false}
               onChange={(e) => {
                 ValueQty(product, e);
               }}
-              precision={product.decimals !== 0 ? 2 : 0}
+              precision={product.decimals === 0 ? 0 : 2}
               onKeyDown={(e) => {
-                if (product.decimals === 0) {
-                  if (e.key === "." || e.key === ",") {
-                    e.preventDefault();
-                  }
-                }
-                if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete") {
-                  e.preventDefault();
-                }
+                onKeyDownPress(e, product);
               }}
             />
             <div
               onClick={() => {
-                AddQty(product);
+                AddQty(product, product.decimals);
               }}
               className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
                 qty >= product.quantity

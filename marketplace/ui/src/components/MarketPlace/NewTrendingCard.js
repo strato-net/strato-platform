@@ -43,8 +43,10 @@ const NewTrendingCard = ({
   )
     ? 18
     : topSellingProduct.decimals || 0;
+  
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity : 1);
+
+  const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity :  topSellingProduct?.decimals ? 0.01 : 1);
 
   const ownerSameAsUser = () => {
     if (user?.commonName === topSellingProduct?.ownerCommonName) {
@@ -121,6 +123,58 @@ const NewTrendingCard = ({
       window.location.href = loginUrl;
     }
     setIsModalVisible(false);
+  };
+
+  const handleIncrement = (quantity, decimals) => {
+    if (decimals === null) {
+      setQuantity(quantity + 0.01);
+      if (
+        quantity + 1 <= saleQuantity &&
+        quantity + 1 <= topSellingProduct.quantity
+      ) {
+        setQuantity(quantity + 1);
+      }
+    }
+    else 
+      setQuantity(quantity + 0.01);
+  }
+
+  const handleDecrement = (quantity, decimals) => {
+    if (decimals === null) {
+      setQuantity(Math.max(quantity - 1, 1));
+    }
+    else {
+      const minValue = 1 / Math.pow(10, decimals || 0); // Minimum allowed decimal value
+      setQuantity((prevQuantity) => Math.max(prevQuantity - 0.01, minValue));
+    }
+  }
+
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct.decimals === null) {
+      // Prevent decimals
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (!/^[0-9]$/.test(e.key) && 
+          e.key !== "Backspace" && 
+          e.key !== "Delete" && 
+          e.key !== "ArrowLeft" && 
+          e.key !== "ArrowRight") {
+        e.preventDefault();
+      }
+    } else {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight"
+      ) {
+        e.preventDefault();
+      }
+    }
   };
 
   return (
@@ -289,7 +343,7 @@ const NewTrendingCard = ({
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                setQuantity(Math.max(quantity - 1, 1));
+                handleDecrement(quantity, topSellingProduct.decimals)
               }}
             >
               -
@@ -301,12 +355,12 @@ const NewTrendingCard = ({
               value={quantity}
               max={saleQuantity}
               min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
+              precision={topSellingProduct.decimals === null ? 0 : 2}
               onChange={(e) => {
                 if (!isNaN(e)) {
                   setQuantity(parseFloat(e || 0));
                 }
               }}
-              precision={topSellingProduct.decimals !== null ? 2 : 0}
               onPressEnter={(e) => {
                 const newValue = parseFloat(e.target.value, 10);
                 if (!isNaN(newValue) && newValue <= saleQuantity) {
@@ -319,14 +373,7 @@ const NewTrendingCard = ({
                 }
               }}
               onKeyDown={(e) => {
-                if (topSellingProduct.decimals === null) {
-                  if (e.key === "." || e.key === ",") {
-                    e.preventDefault();
-                  }
-                }
-                if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete") {
-                  e.preventDefault();
-                }
+                onKeyDownPress(e, topSellingProduct)
               }}
               controls={false}
             />
@@ -337,12 +384,7 @@ const NewTrendingCard = ({
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                if (
-                  quantity + 1 <= saleQuantity &&
-                  quantity + 1 <= topSellingProduct.quantity
-                ) {
-                  setQuantity(quantity + 1);
-                }
+                handleIncrement(quantity, topSellingProduct.decimals)
               }}
             >
               +
