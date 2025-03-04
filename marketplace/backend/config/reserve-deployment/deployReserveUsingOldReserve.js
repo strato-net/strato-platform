@@ -97,7 +97,7 @@ async function main() {
       assetOracle: oracle,
       name: name,
       assetRootAddress: assetRootAddress,
-      unitConversionRate: unitConversionRate,
+      unitConversionRate: Number(unitConversionRate),
       usdstToken: USDST_TOKEN,
       usdstPrice: Number(USDST_PRICE),
       stratsPrice: Number(STRATS_TO_USDST_FACTOR),

@@ -72,7 +72,7 @@ async function main() {
     // Be sure to have updated the SimpleReserve.sol contract with the correct Base Code Collection.
     const contractName = 'SimpleReserve';
     const contractFilename =
-      '../dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol';
+      '../../dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol';
     const source = await importer.combine(contractFilename);
 
     // Build the constructor arguments.
@@ -80,7 +80,7 @@ async function main() {
       assetOracle: ASSET_ORACLE_ADDRESS,
       name: RESERVE_NAME,
       assetRootAddress: ASSET_ROOT_ADDRESS,
-      unitConversionRate: UNIT_CONVERSION_RATE,
+      unitConversionRate: Number(UNIT_CONVERSION_RATE),
       usdstToken: USDST_TOKEN,
       usdstPrice: Number(USDST_PRICE),
       stratsPrice: Number(STRATS_TO_USDST_FACTOR),
