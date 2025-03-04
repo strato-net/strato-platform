@@ -2281,7 +2281,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     };
 
     const reserves = await rest.search(
-      user,
+      rawAdmin,
       { name: 'BlockApps-Mercata-Reserve' },
       reserveSearchOptions
     );
