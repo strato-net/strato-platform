@@ -1,4 +1,5 @@
 import { useWebSocket } from 'react-use-websocket/dist/lib/use-websocket';
+import { useCallback } from 'react';
 
 function constructEndpoint() {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -7,44 +8,44 @@ function constructEndpoint() {
 }
 
 export function useEventStream(filterFunc = null) {
-  // console.log(constructEndpoint()); // todelete: for debugging
-  // create pinger
-  const { sendMessage } = useWebSocket(constructEndpoint(), { share: true });
+  const filterPongs = useCallback(
+    (msg) => msg.data !== 'pong' && (filterFunc ? filterFunc(msg) : true),
+    [filterFunc]
+  );
 
-  return useWebSocket(constructEndpoint(), {
-    share: true,
-    filter: filterPongs.bind(this, filterFunc),
-    retryOnError: true,
-    onOpen: handleOpen.bind(this, sendMessage),
-    onClose: handleClose,
-  });
+  const { sendMessage, lastMessage, readyState } = useWebSocket(
+    constructEndpoint(),
+    {
+      share: true,
+      filter: filterPongs,
+      retryOnError: true,
+      onOpen: () => handleOpen(sendMessage),
+      onClose: handleClose,
+    }
+  );
+
+  return { sendMessage, lastMessage, readyState };
 }
 
 let numWebsockets = 0;
 let intervalID = null;
-// as long as there is at least 1 frontend component using a websocket,
-// we need one in the background to send constant pings to keep the connection alive
-function handleOpen(sendFunc) {
+
+function handleOpen(sendMessage) {
+  console.log('WebSocket connected!!!');
   numWebsockets++;
-  if (intervalID === null) {
-    intervalID = setInterval(sendPing, 50 * 1000, sendFunc);
+  if (!intervalID) {
+    intervalID = setInterval(() => sendPing(sendMessage), 50 * 1000);
   }
 }
 
-function sendPing(sendFunc) {
-  sendFunc('ping');
+function sendPing(sendMessage) {
+  sendMessage('ping');
 }
 
 function handleClose() {
-  if (numWebsockets > 0) {
-    numWebsockets--;
-  }
+  numWebsockets = Math.max(0, numWebsockets - 1);
   if (numWebsockets === 0) {
-    clearInterval(intervalID); // no more pinging
+    clearInterval(intervalID);
     intervalID = null;
   }
-}
-
-function filterPongs(otherFilterFunc, msg) {
-  return msg.data !== 'pong' && otherFilterFunc(msg);
 }

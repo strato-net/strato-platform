@@ -13,6 +13,7 @@ import { useMarketplaceState } from './contexts/marketplace';
 import { getCookie, delete_cookie } from './helpers/cookie';
 import InternalError from './components/500';
 import { CategorysProvider } from './contexts/category';
+import { useEventStream } from './helpers/websocket';
 
 const { Content } = Layout;
 
@@ -69,6 +70,20 @@ const App = () => {
   const handleMenuTab = (data) => {
     setShowMenu(false);
   };
+
+  const { lastMessage } = useEventStream();
+
+    useEffect(() => {
+    if (lastMessage) {
+      try {
+        const eventData = JSON.parse(lastMessage.data);
+        console.log("Received eventtntntntntntnt:", eventData);
+        // Handle the event (update state, trigger UI changes, etc.)
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", lastMessage.data);
+      }
+    }
+  }, [lastMessage]);
 
   return (
     <BrowserRouter basename="/">
