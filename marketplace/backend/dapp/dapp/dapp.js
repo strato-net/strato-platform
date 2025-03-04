@@ -2276,7 +2276,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       query: {
         creator: CREATOR,
         isActive: IS_ACTIVE,
-        address: `eq.${assetAddress}`,
+        assetRootAddress: `eq.${assetAddress}`,
       },
     };
 
