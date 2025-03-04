@@ -1184,6 +1184,53 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return tokensJs.addHash(rawAdmin, args, options);
   };
 
+  contract.bridgeOut = async function (args, options = defaultOptions) {
+    const { tokenAssetRootAddress, quantity, externalChainWalletAddress } = args;
+
+    const bnQauntity = new BigNumber(quantity);
+
+    // Get user's active USDST assets with non-zero quantities
+    const userTokenAssets = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: tokenAssetRootAddress,
+        status: ASSET_STATUS.ACTIVE,
+        queryOptions: { select: 'address, quantity::text' },
+        notEqualsField: 'quantity',
+        notEqualsValue: '0',
+        order: 'block_timestamp.desc',
+      },
+      options
+    );
+
+    // Accumulate USDST asset addresses to cover the order total
+    const { addressesToUse } = userTokenAssets.reduce(
+      (acc, asset) => {
+        if (acc.accumulatedTotal.gte(bnQauntity)) {
+          return acc;
+        }
+
+        acc.addressesToUse.push(asset.address);
+        acc.accumulatedTotal = acc.accumulatedTotal.plus(
+          new BigNumber(asset.quantity)
+        );
+
+        return acc;
+      },
+      { addressesToUse: [], accumulatedTotal: new BigNumber(0) }
+    );
+
+    const burnETHSTArgs = {
+      tokenAssetRootAddress,
+      quantity: actualRepayment,
+      baseAddress: externalChainWalletAddress,
+      ethstAddresses: addressesToUse,
+    };
+
+    return tokensJs.burnETHST(rawAdmin, burnETHSTArgs, options);
+  };
+
   contract.getUSDSTBalance = async function (_, options = defaultOptions) {
     const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
     const balance = await inventoryJs.getAll(

@@ -111,6 +111,7 @@ export const Tokens = {
   getETHSTAddress: '/address',
   getWBTCSTAddress: '/wbtcstAddress',
   addHash: '/addHash',
+  bridgeOut: '/bridgeOut',
 };
 
 export const CarbonOffset = {
