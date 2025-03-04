@@ -107,7 +107,7 @@ const ProductDetails = ({ user, users }) => {
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
   const [Id, setId] = useState(undefined);
-  const [qty, setQty] = useState(inventoryDetails?.decimals === null ? 1 : 0.01);
+  const [qty, setQty] = useState();
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState(null);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
@@ -115,6 +115,10 @@ const ProductDetails = ({ user, users }) => {
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
+
+  useEffect(() => {
+    setQty(inventoryDetails?.decimals === null ? 1 : 0.01)
+  },[inventoryDetails])
 
   // Stakeable
   const isStaked =
