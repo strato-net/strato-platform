@@ -31,7 +31,6 @@ let numWebsockets = 0;
 let intervalID = null;
 
 function handleOpen(sendMessage) {
-  console.log('WebSocket connected!!!');
   numWebsockets++;
   if (!intervalID) {
     intervalID = setInterval(() => sendPing(sendMessage), 50 * 1000);

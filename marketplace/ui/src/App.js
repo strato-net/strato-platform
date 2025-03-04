@@ -91,16 +91,15 @@ const App = () => {
           {}
         );
 
+        const eventContractAddress = eventData?.eventEvent?.eventContractAddress;
+
         if (eventName === 'MintedETHST') {
-          const {
-            amount: stakeQuantity,
-            address: assetAddress,
-            username: ownerCommonName,
-          } = eventArgs;
+          const { amount: stakeQuantity, username: ownerCommonName } =
+            eventArgs;
 
           const body = {
             stakeQuantity: new BigNumber(stakeQuantity).toFixed(0),
-            assetAddress,
+            assetAddress: eventContractAddress,
             ownerCommonName,
           };
 
