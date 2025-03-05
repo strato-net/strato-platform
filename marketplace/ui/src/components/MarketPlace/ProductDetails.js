@@ -327,10 +327,12 @@ const ProductDetails = ({ user, users }) => {
         setQty(value);
       }
       else {
-        // value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
-        let newValue = qty - 0.01;
-        newValue = parseFloat(newValue.toFixed(4));
-        setQty(newValue);
+        if (qty > 0) {
+          // value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
+          let newValue = qty - 0.01;
+          newValue = parseFloat(newValue.toFixed(4));
+          setQty(newValue);
+        }
       }
     }
   };

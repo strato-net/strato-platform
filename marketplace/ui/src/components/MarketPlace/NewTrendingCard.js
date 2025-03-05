@@ -139,8 +139,7 @@ const NewTrendingCard = ({
     } else {
       let newValue = quantity + 0.01;
       newValue = parseFloat(newValue.toFixed(4));
-      // setQuantity(newValue);
-      setQuantity(quantity + 0.01);
+      setQuantity(newValue);
     }
   };
 
