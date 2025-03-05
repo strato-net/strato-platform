@@ -15,11 +15,11 @@ const isSubscribed = async (username) => {
 };
 
 // Subscribe a user to the notification service
-const subscribe = async (username, email) => {
+const subscribe = async (username, email, telegramUsername, referrerUsername) => {
   try {
     await client.query(
-      "INSERT INTO contact_info (username, email) VALUES ($1, $2)",
-      [username, email]
+      "INSERT INTO contact_info (username, email, telegram_id, referrer_id) VALUES ($1, $2, $3, $4)",
+      [username, email, telegramUsername, referrerUsername]
     );
     return true;
   } catch (error) {

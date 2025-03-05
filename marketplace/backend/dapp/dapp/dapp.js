@@ -13,7 +13,7 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
-  DECIMAL_FACTOR_18
+  DECIMAL_FACTOR_18,
 } from '/helpers/constants';
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from '/helpers/config';
 import { pollingHelper } from '/helpers/utils';
@@ -1782,7 +1782,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
-      const quantities = orderList.map((o) => new BigNumber(o.quantity).toFixed(0));
+      const quantities = orderList.map((o) =>
+        new BigNumber(o.quantity).toFixed(0)
+      );
       const decimals = orderList.map((o) => o.decimals);
 
       const assets = await inventoryJs.getAll(
@@ -1942,6 +1944,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.waitForOrderEvent = async function (args, options = defaultOptions) {
+    const { orderHash, reserve, asset } = args;
+
+    // Search until we find the order event
     const orderEvent = await rest.searchUntil(
       rawAdmin,
       { name: 'BlockApps-Mercata-PaymentService.Order' },
@@ -1950,10 +1955,71 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         ...options,
         query: {
           limit: 1,
-          orderHash: `eq.${args.orderHash}`,
+          orderHash: `eq.${orderHash}`,
         },
       }
     );
+
+    if (reserve) {
+      // Step 1: Find the escrow associated with the reserve (if any)
+      const escrowQueryArgs = {
+        select: 'address',
+        reserve: `eq.${reserve}`,
+        borrowerCommonName: `eq.${userCommonName}`,
+        isActive: 'eq.true',
+      };
+      const escrows = await escrowJs.searchEscrow(
+        rawAdmin,
+        escrowQueryArgs,
+        options
+      );
+      const escrowAddress =
+        escrows && escrows.length > 0
+          ? escrows[0].address
+          : constants.zeroAddress;
+
+      // Step 2: Find the user's assets
+      const assetQueryArgs = {
+        ownerCommonName: userCert.commonName,
+        originAddress: asset,
+        status: ASSET_STATUS.ACTIVE,
+        queryOptions: { select: 'address,quantity' },
+        notEqualsField: 'quantity',
+        notEqualsValue: '0',
+        order: 'block_timestamp.desc',
+      };
+      const assets = await inventoryJs.getAll(
+        rawAdmin,
+        assetQueryArgs,
+        options
+      );
+
+      // Step 3: Calculate the total order quantity.
+      // Assumes orderEvent[0].quantities is an array of numeric or numeric-like values.
+      const orderQuantity = orderEvent[0].quantities.reduce(
+        (acc, qty) => acc + Number(qty),
+        0
+      );
+
+      // Step 4: Accumulate asset addresses until we cover the order quantity.
+      let accumulated = 0;
+      const assetAddresses = [];
+      for (const assetItem of assets) {
+        if (accumulated >= orderQuantity) break;
+        assetAddresses.push(assetItem.address);
+        accumulated += Number(assetItem.quantity);
+      }
+
+      // Stake the assets.
+      const stakeArgs = {
+        reserve,
+        escrowAddress,
+        assets: assetAddresses,
+        collateralQuantity: orderQuantity,
+      };
+      await reserveJs.stake(rawAdmin, stakeArgs, options);
+    }
+
     return orderEvent;
   };
 
@@ -2092,7 +2158,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.fetchTotalCataRewards = async function (options = defaultOptions) {
     return await reserveJs.fetchTotalCataRewards(rawAdmin, options);
-  }
+  };
 
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;

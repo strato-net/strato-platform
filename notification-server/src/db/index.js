@@ -36,7 +36,9 @@ const connectToDB = async () => {
     const query = `
             CREATE TABLE IF NOT EXISTS contact_info (
                 username TEXT PRIMARY KEY,
-                email TEXT
+                email TEXT,
+                telegram_id TEXT,
+                referrer_id TEXT
             );
         `;
 
