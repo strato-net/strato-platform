@@ -117,8 +117,8 @@ const ProductDetails = ({ user, users }) => {
   const [availableQuantity, setAvailableQuantity] = useState(1);
 
   useEffect(() => {
-    setQty(inventoryDetails?.decimals === null ? 1 : 0.01)
-  },[inventoryDetails])
+    setQty(inventoryDetails?.decimals === null ? 1 : 0.01);
+  }, [inventoryDetails]);
 
   // Stakeable
   const isStaked =
@@ -325,8 +325,7 @@ const ProductDetails = ({ user, users }) => {
       if (inventoryDetails.decimals === null) {
         value = Math.max(qty - 1, 1);
         setQty(value);
-      }
-      else {
+      } else {
         value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
         setQty((prevQuantity) => Math.max(prevQuantity - 0.01, value));
       }
@@ -339,8 +338,7 @@ const ProductDetails = ({ user, users }) => {
       if (inventoryDetails.decimals === null) {
         value = qty + 1;
         setQty(value);
-      }
-      else {
+      } else {
         value = qty + 0.01;
         setQty(value);
       }
@@ -500,33 +498,35 @@ const ProductDetails = ({ user, users }) => {
     ? 18
     : details?.decimals || 0;
 
-    const onKeyDownPress = (e, inventoryDetails) => {
-      if (inventoryDetails.decimals === null) {
-        // Prevent decimals
-        if (e.key === "." || e.key === ",") {
-          e.preventDefault();
-        }
-        // Prevent non-numeric keys except Backspace, Delete, and navigation keys
-        if (!/^[0-9]$/.test(e.key) && 
-            e.key !== "Backspace" && 
-            e.key !== "Delete" && 
-            e.key !== "ArrowLeft" && 
-            e.key !== "ArrowRight") {
-          e.preventDefault();
-        }
-      } else {
-        // Allow decimals for products with defined decimal places
-        if (
-          !/[0-9.]/.test(e.key) &&
-          e.key !== "Backspace" &&
-          e.key !== "Delete" &&
-          e.key !== "ArrowLeft" &&
-          e.key !== "ArrowRight"
-        ) {
-          e.preventDefault();
-        }
+  const onKeyDownPress = (e, inventoryDetails) => {
+    if (inventoryDetails.decimals === null) {
+      // Prevent decimals
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
       }
-    };
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    } else {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+  };
 
   return (
     <>
@@ -782,7 +782,6 @@ const ProductDetails = ({ user, users }) => {
                             Math.pow(10, inventoryDetails.decimals || 0)
                       }
                       precision={inventoryDetails.decimals !== null ? 2 : 0}
-                      // defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
                         if (e < availableQuantity) {
@@ -795,6 +794,7 @@ const ProductDetails = ({ user, users }) => {
                         onKeyDownPress(e, inventoryDetails);
                       }}
                     />
+
                     <div
                       onClick={() => add(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
@@ -1121,9 +1121,7 @@ const ProductDetails = ({ user, users }) => {
                       <h2 className="w-full text-center font-bold text-2xl">
                         12-Month Historical Data
                       </h2>
-                      <Statistics
-                        priceHistory={priceHistory}
-                      />
+                      <Statistics priceHistory={priceHistory} />
                     </>
                   )}
                 </div>

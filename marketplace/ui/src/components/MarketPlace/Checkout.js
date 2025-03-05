@@ -171,8 +171,7 @@ const Checkout = () => {
         if (items[index].qty - 0.01 >= 0) {
           if (product.decimals === 0) {
             items[index].qty -= 1;
-          }
-          else {
+          } else {
             if (items[index].qty > 0) {
               items[index].qty -= 0.01;
             }
@@ -191,8 +190,7 @@ const Checkout = () => {
         if (items[index].qty + 1 <= availableQuantity) {
           if (product.decimals === 0) {
             items[index].qty += 1;
-          }
-          else {
+          } else {
             items[index].qty += 0.01;
           }
           actions.addItemToCart(marketplaceDispatch, items);
@@ -272,25 +270,27 @@ const Checkout = () => {
   const onKeyDownPress = (e, topSellingProduct) => {
     if (topSellingProduct.decimals === null) {
       // Prevent decimals
-      if (e.key === "." || e.key === ",") {
+      if (e.key === '.' || e.key === ',') {
         e.preventDefault();
       }
       // Prevent non-numeric keys except Backspace, Delete, and navigation keys
-      if (!/^[0-9]$/.test(e.key) && 
-          e.key !== "Backspace" && 
-          e.key !== "Delete" && 
-          e.key !== "ArrowLeft" && 
-          e.key !== "ArrowRight") {
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
         e.preventDefault();
       }
     } else {
       // Allow decimals for products with defined decimal places
       if (
         !/[0-9.]/.test(e.key) &&
-        e.key !== "Backspace" &&
-        e.key !== "Delete" &&
-        e.key !== "ArrowLeft" &&
-        e.key !== "ArrowRight"
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
       ) {
         e.preventDefault();
       }
@@ -354,44 +354,23 @@ const Checkout = () => {
       render: (_, product) => {
         let qty = product.qty;
         return (
-          <div className="flex items-center justify-center mt-2">
-            <div
-              onClick={() => {
-                MinusQty(qty, product);
-              }}
-              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-              }`}
-            >
-              -
+          <>
+            <div className="input-text flex items-center justify-center mt-2">
+              <input
+                type="number"
+                className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
+                min={1 / Math.pow(10, product.decimals || 0)}
+                step={product.decimals === null ? 1 : 0.01}
+                defaultValue={qty}
+                onChange={(e) => {
+                  ValueQty(product, e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  onKeyDownPress(e, product);
+                }}
+              />
             </div>
-            <InputNumber
-              className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
-              min={1 / Math.pow(10, product.decimals || 0)}
-              value={qty}
-              defaultValue={qty}
-              controls={false}
-              onChange={(e) => {
-                ValueQty(product, e);
-              }}
-              precision={product.decimals === 0 ? 0 : 2}
-              onKeyDown={(e) => {
-                onKeyDownPress(e, product);
-              }}
-            />
-            <div
-              onClick={() => {
-                AddQty(product, product.decimals);
-              }}
-              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                qty >= product.quantity
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-            >
-              +
-            </div>
-          </div>
+          </>
         );
       },
     },

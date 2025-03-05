@@ -1,3 +1,11 @@
+/* Chrome, Edge, Safari */
+.input-text input[type="number"]::-webkit-inner-spin-button,
+.input-text input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1 !important;
+  display: block !important;
+}
+
+
 :where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper
   .ant-table-thead
   > tr

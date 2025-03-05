@@ -125,37 +125,11 @@ const NewTrendingCard = ({
     setIsModalVisible(false);
   };
 
-  const handleIncrement = (quantity, decimals) => {
-    if (decimals === null) {
-      setQuantity(quantity + 0.01);
-      if (
-        quantity + 1 <= saleQuantity &&
-        quantity + 1 <= topSellingProduct.quantity
-      ) {
-        setQuantity(quantity + 1);
-      }
-    }
-    else 
-      setQuantity(quantity + 0.01);
-  }
-
-  const handleDecrement = (quantity, decimals) => {
-    if (decimals === null) {
-      setQuantity(Math.max(quantity - 1, 1));
-    }
-    else {
-      const minValue = 1 / Math.pow(10, decimals || 0); // Minimum allowed decimal value
-      setQuantity((prevQuantity) => Math.max(prevQuantity - 0.01, minValue));
-    }
-  }
-
   const onKeyDownPress = (e, topSellingProduct) => {
     if (topSellingProduct.decimals === null) {
-      // Prevent decimals
       if (e.key === "." || e.key === ",") {
         e.preventDefault();
       }
-      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
       if (!/^[0-9]$/.test(e.key) && 
           e.key !== "Backspace" && 
           e.key !== "Delete" && 
@@ -164,7 +138,6 @@ const NewTrendingCard = ({
         e.preventDefault();
       }
     } else {
-      // Allow decimals for products with defined decimal places
       if (
         !/[0-9.]/.test(e.key) &&
         e.key !== "Backspace" &&
@@ -335,60 +308,26 @@ const NewTrendingCard = ({
           }`}
         >
           <Typography>Quantity:</Typography>
-          <div className="flex gap-3 p-1 bg-white">
-            <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity === 1
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-              onClick={() => {
-                handleDecrement(quantity, topSellingProduct.decimals)
-              }}
-            >
-              -
-            </Typography>
-            <InputNumber
-              className="w-12"
+          <div className="input-text flex gap-3 p-1 bg-white">
+            <input
+              type="number"
+              className="w-7 text-center"
               size="small"
-              bordered={false}
-              value={quantity}
+              step={topSellingProduct.decimals === null ? 1 : 0.01}
+              style={{ border: "none" }}
+              defaultValue={quantity}
               max={saleQuantity}
               min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
-              precision={topSellingProduct.decimals === null ? 0 : 2}
               onChange={(e) => {
-                if (!isNaN(e)) {
-                  setQuantity(parseFloat(e || 0));
-                }
-              }}
-              onPressEnter={(e) => {
-                const newValue = parseFloat(e.target.value, 10);
-                if (!isNaN(newValue) && newValue <= saleQuantity) {
-                  setQuantity(newValue);
-                } else {
-                  api.error({
-                    message: 'Cannot add more than available quantity',
-                    placement: 'bottom',
-                  });
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) {
+                  setQuantity(value);
                 }
               }}
               onKeyDown={(e) => {
-                onKeyDownPress(e, topSellingProduct)
+                onKeyDownPress(e, topSellingProduct);
               }}
-              controls={false}
             />
-            <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity >= Math.min(saleQuantity, topSellingProduct.quantity)
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-              onClick={() => {
-                handleIncrement(quantity, topSellingProduct.decimals)
-              }}
-            >
-              +
-            </Typography>
           </div>
         </div>
         <div className={`flex gap-4 mt-1`}>
