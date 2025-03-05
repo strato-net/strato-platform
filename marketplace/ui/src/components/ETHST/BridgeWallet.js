@@ -20,7 +20,7 @@ const ERC20_ABI = [
 ];
 
 const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenName}) => {
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
   const [ loader, setLoader ] = useState(false);
   const ethDispatch = useEthDispatch();
   const { user } = useAuthenticateState();
@@ -207,6 +207,7 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
         handleCancel();
       }
     } catch (error) {
+      ethActions.setMessage(ethDispatch, error.code);
       console.error("Transaction failed:", error);
     } finally {
       setLoader(false);
