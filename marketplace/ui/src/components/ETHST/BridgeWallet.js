@@ -30,7 +30,7 @@ const BridgeWalletModal = ({
   tabKey = '1',
   inventorypageDetails,
 }) => {
-  const [quantity, setQuantity] = useState(accountDetails.balance);
+  const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
   const [ethereumAddress, setEthereumAddress] = useState('');
   const [loader, setLoader] = useState(false);
   const ethDispatch = useEthDispatch();
@@ -189,7 +189,8 @@ const BridgeWalletModal = ({
         handleCancel();
       }
     } catch (error) {
-      console.error('Transaction failed:', error);
+      ethActions.setMessage(ethDispatch, error.code);
+      console.error("Transaction failed:", error);
     } finally {
       setLoader(false);
     }

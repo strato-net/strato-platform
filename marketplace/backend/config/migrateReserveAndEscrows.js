@@ -113,32 +113,32 @@ const migrateBatch = async (
  * @param {string} newReserveAddress - The new reserve address.
  * @param {Array<string>} escrowBatch - Batch of escrow addresses.
  */
-const updateOldEscrowDataBatch = async (
-  token,
-  newReserveAddress,
-  escrowBatch
-) => {
-  const callArgs = {
-    contract: { address: newReserveAddress },
-    method: 'updateOldEscrowData',
-    args: util.usc({
-      escrows: escrowBatch,
-    }),
-  };
-  console.log(
-    `Updating old escrow data for batch: ${JSON.stringify(escrowBatch)}`
-  );
-  const finalResults = await callAndWait(token, callArgs);
-  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
-  if (final.status !== 'Success') {
-    throw new Error(
-      `Error: updateOldEscrowData failed for batch ${JSON.stringify(
-        escrowBatch
-      )}`
-    );
-  }
-  console.log(`updateOldEscrowData for batch succeeded.`);
-};
+// const updateOldEscrowDataBatch = async (
+//   token,
+//   newReserveAddress,
+//   escrowBatch
+// ) => {
+//   const callArgs = {
+//     contract: { address: newReserveAddress },
+//     method: 'updateOldEscrowData',
+//     args: util.usc({
+//       escrows: escrowBatch,
+//     }),
+//   };
+//   console.log(
+//     `Updating old escrow data for batch: ${JSON.stringify(escrowBatch)}`
+//   );
+//   const finalResults = await callAndWait(token, callArgs);
+//   const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+//   if (final.status !== 'Success') {
+//     throw new Error(
+//       `Error: updateOldEscrowData failed for batch ${JSON.stringify(
+//         escrowBatch
+//       )}`
+//     );
+//   }
+//   console.log(`updateOldEscrowData for batch succeeded.`);
+// };
 
 /**
  * Calls the new reserve's updateOldEscrowBorrowData function for a batch of escrows.
@@ -147,32 +147,32 @@ const updateOldEscrowDataBatch = async (
  * @param {string} newReserveAddress - The new reserve address.
  * @param {Array<string>} escrowBatch - Batch of escrow addresses.
  */
-const updateOldEscrowBorrowDataBatch = async (
-  token,
-  newReserveAddress,
-  escrowBatch
-) => {
-  const callArgs = {
-    contract: { address: newReserveAddress },
-    method: 'updateOldEscrowBorrowData',
-    args: util.usc({
-      escrows: escrowBatch,
-    }),
-  };
-  console.log(
-    `Updating old escrow borrow data for batch: ${JSON.stringify(escrowBatch)}`
-  );
-  const finalResults = await callAndWait(token, callArgs);
-  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
-  if (final.status !== 'Success') {
-    throw new Error(
-      `Error: updateOldEscrowBorrowData failed for batch ${JSON.stringify(
-        escrowBatch
-      )}`
-    );
-  }
-  console.log(`updateOldEscrowBorrowData for batch succeeded.`);
-};
+// const updateOldEscrowBorrowDataBatch = async (
+//   token,
+//   newReserveAddress,
+//   escrowBatch
+// ) => {
+//   const callArgs = {
+//     contract: { address: newReserveAddress },
+//     method: 'updateOldEscrowBorrowData',
+//     args: util.usc({
+//       escrows: escrowBatch,
+//     }),
+//   };
+//   console.log(
+//     `Updating old escrow borrow data for batch: ${JSON.stringify(escrowBatch)}`
+//   );
+//   const finalResults = await callAndWait(token, callArgs);
+//   const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+//   if (final.status !== 'Success') {
+//     throw new Error(
+//       `Error: updateOldEscrowBorrowData failed for batch ${JSON.stringify(
+//         escrowBatch
+//       )}`
+//     );
+//   }
+//   console.log(`updateOldEscrowBorrowData for batch succeeded.`);
+// };
 
 /**
  * Transfers the CATA token from the old reserve to the new reserve.
@@ -361,10 +361,10 @@ async function main() {
       );
 
       // On the new reserve, update the escrow data.
-      await updateOldEscrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
+      // await updateOldEscrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
 
       // On the new reserve, update the escrow borrow data.
-      await updateOldEscrowBorrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
+      // await updateOldEscrowBorrowDataBatch(token2, NEW_RESERVE_ADDRESS, batch);
     }
 
     // On the old reserve, transfer CATA back to owner
