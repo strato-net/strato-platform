@@ -237,10 +237,7 @@ const Checkout = () => {
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
-        if (!e || e === '' || e === 0) {
-          items[index].qty = 1;
-          actions.addItemToCart(marketplaceDispatch, items);
-        } else if (e <= availableQuantity) {
+        if (e <= availableQuantity) {
           items[index].qty = e;
           actions.addItemToCart(marketplaceDispatch, items);
         } else {
@@ -365,20 +362,22 @@ const Checkout = () => {
             >
               -
             </div>
+
             <InputNumber
               className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
               min={1 / Math.pow(10, product.decimals || 0)}
               value={qty}
-              defaultValue={qty}
+              // defaultValue={qty}
               controls={false}
               onChange={(e) => {
                 ValueQty(product, e);
               }}
-              precision={product.decimals === 0 ? 0 : 2}
+              precision={product.decimals === 0 ? 0 : 5}
               onKeyDown={(e) => {
                 onKeyDownPress(e, product);
               }}
             />
+
             <div
               onClick={() => {
                 AddQty(product, product.decimals);

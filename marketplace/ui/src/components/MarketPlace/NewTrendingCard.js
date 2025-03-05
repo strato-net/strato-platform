@@ -355,7 +355,7 @@ const NewTrendingCard = ({
               value={quantity}
               max={saleQuantity}
               min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
-              precision={topSellingProduct.decimals === null ? 0 : 2}
+              precision={topSellingProduct.decimals === null ? 0 : 5}
               onChange={(e) => {
                 if (!isNaN(e)) {
                   setQuantity(parseFloat(e || 0));
