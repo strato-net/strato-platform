@@ -339,8 +339,8 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
     const amountWithoutSymbol = totalAmount.split(' ');
-    
-    const isDisabled = !activePaymentProviders || activePaymentProviders?.length === 0 || amountWithoutSymbol[0] < 10;
+
+    const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
 
   return (
     <>

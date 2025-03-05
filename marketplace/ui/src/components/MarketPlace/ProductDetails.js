@@ -327,8 +327,10 @@ const ProductDetails = ({ user, users }) => {
         setQty(value);
       }
       else {
-        value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
-        setQty((prevQuantity) => Math.max(prevQuantity - 0.01, value));
+        // value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
+        let newValue = qty - 0.01;
+        newValue = parseFloat(newValue.toFixed(4));
+        setQty(newValue);
       }
     }
   };
@@ -341,11 +343,13 @@ const ProductDetails = ({ user, users }) => {
         setQty(value);
       }
       else {
-        value = qty + 0.01;
-        setQty(value);
+        let newValue = qty + 0.01;
+        newValue = parseFloat(newValue.toFixed(4));
+        setQty(newValue);
       }
     }
   };
+  
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
@@ -774,27 +778,34 @@ const ProductDetails = ({ user, users }) => {
                       value={
                         !isStakeable || !ownerSameAsUser()
                           ? `${qty}`
-                          : assetsWithEighteenDecimalPlaces.includes(
-                              inventoryDetails.root
-                            )
+                          : assetsWithEighteenDecimalPlaces.includes(inventoryDetails.root)
                           ? inventoryDetails.quantity / 1e18
-                          : inventoryDetails.quantity /
-                            Math.pow(10, inventoryDetails.decimals || 0)
+                          : inventoryDetails.quantity / Math.pow(10, inventoryDetails.decimals || 0)
                       }
-                      precision={inventoryDetails.decimals !== null ? 5 : 0}
-                      // defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
-                        if (e < availableQuantity) {
-                          setQty(parseFloat(e || 0));
-                        } else {
-                          setQty(availableQuantity);
+                        if (!isNaN(e)) {
+                          let value = e.toString();
+
+                          // Split number into integer and decimal parts
+                          let [integer, decimal] = value.split(".");
+
+                          // Restrict decimal places based on inventoryDetails.decimals
+                          if (decimal && decimal.length > (inventoryDetails.decimals || 0)) {
+                            value = parseFloat(integer + "." + decimal.slice(0, inventoryDetails.decimals));
+                          } else {
+                            value = parseFloat(value);
+                          }
+
+                          // Ensure the value does not exceed max availableQuantity
+                          setQty(value < availableQuantity ? value : availableQuantity);
                         }
                       }}
                       onKeyDown={(e) => {
                         onKeyDownPress(e, inventoryDetails);
                       }}
                     />
+
                     <div
                       onClick={() => add(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${

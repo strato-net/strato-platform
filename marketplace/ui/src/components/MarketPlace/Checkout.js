@@ -174,7 +174,7 @@ const Checkout = () => {
           }
           else {
             if (items[index].qty > 0) {
-              items[index].qty -= 0.01;
+              items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
             }
           }
           actions.addItemToCart(marketplaceDispatch, items);
@@ -193,7 +193,7 @@ const Checkout = () => {
             items[index].qty += 1;
           }
           else {
-            items[index].qty += 0.01;
+            items[index].qty = parseFloat((items[index].qty + 0.01).toFixed(4));
           }
           actions.addItemToCart(marketplaceDispatch, items);
         }
@@ -364,15 +364,24 @@ const Checkout = () => {
             </div>
 
             <InputNumber
-              className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
+              className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
               min={1 / Math.pow(10, product.decimals || 0)}
               value={qty}
-              // defaultValue={qty}
               controls={false}
               onChange={(e) => {
-                ValueQty(product, e);
+                if (!isNaN(e)) {
+                  let value = e.toString();
+                  let [integer, decimal] = value.split(".");
+
+                  if (decimal && decimal.length > (product.decimals || 0)) {
+                    value = parseFloat(integer + "." + decimal.slice(0, product.decimals));
+                  } else {
+                    value = parseFloat(value);
+                  }
+
+                  ValueQty(product, value);
+                }
               }}
-              precision={product.decimals === 0 ? 0 : 5}
               onKeyDown={(e) => {
                 onKeyDownPress(e, product);
               }}
