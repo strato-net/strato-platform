@@ -1,5 +1,4 @@
-const { Alchemy, Network, Wallet } = require("alchemy-sdk");
-const { ethers } = require("ethers");
+const { Alchemy, Network, Wallet, Contract } = require("alchemy-sdk");
 const {
   alchemyApiKey,
   alchemyNetwork,
@@ -35,11 +34,18 @@ async function getContractAddress(mercataContractAddress) {
     }
 
     const txHash = response.data[0].txhash;
-    const receipt = await alchemy.core.getTransactionReceipt(txHash);
-    if (receipt && receipt.contractAddress) {
-      return { success: true, contractAddress: receipt.contractAddress };
+
+    // Retrieve the transaction details
+    const tx = await alchemy.core.getTransaction(txHash);
+
+    // Use the value field to determine transfer type.
+    // For native ETH transfers, tx.value is non-zero.
+    // For ERC20 token transfers, tx.value is typically zero.
+    if (tx.value && !tx.value.isZero()) {
+      return { success: true, contractAddress: null };
+    } else {
+      return { success: true, contractAddress: tx.to };
     }
-    return { success: true, contractAddress: null };
   } catch (error) {
     console.warn("Error in getContractAddress:", error.message);
     return { success: false, error };
@@ -73,14 +79,12 @@ async function sendERC20Transfer(tokenContractAddress, to, amount) {
   const erc20Abi = [
     "function transfer(address to, uint256 amount) external returns (bool)",
   ];
-  const tokenContract = new ethers.Contract(
-    tokenContractAddress,
-    erc20Abi,
-    signer
-  );
-  const tx = await tokenContract.transfer(to, amount.toString());
-  console.log("ERC20 token transfer sent. Waiting for confirmation...");
-  return await tx.wait();
+
+  const tokenContract = new Contract(tokenContractAddress, erc20Abi, signer);
+
+  // Function to transfer tokens
+  const tx = await tokenContract.transfer(to, amount);
+  return await tx.wait(); // Wait for transaction confirmation
 }
 
 /**
@@ -91,12 +95,11 @@ async function sendERC20Transfer(tokenContractAddress, to, amount) {
  */
 async function handleBridgeOut(event) {
   try {
-    const eventArgs = event?.eventEvent?.eventArgs || [];
+    const eventEvent = event?.eventEvent;
+    const eventArgs = eventEvent?.eventArgs || [];
+    const mercataContractAddress = eventEvent?.eventContractAddress;
     const to = eventArgs.find((arg) => arg[0] === "baseAddress")?.[1];
     const value = eventArgs.find((arg) => arg[0] === "amount")?.[1];
-    const mercataContractAddress = eventArgs.find(
-      (arg) => arg[0] === "mercataContractAddress"
-    )?.[1];
 
     if (!to || !value || !mercataContractAddress) {
       throw new Error(

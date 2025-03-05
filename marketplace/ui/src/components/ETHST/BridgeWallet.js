@@ -1,6 +1,8 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
 import { useState } from 'react';
 import { actions as ethActions } from '../../contexts/eth/actions';
+import { actions } from '../../contexts/inventory/actions';
+import { useInventoryDispatch } from '../../contexts/inventory';
 import { useEthDispatch, useEthState } from '../../contexts/eth';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { ethers } from 'ethers';
@@ -25,12 +27,14 @@ const BridgeWalletModal = ({
   accountDetails,
   signer,
   tokenName,
-  tabKey,
+  tabKey = '1',
+  inventorypageDetails,
 }) => {
   const [quantity, setQuantity] = useState(accountDetails.balance);
   const [ethereumAddress, setEthereumAddress] = useState('');
   const [loader, setLoader] = useState(false);
   const ethDispatch = useEthDispatch();
+  const inventoryDispatch = useInventoryDispatch();
   const { user } = useAuthenticateState();
   const { isAddingHash, isBridgingOut } = useEthState();
 
@@ -84,7 +88,7 @@ const BridgeWalletModal = ({
         <Input
           placeholder="Ethereum Chain address"
           value={ethereumAddress}
-          onChange={(value) => setEthereumAddress(value)}
+          onChange={(e) => setEthereumAddress(e.target.value)}
         />
       ),
     },
@@ -146,14 +150,15 @@ const BridgeWalletModal = ({
               : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
             value: ethers.utils.parseEther(quantity.toString()),
           });
-          const body = {
-            userAddress: user.userAddress,
-            txHash: tx.hash,
-            amount: quantity.toString(),
-            tokenName,
-          };
-          isDone = await ethActions.addHash(ethDispatch, body);
         }
+        await tx.wait();
+        const body = {
+          userAddress: user.userAddress,
+          txHash: tx.hash,
+          amount: quantity.toString(),
+          tokenName,
+        };
+        isDone = await ethActions.addHash(ethDispatch, body);
       } else {
         // Bridge Out (Mercata -> Eth)
         if (!ethereumAddress && !accountDetails.assetRootAddress) {
@@ -162,7 +167,10 @@ const BridgeWalletModal = ({
           );
         }
         const body = {
-          quantity: quantity.toString(),
+          quantity: ethers.utils
+            .parseUnits(quantity.toString(), accountDetails.decimals)
+            .toString(),
+          quantityNumber: quantity,
           externalChainWalletAddress: ethereumAddress,
           tokenAssetRootAddress: accountDetails.assetRootAddress,
           tokenName,
@@ -170,6 +178,14 @@ const BridgeWalletModal = ({
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
       if (isDone) {
+        await actions.fetchInventory(
+          inventoryDispatch,
+          inventorypageDetails.limit,
+          inventorypageDetails.offset,
+          '',
+          inventorypageDetails.categoryName,
+          ''
+        );
         handleCancel();
       }
     } catch (error) {

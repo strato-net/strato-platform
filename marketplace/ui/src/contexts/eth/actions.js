@@ -175,7 +175,7 @@ const actions = {
     dispatch({ type: actionDescriptors.bridgeOut });
 
     try {
-      const { tokenName, ...restPayload } = payload;
+      const { tokenName, quantityNumber, ...restPayload } = payload;
       const response = await fetch(`${apiUrl}/tokens/bridgeOut`, {
         method: HTTP_METHODS.POST,
         credentials: 'same-origin',
@@ -193,7 +193,7 @@ const actions = {
           type: actionDescriptors.bridgeOutSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, `Successfully initiated the bridging of ${restPayload.quantity} ${tokenName} to ${restPayload.quantity} ${tokenName.toLowerCase().endsWith("st") ? tokenName.slice(0, -2) : tokenName}.`, true);
+        actions.setMessage(dispatch, `Successfully initiated the bridging of ${quantityNumber} ${tokenName} to ${quantityNumber} ${tokenName.toLowerCase().endsWith("st") ? tokenName.slice(0, -2) : tokenName}.`, true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({

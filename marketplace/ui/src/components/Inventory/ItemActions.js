@@ -617,7 +617,9 @@ const ItemActions = ({
           accountDetails={{
             assetRootAddress: inventory.root,
             balance: quantity.toString(),
+            decimals,
           }}
+          inventorypageDetails={{ limit, offset, categoryName: category }}
           tokenName={inventory.name}
           tabKey={'2'}
         />
