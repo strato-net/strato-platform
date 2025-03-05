@@ -551,8 +551,9 @@ async function main() {
 
         // Check if it's time to run the oracle update
         if (
-          now.getHours() === parseInt(oracleUpdateTime, 10) &&
-          lastOracleRun !== currentDate
+          (now.getHours() === parseInt(oracleUpdateTime, 10) &&
+            lastOracleRun !== currentDate) ||
+          !lastOracleRun
         ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
           await submitOraclePricePeriodically();
