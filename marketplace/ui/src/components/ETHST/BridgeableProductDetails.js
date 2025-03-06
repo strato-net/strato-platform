@@ -149,7 +149,7 @@ const ProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.WbtcstProductDetail.url,
+    path: routes.bridgeableProductDetail.url,
     strict: true,
   });
 

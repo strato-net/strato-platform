@@ -27,6 +27,27 @@ router.get(
   TokensController.getWBTCSTAddress
 );
 
+router.get(
+  Tokens.getUSDTSTAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  TokensController.getUSDTSTAddress
+);
+
+router.get(
+  Tokens.getUSDCSTAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  TokensController.getUSDCSTAddress
+);
+
+router.get(
+  Tokens.getPAXGSTAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  TokensController.getPAXGSTAddress
+);
+
 router.post(
   Tokens.addHash,
   authHandler.authorizeRequest(),

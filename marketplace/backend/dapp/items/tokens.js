@@ -204,6 +204,36 @@ function getWBTCSTAddress() {
   }
 }
 
+function getUSDTSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodUSDTSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetUSDTSTAddress;
+  } else {
+    return constants.prodUSDTSTAddress;
+  }
+}
+
+function getUSDCSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodUSDCSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetUSDCSTAddress;
+  } else {
+    return constants.prodUSDCSTAddress;
+  }
+}
+
+function getPAXGSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodPAXGSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetPAXGSTAddress;
+  } else {
+    return constants.prodPAXGSTAddress;
+  }
+}
+
 function getStratsAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
     return constants.prodStratsAddress;
@@ -227,4 +257,7 @@ export default {
   getETHSTAddress,
   getStratsAddress,
   getWBTCSTAddress,
+  getUSDTSTAddress,
+  getUSDCSTAddress,
+  getPAXGSTAddress,
 };

@@ -110,6 +110,9 @@ export const Tokens = {
   create: '/',
   getETHSTAddress: '/address',
   getWBTCSTAddress: '/wbtcstAddress',
+  getUSDTSTAddress: '/usdtstAddress',
+  getUSDCSTAddress: '/usdcstAddress',
+  getPAXGSTAddress: '/paxgstAddress',
   addHash: '/addHash',
 };
 

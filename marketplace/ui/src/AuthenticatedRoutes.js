@@ -23,7 +23,7 @@ import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
 import EthstProductDetails from './components/ETHST/EthstProductDetails';
-import WbtcstProductDetails from './components/ETHST/WbtcstProductDetails';
+import BridgeableProductDetails from './components/ETHST/BridgeableProductDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
@@ -210,7 +210,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
             <Route
         exact
-        path={routes.WbtcstProductDetail.url}
+        path={routes.bridgeableProductDetail.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -220,7 +220,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <EthProvider>
-                          <WbtcstProductDetails user={user} users={users} />
+                          <BridgeableProductDetails user={user} users={users} />
                         </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>
