@@ -19,21 +19,18 @@ services:
     - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
     - UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS}
     - SKIP_ORACLE_DEPLOYMENT=${SKIP_ORACLE_DEPLOYMENT}
-    - ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL}
     - SALE_UPDATE=${SALE_UPDATE}
-    - SALE_UPDATE_TIME=${SALE_UPDATE_TIME}
     - METALS_USERNAME=${METALS_USERNAME}
     - METALS_PASSWORD=${METALS_PASSWORD}
-    - SILVER_ASSET_ADDRESSES=${SILVER_ASSET_ADDRESSES}
-    - SILVER_PRICE_MARKUP=${SILVER_PRICE_MARKUP}
-    - GOLD_ASSET_ADDRESSES=${GOLD_ASSET_ADDRESSES}
-    - GOLD_PRICE_MARKUP=${GOLD_PRICE_MARKUP}
     build: .
     image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
     ports:
       - 8080:8018 # healthcheck ping only
     volumes:
       - oracleconfig:/config:rw
+      - ./oracle.json:/mnt/oracle.json:ro
+    tmpfs:
+      - /tmp
     restart: unless-stopped
     logging:
       driver: "json-file"
