@@ -144,14 +144,19 @@ const NewTrendingCard = ({
 
   const handleDecrement = (quantity, decimals) => {
     if (decimals === null) {
-      setQuantity(Math.max(quantity - 1, 1));
+      if (quantity - 1 > 0) {
+        setQuantity(Math.max(quantity - 1, 1));
+      }
     } else {
       const minValue = 1 / Math.pow(10, decimals || 0);
-  
-      setQuantity((prevQuantity) => {
-        const newQuantity = parseFloat(Math.max(prevQuantity - 0.01, minValue)).toFixed(4)
-        return newQuantity;
-      });
+      if (quantity - 0.01 > 0) {
+        setQuantity((prevQuantity) => {
+            const newQuantity = parseFloat(
+              Math.max(prevQuantity - 0.01, minValue)
+            ).toFixed(4);
+            return Number(newQuantity);
+        });
+      }
     }
   };
 
@@ -346,7 +351,7 @@ const NewTrendingCard = ({
           <div className="flex gap-3 p-1 bg-white">
             <Typography
               className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity === 1
+                quantity === 1 || quantity === 0.01
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer'
               }`}

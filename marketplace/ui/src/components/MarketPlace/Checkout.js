@@ -193,7 +193,7 @@ const Checkout = () => {
             items[index].qty += 1;
           }
           else {
-            items[index].qty = parseFloat((items[index].qty + 0.01).toFixed(4));
+            items[index].qty = parseFloat((Number(items[index].qty) + 0.01).toFixed(4));
           }
           actions.addItemToCart(marketplaceDispatch, items);
         }
@@ -357,7 +357,7 @@ const Checkout = () => {
                 MinusQty(qty, product);
               }}
               className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                (qty === 1 || qty === 0.01) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
               }`}
             >
               -
