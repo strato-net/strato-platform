@@ -177,7 +177,7 @@ const BridgeWalletModal = ({
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
-      if (isDone) {
+      if (isDone && tabKey != '1') {
         await actions.fetchInventory(
           inventoryDispatch,
           inventorypageDetails.limit,
@@ -186,13 +186,13 @@ const BridgeWalletModal = ({
           inventorypageDetails.categoryName,
           ''
         );
-        handleCancel();
       }
     } catch (error) {
       ethActions.setMessage(ethDispatch, error.code);
       console.error("Transaction failed:", error);
     } finally {
       setLoader(false);
+      handleCancel();
     }
   };
 
