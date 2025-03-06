@@ -7,7 +7,7 @@ RUN apk add bash apache2-utils vim nano bind-tools && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
     luarocks install lua-resty-openidc 1.7.6
 
-RUN apk add python3  # Adding with a separate layer to match previous steps with other nginx images. TODO: refactor to reuse build base
+RUN apk add python3 py-yaml py-requests  # Adding with a separate layer to make the previous steps match with other nginx images. TODO: refactor to reuse build base
 
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \
