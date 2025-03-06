@@ -344,7 +344,7 @@ const ProductDetails = ({ user, users }) => {
         setQty(value);
       }
       else {
-        let newValue = qty + 0.01;
+        let newValue = Number(qty) + 0.01;
         newValue = parseFloat(newValue.toFixed(4));
         setQty(newValue);
       }
@@ -761,7 +761,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={() => subtract(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty > 1 && (!isStakeable || !ownerSameAsUser())
+                        qty === 0 && (!isStakeable || !ownerSameAsUser())
                           ? ''
                           : 'cursor-not-allowed opacity-50'
                       }`}

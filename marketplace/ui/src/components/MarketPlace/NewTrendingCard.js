@@ -129,7 +129,6 @@ const NewTrendingCard = ({
 
   const handleIncrement = (quantity, decimals) => {
     if (decimals === null) {
-      setQuantity(quantity + 0.01);
       if (
         quantity + 1 <= saleQuantity &&
         quantity + 1 <= topSellingProduct.quantity
@@ -137,7 +136,7 @@ const NewTrendingCard = ({
         setQuantity(quantity + 1);
       }
     } else {
-      let newValue = quantity + 0.01;
+      let newValue = Number(quantity) + 0.01;
       newValue = parseFloat(newValue.toFixed(4));
       setQuantity(newValue);
     }
