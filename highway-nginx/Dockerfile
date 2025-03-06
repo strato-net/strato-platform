@@ -1,7 +1,7 @@
 FROM openresty/openresty:1.21.4.4-1-alpine-fat
 MAINTAINER BlockApps Inc.
 
-RUN apk add bash apache2-utils vim nano bind-tools && \
+RUN apk add bash apache2-utils vim nano bind-tools jq && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/0.20181120/prometheus.lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
