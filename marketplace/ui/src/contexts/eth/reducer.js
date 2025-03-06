@@ -96,6 +96,21 @@ const reducer = (state, action) => {
         ...state,
         isAddingHash: false,
       };
+    case actionDescriptors.bridgeOut:
+      return {
+        ...state,
+        isBridgingOut: true,
+      };
+    case actionDescriptors.bridgeOutSuccessful:
+      return {
+        ...state,
+        isBridgingOut: false,
+      };
+    case actionDescriptors.bridgeOutFailed:
+      return {
+        ...state,
+        isBridgingOut: false,
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

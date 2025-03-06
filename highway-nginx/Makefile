@@ -9,5 +9,5 @@ endif
 all: build
 
 build:
-	docker build -t $(BASIL_DOCKER_TAG) .
+	docker build --add-host=openresty.org:3.125.51.27 -t $(BASIL_DOCKER_TAG) .
 	docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)

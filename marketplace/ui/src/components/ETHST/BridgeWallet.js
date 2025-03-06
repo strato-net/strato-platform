@@ -1,6 +1,8 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
 import { useState } from 'react';
 import { actions as ethActions } from '../../contexts/eth/actions';
+import { actions } from '../../contexts/inventory/actions';
+import { useInventoryDispatch } from '../../contexts/inventory';
 import { useEthDispatch, useEthState } from '../../contexts/eth';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { ethers } from 'ethers';
@@ -10,21 +12,31 @@ const ERC20_ABI = [
   {
     constant: false,
     inputs: [
-      { name: "_to", type: "address" },
-      { name: "_value", type: "uint256" },
+      { name: '_to', type: 'address' },
+      { name: '_value', type: 'uint256' },
     ],
-    name: "transfer",
-    outputs: [{ name: "", type: "bool" }],
-    type: "function",
+    name: 'transfer',
+    outputs: [{ name: '', type: 'bool' }],
+    type: 'function',
   },
 ];
 
-const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenName}) => {
+const BridgeWalletModal = ({
+  open,
+  handleCancel,
+  accountDetails,
+  signer,
+  tokenName,
+  tabKey = '1',
+  inventorypageDetails,
+}) => {
   const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
-  const [ loader, setLoader ] = useState(false);
+  const [ethereumAddress, setEthereumAddress] = useState('');
+  const [loader, setLoader] = useState(false);
   const ethDispatch = useEthDispatch();
+  const inventoryDispatch = useInventoryDispatch();
   const { user } = useAuthenticateState();
-  const { isAddingHash } = useEthState();
+  const { isAddingHash, isBridgingOut } = useEthState();
 
   const ethToMercataColumns = [
     {
@@ -52,9 +64,10 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
     },
   ];
 
-  const ethToBaseColumns = [
+  const mercataToEthColumns = [
     {
-      title: 'ETHST Available',
+      title: `${tokenName} Available`,
+      dataIndex: 'balance',
       align: 'center',
     },
     {
@@ -68,11 +81,15 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
       ),
     },
     {
-      title: 'Wallet Address',
+      title: 'Ethereum Wallet Address',
       dataIndex: 'walletAddress',
       align: 'center',
-      render: (_, record) => (
-        <Input disabled={true} value={record.walletAddress} />
+      render: () => (
+        <Input
+          placeholder="Ethereum Chain address"
+          value={ethereumAddress}
+          onChange={(e) => setEthereumAddress(e.target.value)}
+        />
       ),
     },
   ];
@@ -86,73 +103,17 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
           pagination={false}
         />
       </div>
-      <div className="flex flex-col gap-[18px] md:hidden mt-2">
-        <div>
-          <p className="text-[#202020] font-medium text-sm">
-            Quantity Available
-          </p>
-          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p>{accountDetails.balance}</p>
-          </div>
-        </div>
-        <div>
-          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-          <div>
-            <InputNumber
-              className="w-full h-9"
-              value={quantity}
-              onChange={(value) => setQuantity(value)}
-            />
-          </div>
-        </div>
-        <div>
-          <p className="text-[#202020] font-medium text-sm">
-            Base Wallet Address
-          </p>
-          <Input
-            placeholder="Base Chain address"
-            value={accountDetails.walletAddress}
-            disabled={true}
-          />
-        </div>
-      </div>
     </>
   );
 
-  const ethToBase = () => (
+  const mercataToEth = () => (
     <>
       <div className="head hidden md:block">
         <Table
-          columns={ethToBaseColumns}
+          columns={mercataToEthColumns}
           dataSource={[accountDetails]}
           pagination={false}
         />
-      </div>
-      <div className="flex flex-col gap-[18px] md:hidden mt-5">
-        <div>
-          <p className="text-[#202020] font-medium text-sm">
-            Quantity Available
-          </p>
-          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p>10</p>
-          </div>
-        </div>
-        <div>
-          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-          <div>
-            <InputNumber
-              className="w-full h-9"
-              value={quantity}
-              onChange={(value) => setQuantity(value)}
-            />
-          </div>
-        </div>
-        <div>
-          <p className="text-[#202020] font-medium text-sm">
-            Base Wallet Address
-          </p>
-          <Input placeholder="Base Chain address" />
-        </div>
       </div>
     </>
   );
@@ -160,57 +121,78 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
   const handleSubmit = async () => {
     setLoader(true);
     let tx;
+    let isDone;
     try {
-      if (tokenName === "WBTC") {
-        // WBTC contract address based on environment
-        const wbtcAddress = fileServerUrl.includes("test")
-          ? "0x29f2D40B0605204364af54EC677bD022dA425d03"
-          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
-  
-        // Create ERC-20 contract instance
-        const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, signer);
-  
-        // Convert quantity to smallest WBTC unit (8 decimals)
-        const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
-  
-        // Send ERC-20 token transfer
-        tx = await wbtcContract.transfer(
-          fileServerUrl.includes("test")
-            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
-            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
-          wbtcAmount
-        );
-  
-        console.log("WBTC transfer transaction hash:", tx.hash);
+      // Use tabKey (or any external control) to determine which bridging logic to run.
+      if (tabKey === '1') {
+        // Bridge In (Eth -> Mercata)
+        if (tokenName === 'WBTC') {
+          const wbtcAddress = fileServerUrl.includes('test')
+            ? '0x29f2D40B0605204364af54EC677bD022dA425d03'
+            : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599';
+
+          const wbtcContract = new ethers.Contract(
+            wbtcAddress,
+            ERC20_ABI,
+            signer
+          );
+          const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
+          tx = await wbtcContract.transfer(
+            fileServerUrl.includes('test')
+              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
+              : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
+            wbtcAmount
+          );
+        } else {
+          tx = await signer.sendTransaction({
+            to: fileServerUrl.includes('test')
+              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
+              : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
+            value: ethers.utils.parseEther(quantity.toString()),
+          });
+        }
+        await tx.wait();
+        const body = {
+          userAddress: user.userAddress,
+          txHash: tx.hash,
+          amount: quantity.toString(),
+          tokenName,
+        };
+        isDone = await ethActions.addHash(ethDispatch, body);
       } else {
-        // ETH transfer logic (native transfer)
-        tx = await signer.sendTransaction({
-          to: fileServerUrl.includes("test")
-            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
-            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
-          value: ethers.utils.parseEther(quantity.toString()), // Convert ETH to wei
-        });
-  
-        console.log("ETH transfer transaction hash:", tx.hash);
+        // Bridge Out (Mercata -> Eth)
+        if (!ethereumAddress && !accountDetails.assetRootAddress) {
+          throw new Error(
+            'Please provide a valid Ethereum address for bridging out.'
+          );
+        }
+        const body = {
+          quantity: ethers.utils
+            .parseUnits(quantity.toString(), accountDetails.decimals)
+            .toString(),
+          quantityNumber: quantity,
+          externalChainWalletAddress: ethereumAddress,
+          tokenAssetRootAddress: accountDetails.assetRootAddress,
+          tokenName,
+        };
+        isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
-  
-      const body = {
-        userAddress: user.userAddress,
-        txHash: tx.hash,
-        amount: quantity.toString(),
-        tokenName,
-      };
-  
-      let isDone = await ethActions.addHash(ethDispatch, body);
-  
-      if (isDone) {
-        handleCancel();
+      if (isDone && tabKey != '1') {
+        await actions.fetchInventory(
+          inventoryDispatch,
+          inventorypageDetails.limit,
+          inventorypageDetails.offset,
+          '',
+          inventorypageDetails.categoryName,
+          ''
+        );
       }
     } catch (error) {
       ethActions.setMessage(ethDispatch, error.code);
       console.error("Transaction failed:", error);
     } finally {
       setLoader(false);
+      handleCancel();
     }
   };
 
@@ -225,20 +207,25 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
             type="primary"
             className="w-32 h-9"
             onClick={handleSubmit}
-            loading={isAddingHash || loader}
+            disabled={quantity <= 0 || quantity > accountDetails.balance}
+            loading={isAddingHash || loader || isBridgingOut}
           >
             Bridge
           </Button>
         </div>,
       ]}
     >
-      <Tabs defaultActiveKey="1">
-        <Tabs.TabPane tab={`Bridge ${tokenName} to Mercata`} key="1">
-          {ethToMercata()}
+      <Tabs activeKey="1">
+        <Tabs.TabPane
+          tab={
+            tabKey === '1'
+              ? `Bridge ${tokenName} to Mercata`
+              : `Bridge ${tokenName} to Ethereum`
+          }
+          key="1"
+        >
+          {tabKey === '1' ? ethToMercata() : mercataToEth()}
         </Tabs.TabPane>
-        {/* <Tabs.TabPane tab="Bridge ETH to Base" key="2">
-          {ethToBase()}
-        </Tabs.TabPane> */}
       </Tabs>
     </Modal>
   );

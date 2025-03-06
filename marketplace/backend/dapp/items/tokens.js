@@ -164,6 +164,22 @@ async function addHash(user, args, options) {
   return rest.call(user, callArgs, options);
 }
 
+async function burnETHST(user, args, options) {
+  const { ethstAddresses, quantity, baseAddress, tokenAssetRootAddress } = args;
+  const contractName = 'MercataETHBridge';
+
+  const callArgs = {
+    contract: {
+      name: contractName,
+      address: tokenAssetRootAddress,
+    },
+    method: 'burnETHST',
+    args: util.usc({ ethstAddresses, quantity, baseAddress }),
+  };
+
+  return rest.call(user, callArgs, options);
+}
+
 function getUSDSTAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
     return constants.prodUSDSTAddress;
@@ -252,6 +268,7 @@ export default {
   marshalIn,
   marshalOut,
   addHash,
+  burnETHST,
   getUSDSTAddress,
   getCataAddress,
   getETHSTAddress,

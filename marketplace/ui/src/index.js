@@ -5,6 +5,7 @@ import { AuthenticationProvider } from './contexts/authentication';
 import reportWebVitals from './reportWebVitals';
 import './styles/app.css';
 import { MarketplaceProvider } from './contexts/marketplace';
+import { InventoriesProvider } from './contexts/inventory';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
@@ -12,7 +13,9 @@ root.render(
   <React.StrictMode>
     <AuthenticationProvider>
       <MarketplaceProvider>
-        <App />
+        <InventoriesProvider>
+          <App />
+        </InventoriesProvider>
       </MarketplaceProvider>
     </AuthenticationProvider>
   </React.StrictMode>

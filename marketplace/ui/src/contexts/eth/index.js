@@ -11,6 +11,7 @@ const EthProvider = ({ children }) => {
     message: null,
     ethstAddress: null,
     isAddingHash: false,
+    isBridgingOut: false,
     wbtcstAddress: null,
     usdtstAddress: null,
     usdcstAddress: null,

@@ -111,8 +111,6 @@ const Inventory = ({ user }) => {
     dailyCataReward,
   } = useInventoryState();
 
-  const { ethstAddress } = useEthState();
-
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -157,6 +155,7 @@ const Inventory = ({ user }) => {
 
   const itemDispatch = useItemDispatch();
   const { message: itemMsg, success: itemSuccess } = useItemState();
+  const { message: ethMsg, success: ethSuccess, ethstAddress, wbtcstAddress  } = useEthState();
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } =
     useRedemptionState();
@@ -340,6 +339,24 @@ const Inventory = ({ user }) => {
         onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 4,
+      });
+    }
+  };
+
+  const ethToast = (placement) => {
+    if (ethSuccess) {
+      api.success({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
+        placement,
+        key: 9,
+      });
+    } else {
+      api.error({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
+        placement,
+        key: 10,
       });
     }
   };
@@ -542,6 +559,7 @@ const Inventory = ({ user }) => {
             category={category}
             allSubcategories={allSubcategories}
             user={user}
+            bridgeableTokens={[ethstAddress, wbtcstAddress]}
             supportedTokens={supportedTokens}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
@@ -881,6 +899,7 @@ const Inventory = ({ user }) => {
       {itemMsg && itemToast('bottom')}
       {redemptionMsg && redemptionToast('bottom')}
       {issuerStatusMsg && issuerStatusToast('bottom')}
+      {ethMsg && ethToast('bottom')}
     </>
   );
 };

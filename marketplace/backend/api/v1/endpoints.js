@@ -114,6 +114,7 @@ export const Tokens = {
   getUSDCSTAddress: '/usdcstAddress',
   getPAXGSTAddress: '/paxgstAddress',
   addHash: '/addHash',
+  bridgeOut: '/bridgeOut',
 };
 
 export const CarbonOffset = {
@@ -208,6 +209,7 @@ export const Reserve = {
   fetchTotalCataRewards: '/fetchTotalCataRewards',
   oraclePrice: '/oraclePrice/:address',
   stake: '/stake',
+  stakeAfterBridge: '/stakeAfterBridge',
   unstake: '/unstake',
   borrow: '/borrow',
   repay: '/repay',
