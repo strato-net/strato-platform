@@ -2330,7 +2330,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       assets: [asset.address],
       collateralQuantity: stakeQuantity,
     };
-    await reserveJs.stake(rawAdmin, stakeArgs, options);
+    return await reserveJs.stake(rawAdmin, stakeArgs, options);
   };
 
   contract.getStakeTransactions = async function (
