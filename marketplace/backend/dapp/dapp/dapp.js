@@ -1199,7 +1199,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         ownerCommonName: userCert.commonName,
         originAddress: tokenAssetRootAddress,
         status: ASSET_STATUS.ACTIVE,
-        queryOptions: { select: 'address, quantity::text' },
+        queryOptions: { select: 'address, quantity::text, sale' },
         notEqualsField: 'quantity',
         notEqualsValue: '0',
         order: 'block_timestamp.desc',
@@ -1207,8 +1207,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
 
+    const assetsWithoutSale = userTokenAssets.filter(
+      (asset) => asset.sale === null
+    );
+
     // Accumulate USDST asset addresses to cover the order total
-    const { addressesToUse } = userTokenAssets.reduce(
+    const { addressesToUse } = assetsWithoutSale.reduce(
       (acc, asset) => {
         if (acc.accumulatedTotal.gte(bnQauntity)) {
           return acc;
