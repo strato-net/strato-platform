@@ -168,17 +168,17 @@ const Checkout = () => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-        if (items[index].qty - 0.01 >= 0) {
           if (product.decimals === 0) {
-            items[index].qty -= 1;
+            if (items[index].qty - 1 > 0) {
+              items[index].qty -= 1;
+            }
           }
           else {
-            if (items[index].qty > 0) {
-              items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
+            if (items[index].qty - 0.01 > 0) {
+                items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
             }
           }
           actions.addItemToCart(marketplaceDispatch, items);
-        }
       }
     });
   };
