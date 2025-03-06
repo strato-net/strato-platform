@@ -338,6 +338,10 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+    const amountWithoutSymbol = totalAmount.split(' ');
+
+    const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+
   return (
     <>
       <div>
@@ -421,24 +425,30 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       </Checkbox>
                     </div>
                   )}
-                  <Button
-                    type="primary"
-                    disabled={
-                      !activePaymentProviders ||
-                      activePaymentProviders?.length === 0
-                    }
-                    className="w-full bg-blue-800 text-white h-10 text-lg"
-                    onClick={() =>
-                      reserve && stakeChecked
-                        ? handlePlaceOrder(
-                            reserve?.address,
-                            reserve?.assetRootAddress
-                          )
-                        : handlePlaceOrder()
-                    }
-                  >
-                    Place Order
-                  </Button>
+                  <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
+                    <Button
+                      type="primary"
+                      disabled={
+                        !activePaymentProviders ||
+                        activePaymentProviders?.length === 0
+                      }
+                      onClick={() =>
+                        reserve && stakeChecked
+                          ? handlePlaceOrder(
+                              reserve?.address,
+                              reserve?.assetRootAddress
+                            )
+                          : handlePlaceOrder()
+                      }
+                      className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
+                        isDisabled
+                          ? '!bg-[#808080] cursor-not-allowed'
+                          : '!bg-[#13188A] cursor-pointer'
+                      }`}
+                    >
+                      Place Order
+                    </Button>
+                  </Tooltip>
                 </div>
               </Col>
             </Row>

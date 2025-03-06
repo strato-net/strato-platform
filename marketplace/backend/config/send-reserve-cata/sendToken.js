@@ -1,7 +1,7 @@
 require('dotenv').config();
 const axios = require('axios');
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
-const config = fsUtil.getYaml(`../config.yaml`);
+const config = fsUtil.getYaml(`../../config.yaml`);
 
 /**
  * Obtains a user token using OAuth resource owner credentials.
@@ -55,23 +55,34 @@ const callListAndWait = async (token, callListArgs) => {
   return finalResults;
 };
 
+/**
+ * Obtains an environment variable.
+ * Throws an error if the variable is not set.
+ * @param {string} name - The environment variable name.
+ * @returns {string} - The environment variable value.
+ */
+function getEnvVar(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Invalid ${name}`);
+  }
+  return value;
+}
+
 async function main() {
   try {
-    // Read configuration/credentials from environment variables.
-    const CATA_USERNAME = process.env.USERNAME; // CATA token owner
-    const CATA_PASSWORD = process.env.PASSWORD;
-    const USERNAME = process.env.USERNAME; // Reserve owner
-    const PASSWORD = process.env.PASSWORD;
-    const CATA_ADDRESS =
-      process.env.CATA_ADDRESS || 'e64fac120eef3e3551cfe914af7dfb58d4f0beef';
-    const NEW_RESERVE_ADDRESS = process.env.NEW_RESERVE_ADDRESS;
-    const CATA_QUANTITY =
-      process.env.CATA_QUANTITY || '100000000000000000000000000';
+    const CATA_USERNAME = getEnvVar('CATA_USERNAME');
+    const CATA_PASSWORD = getEnvVar('CATA_PASSWORD');
+    const RESERVE_OWNER_USERNAME = getEnvVar('RESERVE_OWNER_USERNAME');
+    const RESERVE_OWNER_PASSWORD = getEnvVar('RESERVE_OWNER_PASSWORD');
+    const CATA_ADDRESS = getEnvVar('CATA_ADDRESS');
+    const RESERVE_ADDRESS = getEnvVar('RESERVE_ADDRESS');
+    const CATA_QUANTITY = getEnvVar('CATA_QUANTITY');
 
     // Obtain the first access token.
     console.log('Obtaining first access token...');
     let token = await getUserToken(CATA_USERNAME, CATA_PASSWORD);
-    console.log('Access token 1:', token);
+    console.log('Access token of cata token owner:', token);
 
     // Call automaticTransfer.
     console.log('Calling automaticTransfer...');
@@ -81,7 +92,7 @@ async function main() {
         contract: { address: CATA_ADDRESS, name: 'Tokens' },
         method: 'automaticTransfer',
         args: util.usc({
-          newOwner: NEW_RESERVE_ADDRESS,
+          newOwner: RESERVE_ADDRESS,
           price: 0.1,
           quantity: Number(CATA_QUANTITY),
           transferNumber: util.iuid(),
@@ -94,7 +105,7 @@ async function main() {
       JSON.stringify(finalResults, null, 2)
     );
 
-    // Extract NEW_USDST_ADDRESS from the result.
+    // Extract newly created cata token from the result.
     // This mimics: jq -r '.[0].txResult.contractsCreated'
     if (!Array.isArray(finalResults) || finalResults.length === 0) {
       throw new Error('Invalid automaticTransfer result');
@@ -109,14 +120,14 @@ async function main() {
     console.log('Calling setCATAToken...');
     callListArgs = [
       {
-        contract: { address: NEW_RESERVE_ADDRESS, name: 'SimpleReserve' },
+        contract: { address: RESERVE_ADDRESS, name: 'SimpleReserve' },
         method: 'setCataToken',
         args: util.usc({
           newCataToken: newTokenAddress,
         }),
       },
     ];
-    token = await getUserToken(USERNAME, PASSWORD);
+    token = await getUserToken(RESERVE_OWNER_USERNAME, RESERVE_OWNER_PASSWORD);
     const updateResult = await callListAndWait({ token: token }, callListArgs);
     console.log('setCATAToken result:', JSON.stringify(updateResult, null, 2));
   } catch (error) {

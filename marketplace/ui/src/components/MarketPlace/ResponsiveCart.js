@@ -242,6 +242,34 @@ const ResponsiveCart = ({
     }
   };
 
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct.decimals === null) {
+      // Prevent decimals
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (!/^[0-9]$/.test(e.key) && 
+          e.key !== "Backspace" && 
+          e.key !== "Delete" && 
+          e.key !== "ArrowLeft" && 
+          e.key !== "ArrowRight") {
+        e.preventDefault();
+      }
+    } else {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight"
+      ) {
+        e.preventDefault();
+      }
+    }
+  };
+
   const handleChange = async (value) => {
     const provider = paymentServices.find(
       (provider) => provider?.serviceName === value
@@ -364,13 +392,16 @@ const ResponsiveCart = ({
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
                     <InputNumber
-                      className="w-[7rem] border-none text-[#202020] font-medium bg-[transparent] rounded-none outline-none text-sm text-center flex flex-col justify-center"
-                      min={1}
+                      className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
+                      min={1 / Math.pow(10, product.decimals || 0)}
                       value={qty}
-                      defaultValue={qty}
                       controls={false}
                       onChange={(e) => {
                         ValueQty(product, e);
+                      }}
+                      precision={product.decimals === 0 ? 0 : 5}
+                      onKeyDown={(e) => {
+                        onKeyDownPress(e, product);
                       }}
                     />
                     <div
