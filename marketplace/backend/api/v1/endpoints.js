@@ -206,6 +206,7 @@ export const Reserve = {
   fetchTotalCataRewards: '/fetchTotalCataRewards',
   oraclePrice: '/oraclePrice/:address',
   stake: '/stake',
+  stakeAfterBridge: '/stakeAfterBridge',
   unstake: '/unstake',
   borrow: '/borrow',
   repay: '/repay',

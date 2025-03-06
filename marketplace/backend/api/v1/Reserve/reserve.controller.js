@@ -75,6 +75,20 @@ class ReserveController {
     }
   }
 
+  // Stake after bridging
+  static async stakeAfterBridge(req, res, next) {
+    try {
+      const { dapp, body } = req;
+      ReserveController.validateStakeAfterBridgeArgs(body);
+
+      const result = await dapp.stakeAfterBridge(body);
+      rest.response.status200(res, result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
   // Unstake from the reserve system
   static async unstake(req, res, next) {
     try {
@@ -173,6 +187,19 @@ class ReserveController {
     ReserveController.validateArgs(args, schema, 'Stake');
   }
 
+  static validateStakeAfterBridgeArgs(args) {
+    const schema = Joi.object({
+      stakeQuantity: Joi.string().pattern(/^\d+$/).required().messages({
+        'any.required': 'Stake Quantity is required and must be a string.',
+        'string.base': 'Stake Quantity must be a valid string.',
+        'string.pattern.base': 'Stake Quantity must be a valid number.',
+      }),
+      ownerCommonName: Joi.string().required(),
+      assetAddress: Joi.string().required(),
+    });
+    ReserveController.validateArgs(args, schema, 'Stake');
+  }
+
   static validateUnstakeArgs(args) {
     const schema = Joi.object({
       quantity: Joi.string().pattern(/^\d+$/).required().messages({
@@ -183,7 +210,7 @@ class ReserveController {
       escrowAddresses: Joi.array().items(Joi.string()).required().messages({
         'array.base': 'escrowAddresses must be an array of strings.',
         'string.base': 'Each escrowAddress must be a valid string.',
-        }),
+      }),
       reserve: Joi.string().required().messages({
         'any.required': 'Reserve is required and must be a string.',
         'string.base': 'Reserve must be a valid string.',
@@ -195,7 +222,8 @@ class ReserveController {
   static validateBorrowArgs(args) {
     const schema = Joi.object({
       escrowAddresses: Joi.array().items(Joi.string()).required().messages({
-        'any.required': 'Escrow Addresses are required and must be an array of strings.',
+        'any.required':
+          'Escrow Addresses are required and must be an array of strings.',
         'array.base': 'Escrow Addresses must be an array.',
         'string.base': 'Each Escrow Address must be a valid string.',
       }),
@@ -220,7 +248,7 @@ class ReserveController {
         'any.required': 'Reserve is required and must be a string.',
         'string.base': 'Reserve must be a valid string.',
       }),
-      value: Joi.string().pattern(/^\d+$/).required()
+      value: Joi.string().pattern(/^\d+$/).required(),
     });
     ReserveController.validateArgs(args, schema, 'Repay');
   }
