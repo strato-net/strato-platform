@@ -3,7 +3,9 @@ MAINTAINER BlockApps Inc.
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
+# Hardcoding IP as a temporary fix for https://github.com/openresty/openresty/issues/1035
+RUN echo "3.125.51.27 openresty.org" >> /etc/hosts && \
+    apt-get update && \
     apt-get install -y apache2-utils curl openresty-opm && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
