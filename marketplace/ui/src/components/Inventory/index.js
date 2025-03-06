@@ -173,6 +173,9 @@ const Inventory = ({ user }) => {
     categoryActions.fetchCategories(categoryDispatch);
     ethActions.fetchETHSTAddress(ethDispatch);
     ethActions.fetchWBTCSTAddress(ethDispatch);
+    ethActions.fetchUSDTSTAddress(ethDispatch);
+    ethActions.fetchUSDCSTAddress(ethDispatch);
+    ethActions.fetchPAXGSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {

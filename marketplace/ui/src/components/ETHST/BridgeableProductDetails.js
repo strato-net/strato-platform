@@ -18,7 +18,7 @@ import {
   SolutionOutlined,
   RiseOutlined,
 } from '@ant-design/icons';
-import { useMatch, useNavigate, useLocation } from 'react-router-dom';
+import { useMatch, useNavigate, useLocation, useParams } from 'react-router-dom';
 //actions
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -45,7 +45,6 @@ import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
 import TimeRangeTabs from '../MarketPlace/TimeRangeTabs';
 import Statistics from '../MarketPlace/Statistics';
-import WbtcstSteps from './WbtcstSteps';
 import LoginModal from '../MarketPlace/LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 import BorrowModal from '../Inventory/BorrowModal';
@@ -84,6 +83,7 @@ import 'swiper/css/autoplay';
 
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+import StakeSteps from './StakeSteps';
 
 const ERC20_ABI = [
   {
@@ -147,6 +147,8 @@ const ProductDetails = ({ user, users }) => {
   } else if (pathname.includes('inventories')) {
     isCalledFromInventory = true;
   }
+
+  const { bridgeableAsset } = useParams();
 
   const routeMatch = useMatch({
     path: routes.bridgeableProductDetail.url,
@@ -612,7 +614,7 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <WbtcstSteps />
+          <StakeSteps name={bridgeableAsset} />
           <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
             <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (

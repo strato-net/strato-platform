@@ -19,12 +19,15 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const ethDispatch = useEthDispatch();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = useEthState();
 
   useEffect(() => {
     const fetchAddresses = async () => {
       ethActions.fetchETHSTAddress(ethDispatch);
       ethActions.fetchWBTCSTAddress(ethDispatch);
+      ethActions.fetchUSDTSTAddress(ethDispatch);
+      ethActions.fetchUSDCSTAddress(ethDispatch);
+      ethActions.fetchPAXGSTAddress(ethDispatch);
     };
 
     fetchAddresses();
@@ -42,6 +45,12 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
       ? categoryQueryValueArr[0]
       : SEO.IMAGE_META;
 
+      const isEthst = reserveItem.originAddress === ethstAddress;
+      const isWbtcst = reserveItem.originAddress === wbtcstAddress;
+      const isUsdtst = reserveItem.originAddress === usdtstAddress;
+      const isUsdcst = reserveItem.originAddress === usdcstAddress;
+      const isPaxgst = reserveItem.originAddress === paxgstAddress;    
+
   const handleCancel = () => {
     setIsModalVisible(false);
   };
@@ -55,7 +64,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (reserveItem.originAddress === ethstAddress) {
+    if (isEthst) {
       navigate(
         `${routes.EthstProductDetail.url.replace(
           ':address',
@@ -65,12 +74,12 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
           state: { isCalledFromInventory: false },
         }
       );
-    } else if (reserveItem.originAddress === wbtcstAddress) {
+    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
       navigate(
-        `${routes.WbtcstProductDetail.url.replace(
+        `${routes.bridgeableProductDetail.url.replace(
           ':address',
           reserveItem.address
-        )}`,
+        ).replace(':bridgeableAsset', reserveItem.name)}`,
         {
           state: { isCalledFromInventory: false },
         }

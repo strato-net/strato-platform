@@ -28,6 +28,9 @@ const Feed = ({ user }) => {
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
       await ethActions.fetchWBTCSTAddress(ethDispatch);
+      await ethActions.fetchUSDTSTAddress(ethDispatch);
+      await ethActions.fetchUSDCSTAddress(ethDispatch);
+      await ethActions.fetchPAXGSTAddress(ethDispatch);
     };
 
     fetchAddresses();

@@ -179,7 +179,7 @@ const GlobalTransaction = ({
       });
     } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
       const url = routes.bridgeableProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
+      navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data?.assetName)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {

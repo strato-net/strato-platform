@@ -72,6 +72,9 @@ const MarketPlace = ({ user, isAuthenticated }) => {
     inventoryActions.fetchTotalCataRewards(inventoryDispatch);
     ethActions.fetchETHSTAddress(ethDispatch);
     ethActions.fetchWBTCSTAddress(ethDispatch);
+    ethActions.fetchUSDTSTAddress(ethDispatch);
+    ethActions.fetchUSDCSTAddress(ethDispatch);
+    ethActions.fetchPAXGSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {

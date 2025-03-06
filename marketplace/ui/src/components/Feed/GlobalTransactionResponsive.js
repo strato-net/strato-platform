@@ -19,6 +19,9 @@ const GlobalTransactionResponsive = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
+  usdtstAddress,
+  usdcstAddress,
+  paxgstAddress,
   stratsAddress,
 }) => {
   const USDSTIcon = (
@@ -145,14 +148,18 @@ const GlobalTransactionResponsive = ({
               const handleAssetRedirection = () => {
                 const isEthst = assetOriginAddress === ethstAddress;
                 const isWbtcst = assetOriginAddress === wbtcstAddress;
+                const isUsdtst = assetOriginAddress === usdtstAddress;
+                const isUsdcst = assetOriginAddress === usdcstAddress;
+                const isPaxgst = assetOriginAddress === paxgstAddress;
+
                 if (isEthst) {
                   const url = routes.EthstProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });
-                } else if (isWbtcst) {
-                  const url = routes.WbtcstProductDetail.url;
-                  navigate(`${url.replace(':address', assetAddress)}`, {
+                } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+                  const url = routes.bridgeableProductDetail.url;
+                  navigate(`${url.replace(':address', assetAddress).replace(':bridgeableAsset', assetName)}`, {
                     state: { isCalledFromInventory: false },
                   });
                 } else {
