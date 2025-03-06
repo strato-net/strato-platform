@@ -107,7 +107,7 @@ const ProductDetails = ({ user, users }) => {
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
   const [Id, setId] = useState(undefined);
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState();
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState(null);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
@@ -115,6 +115,10 @@ const ProductDetails = ({ user, users }) => {
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
+
+  useEffect(() => {
+    setQty(inventoryDetails?.decimals === null ? 1 : 0.01)
+  },[inventoryDetails])
 
   // Stakeable
   const isStaked =
@@ -315,20 +319,39 @@ const ProductDetails = ({ user, users }) => {
     setIsModalVisible(false);
   };
 
-  const subtract = () => {
+  const subtract = (inventoryDetails) => {
     if (!isStakeable || !ownerSameAsUser()) {
-      const value = Math.max(qty - 1, 1);
-      setQty(value);
+      let value;
+      if (inventoryDetails.decimals === null) {
+        value = Math.max(qty - 1, 1);
+        setQty(value);
+      }
+      else {
+        if (qty > 0) {
+          // value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
+          let newValue = qty - 0.01;
+          newValue = parseFloat(newValue.toFixed(4));
+          setQty(newValue);
+        }
+      }
     }
   };
 
-  const add = () => {
+  const add = (inventoryDetails) => {
+    let value;
     if (qty + 1 <= availableQuantity && (!isStakeable || !ownerSameAsUser())) {
-      let value = qty + 1;
-      setQty(value);
-    } else {
+      if (inventoryDetails.decimals === null) {
+        value = qty + 1;
+        setQty(value);
+      }
+      else {
+        let newValue = qty + 0.01;
+        newValue = parseFloat(newValue.toFixed(4));
+        setQty(newValue);
+      }
     }
   };
+  
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
@@ -482,6 +505,34 @@ const ProductDetails = ({ user, users }) => {
   )
     ? 18
     : details?.decimals || 0;
+
+    const onKeyDownPress = (e, inventoryDetails) => {
+      if (inventoryDetails.decimals === null) {
+        // Prevent decimals
+        if (e.key === "." || e.key === ",") {
+          e.preventDefault();
+        }
+        // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+        if (!/^[0-9]$/.test(e.key) && 
+            e.key !== "Backspace" && 
+            e.key !== "Delete" && 
+            e.key !== "ArrowLeft" && 
+            e.key !== "ArrowRight") {
+          e.preventDefault();
+        }
+      } else {
+        // Allow decimals for products with defined decimal places
+        if (
+          !/[0-9.]/.test(e.key) &&
+          e.key !== "Backspace" &&
+          e.key !== "Delete" &&
+          e.key !== "ArrowLeft" &&
+          e.key !== "ArrowRight"
+        ) {
+          e.preventDefault();
+        }
+      }
+    };
 
   return (
     <>
@@ -710,7 +761,7 @@ const ProductDetails = ({ user, users }) => {
                     id="quantity"
                   >
                     <div
-                      onClick={subtract}
+                      onClick={() => subtract(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
                         qty > 1 && (!isStakeable || !ownerSameAsUser())
                           ? ''
@@ -729,25 +780,36 @@ const ProductDetails = ({ user, users }) => {
                       value={
                         !isStakeable || !ownerSameAsUser()
                           ? `${qty}`
-                          : assetsWithEighteenDecimalPlaces.includes(
-                              inventoryDetails.root
-                            )
+                          : assetsWithEighteenDecimalPlaces.includes(inventoryDetails.root)
                           ? inventoryDetails.quantity / 1e18
-                          : inventoryDetails.quantity /
-                            Math.pow(10, inventoryDetails.decimals || 0)
+                          : inventoryDetails.quantity / Math.pow(10, inventoryDetails.decimals || 0)
                       }
-                      defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
-                        if (e < availableQuantity) {
-                          setQty(parseFloat(e || 0));
-                        } else {
-                          setQty(availableQuantity);
+                        if (!isNaN(e)) {
+                          let value = e.toString();
+
+                          // Split number into integer and decimal parts
+                          let [integer, decimal] = value.split(".");
+
+                          // Restrict decimal places based on inventoryDetails.decimals
+                          if (decimal && decimal.length > (inventoryDetails.decimals || 0)) {
+                            value = parseFloat(integer + "." + decimal.slice(0, inventoryDetails.decimals));
+                          } else {
+                            value = parseFloat(value);
+                          }
+
+                          // Ensure the value does not exceed max availableQuantity
+                          setQty(value < availableQuantity ? value : availableQuantity);
                         }
                       }}
+                      onKeyDown={(e) => {
+                        onKeyDownPress(e, inventoryDetails);
+                      }}
                     />
+
                     <div
-                      onClick={add}
+                      onClick={() => add(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
                         qty < availableQuantity &&
                         (!isStakeable || !ownerSameAsUser())
