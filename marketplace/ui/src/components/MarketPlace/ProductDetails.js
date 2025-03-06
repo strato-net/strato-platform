@@ -327,12 +327,11 @@ const ProductDetails = ({ user, users }) => {
         setQty(value);
       }
       else {
-        if (qty > 0) {
-          // value = 1 / Math.pow(10, inventoryDetails.decimals || 0); // Minimum allowed decimal value
-          let newValue = qty - 0.01;
-          newValue = parseFloat(newValue.toFixed(4));
-          setQty(newValue);
-        }
+        const minValue = 1 / Math.pow(10, inventoryDetails.decimals || 0);
+        setQty((prevQuantity) => {
+          const newQuantity = parseFloat(Math.max(prevQuantity - 0.01, minValue)).toFixed(4);
+          return newQuantity;
+        });
       }
     }
   };
@@ -351,7 +350,6 @@ const ProductDetails = ({ user, users }) => {
       }
     }
   };
-  
 
   const openToast = (placement, isError, msg) => {
     if (isError) {

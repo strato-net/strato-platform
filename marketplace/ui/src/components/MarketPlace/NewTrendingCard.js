@@ -147,11 +147,12 @@ const NewTrendingCard = ({
     if (decimals === null) {
       setQuantity(Math.max(quantity - 1, 1));
     } else {
-      if (quantity > 0) {
-        let newValue = quantity - 0.01;
-        newValue = parseFloat(newValue.toFixed(4));
-        setQuantity(newValue);
-      }
+      const minValue = 1 / Math.pow(10, decimals || 0);
+  
+      setQuantity((prevQuantity) => {
+        const newQuantity = parseFloat(Math.max(prevQuantity - 0.01, minValue)).toFixed(4)
+        return newQuantity;
+      });
     }
   };
 
