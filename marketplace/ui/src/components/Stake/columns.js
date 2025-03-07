@@ -170,14 +170,44 @@ export const aggregateStakeColumns = (
         let totalCataRewardsIssued = 0;
 
         if (record?.inventories) {
-          totalCataRewardsIssued = record.inventories.reduce((sum, item) => {
+          // Collect unique escrow assets across all inventories
+          const uniqueEscrowAssetsMap = new Map();
+
+          record.inventories.forEach((item) => {
             const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
-            return sum + sumCataRewardsFromAssets(escrowAssets);
-          }, 0);
+            if (Array.isArray(escrowAssets)) {
+              escrowAssets.forEach((asset) => {
+                // Only add the asset if it has an address and hasn't been added yet
+                if (
+                  asset?.address &&
+                  !uniqueEscrowAssetsMap.has(asset.address)
+                ) {
+                  uniqueEscrowAssetsMap.set(asset.address, asset);
+                }
+              });
+            }
+          });
+
+          // Sum rewards using the array of unique escrow assets
+          totalCataRewardsIssued = sumCataRewardsFromAssets(
+            Array.from(uniqueEscrowAssetsMap.values())
+          );
         } else {
-          // If no inventories, check record['BlockApps-Mercata-Escrow-assets']
+          // If no inventories exist, process record assets similarly
           const recordAssets = record['BlockApps-Mercata-Escrow-assets'];
-          totalCataRewardsIssued = sumCataRewardsFromAssets(recordAssets);
+          const uniqueRecordAssetsMap = new Map();
+
+          if (Array.isArray(recordAssets)) {
+            recordAssets.forEach((asset) => {
+              if (asset?.address && !uniqueRecordAssetsMap.has(asset.address)) {
+                uniqueRecordAssetsMap.set(asset.address, asset);
+              }
+            });
+          }
+
+          totalCataRewardsIssued = sumCataRewardsFromAssets(
+            Array.from(uniqueRecordAssetsMap.values())
+          );
         }
 
         // If these rewards also follow 18 decimals, apply division
