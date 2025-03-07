@@ -245,25 +245,27 @@ const ResponsiveCart = ({
   const onKeyDownPress = (e, topSellingProduct) => {
     if (topSellingProduct.decimals === null) {
       // Prevent decimals
-      if (e.key === "." || e.key === ",") {
+      if (e.key === '.' || e.key === ',') {
         e.preventDefault();
       }
       // Prevent non-numeric keys except Backspace, Delete, and navigation keys
-      if (!/^[0-9]$/.test(e.key) && 
-          e.key !== "Backspace" && 
-          e.key !== "Delete" && 
-          e.key !== "ArrowLeft" && 
-          e.key !== "ArrowRight") {
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
         e.preventDefault();
       }
     } else {
       // Allow decimals for products with defined decimal places
       if (
         !/[0-9.]/.test(e.key) &&
-        e.key !== "Backspace" &&
-        e.key !== "Delete" &&
-        e.key !== "ArrowLeft" &&
-        e.key !== "ArrowRight"
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
       ) {
         e.preventDefault();
       }
@@ -384,7 +386,7 @@ const ResponsiveCart = ({
                         MinusQty(qty, product);
                       }}
                       className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                        qty === 1
+                        ((qty === 1 && product.decimals === 0) || qty === 0.01)
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}
@@ -392,14 +394,29 @@ const ResponsiveCart = ({
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
                     <InputNumber
-                      className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
+                      className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
                       min={1 / Math.pow(10, product.decimals || 0)}
                       value={qty}
                       controls={false}
                       onChange={(e) => {
-                        ValueQty(product, e);
+                        if (!isNaN(e)) {
+                          let value = e.toString();
+                          let [integer, decimal] = value.split('.');
+
+                          if (
+                            decimal &&
+                            decimal.length > (product.decimals || 0)
+                          ) {
+                            value = parseFloat(
+                              integer + '.' + decimal.slice(0, product.decimals)
+                            );
+                          } else {
+                            value = parseFloat(value);
+                          }
+
+                          ValueQty(product, value);
+                        }
                       }}
-                      precision={product.decimals === 0 ? 0 : 5}
                       onKeyDown={(e) => {
                         onKeyDownPress(e, product);
                       }}

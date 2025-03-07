@@ -768,7 +768,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={() => subtract(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        ((isStakeable || ownerSameAsUser()) && (qty === 1 || qty === 0.01))
+                        ((isStakeable || ownerSameAsUser()) && ((qty === 1 && inventoryDetails.decimals === null ) || qty === 0.01))
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}

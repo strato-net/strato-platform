@@ -351,7 +351,7 @@ const NewTrendingCard = ({
           <div className="flex gap-3 p-1 bg-white">
             <Typography
               className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity === 1 || quantity === 0.01
+                (quantity === 1 && topSellingProduct.decimals === null ) || quantity === 0.01
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer'
               }`}
