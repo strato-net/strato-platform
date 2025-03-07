@@ -117,7 +117,7 @@ const ProductDetails = ({ user, users }) => {
   const [availableQuantity, setAvailableQuantity] = useState(1);
 
   useEffect(() => {
-    setQty(inventoryDetails?.decimals === null ? 1 : 0.01);
+    setQty(inventoryDetails?.decimals ? 0.01 : 1);
   }, [inventoryDetails]);
 
   // Stakeable
@@ -322,12 +322,7 @@ const ProductDetails = ({ user, users }) => {
   const subtract = (inventoryDetails) => {
     if (!isStakeable || !ownerSameAsUser()) {
       let value;
-      if (inventoryDetails.decimals === null) {
-        if (qty - 1 > 0) {
-          value = Number(Math.max(qty - 1, 1));
-          setQty(value);
-        }
-      } else {
+      if (inventoryDetails.decimals) {
         if (qty - 0.01 > 0) {
           const minValue = 1 / Math.pow(10, inventoryDetails.decimals || 0);
           setQty((prevQuantity) => {
@@ -338,19 +333,26 @@ const ProductDetails = ({ user, users }) => {
           });
         }
       }
+      else {
+        if (qty - 1 > 0) {
+          value = Number(Math.max(qty - 1, 1));
+          setQty(value);
+        }
+      }
     }
   };
 
   const add = (inventoryDetails) => {
     let value;
     if (qty + 1 <= availableQuantity && (!isStakeable || !ownerSameAsUser())) {
-      if (inventoryDetails.decimals === null) {
-        value = Number(qty) + 1;
-        setQty(value);
-      } else {
+      if (inventoryDetails.decimals) {
         let newValue = Number(qty) + 0.01;
         newValue = parseFloat(newValue.toFixed(4));
         setQty(newValue);
+      }
+      else {
+        value = Number(qty) + 1;
+        setQty(value);
       }
     }
   };
@@ -768,7 +770,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={() => subtract(inventoryDetails)}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        ((isStakeable || ownerSameAsUser()) && ((qty === 1 && inventoryDetails.decimals === null ) || qty === 0.01))
+                        ((isStakeable || ownerSameAsUser()) && ((qty === 1 && !inventoryDetails.decimals) || qty === 0.01))
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}

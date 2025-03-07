@@ -168,14 +168,14 @@ const Checkout = () => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-          if (product.decimals === 0) {
-            if (items[index].qty - 1 > 0) {
-              items[index].qty -= 1;
+          if (product?.decimals) {
+            if (items[index].qty - 0.01 > 0) {
+              items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
             }
           }
           else {
-            if (items[index].qty - 0.01 > 0) {
-                items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
+            if (items[index].qty - 1 > 0) {
+              items[index].qty -= 1;
             }
           }
           actions.addItemToCart(marketplaceDispatch, items);
@@ -189,11 +189,11 @@ const Checkout = () => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
         if (items[index].qty + 1 <= availableQuantity) {
-          if (product.decimals === 0) {
-            items[index].qty += 1;
+          if (product.decimals) {
+            items[index].qty = parseFloat((Number(items[index].qty) + 0.01).toFixed(4));
           }
           else {
-            items[index].qty = parseFloat((Number(items[index].qty) + 0.01).toFixed(4));
+            items[index].qty += 1;
           }
           actions.addItemToCart(marketplaceDispatch, items);
         }
@@ -357,7 +357,7 @@ const Checkout = () => {
                 MinusQty(qty, product);
               }}
               className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                ((qty === 1 && product.decimals === 0) || qty === 0.01) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                ((qty === 1 && !product.decimals) || qty === 0.01) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
               }`}
             >
               -

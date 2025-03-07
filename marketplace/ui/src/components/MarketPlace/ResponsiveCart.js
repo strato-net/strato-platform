@@ -243,14 +243,9 @@ const ResponsiveCart = ({
   };
 
   const onKeyDownPress = (e, topSellingProduct) => {
-    if (topSellingProduct.decimals === null) {
-      // Prevent decimals
-      if (e.key === '.' || e.key === ',') {
-        e.preventDefault();
-      }
-      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+    if (topSellingProduct.decimals) {
       if (
-        !/^[0-9]$/.test(e.key) &&
+        !/[0-9.]/.test(e.key) &&
         e.key !== 'Backspace' &&
         e.key !== 'Delete' &&
         e.key !== 'ArrowLeft' &&
@@ -258,10 +253,14 @@ const ResponsiveCart = ({
       ) {
         e.preventDefault();
       }
-    } else {
-      // Allow decimals for products with defined decimal places
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
       if (
-        !/[0-9.]/.test(e.key) &&
+        !/^[0-9]$/.test(e.key) &&
         e.key !== 'Backspace' &&
         e.key !== 'Delete' &&
         e.key !== 'ArrowLeft' &&
@@ -386,7 +385,7 @@ const ResponsiveCart = ({
                         MinusQty(qty, product);
                       }}
                       className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                        ((qty === 1 && product.decimals === 0) || qty === 0.01)
+                        ((qty === 1 && !product?.decimals) || qty === 0.01)
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}
@@ -395,7 +394,7 @@ const ResponsiveCart = ({
                     </div>
                     <InputNumber
                       className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
-                      min={1 / Math.pow(10, product.decimals || 0)}
+                      min={1 / Math.pow(10, product?.decimals || 0)}
                       value={qty}
                       controls={false}
                       onChange={(e) => {

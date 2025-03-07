@@ -128,26 +128,23 @@ const NewTrendingCard = ({
   };
 
   const handleIncrement = (quantity, decimals) => {
-    if (decimals === null) {
+    if (decimals) {
+      let newValue = Number(quantity) + 0.01;
+      newValue = parseFloat(newValue.toFixed(4));
+      setQuantity(newValue);
+    }
+    else {
       if (
         quantity + 1 <= saleQuantity &&
         quantity + 1 <= topSellingProduct.quantity
       ) {
         setQuantity(quantity + 1);
       }
-    } else {
-      let newValue = Number(quantity) + 0.01;
-      newValue = parseFloat(newValue.toFixed(4));
-      setQuantity(newValue);
     }
   };
 
   const handleDecrement = (quantity, decimals) => {
-    if (decimals === null) {
-      if (quantity - 1 > 0) {
-        setQuantity(Math.max(quantity - 1, 1));
-      }
-    } else {
+    if (decimals) {
       const minValue = 1 / Math.pow(10, decimals || 0);
       if (quantity - 0.01 > 0) {
         setQuantity((prevQuantity) => {
@@ -158,17 +155,18 @@ const NewTrendingCard = ({
         });
       }
     }
+    else {
+      if (quantity - 1 > 0) {
+        setQuantity(Math.max(quantity - 1, 1));
+      }
+    }
   };
 
   const onKeyDownPress = (e, topSellingProduct) => {
-    if (topSellingProduct.decimals === null) {
-      // Prevent decimals
-      if (e.key === '.' || e.key === ',') {
-        e.preventDefault();
-      }
-      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+    console.log(topSellingProduct, 'topselling')
+    if (topSellingProduct?.decimals) {
       if (
-        !/^[0-9]$/.test(e.key) &&
+        !/[0-9.]/.test(e.key) &&
         e.key !== 'Backspace' &&
         e.key !== 'Delete' &&
         e.key !== 'ArrowLeft' &&
@@ -176,10 +174,14 @@ const NewTrendingCard = ({
       ) {
         e.preventDefault();
       }
-    } else {
-      // Allow decimals for products with defined decimal places
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
       if (
-        !/[0-9.]/.test(e.key) &&
+        !/^[0-9]$/.test(e.key) &&
         e.key !== 'Backspace' &&
         e.key !== 'Delete' &&
         e.key !== 'ArrowLeft' &&
@@ -351,12 +353,12 @@ const NewTrendingCard = ({
           <div className="flex gap-3 p-1 bg-white">
             <Typography
               className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                (quantity === 1 && topSellingProduct.decimals === null ) || quantity === 0.01
+                (quantity === 1 && !topSellingProduct?.decimals) || quantity === 0.01
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                handleDecrement(quantity, topSellingProduct.decimals);
+                handleDecrement(quantity, topSellingProduct?.decimals);
               }}
             >
               -
