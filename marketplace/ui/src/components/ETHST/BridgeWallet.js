@@ -126,23 +126,47 @@ const BridgeWalletModal = ({
       // Use tabKey (or any external control) to determine which bridging logic to run.
       if (tabKey === '1') {
         // Bridge In (Eth -> Mercata)
-        if (tokenName === 'WBTC') {
-          const wbtcAddress = fileServerUrl.includes('test')
-            ? '0x29f2D40B0605204364af54EC677bD022dA425d03'
-            : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599';
+        let tokenAddress, decimals, recipient;
 
-          const wbtcContract = new ethers.Contract(
-            wbtcAddress,
-            ERC20_ABI,
-            signer
-          );
-          const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
-          tx = await wbtcContract.transfer(
-            fileServerUrl.includes('test')
-              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
-            wbtcAmount
-          );
+        if (tokenName === 'WBTCST') {
+            tokenAddress = fileServerUrl.includes('test')
+                ? '0x29f2D40B0605204364af54EC677bD022dA425d03'  // Testnet WBTC
+                : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // Mainnet WBTC
+            decimals = 8;
+            recipient = fileServerUrl.includes('test')
+                ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'  // Testnet recipient
+                : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
+        } else if (tokenName === 'USDTST') {// TODO: add the below addresses
+            tokenAddress = fileServerUrl.includes('test')
+                ? '0xYourTestnetUSDTAddress'  // Testnet USDT
+                : '0xYourMainnetUSDTAddress'; // Mainnet USDT
+            decimals = 6;
+            recipient = fileServerUrl.includes('test')
+                ? '0xTestnetRecipientUSDT'  // Testnet recipient
+                : '0xMainnetRecipientUSDT'; // Mainnet recipient
+        } else if (tokenName === 'USDCST') {
+            tokenAddress = fileServerUrl.includes('test')
+                ? '0xYourTestnetUSDCAddress'  // Testnet USDC
+                : '0xYourMainnetUSDCAddress'; // Mainnet USDC
+            decimals = 6;
+            recipient = fileServerUrl.includes('test')
+                ? '0xTestnetRecipientUSDC'  // Testnet recipient
+                : '0xMainnetRecipientUSDC'; // Mainnet recipient
+        } else if (tokenName === 'PAXGST') {
+            tokenAddress = fileServerUrl.includes('test')
+                ? '0xYourTestnetPAXGAddress'  // Testnet PAXG
+                : '0xYourMainnetPAXGAddress'; // Mainnet PAXG
+            decimals = 18;
+            recipient = fileServerUrl.includes('test')
+                ? '0xTestnetRecipientPAXG'  // Testnet recipient
+                : '0xMainnetRecipientPAXG'; // Mainnet recipient
+        }
+        
+        if (tokenAddress) {
+            const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+            const tokenAmount = ethers.utils.parseUnits(quantity.toString(), decimals);
+        
+            tx = await tokenContract.transfer(recipient, tokenAmount);
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
@@ -151,6 +175,7 @@ const BridgeWalletModal = ({
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
+
         await tx.wait();
         const body = {
           userAddress: user.userAddress,
@@ -177,6 +202,7 @@ const BridgeWalletModal = ({
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
+
       if (isDone && tabKey != '1') {
         await actions.fetchInventory(
           inventoryDispatch,
@@ -195,6 +221,7 @@ const BridgeWalletModal = ({
       handleCancel();
     }
   };
+
 
   return (
     <Modal

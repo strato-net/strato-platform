@@ -209,7 +209,7 @@ const ProductDetails = ({ user, users }) => {
   const disconnect = useDisconnect();
   const { address } = useAppKitAccount();
   const { chainId } = useAppKitNetwork();
-  const [wbtcBalance, setWbtcBalance] = useState(0);
+  const [tokenBalance, setTokenBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
   // *** New useEffect: Listen for wallet account changes ***
@@ -230,33 +230,56 @@ const ProductDetails = ({ user, users }) => {
     // Function to fetch balance using the same provider
     const fetchBalance = async () => {
       if (address && chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id) {
-        const wbtcAddress = fileServerUrl.includes('test')
-          ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
-          : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
-
-        const provider = new ethers.providers.Web3Provider(walletProvider);
-        const signer = provider.getSigner();
-        setSigner(signer);
-
-        // Create WBTC contract instance
-        const wbtcContract = new ethers.Contract(
-          wbtcAddress,
-          ERC20_ABI,
-          provider
-        );
-
-        try {
-          // Get WBTC balance
-          const wbtcBalance = await wbtcContract.balanceOf(address);
-
-          // WBTC has 8 decimals (like BTC), format accordingly
-          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-          setWbtcBalance(formattedBalance); // Set WBTC balance
-        } catch (error) {
-          console.error('Failed to fetch WBTC balance:', error);
-        }
+          let tokenAddress, decimals, setBalance;
+  
+          if (bridgeableAsset === 'WBTCST') {
+              tokenAddress = fileServerUrl.includes('test')
+                  ? '0x29f2D40B0605204364af54EC677bD022dA425d03'  // Sepolia Testnet WBTC
+                  : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // Mainnet WBTC
+              decimals = 8;
+              setBalance = tokenBalance;
+          } else if (bridgeableAsset === 'USDTST') {
+              tokenAddress = fileServerUrl.includes('test')
+                  ? '0x110a13FC3efE6A245B50102D2d79B3E76125Ae83'  // Sepolia Testnet USDT
+                  : '0xdAC17F958D2ee523a2206206994597C13D831ec7'; // Mainnet USDT
+              decimals = 6;
+              setBalance = tokenBalance;
+          } else if (bridgeableAsset === 'USDCST') {
+              tokenAddress = fileServerUrl.includes('test')
+                  ? '0x42bb40bF79730451B11f6De1CbA222F17b87Afd7'  // Sepolia Testnet USDC
+                  : '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // Mainnet USDC
+              decimals = 6;
+              setBalance = tokenBalance;
+          } else if (bridgeableAsset === 'PAXGST') {
+              tokenAddress = fileServerUrl.includes('test')
+                  ? '0x7eFb7b64f89903a62AE4d65e31b4c2aDaAd73b1F'  // Sepolia Testnet PAXG
+                  : '0x45804880De22913dAFE09f4980848ECE6EcbAf78'; // Mainnet PAXG
+              decimals = 18;
+              setBalance = tokenBalance;
+          } else {
+              console.error(`Unsupported token: ${bridgeableAsset}`);
+              return;
+          }
+  
+          const provider = new ethers.providers.Web3Provider(walletProvider);
+          const signer = provider.getSigner();
+          setSigner(signer);
+  
+          try {
+              // Create ERC20 contract instance
+              const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+              const balance = await tokenContract.balanceOf(address);
+  
+              // Format balance according to token decimals
+              const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+  
+              // Set the balance for the specific token
+              setTokenBalance(formattedBalance);
+          } catch (error) {
+              console.error(`Failed to fetch ${bridgeableAsset} balance:`, error);
+          }
       }
-    };
+    };  
   
     // Fetch balance when the account changes
     fetchBalance();
@@ -273,39 +296,39 @@ const ProductDetails = ({ user, users }) => {
     };
   }, []);
 
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (address) {
-        const wbtcAddress = fileServerUrl.includes('test')
-          ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
-          : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
+  // useEffect(() => {
+  //   const fetchBalance = async () => {
+  //     if (address) {
+  //       const wbtcAddress = fileServerUrl.includes('test')
+  //         ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
+  //         : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
 
-        const provider = new ethers.providers.Web3Provider(walletProvider);
-        const signer = provider.getSigner();
-        setSigner(signer);
+  //       const provider = new ethers.providers.Web3Provider(walletProvider);
+  //       const signer = provider.getSigner();
+  //       setSigner(signer);
 
-        // Create WBTC contract instance
-        const wbtcContract = new ethers.Contract(
-          wbtcAddress,
-          ERC20_ABI,
-          provider
-        );
+  //       // Create WBTC contract instance
+  //       const wbtcContract = new ethers.Contract(
+  //         wbtcAddress,
+  //         ERC20_ABI,
+  //         provider
+  //       );
 
-        try {
-          // Get WBTC balance
-          const wbtcBalance = await wbtcContract.balanceOf(address);
+  //       try {
+  //         // Get WBTC balance
+  //         const wbtcBalance = await wbtcContract.balanceOf(address);
 
-          // WBTC has 8 decimals (like BTC), format accordingly
-          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-          setWbtcBalance(formattedBalance); // Set WBTC balance
-        } catch (error) {
-          console.error('Failed to fetch WBTC balance:', error);
-        }
-      }
-    };
+  //         // WBTC has 8 decimals (like BTC), format accordingly
+  //         const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
+  //         setTokenBalance(formattedBalance); // Set WBTC balance
+  //       } catch (error) {
+  //         console.error('Failed to fetch WBTC balance:', error);
+  //       }
+  //     }
+  //   };
 
-    fetchBalance();
-  }, [address, chainId]);
+  //   fetchBalance();
+  // }, [address, chainId]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -977,9 +1000,9 @@ const ProductDetails = ({ user, users }) => {
           signer={signer}
           accountDetails={{
             walletAddress: address,
-            balance: wbtcBalance,
+            balance: tokenBalance,
           }}
-          tokenName="WBTC"
+          tokenName={bridgeableAsset}
         />
       )}
       {borrowModalOpen && (
