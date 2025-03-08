@@ -231,7 +231,7 @@ const ProductDetails = ({ user, users }) => {
     const fetchBalance = async () => {
       if (address && chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id) {
           let tokenAddress, decimals, setBalance;
-  
+          
           if (bridgeableAsset === 'WBTCST') {
               tokenAddress = fileServerUrl.includes('test')
                   ? '0x29f2D40B0605204364af54EC677bD022dA425d03'  // Sepolia Testnet WBTC
@@ -240,13 +240,13 @@ const ProductDetails = ({ user, users }) => {
               setBalance = tokenBalance;
           } else if (bridgeableAsset === 'USDTST') {
               tokenAddress = fileServerUrl.includes('test')
-                  ? '0x110a13FC3efE6A245B50102D2d79B3E76125Ae83'  // Sepolia Testnet USDT
+                  ? '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6'  // Sepolia Testnet USDT
                   : '0xdAC17F958D2ee523a2206206994597C13D831ec7'; // Mainnet USDT
               decimals = 6;
               setBalance = tokenBalance;
           } else if (bridgeableAsset === 'USDCST') {
               tokenAddress = fileServerUrl.includes('test')
-                  ? '0x42bb40bF79730451B11f6De1CbA222F17b87Afd7'  // Sepolia Testnet USDC
+                  ? '0x16dA4541aD1807f4443d92D26044C1147406EB80'  // Sepolia Testnet USDC
                   : '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // Mainnet USDC
               decimals = 6;
               setBalance = tokenBalance;
@@ -264,7 +264,8 @@ const ProductDetails = ({ user, users }) => {
           const provider = new ethers.providers.Web3Provider(walletProvider);
           const signer = provider.getSigner();
           setSigner(signer);
-  
+           console.log("tokenAddress", tokenAddress);
+           
           try {
               // Create ERC20 contract instance
               const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
@@ -1002,7 +1003,7 @@ const ProductDetails = ({ user, users }) => {
             walletAddress: address,
             balance: tokenBalance,
           }}
-          tokenName={bridgeableAsset}
+          tokenName={bridgeableAsset.replace('ST', '')}
         />
       )}
       {borrowModalOpen && (

@@ -138,7 +138,7 @@ const BridgeWalletModal = ({
                 : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
         } else if (tokenName === 'USDTST') {// TODO: add the below addresses
             tokenAddress = fileServerUrl.includes('test')
-                ? '0xYourTestnetUSDTAddress'  // Testnet USDT
+                ? '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6'  // Testnet USDT
                 : '0xYourMainnetUSDTAddress'; // Mainnet USDT
             decimals = 6;
             recipient = fileServerUrl.includes('test')
@@ -146,7 +146,7 @@ const BridgeWalletModal = ({
                 : '0xMainnetRecipientUSDT'; // Mainnet recipient
         } else if (tokenName === 'USDCST') {
             tokenAddress = fileServerUrl.includes('test')
-                ? '0xYourTestnetUSDCAddress'  // Testnet USDC
+                ? '0x16dA4541aD1807f4443d92D26044C1147406EB80'  // Testnet USDC
                 : '0xYourMainnetUSDCAddress'; // Mainnet USDC
             decimals = 6;
             recipient = fileServerUrl.includes('test')
