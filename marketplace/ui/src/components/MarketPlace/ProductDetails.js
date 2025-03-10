@@ -117,7 +117,7 @@ const ProductDetails = ({ user, users }) => {
   const [availableQuantity, setAvailableQuantity] = useState(1);
 
   useEffect(() => {
-    setQty(inventoryDetails?.decimals || decimals ? 0.01 : 1);
+    setQty(decimals ? 0.01 : 1);
   }, [inventoryDetails]);
 
   // Stakeable
@@ -319,13 +319,13 @@ const ProductDetails = ({ user, users }) => {
     setIsModalVisible(false);
   };
 
-  const subtract = (inventoryDetails) => {
+  const subtract = () => {
     if (!isStakeable || !ownerSameAsUser()) {
       let value;
-      if (inventoryDetails?.decimals || decimals) {
+      if (decimals) {
         if (qty - 0.01 > 0) {
           const minValue =
-            1 / Math.pow(10, inventoryDetails?.decimals || decimals || 0);
+            1 / Math.pow(10, decimals || 0);
           setQty((prevQuantity) => {
             const newQuantity = Number(
               parseFloat(Math.max(prevQuantity - 0.01, minValue)).toFixed(4)
@@ -342,10 +342,10 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  const add = (inventoryDetails) => {
+  const add = () => {
     let value;
     if (qty + 1 <= availableQuantity && (!isStakeable || !ownerSameAsUser())) {
-      if (inventoryDetails?.decimals || decimals) {
+      if (decimals) {
         let newValue = Number(qty) + 0.01;
         newValue = parseFloat(newValue.toFixed(4));
         setQty(newValue);
@@ -509,8 +509,8 @@ const ProductDetails = ({ user, users }) => {
     ? 18
     : details?.decimals || 0;
 
-  const onKeyDownPress = (e, inventoryDetails) => {
-    if (inventoryDetails?.decimals || decimals) {
+  const onKeyDownPress = (e) => {
+    if (decimals) {
       // Allow decimals for products with defined decimal places
       if (
         !/[0-9.]/.test(e.key) &&
@@ -767,9 +767,11 @@ const ProductDetails = ({ user, users }) => {
                     id="quantity"
                   >
                     <div
-                      onClick={() => subtract(inventoryDetails)}
+                      onClick={() => subtract()}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        ((isStakeable || ownerSameAsUser()) && ((qty === 1 && !inventoryDetails?.decimals && !decimals) || qty === 0.01))
+                        (isStakeable || ownerSameAsUser()) &&
+                        ((qty === 1 && !decimals) ||
+                          qty === 0.01)
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}
@@ -782,7 +784,7 @@ const ProductDetails = ({ user, users }) => {
                       className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
                       min={
                         1 /
-                        Math.pow(10, inventoryDetails?.decimals || decimals || 0)
+                        Math.pow(10, decimals || 0)
                       }
                       max={availableQuantity}
                       disabled={isStakeable && ownerSameAsUser()}
@@ -794,7 +796,7 @@ const ProductDetails = ({ user, users }) => {
                             )
                           ? inventoryDetails.quantity / 1e18
                           : inventoryDetails.quantity /
-                            Math.pow(10, inventoryDetails?.decimals || decimals || 0)
+                            Math.pow(10, decimals || 0)
                       }
                       controls={false}
                       onChange={(e) => {
@@ -807,14 +809,14 @@ const ProductDetails = ({ user, users }) => {
                           // Restrict decimal places based on inventoryDetails.decimals
                           if (
                             decimal &&
-                            decimal.length > (inventoryDetails?.decimals || decimals || 0)
+                            decimal.length > (decimals || 0)
                           ) {
                             value = parseFloat(
                               integer +
                                 '.' +
                                 decimal.slice(
                                   0,
-                                  inventoryDetails?.decimals || decimals
+                                  decimals
                                 )
                             );
                           } else {
@@ -830,18 +832,16 @@ const ProductDetails = ({ user, users }) => {
                         }
                       }}
                       onKeyDown={(e) => {
-                        onKeyDownPress(e, inventoryDetails);
+                        onKeyDownPress(e);
                       }}
                     />
 
                     <div
-                      onClick={() => add(inventoryDetails)}
+                      onClick={() => add()}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        (isStakeable || ownerSameAsUser()) &&
-                        ((qty === 1 && !inventoryDetails?.decimals && !decimals) ||
-                          qty === 0.01)
-                          ? 'cursor-not-allowed opacity-50'
-                          : 'cursor-pointer'
+                        (!isStakeable || !ownerSameAsUser())
+                          ? ''
+                          : 'cursor-not-allowed opacity-50'
                       }`}
                     >
                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
