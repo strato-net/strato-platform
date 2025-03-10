@@ -299,18 +299,6 @@ const TransferModal = ({
             handleQuantityChange(record.id, new BigNumber(value))
           }
           disabled={index !== transfers.length - 1}
-          formatter={(val) => {
-            if (val === undefined || val === null) return record.quantity;
-            const strVal = val.toString();
-            // Only modify the string if it contains a decimal point
-            if (strVal.includes('.')) {
-              // Remove trailing zeros and remove a trailing decimal point if it remains
-              return strVal.replace(/0+$/, '').replace(/\.$/, '');
-            }
-
-            // For whole numbers, return the string as is
-            return strVal;
-          }}
           // Parser to limit input to decimals
           parser={(val) => {
             if (!val) return record.quantity;
