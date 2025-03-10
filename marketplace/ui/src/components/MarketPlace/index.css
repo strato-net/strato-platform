@@ -8,6 +8,22 @@
   > td {
   padding: 14px;
 }
+.pay-summary-responsive-span {
+  position: absolute;
+  top: 31.8rem;
+  right: 9.7rem;
+  color: rgb(244, 22, 22);
+}
+.pay-summary-span {
+  position: absolute;
+  top: 6.2rem;
+  right: 1rem;
+  color: rgb(244, 22, 22);
+}
+
+.pay-summary {
+  font-size: 0.6rem;
+}
 
 img.ant-image-preview-img {
   display: inline-block;

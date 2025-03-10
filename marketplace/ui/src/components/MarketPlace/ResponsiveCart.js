@@ -6,6 +6,7 @@ import {
   Checkbox,
   Spin,
   Modal,
+  Tooltip
 } from 'antd';
 import { useState, useEffect } from 'react';
 import { Images } from '../../images';
@@ -336,6 +337,10 @@ const ResponsiveCart = ({
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+  const amountWithoutSymbol = totalAmount.split(' ');
+
+  const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
       {contextHolderForModal}
@@ -536,7 +541,16 @@ const ResponsiveCart = ({
             )}
             <div className="flex justify-between items-center mb-3 p-2">
               <span className="text-base font-normal">Order Total :</span>
-              <span className="text-base font-normal">{totalAmount} </span>
+              <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
+                <span className="text-base font-normal">
+                  {totalAmount}{' '}
+                </span>
+                {isDisabled &&
+                  <span className='pay-summary-responsive-span'>
+                    <label className='pay-summary'>Order amount should be greater than $10</label>
+                  </span>
+                }
+              </Tooltip>
             </div>
             <Button
               type="primary"

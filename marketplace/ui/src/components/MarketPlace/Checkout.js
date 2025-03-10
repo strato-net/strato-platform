@@ -521,6 +521,7 @@ const Checkout = () => {
                       removeCartList={removeCartList}
                       openToastOrder={openToastOrder}
                       reserve={filterReserve(e.value.items)}
+                      
                     />
                   </div>
                 </React.Fragment>
