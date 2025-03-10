@@ -46,7 +46,7 @@ const NewTrendingCard = ({
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
 
   const [quantity, setQuantity] = useState(
-    saleQuantity < 1 ? saleQuantity : topSellingProduct?.decimals ? 0.01 : 1
+    saleQuantity < 1 ? saleQuantity : decimals ? 0.01 : 1
   );
 
   const ownerSameAsUser = () => {
@@ -127,43 +127,45 @@ const NewTrendingCard = ({
     setIsModalVisible(false);
   };
 
-  const handleIncrement = (quantity, decimals) => {
-    if (decimals === null) {
-      setQuantity(quantity + 0.01);
+  const handleIncrement = (quantity) => {
+    if (decimals) {
+      let newValue = Number(quantity) + 0.01;
+      newValue = parseFloat(newValue.toFixed(4));
+      setQuantity(newValue);
+    }
+    else {
       if (
         quantity + 1 <= saleQuantity &&
         quantity + 1 <= topSellingProduct.quantity
       ) {
         setQuantity(quantity + 1);
       }
-    } else {
-      let newValue = quantity + 0.01;
-      newValue = parseFloat(newValue.toFixed(4));
-      setQuantity(newValue);
     }
   };
 
-  const handleDecrement = (quantity, decimals) => {
-    if (decimals === null) {
-      setQuantity(Math.max(quantity - 1, 1));
-    } else {
-      if (quantity > 0) {
-        let newValue = quantity - 0.01;
-        newValue = parseFloat(newValue.toFixed(4));
-        setQuantity(newValue);
+  const handleDecrement = (quantity) => {
+    if (decimals) {
+      const minValue = 1 / Math.pow(10, decimals || 0);
+      if (quantity - 0.01 > 0) {
+        setQuantity((prevQuantity) => {
+            const newQuantity = parseFloat(
+              Math.max(prevQuantity - 0.01, minValue)
+            ).toFixed(4);
+            return Number(newQuantity);
+        });
+      }
+    }
+    else {
+      if (quantity - 1 > 0) {
+        setQuantity(Math.max(quantity - 1, 1));
       }
     }
   };
 
-  const onKeyDownPress = (e, topSellingProduct) => {
-    if (topSellingProduct.decimals === null) {
-      // Prevent decimals
-      if (e.key === '.' || e.key === ',') {
-        e.preventDefault();
-      }
-      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+  const onKeyDownPress = (e) => {
+    if (decimals) {
       if (
-        !/^[0-9]$/.test(e.key) &&
+        !/[0-9.]/.test(e.key) &&
         e.key !== 'Backspace' &&
         e.key !== 'Delete' &&
         e.key !== 'ArrowLeft' &&
@@ -171,10 +173,14 @@ const NewTrendingCard = ({
       ) {
         e.preventDefault();
       }
-    } else {
-      // Allow decimals for products with defined decimal places
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
       if (
-        !/[0-9.]/.test(e.key) &&
+        !/^[0-9]$/.test(e.key) &&
         e.key !== 'Backspace' &&
         e.key !== 'Delete' &&
         e.key !== 'ArrowLeft' &&
@@ -346,12 +352,12 @@ const NewTrendingCard = ({
           <div className="flex gap-3 p-1 bg-white">
             <Typography
               className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity === 1
+                (quantity === 1 && !decimals) || quantity === 0.01
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                handleDecrement(quantity, topSellingProduct.decimals);
+                handleDecrement(quantity);
               }}
             >
               -
@@ -363,7 +369,7 @@ const NewTrendingCard = ({
               bordered={false}
               value={quantity}
               max={saleQuantity}
-              min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
+              min={1 / Math.pow(10, decimals || 0)}
               onChange={(e) => {
                 if (!isNaN(e)) {
                   let value = e.toString();
@@ -374,12 +380,12 @@ const NewTrendingCard = ({
                   // Restrict decimal places based on product decimals
                   if (
                     decimal &&
-                    decimal.length > (topSellingProduct.decimals || 0)
+                    decimal.length > (decimals || 0)
                   ) {
                     value = parseFloat(
                       integer +
                         '.' +
-                        decimal.slice(0, topSellingProduct.decimals)
+                        decimal.slice(0, decimals)
                     );
                   } else {
                     value = parseFloat(value);
@@ -400,7 +406,7 @@ const NewTrendingCard = ({
                 }
               }}
               onKeyDown={(e) => {
-                onKeyDownPress(e, topSellingProduct);
+                onKeyDownPress(e);
               }}
               controls={false}
             />
@@ -412,7 +418,7 @@ const NewTrendingCard = ({
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                handleIncrement(quantity, topSellingProduct.decimals);
+                handleIncrement(quantity);
               }}
             >
               +
