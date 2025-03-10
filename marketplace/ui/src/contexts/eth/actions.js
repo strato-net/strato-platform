@@ -5,25 +5,9 @@ const actionDescriptors = {
   resetMessage: 'reset_message',
   setMessage: 'set_message',
 
-  fetchETHSTAddress: 'fetch_ethst_address',
-  fetchETHSTAddressSuccessful: 'fetch_ethst_address_successful',
-  fetchETHSTAddressFailed: 'fetch_ethst_address_failed',
-
-  fetchWBTCSTAddress: 'fetch_wbtcst_address',
-  fetchWBTCSTAddressSuccessful: 'fetch_wbtcst_address_successful',
-  fetchWBTCSTAddressFailed: 'fetch_wbtcst_address_failed',
-
-  fetchUSDTSTAddress: 'fetch_usdtst_address',
-  fetchUSDTSTAddressSuccessful: 'fetch_usdtst_address_successful',
-  fetchUSDTSTAddressFailed: 'fetch_usdtst_address_failed',
-
-  fetchUSDCSTAddress: 'fetch_usdcst_address',
-  fetchUSDCSTAddressSuccessful: 'fetch_usdcst_address_successful',
-  fetchUSDCSTAddressFailed: 'fetch_usdcst_address_failed',
-
-  fetchPAXGSTAddress: 'fetch_paxgst_address',
-  fetchPAXGSTAddressSuccessful: 'fetch_paxgst_address_successful',
-  fetchPAXGSTAddressFailed: 'fetch_paxgst_address_failed',
+  fetchBridgeableAddress: 'fetch_bridgeable_address',
+  fetchBridgeableAddressSuccessful: 'fetch_bridgeable_address_successful',
+  fetchBridgeableAddressFailed: 'fetch_bridgeable_address_failed',
 
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
@@ -42,10 +26,10 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchETHSTAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchETHSTAddress });
+  fetchBridgeableAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchBridgeableAddress });
     try {
-      let response = await fetch(`${apiUrl}/tokens/address`, {
+      let response = await fetch(`${apiUrl}/tokens/bridgeableAddress`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -56,201 +40,34 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchETHSTAddressFailed,
-          payload: 'Error while fetching ETHST address',
+          type: actionDescriptors.fetchBridgeableAddressFailed,
+          payload: 'Error while fetching Bridgeable address',
         });
         return null;
       }
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchETHSTAddressSuccessful,
+          type: actionDescriptors.fetchBridgeableAddressSuccessful,
           payload: body?.data,
         });
         return body.data;
       }
 
       dispatch({
-        type: actionDescriptors.fetchETHSTAddressFailed,
-        payload: 'Error while fetching ETHST address',
+        type: actionDescriptors.fetchBridgeableAddressFailed,
+        payload: 'Error while fetching Bridgeable address',
       });
       return null;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchETHSTAddressFailed,
-        payload: 'Error while fetching ETHST address',
+        type: actionDescriptors.fetchBridgeableAddressFailed,
+        payload: 'Error while fetching Bridgeable address',
       });
       return null;
     }
   },
 
-  fetchWBTCSTAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchWBTCSTAddress });
-    try {
-      let response = await fetch(`${apiUrl}/tokens/wbtcstAddress`, {
-        method: HTTP_METHODS.GET,
-        credentials: 'same-origin',
-      });
-
-      const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.fetchWBTCSTAddressFailed,
-          payload: 'Error while fetching WBTCST address',
-        });
-        return null;
-      }
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchWBTCSTAddressSuccessful,
-          payload: body?.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchWBTCSTAddressFailed,
-        payload: 'Error while fetching WBTCST address',
-      });
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchWBTCSTAddressFailed,
-        payload: 'Error while fetching WBTCST address',
-      });
-      return null;
-    }
-  },
-
-  fetchUSDTSTAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchUSDTSTAddress });
-    try {
-      let response = await fetch(`${apiUrl}/tokens/usdtstAddress`, {
-        method: HTTP_METHODS.GET,
-        credentials: 'same-origin',
-      });
-
-      const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.fetchUSDTSTAddressFailed,
-          payload: 'Error while fetching USDTST address',
-        });
-        return null;
-      }
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchUSDTSTAddressSuccessful,
-          payload: body?.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchUSDTSTAddressFailed,
-        payload: 'Error while fetching USDTST address',
-      });
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchUSDTSTAddressFailed,
-        payload: 'Error while fetching USDTST address',
-      });
-      return null;
-    }
-  },
-
-  fetchUSDCSTAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchUSDCSTAddress });
-    try {
-      let response = await fetch(`${apiUrl}/tokens/usdcstAddress`, {
-        method: HTTP_METHODS.GET,
-        credentials: 'same-origin',
-      });
-
-      const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.fetchUSDCSTAddressFailed,
-          payload: 'Error while fetching USDCST address',
-        });
-        return null;
-      }
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchUSDCSTAddressSuccessful,
-          payload: body?.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchUSDCSTAddressFailed,
-        payload: 'Error while fetching USDCST address',
-      });
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchUSDCSTAddressFailed,
-        payload: 'Error while fetching USDCST address',
-      });
-      return null;
-    }
-  },
-
-  fetchPAXGSTAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchPAXGSTAddress });
-    try {
-      let response = await fetch(`${apiUrl}/tokens/paxgstAddress`, {
-        method: HTTP_METHODS.GET,
-        credentials: 'same-origin',
-      });
-
-      const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.fetchPAXGSTAddressFailed,
-          payload: 'Error while fetching PAXGST address',
-        });
-        return null;
-      }
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchPAXGSTAddressSuccessful,
-          payload: body?.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchPAXGSTAddressFailed,
-        payload: 'Error while fetching PAXGST address',
-      });
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchPAXGSTAddressFailed,
-        payload: 'Error while fetching PAXGST address',
-      });
-      return null;
-    }
-  },
 
   addHash: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.addHash });

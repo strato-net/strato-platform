@@ -30,7 +30,8 @@ const NewTrendingCard = ({
   const location = useLocation();
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = useEthState();
+  const { bridgeableAddress } = useEthState();
+    const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 

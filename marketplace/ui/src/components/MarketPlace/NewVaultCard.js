@@ -19,15 +19,12 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const ethDispatch = useEthDispatch();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = useEthState();
+  const { bridgeableAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      ethActions.fetchETHSTAddress(ethDispatch);
-      ethActions.fetchWBTCSTAddress(ethDispatch);
-      ethActions.fetchUSDTSTAddress(ethDispatch);
-      ethActions.fetchUSDCSTAddress(ethDispatch);
-      ethActions.fetchPAXGSTAddress(ethDispatch);
+      ethActions.fetchBridgeableAddress(ethDispatch);
     };
 
     fetchAddresses();

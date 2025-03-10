@@ -14,73 +14,19 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message,
       };
-    case actionDescriptors.fetchETHSTAddress:
+    case actionDescriptors.fetchBridgeableAddress:
       return {
         ...state,
       };
-    case actionDescriptors.fetchETHSTAddressSuccessful:
+    case actionDescriptors.fetchBridgeableAddressSuccessful:
       return {
         ...state,
-        ethstAddress: action.payload,
+        bridgeableAddress: action.payload,
       };
-    case actionDescriptors.fetchETHSTAddressFailed:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchWBTCSTAddress:
+    case actionDescriptors.fetchBridgeableAddressFailed:
       return {
         ...state,
       };
-    case actionDescriptors.fetchWBTCSTAddressSuccessful:
-      return {
-        ...state,
-        wbtcstAddress: action.payload,
-      };
-    case actionDescriptors.fetchWBTCSTAddressFailed:
-      return {
-        ...state,
-      };
-
-    case actionDescriptors.fetchUSDTSTAddress:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchUSDTSTAddressSuccessful:
-      return {
-        ...state,
-        usdtstAddress: action.payload,
-      };
-    case actionDescriptors.fetchUSDTSTAddressFailed:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchUSDCSTAddress:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchUSDCSTAddressSuccessful:
-      return {
-        ...state,
-        usdcstAddress: action.payload,
-      };
-    case actionDescriptors.fetchUSDCSTAddressFailed:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchPAXGSTAddress:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchPAXGSTAddressSuccessful:
-      return {
-        ...state,
-        paxgstAddress: action.payload,
-      };
-    case actionDescriptors.fetchPAXGSTAddressFailed:
-      return {
-        ...state,
-      };
-
     case actionDescriptors.addHash:
       return {
         ...state,

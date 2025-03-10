@@ -44,9 +44,9 @@ const GlobalTransaction = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
-  UsdtstAddress,
-  UsdcstAddress,
-  PaxgstAddress,
+  usdtstAddress,
+  usdcstAddress,
+  paxgstAddress,
   stratsAddress,
 }) => {
   const USDSTIcon = (
@@ -168,9 +168,9 @@ const GlobalTransaction = ({
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
     const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    const isUsdtst = data?.assetOriginAddress === UsdtstAddress;
-    const isUsdcst = data?.assetOriginAddress === UsdcstAddress;
-    const isPaxgst = data?.assetOriginAddress === PaxgstAddress;
+    const isUsdtst = data?.assetOriginAddress === usdtstAddress;
+    const isUsdcst = data?.assetOriginAddress === usdcstAddress;
+    const isPaxgst = data?.assetOriginAddress === paxgstAddress;
 
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
@@ -478,6 +478,9 @@ const GlobalTransaction = ({
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
               wbtcstAddress={wbtcstAddress}
+              usdtstAddress={usdtstAddress}
+              usdcstAddress={usdcstAddress}
+              paxgstAddress={paxgstAddress}
               stratsAddress={stratsAddress}
             />
           </Row>

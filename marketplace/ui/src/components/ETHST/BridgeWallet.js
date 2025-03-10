@@ -138,11 +138,11 @@ const BridgeWalletModal = ({
                 : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
         } else if (tokenName === 'USDTST') {// TODO: add the below addresses
             tokenAddress = fileServerUrl.includes('test')
-                ? '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6'  // Testnet USDT
+                ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'  // Testnet USDT
                 : '0xYourMainnetUSDTAddress'; // Mainnet USDT
             decimals = 6;
             recipient = fileServerUrl.includes('test')
-                ? '0xTestnetRecipientUSDT'  // Testnet recipient
+                ? '0xf3e2066407c5605d961dc77a5398f9e8e3411767'  // Testnet recipient
                 : '0xMainnetRecipientUSDT'; // Mainnet recipient
         } else if (tokenName === 'USDCST') {
             tokenAddress = fileServerUrl.includes('test')
@@ -160,12 +160,12 @@ const BridgeWalletModal = ({
             recipient = fileServerUrl.includes('test')
                 ? '0xTestnetRecipientPAXG'  // Testnet recipient
                 : '0xMainnetRecipientPAXG'; // Mainnet recipient
-        }
+        }        
         
         if (tokenAddress) {
             const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
             const tokenAmount = ethers.utils.parseUnits(quantity.toString(), decimals);
-        
+            
             tx = await tokenContract.transfer(recipient, tokenAmount);
         } else {
           tx = await signer.sendTransaction({

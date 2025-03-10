@@ -37,11 +37,7 @@ const Transaction = ({ user }) => {
         await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
           marketplaceDispatch
         );
-      await ethAcions.fetchETHSTAddress(ethDispatch);
-      await ethAcions.fetchWBTCSTAddress(ethDispatch);
-      await ethAcions.fetchUSDTSTAddress(ethDispatch);
-      await ethAcions.fetchUSDCSTAddress(ethDispatch);
-      await ethAcions.fetchPAXGSTAddress(ethDispatch);
+      await ethAcions.fetchBridgeableAddress(ethDispatch);
   
       setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);

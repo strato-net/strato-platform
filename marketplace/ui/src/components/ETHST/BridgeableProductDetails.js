@@ -1003,7 +1003,7 @@ const ProductDetails = ({ user, users }) => {
             walletAddress: address,
             balance: tokenBalance,
           }}
-          tokenName={bridgeableAsset.replace('ST', '')}
+          tokenName={bridgeableAsset}
         />
       )}
       {borrowModalOpen && (

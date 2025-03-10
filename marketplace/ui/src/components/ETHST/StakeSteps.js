@@ -73,7 +73,7 @@ const StakeSteps = ({name}) => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Connect to your Ethereum wallet and bridge your {name.replace(/ST/g, '')} to Mercata’s
+              Connect to your Ethereum wallet and bridge your {name.replace(/st/gi, '')} to Mercata’s
               equivalent token {name} to begin staking!
             </p>
           </div>

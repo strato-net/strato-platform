@@ -67,7 +67,8 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -184,12 +185,18 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    if (inventory.originAddress === ethstAddress) {
+    const isEthst = inventory.originAddress === ethstAddress;
+    const isWbtcst = inventory.originAddress === wbtcstAddress;
+    const isUsdtst = inventory.originAddress === usdtstAddress;
+    const isUsdcst = inventory.originAddress === usdcstAddress;
+    const isPaxgst = inventory.originAddress === paxgstAddress;
+
+    if (isEthst) {
       navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (inventory.originAddress === wbtcstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address).replace(':bridgeableAsset', inventory.name)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {

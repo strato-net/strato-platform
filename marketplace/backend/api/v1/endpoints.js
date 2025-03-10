@@ -108,11 +108,8 @@ export const Art = {
 export const Tokens = {
   prefix: '/tokens',
   create: '/',
-  getETHSTAddress: '/address',
-  getWBTCSTAddress: '/wbtcstAddress',
-  getUSDTSTAddress: '/usdtstAddress',
-  getUSDCSTAddress: '/usdcstAddress',
-  getPAXGSTAddress: '/paxgstAddress',
+  getBridgeableAddress: '/bridgeableAddress',
+
   addHash: '/addHash',
   bridgeOut: '/bridgeOut',
 };

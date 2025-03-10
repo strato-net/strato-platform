@@ -20,49 +20,9 @@ class TokensController {
     }
   }
 
-  static async getETHSTAddress(_, res, next) {
+  static async getBridgeableAddress(_, res, next) {
     try {
-      const address = await tokensJs.getETHSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getWBTCSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getWBTCSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getUSDTSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getUSDTSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getUSDCSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getUSDCSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getPAXGSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getPAXGSTAddress();
+      const address = await tokensJs.getBridgeableAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {

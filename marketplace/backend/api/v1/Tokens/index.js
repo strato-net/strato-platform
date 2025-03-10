@@ -14,38 +14,10 @@ router.post(
 );
 
 router.get(
-  Tokens.getETHSTAddress,
+  Tokens.getBridgeableAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
-  TokensController.getETHSTAddress
-);
-
-router.get(
-  Tokens.getWBTCSTAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getWBTCSTAddress
-);
-
-router.get(
-  Tokens.getUSDTSTAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getUSDTSTAddress
-);
-
-router.get(
-  Tokens.getUSDCSTAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getUSDCSTAddress
-);
-
-router.get(
-  Tokens.getPAXGSTAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getPAXGSTAddress
+  TokensController.getBridgeableAddress
 );
 
 router.post(

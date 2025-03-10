@@ -200,51 +200,13 @@ function getCataAddress() {
   }
 }
 
-function getETHSTAddress() {
+function getBridgeableAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodETHSTAddress;
+      const { prodETHSTAddress, prodWBTCSTAddress, prodUSDTSTAddress, prodUSDCSTAddress, prodPAXGSTAddress } = constants;
+    return { ethstAddress: prodETHSTAddress, wbtcstAddress:prodWBTCSTAddress, usdtstAddress:prodUSDTSTAddress, usdcstAddress:prodUSDCSTAddress, paxgstAddress:prodPAXGSTAddress };
   } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetETHSTAddress;
-  } else {
-    return constants.prodETHSTAddress;
-  }
-}
-
-function getWBTCSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodWBTCSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetWBTCSTAddress;
-  } else {
-    return constants.prodWBTCSTAddress;
-  }
-}
-
-function getUSDTSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodUSDTSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetUSDTSTAddress;
-  } else {
-    return constants.prodUSDTSTAddress;
-  }
-}
-
-function getUSDCSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodUSDCSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetUSDCSTAddress;
-  } else {
-    return constants.prodUSDCSTAddress;
-  }
-}
-
-function getPAXGSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodPAXGSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetPAXGSTAddress;
+    const { testnetETHSTAddress, testnetWBTCSTAddress, testnetUSDTSTAddress, testnetUSDCSTAddress, testnetPAXGSTAddress } = constants;
+    return { ethstAddress:testnetETHSTAddress, wbtcstAddress:testnetWBTCSTAddress, usdtstAddress:testnetUSDTSTAddress, usdcstAddress:testnetUSDCSTAddress, paxgstAddress:testnetPAXGSTAddress }
   } else {
     return constants.prodPAXGSTAddress;
   }
@@ -271,10 +233,6 @@ export default {
   burnETHST,
   getUSDSTAddress,
   getCataAddress,
-  getETHSTAddress,
-  getStratsAddress,
-  getWBTCSTAddress,
-  getUSDTSTAddress,
-  getUSDCSTAddress,
-  getPAXGSTAddress,
+  getBridgeableAddress,
+  getStratsAddress
 };

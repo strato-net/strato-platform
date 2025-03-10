@@ -82,11 +82,7 @@ const CategoryProductList = ({ user }) => {
   const isLoading = isMarketplaceLoading;
 
   useEffect(() => {
-    ethActions.fetchETHSTAddress(ethDispatch);
-    ethActions.fetchWBTCSTAddress(ethDispatch);
-    ethActions.fetchUSDTSTAddress(ethDispatch);
-    ethActions.fetchUSDCSTAddress(ethDispatch);
-    ethActions.fetchPAXGSTAddress(ethDispatch);
+    ethActions.fetchBridgeableAddress(ethDispatch);
   });
 
   useEffect(() => {
