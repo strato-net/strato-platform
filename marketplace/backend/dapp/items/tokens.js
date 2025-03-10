@@ -208,7 +208,7 @@ function getBridgeableAddress() {
     const { testnetETHSTAddress, testnetWBTCSTAddress, testnetUSDTSTAddress, testnetUSDCSTAddress, testnetPAXGSTAddress } = constants;
     return { ethstAddress:testnetETHSTAddress, wbtcstAddress:testnetWBTCSTAddress, usdtstAddress:testnetUSDTSTAddress, usdcstAddress:testnetUSDCSTAddress, paxgstAddress:testnetPAXGSTAddress }
   } else {
-    return constants.prodPAXGSTAddress;
+    return { ethstAddress: prodETHSTAddress, wbtcstAddress:prodWBTCSTAddress, usdtstAddress:prodUSDTSTAddress, usdcstAddress:prodUSDCSTAddress, paxgstAddress:prodPAXGSTAddress };
   }
 }
 
