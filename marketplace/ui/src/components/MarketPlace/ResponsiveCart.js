@@ -404,10 +404,10 @@ const ResponsiveCart = ({
 
                           if (
                             decimal &&
-                            decimal.length > (product.decimals || 0)
+                            decimal.length > (product?.decimals || 0)
                           ) {
                             value = parseFloat(
-                              integer + '.' + decimal.slice(0, product.decimals)
+                              integer + '.' + decimal.slice(0, product?.decimals)
                             );
                           } else {
                             value = parseFloat(value);

@@ -52,6 +52,16 @@ const Checkout = () => {
 
   const [mapData, setmapData] = useState([]);
 
+  const calculateDecimals = (item) => {
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
+      item.product.originAddress
+    )
+      ? 18
+      : item.product.decimals || 0;
+
+    return decimals;
+  };
+ 
   const calculateTax = (item) => {
     const decimals = assetsWithEighteenDecimalPlaces.includes(
       item.product.originAddress
@@ -168,7 +178,8 @@ const Checkout = () => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-          if (product?.decimals) {
+        const decimals = calculateDecimals(element);
+          if (product?.decimals || decimals) {
             if (items[index].qty - 0.01 > 0) {
               items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
             }
@@ -187,9 +198,10 @@ const Checkout = () => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
+        const decimals = calculateDecimals(element);
         const availableQuantity = product.quantity ? product.quantity : 1;
         if (items[index].qty + 1 <= availableQuantity) {
-          if (product.decimals) {
+          if (product?.decimals || decimals) {
             items[index].qty = parseFloat((Number(items[index].qty) + 0.01).toFixed(4));
           }
           else {
@@ -267,7 +279,19 @@ const Checkout = () => {
   };
 
   const onKeyDownPress = (e, topSellingProduct) => {
-    if (topSellingProduct.decimals === null) {
+    if (topSellingProduct?.decimals) {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight"
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
       // Prevent decimals
       if (e.key === "." || e.key === ",") {
         e.preventDefault();
@@ -278,17 +302,6 @@ const Checkout = () => {
           e.key !== "Delete" && 
           e.key !== "ArrowLeft" && 
           e.key !== "ArrowRight") {
-        e.preventDefault();
-      }
-    } else {
-      // Allow decimals for products with defined decimal places
-      if (
-        !/[0-9.]/.test(e.key) &&
-        e.key !== "Backspace" &&
-        e.key !== "Delete" &&
-        e.key !== "ArrowLeft" &&
-        e.key !== "ArrowRight"
-      ) {
         e.preventDefault();
       }
     }
