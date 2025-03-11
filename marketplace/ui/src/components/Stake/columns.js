@@ -281,7 +281,7 @@ export const stakeColumns = (
   limit,
   offset,
   reserves,
-  USDSTAddress,
+  bridgeableTokens,
   assetsWithEighteenDecimalPlaces,
   navigate
 ) => {
@@ -458,6 +458,7 @@ export const stakeColumns = (
           debouncedSearchTerm={''}
           user={user}
           reserves={reserves}
+          bridgeableTokens={bridgeableTokens}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       ),
