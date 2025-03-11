@@ -27,13 +27,16 @@ library:
   - common-log
   - containers
   - deepseq
+  - esqueleto
   - ethereum-rlp
   - format
   - generic-arbitrary
   - hedis
   - labeled-error
   - mtl
+  - persistent
   - random
+  - sql-monad
   - strato-model
   - strato-redis-blockdb
   - swagger2
