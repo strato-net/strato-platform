@@ -414,7 +414,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                 <div className="p-4 rounded-lg shadow-md w-full">
                   <div className="flex justify-between items-center mb-6">
                     <span className="text-base font-normal">Order Total :</span>
-                    <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
+                    <Tooltip title={isDisabled ? "Minimum Credit Card Order Size $10.Please increase the quantity to proceed." : ""}>
                       <span className="text-base font-normal">
                         {totalAmount}{' '}
                       </span>

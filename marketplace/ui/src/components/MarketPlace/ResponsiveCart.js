@@ -541,7 +541,7 @@ const ResponsiveCart = ({
             )}
             <div className="flex justify-between items-center mb-3 p-2">
               <span className="text-base font-normal">Order Total :</span>
-              <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
+              <Tooltip title={isDisabled ? "Minimum Credit Card Order Size $10. Please increase the quantity to proceed." : ""}>
                 <span className="text-base font-normal">
                   {totalAmount}{' '}
                 </span>
