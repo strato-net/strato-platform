@@ -28,7 +28,9 @@ import PurchasableStakeItems from './PurchasableStakeItems';
 import StakeSteps from './StakeSteps';
 import StakeInventoryCard from '../Inventory/StakeInventoryCard';
 import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import { actions as categoryActions } from '../../contexts/category/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
 
@@ -103,6 +105,7 @@ const { Title } = Typography;
 const Stake = ({ user }) => {
   const inventoryDispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const ethDispatch = useEthDispatch();
   const {
     reserves,
     inventories,
@@ -116,6 +119,12 @@ const Stake = ({ user }) => {
   const { categorys } = useCategoryState();
   const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
+  const {
+    message: ethMsg,
+    success: ethSuccess,
+    ethstAddress,
+    wbtcstAddress,
+  } = useEthState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -141,6 +150,8 @@ const Stake = ({ user }) => {
       }
     }
     categoryActions.fetchCategories(categoryDispatch);
+    ethActions.fetchETHSTAddress(ethDispatch);
+    ethActions.fetchWBTCSTAddress(ethDispatch);
   }, [user]);
 
   useEffect(() => {
@@ -168,6 +179,24 @@ const Stake = ({ user }) => {
       api.error({
         message: message,
         onClose: inventoryActions.resetMessage(inventoryDispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
+  const openEthToast = (placement) => {
+    if (ethSuccess) {
+      api.success({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
         placement,
         key: 2,
       });
@@ -216,7 +245,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          USDSTAddress,
+          [ethstAddress, wbtcstAddress],
           assetsWithEighteenDecimalPlaces,
           navigate
         )}
@@ -338,6 +367,7 @@ const Stake = ({ user }) => {
         </div>
       </div>
       {message && openToast('bottom')}
+      {ethMsg && openEthToast('bottom')}
     </>
   );
 };

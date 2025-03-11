@@ -1,5 +1,6 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { actions } from '../../contexts/inventory/actions';
 import { useInventoryDispatch } from '../../contexts/inventory';
@@ -28,7 +29,7 @@ const BridgeWalletModal = ({
   signer,
   tokenName,
   tabKey = '1',
-  inventorypageDetails,
+  pageDetails,
 }) => {
   const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
   const [ethereumAddress, setEthereumAddress] = useState('');
@@ -37,6 +38,9 @@ const BridgeWalletModal = ({
   const inventoryDispatch = useInventoryDispatch();
   const { user } = useAuthenticateState();
   const { isAddingHash, isBridgingOut } = useEthState();
+
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   const ethToMercataColumns = [
     {
@@ -118,6 +122,36 @@ const BridgeWalletModal = ({
     </>
   );
 
+  /**
+   * Refresh the inventory and reserve data after a successful stake/unstake action.
+   */
+  const refreshDataAfterAction = async () => {
+    if (
+      queryParams.get('st') === 'true' ||
+      window.location.pathname === '/stake'
+    ) {
+      await actions.fetchInventory(
+        inventoryDispatch,
+        pageDetails.limit,
+        pageDetails.offset,
+        '',
+        pageDetails.categoryName,
+        pageDetails.reserves.map((reserve) => reserve.assetRootAddress)
+      );
+      await actions.getAllReserve(inventoryDispatch);
+      await actions.getUserCataRewards(inventoryDispatch);
+    } else {
+      await actions.fetchInventory(
+        inventoryDispatch,
+        pageDetails.limit,
+        pageDetails.offset,
+        '',
+        pageDetails.categoryName,
+        ''
+      );
+    }
+  };
+
   const handleSubmit = async () => {
     setLoader(true);
     let tx;
@@ -178,18 +212,11 @@ const BridgeWalletModal = ({
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
       if (isDone && tabKey != '1') {
-        await actions.fetchInventory(
-          inventoryDispatch,
-          inventorypageDetails.limit,
-          inventorypageDetails.offset,
-          '',
-          inventorypageDetails.categoryName,
-          ''
-        );
+        refreshDataAfterAction();
       }
     } catch (error) {
       ethActions.setMessage(ethDispatch, error.code);
-      console.error("Transaction failed:", error);
+      console.error('Transaction failed:', error);
     } finally {
       setLoader(false);
       handleCancel();
