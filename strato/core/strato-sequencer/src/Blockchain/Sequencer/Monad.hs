@@ -316,7 +316,7 @@ fuseChannels = do
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift)
     <$> mergeSources
-      [ conduitBatchSource "conduitSource" "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
+      [ conduitBatchSource "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
       4096 -- 🙏
