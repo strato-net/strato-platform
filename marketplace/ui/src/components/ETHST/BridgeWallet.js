@@ -103,6 +103,37 @@ const BridgeWalletModal = ({
           pagination={false}
         />
       </div>
+      <div className="flex flex-col gap-[18px] md:hidden">
+        <div>
+          {' '}
+          <p className="text-[#202020] font-medium text-sm">
+            {tokenName} Available
+          </p>
+          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+            <p> {accountDetails.balance} </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+          <div>
+            <InputNumber
+              className="w-full h-9"
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+            />
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Wallet Address</p>
+          <div>
+            <Input
+              className="w-full h-9"
+              disabled={true}
+              value={accountDetails.walletAddress}
+            />
+          </div>
+        </div>
+      </div>
     </>
   );
 
@@ -189,7 +220,7 @@ const BridgeWalletModal = ({
       }
     } catch (error) {
       ethActions.setMessage(ethDispatch, error.code);
-      console.error("Transaction failed:", error);
+      console.error('Transaction failed:', error);
     } finally {
       setLoader(false);
       handleCancel();
@@ -202,17 +233,49 @@ const BridgeWalletModal = ({
       onCancel={handleCancel}
       width={1000}
       footer={[
-        <div className="flex justify-center md:block">
-          <Button
-            type="primary"
-            className="w-32 h-9"
-            onClick={handleSubmit}
-            disabled={quantity <= 0 || quantity > accountDetails.balance}
-            loading={isAddingHash || loader || isBridgingOut}
-          >
-            Bridge
-          </Button>
-        </div>,
+        <>
+          <div className="md:flex justify-between items-center w-full hidden">
+            <div className="max-w-[60%] text-left">
+              <p className="text-xs">
+                <b>Note:</b> Bridged tokens will be automatically staked in the
+                app. Please allow a few minutes for the staking process to
+                complete after bridging.
+              </p>
+            </div>
+
+            <div>
+              <Button
+                type="primary"
+                className="w-32 h-9"
+                onClick={handleSubmit}
+                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                loading={isAddingHash || loader || isBridgingOut}
+              >
+                Bridge
+              </Button>
+            </div>
+          </div>
+          <div className="md:hidden">
+            <div className="w-full flex justify-center mt-8">
+              <Button
+                type="primary"
+                className="w-full h-9"
+                onClick={handleSubmit}
+                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                loading={isAddingHash || loader || isBridgingOut}
+              >
+                Bridge
+              </Button>
+            </div>
+            <div className="w-full text-left mt-4">
+              <p className="text-xs">
+                <b>Note:</b> Bridged tokens will be automatically staked in the
+                app. Please allow a few minutes for the staking process to
+                complete after bridging.
+              </p>
+            </div>
+          </div>
+        </>,
       ]}
     >
       <Tabs activeKey="1">
