@@ -36,6 +36,7 @@ import Blockchain.HeaderCache
 import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
+import Blockchain.Options
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
@@ -135,11 +136,10 @@ handleEvents peer = awaitForever $ \case
     start' <- case dir of
       Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
       Forward -> return start
-    mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
     -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
     -- 3/4s of the blocks will be dropped when creating the blockheaders
     -- so we overcompensate here.
-    let count = (1 + skip') * min mrh max'
+    let count = (1 + skip') * min flags_maxReturnedHeaders max'
     chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
@@ -164,8 +164,7 @@ handleEvents peer = awaitForever $ \case
                 if num > fromIntegral max'
                   then num - fromIntegral max'
                   else 1
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        let count = (1 + skip') * min mrh (fromIntegral max')
+        let count = (1 + skip') * min flags_maxReturnedHeaders (fromIntegral max')
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
@@ -199,8 +198,7 @@ handleEvents peer = awaitForever $ \case
     yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
   MsgEvt (GetBlockBodies shas') -> do
     lift stampActionTimestamp
-    mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-    let shas = take mrh shas'
+    let shas = take flags_maxReturnedHeaders shas'
     lift (getUntilMissing shas) >>= \bodies -> do
       yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
     where
@@ -372,8 +370,7 @@ handleEvents peer = awaitForever $ \case
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        let count = min mrh . fromIntegral $ end - start + 1
+        let count = min flags_maxReturnedHeaders . fromIntegral $ end - start + 1
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start ..]
         when (null chain) $
           $logErrorS "handleEvents/P2pPushBlocks" . T.pack $
@@ -392,9 +389,8 @@ handleEvents peer = awaitForever $ \case
       Just oldTS -> do
         ts <- liftIO getCurrentTime
         let diffTime = ts `diffUTCTime` oldTS
-        maxTime <- fromIntegral . unConnectionTimeout <$> lift (access (Proxy @ConnectionTimeout))
-        liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
-        when (diffTime > maxTime) $ do
+        liftIO $ setTitle $ "timer: " ++ show (fromIntegral flags_connectionTimeout - diffTime)
+        when (diffTime > fromIntegral flags_connectionTimeout) $ do
           yieldR $ Disconnect UselessPeer
           liftIO $ setTitle "timer timed out!"
           throwIO PeerNonResponsive
@@ -409,15 +405,13 @@ handleEvents peer = awaitForever $ \case
 
 syncFetch ::
   ( MonadIO m,
-    Modifiable ActionTimestamp m,
-    Accessible MaxReturnedHeaders m
+    Modifiable ActionTimestamp m
   ) =>
   Direction ->
   Integer ->
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
-  mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-  yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
+  yieldR $ GetBlockHeaders (BlockNumber num) flags_maxReturnedHeaders 0 d
   lift stampActionTimestamp
 
 shouldRespond :: PPeer -> Origin.TXOrigin -> Bool

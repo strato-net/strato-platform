@@ -123,8 +123,7 @@ handleMsgClientConduit myId peer = do
       $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ show syncTask
       if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
         then do
-          mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) mrh 0 Forward
+          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
         else do
           $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block, marking the new chiliad as 'NotReady'"
           lift $ setSyncTaskNotReady host
@@ -183,8 +182,7 @@ handleMsgServerConduit myPubkey peer = do
       let Host host = pPeerHost peer
       syncTask <- lift $ getNewSyncTask host
       $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ show syncTask
-      mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) mrh 0 Forward
+      yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)

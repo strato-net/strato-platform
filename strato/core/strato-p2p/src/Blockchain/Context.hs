@@ -23,8 +23,6 @@ module Blockchain.Context
     , RunsClient(..)
     , RunsServer(..)
     , ActionTimestamp(..)
-    , MaxReturnedHeaders(..)
-    , ConnectionTimeout(..)
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
@@ -141,8 +139,6 @@ newtype Outbound a = Outbound {unOutbound :: a}
 data Config = Config
   { configSQLDB :: SQLDB,
     configRedisBlockDB :: RBDB.RedisConnection,
-    configConnectionTimeout :: ConnectionTimeout,
-    configMaxReturnedHeaders :: MaxReturnedHeaders,
     configVaultClient :: ClientEnv,
     configContext :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
@@ -155,10 +151,6 @@ emptyActionTimestamp :: ActionTimestamp
 emptyActionTimestamp = ActionTimestamp Nothing
 
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
-
-newtype MaxReturnedHeaders = MaxReturnedHeaders {unMaxReturnedHeaders :: Int}
-
-newtype ConnectionTimeout = ConnectionTimeout {unConnectionTimeout :: Int}
 
 newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe ChainMemberParsedSet}
 
@@ -344,8 +336,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
-    if diffTime > maxTime
+    if diffTime > fromIntegral flags_connectionTimeout
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []
@@ -363,8 +354,7 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
-    if diffTime > maxTime
+    if diffTime > fromIntegral flags_connectionTimeout
       then do
         -- stale cache; override it
         let emptyRBH = RemainingBlockHeaders []
@@ -378,18 +368,12 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
 instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
 
-instance MonadIO m => Mod.Accessible MaxReturnedHeaders (ReaderT Config m) where
-  access _ = asks configMaxReturnedHeaders
-
 instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
   get _ = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k}, ()))
 
 instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
   access _ = Mod.get (Proxy @PeerAddress)
-
-instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT Config m) where
-  access _ = asks configConnectionTimeout
 
 instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
   access _ = asks configRedisBlockDB
@@ -460,9 +444,7 @@ type MonadP2P m =
       m,
     All
       '[Mod.Accessible]
-      '[ MaxReturnedHeaders,
-         ConnectionTimeout,
-         GenesisBlockHash,
+      '[ GenesisBlockHash,
          AvailablePeers,
          BondedPeers,
          PublicKey
@@ -536,8 +518,8 @@ runContextM ::
   m ()
 runContextM r = void . runResourceT . flip runReaderT r
 
-initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> Int -> m Config
-initConfig wireMessagesRef maxHeaders = do
+initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
+initConfig wireMessagesRef = do
   dbs <- openDBs
 
   runSqlPool (SQL.rawExecute "CREATE SEQUENCE chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
@@ -557,8 +539,6 @@ initConfig wireMessagesRef maxHeaders = do
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
-    , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
-    , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
