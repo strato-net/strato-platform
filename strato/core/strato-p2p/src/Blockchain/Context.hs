@@ -56,6 +56,7 @@ import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Composable.Kafka
+import           Control.Monad.Composable.SQL
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
@@ -86,6 +87,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Model.SyncState
+import qualified Blockchain.Model.SyncTask as SYNCTASK
 import           Blockchain.Model.WrappedBlock
 import           Blockchain.Options
 import           Blockchain.P2PUtil
@@ -205,8 +207,6 @@ instance RunsClient ContextM where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
       handler conduits
-
-
 
 instance RunsServer ContextM (LoggingT IO) where
   runServer (TCPPort listenPort) runner handler = do
@@ -448,6 +448,7 @@ type MonadP2P m =
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
+    HasSQL m,
     m `Mod.Outputs` [IngestEvent],
     All
       '[Mod.Accessible, Mod.Modifiable]
@@ -538,6 +539,10 @@ runContextM r = void . runResourceT . flip runReaderT r
 initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> Int -> m Config
 initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
+
+  runSqlPool (SQL.rawExecute "CREATE SEQUENCE chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
+  runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
+
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings

@@ -26,12 +26,15 @@ import Blockchain.EventException
 import Blockchain.Frame
 import Blockchain.Metrics
 import Blockchain.Model.SyncState
+import Blockchain.Model.SyncTask
 import Blockchain.Options
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
+import Blockchain.SyncDB
 import Blockchain.Threads
 import Conduit
 import Control.Monad (forever, when)
@@ -115,9 +118,17 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
-      BestSequencedBlock _ lastBlockNumber _ <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
-      mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+      let Host host = pPeerHost peer
+      syncTask <- lift $ getNewSyncTask host
+      $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ show syncTask
+      if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
+        then do
+          mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) mrh 0 Forward
+        else do
+          $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block, marking the new chiliad as 'NotReady'"
+          lift $ setSyncTaskNotReady host
+
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
@@ -169,9 +180,11 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      BestSequencedBlock _ lastBlockNumber _ <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
+      let Host host = pPeerHost peer
+      syncTask <- lift $ getNewSyncTask host
+      $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ show syncTask
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+      yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) mrh 0 Forward
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)

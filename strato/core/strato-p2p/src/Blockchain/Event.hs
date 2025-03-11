@@ -18,7 +18,6 @@ module Blockchain.Event
   )
 where
 
-import BlockApps.Crossmon (recordMaxBlockNumber)
 import BlockApps.Logging
 import BlockApps.X509.Certificate as XC
 import Blockchain.Blockstanbul (blockstanbulSender, WireMessage)
@@ -33,17 +32,19 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.Wire
 import Blockchain.EventException
 import Blockchain.EventModel
+import Blockchain.HeaderCache
 import Blockchain.Model.SyncState
+import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
-import Blockchain.Options
 import Blockchain.Sequencer.Event
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Verification
+import Blockchain.SyncDB
 import Control.Arrow (second, (&&&))
 import Control.Monad
 import Control.Monad.Change.Alter
@@ -57,7 +58,6 @@ import Data.Conduit
 import Data.List hiding (insert, lookup)
 import qualified Data.Map.Strict as M
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Debug.Trace (trace)
@@ -169,48 +169,20 @@ handleEvents peer = awaitForever $ \case
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
-    let headers = morphBlockHeader <$> bHeaders
-    --- put bheaders log right here
     lift stampActionTimestamp
-    -- check if blockheaders we recieved have parents.
-    let parents = map BlockHeader.parentHash headers
-    existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
-    let missingParents = S.fromList parents S.\\ (M.keysSet existingParents `S.union` S.fromList (blockHeaderHash <$> bHeaders))
-    unless (S.null missingParents) $ do
-      BestSequencedBlock _ bestBlockNum _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-      let fetchNumber = bestBlockNum + 1
-      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-      if M.null existingParents
-        then syncFetch Forward fetchNumber
-        else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
     
-    alreadyRequestedHeaders <- lift getBlockHeaders -- check what already requested
-    alreadyRequestedRemainingHeaders <- lift getRemainingBHeaders
-    let headerHashes = map (blockHeaderHash &&& id) headers
-        hashes = map fst headerHashes
-    headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockHeader) hashes
-    let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
-        (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
-    case (alreadyRequestedHeaders, alreadyRequestedRemainingHeaders) of
-      ([], _) -> do
-        -- proceed if we are not already requesting bodies
-        lift $ putBlockHeaders neededHeaders'
-        lift $ putRemainingBHeaders remainingHeaders
-        $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
-        unless (null neededHeaders') $ do 
-          yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
-        lift stampActionTimestamp
-      (_, []) -> do
-        lift $ putRemainingBHeaders neededHeaders -- save it to handle later
-        $logInfoS "handleEvents/BlockHeaders" $ 
-          "Not requesting BlockBodies because cache is currently in use, but will request after next batch of BlockBodies arrives."
-      (_, _) -> $logInfoS "handleEvents/BlockHeaders" $
-          T.unlines
-            [ "Tried to request more block bodies but it seems the block headers cache is currenlty being used.",
-              "If this message shows up a lot but the node's best block # doesn't increase,",
-              "there might be something wrong with the cache."
-            ]
+    let headers = morphBlockHeader <$> bHeaders
+
+    bodyRequestAlreadyActive <- lift isBodyRequestActive
+
+    lift $ addToHeaderCache headers
+
+    unless bodyRequestAlreadyActive $ do
+      bodyHashes' <- lift getBodiesToFetch
+      yieldR $ GetBlockBodies bodyHashes'
+
+
+
 
   -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
   -- todo: e.g. if they have bodies for Keccak256s [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
@@ -252,32 +224,48 @@ handleEvents peer = awaitForever $ \case
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
-  MsgEvt (BlockBodies []) -> do 
-    lift stampActionTimestamp
-    lift $ putBlockHeaders [] -- clear cache for other threads
-    lift $ putRemainingBHeaders []
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
-    headers <- lift getBlockHeaders
-    let verified = and $ zipWith (\h b -> BlockHeader.transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
-    unless verified $ error "headers don't match bodies"
-    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
-    unless (null headers) $ recordMaxBlockNumber "p2p_block_bodies" . maximum $ map BlockHeader.number headers
-    let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
+
+    blocks' <- lift $ recombineBlocksFromCache bodies
+
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
-    rHeaders <- lift getRemainingBHeaders
-    let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
-    lift $ putBlockHeaders neededHeaders
-    lift $ putRemainingBHeaders remainingHeaders
-    if null neededHeaders
-      then do
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        let sortedHeaders = sortOn blockHeaderBlockNumber headers
-        yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last sortedHeaders) mrh 0 Forward
-        lift stampActionTimestamp
+
+    let Host host = pPeerHost peer
+
+    currentSyncTask <- lift $ getCurrentSyncTask  host
+    let maxBlockNumber :: Integer
+        maxBlockNumber = maximum $ map (BlockHeader.number . blockBlockData) blocks'
+
+    fetchNumber <-
+        if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
+          then do
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
+            lift $ setSyncTaskFinished host
+            syncTask <- lift $ getNewSyncTask host
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
+            return $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+          else do
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
+            return $ maxBlockNumber + 1
+
+    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
+
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+
+    bodyHashes' <- lift getBodiesToFetch
+
+    if null bodyHashes'
+      then do -- all the block bodies have been sent, let's try to download more headers
+      if fetchNumber <= worldNumber
+        then syncFetch Forward fetchNumber
+        else do
+            currentSyncTask' <- lift $ getCurrentSyncTask  host
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
+            lift $ setSyncTaskNotReady host
       else do
-        yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
-        lift stampActionTimestamp
+        yieldR $ GetBlockBodies bodyHashes'
+
   MsgEvt (Blockstanbul wm) -> do
     lift $ do
       stampActionTimestamp
@@ -448,10 +436,3 @@ shouldSend peer txo = case txo of
     -- probably means it was converted, see if this is a problem
     trace "NewTx of type Morphism came in. Should this even happen?" True
   Origin.Blockstanbul -> True
-
-splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
-splitNeededHeaders neededHeaders =
-  let txsLens = BlockHeader.extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
-      txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
-      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
-   in splitAt (length txsLensInLimit) neededHeaders
