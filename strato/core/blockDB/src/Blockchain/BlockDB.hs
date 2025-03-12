@@ -2,13 +2,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -205,7 +200,7 @@ insertHeader sha h = do
     sadd (inNamespace Numbers number') [toValue sha]
   case res of
     TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Aborted")
+    TxAborted -> pure . Left $ SingleLine (S8.pack "insertHeader - Aborted")
     TxError e -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
 insertHeaders ::
@@ -267,7 +262,7 @@ insertBlocks = sequenceA . M.mapWithKey insertBlock
 deleteBlock ::
   Keccak256 ->
   Redis (Either Reply Status)
-deleteBlock _ = pure . Left $ SingleLine (S8.pack $ "deleteBlock - Not Implemented")
+deleteBlock _ = pure . Left $ SingleLine (S8.pack "deleteBlock - Not Implemented")
 
 deleteBlocks ::
   Traversable t =>

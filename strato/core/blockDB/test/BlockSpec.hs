@@ -21,7 +21,6 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad
 import qualified Crypto.Secp256k1 as SEC
-import Data.Aeson
 import Data.Aeson as Ae
 import Data.Aeson.Diff
 import qualified Data.Aeson.KeyMap as KM
@@ -182,79 +181,79 @@ binaryCheck x = binaryRT x `shouldBe` x
 enodeRLP :: Spec
 enodeRLP = do
   it "should convert an Enode address to and from its RLP encoding" $
-    property $
+    property
       (\x -> rlpCheck (x :: Enode))
 
 enodeJSON :: Spec
 enodeJSON = do
   it "should convert an Enode address to and from its JSON encoding" $
-    property $
+    property
       (\x -> jsonCheck (x :: Enode))
 
 chainMembersRLP :: Spec
 chainMembersRLP = do
   it "should convert an ChainMembers address to and from its RLP encoding" $
-    property $
+    property
       (\x -> rlpCheck (x :: ChainMembers))
 
 chainMembersJSON :: Spec
 chainMembersJSON = do
   it "should convert an ChainMembers address to and from its JSON encoding" $
-    property $
+    property
       (\x -> jsonCheck (x :: ChainMembers))
 
 chainMembersBinary :: Spec
 chainMembersBinary = do
   it "should convert an ChainMembers address to and from its Binary encoding" $
-    property $
+    property
       (\x -> binaryCheck (x :: ChainMembers))
 
 accountRLP :: Spec
 accountRLP = do
   it "should convert an Account to and from its RLP encoding" $
-    property $
+    property
       (\x -> rlpCheck (x :: Address))
 
 accountJSON :: Spec
 accountJSON = do
   it "should convert an Account to and from its JSON encoding" $
-    property $
+    property
       (\x -> jsonCheck (x :: Address))
 
 codePtrRLP :: Spec
 codePtrRLP = do
   it "should convert a CodePtr to and from its RLP encoding" $
-    property $
+    property
       (\x -> rlpCheck (x :: CodePtr))
 
 codePtrJSON :: Spec
 codePtrJSON = do
   it "should convert a CodePtr to and from its JSON encoding" $
-    property $
+    property
       (\x -> jsonCheck (x :: CodePtr))
 
 codeRLP :: Spec
 codeRLP = do
   it "should convert a Code to and from its RLP encoding" $
-    property $
+    property
       (\x -> rlpCheck (x :: Code))
 
 codeJSON :: Spec
 codeJSON = do
   it "should convert a Code to and from its JSON encoding" $
-    property $
+    property
       (\x -> jsonCheck (x :: Code))
 
 actionJSON :: Spec
 actionJSON = do
   it "should convert an Action to and from its JSON encoding" $
-    property $
+    property
       (\x -> jsonCheck (x :: Map Word256 Word256))
 
 transactionRLP :: Spec
 transactionRLP = do
   it "should convert a Transaction to and from its RLP encoding" $
-    property $
+    property
       (\x -> rlpCheck (x :: Transaction))
 
 transactionJSON :: Spec
@@ -266,7 +265,7 @@ transactionJSON = do
 transactionRLPBack :: Spec
 transactionRLPBack = do
   it "should convert a Transaction to and from its RLP encoding for backwards compatibility" $
-    forAll (arbitrary `suchThat` (isNothing . txMetadata)) $
+    forAll (arbitrary `suchThat` (isNothing . txMetadata))
       (\x -> rlpCheck (x :: Transaction))
 
 transactionJSONBack :: Spec
@@ -298,7 +297,7 @@ addressToString address =
    in t
 
 testAddresses :: [String]
-testAddresses = map (\i -> (take (40 - i) $ repeat '0') ++ (take i $ repeat 'a')) [0 .. 40]
+testAddresses = map (\i -> replicate (40 - i) '0' ++ replicate i 'a') [0 .. 40]
 
 sigRecovery :: Spec
 sigRecovery = it "whoSignedThisTransaction works with both Haskoin and secp256k1-haskell recovery functions" $ do
@@ -319,7 +318,7 @@ ecWhoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
+      sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (transactionV t - 0x1b))
       mesg = keccak256ToByteString $ partialTransactionHash t
 
 blockRoundTrip :: Spec
@@ -366,7 +365,7 @@ compareJSON expected actual =
       let o = Ae.encode c
           inValue = Ae.eitherDecode expected :: Either String Ae.Value
           outValue = Ae.eitherDecode o :: Either String Ae.Value
-       in liftM2 diff inValue outValue `shouldBe` (Right $ Patch [])
+       in liftM2 diff inValue outValue `shouldBe` Right (Patch [])
 
 unsafeExtractTX :: String -> IO Transaction'
 unsafeExtractTX file = do

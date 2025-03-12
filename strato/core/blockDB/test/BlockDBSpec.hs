@@ -139,7 +139,7 @@ spec = around (withConn 1) $ do
         (blockHash <$> r)
  
     it "Should get genesis from chain" $ \conn -> do
-      g <- liftIO $ makeGenesisBlock
+      g <- liftIO makeGenesisBlock
       let genHash = blockHeaderHash g
       chain <- liftIO $ buildChain g 2 2
       r <- runRedis conn $ do
@@ -153,7 +153,7 @@ spec = around (withConn 1) $ do
   describe "ChainTest" $ do
     flushDB
     it "Should get back best block after putting it" $ \conn -> do
-      g <- liftIO $ makeGenesisBlock
+      g <- liftIO makeGenesisBlock
       chain <- liftIO $ buildChain g 10 2
       let bb = last chain
           bbh = blockHeaderHash bb
@@ -173,7 +173,7 @@ spec = around (withConn 1) $ do
         g <- liftIO makeGenesisBlock
         tree <- bush g m n :: IO (Tree BlockHeader)
         let bestBlocks = sortBy (comparing number) (leaves tree)
-        let allblocks = toList $ tree
+        let allblocks = toList tree
         let chains = flip stem' allblocks <$> bestBlocks
         -- liftIO . putStrLn . showTree $ pb <$> tree
 
@@ -181,11 +181,11 @@ spec = around (withConn 1) $ do
           void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
           forM_ allblocks RDB.putHeader
           forM chains $ \chain -> do
-            workChain' RDB.putBestBlockInfo $ (reverse $ chain)
+            workChain' RDB.putBestBlockInfo $ reverse chain
             res <- RDB.getBestBlockInfo :: Redis (Maybe BestBlock)
             return $ bestBlockHash <$> res
 
-        let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb)
+        let bbs = flip map bestBlocks $ \bb -> Just $ blockHeaderHash bb
         HUnit.assertBool
           ("Couldn't get best block iterated from chain (" ++ (show . length $ tree) ++ ", " ++ (show . length . leaves $ tree) ++ ")")
           (bbs == r)
@@ -213,7 +213,7 @@ workChain g chain = forM_ (reverse chain) f
     f b = g (blockHeaderHash b) (number b)
 
 workChain' :: (Keccak256 -> Integer -> Redis (Either Reply Status)) -> [BlockHeader] -> Redis ()
-workChain' g = flip forM_ f
+workChain' g = mapM_ f
   where
     f b = do
       void $ g (blockHeaderHash b) (number b)

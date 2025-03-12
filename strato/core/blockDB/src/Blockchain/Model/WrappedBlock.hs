@@ -95,7 +95,7 @@ blockToIngestBlock origin BDB.Block {BDB.blockBlockData = bd, BDB.blockReceiptTr
 
 ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
 ingestBlockToSequencedBlock ib = do
-  let theHash = (blockHeaderHash . ibBlockData $ ib)
+  let theHash = blockHeaderHash $ ibBlockData ib
   otxs <- traverse (wrapIngestBlockTransaction theHash) $ ibReceiptTransactions ib
   Just
     SequencedBlock
