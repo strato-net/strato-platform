@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Blockchain.Model.WrappedBlock (
@@ -22,63 +22,63 @@ module Blockchain.Model.WrappedBlock (
   outputBlockHash
   ) where
 
-import qualified Blockchain.Data.Block as BDB
-import Blockchain.Data.BlockHeader
-import Blockchain.Data.RLP
-import qualified Blockchain.Data.TXOrigin as TO
-import qualified Blockchain.Data.Transaction as TX
-import Blockchain.DB.Witnessable
-import qualified Blockchain.Strato.Model.Address as A
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Keccak256 (Keccak256)
-import Control.DeepSeq
-import Data.Binary
-import Data.Data
-import Data.Maybe (fromJust, fromMaybe)
-import qualified GHC.Generics as GHCG
-import Test.QuickCheck
-import Test.QuickCheck.Arbitrary.Generic
-import qualified Text.Colors as CL
-import Text.Format
-import Text.Tools
+import qualified Blockchain.Data.Block             as BDB
+import           Blockchain.Data.BlockHeader
+import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Transaction       as TX
+import qualified Blockchain.Data.TXOrigin          as TO
+import           Blockchain.DB.Witnessable
+import qualified Blockchain.Strato.Model.Address   as A
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Keccak256 (Keccak256)
+import           Control.DeepSeq
+import           Data.Binary
+import           Data.Data
+import           Data.Maybe                        (fromJust, fromMaybe)
+import qualified GHC.Generics                      as GHCG
+import           Test.QuickCheck
+import           Test.QuickCheck.Arbitrary.Generic
+import qualified Text.Colors                       as CL
+import           Text.Format
+import           Text.Tools
 
 data IngestTx = IngestTx
-  { itOrigin :: TO.TXOrigin,
+  { itOrigin      :: TO.TXOrigin,
     itTransaction :: TX.Transaction
   }
   deriving (Eq, Read, Show, GHCG.Generic)
 
 data IngestBlock = IngestBlock
-  { ibOrigin :: TO.TXOrigin,
-    ibBlockData :: BlockHeader,
+  { ibOrigin              :: TO.TXOrigin,
+    ibBlockData           :: BlockHeader,
     ibReceiptTransactions :: [TX.Transaction],
-    ibBlockUncles :: [BlockHeader]
+    ibBlockUncles         :: [BlockHeader]
   }
   deriving (Eq, Show, GHCG.Generic)
 
 data SequencedBlock = SequencedBlock
-  { sbOrigin :: TO.TXOrigin,
-    sbHash :: Keccak256,
-    sbBlockData :: BlockHeader,
+  { sbOrigin              :: TO.TXOrigin,
+    sbHash                :: Keccak256,
+    sbBlockData           :: BlockHeader,
     sbReceiptTransactions :: [OutputTx],
-    sbBlockUncles :: [BlockHeader]
+    sbBlockUncles         :: [BlockHeader]
   }
   deriving (Show, GHCG.Generic)
 
 data OutputTx = OutputTx
-  { otOrigin :: TO.TXOrigin,
-    otHash :: Keccak256,
-    otSigner :: A.Address,
-    otBaseTx :: TX.Transaction,
+  { otOrigin         :: TO.TXOrigin,
+    otHash           :: Keccak256,
+    otSigner         :: A.Address,
+    otBaseTx         :: TX.Transaction,
     otPrivatePayload :: Maybe TX.Transaction
   }
   deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
 data OutputBlock = OutputBlock
-  { obOrigin :: TO.TXOrigin,
-    obBlockData :: BlockHeader,
+  { obOrigin              :: TO.TXOrigin,
+    obBlockData           :: BlockHeader,
     obReceiptTransactions :: [OutputTx],
-    obBlockUncles :: [BlockHeader]
+    obBlockUncles         :: [BlockHeader]
   }
   deriving (Eq, Show, GHCG.Generic)
 

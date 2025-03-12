@@ -1,9 +1,9 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -30,19 +30,20 @@ module Blockchain.BlockDB
   )
 where
 
-import Blockchain.Data.BlockHeader
-import Blockchain.Model.WrappedBlock
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.RedisBlockDB.Models as Models
-import Control.Arrow ((&&&))
-import Control.Monad
-import qualified Data.ByteString.Char8 as S8
-import Data.Foldable (foldl')
-import qualified Data.Map.Strict as M
-import Data.Maybe (fromJust, fromMaybe, isNothing)
-import qualified Data.Set as S
-import Database.Redis
+import           Blockchain.Data.BlockHeader
+import           Blockchain.Model.WrappedBlock
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.RedisBlockDB.Models as Models
+import           Control.Arrow                         ((&&&))
+import           Control.Monad
+import qualified Data.ByteString.Char8                 as S8
+import           Data.Foldable                         (foldl')
+import qualified Data.Map.Strict                       as M
+import           Data.Maybe                            (fromJust, fromMaybe,
+                                                        isNothing)
+import qualified Data.Set                              as S
+import           Database.Redis
 
 -- todo: move this somewhere?
 zipMapM ::
@@ -61,19 +62,19 @@ inNamespace ns k = ns' `S8.append` toKey k
   where
     ns' = namespaceToKeyPrefix ns
 
-namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString 
-namespaceToKeyPrefix ns = case ns of 
-  Headers -> "h:"
-  Transactions -> "t:"
-  Numbers -> "n:"
-  Uncles -> "u:"
-  Parent -> "p:"
-  Children -> "c:"
-  Canonical -> "q:"
-  Validators -> "validators"
-  X509Certificates -> "x509:"
+namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString
+namespaceToKeyPrefix ns = case ns of
+  Headers            -> "h:"
+  Transactions       -> "t:"
+  Numbers            -> "n:"
+  Uncles             -> "u:"
+  Parent             -> "p:"
+  Children           -> "c:"
+  Canonical          -> "q:"
+  Validators         -> "validators"
+  X509Certificates   -> "x509:"
   ParsedSetWhitePage -> "potu:"
-  ParsedSetToX509 -> "psx509:"
+  ParsedSetToX509    -> "psx509:"
 
 getInNamespace ::
   (RedisDBKeyable key) =>
@@ -251,8 +252,8 @@ insertBlock sha b = do
   --forM_ uncles -- todo index the uncles' headers/numbers/etc?
   case res of
     TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack "Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack e)
+    TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
+    TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
 insertBlocks ::
   M.Map Keccak256 OutputBlock ->

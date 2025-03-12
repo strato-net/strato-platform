@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.Model.JsonBlock (
@@ -19,36 +19,37 @@ module Blockchain.Model.JsonBlock (
   asrToAsrPrime
   ) where
 
-import BlockApps.X509
-import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
-import Blockchain.Data.DataDefs
-import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Class (blockHeaderHash, DummyCertRevocation(..))
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Validator
-import Control.DeepSeq
-import Control.Monad (join)
-import Data.Aeson
-import Data.Aeson.Types (Parser)
-import qualified Data.ByteString as B
-import qualified Data.Map.Strict as M
-import Data.Maybe
-import Data.Swagger hiding (format)
-import Data.Text.Encoding (encodeUtf8)
-import Data.Time.Calendar
-import Data.Time.Clock
-import Data.Word
-import GHC.Generics
+import           BlockApps.X509
+import           Blockchain.Data.Block
+import           Blockchain.Data.BlockHeader
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Class        (DummyCertRevocation (..),
+                                                       blockHeaderHash)
+import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Validator
+import           Control.DeepSeq
+import           Control.Monad                        (join)
+import           Data.Aeson
+import           Data.Aeson.Types                     (Parser)
+import qualified Data.ByteString                      as B
+import qualified Data.Map.Strict                      as M
+import           Data.Maybe
+import           Data.Swagger                         hiding (format)
+import           Data.Text.Encoding                   (encodeUtf8)
+import           Data.Time.Calendar
+import           Data.Time.Clock
+import           Data.Word
+import           GHC.Generics
 import qualified LabeledError
-import Numeric
+import           Numeric
 {-
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
@@ -128,7 +129,7 @@ instance FromJSON RawTransaction' where
     tto <- t .:? "to"
     tval <- LabeledError.read "FromJSON/RawTransaction'" <$> t .:? "value" .!= "0"
     tcd <- t .:? "codeOrData"
-    cName <- t .:? "cName" 
+    cName <- t .:? "cName"
     cpa <- t .:? "cpa"
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
@@ -211,7 +212,7 @@ instance FromJSON UnsignedRawTransaction' where
     tgl <- t .:? "gasLimit" .!= 0
     tto <- t .:? "to"
     tval <- LabeledError.read "FromJSON/UnsignedRawTransaction'" <$> t .:? "value" .!= "0"
-    tcd <- t .:? "codeOrData" 
+    tcd <- t .:? "codeOrData"
     cName <- t .:? "contractName"
     cpa <- t .:? "codePtrAddress"
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
@@ -442,7 +443,7 @@ instance ToJSON BlockData' where
         "mixHash" .= mh
       ]
 
-  toJSON (BlockData' (BlockHeaderV2{..})) = 
+  toJSON (BlockData' (BlockHeaderV2{..})) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= parentHash,
@@ -618,7 +619,7 @@ transactionSemantics _ = Contract
 
 isAddr :: Maybe Address -> Bool
 isAddr a = case a of
-  Just _ -> True
+  Just _  -> True
   Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
@@ -630,4 +631,4 @@ rawTransactionSemantics rawtx = work
       | otherwise = Transfer
     cod = case rawTransactionCodeOrData rawtx of
       Just c -> c
-      _ -> ""
+      _      -> ""

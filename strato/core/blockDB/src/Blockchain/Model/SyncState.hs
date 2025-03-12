@@ -6,14 +6,14 @@ module Blockchain.Model.SyncState (
   WorldBestBlock(..)
   ) where
 
-import Blockchain.Data.RLP
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Validator
-import Text.Format
-import Text.Format.Template
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Validator
+import           Text.Format
+import           Text.Format.Template
 
 data BestBlock = BestBlock
-  { bestBlockHash :: Keccak256,
+  { bestBlockHash   :: Keccak256,
     bestBlockNumber :: Integer
   }
   deriving (Eq, Show)
@@ -27,8 +27,8 @@ instance RLPSerializable BestBlock where
 
 
 data BestSequencedBlock = BestSequencedBlock {
-  bestSequencedBlockHash :: Keccak256,
-  bestSequencedBlockNumber :: Integer,
+  bestSequencedBlockHash       :: Keccak256,
+  bestSequencedBlockNumber     :: Integer,
   bestSequencedBlockValidators :: [Validator]
   } deriving (Eq, Show)
 
