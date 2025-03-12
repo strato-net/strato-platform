@@ -25,6 +25,7 @@ abstract contract Reserve is Utils, Structs {
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public liquidationRatio = 80; // Liquidation ratio as percentage
+    uint public interestOnLoan = 1; // 1% interest on loan
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
@@ -35,6 +36,7 @@ abstract contract Reserve is Utils, Structs {
     decimal public lastUpdatedOraclePrice = 0;
 
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
+    uint constant SECONDS_IN_YEAR = 31536000;
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal usdstLoan);
     event StakeUnlocked(address indexed user, address escrow, uint quantity);
@@ -43,12 +45,13 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, uint _interestOnLoan, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
         unitConversionRate = _unitConversionRate;
+        interestOnLoan = _interestOnLoan;
         usdstToken = _usdstToken;
         (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
         oraclePrice = oraclePrice / unitConversionRate;
@@ -89,13 +92,37 @@ abstract contract Reserve is Utils, Structs {
             
             try {
                 if (escrow.version() == "2.0") {
-                escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
+                    escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
                 }
             }
             catch {
                 escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
             }
-            
+
+            // Update borrow amount based on interest
+            uint borrowedAmount = escrow.borrowedAmount();
+            if (borrowedAmount > 0) {
+                // Calculate interest for the elapsed time as a fraction of the year
+                uint interestAmount = (borrowedAmount * interestOnLoan * delta) / (100 * SECONDS_IN_YEAR);
+                try {
+                    escrow.updateBorrowedAmount(interestAmount, true);
+                } catch {
+                    // Compute temporary new loanToValueRatio to allow adding the interest
+                    newLoanToValueRatio = ((borrowedAmount + interestAmount) * 100) / escrow.collateralValue();
+                    try {
+                        if (escrow.version() == "2.0") {
+                            escrow.updateOnPriceChange(oraclePrice * usdstPrice, newLoanToValueRatio, liquidationRatio);
+                        }
+                    } catch {
+                        escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, newLoanToValueRatio, liquidationRatio);
+                    }
+                    escrow.updateBorrowedAmount(interestAmount, true);
+                }
+            }
+
+            // Have to implement liquidation logic here for interest accruement to work.
+            // liquidate when borrowed amount is more than liquidationAmount
+
             //get cata reward from escrow
             if (delta > 0) {
                 decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
@@ -251,6 +278,11 @@ abstract contract Reserve is Utils, Structs {
     function setUnitConversionRate(decimal _newRate) public requireOwner("update unit conversion rate") {
         require(_newRate > 0, "Unit conversion rate must be greater than 0");
         unitConversionRate = _newRate;
+    }
+
+    function setInterestOnLoan(uint _newInterest) public requireOwner("update interest on loan") {
+        require(_newInterest > 0, "Interest on loan must be greater than 0");
+        interestOnLoan = _newInterest;
     }
 
     function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
