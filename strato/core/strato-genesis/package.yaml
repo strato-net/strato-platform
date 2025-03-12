@@ -30,21 +30,17 @@ library:
       - monad-alter
       - scientific
       - split
-      - strato-statediff
       - time
       - vector
-      - vm-tools
       - aeson
       - bytestring
       - merkle-patricia-db
       - strato-model
       - text
       - raw-strings-qq
-      - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
       - lens
-      - ordered-containers
 
 tests:
   strato-genesis-test:

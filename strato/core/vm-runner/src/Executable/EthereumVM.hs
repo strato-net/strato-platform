@@ -22,6 +22,7 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.BlockChain
+import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
@@ -31,6 +32,8 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
@@ -39,12 +42,12 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
+import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics

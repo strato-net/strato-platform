@@ -20,13 +20,14 @@ module Blockchain.Sequencer (
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul 
-import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
+import Blockchain.DB.Witnessable
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
-import Blockchain.Sequencer.DB.Witnessable
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
@@ -94,26 +95,20 @@ sequencer = do
     ctx <- fromJust <$> getBlockstanbulContext
     let selfAddr = fromJust $ _selfAddr ctx
     _ <- writeSeqVmEvents [VmSelfAddress selfAddr]
-    -- check checkpoint in ldb
-    mChckpt <- A.lookup (A.Proxy @Checkpoint) ()
-    ctx' <- case mChckpt of 
-      Just (Checkpoint v vals) -> do 
-        return ctx { _view = v, _validators = S.fromList vals}
-      Nothing -> return ctx
     -- check for own cert and if val
     maybeCert <- A.lookup (A.Proxy @X509CertInfoState) selfAddr
     ctx'' <- case maybeCert of
       Just cert -> do
         let chainm = getChainMemberFromX509 cert
         logF $ "Node identity verified: " ++ show chainm
-        case chainMemberParsedSetToValidator chainm `S.member` _validators ctx' of
+        case chainMemberParsedSetToValidator chainm `S.member` _validators ctx of
           True -> do
             logF "You are a validator in this network!"
-            return ctx' { _selfCert = Just chainm, _isValidator = True }
-          False -> return ctx' { _selfCert = Just chainm }
+            return ctx { _selfCert = Just chainm, _isValidator = True }
+          False -> return ctx { _selfCert = Just chainm }
       Nothing -> do
         logF "Awaiting node identity verification..."
-        return ctx'
+        return ctx
     putBlockstanbulContext ctx''
   logF "Sequencer startup"
   source <- fuseChannels
@@ -124,8 +119,7 @@ sequencer = do
 eventHandler :: (
   MonadFail m,
   HasKafka m,
-  MonadSequencer m,
-  (() `A.Alters` Checkpoint) m
+  MonadSequencer m
   ) =>
   ConduitT SeqLoopEvent Void m ()
 eventHandler = forever $ timeAction seqLoopTiming $ do
@@ -145,7 +139,6 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
 
 unseqEventHandler ::
   ( MonadSequencer m, 
-    (() `A.Alters` Checkpoint) m,
     HasKafka m) =>
   [IngestEvent] -> m ()
 unseqEventHandler events = do
@@ -210,7 +203,6 @@ blockstanbulSend ::
   ( MonadLogger m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   [InEvent] -> m ()
@@ -221,7 +213,6 @@ blockstanbulSend' ::
   ( MonadLogger m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   InEvent -> m ()
@@ -240,7 +231,7 @@ blockstanbulSend' msg = do
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   let rBlocks = catMaybes (map getSequencedBlock blocks)
   committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
-  let (vms, p2ps, ckpts) = vmEvenP2pCheckptFilterHelper resp
+  let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
   let vmevs =
         creates
@@ -260,28 +251,29 @@ blockstanbulSend' msg = do
       now <- liftIO getCurrentTime
       when (now < tNext) $
         liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-      Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
-        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
+      ctx <- fmap (fromMaybe $ error "BlockstanbulContext missing") $ getBlockstanbulContext
+      Mod.put (Mod.Proxy @BestSequencedBlock) $
+        BestSequencedBlock
+            (BDB.blockHeaderHash bh)
+            (BDB.blockHeaderBlockNumber bh)
+            (S.toList $ _validators ctx)
 
-  $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
-  forM_ ckpts (A.insert (A.Proxy @Checkpoint) ())
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   _ <- writeSeqP2pEvents p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   _ <- writeSeqVmEvents vmevs
   return ()
   where
-    vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent], [Checkpoint])
+    vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
-      let (vms, p2ps, ctxs) = vmEvenP2pCheckptFilterHelper xs
+      let (vms, p2ps) = vmEvenP2pCheckptFilterHelper xs
       case x of
-        OMsg a m -> (vms, P2pBlockstanbul (WireMessage a m) : p2ps, ctxs)
-        GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps, ctxs)
-        LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps, ctxs)
-        NewCheckpoint ck -> (vms, p2ps, ck : ctxs)
-        RunPreprepare b -> (VmRunPreprepare b : vms, p2ps, ctxs)
-        _ -> (vms, p2ps, ctxs)
-    vmEvenP2pCheckptFilterHelper [] = ([], [], [])
+        OMsg a m -> (vms, P2pBlockstanbul (WireMessage a m) : p2ps)
+        GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps)
+        LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps)
+        RunPreprepare b -> (VmRunPreprepare b : vms, p2ps)
+        _ -> (vms, p2ps)
+    vmEvenP2pCheckptFilterHelper [] = ([], [])
 
 transformFullTransactions ::
   ( MonadLogger m,
@@ -344,7 +336,6 @@ runConsensus ::
     MonadMonitor m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   SequencedBlock -> m ()
@@ -373,7 +364,6 @@ transformBlocks ::
     MonadMonitor m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   [IngestBlock] -> m ()

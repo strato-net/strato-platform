@@ -9,19 +9,20 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.Options ()
-import Blockchain.Data.GenesisInfo
 import Blockchain.EthConf
-import Blockchain.Generation
+import Blockchain.Model.SyncState
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Options (flags_network)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import Blockchain.SyncDB
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
+import Data.Maybe
 import Data.String
 import qualified Database.Redis as Redis
 import Flags
@@ -51,7 +52,11 @@ main = do
   blockappsInit "seq_main"
   runInstrumentation "strato-sequencer"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
-  validators <- readValidatorsFromGenesisInfo <$> getGenesisInfo
+
+  conn <- Redis.checkedConnect lookupRedisBlockDBConfig
+  
+  bestSequencedBlock <- fmap (fromMaybe (error "no BestSequencedBlock in database")) $ Redis.runRedis conn getBestSequencedBlockInfo
+  let validators = bestSequencedBlockValidators bestSequencedBlock
 
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
@@ -90,8 +95,6 @@ main = do
 
   cht <- atomically newTMChan
 
-  redisBDBPool <- Redis.checkedConnect lookupRedisBlockDBConfig
-
   let seqCfg =
         SequencerConfig
           { depBlockDBCacheSize = flags_depblockcachesize,
@@ -105,7 +108,7 @@ main = do
             maxUsPerIter = flags_seq_max_us_per_iter,
             vaultClient = Just clientEnv,
             kafkaClientId = fromString flags_kafkaclientid,
-            redisConn = RBDB.RedisConnection redisBDBPool
+            redisConn = RBDB.RedisConnection conn
           }
   race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer ))
     . run 8050

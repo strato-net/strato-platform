@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Handlers.Peers
@@ -7,16 +7,17 @@ module Handlers.Peers
   )
 where
 
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
-import Control.Monad.IO.Class
-import Data.Aeson
-import qualified Data.Aeson.Key as DAK
-import qualified Data.Text as T
-import SQLM
-import Servant hiding (ServerError)
-import UnliftIO
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
+import           Blockchain.Strato.Model.Host
+import           Control.Monad.IO.Class
+import           Data.Aeson
+import qualified Data.Aeson.Key                                as DAK
+import qualified Data.Text                                     as T
+import           Servant                                       hiding
+                                                               (ServerError)
+import           SQLM
+import           UnliftIO
 
 type API = "peers" :> Get '[JSON] Value
 

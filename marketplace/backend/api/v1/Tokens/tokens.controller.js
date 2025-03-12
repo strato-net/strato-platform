@@ -55,6 +55,21 @@ class TokensController {
     }
   }
 
+  static async bridgeOut(req, res, next) {
+    try {
+      const { dapp, body } = req;
+
+      TokensController.validateBridgeOutArgs(body);
+
+      const result = await dapp.bridgeOut(body);
+      rest.response.status200(res, result);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   // ----------------------- ARG VALIDATION ------------------------
 
   static validateCreateTokensArgs(args) {
@@ -101,6 +116,27 @@ class TokensController {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
         'Add Hash Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
+    }
+  }
+
+  static validateBridgeOutArgs(args) {
+    const burnETHSTSchema = Joi.object({
+      quantity: Joi.string().required(),
+      externalChainWalletAddress: Joi.string().required(),
+      tokenAssetRootAddress: Joi.string().required(),
+    });
+
+    const validation = burnETHSTSchema.validate(args);
+
+    if (validation.error) {
+      console.log(validation.error.message);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Burn ETHST Argument Validation Error',
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }

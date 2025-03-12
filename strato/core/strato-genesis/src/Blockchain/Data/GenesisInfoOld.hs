@@ -17,7 +17,7 @@ module Blockchain.Data.GenesisInfoOld
   )
 where
 
-import Blockchain.Data.ArbitraryInstances ()
+--import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.AccountInfoOld
 import Blockchain.Data.CodeInfoOld
 import Blockchain.Database.MerklePatricia

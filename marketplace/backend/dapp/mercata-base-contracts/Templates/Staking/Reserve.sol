@@ -83,7 +83,7 @@ abstract contract Reserve is Utils, Structs {
         oraclePrice = oraclePrice / unitConversionRate;
         for (uint i = 0; i < _escrowAddresses.length; i++) {
             Escrow escrow = Escrow(_escrowAddresses[i]);
-            require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
+            require(address(escrow).creator == this.creator || address(escrow).creator == "BlockApps", "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
             

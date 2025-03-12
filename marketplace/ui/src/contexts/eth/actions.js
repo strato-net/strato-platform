@@ -13,6 +13,9 @@ const actionDescriptors = {
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
   addHashFailed: 'add_hash_failed',
+  bridgeOut: 'bridge_out',
+  bridgeOutSuccessful: 'bridge_out_successful',
+  bridgeOutFailed: 'bridge_out_failed',
 };
 
 const actions = {
@@ -162,6 +165,67 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.addHashFailed,
+        error: 'Error while bridging',
+      });
+      actions.setMessage(dispatch, 'Error while bridging');
+    }
+  },
+
+  bridgeOut: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.bridgeOut });
+
+    try {
+      const { tokenName, quantityNumber, ...restPayload } = payload;
+      const response = await fetch(`${apiUrl}/tokens/bridgeOut`, {
+        method: HTTP_METHODS.POST,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(restPayload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.bridgeOutSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, `Successfully initiated the bridging of ${quantityNumber} ${tokenName} to ${quantityNumber} ${tokenName.toLowerCase().endsWith("st") ? tokenName.slice(0, -2) : tokenName}.`, true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.bridgeOutFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.bridgeOutFailed,
+          error: 'Error while bridging',
+        });
+        actions.setMessage(dispatch, 'Error while bridging');
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.bridgeOutFailed,
+          error: 'Unauthorized while bridging',
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.bridgeOutFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.bridgeOutFailed,
         error: 'Error while bridging',
       });
       actions.setMessage(dispatch, 'Error while bridging');

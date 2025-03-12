@@ -18,7 +18,6 @@ module Blockchain.Data.GenesisInfo
   )
 where
 
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.AccountInfo
 import Blockchain.Data.CodeInfo
 import qualified Blockchain.Data.AccountInfoOld as OLD

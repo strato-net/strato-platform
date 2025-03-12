@@ -9,7 +9,7 @@ import Blockchain.Bagger.Transactions
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
-import Blockchain.Sequencer.Event (OutputTx (..))
+import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256

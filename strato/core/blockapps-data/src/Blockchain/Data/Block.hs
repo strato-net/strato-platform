@@ -6,9 +6,6 @@
 
 module Blockchain.Data.Block
   ( Block (..),
-    BestBlock (..),
-    BestSequencedBlock (..),
-    WorldBestBlock (..),
     Canonical (..),
     Private (..),
     setBlockNo,
@@ -27,9 +24,11 @@ import Control.DeepSeq
 import Data.Binary
 import Data.List
 import GHC.Generics
+import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
+
 
 data Block = Block
   { blockBlockData :: BlockHeader,
@@ -73,22 +72,22 @@ instance HasIstanbulExtra Block where
   getIstanbulExtra     = getIstanbulExtra . blockBlockData
   putIstanbulExtra i b = b{blockBlockData = putIstanbulExtra i $ blockBlockData b}
 
+instance Arbitrary Block where
+  arbitrary = do
+    txCount <- choose (0, 20)
+    uncleCount <- choose (0, 2)
+    bData <- arbitrary
+    bTransactions <- vectorOf txCount arbitrary
+    bUncles <- vectorOf uncleCount arbitrary
+
+    return $ Block bData bTransactions bUncles
+
 instance BlockLike BlockHeader Transaction Block where
   blockHeader = blockBlockData
   blockTransactions = blockReceiptTransactions
   blockUncleHeaders = blockBlockUncles
 
   buildBlock bd txs us = Block bd txs us
-
-data BestBlock = BestBlock
-  { bestBlockHash :: Keccak256,
-    bestBlockNumber :: Integer
-  }
-  deriving (Eq, Show)
-
-newtype BestSequencedBlock = BestSequencedBlock {unBestSequencedBlock :: BestBlock} deriving (Eq, Show)
-
-newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving (Eq, Show)
 
 newtype Canonical a = Canonical {unCanonical :: a} deriving (Functor)
 

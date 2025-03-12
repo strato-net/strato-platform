@@ -12,4 +12,6 @@ library:
     - base16-bytestring
     - bytestring
     - common-log
+    - template-haskell
     - text
+    - time

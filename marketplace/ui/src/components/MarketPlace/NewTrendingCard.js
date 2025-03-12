@@ -29,8 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { ethstAddress, wbtcstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
@@ -43,8 +42,12 @@ const NewTrendingCard = ({
   )
     ? 18
     : topSellingProduct.decimals || 0;
+
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity : 1);
+
+  const [quantity, setQuantity] = useState(
+    saleQuantity < 1 ? saleQuantity : decimals ? 0.01 : 1
+  );
 
   const ownerSameAsUser = () => {
     if (user?.commonName === topSellingProduct?.ownerCommonName) {
@@ -57,7 +60,8 @@ const NewTrendingCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
-    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress &&
+    topSellingProduct.originAddress !== ethstAddress &&
+    topSellingProduct.originAddress !== wbtcstAddress &&
     (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
@@ -121,6 +125,70 @@ const NewTrendingCard = ({
       window.location.href = loginUrl;
     }
     setIsModalVisible(false);
+  };
+
+  const handleIncrement = (quantity) => {
+    if (decimals) {
+      let newValue = Number(quantity) + 0.01;
+      newValue = parseFloat(newValue.toFixed(4));
+      setQuantity(newValue);
+    }
+    else {
+      if (
+        quantity + 1 <= saleQuantity &&
+        quantity + 1 <= topSellingProduct.quantity
+      ) {
+        setQuantity(quantity + 1);
+      }
+    }
+  };
+
+  const handleDecrement = (quantity) => {
+    if (decimals) {
+      const minValue = 1 / Math.pow(10, decimals || 0);
+      if (quantity - 0.01 > 0) {
+        setQuantity((prevQuantity) => {
+            const newQuantity = parseFloat(
+              Math.max(prevQuantity - 0.01, minValue)
+            ).toFixed(4);
+            return Number(newQuantity);
+        });
+      }
+    }
+    else {
+      if (quantity - 1 > 0) {
+        setQuantity(Math.max(quantity - 1, 1));
+      }
+    }
+  };
+
+  const onKeyDownPress = (e) => {
+    if (decimals) {
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
   };
 
   return (
@@ -274,7 +342,7 @@ const NewTrendingCard = ({
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
             (topSellingProduct.originAddress === ethstAddress ||
-            topSellingProduct.originAddress === wbtcstAddress) &&
+              topSellingProduct.originAddress === wbtcstAddress) &&
             reserve
               ? 'invisible'
               : ''
@@ -284,29 +352,51 @@ const NewTrendingCard = ({
           <div className="flex gap-3 p-1 bg-white">
             <Typography
               className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity === 1
+                (quantity === 1 && !decimals) || quantity === 0.01
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                setQuantity(Math.max(quantity - 1, 1));
+                handleDecrement(quantity);
               }}
             >
               -
             </Typography>
+
             <InputNumber
-              className="w-10"
+              className="w-12"
               size="small"
               bordered={false}
               value={quantity}
               max={saleQuantity}
-              min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
+              min={1 / Math.pow(10, decimals || 0)}
               onChange={(e) => {
-                setQuantity(parseFloat(e || 0));
+                if (!isNaN(e)) {
+                  let value = e.toString();
+
+                  // Split number into integer and decimal parts
+                  let [integer, decimal] = value.split('.');
+
+                  // Restrict decimal places based on product decimals
+                  if (
+                    decimal &&
+                    decimal.length > (decimals || 0)
+                  ) {
+                    value = parseFloat(
+                      integer +
+                        '.' +
+                        decimal.slice(0, decimals)
+                    );
+                  } else {
+                    value = parseFloat(value);
+                  }
+
+                  setQuantity(value);
+                }
               }}
               onPressEnter={(e) => {
-                const newValue = parseFloat(e.target.value, 10);
-                if (newValue <= saleQuantity) {
+                const newValue = parseFloat(e.target.value);
+                if (!isNaN(newValue) && newValue <= saleQuantity) {
                   setQuantity(newValue);
                 } else {
                   api.error({
@@ -315,8 +405,12 @@ const NewTrendingCard = ({
                   });
                 }
               }}
+              onKeyDown={(e) => {
+                onKeyDownPress(e);
+              }}
               controls={false}
             />
+
             <Typography
               className={`px-2 bg-[#EEEFFA] rounded-sm ${
                 quantity >= Math.min(saleQuantity, topSellingProduct.quantity)
@@ -324,12 +418,7 @@ const NewTrendingCard = ({
                   : 'cursor-pointer'
               }`}
               onClick={() => {
-                if (
-                  quantity + 1 <= saleQuantity &&
-                  quantity + 1 <= topSellingProduct.quantity
-                ) {
-                  setQuantity(quantity + 1);
-                }
+                handleIncrement(quantity);
               }}
             >
               +
@@ -380,7 +469,10 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
-              } else if (topSellingProduct.originAddress === wbtcstAddress && reserve) {
+              } else if (
+                topSellingProduct.originAddress === wbtcstAddress &&
+                reserve
+              ) {
                 navigate(
                   `${routes.WbtcstProductDetail.url.replace(
                     ':address',
