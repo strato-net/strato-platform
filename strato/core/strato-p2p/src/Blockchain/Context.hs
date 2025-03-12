@@ -523,7 +523,7 @@ initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m 
 initConfig wireMessagesRef = do
   dbs <- openDBs
 
-  runSqlPool (SQL.rawExecute "CREATE SEQUENCE chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
+  runSqlPool (SQL.rawExecute "CREATE SEQUENCE IF NOT EXISTS chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
   runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
 
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
