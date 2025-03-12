@@ -20,7 +20,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
   const { bridgeableAddress } = useEthState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress } = bridgeableAddress || {};
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -46,7 +46,8 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
       const isWbtcst = reserveItem.originAddress === wbtcstAddress;
       const isUsdtst = reserveItem.originAddress === usdtstAddress;
       const isUsdcst = reserveItem.originAddress === usdcstAddress;
-      const isPaxgst = reserveItem.originAddress === paxgstAddress;    
+      const isPaxgst = reserveItem.originAddress === paxgstAddress; 
+      const isSilvst = reserveItem.originAddress === silvstAddress;   
 
   const handleCancel = () => {
     setIsModalVisible(false);
@@ -71,7 +72,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
           state: { isCalledFromInventory: false },
         }
       );
-    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) {
       navigate(
         `${routes.bridgeableProductDetail.url.replace(
           ':address',

@@ -48,6 +48,7 @@ const GlobalTransaction = ({
   usdcstAddress,
   paxgstAddress,
   stratsAddress,
+  silvstAddress
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -171,13 +172,14 @@ const GlobalTransaction = ({
     const isUsdtst = data?.assetOriginAddress === usdtstAddress;
     const isUsdcst = data?.assetOriginAddress === usdcstAddress;
     const isPaxgst = data?.assetOriginAddress === paxgstAddress;
+    const isSilvst = data?.assetOriginAddress === silvstAddress;
 
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) {
       const url = routes.bridgeableProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data?.assetName)}`, {
         state: { isCalledFromInventory: false },
@@ -482,6 +484,7 @@ const GlobalTransaction = ({
               usdcstAddress={usdcstAddress}
               paxgstAddress={paxgstAddress}
               stratsAddress={stratsAddress}
+              silvstAddress={silvstAddress}
             />
           </Row>
         </div>

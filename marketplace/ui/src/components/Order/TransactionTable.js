@@ -83,7 +83,7 @@ const TransactionTable = ({
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
   const { bridgeableAddress } = useEthState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress } = bridgeableAddress || {};
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -297,13 +297,14 @@ const TransactionTable = ({
     const isUsdtst = data?.assetOriginAddress === usdtstAddress;
     const isUsdcst = data?.assetOriginAddress === usdcstAddress;
     const isPaxgst = data?.assetOriginAddress === paxgstAddress;
+    const isSilvst = data?.assetOriginAddress === silvstAddress;
 
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst ) {
+    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) {
       const url = routes.bridgeableProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data.assetName)}`, {
         state: { isCalledFromInventory: false },

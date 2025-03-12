@@ -16,7 +16,7 @@ const Feed = ({ user }) => {
   const { USDSTAddress, assetsWithEighteenDecimalPlaces, stratsAddress } =
     useMarketplaceState();
   const { bridgeableAddress } = useEthState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress } = bridgeableAddress || {};
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const ethDispatch = useEthDispatch();
@@ -57,6 +57,7 @@ const Feed = ({ user }) => {
           usdcstAddress={usdcstAddress}
           paxgstAddress={paxgstAddress}
           stratsAddress={stratsAddress}
+          silvstAddress={silvstAddress}
         />
       )}
     </div>

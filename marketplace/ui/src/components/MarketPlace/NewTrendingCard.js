@@ -31,7 +31,7 @@ const NewTrendingCard = ({
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { bridgeableAddress } = useEthState();
-    const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+    const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress } = bridgeableAddress || {};
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -62,13 +62,14 @@ const NewTrendingCard = ({
   const isUsdtst = topSellingProduct.originAddress === usdtstAddress;
   const isUsdcst = topSellingProduct.originAddress === usdcstAddress;
   const isPaxgst = topSellingProduct.originAddress === paxgstAddress;
+  const isSilvst = topSellingProduct.originAddress === silvstAddress;
 
   const naviroute = routes.MarketplaceProductDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
     !isEthst &&
-    !isWbtcst && !isUsdtst && !isUsdcst && !isPaxgst &&
+    !isWbtcst && !isUsdtst && !isUsdcst && !isPaxgst && !isSilvst &&
     (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
@@ -235,7 +236,7 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
-              } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+              } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) {
                 navigate(
                   `${routes.bridgeableProductDetail.url.replace(
                     ':address',
@@ -343,7 +344,7 @@ const NewTrendingCard = ({
         </div>
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            (isEthst || isWbtcst || isUsdtst || isUsdcst || isPaxgst ) &&
+            (isEthst || isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst ) &&
             reserve
               ? 'invisible'
               : ''
@@ -471,7 +472,7 @@ const NewTrendingCard = ({
                   { state: { isCalledFromInventory: false } }
                 );
               } else if (
-                (isWbtcst || isUsdtst || isUsdcst || isPaxgst)  &&
+                (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst)  &&
                 reserve
               ) {
                 navigate(
@@ -491,7 +492,7 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {(isEthst || isWbtcst || isUsdtst || isUsdcst || isPaxgst) &&
+            {(isEthst || isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) &&
             reserve
               ? 'Bridge'
               : 'Buy Now'}

@@ -23,6 +23,7 @@ const GlobalTransactionResponsive = ({
   usdcstAddress,
   paxgstAddress,
   stratsAddress,
+  silvstAddress
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -151,13 +152,14 @@ const GlobalTransactionResponsive = ({
                 const isUsdtst = assetOriginAddress === usdtstAddress;
                 const isUsdcst = assetOriginAddress === usdcstAddress;
                 const isPaxgst = assetOriginAddress === paxgstAddress;
+                const isSilvst = assetOriginAddress === silvstAddress;
 
                 if (isEthst) {
                   const url = routes.EthstProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });
-                } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+                } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) {
                   const url = routes.bridgeableProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress).replace(':bridgeableAsset', assetName)}`, {
                     state: { isCalledFromInventory: false },

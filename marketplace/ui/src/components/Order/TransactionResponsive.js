@@ -26,7 +26,7 @@ const TransactionResponsive = ({
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
   const { bridgeableAddress } = useEthState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress } = bridgeableAddress || {};
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -200,13 +200,14 @@ const TransactionResponsive = ({
             const isUsdtst = assetOriginAddress === usdtstAddress; 
             const isUsdcst = assetOriginAddress === usdcstAddress;
             const isPaxgst = assetOriginAddress === paxgstAddress;
+            const isSilvst = assetOriginAddress === silvstAddress;
 
             if (isEthst) {
               const url = routes.EthstProductDetail.url;
               navigate(`${url.replace(':address', assetAddress)}`, {
                 state: { isCalledFromInventory: false },
               });
-            } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+            } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst || isSilvst) {
               const url = routes.bridgeableProductDetail.url;
               navigate(`${url.replace(':address', assetAddress).replace(':bridgeableAsset', assetName)}`, {
                 state: { isCalledFromInventory: false },

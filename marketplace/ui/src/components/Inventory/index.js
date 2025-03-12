@@ -156,7 +156,7 @@ const Inventory = ({ user }) => {
   const itemDispatch = useItemDispatch();
   const { message: itemMsg, success: itemSuccess } = useItemState();
   const { message: ethMsg, success: ethSuccess, bridgeableAddress } = useEthState();
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress } = bridgeableAddress || {};
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } =
     useRedemptionState();
@@ -556,7 +556,7 @@ const Inventory = ({ user }) => {
             category={category}
             allSubcategories={allSubcategories}
             user={user}
-            bridgeableTokens={[ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress]}
+            bridgeableTokens={[ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress, silvstAddress]}
             supportedTokens={supportedTokens}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
