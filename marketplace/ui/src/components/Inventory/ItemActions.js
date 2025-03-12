@@ -619,7 +619,7 @@ const ItemActions = ({
             balance: quantity.toString(),
             decimals,
           }}
-          inventorypageDetails={{ limit, offset, categoryName: category }}
+          pageDetails={{ limit, offset, categoryName: category }}
           tokenName={inventory.name}
           tabKey={'2'}
         />

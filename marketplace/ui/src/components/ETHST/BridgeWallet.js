@@ -1,5 +1,6 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { actions } from '../../contexts/inventory/actions';
 import { useInventoryDispatch } from '../../contexts/inventory';
@@ -28,7 +29,7 @@ const BridgeWalletModal = ({
   signer,
   tokenName,
   tabKey = '1',
-  inventorypageDetails,
+  pageDetails,
 }) => {
   const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
   const [ethereumAddress, setEthereumAddress] = useState('');
@@ -37,6 +38,9 @@ const BridgeWalletModal = ({
   const inventoryDispatch = useInventoryDispatch();
   const { user } = useAuthenticateState();
   const { isAddingHash, isBridgingOut } = useEthState();
+
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   const ethToMercataColumns = [
     {
@@ -103,6 +107,37 @@ const BridgeWalletModal = ({
           pagination={false}
         />
       </div>
+      <div className="flex flex-col gap-[18px] md:hidden">
+        <div>
+          {' '}
+          <p className="text-[#202020] font-medium text-sm">
+            {tokenName} Available
+          </p>
+          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+            <p> {accountDetails.balance} </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+          <div>
+            <InputNumber
+              className="w-full h-9"
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+            />
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Wallet Address</p>
+          <div>
+            <Input
+              className="w-full h-9"
+              disabled={true}
+              value={accountDetails.walletAddress}
+            />
+          </div>
+        </div>
+      </div>
     </>
   );
 
@@ -117,6 +152,36 @@ const BridgeWalletModal = ({
       </div>
     </>
   );
+
+  /**
+   * Refresh the inventory and reserve data after a successful stake/unstake action.
+   */
+  const refreshDataAfterAction = async () => {
+    if (
+      queryParams.get('st') === 'true' ||
+      window.location.pathname === '/stake'
+    ) {
+      await actions.fetchInventory(
+        inventoryDispatch,
+        pageDetails.limit,
+        pageDetails.offset,
+        '',
+        pageDetails.categoryName,
+        pageDetails.reserves.map((reserve) => reserve.assetRootAddress)
+      );
+      await actions.getAllReserve(inventoryDispatch);
+      await actions.getUserCataRewards(inventoryDispatch);
+    } else {
+      await actions.fetchInventory(
+        inventoryDispatch,
+        pageDetails.limit,
+        pageDetails.offset,
+        '',
+        pageDetails.categoryName,
+        ''
+      );
+    }
+  };
 
   const handleSubmit = async () => {
     setLoader(true);
@@ -204,18 +269,11 @@ const BridgeWalletModal = ({
       }
 
       if (isDone && tabKey != '1') {
-        await actions.fetchInventory(
-          inventoryDispatch,
-          inventorypageDetails.limit,
-          inventorypageDetails.offset,
-          '',
-          inventorypageDetails.categoryName,
-          ''
-        );
+        refreshDataAfterAction();
       }
     } catch (error) {
       ethActions.setMessage(ethDispatch, error.code);
-      console.error("Transaction failed:", error);
+      console.error('Transaction failed:', error);
     } finally {
       setLoader(false);
       handleCancel();
@@ -229,17 +287,49 @@ const BridgeWalletModal = ({
       onCancel={handleCancel}
       width={1000}
       footer={[
-        <div className="flex justify-center md:block">
-          <Button
-            type="primary"
-            className="w-32 h-9"
-            onClick={handleSubmit}
-            disabled={quantity <= 0 || quantity > accountDetails.balance}
-            loading={isAddingHash || loader || isBridgingOut}
-          >
-            Bridge
-          </Button>
-        </div>,
+        <>
+          <div className="md:flex justify-between items-center w-full hidden">
+            <div className="max-w-[60%] text-left">
+              <p className="text-xs">
+                <b>Note:</b> Bridged tokens will be automatically staked in the
+                app. Please allow a few minutes for the staking process to
+                complete after bridging.
+              </p>
+            </div>
+
+            <div>
+              <Button
+                type="primary"
+                className="w-32 h-9"
+                onClick={handleSubmit}
+                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                loading={isAddingHash || loader || isBridgingOut}
+              >
+                Bridge
+              </Button>
+            </div>
+          </div>
+          <div className="md:hidden">
+            <div className="w-full flex justify-center mt-8">
+              <Button
+                type="primary"
+                className="w-full h-9"
+                onClick={handleSubmit}
+                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                loading={isAddingHash || loader || isBridgingOut}
+              >
+                Bridge
+              </Button>
+            </div>
+            <div className="w-full text-left mt-4">
+              <p className="text-xs">
+                <b>Note:</b> Bridged tokens will be automatically staked in the
+                app. Please allow a few minutes for the staking process to
+                complete after bridging.
+              </p>
+            </div>
+          </div>
+        </>,
       ]}
     >
       <Tabs activeKey="1">

@@ -37,6 +37,8 @@ import { useInventoryState } from '../../contexts/inventory';
 import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
+import BridgeWallet from '../ETHST/BridgeWallet';
+
 const USDSTIcon = (
   <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
 );
@@ -51,6 +53,7 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
+  bridgeableTokens,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -69,6 +72,7 @@ const InventoryCard = ({
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const { bridgeableAddress } = useEthState();
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -184,6 +188,14 @@ const InventoryCard = ({
     setBridgeModalOpen(false);
   };
 
+  const showBridgeOutModal = () => {
+    setBridgeOutModalOpen(true);
+  };
+
+  const handleBridgeOutModalClose = () => {
+    setBridgeOutModalOpen(false);
+  };
+
   const callDetailPage = () => {
     const isEthst = inventory.originAddress === ethstAddress;
     const isWbtcst = inventory.originAddress === wbtcstAddress;
@@ -273,6 +285,13 @@ const InventoryCard = ({
       supportedTokens.some(
         (token) => token.mercata_root_address === inventoryRoot
       )
+    );
+  };
+
+  const isBridgeableToken = (inventoryRoot) => {
+    return (
+      Array.isArray(bridgeableTokens) &&
+      bridgeableTokens.find((address) => address === inventoryRoot)
     );
   };
 
@@ -436,22 +455,31 @@ const InventoryCard = ({
             )}
             {(!stakeable || (!inventory.escrow && stakeable)) && (
               <>
-                {stakeable && (
-                  <Button
-                    type="link"
-                    className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-                    onClick={showRedeemModal}
-                    disabled={
-                      inventory.price ||
-                      inventory.address === inventory.originAddress ||
-                      !isActive() ||
-                      disableSADDOGS(inventory) ||
-                      getCategory()?.includes('Tokens')
-                    }
-                  >
-                    <SendOutlined /> Redeem
-                  </Button>
-                )}
+                {stakeable &&
+                  (isBridgeableToken ? (
+                    <Button
+                      type="link"
+                      className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6`}
+                      onClick={showBridgeOutModal}
+                    >
+                      <RetweetOutlined /> Bridge
+                    </Button>
+                  ) : (
+                    <Button
+                      type="link"
+                      className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                      onClick={showRedeemModal}
+                      disabled={
+                        inventory.price ||
+                        inventory.address === inventory.originAddress ||
+                        !isActive() ||
+                        disableSADDOGS(inventory) ||
+                        getCategory()?.includes('Tokens')
+                      }
+                    >
+                      <SendOutlined /> Redeem
+                    </Button>
+                  ))}
                 <Button
                   type="link"
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
@@ -724,6 +752,20 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           reserves={reserves}
+        />
+      )}
+      {bridgeOutModalOpen && (
+        <BridgeWallet
+          open={bridgeOutModalOpen}
+          handleCancel={handleBridgeOutModalClose}
+          accountDetails={{
+            assetRootAddress: inventory.root,
+            balance: quantity.toString(),
+            decimals,
+          }}
+          pageDetails={{ limit, offset, categoryName: category }}
+          tokenName={inventory.name}
+          tabKey={'2'}
         />
       )}
     </div>

@@ -821,6 +821,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
+                        bridgeableTokens={[ethstAddress, wbtcstAddress]}
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
@@ -845,6 +846,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
+                        bridgeableTokens={[ethstAddress, wbtcstAddress]}
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
