@@ -17,7 +17,6 @@ import Blockchain.Blockstanbul.Messages hiding (sequence)
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.Options (flags_strictBlockstanbul)
 import Blockchain.Blockstanbul.StateMachine
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
