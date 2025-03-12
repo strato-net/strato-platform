@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE QuasiQuotes          #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -42,6 +43,7 @@ import qualified Database.Redis                        as REDIS
 import           System.Random                         (randomIO)
 import qualified Text.Colors                           as CL
 import           Text.Format
+import           Text.RawString.QQ
 
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT
@@ -119,7 +121,7 @@ getBestSequencedBlockInfo :: Redis (Maybe BestSequencedBlock)
 getBestSequencedBlockInfo =
   REDIS.get bestSequencedBlockInfoKey >>= \case
     Left e -> error $ "error trying to get BestSequencedBlock: " ++ show e
-    Right r ->  return $ fmap fromValue r
+    Right v ->  return $ fmap fromValue v
 
 putBestSequencedBlockInfo :: RedisCtx m f => BestSequencedBlock -> m (f REDIS.Status)
 putBestSequencedBlockInfo = REDIS.set bestSequencedBlockInfoKey . toValue
@@ -130,7 +132,7 @@ getBestBlockInfo' key =
     Left x -> do
       liftLog $ $logErrorS "getBestBlockInfo'" . T.pack $ "got Left " ++ show x
       return Nothing
-    Right r -> case r of
+    Right v -> case v of
       Nothing -> return Nothing -- return . Left $ REDIS.SingleLine "No BestBlock data set in RedisBlockDB"
       Just bs -> return . Just $ BestBlock sha num
         where
@@ -302,16 +304,24 @@ instance HasSQL m => HasSyncDB m where
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
 
-    vals <-
-      select $ from $ \syncTask -> do
-          where_ (
-            (syncTask^.SyncTaskAssignmentTime <=. val oneMinuteAgo)
-            &&.
-            ((syncTask^.SyncTaskStatus) !=. val Finished)
+    result <- rawSql
+        [r|
+            UPDATE "sync_task"
+            SET "host" = ?, "assignment_time" = ?
+            WHERE "id" = (
+                SELECT "id"
+                FROM "sync_task"
+                WHERE "assignment_time" < ?
+                  AND "status" != 'Finished'
+                ORDER BY "assignment_time" ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
             )
-          return syncTask
+            RETURNING
+        |]
+        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
 
-    case vals of
+    case result of
       oneTask:_ -> return $ entityVal oneTask
       [] -> do
         --No existing task, make a new one

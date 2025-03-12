@@ -35,6 +35,7 @@ library:
   - labeled-error
   - mtl
   - persistent
+  - raw-strings-qq
   - random
   - sql-monad
   - strato-model
