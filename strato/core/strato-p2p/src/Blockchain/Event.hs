@@ -1,16 +1,16 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Blockchain.Event
   ( module Blockchain.EventModel,
@@ -18,55 +18,57 @@ module Blockchain.Event
   )
 where
 
-import BlockApps.Logging
-import BlockApps.X509.Certificate as XC
-import Blockchain.Blockstanbul (blockstanbulSender, WireMessage)
-import Blockchain.Context
-import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader (BlockHeader)
-import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.PubKey
-import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.Data.Transaction
-import Blockchain.Data.Wire
-import Blockchain.EventException
-import Blockchain.EventModel
-import Blockchain.HeaderCache
-import Blockchain.Model.SyncState
-import Blockchain.Model.SyncTask
-import Blockchain.Model.WrappedBlock
-import Blockchain.Options
-import Blockchain.Sequencer.Event
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.MicroTime
-import Blockchain.Strato.Model.Secp256k1
-import Blockchain.SyncDB
-import Control.Arrow (second, (&&&))
-import Control.Monad
-import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify hiding (awaitForever, get, put, yield)
-import qualified Control.Monad.Change.Modify as Mod (get, put)
-import Control.Monad.IO.Class
-import Control.Monad.State
-import qualified Data.ByteString.Base16 as BC16
-import qualified Data.ByteString.Char8 as BS8
-import Data.Conduit
-import Data.List hiding (insert, lookup)
-import qualified Data.Map.Strict as M
-import Data.Maybe
-import qualified Data.Text as T
-import Data.Time.Clock
-import Debug.Trace (trace)
-import Text.Format
-import Text.Printf
-import Text.Tools
-import UnliftIO.Exception
-import Prelude hiding (lookup)
+import           BlockApps.Logging
+import           BlockApps.X509.Certificate            as XC
+import           Blockchain.Blockstanbul               (WireMessage,
+                                                        blockstanbulSender)
+import           Blockchain.Context
+import           Blockchain.Data.Block
+import           Blockchain.Data.BlockHeader           (BlockHeader)
+import qualified Blockchain.Data.BlockHeader           as BlockHeader
+import           Blockchain.Data.Control               (P2PCNC (..))
+import           Blockchain.Data.PubKey
+import           Blockchain.Data.Transaction
+import qualified Blockchain.Data.TXOrigin              as Origin
+import           Blockchain.Data.Wire
+import           Blockchain.EventException
+import           Blockchain.EventModel
+import           Blockchain.HeaderCache
+import           Blockchain.Model.SyncState
+import           Blockchain.Model.SyncTask
+import           Blockchain.Model.WrappedBlock
+import           Blockchain.Options
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Address       (Address)
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.MicroTime
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.SyncDB
+import           Control.Arrow                         (second, (&&&))
+import           Control.Monad
+import           Control.Monad.Change.Alter
+import           Control.Monad.Change.Modify           hiding (awaitForever,
+                                                        get, put, yield)
+import qualified Control.Monad.Change.Modify           as Mod (get, put)
+import           Control.Monad.IO.Class
+import           Control.Monad.State
+import qualified Data.ByteString.Base16                as BC16
+import qualified Data.ByteString.Char8                 as BS8
+import           Data.Conduit
+import           Data.List                             hiding (insert, lookup)
+import qualified Data.Map.Strict                       as M
+import           Data.Maybe
+import qualified Data.Text                             as T
+import           Data.Time.Clock
+import           Debug.Trace                           (trace)
+import           Prelude                               hiding (lookup)
+import           Text.Format
+import           Text.Printf
+import           Text.Tools
+import           UnliftIO.Exception
 
 -- drop every n-th element from the list
 -- e.g. skipEntries 0 [1..20] => [1..20]
@@ -78,14 +80,14 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
   where
     helper xs' = case drop n xs' of
       (y : ys) -> y : helper ys
-      [] -> []
+      []       -> []
 
 peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
   where
     key = p2s (pPeerPubkey peer)
     p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
-    p2s _ = ""
+    p2s _        = ""
 
 yieldR :: Monad m => a -> ConduitT i (Either e a) m ()
 yieldR = yield . Right
@@ -99,7 +101,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
-    $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ (intercalate "\n" (format <$> txs))
+    $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
     lift stampActionTimestamp
     let txo = Origin.PeerString (peerString peer)
     ts <- liftIO getCurrentMicrotime
@@ -107,7 +109,7 @@ handleEvents peer = awaitForever $ \case
     yieldL $ ToUnseq ingestTxs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
-    $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock"
+    $logInfoS "handleEvents/NewBlock" "newBlock"
     let sha = blockHash block'
     let header = blockHeader block'
     let num = blockHeaderBlockNumber header
@@ -120,7 +122,7 @@ handleEvents peer = awaitForever $ \case
         BestSequencedBlock _ bestBlockNum _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
         let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-        $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
+        $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
         syncFetch Forward fetchNumber
       Just _ -> do
         let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
@@ -134,7 +136,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
     lift stampActionTimestamp
     start' <- case dir of
-      Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
+      Reverse -> return $ if start > fromIntegral max' then start - fromIntegral max' else 1
       Forward -> return start
     -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
     -- 3/4s of the blocks will be dropped when creating the blockheaders
@@ -143,7 +145,7 @@ handleEvents peer = awaitForever $ \case
     chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
-        T.concat $
+        T.concat
           [ "Warning: A peer requested blocks starting at #",
             T.pack $ show start,
             ", but we don't have these in our canonical chain....",
@@ -169,7 +171,7 @@ handleEvents peer = awaitForever $ \case
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     lift stampActionTimestamp
-    
+
     let headers = morphBlockHeader <$> bHeaders
 
     bodyRequestAlreadyActive <- lift isBodyRequestActive
@@ -302,7 +304,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (MPNodes nds) -> do
     yieldL $ ToUnseq [IEMPNodesReceived nds]
   MsgEvt (Disconnect _) -> do
-    $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
+    $logInfoS "handleEvents/Disconnect" "Disconnect event received in Event handler"
     throwIO PeerDisconnected
   NewSeqEvent oe -> case oe of
     P2pBlock b -> do
@@ -317,7 +319,7 @@ handleEvents peer = awaitForever $ \case
         $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx)
         $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
         yieldR $ Transactions [otBaseTx tx]
-        
+
     P2pBlockstanbul msg -> do
       {-
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
@@ -417,7 +419,7 @@ syncFetch d num = do
 shouldRespond :: PPeer -> Origin.TXOrigin -> Bool
 shouldRespond peer txo = case txo of
   Origin.PeerString ps -> ps == peerString peer
-  _ -> False
+  _                    -> False
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of

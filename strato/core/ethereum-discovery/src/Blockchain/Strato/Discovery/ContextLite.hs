@@ -1,16 +1,15 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -26,53 +25,54 @@ module Blockchain.Strato.Discovery.ContextLite
   )
 where
 
-import BlockApps.Logging
-import Blockchain.DB.SQLDB
-import Blockchain.DBM
-import Blockchain.Data.PubKey (secPubKeyToPoint)
-import Blockchain.EthConf (lookupRedisBlockDBConfig)
-import Blockchain.Model.SyncState
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Discovery.UDP (processDataStream')
-import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Validator
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.SyncDB
-import Control.Concurrent (threadDelay)
-import Control.Exception hiding (catch)
-import Control.Monad (void)
-import Control.Monad.Catch hiding (bracket)
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Change.Modify (Accessible (..))
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Base
-import Control.Monad.IO.Class
-import Control.Monad.IO.Unlift
-import Control.Monad.Reader
-import Crypto.Types.PubKey.ECC
-import qualified Data.ByteString as B
-import Data.IP
-import Data.List
-import Data.Maybe
-import qualified Data.Text as T
-import qualified Database.Persist.Postgresql as SQL
-import qualified Database.Redis as Redis
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import Network.Socket
-import qualified Network.Socket.ByteString as NB
-import Servant.Client
-import qualified Strato.Strato23.API as VC
-import qualified Strato.Strato23.Client as VC
-import System.Timeout
+import           BlockApps.Logging
+import           Blockchain.Data.PubKey                (secPubKeyToPoint)
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
+import           Blockchain.Model.SyncState
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.UDP       (processDataStream')
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Validator
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import           Blockchain.SyncDB
+import           Control.Concurrent                    (threadDelay)
+import           Control.Exception                     hiding (catch)
+import           Control.Monad                         (void)
+import           Control.Monad.Catch                   hiding (bracket)
+import qualified Control.Monad.Change.Alter            as A
+import           Control.Monad.Change.Modify           (Accessible (..))
+import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Composable.Base
+import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
+import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString                       as B
+import           Data.IP
+import           Data.List
+import           Data.Maybe
+import qualified Data.Text                             as T
+import qualified Database.Persist.Postgresql           as SQL
+import qualified Database.Redis                        as Redis
+import           Network.HTTP.Client                   (defaultManagerSettings,
+                                                        newManager)
+import           Network.Socket
+import qualified Network.Socket.ByteString             as NB
+import           Servant.Client
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
+import           System.Timeout
 
 data ContextLite = ContextLite
-  { liteSQLDB :: SQLDB,
+  { liteSQLDB    :: SQLDB,
     redisBlockDB :: RBDB.RedisConnection,
-    vaultClient :: ClientEnv,
-    sock :: Socket,
-    myUdpPort :: UDPPort,
-    myTcpPort :: TCPPort
+    vaultClient  :: ClientEnv,
+    sock         :: Socket,
+    myUdpPort    :: UDPPort,
+    myTcpPort    :: TCPPort
   }
 
 instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
@@ -92,7 +92,7 @@ instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
 
 instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
   access _ = asks redisBlockDB
-  
+
 instance MonadIO m => Accessible [Validator] (ReaderT ContextLite m) where
   access _ = do
     bestSequencedBlock <- fromMaybe (error "missing BestSequencedBlock in redis") <$> RBDB.withRedisBlockDB getBestSequencedBlockInfo
@@ -117,7 +117,7 @@ instance MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) whe
           actions' = SQL.selectList [PPeerHost SQL.==. host'] []
 
 instance MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
-  select _ ip = getPeerByIP ip
+  select _ = getPeerByIP
     where
       getPeerByIP :: IP -> ReaderT ContextLite m (Maybe PPeer)
       getPeerByIP ip' =
@@ -131,8 +131,8 @@ instance MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
   replace _ addr' packet = do
     sock' <- asks sock
-    liftIO $ catch 
-      (void $ NB.sendTo sock' packet addr') 
+    liftIO $ catch
+      (void $ NB.sendTo sock' packet addr')
       (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
 
 instance A.Selectable (Host, UDPPort, B.ByteString) Point IO where
@@ -142,7 +142,7 @@ instance A.Selectable (Host, UDPPort, B.ByteString) Point IO where
     where
       getSocket :: IO Socket
       getSocket = do
-        (serveraddr : _) <- getAddrInfo 
+        (serveraddr : _) <- getAddrInfo
           (Just defaultHints {addrFlags = [AI_ALL]})
           (Just $ hostToString domain)
           (Just $ show udpPortNum)
@@ -170,7 +170,7 @@ instance MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT Conte
         (Just defaultHints {addrFlags = [AI_ALL]})
         (Just $ hostToString ip)
         (Just $ show udpPortNum))
-      ((\(err :: IOError) -> runLoggingT ($logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return []))
+      (\(err :: IOError) -> runLoggingT ($logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return [])
 
 instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
@@ -219,7 +219,7 @@ waitOnVault action = do
   case res of
     Left err -> do
       $logErrorS "HasVault" . T.pack $ "vault-proxy returned an error: " ++ show err
-      liftIO $ threadDelay $ 2000000 -- 2 seconds
+      liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> return val
 
@@ -246,22 +246,18 @@ getPeerByIP' ::
   (A.Selectable IP PPeer m) =>
   IP ->
   m (Maybe PPeer)
-getPeerByIP' ip = A.select (A.Proxy @PPeer) ip
+getPeerByIP' = A.select (A.Proxy @PPeer)
 
-doPeersExist ::
-  (A.Selectable IP PPeer m) =>
-  [IP] ->
-  m (Bool)
-doPeersExist peers = do
-  maybePeer <- traverse doesPeerExist peers
-  pure $ all (== True) maybePeer
+doPeersExist :: (A.Selectable IP PPeer m) =>
+                [IP] -> m Bool
+doPeersExist peers = and <$> traverse doesPeerExist peers
 
 doesPeerExist ::
   (A.Selectable IP PPeer m) =>
   IP ->
-  m (Bool)
+  m Bool
 doesPeerExist peer = do
   maybePeer <- A.select (A.Proxy @PPeer) peer
   case maybePeer of
     Nothing -> pure False
-    Just _ -> pure True
+    Just _  -> pure True

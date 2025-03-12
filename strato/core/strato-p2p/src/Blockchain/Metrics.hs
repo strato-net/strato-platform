@@ -1,6 +1,6 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Blockchain.Metrics
   ( recordEvent,
@@ -16,18 +16,18 @@ module Blockchain.Metrics
   )
 where
 
-import qualified Blockchain.Blockstanbul as PBFT
-import Blockchain.Data.Wire
-import Blockchain.Display (MsgDirection (..))
-import Blockchain.EventModel
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer (PPeer (..))
-import Control.Exception
-import Control.Monad.IO.Class
-import qualified Data.ByteString as B
-import Data.Text
-import Data.Typeable
-import Prometheus
+import qualified Blockchain.Blockstanbul               as PBFT
+import           Blockchain.Data.Wire
+import           Blockchain.Display                    (MsgDirection (..))
+import           Blockchain.EventModel
+import           Blockchain.Strato.Discovery.Data.Peer (PPeer (..))
+import           Blockchain.Strato.Model.Host
+import           Control.Exception
+import           Control.Monad.IO.Class
+import qualified Data.ByteString                       as B
+import           Data.Text
+import           Data.Typeable
+import           Prometheus
 
 -- TODO(tim): Add peer to labels
 receivedMessages :: Vector Text Counter
@@ -81,9 +81,9 @@ recordMessage' msgVect msg = do
         NewBlock _ _ -> "new_block"
         Blockstanbul wm ->
           case PBFT._message wm of
-            PBFT.Preprepare {} -> "preprepare"
-            PBFT.Prepare {} -> "prepare"
-            PBFT.Commit {} -> "commit"
+            PBFT.Preprepare {}  -> "preprepare"
+            PBFT.Prepare {}     -> "prepare"
+            PBFT.Commit {}      -> "commit"
             PBFT.RoundChange {} -> "round_change"
         GetChainDetails _ -> "get_chain_details"
         ChainDetails _ -> "chain_details"

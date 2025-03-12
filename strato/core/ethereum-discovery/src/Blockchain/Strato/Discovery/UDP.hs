@@ -1,7 +1,7 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Blockchain.Strato.Discovery.UDP
   ( dataToPacket,
@@ -22,35 +22,35 @@ module Blockchain.Strato.Discovery.UDP
   )
 where
 
-import BlockApps.Logging
-import Blockchain.Data.RLP
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Discovery.P2PUtil (DiscoverException (..))
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
-import Control.Error (note)
-import Control.Exception hiding (try)
-import Control.Monad (forM_)
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.IO.Class
-import Crypto.Types.PubKey.ECC
-import Data.Binary
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import Data.List.Split
-import Data.Maybe
-import qualified Data.Text as T
-import Data.Time.Clock.POSIX
-import Network.Socket
-import qualified Network.URI as URI
-import Numeric
-import System.Endian
-import qualified Text.Colors as CL
-import Text.Format
-import UnliftIO
+import           BlockApps.Logging
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
+import           Control.Error                         (note)
+import           Control.Exception                     hiding (try)
+import           Control.Monad                         (forM_)
+import qualified Control.Monad.Change.Alter            as A
+import           Control.Monad.IO.Class
+import           Crypto.Types.PubKey.ECC
+import           Data.Binary
+import           Data.Bits
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import           Data.List.Split
+import           Data.Maybe
+import qualified Data.Text                             as T
+import           Data.Time.Clock.POSIX
+import           Network.Socket
+import qualified Network.URI                           as URI
+import           Numeric
+import           System.Endian
+import qualified Text.Colors                           as CL
+import           Text.Format
+import           UnliftIO
 
 data NodeDiscoveryPacket
   = Ping Integer Endpoint Endpoint Integer
@@ -110,7 +110,7 @@ stringToIAddr x
 instance RLPSerializable IAddr where
   rlpEncode (IPV4Addr x) = rlpEncode $ fromBE32 x
   rlpEncode (IPV6Addr (x1, x2, x3, x4)) = rlpEncode $ B.toStrict $ encode x4 <> encode x3 <> encode x2 <> encode x1
-  rlpEncode (HostName s) = rlpEncode $ (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
+  rlpEncode (HostName s) = rlpEncode (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
   rlpDecode o@(RLPString s)
     | B.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o
     --TODO- verify the order of this
@@ -247,12 +247,13 @@ sendPacket thePeer packet = do
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
     A.replace (A.Proxy @B.ByteString) addr $ theHash <> sigBS <> B.singleton theType' <> theData
-  flip updateLastMessage thePeer (case packet of
-    Ping{} -> "Ping"
-    Pong{} -> "Pong"
-    FindNeighbors{} -> "FindNeighbors"
-    Neighbors{} -> "Neighbors"
-    )
+  updateLastMessage
+    (case packet of
+       Ping{}          -> "Ping"
+       Pong{}          -> "Pong"
+       FindNeighbors{} -> "FindNeighbors"
+       Neighbors{}     -> "Neighbors")
+    thePeer
 
 processDataStream' :: B.ByteString -> PublicKey
 processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
@@ -303,6 +304,6 @@ getServerPubKey peer = do
 
   pubKey <- try $ A.select (A.Proxy @Point) (domain, udpPort, theMsg)
   case pubKey of
-    Right Nothing -> return $ Left $ SomeException UDPTimeout
-    Left x -> return $ Left x
+    Right Nothing  -> return $ Left $ SomeException UDPTimeout
+    Left x         -> return $ Left x
     Right (Just x) -> return $ Right x

@@ -5,13 +5,13 @@ module Blockchain.Strato.Discovery.Data.PeerSpec
   )
 where
 
-import Blockchain.Strato.Discovery.Data.Host as H
-import Blockchain.Strato.Discovery.Data.Peer
-import Data.String
-import Test.Hspec
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Host          as H
+import           Data.String
+import           Test.Hspec
 
 publicKey :: String
-publicKey = take 128 (repeat '1')
+publicKey = replicate 128 '1'
 
 port :: Int
 port = 30303

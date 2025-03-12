@@ -1,15 +1,15 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Blockchain.Context
     ( MonadP2P
@@ -49,33 +49,33 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Exception                     hiding (bracket)
-import           Control.Lens                          hiding (Context)
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Exception                       hiding (bracket)
+import           Control.Lens                            hiding (Context)
+import qualified Control.Monad.Change.Alter              as A
+import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.Composable.Kafka
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
-import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Char8                 as BC
+import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
-import qualified Data.Kind                             as DK
-import           Data.Foldable                         (toList)
-import qualified Data.Map.Strict                       as M
+import           Data.Foldable                           (toList)
+import qualified Data.Kind                               as DK
+import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
-import qualified Data.Set.Ordered as S
+import qualified Data.Set.Ordered                        as S
 import           Data.String
-import qualified Data.Text                             as T
+import qualified Data.Text                               as T
 import           Data.Time.Clock
-import           GHC.Exts                              (Constraint)
+import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 
 import           Blockchain.BlockDB
-import           Blockchain.Blockstanbul               (WireMessage)
+import           Blockchain.Blockstanbul                 (WireMessage)
 import           Blockchain.CertificateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
@@ -85,32 +85,33 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Model.SyncState
-import qualified Blockchain.Model.SyncTask as SYNCTASK
+import qualified Blockchain.Model.SyncTask               as SYNCTASK
 import           Blockchain.Model.WrappedBlock
 import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
-import qualified Blockchain.Sequencer.Kafka            as SK
+import qualified Blockchain.Sequencer.Kafka              as SK
 
-import           Blockchain.Strato.Discovery.Data.Host
-import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.ContextLite ()
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                         (void)
+import           Control.Monad                           (void)
 import           Control.Monad.Composable.Base
-import qualified Database.Persist.Sql                  as SQL
-import qualified Database.Redis                        as Redis
-import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
-import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
+import qualified Database.Persist.Sql                    as SQL
+import qualified Database.Redis                          as Redis
+import           Network.HTTP.Client                     (defaultManagerSettings,
+                                                          newManager)
+import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
 import           Servant.Client
-import qualified Strato.Strato23.API                   as VC
-import qualified Strato.Strato23.Client                as VC
+import qualified Strato.Strato23.API                     as VC
+import qualified Strato.Strato23.Client                  as VC
 
 import           UnliftIO
 
@@ -137,12 +138,12 @@ newtype Inbound a = Inbound {unInbound :: a}
 newtype Outbound a = Outbound {unOutbound :: a}
 
 data Config = Config
-  { configSQLDB :: SQLDB,
-    configRedisBlockDB :: RBDB.RedisConnection,
-    configVaultClient :: ClientEnv,
-    configContext :: IORef Context,
+  { configSQLDB                    :: SQLDB,
+    configRedisBlockDB             :: RBDB.RedisConnection,
+    configVaultClient              :: ClientEnv,
+    configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
-    configPubKey :: PublicKey
+    configPubKey                   :: PublicKey
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -158,11 +159,11 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState        :: KafkaEnv
-  , blockHeaders             :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
-  , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
-  , actionTimestamp          :: ActionTimestamp
-  , _blockstanbulPeerAddr    :: PeerAddress
+  { contextKafkaState     :: KafkaEnv
+  , blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp       :: ActionTimestamp
+  , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
 
@@ -174,8 +175,8 @@ type ContextM = ReaderT Config (ResourceT (LoggingT IO))
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
-    _peerSink :: ConduitM B.ByteString Void m (),
-    _seqSource :: ConduitM () P2pEvent m ()
+    _peerSink   :: ConduitM B.ByteString Void m (),
+    _seqSource  :: ConduitM () P2pEvent m ()
   }
 
 makeLenses ''P2pConduits
@@ -218,7 +219,7 @@ instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) wher
   insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
   delete _ = void . RBDB.withRedisBlockDB . deleteHeader
   lookupMany _ =
-    fmap (M.fromList . catMaybes . map sequenceA)
+    fmap (M.fromList . mapMaybe sequenceA)
       . RBDB.withRedisBlockDB
       . getHeaders
   insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
@@ -268,13 +269,13 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
   insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
   delete _ = void . RBDB.withRedisBlockDB . deleteBlock
   lookupMany _ =
-    fmap (M.fromList . catMaybes . map sequenceA)
+    fmap (M.fromList . mapMaybe sequenceA)
       . RBDB.withRedisBlockDB
       . getBlocks
   insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
 
-instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
+instance MonadIO m => (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) (ReaderT Config m) where
   lookup _ k = do
     wms <- readIORef =<< asks configBlockstanbulWireMessages
     let b = S.member k wms
@@ -298,7 +299,7 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
              in (wms', ())
         )
 
-instance MonadIO m => ((Host, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
+instance MonadIO m => ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) (ReaderT Config m) where
   lookup _ k = do
     wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
     let b = S.member k wms
@@ -323,7 +324,7 @@ instance
 instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _ = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
-  
+
 instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
@@ -395,7 +396,7 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
       [] -> return Nothing
       lst -> return . Just . SQL.entityVal $ head lst
     where
-      actions = SQL.selectList [PPeerPubkey SQL.==. (Just pk)] []
+      actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
 instance MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
