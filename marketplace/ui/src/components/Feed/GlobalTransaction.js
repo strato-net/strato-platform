@@ -42,11 +42,7 @@ const GlobalTransaction = ({
   user,
   USDSTAddress,
   assetsWithEighteenDecimalPlaces,
-  ethstAddress,
-  wbtcstAddress,
-  usdtstAddress,
-  usdcstAddress,
-  paxgstAddress,
+  bridgeableAddresses,
   stratsAddress,
 }) => {
   const USDSTIcon = (
@@ -166,18 +162,7 @@ const GlobalTransaction = ({
   };
 
   const handleAssetRedirection = (data) => {
-    const isEthst = data?.assetOriginAddress === ethstAddress;
-    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    const isUsdtst = data?.assetOriginAddress === usdtstAddress;
-    const isUsdcst = data?.assetOriginAddress === usdcstAddress;
-    const isPaxgst = data?.assetOriginAddress === paxgstAddress;
-
-    if (isEthst) {
-      const url = routes.EthstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+    if (Object.values(bridgeableAddresses).includes(data?.assetOriginAddress)) {
       const url = routes.bridgeableProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data?.assetName)}`, {
         state: { isCalledFromInventory: false },
@@ -476,11 +461,7 @@ const GlobalTransaction = ({
               user={user}
               isTransactionLoading={isTransactionLoading}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-              ethstAddress={ethstAddress}
-              wbtcstAddress={wbtcstAddress}
-              usdtstAddress={usdtstAddress}
-              usdcstAddress={usdcstAddress}
-              paxgstAddress={paxgstAddress}
+              bridgeableAddresses={bridgeableAddresses}
               stratsAddress={stratsAddress}
             />
           </Row>
