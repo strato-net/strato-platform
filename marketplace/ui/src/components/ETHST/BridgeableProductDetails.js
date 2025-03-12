@@ -297,40 +297,6 @@ const ProductDetails = ({ user, users }) => {
     };
   }, []);
 
-  // useEffect(() => {
-  //   const fetchBalance = async () => {
-  //     if (address) {
-  //       const wbtcAddress = fileServerUrl.includes('test')
-  //         ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
-  //         : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
-
-  //       const provider = new ethers.providers.Web3Provider(walletProvider);
-  //       const signer = provider.getSigner();
-  //       setSigner(signer);
-
-  //       // Create WBTC contract instance
-  //       const wbtcContract = new ethers.Contract(
-  //         wbtcAddress,
-  //         ERC20_ABI,
-  //         provider
-  //       );
-
-  //       try {
-  //         // Get WBTC balance
-  //         const wbtcBalance = await wbtcContract.balanceOf(address);
-
-  //         // WBTC has 8 decimals (like BTC), format accordingly
-  //         const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-  //         setTokenBalance(formattedBalance); // Set WBTC balance
-  //       } catch (error) {
-  //         console.error('Failed to fetch WBTC balance:', error);
-  //       }
-  //     }
-  //   };
-
-  //   fetchBalance();
-  // }, [address, chainId]);
-
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
