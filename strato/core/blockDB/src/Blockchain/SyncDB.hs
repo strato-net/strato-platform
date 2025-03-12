@@ -1,8 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Blockchain.SyncDB
@@ -20,28 +20,28 @@ module Blockchain.SyncDB
   )
 where
 
-import BlockApps.Logging
-import Blockchain.BlockDB
-import Blockchain.DB.SQLDB
-import Blockchain.Model.SyncState
-import Blockchain.Model.SyncTask
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.RedisBlockDB.Models as Models
-import Control.Concurrent (threadDelay)
-import Control.Monad
-import Control.Monad.Composable.SQL
-import Control.Monad.Trans
-import qualified Data.ByteString.Char8 as S8
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Time
-import Database.Esqueleto.Legacy
-import qualified Database.Persist.Sql as SQL
-import Database.Redis (Redis, RedisCtx)
-import qualified Database.Redis as REDIS
-import System.Random (randomIO)
-import Text.Format
-import qualified Text.Colors as CL
+import           BlockApps.Logging
+import           Blockchain.BlockDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.Model.SyncState
+import           Blockchain.Model.SyncTask
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.RedisBlockDB.Models as Models
+import           Control.Concurrent                    (threadDelay)
+import           Control.Monad
+import           Control.Monad.Composable.SQL
+import           Control.Monad.Trans
+import qualified Data.ByteString.Char8                 as S8
+import qualified Data.Text                             as T
+import           Data.Time
+import           Database.Esqueleto.Legacy
+import qualified Database.Persist.Sql                  as SQL
+import           Database.Redis                        (Redis, RedisCtx)
+import qualified Database.Redis                        as REDIS
+import           System.Random                         (randomIO)
+import qualified Text.Colors                           as CL
+import           Text.Format
 
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT
@@ -55,19 +55,19 @@ inNamespace ns k = ns' `S8.append` toKey k
   where
     ns' = namespaceToKeyPrefix ns
 
-namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString 
-namespaceToKeyPrefix ns = case ns of 
-  Headers -> "h:"
-  Transactions -> "t:"
-  Numbers -> "n:"
-  Uncles -> "u:"
-  Parent -> "p:"
-  Children -> "c:"
-  Canonical -> "q:"
-  Validators -> "validators"
-  X509Certificates -> "x509:"
+namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString
+namespaceToKeyPrefix ns = case ns of
+  Headers            -> "h:"
+  Transactions       -> "t:"
+  Numbers            -> "n:"
+  Uncles             -> "u:"
+  Parent             -> "p:"
+  Children           -> "c:"
+  Canonical          -> "q:"
+  Validators         -> "validators"
+  X509Certificates   -> "x509:"
   ParsedSetWhitePage -> "potu:"
-  ParsedSetToX509 -> "psx509:"
+  ParsedSetToX509    -> "psx509:"
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -95,7 +95,7 @@ putBestBlockInfo newSha newNumber = do
           --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
           --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
           res <- REDIS.multiExec $ do
-            forM_ updates $ \(sha, num) -> REDIS.set (inNamespace Canonical $ num) (toValue sha)
+            forM_ updates $ \(sha, num) -> REDIS.set (inNamespace Canonical num) (toValue sha)
             unless (null deletions) . void . REDIS.del $ inNamespace Canonical . toKey <$> deletions
             forceBestBlockInfo newSha newNumber
           checkAndUpdateSyncStatus
@@ -254,9 +254,9 @@ getSyncStatusNow = do
       pure $
         Just $ case (status, nodeNumber, worldNumber) of
           (Just False, Just ntd, Just wtd) -> ntd >= wtd
-          (Nothing, Just ntd, Just wtd) -> ntd >= wtd
-          (Nothing, Nothing, Just _) -> False
-          _ -> True
+          (Nothing, Just ntd, Just wtd)    -> ntd >= wtd
+          (Nothing, Nothing, Just _)       -> False
+          _                                -> True
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"
@@ -266,17 +266,17 @@ getSyncStatus :: Redis (Maybe Bool)
 getSyncStatus = fmap fromValue . eitherToMaybe <$> REDIS.get syncStatusKey
   where
     eitherToMaybe :: Either a (Maybe b) -> Maybe b
-    eitherToMaybe (Left _) = Nothing
+    eitherToMaybe (Left _)  = Nothing
     eitherToMaybe (Right a) = a
 
 putSyncStatus :: RedisCtx m f => Bool -> m (f REDIS.Status)
 putSyncStatus status = REDIS.set syncStatusKey $ toValue status
 
 class HasSyncDB m where
-  getCurrentSyncTask :: Text -> m SyncTask
-  getNewSyncTask :: Text -> m SyncTask
-  setSyncTaskFinished :: Text -> m ()
-  setSyncTaskNotReady :: Text -> m ()
+  getCurrentSyncTask :: Host -> m SyncTask
+  getNewSyncTask :: Host -> m SyncTask
+  setSyncTaskFinished :: Host -> m ()
+  setSyncTaskNotReady :: Host -> m ()
 
 instance HasSQL m => HasSyncDB m where
   getCurrentSyncTask host = sqlQuery $ do
@@ -307,7 +307,7 @@ instance HasSQL m => HasSyncDB m where
           where_ (
             (syncTask^.SyncTaskAssignmentTime <=. val oneMinuteAgo)
             &&.
-            ((syncTask^.SyncTaskStatus) !=. (val Finished))
+            ((syncTask^.SyncTaskStatus) !=. val Finished)
             )
           return syncTask
 
@@ -315,11 +315,11 @@ instance HasSQL m => HasSyncDB m where
       oneTask:_ -> return $ entityVal oneTask
       [] -> do
         --No existing task, make a new one
-        results <- SQL.rawSql "INSERT INTO sync_task (host) VALUES (?) RETURNING " [SQL.PersistText host]
+        results <- SQL.rawSql "INSERT INTO sync_task (host) VALUES (?) RETURNING " [toPersistValue host]
 
         case results of
           [v] -> return $ SQL.entityVal v
-          _ -> error "insert failed in getSyncTask"
+          _   -> error "insert failed in getSyncTask"
 
   setSyncTaskFinished host = sqlQuery $ do
     update $ \syncTask -> do

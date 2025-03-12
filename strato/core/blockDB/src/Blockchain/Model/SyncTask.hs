@@ -1,15 +1,15 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Blockchain.Model.SyncTask (
   SyncTask(..),
@@ -18,12 +18,12 @@ module Blockchain.Model.SyncTask (
   migrateAll
   ) where
 
-import Data.Text (Text)
-import Data.Time
-import Database.Persist.Sql
-import Database.Persist.TH
-import Text.Format
-import Text.Format.Template
+import           Blockchain.Strato.Model.Host
+import           Data.Time
+import           Database.Persist.Sql
+import           Database.Persist.TH
+import           Text.Format
+import           Text.Format.Template
 
 data SyncTaskStatus = Assigned | Finished | NotReady deriving (Show, Read, Eq)
 
@@ -37,10 +37,10 @@ share
 SyncTask
     chiliad Int default=nextval('chiliad')
     assignmentTime UTCTime default=now()
-    host Text
+    host Host
     status SyncTaskStatus default='Assigned'
     deriving Show Read Eq
 |]
-        
+
 $(deriveFormat ''SyncTask)
 

@@ -31,7 +31,6 @@ import           Blockchain.Options
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Options       (computeNetworkID)
 import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
@@ -118,15 +117,14 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
-      let Host host = pPeerHost peer
-      syncTask <- lift $ getNewSyncTask host
+      syncTask <- lift $ getNewSyncTask (pPeerHost peer)
       $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ show syncTask
       if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
         then do
           yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
         else do
           $logInfoS "handleMsgClientConduit" "sync task chiliad higher than world highest block, marking the new chiliad as 'NotReady'"
-          lift $ setSyncTaskNotReady host
+          lift $ setSyncTaskNotReady (pPeerHost peer)
 
       lift stampActionTimestamp
     other -> assertHandshake other
@@ -179,8 +177,7 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      let Host host = pPeerHost peer
-      syncTask <- lift $ getNewSyncTask host
+      syncTask <- lift $ getNewSyncTask (pPeerHost peer)
       $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ show syncTask
       yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
       lift stampActionTimestamp

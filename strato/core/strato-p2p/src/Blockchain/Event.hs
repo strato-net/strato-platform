@@ -42,7 +42,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address       (Address)
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Strato.Model.Secp256k1
@@ -231,9 +230,7 @@ handleEvents peer = awaitForever $ \case
 
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
 
-    let Host host = pPeerHost peer
-
-    currentSyncTask <- lift $ getCurrentSyncTask  host
+    currentSyncTask <- lift $ getCurrentSyncTask (pPeerHost peer)
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum $ map (BlockHeader.number . blockBlockData) blocks'
 
@@ -241,8 +238,8 @@ handleEvents peer = awaitForever $ \case
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            lift $ setSyncTaskFinished host
-            syncTask <- lift $ getNewSyncTask host
+            lift $ setSyncTaskFinished (pPeerHost peer)
+            syncTask <- lift $ getNewSyncTask (pPeerHost peer)
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
             return $ fromIntegral $ 1000 * syncTaskChiliad syncTask
           else do
@@ -260,9 +257,9 @@ handleEvents peer = awaitForever $ \case
       if fetchNumber <= worldNumber
         then syncFetch Forward fetchNumber
         else do
-            currentSyncTask' <- lift $ getCurrentSyncTask  host
+            currentSyncTask' <- lift $ getCurrentSyncTask (pPeerHost peer)
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
-            lift $ setSyncTaskNotReady host
+            lift $ setSyncTaskNotReady (pPeerHost peer)
       else do
         yieldR $ GetBlockBodies bodyHashes'
 
