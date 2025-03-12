@@ -4,7 +4,7 @@ require('dotenv').config();
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 
 // Load configuration from a YAML file.
-const config = fsUtil.getYaml(`../config.yaml`);
+const config = fsUtil.getYaml(`../../config.yaml`);
 
 /**
  * Obtains a user token using the OAuth resource owner credentials.
@@ -29,15 +29,15 @@ const getUserToken = async (username, password, req = null) => {
 async function main() {
   try {
     // Destructure and validate required environment variables.
-    const { USERNAME, PASSWORD, OLD_RESERVE_ADDRESS } = process.env;
+    const { USERNAME, PASSWORD, RESERVE_ADDRESS } = process.env;
 
     if (!USERNAME || !PASSWORD) {
       throw new Error(
         'USERNAME and PASSWORD environment variables are required.'
       );
     }
-    if (!OLD_RESERVE_ADDRESS) {
-      throw new Error('OLD_RESERVE_ADDRESS environment variable is required.');
+    if (!RESERVE_ADDRESS) {
+      throw new Error('RESERVE_ADDRESS environment variable is required.');
     }
 
     // 1. Obtain the user token via OAuth.
@@ -51,14 +51,14 @@ async function main() {
     // 2. Build call arguments for the 'deactivate' method.
     // Note: We only need to pass the contract's address.
     const callArgs = {
-      contract: { address: OLD_RESERVE_ADDRESS },
+      contract: { address: RESERVE_ADDRESS },
       method: 'deactivate',
       // No arguments are required for 'deactivate'.
       args: util.usc({}),
     };
 
     console.log(
-      `Calling 'deactivate' on reserve at address: ${OLD_RESERVE_ADDRESS}...`
+      `Calling 'deactivate' on reserve at address: ${RESERVE_ADDRESS}...`
     );
     const callResponse = await rest.call(token, callArgs, {
       config,
@@ -87,8 +87,11 @@ async function main() {
       3600000
     );
 
+    if (!finalResults || finalResults.length === 0 || finalResults[0].status !== 'Success') { 
+      throw new Error('Failed to deactivate reserve.');
+    }
     console.log(
-      `Reserve at address ${OLD_RESERVE_ADDRESS} has been deactivated.`
+      `Reserve at address ${RESERVE_ADDRESS} has been deactivated.`
     );
   } catch (error) {
     console.error('Fatal error in deactivating reserve:', error);

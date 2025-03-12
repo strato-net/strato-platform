@@ -42,6 +42,13 @@ router.post(
 );
 
 router.post(
+  Reserve.stakeAfterBridge,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ReserveController.stakeAfterBridge
+);
+
+router.post(
   Reserve.unstake,
   authHandler.authorizeRequest(),
   loadDapp,

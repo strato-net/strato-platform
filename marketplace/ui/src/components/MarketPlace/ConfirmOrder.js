@@ -1,4 +1,14 @@
-import { Row, notification, Spin, Modal, Col, Radio, Button } from 'antd';
+import {
+  Row,
+  notification,
+  Spin,
+  Modal,
+  Col,
+  Radio,
+  Button,
+  Tooltip,
+  Checkbox,
+} from 'antd';
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
@@ -16,7 +26,7 @@ import { setCookie } from '../../helpers/cookie';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
 
-const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
+const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -29,6 +39,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     success,
     isCreatePaymentSubmitting,
   } = useOrderState();
+  const [isLoading, setIsLoading] = useState(false);
   const [tax, setTax] = useState(new BigNumber(0));
   const [subTotal, setSubTotal] = useState(new BigNumber(0));
   const [total, setTotal] = useState(new BigNumber(0));
@@ -58,6 +69,12 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   useEffect(() => {
     setCartData(data);
   }, [data]);
+
+  const [stakeChecked, setStakeChecked] = useState(true);
+
+  const changeChecked = (e) => {
+    setStakeChecked(e.target.checked);
+  };
 
   const countDown = () => {
     modal.info({
@@ -164,7 +181,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     }
   };
 
-  const handlePaymentConfirm = async (paymentService) => {
+  const handlePaymentConfirm = async (paymentService, reserve, asset) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -233,13 +250,26 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
         checkoutRoute &&
         checkoutRoute !== ''
       ) {
-        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const redirectUrlValue = `${window.location.protocol}//${
+          window.location.host
+        }/order/status?assets=${assets}&orderHash=${checkoutHash}${
+          reserve ? `&stake=${reserve},${asset}` : ''
+        }`;
+
+        // Encode the URL so it’s safe to pass as a query parameter
+        const encodedRedirectUrl = encodeURIComponent(redirectUrlValue);
+
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${encodedRedirectUrl}`;
         window.location.replace(url);
       } else {
         window.location.replace(
-          `/order/status?assets=${assets}&orderHash=${checkoutHash}`
+          `/order/status?assets=${assets}&orderHash=${checkoutHash}${
+            reserve ? `&stake=${reserve},${asset}` : ''
+          }`
         );
       }
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -250,7 +280,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     setSelectedProvider(provider);
   };
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = async (reserve = null, asset = null) => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
       countDown();
     } else {
@@ -272,7 +302,8 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
             'The minimum order amount is $0.50. Please increase the item quantity to account for this.'
           );
         } else {
-          await handlePaymentConfirm(selectedProvider);
+          setIsLoading(true);
+          await handlePaymentConfirm(selectedProvider, reserve, asset);
         }
       } else {
         let insufficientQuantityMessage = '';
@@ -307,6 +338,10 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+    const amountWithoutSymbol = totalAmount.split(' ');
+
+    const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+
   return (
     <>
       <div>
@@ -315,7 +350,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       <div className="">
         {contextHolder}
         {contextHolderForModal}
-        {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
+        {isCreateOrderSubmitting || isCreatePaymentSubmitting || isLoading ? (
           <div className="h-screen flex justify-center items-center">
             <Spin
               spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting}
@@ -383,17 +418,37 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
                       {totalAmount}{' '}
                     </span>
                   </div>
-                  <Button
-                    type="primary"
-                    disabled={
-                      !activePaymentProviders ||
-                      activePaymentProviders?.length === 0
-                    }
-                    className="w-full bg-blue-800 text-white h-10 text-lg"
-                    onClick={handlePlaceOrder}
-                  >
-                    Place Order
-                  </Button>
+                  {reserve && (
+                    <div className="mb-6">
+                      <Checkbox defaultChecked onChange={changeChecked}>
+                        Stake and earn rewards!
+                      </Checkbox>
+                    </div>
+                  )}
+                  <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
+                    <Button
+                      type="primary"
+                      disabled={
+                        !activePaymentProviders ||
+                        activePaymentProviders?.length === 0
+                      }
+                      onClick={() =>
+                        reserve && stakeChecked
+                          ? handlePlaceOrder(
+                              reserve?.address,
+                              reserve?.assetRootAddress
+                            )
+                          : handlePlaceOrder()
+                      }
+                      className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
+                        isDisabled
+                          ? '!bg-[#808080] cursor-not-allowed'
+                          : '!bg-[#13188A] cursor-pointer'
+                      }`}
+                    >
+                      Place Order
+                    </Button>
+                  </Tooltip>
                 </div>
               </Col>
             </Row>

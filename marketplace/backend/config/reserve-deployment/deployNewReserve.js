@@ -4,7 +4,7 @@ require('dotenv').config();
 const { rest, util, importer, fsUtil, oauthUtil } = require('blockapps-rest');
 
 // Load configuration from a YAML file.
-const config = fsUtil.getYaml(`../config.yaml`);
+const config = fsUtil.getYaml(`../../config.yaml`);
 
 /**
  * Obtains a user token using the OAuth resource owner credentials.
@@ -32,9 +32,12 @@ async function main() {
     const {
       USERNAME,
       PASSWORD,
-      OLD_RESERVE_ADDRESS,
-      USDST_TOKEN,
+      RESERVE_NAME,
+      ASSET_ROOT_ADDRESS,
+      ASSET_ORACLE_ADDRESS,
+      UNIT_CONVERSION_RATE,
       USDST_PRICE,
+      USDST_TOKEN,
       STRATS_TO_USDST_FACTOR,
     } = process.env;
 
@@ -43,8 +46,18 @@ async function main() {
         'USERNAME and PASSWORD environment variables are required.'
       );
     }
-    if (!OLD_RESERVE_ADDRESS) {
-      throw new Error('OLD_RESERVE_ADDRESS environment variable is required.');
+    if (
+      !RESERVE_NAME ||
+      !ASSET_ORACLE_ADDRESS ||
+      !ASSET_ROOT_ADDRESS ||
+      !UNIT_CONVERSION_RATE ||
+      !USDST_PRICE ||
+      !USDST_TOKEN ||
+      !STRATS_TO_USDST_FACTOR
+    ) {
+      throw new Error(
+        'ASSET_ORACLE_ADDRESS, ASSET_ROOT_ADDRESS, UNIT_CONVERSION_RATE, USDST_PRICE, USDST_TOKEN, and STRATS_TO_USDST_FACTOR environment variables are required.'
+      );
     }
 
     // 1. Obtain the user token via OAuth.
@@ -55,43 +68,19 @@ async function main() {
     console.log('Token acquired:', tokenString);
     const token = { token: tokenString };
 
-    // 2. Query Cirrus for the old reserve.
-    const oldReserveQuery = {
-      config,
-      query: {
-        address: 'eq.' + OLD_RESERVE_ADDRESS,
-      },
-    };
-
-    const oldReserveResults = await rest.search(
-      token,
-      { name: 'BlockApps-Mercata-Reserve' },
-      oldReserveQuery
-    );
-
-    if (!oldReserveResults || oldReserveResults.length === 0) {
-      throw new Error(
-        `No old reserve found for address: ${OLD_RESERVE_ADDRESS}`
-      );
-    }
-
-    const oldReserve = oldReserveResults[0];
-
-    // 3. Extract required fields from the old reserve.
-    const { oracle, name, assetRootAddress, unitConversionRate } = oldReserve;
-
     // 4. Set up contract details for deployment.
+    // Be sure to have updated the SimpleReserve.sol contract with the correct Base Code Collection.
     const contractName = 'SimpleReserve';
     const contractFilename =
-      '../dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol';
+      '../../dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol';
     const source = await importer.combine(contractFilename);
 
     // Build the constructor arguments.
     const constructorArgs = {
-      assetOracle: oracle,
-      name: name,
-      assetRootAddress: assetRootAddress,
-      unitConversionRate: unitConversionRate,
+      assetOracle: ASSET_ORACLE_ADDRESS,
+      name: RESERVE_NAME,
+      assetRootAddress: ASSET_ROOT_ADDRESS,
+      unitConversionRate: Number(UNIT_CONVERSION_RATE),
       usdstToken: USDST_TOKEN,
       usdstPrice: Number(USDST_PRICE),
       stratsPrice: Number(STRATS_TO_USDST_FACTOR),
@@ -110,8 +99,6 @@ async function main() {
       cacheNonce: true,
       isAsync: true,
     };
-    console.log('Contract args:', contractArgs);
-    console.log('Deployment options:', options);
     console.log(
       'Deploying new SimpleReserve contract via rest.createContract...'
     );

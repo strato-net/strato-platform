@@ -178,7 +178,7 @@ const InvoiceComponent = ({ invoice, decimals }) => {
                   )}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
-                  {formattedNum((quantity / Math.pow(10, decimals)).toFixed(2))}
+                  {formattedNum((quantity / Math.pow(10, decimals)))}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                   {totalPrice}

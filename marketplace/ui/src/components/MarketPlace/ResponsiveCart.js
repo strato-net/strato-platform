@@ -1,4 +1,12 @@
-import { Button, Typography, InputNumber, Radio } from 'antd';
+import {
+  Button,
+  Typography,
+  InputNumber,
+  Radio,
+  Checkbox,
+  Spin,
+  Modal,
+} from 'antd';
 import { useState, useEffect } from 'react';
 import { Images } from '../../images';
 import {
@@ -13,6 +21,7 @@ import { useOrderDispatch, useOrderState } from '../../contexts/order';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
 import BigNumber from 'bignumber.js';
+import { setCookie } from '../../helpers/cookie';
 
 const ResponsiveCart = ({
   paymentServices,
@@ -23,6 +32,7 @@ const ResponsiveCart = ({
   ValueQty,
   removeCartList,
   openToastOrder,
+  reserve,
 }) => {
   // temporary fix to put USDST as top payment option, will be updated in next release
   const activePaymentProviders =
@@ -44,13 +54,41 @@ const ResponsiveCart = ({
   const [tax, setTax] = useState(new BigNumber(0));
   const [subTotal, setSubTotal] = useState(new BigNumber(0));
   const [total, setTotal] = useState(new BigNumber(0));
+  const [modal, contextHolderForModal] = Modal.useModal();
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
+  const [isLoading, setIsLoading] = useState(false);
   const [faqOpenState, setFaqOpenState] = useState(
     Array(cartData.length).fill(false)
   );
+  const [stakeChecked, setStakeChecked] = useState(true);
+
+  const changeChecked = (e) => {
+    setStakeChecked(e.target.checked);
+  };
+
+  const countDown = () => {
+    modal.info({
+      okButtonProps: { hidden: true },
+      content: (
+        <>
+          <p className="font-medium">
+            In order to proceed with your purchase, you will first need to log
+            in or register an account with Mercata.
+          </p>
+          <br />
+          <p>You will be redirected to the sign-in page shortly.</p>
+          <Spin className="flex justify-center mt-2" />
+        </>
+      ),
+    });
+    setTimeout(() => {
+      setCookie('returnUrl', `/checkout`, 10);
+      window.location.href = loginUrl;
+    }, 4000);
+  };
 
   useEffect(() => {
     setCartData(data);
@@ -112,7 +150,7 @@ const ResponsiveCart = ({
     );
   };
 
-  const handlePaymentConfirm = async (paymentService) => {
+  const handlePaymentConfirm = async (paymentService, reserve, asset) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
 
@@ -181,12 +219,54 @@ const ResponsiveCart = ({
         checkoutRoute &&
         checkoutRoute !== ''
       ) {
-        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const redirectUrlValue = `${window.location.protocol}//${
+          window.location.host
+        }/order/status?assets=${assets}&orderHash=${checkoutHash}${
+          reserve ? `&stake=${reserve},${asset}` : ''
+        }`;
+
+        // Encode the URL so it’s safe to pass as a query parameter
+        const encodedRedirectUrl = encodeURIComponent(redirectUrlValue);
+
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${encodedRedirectUrl}`;
         window.location.replace(url);
       } else {
         window.location.replace(
-          `/order/status?assets=${assets}&orderHash=${checkoutHash}`
+          `/order/status?assets=${assets}&orderHash=${checkoutHash}${
+            reserve ? `&stake=${reserve},${asset}` : ''
+          }`
         );
+      }
+    } else {
+      setIsLoading(false);
+    }
+  };
+
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct.decimals) {
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
       }
     }
   };
@@ -198,9 +278,9 @@ const ResponsiveCart = ({
     setSelectedProvider(provider);
   };
 
-  const handlePlaceOrder = async (provider) => {
+  const handlePlaceOrder = async (reserve = null, asset = null) => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-      window.location.href = loginUrl;
+      countDown();
     } else {
       const saleAddresses = [];
       const quantities = [];
@@ -220,7 +300,8 @@ const ResponsiveCart = ({
             'The minimum order amount is $0.50. Please increase the item quantity to account for this.'
           );
         } else {
-          await handlePaymentConfirm(provider);
+          setIsLoading(true);
+          await handlePaymentConfirm(selectedProvider, reserve, asset);
         }
       } else {
         let insufficientQuantityMessage = '';
@@ -250,13 +331,14 @@ const ResponsiveCart = ({
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${subTotal} USDST`
+      ? `${new BigNumber(subTotal).toString()} USDST`
       : selectedProvider?.serviceName === 'Stripe'
-      ? `${subTotal} USD`
+      ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
+      {contextHolderForModal}
       {cartData.map((element, index) => {
         let qty = element.qty;
         let product = element;
@@ -303,7 +385,7 @@ const ResponsiveCart = ({
                         MinusQty(qty, product);
                       }}
                       className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                        qty === 1
+                        ((qty === 1 && !product?.decimals) || qty === 0.01)
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}
@@ -311,13 +393,31 @@ const ResponsiveCart = ({
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
                     <InputNumber
-                      className="w-[7rem] border-none text-[#202020] font-medium bg-[transparent] rounded-none outline-none text-sm text-center flex flex-col justify-center"
-                      min={1}
+                      className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
+                      min={1 / Math.pow(10, product?.decimals || 0)}
                       value={qty}
-                      defaultValue={qty}
                       controls={false}
                       onChange={(e) => {
-                        ValueQty(product, e);
+                        if (!isNaN(e)) {
+                          let value = e.toString();
+                          let [integer, decimal] = value.split('.');
+
+                          if (
+                            decimal &&
+                            decimal.length > (product?.decimals || 0)
+                          ) {
+                            value = parseFloat(
+                              integer + '.' + decimal.slice(0, product?.decimals)
+                            );
+                          } else {
+                            value = parseFloat(value);
+                          }
+
+                          ValueQty(product, value);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        onKeyDownPress(e, product);
                       }}
                     />
                     <div
@@ -397,7 +497,7 @@ const ResponsiveCart = ({
             Payment Method
           </h3>
           <div className="p-2">
-            <div className="rounded-lg shadow-md w-full">
+            <div className="rounded-lg shadow-md w-full mb-8 p-2">
               <Radio.Group
                 onChange={(e) => {
                   handleChange(e.target.value);
@@ -427,19 +527,32 @@ const ResponsiveCart = ({
                 </div>
               </Radio.Group>
             </div>
-            <div className="flex justify-between items-center mt-10 mb-3 p-2">
+            {reserve && (
+              <div className="p-2">
+                <Checkbox defaultChecked onChange={changeChecked}>
+                  Stake and earn rewards!
+                </Checkbox>
+              </div>
+            )}
+            <div className="flex justify-between items-center mb-3 p-2">
               <span className="text-base font-normal">Order Total :</span>
               <span className="text-base font-normal">{totalAmount} </span>
             </div>
             <Button
               type="primary"
+              loading={isLoading}
               disabled={
                 !activePaymentProviders || activePaymentProviders?.length === 0
               }
               className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
-              onClick={() => {
-                handlePlaceOrder(selectedProvider);
-              }}
+              onClick={() =>
+                reserve && stakeChecked
+                  ? handlePlaceOrder(
+                      reserve?.address,
+                      reserve?.assetRootAddress
+                    )
+                  : handlePlaceOrder()
+              }
             >
               Place Order
             </Button>

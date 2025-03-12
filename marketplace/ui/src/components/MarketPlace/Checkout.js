@@ -12,8 +12,13 @@ import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from '../../contexts/marketplace';
+import {
+  useInventoryState,
+  useInventoryDispatch,
+} from '../../contexts/inventory';
 import { useOrderState, useOrderDispatch } from '../../contexts/order';
 import { actions } from '../../contexts/marketplace/actions';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import { Images } from '../../images';
 import { useState, useEffect } from 'react';
 import './index.css';
@@ -36,16 +41,27 @@ const { Title, Text } = Typography;
 const Checkout = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
+  const inventoryDispatch = useInventoryDispatch();
   const { paymentServices, arePaymentServicesLoading } =
     usePaymentServiceState();
+  const { reserves, isReservesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
 
+  const calculateDecimals = (item) => {
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
+      item.product.originAddress
+    )
+      ? 18
+      : item.product.decimals || 0;
+
+    return decimals;
+  };
+ 
   const calculateTax = (item) => {
     const decimals = assetsWithEighteenDecimalPlaces.includes(
       item.product.originAddress
@@ -82,7 +98,8 @@ const Checkout = () => {
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-  }, [paymentServiceDispatch]);
+    inventoryActions.getAllReserve(inventoryDispatch);
+  }, [paymentServiceDispatch, inventoryDispatch]);
 
   useEffect(() => {
     const map = new Map();
@@ -141,6 +158,7 @@ const Checkout = () => {
           amount: amount,
           action: item.product.address,
           qty: Math.min(item.qty, quantity),
+          assetRootAddress: item.product.originAddress,
         });
       });
 
@@ -154,15 +172,24 @@ const Checkout = () => {
   }, [marketplaceDispatch, cartList]);
 
   const MinusQty = (qty, product) => {
-    if (qty <= 1) {
+    if (qty <= 0) {
       return;
     }
-
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-        items[index].qty -= 1;
-        actions.addItemToCart(marketplaceDispatch, items);
+        const decimals = calculateDecimals(element);
+          if (product?.decimals || decimals) {
+            if (items[index].qty - 0.01 > 0) {
+              items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
+            }
+          }
+          else {
+            if (items[index].qty - 1 > 0) {
+              items[index].qty -= 1;
+            }
+          }
+          actions.addItemToCart(marketplaceDispatch, items);
       }
     });
   };
@@ -171,9 +198,15 @@ const Checkout = () => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
+        const decimals = calculateDecimals(element);
         const availableQuantity = product.quantity ? product.quantity : 1;
         if (items[index].qty + 1 <= availableQuantity) {
-          items[index].qty += 1;
+          if (product?.decimals || decimals) {
+            items[index].qty = parseFloat((Number(items[index].qty) + 0.01).toFixed(4));
+          }
+          else {
+            items[index].qty += 1;
+          }
           actions.addItemToCart(marketplaceDispatch, items);
         }
       }
@@ -216,10 +249,7 @@ const Checkout = () => {
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
-        if (!e || e === '' || e === 0) {
-          items[index].qty = 1;
-          actions.addItemToCart(marketplaceDispatch, items);
-        } else if (e <= availableQuantity) {
+        if (e <= availableQuantity) {
           items[index].qty = e;
           actions.addItemToCart(marketplaceDispatch, items);
         } else {
@@ -245,6 +275,35 @@ const Checkout = () => {
         placement,
         key: 2,
       });
+    }
+  };
+
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct?.decimals) {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight"
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      // Prevent decimals
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (!/^[0-9]$/.test(e.key) && 
+          e.key !== "Backspace" && 
+          e.key !== "Delete" && 
+          e.key !== "ArrowLeft" && 
+          e.key !== "ArrowRight") {
+        e.preventDefault();
+      }
     }
   };
 
@@ -311,24 +370,39 @@ const Checkout = () => {
                 MinusQty(qty, product);
               }}
               className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                ((qty === 1 && !product.decimals) || qty === 0.01) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
               }`}
             >
               -
             </div>
+
             <InputNumber
-              className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
-              min={1 / Math.pow(10, product.decimals)}
+              className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
+              min={1 / Math.pow(10, product.decimals || 0)}
               value={qty}
-              defaultValue={qty}
               controls={false}
               onChange={(e) => {
-                ValueQty(product, e);
+                if (!isNaN(e)) {
+                  let value = e.toString();
+                  let [integer, decimal] = value.split(".");
+
+                  if (decimal && decimal.length > (product.decimals || 0)) {
+                    value = parseFloat(integer + "." + decimal.slice(0, product.decimals));
+                  } else {
+                    value = parseFloat(value);
+                  }
+
+                  ValueQty(product, value);
+                }
+              }}
+              onKeyDown={(e) => {
+                onKeyDownPress(e, product);
               }}
             />
+
             <div
               onClick={() => {
-                AddQty(product);
+                AddQty(product, product.decimals);
               }}
               className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
                 qty >= product.quantity
@@ -374,10 +448,24 @@ const Checkout = () => {
     return filteredPaymentServices;
   };
 
+  const filterReserve = (e) => {
+    for (const assetReserve of e) {
+      const reserve = reserves.find(
+        (reserve) => reserve.assetRootAddress === assetReserve.assetRootAddress
+      );
+      if (reserve) {
+        return reserve;
+      }
+    }
+    return null;
+  };
+
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
-      {isCreateOrderSubmitting || arePaymentServicesLoading ? (
+      {isCreateOrderSubmitting ||
+      arePaymentServicesLoading ||
+      isReservesLoading ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
@@ -416,6 +504,7 @@ const Checkout = () => {
                       paymentServices={filterPaymentServices(
                         e.value.paymentServices
                       )}
+                      reserve={filterReserve(e.value.items)}
                       data={e.value.items}
                       columns={columns}
                     />
@@ -431,6 +520,7 @@ const Checkout = () => {
                       ValueQty={ValueQty}
                       removeCartList={removeCartList}
                       openToastOrder={openToastOrder}
+                      reserve={filterReserve(e.value.items)}
                     />
                   </div>
                 </React.Fragment>

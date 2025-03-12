@@ -1,5 +1,9 @@
 const { Alchemy, Network, AlchemySubscription } = require("alchemy-sdk");
-const { alchemyApiKey, alchemyNetwork, blockAppsPublicKey, wbtcContractAddress } = require("../config");
+const {
+  alchemyApiKey,
+  alchemyNetwork,
+  blockAppsPublicKey,
+} = require("../config");
 const { handleBridgeIn } = require("../events/bridgeIn");
 const { ethers } = require("ethers");
 
@@ -10,15 +14,24 @@ const setupAlchemyWebSocket = async () => {
   };
   const alchemy = new Alchemy(settings);
 
-  const erc20Filter = {
-    address: wbtcContractAddress, // Set to null to listen to all ERC-20 tokens, or set a specific token address
-    topics: [ethers.id("Transfer(address,address,uint256)")],
-  };
+  const transferTopic = ethers.id("Transfer(address,address,uint256)");
+  const formattedAddress = ethers.zeroPadValue(blockAppsPublicKey, 32);
 
-  alchemy.ws.on(erc20Filter, async (tx) => {
-    console.log("Mined Transaction:", tx);
-    await handleBridgeIn({hash: tx.transactionHash, value: 0, tx });
-  });
+  alchemy.ws.on(
+    [
+      transferTopic,
+      null, // No filtering on the 'from' field.
+      formattedAddress, // Filter for transfers to your address.
+    ],
+    async (log) => {
+      console.log("ERC20 Transfer log from token", log.address, log);
+      await handleBridgeIn({
+        hash: log.transactionHash,
+        value: 0,
+        tx: log,
+      });
+    }
+  );
 
   alchemy.ws.on(
     {

@@ -34,4 +34,11 @@ router.post(
   TokensController.addHash
 )
 
+router.post(
+  Tokens.bridgeOut,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  TokensController.bridgeOut
+);
+
 export default router;
