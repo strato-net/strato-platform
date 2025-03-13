@@ -44,9 +44,6 @@ const tokensArray = [
   },
   {
     name: 'ETHST',
-    ethTestnetAddress: '0x58724DEc334608b375D5e2914FCAc156E019B4D5',
-    ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
-    decimals: 18,
     mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
     mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
   }
