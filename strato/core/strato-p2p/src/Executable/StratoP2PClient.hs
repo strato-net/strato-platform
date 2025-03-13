@@ -208,6 +208,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
               Nothing -> return ()
           e' | Just HeadMacIncorrect <- fromException e' -> do
             disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
+          e' | Just (EventBeforeHandshake _) <- fromException e' -> do
+            disableException thePeer "EventBeforeHandshake" Nothing False
           e' | Just NetworkIDMismatch <- fromException e' -> do
             disableException thePeer "NetworkIDMismatch" Nothing True
             case pPeerPubkey thePeer of 
