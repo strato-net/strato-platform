@@ -52,10 +52,18 @@ const BridgeWalletModal = ({
       title: 'Set Quantity',
       align: 'center',
       render: () => (
-        <InputNumber
-          value={quantity}
-          onChange={(value) => setQuantity(value)}
-        />
+        <div style={{ height: quantity <= 0 ? 'auto' : '32px' }}>
+          <InputNumber
+            value={quantity}
+            onChange={(value) => setQuantity(value)}
+            controls={false}
+            style={{ width: '100%' }}
+            status={quantity < 1/1e6 ? 'error' : ''}
+          />
+          {quantity < 1/1e6 && (
+            <div style={{ color: 'red', fontSize: '12px', marginY: '2px', position: 'absolute' }}>Amount must be greater than 0.000001</div>
+          )}
+        </div>
       ),
     },
     {
@@ -78,10 +86,18 @@ const BridgeWalletModal = ({
       title: 'Set Quantity',
       align: 'center',
       render: () => (
-        <InputNumber
-          value={quantity}
-          onChange={(value) => setQuantity(value)}
-        />
+        <div style={{ height: quantity <= 0 ? 'auto' : '32px' }}>
+          <InputNumber
+            value={quantity}
+            onChange={(value) => setQuantity(value)}
+            controls={false}
+            style={{ width: '100%' }}
+            status={quantity < 1/1e6 ? 'error' : ''}
+          />
+          {quantity < 1/1e6 && (
+            <div style={{ color: 'red', fontSize: '12px', marginY: '2px', position: 'absolute' }}>Amount must be greater than 0.000001</div>
+          )}
+        </div>
       ),
     },
     {
@@ -262,20 +278,22 @@ const BridgeWalletModal = ({
       footer={[
         <>
           <div className="md:flex justify-between items-center w-full hidden">
-            <div className="max-w-[60%] text-left">
-              <p className="text-xs">
-                <b>Note:</b> Bridged tokens will be automatically staked in the
-                app. Please allow a few minutes for the staking process to
-                complete after bridging.
-              </p>
-            </div>
+            {tabKey === '1' && (
+              <div className="max-w-[60%] text-left">
+                <p className="text-xs">
+                  <b>Note:</b> Bridged tokens will be automatically staked in the
+                  app. Please allow a few minutes for the staking process to
+                  complete after bridging.
+                </p>
+              </div>
+            )}
 
-            <div>
+            <div className={tabKey !== '1' ? 'w-full' : ''}>
               <Button
                 type="primary"
                 className="w-32 h-9"
                 onClick={handleSubmit}
-                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                disabled={quantity < 1/1e6  || quantity > accountDetails.balance}
                 loading={isAddingHash || loader || isBridgingOut}
               >
                 Bridge
@@ -288,19 +306,21 @@ const BridgeWalletModal = ({
                 type="primary"
                 className="w-full h-9"
                 onClick={handleSubmit}
-                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                disabled={quantity < 1/1e6 || quantity > accountDetails.balance}
                 loading={isAddingHash || loader || isBridgingOut}
               >
                 Bridge
               </Button>
             </div>
-            <div className="w-full text-left mt-4">
-              <p className="text-xs">
-                <b>Note:</b> Bridged tokens will be automatically staked in the
-                app. Please allow a few minutes for the staking process to
-                complete after bridging.
-              </p>
-            </div>
+            {tabKey === '1' && (
+              <div className="w-full text-left mt-4">
+                <p className="text-xs">
+                  <b>Note:</b> Bridged tokens will be automatically staked in the
+                  app. Please allow a few minutes for the staking process to
+                  complete after bridging.
+                </p>
+              </div>
+            )}
           </div>
         </>,
       ]}
