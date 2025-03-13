@@ -122,9 +122,10 @@ const Stake = ({ user }) => {
   const {
     message: ethMsg,
     success: ethSuccess,
-    ethstAddress,
-    wbtcstAddress,
+    bridgeableAddress
   } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -150,8 +151,6 @@ const Stake = ({ user }) => {
       }
     }
     categoryActions.fetchCategories(categoryDispatch);
-    ethActions.fetchETHSTAddress(ethDispatch);
-    ethActions.fetchWBTCSTAddress(ethDispatch);
   }, [user]);
 
   useEffect(() => {
@@ -245,7 +244,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          [ethstAddress, wbtcstAddress],
+          [ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress],
           assetsWithEighteenDecimalPlaces,
           navigate
         )}
