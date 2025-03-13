@@ -9,6 +9,49 @@ import { useAuthenticateState } from '../../contexts/authentication';
 import { ethers } from 'ethers';
 import { fileServerUrl } from '../../helpers/constants';
 
+const tokensArray = [
+  {
+    name: 'WBTCST',
+    ethTestnetAddress: '0x29f2D40B0605204364af54EC677bD022dA425d03',
+    ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+    decimals: 8,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'USDTST',
+    ethTestnetAddress: '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6',
+    ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    decimals: 6,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'USDCST',
+    ethTestnetAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
+    ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    decimals: 6,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'PAXGST',
+    ethTestnetAddress: '0x58724DEc334608b375D5e2914FCAc156E019B4D5',
+    ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
+    decimals: 18,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'ETHST',
+    ethTestnetAddress: '0x58724DEc334608b375D5e2914FCAc156E019B4D5',
+    ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
+    decimals: 18,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  }
+]
+
 const ERC20_ABI = [
   {
     constant: false,
@@ -192,46 +235,20 @@ const BridgeWalletModal = ({
       if (tabKey === '1') {
         // Bridge In (Eth -> Mercata)
         let tokenAddress, decimals, recipient;
+        const tokenObj = tokensArray.find((tokenD) => tokenD.name === tokenName)
+        tokenAddress = fileServerUrl.includes('test')
+          ? tokenObj.ethTestnetAddress  // Testnet WBTC
+          : tokenObj.ethMainnetAddress; // Mainnet WBTC
+        decimals = tokenObj.decimals;
+        recipient = fileServerUrl.includes('test')
+          ? tokenObj.mercataTestnetAddress // Testnet recipient
+          : tokenObj.mercataMainnetAddress; // Mainnet recipient
 
-        if (tokenName === 'WBTCST') {
-            tokenAddress = fileServerUrl.includes('test')
-                ? '0x29f2D40B0605204364af54EC677bD022dA425d03'  // Testnet WBTC
-                : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // Mainnet WBTC
-            decimals = 8;
-            recipient = fileServerUrl.includes('test')
-                ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'  // Testnet recipient
-                : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
-        } else if (tokenName === 'USDTST') {// TODO: add the below addresses
-            tokenAddress = fileServerUrl.includes('test')
-                ? '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6'  // Testnet USDT
-                : '0xYourMainnetUSDTAddress'; // Mainnet USDT
-            decimals = 6;
-            recipient = fileServerUrl.includes('test')
-                ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'  // Testnet recipient
-                : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
-        } else if (tokenName === 'USDCST') {
-            tokenAddress = fileServerUrl.includes('test')
-                ? '0x16dA4541aD1807f4443d92D26044C1147406EB80'  // Testnet USDC
-                : '0xYourMainnetUSDCAddress'; // Mainnet USDC
-            decimals = 6;
-            recipient = fileServerUrl.includes('test')
-                ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'  // Testnet recipient
-                : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
-        } else if (tokenName === 'PAXGST') {
-            tokenAddress = fileServerUrl.includes('test')
-                ? '0xYourTestnetPAXGAddress'  // Testnet PAXG
-                : '0xYourMainnetPAXGAddress'; // Mainnet PAXG
-            decimals = 18;
-            recipient = fileServerUrl.includes('test')
-                ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'  // Testnet recipient
-                : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'; // Mainnet recipient
-        }        
-        
         if (tokenAddress) {
-            const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-            const tokenAmount = ethers.utils.parseUnits(quantity.toString(), decimals);
-            
-            tx = await tokenContract.transfer(recipient, tokenAmount);
+          const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+          const tokenAmount = ethers.utils.parseUnits(quantity.toString(), decimals);
+
+          tx = await tokenContract.transfer(recipient, tokenAmount);
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
