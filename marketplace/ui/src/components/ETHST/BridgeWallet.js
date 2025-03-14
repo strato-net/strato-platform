@@ -205,14 +205,14 @@ const BridgeWalletModal = ({
           tx = await wbtcContract.transfer(
             fileServerUrl.includes('test')
               ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
+              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
             wbtcAmount
           );
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
               ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
+              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
