@@ -59,7 +59,9 @@ statementsHelper :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper ss = do
   modify $ fmap (M.empty :)
   anns <- concat <$> traverse statementHelper ss
-  modify $ fmap tail
+  modify $ fmap $ \case
+    [] -> []
+    (_:xs) -> xs
   pure anns
 
 isLocalVariable :: SolidString -> SSS Bool

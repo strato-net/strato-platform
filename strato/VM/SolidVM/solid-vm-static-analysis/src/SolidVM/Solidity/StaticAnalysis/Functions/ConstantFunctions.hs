@@ -72,7 +72,9 @@ statementsHelper' :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper' ss = do
   modify (M.empty :)
   anns <- concat <$> traverse statementHelper ss
-  modify tail
+  modify $ \case
+    [] -> []
+    (_:xs) -> xs
   pure anns
 
 isLocalVariable :: SolidString -> SSS Bool

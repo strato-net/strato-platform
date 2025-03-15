@@ -7,6 +7,7 @@ import Control.Monad
 import Data.Decimal
 import Data.Foldable (asum, foldl')
 import Data.Functor.Identity
+import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
@@ -18,7 +19,7 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Types
-import Text.Parsec
+import Text.Parsec hiding (uncons)
 import Text.Parsec.Expr
 import Text.Read (readMaybe)
 
@@ -340,7 +341,7 @@ objectE = do
       k <- many1 (noneOf ":")
       void colon
       v <- expression
-      return (stringToLabel $ init . tail $ show k, v) -- get rid of the surrounding quotes
+      return (stringToLabel $ init . maybe "" snd . uncons $ show k, v) -- get rid of the surrounding quotes
       {-
       // Precedence by order (see github.com/ethereum/solidity/pull/732)
       Expression

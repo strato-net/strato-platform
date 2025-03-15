@@ -165,7 +165,7 @@ outputBlockToContextBestBlockInfo block =
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries evs = do
   let names = map getNames evs
-      numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
+      numberedNames = map (\case [] -> []; x@(x0:_) -> numberIt (length x) x0) $ group $ sort names
 
   $logInfoS "logEventSummaries" . T.pack $
     "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"

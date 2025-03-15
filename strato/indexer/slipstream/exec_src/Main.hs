@@ -10,6 +10,11 @@
 import Bloc.Monad (BlocEnv (..))
 import BlockApps.Init
 import BlockApps.Logging
+import Blockchain.Slipstream.Globals
+import Blockchain.Slipstream.GlobalsColdStorage
+import Blockchain.Slipstream.MessageConsumer
+import Blockchain.Slipstream.Options
+import Blockchain.Slipstream.OutputData
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Kafka
@@ -30,11 +35,6 @@ import Network.Wai.Middleware.Prometheus
 -- import Slipstream.Processor
 
 import SelectAccessible ()
-import Slipstream.Globals
-import Slipstream.GlobalsColdStorage
-import Slipstream.MessageConsumer
-import Slipstream.Options
-import Slipstream.OutputData
 import Text.Printf
 import Text.RawString.QQ
 

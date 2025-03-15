@@ -111,6 +111,7 @@ extra-deps:
 - lens-family-th-0.5.2.1@sha256:24338a7a9bb8c8bca0d5e713ce62df066058bad6c15e6eb609593fd7fe93b3cf,1294
 - monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
 - safe-0.3.21
+- saltine-0.2.2.0
 - semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
 - wai-extra-3.1.14@sha256:1b093366842dc0057cebb4a23dbf9a29269321d70fd242c7695ce0bbd80d32fb,8056
@@ -120,6 +121,7 @@ extra-deps:
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
+# arch: aarch64 # uncomment for MacOS
 
 flags:
   secp256k1-haskell:
@@ -132,15 +134,23 @@ nix:
   # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
   shell-file: nix/stack-integration.nix
 
-resolver: lts-22.4 #also duplicated in docker section below
+resolver: lts-23.14 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
 - /usr/include
+# For MacOS
+# - /opt/homebrew/opt/libffi/include
+# - /opt/homebrew/opt/leveldb/include
+# - /opt/homebrew/opt/postgresql@14/include
 
 extra-lib-dirs:
 - /usr/local/lib
 - /usr/lib
+# For MacOS
+# - /opt/homebrew/opt/libffi/lib
+# - /opt/homebrew/opt/leveldb/lib
+# - /opt/homebrew/opt/postgresql@14/lib
 
 allow-newer: true
 allow-different-user: true
@@ -156,7 +166,7 @@ ghc-options:
 
 
 docker:
-  enable: true
+  enable: true # set to false for MacOS
   image: "strato-buildbase:lts-22.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

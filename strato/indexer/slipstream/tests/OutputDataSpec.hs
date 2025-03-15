@@ -21,14 +21,14 @@ import Test.Hspec
 import Text.RawString.QQ
 
 import BlockApps.Logging
+import qualified Blockchain.Slipstream.Events as SE
+import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.SolidityValue
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import qualified Slipstream.Events as SE
-import Slipstream.OutputData
-import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType

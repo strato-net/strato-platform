@@ -225,7 +225,9 @@ doResolve f fileName imp (seen, resolved) = case imp of
 resolvePath :: Monad m => Text -> EndoM (ExceptT Text m) (ExpressionF a)
 resolvePath fileName (StringLiteral a path') =
   let path = T.pack path'
-      fileDir = tail . reverse $ T.splitOn "/" fileName
+      fileDir = case reverse $ T.splitOn "/" fileName of
+                  [] -> []
+                  (_:xs) -> xs
       pathDir = T.splitOn "/" path
    in maybe (throwE $ "Could not resolve path: " <> path) (pure . lit' a) $ resolvePath' fileDir pathDir
 resolvePath _ expr = pure expr

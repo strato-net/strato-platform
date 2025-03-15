@@ -45,8 +45,7 @@ transFormXabi SVMXabi.Xabi {..} =
     { xabiFuncs = M.map tFormFunc $ M.mapKeysMonotonic T.pack _xabiFuncs,
       xabiConstr = case M.toList _xabiConstr of --Shouldn't _xabiConstr always be a size of 1?
         [] -> Nothing
-        [(_, f)] -> Just $ tFormFunc f
-        _ -> Just $ tFormFunc $ snd $ head $ M.toList _xabiConstr, --I don't think this should ever run
+        ((_, f):_) -> Just $ tFormFunc f,
       xabiVars = M.map tFormVarDeclToVartype $ M.mapKeysMonotonic T.pack _xabiVars,
       xabiTypes = M.map tFormDef $ M.mapKeysMonotonic T.pack _xabiTypes,
       xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _xabiModifiers,

@@ -286,7 +286,11 @@ instance MonadIO m => (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) (Reader
         atomicModifyIORef'
         ( \wms ->
             let s = S.size wms
-                wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+                wms' = if s >= 2000
+                         then case toList wms of
+                                (x:_) -> S.delete x wms
+                                _ -> wms
+                         else wms
                 !wms'' = wms' S.>| k
              in (wms'', ())
         )
@@ -307,7 +311,11 @@ instance MonadIO m => ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)
   insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
     wms <- use outboundWireMessages
     let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        wms' = if s >= 2000
+                 then case toList wms of
+                        (x:_) -> S.delete x wms
+                        _ -> wms -- should never happen
+                 else wms
         !wms'' = wms' S.>| k
     assign outboundWireMessages wms''
   delete _ k =
@@ -386,7 +394,7 @@ instance MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
   select _ host' =
     sqlQuery actions >>= \case
       [] -> return Nothing
-      lst -> return . Just . SQL.entityVal $ head lst
+      (x:_) -> return . Just $ SQL.entityVal x
     where
       actions = SQL.selectList [PPeerHost SQL.==. host'] []
 
@@ -394,7 +402,7 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
     sqlQuery actions >>= \case
       [] -> return Nothing
-      lst -> return . Just . SQL.entityVal $ head lst
+      (x:_) -> return . Just $ SQL.entityVal x
     where
       actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 

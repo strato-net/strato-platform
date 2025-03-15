@@ -124,7 +124,9 @@ instance MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
         sqlQuery actions >>= \case
           [] -> return Nothing
           --If multiple Hosts map to the same IP address, choose one arbitrarily, but prefer ones with domain names
-          lst -> return . Just . SQL.entityVal $ head $ sortOn (isIP . pPeerHost . SQL.entityVal) lst
+          lst -> case sortOn (isIP . pPeerHost . SQL.entityVal) lst of
+                   [] -> error "getPeerByIP: sortOn returned an empty list. This should be impossible"
+                   (p:_) -> return . Just $ SQL.entityVal p
         where
           actions = SQL.selectList [PPeerIp SQL.==. Just ip'] []
 

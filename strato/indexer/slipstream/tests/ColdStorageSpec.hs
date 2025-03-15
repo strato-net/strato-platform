@@ -4,11 +4,11 @@ module ColdStorageSpec where
 
 import BlockApps.Logging
 import BlockApps.Solidity.Value
+import Blockchain.Slipstream.GlobalsColdStorage
 import Blockchain.Strato.Model.Account
 import ClassyPrelude
 import Control.Monad.Trans.Resource
 import Database.Persist.Sqlite
-import Slipstream.GlobalsColdStorage
 import Test.Hspec (Spec, describe, it)
 import Test.Hspec.Expectations.Lifted
 import qualified Prelude as P ()

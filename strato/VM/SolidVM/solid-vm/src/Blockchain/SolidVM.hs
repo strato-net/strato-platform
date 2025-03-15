@@ -67,7 +67,7 @@ import Control.Applicative
 import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
-import Control.Lens hiding (Context, assign, from, to)
+import Control.Lens hiding (Context, assign, from, to, unsnoc)
 import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
@@ -88,7 +88,6 @@ import Data.Decimal
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_)
 import Data.List
-import Data.List.Extra ((!?))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as M
 import Data.Maybe
@@ -978,7 +977,7 @@ expressionType (CC.BoolLiteral _ _) = SVMType.Bool
 expressionType (CC.NumberLiteral _ _ _) = SVMType.Int (Just True) Nothing
 expressionType (CC.StringLiteral _ _) = SVMType.String $ Just True
 expressionType (CC.AccountLiteral _ _) = SVMType.Account False
-expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head xs)) Nothing
+expressionType (CC.ArrayExpression _ (x:_)) = SVMType.Array (expressionType x) Nothing
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
 constant :: Variable -> Maybe Value
@@ -1942,8 +1941,8 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
           val1 <- getVar var1
           convertedFirstArg <- case args of
             (CC.OrderedArgs []) -> pure $ SNULL
-            (CC.OrderedArgs a) -> do
-              firstVar <- expToVar (head a) Nothing
+            (CC.OrderedArgs (a:_)) -> do
+              firstVar <- expToVar a Nothing
               firstVar' <- getVar firstVar
               pure $ firstVar'
             (CC.NamedArgs _) -> pure $ SNULL
@@ -1987,7 +1986,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
               let (funcName, args') =
                     ( case args of
                         (CC.OrderedArgs []) -> typeError "delegate call needs atleast one arguement, none were given " args
-                        (CC.OrderedArgs a) -> case convertedFirstArg of (SString fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first argument to be a string" args
+                        (CC.OrderedArgs (_:a)) -> case convertedFirstArg of (SString fname) -> (fname, (CC.OrderedArgs a)); _ -> typeError "delegate call needs first argument to be a string" args
                         (CC.NamedArgs _) -> typeError "Cannot provide named args to delegate call" args
                     )
               fromAddress <- getCurrentAddress

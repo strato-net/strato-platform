@@ -86,5 +86,7 @@ splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =
   let txsLens = BlockHeader.extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
       txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
-      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
+      txsLensInLimit = case txsLensInSums of
+        [] -> []
+        (_:xs) -> takeWhile (< flags_maxHeadersTxsLens) xs
    in splitAt (length txsLensInLimit) neededHeaders

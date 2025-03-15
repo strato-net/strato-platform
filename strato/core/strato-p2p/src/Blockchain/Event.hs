@@ -76,7 +76,8 @@ import           UnliftIO.Exception
 --      skipEntries 2 [1..20] => [14,7,10,13,16,19]
 --      skipEntries 3 [1..20] => [15,9,13,17]
 skipEntries :: Int -> [a] -> [a]
-skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
+skipEntries _ []     = []
+skipEntries n (x:xs) = x : helper xs
   where
     helper xs' = case drop n xs' of
       (y : ys) -> y : helper ys

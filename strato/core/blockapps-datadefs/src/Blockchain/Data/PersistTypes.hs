@@ -65,7 +65,9 @@ instance PersistFieldSql HexStorage where
 
 instance PersistField Word256 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 64 (fromIntegral i :: Integer)
-  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head . readHex $ T.unpack s) :: Integer) :: Word256)
+  fromPersistValue (PersistText s) = case readHex $ T.unpack s of
+    [] -> Left $ "PersistField Word256: Could not read hex from string " <> s
+    (x:_) -> Right $ (fromIntegral $ ((fst x) :: Integer) :: Word256)
   fromPersistValue x = Left $ T.pack $ "PersistField Word256: expected integer: " ++ (show x)
 
 instance PersistFieldSql Word256 where
@@ -73,7 +75,9 @@ instance PersistFieldSql Word256 where
 
 instance PersistField Word512 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 128 (fromIntegral i :: Integer)
-  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head . readHex $ T.unpack s) :: Integer) :: Word512)
+  fromPersistValue (PersistText s) = case readHex $ T.unpack s of
+    [] -> Left $ "PersistField Word512: Could not read hex from string " <> s
+    (x:_) -> Right $ (fromIntegral $ ((fst x) :: Integer) :: Word512)
   fromPersistValue x = Left $ T.pack $ "PersistField Word512: expected integer: " ++ (show x)
 
 instance PersistFieldSql Word512 where

@@ -837,7 +837,9 @@ getXabiValueType (AccountPath loc path) = do
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
+    Just v -> return $!! case MS.toList path of
+                [] -> v
+                (_:xs) -> loop ccs' xs v
   where
     loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
     loop _ [] = id

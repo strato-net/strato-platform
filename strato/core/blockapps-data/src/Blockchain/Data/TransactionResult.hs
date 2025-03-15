@@ -121,7 +121,9 @@ putTransactionResult ::
   HasSQLDB m =>
   TransactionResult ->
   m (Key TransactionResult)
-putTransactionResult = fmap head . putTransactionResults . pure
+putTransactionResult = fmap unsafeHead . putTransactionResults . pure
+  where unsafeHead []    = error "putTransactionResult: No keys returned"
+        unsafeHead (x:_) = x
 
 putTransactionResults ::
   HasSQLDB m =>

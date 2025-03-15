@@ -139,7 +139,9 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults Nothing resolve [txHash]
+getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResults Nothing resolve [txHash]
+  where unsafeHead [] = throwIO $ AnError "getBlocTransactionResult: No results returned"
+        unsafeHead (x:_) = pure x
 
 getBatchBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,

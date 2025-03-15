@@ -9,6 +9,7 @@ import Blockchain.Strato.Model.Address (Address(..))
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Monad.IO.Class
 import Data.Aeson
+import Data.Base64.Types (extractBase64)
 import Data.ByteString.Base64
 import qualified Data.ByteString.UTF8 as B (fromString)
 import Data.Cache.LRU hiding (fromList)
@@ -115,7 +116,7 @@ data AccessToken = AccessToken
 getAccessToken :: MonadIO m => String -> String -> String -> m (Maybe AccessToken)
 getAccessToken id' sec tokenEndpoint = do
   manager <- liftIO $ newManager tlsManagerSettings
-  let creds64 = encodeBase64' . B.fromString $ id' <> ":" <> sec
+  let creds64 = extractBase64 . encodeBase64' . B.fromString $ id' <> ":" <> sec
   templateRequest <- liftIO $ parseRequest tokenEndpoint
   let rBody = RequestBodyLBS "grant_type=client_credentials"
       rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic " <> creds64)]
