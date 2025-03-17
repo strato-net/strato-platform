@@ -22,7 +22,7 @@ module Blockchain.Sequencer.DB.DependentBlockDB (
 
 import BlockApps.Logging
 import Blockchain.Data.BlockHeader
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad (join)
 import Control.Monad.Change.Alter

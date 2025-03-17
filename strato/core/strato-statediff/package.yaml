@@ -19,7 +19,6 @@ library:
     - ethereum-rlp
     - format
     - kafka-monad
-    - lens
     - merkle-patricia-db
     - monad-alter
     - nibblestring

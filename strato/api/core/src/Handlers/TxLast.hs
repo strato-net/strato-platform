@@ -16,7 +16,7 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ExtendedWord
 import Control.Monad.Composable.SQL

@@ -32,7 +32,6 @@ library:
   - labeled-error
   - lens
   - merkle-patricia-db
-  - mtl
   - monad-alter
   - nibblestring
   - ordered-containers
@@ -79,6 +78,7 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
+      - blockDB
       - bytestring
       - common-log
       - composable-monads-base

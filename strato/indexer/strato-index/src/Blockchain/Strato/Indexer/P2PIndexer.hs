@@ -11,8 +11,8 @@ module Blockchain.Strato.Indexer.P2PIndexer (
   ) where
 
 import BlockApps.Logging
-import Blockchain.Data.Block (BestBlock (..))
-import Blockchain.Sequencer.Event
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
 import Blockchain.Strato.Indexer.Model

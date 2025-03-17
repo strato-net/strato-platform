@@ -1,13 +1,12 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Executable.StratoP2PServer
   ( stratoP2PServer,
@@ -15,38 +14,40 @@ module Executable.StratoP2PServer
   )
 where
 
-import BlockApps.Logging
-import Blockchain.CommunicationConduit
-import Blockchain.Context hiding (Inbound, Outbound)
-import Blockchain.Data.PubKey (secPubKeyToPoint)
-import Blockchain.Display (displayMessage, MsgDirection(..))
-import Blockchain.EthEncryptionException
-import Blockchain.Event
-import Blockchain.EventException
-import Blockchain.ExtMergeSources
-import Blockchain.Frame
-import Blockchain.Metrics
-import Blockchain.Options
-import Blockchain.RLPx
-import Blockchain.Sequencer.Event
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Threads
-import Blockchain.TimerSource
-import Conduit
-import Control.Lens ((^.))
-import Control.Monad
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
-import qualified Data.Conduit.List as CL
-import Data.Either.Combinators
-import Data.Maybe (fromMaybe)
-import qualified Data.Text as T
-import GHC.IO.Exception
-import qualified Text.Colors as C
-import UnliftIO
+import           BlockApps.Logging
+import           Blockchain.CommunicationConduit
+import           Blockchain.Context                    hiding (Inbound,
+                                                        Outbound)
+import           Blockchain.Data.PubKey                (secPubKeyToPoint)
+import           Blockchain.Display                    (MsgDirection (..),
+                                                        displayMessage)
+import           Blockchain.EthEncryptionException
+import           Blockchain.Event
+import           Blockchain.EventException
+import           Blockchain.ExtMergeSources
+import           Blockchain.Frame
+import           Blockchain.Metrics
+import           Blockchain.Options
+import           Blockchain.RLPx
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Threads
+import           Blockchain.TimerSource
+import           Conduit
+import           Control.Lens                          ((^.))
+import           Control.Monad
+import qualified Control.Monad.Change.Alter            as A
+import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                       as B
+import qualified Data.Conduit.List                     as CL
+import           Data.Either.Combinators
+import           Data.Maybe                            (fromMaybe)
+import qualified Data.Text                             as T
+import           GHC.IO.Exception
+import qualified Text.Colors                           as C
+import           UnliftIO
 
 runEthServer ::
   (RunsServer n m, MonadP2P n) =>
@@ -159,8 +160,7 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
         , labelPeerThread peerStr "Sequencer Source" Nothing $
           seqSrc
           .| CL.map NewSeqEvent
-        , labelPeerThread peerStr "Timer Source" Nothing $
-          timerSource
+        , labelPeerThread peerStr "Timer Source" Nothing timerSource
         ] `mergeConnect` (
         CL.iterM recordEvent
           .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p)
@@ -174,8 +174,8 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
         )
 
       case ret of
-        Nothing -> changeLabelStatusM $ "DISCONNECTING"
-        Just e -> changeLabelStatusM $ "DISCONNECTING: " ++ show e
+        Nothing -> changeLabelStatusM "DISCONNECTING"
+        Just e  -> changeLabelStatusM $ "DISCONNECTING: " ++ show e
 
       return ret
 
