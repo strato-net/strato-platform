@@ -1,10 +1,4 @@
 
-ValidatorRef
-    org Text
-    orgUnit Text
-    commonName Text
-    deriving Eq Read Show
-
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256

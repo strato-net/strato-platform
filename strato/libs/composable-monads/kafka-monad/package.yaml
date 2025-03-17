@@ -12,7 +12,6 @@ library:
   - base16-bytestring
   - binary
   - bytestring
-  - common-log
   - composable-monads-base
   - conduit
   - lens

@@ -58,7 +58,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
 -- import Blockchain.SolidVM.SM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))

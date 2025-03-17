@@ -46,8 +46,8 @@ import Bloc.API.TypeWrappers
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.SolidityValue
-import Blockchain.Data.Json (RawTransaction', UnsignedRawTransaction')
 import Blockchain.Data.TransactionResult
+import Blockchain.Model.JsonBlock (RawTransaction', UnsignedRawTransaction')
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Gas

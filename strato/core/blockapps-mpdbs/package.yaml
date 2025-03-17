@@ -21,7 +21,6 @@ library:
   dependencies:
   - base16-bytestring
   - binary
-  - blockapps-data
   - bytestring
   - common-log
   - containers
@@ -30,7 +29,6 @@ library:
   - ethereum-rlp
   - fastMP
   - format
-  - lens
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
