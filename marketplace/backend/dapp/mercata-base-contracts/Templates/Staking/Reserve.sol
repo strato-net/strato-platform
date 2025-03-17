@@ -225,18 +225,6 @@ abstract contract Reserve is Utils, Structs {
         // Clear loan
         escrow.updateBorrowedAmount(usdstAmountRepaid, false); //change
 
-        // Update maxLoanAmount in escrow
-        if (usdstAmountOwed > (escrow.collateralValue() * loanToValueRatio / 100)) {
-            try {
-                if (escrow.version() == "2.0") {
-                    escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
-                }
-            }
-            catch {
-                escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
-            }
-        }
-
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
     
