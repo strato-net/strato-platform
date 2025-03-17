@@ -64,8 +64,8 @@ class TokensController {
     try {
       const { dapp } = req;
       const result = await dapp.getBridgeableAddresses({});
-
-      return rest.response.status200(res, result);
+      const tokensArray =  await tokensJs.getBridgeableAddress_new(result);
+      return rest.response.status200(res, tokensArray);
     } catch (e) {
       return next(e);
     }

@@ -267,7 +267,18 @@ function getCataAddress() {
   }
 }
 
-function getBridgeableAddress_new() {
+function getBridgeableAddress_new(cirrusData) {
+  const addressMapping = cirrusData.reduce((acc, item) => {
+    acc[item.data.name] = item.address;
+    return acc;
+  }, {});
+  
+  // Update tokensArray with addresses
+  tokensArray.forEach(token => {
+    if (addressMapping[token.name]) {
+      token.address = addressMapping[token.name];
+    }
+  });
   return tokensArray;
 }
 
