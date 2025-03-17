@@ -1,5 +1,5 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { actions } from '../../contexts/inventory/actions';
@@ -81,6 +81,16 @@ const BridgeWalletModal = ({
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+
+  const { bridgeableAddress_new } = useEthState();
+  
+  useEffect(() => {
+    const fetchAddresses_new = async () => {
+      await ethActions.fetchBridgeableAddress_new(ethDispatch);
+    };
+
+    fetchAddresses_new();
+  }, []);
 
   const ethToMercataColumns = [
     {
@@ -232,12 +242,13 @@ const BridgeWalletModal = ({
       if (tabKey === '1') {
         // Bridge In (Eth -> Mercata)
         let tokenAddress, decimals, recipient;
-        const tokenObj = tokensArray.find((tokenD) => tokenD.name === tokenName)
-        tokenAddress = fileServerUrl.includes('test')
+
+        const tokenObj = bridgeableAddress_new.find((tokenD) => tokenD.name === tokenName)
+        tokenAddress = fileServerUrl?.includes('test')
           ? tokenObj.ethTestnetAddress  // Testnet WBTC
           : tokenObj.ethMainnetAddress; // Mainnet WBTC
         decimals = tokenObj.decimals;
-        recipient = fileServerUrl.includes('test')
+        recipient = fileServerUrl?.includes('test')
           ? tokenObj.mercataTestnetAddress // Testnet recipient
           : tokenObj.mercataMainnetAddress; // Mainnet recipient
 
