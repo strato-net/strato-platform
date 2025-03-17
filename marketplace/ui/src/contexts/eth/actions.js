@@ -9,6 +9,10 @@ const actionDescriptors = {
   fetchBridgeableAddressSuccessful: 'fetch_bridgeable_address_successful',
   fetchBridgeableAddressFailed: 'fetch_bridgeable_address_failed',
 
+  fetchBridgeableAddress_new: 'fetch_bridgeable_address_new',
+  fetchBridgeableAddressSuccessful_new: 'fetch_bridgeable_address_successful_new',
+  fetchBridgeableAddressFailed_new: 'fetch_bridgeable_address_failed_new',
+
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
   addHashFailed: 'add_hash_failed',
@@ -62,6 +66,48 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchBridgeableAddressFailed,
+        payload: 'Error while fetching Bridgeable address',
+      });
+      return null;
+    }
+  },
+
+  fetchBridgeableAddress_new: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchBridgeableAddress_new });
+    try {
+      let response = await fetch(`${apiUrl}/tokens/bridgeableAddress_new`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchBridgeableAddressFailed_new,
+          payload: 'Error while fetching Bridgeable address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchBridgeableAddressSuccessful_new,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchBridgeableAddressFailed_new,
+        payload: 'Error while fetching Bridgeable address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchBridgeableAddressFailed_new,
         payload: 'Error while fetching Bridgeable address',
       });
       return null;

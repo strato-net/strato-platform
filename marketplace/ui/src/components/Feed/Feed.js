@@ -21,6 +21,10 @@ const Feed = ({ user }) => {
   const ethDispatch = useEthDispatch();
 
   useEffect(() => {
+    ethActions.fetchBridgeableAddress_new(ethDispatch);
+  }, []);
+
+  useEffect(() => {
     const fetchAddresses = async () => {
       await marketplaceActions.fetchUSDSTAddress(marketplaceDispatch);
       await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(

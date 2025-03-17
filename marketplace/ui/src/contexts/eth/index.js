@@ -11,7 +11,8 @@ const EthProvider = ({ children }) => {
     message: null,
     bridgeableAddress: null,
     isAddingHash: false,
-    isBridgingOut: false
+    isBridgingOut: false,
+    bridgeableAddress_new: null
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

@@ -27,6 +27,21 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
+    
+    case actionDescriptors.fetchBridgeableAddress_new:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchBridgeableAddressSuccessful_new:
+      return {
+        ...state,
+        bridgeableAddress_new: action.payload,
+      };
+    case actionDescriptors.fetchBridgeableAddressFailed_new:
+      return {
+        ...state,
+      };
+      
     case actionDescriptors.addHash:
       return {
         ...state,

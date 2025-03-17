@@ -5,6 +5,46 @@ import constants from '../../helpers/constants';
 const contractName = 'Tokens';
 const contractFilename = `${util.cwd}/dapp/items/contracts/Tokens.sol`;
 
+const tokensArray = [
+  {
+    name: 'WBTCST',
+    ethTestnetAddress: '0x29f2D40B0605204364af54EC677bD022dA425d03',
+    ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+    decimals: 8,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'USDTST',
+    ethTestnetAddress: '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6',
+    ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    decimals: 6,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'USDCST',
+    ethTestnetAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
+    ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    decimals: 6,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'PAXGST',
+    ethTestnetAddress: '0x58724DEc334608b375D5e2914FCAc156E019B4D5',
+    ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
+    decimals: 18,
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  },
+  {
+    name: 'ETHST',
+    mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+  }
+]
+
 /**
  * Uploads a new Tokens item
  * @param user User token (typically an admin)
@@ -200,6 +240,10 @@ function getCataAddress() {
   }
 }
 
+function getBridgeableAddress_new() {
+  return tokensArray;
+}
+
 function getBridgeableAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
       const { prodETHSTAddress, prodWBTCSTAddress, prodUSDTSTAddress, prodUSDCSTAddress, prodPAXGSTAddress } = constants;
@@ -234,5 +278,6 @@ export default {
   getUSDSTAddress,
   getCataAddress,
   getBridgeableAddress,
-  getStratsAddress
+  getStratsAddress,
+  getBridgeableAddress_new
 };

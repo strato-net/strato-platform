@@ -34,4 +34,11 @@ router.post(
   TokensController.bridgeOut
 );
 
+router.get(
+  Tokens.getBridgeableAddress_new,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  TokensController.getBridgeableAddress_new
+);
+
 export default router;

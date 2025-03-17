@@ -60,6 +60,15 @@ class TokensController {
     }
   }
 
+  static async getBridgeableAddress_new(_, res, next) {
+    try {
+      const tokensArray = await tokensJs.getBridgeableAddress_new();
+      return rest.response.status200(res, tokensArray);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   // ----------------------- ARG VALIDATION ------------------------
 
   static validateCreateTokensArgs(args) {
