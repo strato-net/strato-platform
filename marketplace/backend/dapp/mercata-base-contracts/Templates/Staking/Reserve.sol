@@ -36,7 +36,7 @@ abstract contract Reserve is Utils, Structs {
     decimal public lastUpdatedOraclePrice = 0;
 
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
-    uint constant SECONDS_IN_YEAR = 31536000;
+    uint public SECONDS_IN_YEAR = 31536000;
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal usdstLoan);
     event StakeUnlocked(address indexed user, address escrow, uint quantity);
@@ -108,7 +108,11 @@ abstract contract Reserve is Utils, Structs {
                     escrow.updateBorrowedAmount(interestAmount, true);
                 } catch {
                     // Compute temporary new loanToValueRatio to allow adding the interest
-                    newLoanToValueRatio = ((borrowedAmount + interestAmount) * 100) / escrow.collateralValue();
+                    uint collateralValue = escrow.collateralValue();
+                    uint newLoanToValueRatio = ((borrowedAmount + interestAmount) * 100) / collateralValue;
+                    if (escrow.maxLoanAmount() == (collateralValue * newLoanToValueRatio / 100)) {
+                        newLoanToValueRatio += 1;
+                    }
                     try {
                         if (escrow.version() == "2.0") {
                             escrow.updateOnPriceChange(oraclePrice * usdstPrice, newLoanToValueRatio, liquidationRatio);
@@ -226,6 +230,18 @@ abstract contract Reserve is Utils, Structs {
 
         // Clear loan
         escrow.updateBorrowedAmount(usdstAmountRepaid, false); //change
+
+        // Update maxLoanAmount in escrow
+        if (usdstAmountOwed > (escrow.collateralValue() * loanToValueRatio / 100)) {
+            try {
+                if (escrow.version() == "2.0") {
+                    escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
+                }
+            }
+            catch {
+                escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
+            }
+        }
 
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }

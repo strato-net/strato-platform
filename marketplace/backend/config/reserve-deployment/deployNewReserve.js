@@ -36,6 +36,7 @@ async function main() {
       ASSET_ROOT_ADDRESS,
       ASSET_ORACLE_ADDRESS,
       UNIT_CONVERSION_RATE,
+      INTEREST_ON_LOAN,
       USDST_PRICE,
       USDST_TOKEN,
       STRATS_TO_USDST_FACTOR,
@@ -51,12 +52,13 @@ async function main() {
       !ASSET_ORACLE_ADDRESS ||
       !ASSET_ROOT_ADDRESS ||
       !UNIT_CONVERSION_RATE ||
+      !INTEREST_ON_LOAN ||
       !USDST_PRICE ||
       !USDST_TOKEN ||
       !STRATS_TO_USDST_FACTOR
     ) {
       throw new Error(
-        'ASSET_ORACLE_ADDRESS, ASSET_ROOT_ADDRESS, UNIT_CONVERSION_RATE, USDST_PRICE, USDST_TOKEN, and STRATS_TO_USDST_FACTOR environment variables are required.'
+        'ASSET_ORACLE_ADDRESS, ASSET_ROOT_ADDRESS, UNIT_CONVERSION_RATE, INTEREST_ON_LOAN, USDST_PRICE, USDST_TOKEN, and STRATS_TO_USDST_FACTOR environment variables are required.'
       );
     }
 
@@ -81,6 +83,7 @@ async function main() {
       name: RESERVE_NAME,
       assetRootAddress: ASSET_ROOT_ADDRESS,
       unitConversionRate: Number(UNIT_CONVERSION_RATE),
+      interestOnLoan: Number(INTEREST_ON_LOAN),
       usdstToken: USDST_TOKEN,
       usdstPrice: Number(USDST_PRICE),
       stratsPrice: Number(STRATS_TO_USDST_FACTOR),

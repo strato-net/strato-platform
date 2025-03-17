@@ -84,7 +84,7 @@ async function main() {
     const oldReserve = oldReserveResults[0];
 
     // 3. Extract required fields from the old reserve.
-    const { oracle, name, assetRootAddress, unitConversionRate } = oldReserve;
+    const { oracle, name, assetRootAddress, unitConversionRate, interestOnLoan } = oldReserve;
 
     // 4. Set up contract details for deployment.
     const contractName = 'SimpleReserve';
@@ -98,6 +98,7 @@ async function main() {
       name: name,
       assetRootAddress: assetRootAddress,
       unitConversionRate: Number(unitConversionRate),
+      interestOnLoan: Number(interestOnLoan),
       usdstToken: USDST_TOKEN,
       usdstPrice: Number(USDST_PRICE),
       stratsPrice: Number(STRATS_TO_USDST_FACTOR),
