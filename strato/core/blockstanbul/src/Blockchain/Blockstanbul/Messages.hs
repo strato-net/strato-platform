@@ -11,7 +11,6 @@
 module Blockchain.Blockstanbul.Messages where
 
 import BlockApps.Logging
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
@@ -183,7 +182,6 @@ data OutEvent
     -- will erase the gap with PreviousBlocks.
     GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
   | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
-  | NewCheckpoint Checkpoint
   | RunPreprepare Block
   deriving (Eq, Show, Generic)
 
@@ -200,7 +198,6 @@ instance Format OutEvent where
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
-  format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
   format (RunPreprepare blk) = "RunPreprepare " ++ format (blockHash blk)
 
 blkNum :: Block -> String
@@ -235,7 +232,6 @@ outShortLog loc eoev = do
       ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-      NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
       RunPreprepare blk -> prefix ++ CL.blue "RUN_PRE_PREPARE " ++ format (blockHash blk)
 
 instance NFData OutEvent

@@ -14,7 +14,7 @@ module Blockchain.Strato.Indexer.ApiIndexer
 where
 
 import BlockApps.Logging
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
 import Blockchain.Strato.Indexer.Model

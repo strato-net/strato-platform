@@ -15,7 +15,7 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
+import Blockchain.Model.JsonBlock
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
 import Database.Persist.Postgresql

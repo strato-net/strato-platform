@@ -10,8 +10,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS -fno-warn-unused-top-binds #-}
-{-# OPTIONS -fno-warn-redundant-constraints #-}
 {-# LANGUAGE BlockArguments #-}
 
 module Bloc.Server.Transaction
@@ -46,10 +44,11 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json hiding (Contract)
 import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
+import Blockchain.Model.JsonBlock
+import Blockchain.Model.SyncState (BestBlock (..))
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
@@ -57,8 +56,8 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
-import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
-import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
+import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
+import Blockchain.SyncDB
 import Control.Applicative ((<|>))
 import Control.Arrow
 import Control.Lens hiding (from, ix)
@@ -74,8 +73,6 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.Cache as Cache
 import qualified Data.Cache.Internal as Cache
-import Data.Conduit
-import Data.Conduit.TQueue
 import Data.Foldable
 import Data.Hashable hiding (hash)
 import Data.Int (Int32)
@@ -115,7 +112,7 @@ mergeTxParams (Just inner) (Just outer) =
       (txparamsGasPrice inner <|> txparamsGasPrice outer)
       (txparamsNonce inner <|> txparamsNonce outer)
 mergeTxParams inner outer = inner <|> outer
-
+{-
 txWorker ::
   ( MonadLogger m,
     A.Selectable Address Contract m,
@@ -137,7 +134,7 @@ txWorker = forever $ do
   where
     processTxs = awaitForever $ \(a, b, w, r, c) ->
       lift . void $ postBlocTransaction' (Do CacheNonce) a b w r c
-
+-}
 --------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
 
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
@@ -1335,7 +1332,7 @@ genNonces cacheNonce fromAddr _ l items = do
       Cache.insertSTM fromAddr newCachedNonce nonceCache expTime
       pure txs
 
-getAccountNonce :: (MonadLogger m, HasSQL m, HasBlocEnv m) =>
+getAccountNonce :: (MonadLogger m, HasSQL m) =>
                    Address -> m Nonce
 getAccountNonce addr = do
   let actions = E.select . E.from $ \accStateRef -> do
@@ -1351,7 +1348,7 @@ getAccountNonce addr = do
       let mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
       return $ mkNonce act
     _ -> error "returned more than one account with a single address in getAccountNonce"
-
+{-
 constructArgValues ::
   (MonadIO m, MonadLogger m) =>
   Maybe (Map Text ArgValue) ->
@@ -1366,7 +1363,7 @@ constructArgValues args argNamesTypes = do
     Just argsMap -> do
       vals <- getArgValues argsMap argNamesTypes
       return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
-
+-}
 getArgValues ::
   (MonadIO m, MonadLogger m) =>
   Map Text ArgValue ->

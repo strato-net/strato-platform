@@ -16,7 +16,7 @@ const tokensArray = [
     ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
     decimals: 8,
     mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+    mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
   },
   {
     name: 'USDTST',
@@ -24,7 +24,7 @@ const tokensArray = [
     ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
     decimals: 6,
     mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+    mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
   },
   {
     name: 'USDCST',
@@ -32,7 +32,7 @@ const tokensArray = [
     ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
     decimals: 6,
     mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+    mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
   },
   {
     name: 'PAXGST',
@@ -40,12 +40,12 @@ const tokensArray = [
     ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
     decimals: 18,
     mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+    mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
   },
   {
     name: 'ETHST',
     mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-    mercataMainnetAddress: '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb'
+    mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
   }
 ]
 
@@ -82,6 +82,17 @@ const BridgeWalletModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
+  // Helper function to check if the value exceeds 6 decimal places
+  const hasExceedPrecision = (value) => {
+    if (value === undefined || value === null) return false;
+    const stringValue = String(value);
+    if (stringValue.includes('.')) {
+      const decimalPart = stringValue.split('.')[1];
+      return decimalPart && decimalPart.length > 6;
+    }
+    return false;
+  };
+
   const ethToMercataColumns = [
     {
       title: `${tokenName} Available`,
@@ -92,10 +103,37 @@ const BridgeWalletModal = ({
       title: 'Set Quantity',
       align: 'center',
       render: () => (
-        <InputNumber
-          value={quantity}
-          onChange={(value) => setQuantity(value)}
-        />
+        <div
+          className={`${
+            quantity <= 0 || hasExceedPrecision(quantity) ? 'h-auto' : 'h-8'
+          }`}
+        >
+          <InputNumber
+            value={quantity}
+            onChange={(value) => setQuantity(value)}
+            controls={false}
+            className="w-full"
+            status={
+              quantity < 1 / 1e6 || hasExceedPrecision(quantity) ? 'error' : ''
+            }
+          />
+          {quantity < 1 / 1e6 && (
+            <div
+              style={{ color: 'red' }}
+              className="text-xs my-0.5 absolute w-full"
+            >
+              Amount must be greater than 0.000001
+            </div>
+          )}
+          {hasExceedPrecision(quantity) && (
+            <div
+              style={{ color: 'red' }}
+              className="text-xs my-0.5 absolute w-full"
+            >
+              Maximum precision is 6 decimal places
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -118,10 +156,37 @@ const BridgeWalletModal = ({
       title: 'Set Quantity',
       align: 'center',
       render: () => (
-        <InputNumber
-          value={quantity}
-          onChange={(value) => setQuantity(value)}
-        />
+        <div
+          className={`${
+            quantity <= 0 || hasExceedPrecision(quantity) ? 'h-auto' : 'h-8'
+          }`}
+        >
+          <InputNumber
+            value={quantity}
+            onChange={(value) => setQuantity(value)}
+            controls={false}
+            className="w-full"
+            status={
+              quantity < 1 / 1e6 || hasExceedPrecision(quantity) ? 'error' : ''
+            }
+          />
+          {quantity < 1 / 1e6 && (
+            <div
+              style={{ color: 'red' }}
+              className="text-xs my-0.5 absolute w-full"
+            >
+              Amount must be greater than 0.000001
+            </div>
+          )}
+          {hasExceedPrecision(quantity) && (
+            <div
+              style={{ color: 'red' }}
+              className="text-xs my-0.5 absolute w-full"
+            >
+              Maximum precision is 6 decimal places
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -250,7 +315,7 @@ const BridgeWalletModal = ({
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
               ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
+              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
@@ -303,20 +368,26 @@ const BridgeWalletModal = ({
       footer={[
         <>
           <div className="md:flex justify-between items-center w-full hidden">
-            <div className="max-w-[60%] text-left">
-              <p className="text-xs">
-                <b>Note:</b> Bridged tokens will be automatically staked in the
-                app. Please allow a few minutes for the staking process to
-                complete after bridging.
-              </p>
-            </div>
+            {tabKey === '1' && (
+              <div className="max-w-[60%] text-left">
+                <p className="text-xs">
+                  <b>Note:</b> Bridged tokens will be automatically staked in
+                  the app. Please allow a few minutes for the staking process to
+                  complete after bridging.
+                </p>
+              </div>
+            )}
 
-            <div>
+            <div className={tabKey !== '1' ? 'w-full' : ''}>
               <Button
                 type="primary"
                 className="w-32 h-9"
                 onClick={handleSubmit}
-                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                disabled={
+                  quantity < 1 / 1e6 ||
+                  quantity > accountDetails.balance ||
+                  hasExceedPrecision(quantity)
+                }
                 loading={isAddingHash || loader || isBridgingOut}
               >
                 Bridge
@@ -329,19 +400,25 @@ const BridgeWalletModal = ({
                 type="primary"
                 className="w-full h-9"
                 onClick={handleSubmit}
-                disabled={quantity <= 0 || quantity > accountDetails.balance}
+                disabled={
+                  quantity < 1 / 1e6 ||
+                  quantity > accountDetails.balance ||
+                  hasExceedPrecision(quantity)
+                }
                 loading={isAddingHash || loader || isBridgingOut}
               >
                 Bridge
               </Button>
             </div>
-            <div className="w-full text-left mt-4">
-              <p className="text-xs">
-                <b>Note:</b> Bridged tokens will be automatically staked in the
-                app. Please allow a few minutes for the staking process to
-                complete after bridging.
-              </p>
-            </div>
+            {tabKey === '1' && (
+              <div className="w-full text-left mt-4">
+                <p className="text-xs">
+                  <b>Note:</b> Bridged tokens will be automatically staked in
+                  the app. Please allow a few minutes for the staking process to
+                  complete after bridging.
+                </p>
+              </div>
+            )}
           </div>
         </>,
       ]}
