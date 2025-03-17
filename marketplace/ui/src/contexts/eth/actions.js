@@ -9,9 +9,9 @@ const actionDescriptors = {
   fetchBridgeableAddressSuccessful: 'fetch_bridgeable_address_successful',
   fetchBridgeableAddressFailed: 'fetch_bridgeable_address_failed',
 
-  fetchBridgeableAddress_new: 'fetch_bridgeable_address_new',
-  fetchBridgeableAddressSuccessful_new: 'fetch_bridgeable_address_successful_new',
-  fetchBridgeableAddressFailed_new: 'fetch_bridgeable_address_failed_new',
+  fetchBridgeableTokens: 'fetch_bridgeable_tokens',
+  fetchBridgeableTokensSuccessful: 'fetch_bridgeable_tokens_successful',
+  fetchBridgeableTokensFailed: 'fetch_bridgeable_tokens_failed',
 
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
@@ -72,8 +72,8 @@ const actions = {
     }
   },
 
-  fetchBridgeableAddress_new: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchBridgeableAddress_new });
+  fetchBridgeableTokens: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchBridgeableTokens });
     try {
       let response = await fetch(`${apiUrl}/tokens/bridgeableAddress_new`, {
         method: HTTP_METHODS.GET,
@@ -86,7 +86,7 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchBridgeableAddressFailed_new,
+          type: actionDescriptors.fetchBridgeableTokensFailed,
           payload: 'Error while fetching Bridgeable address',
         });
         return null;
@@ -94,20 +94,20 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchBridgeableAddressSuccessful_new,
+          type: actionDescriptors.fetchBridgeableTokensSuccessful,
           payload: body?.data,
         });
         return body.data;
       }
 
       dispatch({
-        type: actionDescriptors.fetchBridgeableAddressFailed_new,
+        type: actionDescriptors.fetchBridgeableTokensFailed,
         payload: 'Error while fetching Bridgeable address',
       });
       return null;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchBridgeableAddressFailed_new,
+        type: actionDescriptors.fetchBridgeableTokensFailed,
         payload: 'Error while fetching Bridgeable address',
       });
       return null;

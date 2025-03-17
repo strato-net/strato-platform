@@ -112,7 +112,7 @@ export const Tokens = {
 
   addHash: '/addHash',
   bridgeOut: '/bridgeOut',
-  getBridgeableAddress_new: '/bridgeableAddress_new',
+  getBridgeableTokens: '/bridgeableTokens',
 };
 
 export const CarbonOffset = {

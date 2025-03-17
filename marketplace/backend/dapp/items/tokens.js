@@ -267,7 +267,7 @@ function getCataAddress() {
   }
 }
 
-function getBridgeableAddress_new(cirrusData) {
+function getBridgeableTokensAddress(cirrusData) {
   const addressMapping = cirrusData.reduce((acc, item) => {
     acc[item.data.name] = item.address;
     return acc;
@@ -318,5 +318,5 @@ export default {
   getCataAddress,
   getBridgeableAddress,
   getStratsAddress,
-  getBridgeableAddress_new
+  getBridgeableTokensAddress
 };
