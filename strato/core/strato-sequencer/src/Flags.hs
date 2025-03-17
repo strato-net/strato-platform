@@ -25,7 +25,6 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 -- blockstanbul related flags
 -- TODO(tim): We may need to specify a starting view, or catch up from the network
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
-defineFlag "genesisBlockName" ("livenet" :: String) "use the alternate stablenet genesis block"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag
   "blockstanbul_round_period_s"
@@ -54,7 +53,6 @@ exportFlagsAsMetrics = do
   set "kafkaclientid" $ show flags_kafkaclientid
   set "kafkaaddress" flags_kafkaaddress
   set "blockstanbul" $ show flags_blockstanbul
-  set "genesisBlockName" flags_genesisBlockName
   set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
