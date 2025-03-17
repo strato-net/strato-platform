@@ -35,10 +35,10 @@ router.post(
 );
 
 router.get(
-  Tokens.getBridgeableAddress_new,
+  Tokens.getBridgeableTokens,
   authHandler.authorizeRequest(),
   loadDapp,
-  TokensController.getBridgeableAddress_new
+  TokensController.getBridgeableTokens
 );
 
 export default router;

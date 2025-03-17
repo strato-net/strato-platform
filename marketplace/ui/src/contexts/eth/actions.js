@@ -75,7 +75,7 @@ const actions = {
   fetchBridgeableTokens: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchBridgeableTokens });
     try {
-      let response = await fetch(`${apiUrl}/tokens/bridgeableAddress_new`, {
+      let response = await fetch(`${apiUrl}/tokens/bridgeableTokens`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });

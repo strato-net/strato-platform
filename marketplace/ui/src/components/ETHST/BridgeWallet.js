@@ -82,14 +82,14 @@ const BridgeWalletModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  const { bridgeableAddress_new } = useEthState();
+  const { bridgeableTokens } = useEthState();
   
   useEffect(() => {
-    const fetchAddresses_new = async () => {
-      await ethActions.fetchBridgeableAddress_new(ethDispatch);
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
     };
 
-    fetchAddresses_new();
+    fetchBridgeableTokenss();
   }, []);
 
   const ethToMercataColumns = [
@@ -243,7 +243,7 @@ const BridgeWalletModal = ({
         // Bridge In (Eth -> Mercata)
         let tokenAddress, decimals, recipient;
 
-        const tokenObj = bridgeableAddress_new.find((tokenD) => tokenD.name === tokenName)
+        const tokenObj = bridgeableTokens.find((tokenD) => tokenD.name === tokenName)
         tokenAddress = fileServerUrl?.includes('test')
           ? tokenObj.ethTestnetAddress  // Testnet WBTC
           : tokenObj.ethMainnetAddress; // Mainnet WBTC

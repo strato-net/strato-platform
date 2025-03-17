@@ -28,16 +28,16 @@ const reducer = (state, action) => {
         ...state,
       };
     
-    case actionDescriptors.fetchBridgeableAddress_new:
+    case actionDescriptors.fetchBridgeableTokens:
       return {
         ...state,
       };
-    case actionDescriptors.fetchBridgeableAddressSuccessful_new:
+    case actionDescriptors.fetchBridgeableTokensSuccessful:
       return {
         ...state,
-        bridgeableAddress_new: action.payload,
+        bridgeableTokens: action.payload,
       };
-    case actionDescriptors.fetchBridgeableAddressFailed_new:
+    case actionDescriptors.fetchBridgeableTokensFailed:
       return {
         ...state,
       };
