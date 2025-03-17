@@ -204,6 +204,33 @@ async function addHash(user, args, options) {
   return rest.call(user, callArgs, options);
 }
 
+
+async function getBridge(user, args, options) {
+  const CREATOR = 'in.(BlockApps,mercata_usdst)';
+  const IS_ACTIVE = 'eq.true';
+  // const contractName = 'MercataETHBridge';
+  const mercataETHBridgeSearchOptions = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      isActive: IS_ACTIVE,
+      ['data->>isMint']: 'eq.True',
+    },
+  };
+
+  const ethBridge = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-MercataETHBridge' },
+    mercataETHBridgeSearchOptions
+  );
+
+  if (!ethBridge || ethBridge.length === 0) {
+    throw new Error('No active ethBridge found for the given address');
+  }
+
+  return ethBridge;
+}
+
 async function burnETHST(user, args, options) {
   const { ethstAddresses, quantity, baseAddress, tokenAssetRootAddress } = args;
   const contractName = 'MercataETHBridge';
@@ -274,6 +301,7 @@ export default {
   marshalIn,
   marshalOut,
   addHash,
+  getBridge,
   burnETHST,
   getUSDSTAddress,
   getCataAddress,

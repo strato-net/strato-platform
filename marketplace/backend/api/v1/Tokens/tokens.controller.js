@@ -60,10 +60,12 @@ class TokensController {
     }
   }
 
-  static async getBridgeableAddress_new(_, res, next) {
+  static async getBridgeableAddress_new(req, res, next) {
     try {
-      const tokensArray = await tokensJs.getBridgeableAddress_new();
-      return rest.response.status200(res, tokensArray);
+      const { dapp } = req;
+      const result = await dapp.getBridgeableAddresses({});
+
+      return rest.response.status200(res, result);
     } catch (e) {
       return next(e);
     }
