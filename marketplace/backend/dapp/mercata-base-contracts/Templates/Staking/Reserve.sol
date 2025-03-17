@@ -90,15 +90,6 @@ abstract contract Reserve is Utils, Structs {
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
             
-            try {
-                if (escrow.version() == "2.0") {
-                    escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
-                }
-            }
-            catch {
-                escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
-            }
-
             // Update borrow amount based on interest
             uint borrowedAmount = escrow.borrowedAmount();
             if (borrowedAmount > 0) {
@@ -107,21 +98,24 @@ abstract contract Reserve is Utils, Structs {
                 try {
                     escrow.updateBorrowedAmount(interestAmount, true);
                 } catch {
-                    // Compute temporary new loanToValueRatio to allow adding the interest
-                    uint collateralValue = escrow.collateralValue();
-                    uint newLoanToValueRatio = ((borrowedAmount + interestAmount) * 100) / collateralValue;
-                    if (escrow.maxLoanAmount() == (collateralValue * newLoanToValueRatio / 100)) {
-                        newLoanToValueRatio += 1;
-                    }
                     try {
                         if (escrow.version() == "2.0") {
-                            escrow.updateOnPriceChange(oraclePrice * usdstPrice, newLoanToValueRatio, liquidationRatio);
+                            escrow.updateOnPriceChange(oraclePrice * usdstPrice, liquidationRatio, liquidationRatio);
                         }
                     } catch {
-                        escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, newLoanToValueRatio, liquidationRatio);
+                        escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, liquidationRatio, liquidationRatio);
                     }
                     escrow.updateBorrowedAmount(interestAmount, true);
                 }
+            }
+
+            try {
+                if (escrow.version() == "2.0") {
+                    escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
+                }
+            }
+            catch {
+                escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
             }
 
             // Have to implement liquidation logic here for interest accruement to work.
