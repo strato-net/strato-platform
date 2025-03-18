@@ -34,10 +34,11 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
 import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
 import BridgeWallet from '../ETHST/BridgeWallet';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const USDSTIcon = (
   <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -72,7 +73,16 @@ const InventoryCard = ({
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const { bridgeableTokens } = useEthState();
 
-  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
     const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
     acc[key] = item.address;
     return acc;

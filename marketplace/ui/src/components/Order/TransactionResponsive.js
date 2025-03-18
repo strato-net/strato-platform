@@ -14,7 +14,8 @@ import {
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const TransactionResponsive = ({
   data,
@@ -27,7 +28,16 @@ const TransactionResponsive = ({
   const [expandedRows, setExpandedRows] = useState({});
   const { bridgeableTokens } = useEthState();
 
-  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
     const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
     acc[key] = item.address;
     return acc;

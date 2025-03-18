@@ -34,7 +34,7 @@ import {
   useTransactionDispatch,
   useTransactionState,
 } from '../../contexts/transaction';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
@@ -49,6 +49,7 @@ import {
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const TransactionTable = ({
   user,
@@ -83,8 +84,16 @@ const TransactionTable = ({
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
   const { bridgeableTokens } = useEthState();
+  const ethDispatch = useEthDispatch();
 
-  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
     const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
     acc[key] = item.address;
     return acc;

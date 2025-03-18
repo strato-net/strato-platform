@@ -7,7 +7,6 @@ import DOMPurify from 'dompurify';
 // State
 import { useAuthenticateState } from '../../contexts/authentication';
 import { useMarketplaceState } from '../../contexts/marketplace';
-import { useEthState } from '../../contexts/eth';
 // Assets
 import images_placeholder from '../../images/resources/image_placeholder.png';
 import { Images } from '../../images';
@@ -16,6 +15,8 @@ import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import routes from '../../helpers/routes';
 import LoginModal from './LoginModal';
+import { actions as ethActions } from '../../contexts/eth/actions';
+import { useEthDispatch, useEthState} from '../../contexts/eth';
 
 const NewTrendingCard = ({
   topSellingProduct,
@@ -30,9 +31,18 @@ const NewTrendingCard = ({
   const location = useLocation();
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const { bridgeableTokens } = useEthState();
 
-  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const { bridgeableTokens } = useEthState();
+  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
     const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
     acc[key] = item.address;
     return acc;
