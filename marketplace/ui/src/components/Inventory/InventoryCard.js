@@ -25,7 +25,6 @@ import BridgeModal from './BridgeModal';
 import StakeModal from './StakeModal';
 import routes from '../../helpers/routes';
 import {
-  appendingAddressOnTokens,
   ASSET_STATUS,
   OLD_SADDOG_ORIGIN_ADDRESS,
 } from '../../helpers/constants';
@@ -55,7 +54,6 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
-  bridgeableTokenss,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -77,15 +75,14 @@ const InventoryCard = ({
   const ethDispatch = useEthDispatch();
 
   useEffect(() => {
-    const fetchBridgeableTokenss = async () => {
+    const fetchBridgeableTokens = async () => {
       await ethActions.fetchBridgeableTokens(ethDispatch);
     };
-    fetchBridgeableTokenss();
+    fetchBridgeableTokens();
   }, []);
 
-  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -211,17 +208,7 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    const isEthst = inventory.originAddress === ethstAddress;
-    const isWbtcst = inventory.originAddress === wbtcstAddress;
-    const isUsdtst = inventory.originAddress === usdtstAddress;
-    const isUsdcst = inventory.originAddress === usdcstAddress;
-    const isPaxgst = inventory.originAddress === paxgstAddress;
-
-    if (isEthst) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+    if (bridgeableAddresses?.includes(inventory.originAddress)) {
       navigate(`${ethNaviroute.replace(':address', inventory.address).replace(':bridgeableAsset', inventory.name)}`, {
         state: { isCalledFromInventory: false },
       });
@@ -304,8 +291,8 @@ const InventoryCard = ({
 
   const isBridgeableToken = (inventoryRoot) => {
     return (
-      Array.isArray(bridgeableTokenss) &&
-      bridgeableTokenss.find((address) => address === inventoryRoot)
+      Array.isArray(bridgeableAddresses) &&
+      bridgeableAddresses.find((address) => address === inventoryRoot)
     );
   };
 

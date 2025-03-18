@@ -51,7 +51,7 @@ const Feed = ({ user }) => {
           user={user}
           USDSTAddress={USDSTAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          bridgeableAddresses={bridgeableTokens}
+          bridgeableAddresses={bridgeableTokens?.map((token) => token.address)}
           stratsAddress={stratsAddress}
         />
       )}

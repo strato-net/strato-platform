@@ -142,7 +142,7 @@ const GlobalTransactionResponsive = ({
               };
 
               const handleAssetRedirection = () => {
-                if (Object.values(bridgeableAddresses).includes(assetOriginAddress)) {
+                if (bridgeableAddresses?.includes(assetOriginAddress)) {
                   const url = routes.bridgeableProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress).replace(':bridgeableAsset', assetName)}`, {
                     state: { isCalledFromInventory: false },

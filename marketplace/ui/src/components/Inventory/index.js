@@ -57,7 +57,7 @@ import { useAuthenticateState } from '../../contexts/authentication';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
 import RequestBeAuthorizedIssuerModal from './RequestBeAuthorizedIssuerModal';
-import { ISSUER_STATUS, ASSET_STATUS, appendingAddressOnTokens } from '../../helpers/constants';
+import { ISSUER_STATUS, ASSET_STATUS } from '../../helpers/constants';
 import ItemActions from './ItemActions';
 import InventoryCard from './InventoryCard';
 import './index.css';
@@ -164,9 +164,8 @@ const Inventory = ({ user }) => {
     fetchBridgeableTokenss();
   }, []);
 
-  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
   
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } =
     useRedemptionState();
@@ -566,7 +565,7 @@ const Inventory = ({ user }) => {
             category={category}
             allSubcategories={allSubcategories}
             user={user}
-            bridgeableTokens={[ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress]}
+            bridgeableTokens={bridgeableAddresses}
             supportedTokens={supportedTokens}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
@@ -831,7 +830,6 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
-                        bridgeableTokenss={[ethstAddress, wbtcstAddress]}
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
@@ -856,7 +854,6 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
-                        bridgeableTokenss={[ethstAddress, wbtcstAddress]}
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces

@@ -55,7 +55,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (Object.values(bridgeableTokens).includes(reserveItem.originAddress)) {
+    if (bridgeableTokens?.map((token) => token.address).includes(reserveItem.originAddress)) {
       navigate(
         `${routes.bridgeableProductDetail.url.replace(
           ':address',

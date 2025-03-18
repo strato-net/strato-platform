@@ -4,7 +4,6 @@ import classNames from 'classnames';
 import { Images } from '../../images';
 import './ordersTable.css';
 import {
-  appendingAddressOnTokens,
   REDEMPTION_STATUS,
   REDEMPTION_STATUS_CLASSES,
   TRANSACTION_STATUS,
@@ -38,9 +37,7 @@ const TransactionResponsive = ({
     fetchBridgeableTokenss();
   }, []);
 
-  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
-
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -209,18 +206,7 @@ const TransactionResponsive = ({
           };
 
           const handleAssetRedirection = () => {
-            const isEthst = assetOriginAddress === ethstAddress;
-            const isWbtcst = assetOriginAddress === wbtcstAddress;
-            const isUsdtst = assetOriginAddress === usdtstAddress; 
-            const isUsdcst = assetOriginAddress === usdcstAddress;
-            const isPaxgst = assetOriginAddress === paxgstAddress;
-
-            if (isEthst) {
-              const url = routes.EthstProductDetail.url;
-              navigate(`${url.replace(':address', assetAddress)}`, {
-                state: { isCalledFromInventory: false },
-              });
-            } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+            if (bridgeableAddresses?.includes(assetOriginAddress)) {
               const url = routes.bridgeableProductDetail.url;
               navigate(`${url.replace(':address', assetAddress).replace(':bridgeableAsset', assetName)}`, {
                 state: { isCalledFromInventory: false },

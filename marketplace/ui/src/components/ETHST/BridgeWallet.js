@@ -267,7 +267,7 @@ const BridgeWalletModal = ({
         // Bridge In (Eth -> Mercata)
         let tokenAddress, decimals, recipient;
 
-        const tokenObj = bridgeableTokens.find((tokenD) => tokenD.name === tokenName)
+        const tokenObj = bridgeableTokens?.find((tokenD) => tokenD.name.toLowerCase() === tokenName.toLowerCase())
         tokenAddress = fileServerUrl?.includes('test')
           ? tokenObj.ethTestnetAddress  // Testnet WBTC
           : tokenObj.ethMainnetAddress; // Mainnet WBTC

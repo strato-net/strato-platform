@@ -120,6 +120,15 @@ const ProductDetails = ({ user, users }) => {
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
   const { success, message } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+
+    fetchBridgeableTokenss();
+  }, []);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -215,7 +224,7 @@ const ProductDetails = ({ user, users }) => {
   // *** New useEffect: Listen for wallet account changes ***
   useEffect(() => {
     if (!walletProvider) return;
-  
+
     // Handler for account changes
     const handleAccountsChanged = (accounts) => {
       if (!accounts || accounts.length === 0) {
@@ -223,68 +232,49 @@ const ProductDetails = ({ user, users }) => {
         disconnect.disconnect();
       }
     };
-  
+
     // Attach the event listener
     walletProvider.on("accountsChanged", handleAccountsChanged);
-  
+
     // Function to fetch balance using the same provider
     const fetchBalance = async () => {
       if (address && chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id) {
-          let tokenAddress, decimals, setBalance;
-          
-          if (bridgeableAsset === 'WBTCST') {
-              tokenAddress = fileServerUrl.includes('test')
-                  ? '0x29f2D40B0605204364af54EC677bD022dA425d03'  // Sepolia Testnet WBTC
-                  : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // Mainnet WBTC
-              decimals = 8;
-              setBalance = tokenBalance;
-          } else if (bridgeableAsset === 'USDTST') {
-              tokenAddress = fileServerUrl.includes('test')
-                  ? '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6'  // Sepolia Testnet USDT
-                  : '0xdAC17F958D2ee523a2206206994597C13D831ec7'; // Mainnet USDT
-              decimals = 6;
-              setBalance = tokenBalance;
-          } else if (bridgeableAsset === 'USDCST') {
-              tokenAddress = fileServerUrl.includes('test')
-                  ? '0x16dA4541aD1807f4443d92D26044C1147406EB80'  // Sepolia Testnet USDC
-                  : '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // Mainnet USDC
-              decimals = 6;
-              setBalance = tokenBalance;
-          } else if (bridgeableAsset === 'PAXGST') {
-              tokenAddress = fileServerUrl.includes('test')
-                  ? '0x7eFb7b64f89903a62AE4d65e31b4c2aDaAd73b1F'  // Sepolia Testnet PAXG
-                  : '0x45804880De22913dAFE09f4980848ECE6EcbAf78'; // Mainnet PAXG
-              decimals = 18;
-              setBalance = tokenBalance;
-          } else {
-              console.error(`Unsupported token: ${bridgeableAsset}`);
-              return;
-          }
-  
-          const provider = new ethers.providers.Web3Provider(walletProvider);
-          const signer = provider.getSigner();
-          setSigner(signer);
-           console.log("tokenAddress", tokenAddress);
-           
-          try {
-              // Create ERC20 contract instance
-              const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-              const balance = await tokenContract.balanceOf(address);
-  
-              // Format balance according to token decimals
-              const formattedBalance = ethers.utils.formatUnits(balance, decimals);
-  
-              // Set the balance for the specific token
-              setTokenBalance(formattedBalance);
-          } catch (error) {
-              console.error(`Failed to fetch ${bridgeableAsset} balance:`, error);
-          }
+        let tokenAddress, decimals;
+
+        const tokenObj = bridgeableTokens?.find((tokenD) => tokenD.name.toLowerCase() === bridgeableAsset.toLowerCase())
+        if (tokenObj) {
+          tokenAddress = fileServerUrl?.includes('test')
+            ? tokenObj.ethTestnetAddress  // Testnet WBTC
+            : tokenObj.ethMainnetAddress; // Mainnet WBTC
+          decimals = tokenObj.decimals;
+        } else {
+          console.error(`Unsupported token: ${bridgeableAsset}`);
+          return;
+        }
+
+        const provider = new ethers.providers.Web3Provider(walletProvider);
+        const signer = provider.getSigner();
+        setSigner(signer);
+
+        try {
+          // Create ERC20 contract instance
+          const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+          const balance = await tokenContract.balanceOf(address);
+
+          // Format balance according to token decimals
+          const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+
+          // Set the balance for the specific token
+          setTokenBalance(formattedBalance);
+        } catch (error) {
+          console.error(`Failed to fetch ${bridgeableAsset} balance:`, error);
+        }
       }
-    };  
-  
+    };
+
     // Fetch balance when the account changes
     fetchBalance();
-  
+
     // Cleanup: remove event listener on unmount
     return () => {
       walletProvider.removeListener("accountsChanged", handleAccountsChanged);

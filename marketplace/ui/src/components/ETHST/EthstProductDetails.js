@@ -910,7 +910,7 @@ const ProductDetails = ({ user, users }) => {
             walletAddress: address,
             balance: ethBalance,
           }}
-          tokenName="ETH"
+          tokenName="ETHST"
         />
       )}
       {borrowModalOpen && (

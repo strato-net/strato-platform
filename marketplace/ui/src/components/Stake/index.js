@@ -33,7 +33,6 @@ import { actions as categoryActions } from '../../contexts/category/actions';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
-import { appendingAddressOnTokens } from '../../helpers/constants';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 const USDSTIcon = (
@@ -133,9 +132,7 @@ const Stake = ({ user }) => {
     fetchBridgeableTokenss();
   }, []);
   
-  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
-
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
@@ -255,7 +252,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          [ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress],
+          bridgeableAddresses,
           assetsWithEighteenDecimalPlaces,
           navigate
         )}

@@ -17,7 +17,6 @@ import routes from '../../helpers/routes';
 import LoginModal from './LoginModal';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { useEthDispatch, useEthState} from '../../contexts/eth';
-import { appendingAddressOnTokens } from '../../helpers/constants';
 
 const NewTrendingCard = ({
   topSellingProduct,
@@ -43,9 +42,8 @@ const NewTrendingCard = ({
   }, []);
 
   const { bridgeableTokens } = useEthState();
-  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
-  const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -71,18 +69,11 @@ const NewTrendingCard = ({
     return false;
   };
 
-  const isEthst = topSellingProduct.originAddress === ethstAddress;
-  const isWbtcst = topSellingProduct.originAddress === wbtcstAddress;
-  const isUsdtst = topSellingProduct.originAddress === usdtstAddress;
-  const isUsdcst = topSellingProduct.originAddress === usdcstAddress;
-  const isPaxgst = topSellingProduct.originAddress === paxgstAddress;
-
   const naviroute = routes.MarketplaceProductDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
-    !isEthst &&
-    !isWbtcst && !isUsdtst && !isUsdcst && !isPaxgst &&
+    !bridgeableAddresses?.includes(topSellingProduct.originAddress) &&
     (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
@@ -247,15 +238,7 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-              if (isEthst) {
-                navigate(
-                  `${ethNaviroute.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else if (isWbtcst || isUsdtst || isUsdcst || isPaxgst) {
+              if (bridgeableAddresses?.includes(topSellingProduct.originAddress)) {
                 navigate(
                   `${routes.bridgeableProductDetail.url.replace(
                     ':address',
@@ -363,7 +346,7 @@ const NewTrendingCard = ({
         </div>
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            (isEthst || isWbtcst || isUsdtst || isUsdcst || isPaxgst ) &&
+            (bridgeableAddresses?.includes(topSellingProduct.originAddress)) &&
             reserve
               ? 'invisible'
               : ''
@@ -482,18 +465,7 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if (isEthst && reserve) {
-                navigate(
-                  `${ethNaviroute.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else if (
-                (isWbtcst || isUsdtst || isUsdcst || isPaxgst)  &&
-                reserve
-              ) {
+              if (bridgeableAddresses?.includes(topSellingProduct.originAddress) && reserve) {
                 navigate(
                   `${routes.bridgeableProductDetail.url.replace(
                     ':address',
@@ -511,7 +483,7 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {(isEthst || isWbtcst || isUsdtst || isUsdcst || isPaxgst) &&
+            {(bridgeableAddresses?.includes(topSellingProduct.originAddress)) &&
             reserve
               ? 'Bridge'
               : 'Buy Now'}

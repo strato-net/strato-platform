@@ -634,10 +634,3 @@ export const DOWNLOAD_OPTIONS = [
   },
 ];
 
-export const appendingAddressOnTokens = (bridgeableTokens) => {
-  return bridgeableTokens?.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
-};
