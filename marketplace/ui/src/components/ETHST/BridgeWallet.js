@@ -38,7 +38,7 @@ const BridgeWalletModal = ({
         ? Math.floor(Number(accountDetails.balance) * 1e6) / 1e6
         : accountDetails.balance,
   };
-  const [quantity, setQuantity] = useState(updatedAccountDetails?.balance || 1);
+  const [quantity, setQuantity] = useState(updatedAccountDetails?.balance || 0);
   const [ethereumAddress, setEthereumAddress] = useState('');
   const [loader, setLoader] = useState(false);
   const ethDispatch = useEthDispatch();
@@ -125,7 +125,7 @@ const BridgeWalletModal = ({
       render: () => (
         <div
           className={`${
-            quantity <= 0 || hasExceedPrecision(quantity) ? 'h-auto' : 'h-8'
+            quantity <= 0 || (hasExceedPrecision(quantity) && !hasExceedPrecision(updatedAccountDetails.balance)) ? 'h-auto' : 'h-8'
           }`}
         >
           <InputNumber
@@ -134,7 +134,7 @@ const BridgeWalletModal = ({
             controls={false}
             className="w-full"
             status={
-              quantity < 1 / 1e6 || hasExceedPrecision(quantity) ? 'error' : ''
+              quantity < 1 / 1e6 || (hasExceedPrecision(quantity) && !hasExceedPrecision(updatedAccountDetails.balance)) ? 'error' : ''
             }
           />
           {quantity < 1 / 1e6 && (
@@ -145,7 +145,7 @@ const BridgeWalletModal = ({
               Amount must be greater than 0.000001
             </div>
           )}
-          {hasExceedPrecision(quantity) && (
+          {hasExceedPrecision(quantity) && !hasExceedPrecision(updatedAccountDetails.balance) && (
             <div
               style={{ color: 'red' }}
               className="text-xs my-0.5 absolute w-full"
@@ -352,7 +352,7 @@ const BridgeWalletModal = ({
                 disabled={
                   quantity < 1 / 1e6 ||
                   quantity > updatedAccountDetails.balance ||
-                  hasExceedPrecision(quantity)
+                  (!hasExceedPrecision(updatedAccountDetails.balance) && hasExceedPrecision(quantity))
                 }
                 loading={isAddingHash || loader || isBridgingOut}
               >
@@ -369,7 +369,7 @@ const BridgeWalletModal = ({
                 disabled={
                   quantity < 1 / 1e6 ||
                   quantity > updatedAccountDetails.balance ||
-                  hasExceedPrecision(quantity)
+                  (!hasExceedPrecision(updatedAccountDetails.balance) && hasExceedPrecision(quantity))
                 }
                 loading={isAddingHash || loader || isBridgingOut}
               >
