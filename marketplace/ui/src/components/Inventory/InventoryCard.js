@@ -25,6 +25,7 @@ import BridgeModal from './BridgeModal';
 import StakeModal from './StakeModal';
 import routes from '../../helpers/routes';
 import {
+  appendingAddressOnTokens,
   ASSET_STATUS,
   OLD_SADDOG_ORIGIN_ADDRESS,
 } from '../../helpers/constants';
@@ -82,11 +83,7 @@ const InventoryCard = ({
     fetchBridgeableTokenss();
   }, []);
 
-  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
+  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
 
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);

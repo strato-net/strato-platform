@@ -33,6 +33,7 @@ import { actions as categoryActions } from '../../contexts/category/actions';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
+import { appendingAddressOnTokens } from '../../helpers/constants';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 const USDSTIcon = (
@@ -124,12 +125,15 @@ const Stake = ({ user }) => {
     success: ethSuccess,
     bridgeableTokens
   } = useEthState();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
   
-  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
+  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
 
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 

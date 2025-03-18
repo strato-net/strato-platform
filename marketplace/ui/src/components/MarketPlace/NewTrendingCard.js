@@ -17,6 +17,7 @@ import routes from '../../helpers/routes';
 import LoginModal from './LoginModal';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { useEthDispatch, useEthState} from '../../contexts/eth';
+import { appendingAddressOnTokens } from '../../helpers/constants';
 
 const NewTrendingCard = ({
   topSellingProduct,
@@ -42,11 +43,7 @@ const NewTrendingCard = ({
   }, []);
 
   const { bridgeableTokens } = useEthState();
-  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
+  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
 
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const { hasChecked, isAuthenticated, loginUrl, user } =

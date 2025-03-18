@@ -4,6 +4,7 @@ import classNames from 'classnames';
 import { Images } from '../../images';
 import './ordersTable.css';
 import {
+  appendingAddressOnTokens,
   REDEMPTION_STATUS,
   REDEMPTION_STATUS_CLASSES,
   TRANSACTION_STATUS,
@@ -37,11 +38,7 @@ const TransactionResponsive = ({
     fetchBridgeableTokenss();
   }, []);
 
-  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
+  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
 
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 

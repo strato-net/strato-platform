@@ -46,6 +46,7 @@ import {
   REDEMPTION_STATUS_CLASSES,
   DATE_TIME_FORMAT,
   TRANSACTION_STATUS_TEXT,
+  appendingAddressOnTokens,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
@@ -93,11 +94,7 @@ const TransactionTable = ({
     fetchBridgeableTokenss();
   }, []);
 
-  const bridgeableAddress = bridgeableTokens?.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
+  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
 
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 

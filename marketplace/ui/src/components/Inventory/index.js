@@ -57,7 +57,7 @@ import { useAuthenticateState } from '../../contexts/authentication';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
 import RequestBeAuthorizedIssuerModal from './RequestBeAuthorizedIssuerModal';
-import { ISSUER_STATUS, ASSET_STATUS } from '../../helpers/constants';
+import { ISSUER_STATUS, ASSET_STATUS, appendingAddressOnTokens } from '../../helpers/constants';
 import ItemActions from './ItemActions';
 import InventoryCard from './InventoryCard';
 import './index.css';
@@ -157,11 +157,14 @@ const Inventory = ({ user }) => {
   const { message: itemMsg, success: itemSuccess } = useItemState();
   const { message: ethMsg, success: ethSuccess, bridgeableTokens } = useEthState();
 
-  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
-    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
-    acc[key] = item.address;
-    return acc;
-  }, {});
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddress = appendingAddressOnTokens(bridgeableTokens);
   
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const redemptionDispatch = useRedemptionDispatch();
