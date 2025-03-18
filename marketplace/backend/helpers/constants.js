@@ -84,6 +84,47 @@ export default {
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
   testTokenServerUrl: 'https://campaigns-test.blockapps.net',
   prodTokenServerUrl: 'https://campaigns.blockapps.net',
+
+  tokensArray: [
+    {
+      name: 'WBTCST',
+      ethTestnetAddress: '0x29f2D40B0605204364af54EC677bD022dA425d03',
+      ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+      decimals: 8,
+      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+    },
+    {
+      name: 'USDTST',
+      ethTestnetAddress: '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6',
+      ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+      decimals: 6,
+      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+    },
+    {
+      name: 'USDCST',
+      ethTestnetAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
+      ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      decimals: 6,
+      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+    },
+    {
+      name: 'PAXGST',
+      ethTestnetAddress: '0x58724DEc334608b375D5e2914FCAc156E019B4D5',
+      ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
+      decimals: 18,
+      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+    },
+    {
+      name: 'ETHST',
+      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+    }
+  ]
+
 };
 
 export const DECIMAL_FACTOR_18 = Math.pow(10, 18);
