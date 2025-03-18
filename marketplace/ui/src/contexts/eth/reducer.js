@@ -14,19 +14,6 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message,
       };
-    case actionDescriptors.fetchBridgeableAddress:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchBridgeableAddressSuccessful:
-      return {
-        ...state,
-        bridgeableAddress: action.payload,
-      };
-    case actionDescriptors.fetchBridgeableAddressFailed:
-      return {
-        ...state,
-      };
     
     case actionDescriptors.fetchBridgeableTokens:
       return {

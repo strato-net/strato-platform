@@ -20,16 +20,6 @@ class TokensController {
     }
   }
 
-  static async getBridgeableAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getBridgeableAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
   static async addHash(req, res, next) {
     try {
       const { dapp, body } = req;

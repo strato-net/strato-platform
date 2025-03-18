@@ -13,13 +13,6 @@ router.post(
   TokensController.create
 );
 
-router.get(
-  Tokens.getBridgeableAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getBridgeableAddress
-);
-
 router.post(
   Tokens.addHash,
   authHandler.authorizeRequest(),

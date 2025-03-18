@@ -5,10 +5,6 @@ const actionDescriptors = {
   resetMessage: 'reset_message',
   setMessage: 'set_message',
 
-  fetchBridgeableAddress: 'fetch_bridgeable_address',
-  fetchBridgeableAddressSuccessful: 'fetch_bridgeable_address_successful',
-  fetchBridgeableAddressFailed: 'fetch_bridgeable_address_failed',
-
   fetchBridgeableTokens: 'fetch_bridgeable_tokens',
   fetchBridgeableTokensSuccessful: 'fetch_bridgeable_tokens_successful',
   fetchBridgeableTokensFailed: 'fetch_bridgeable_tokens_failed',
@@ -28,48 +24,6 @@ const actions = {
 
   setMessage: (dispatch, message, success = false) => {
     dispatch({ type: actionDescriptors.setMessage, message, success });
-  },
-
-  fetchBridgeableAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchBridgeableAddress });
-    try {
-      let response = await fetch(`${apiUrl}/tokens/bridgeableAddress`, {
-        method: HTTP_METHODS.GET,
-        credentials: 'same-origin',
-      });
-
-      const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.fetchBridgeableAddressFailed,
-          payload: 'Error while fetching Bridgeable address',
-        });
-        return null;
-      }
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchBridgeableAddressSuccessful,
-          payload: body?.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchBridgeableAddressFailed,
-        payload: 'Error while fetching Bridgeable address',
-      });
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchBridgeableAddressFailed,
-        payload: 'Error while fetching Bridgeable address',
-      });
-      return null;
-    }
   },
 
   fetchBridgeableTokens: async (dispatch) => {

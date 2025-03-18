@@ -243,18 +243,6 @@ function getBridgeableTokensAddress(cirrusData) {
   return tokensArray;
 }
 
-function getBridgeableAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-      const { prodETHSTAddress, prodWBTCSTAddress, prodUSDTSTAddress, prodUSDCSTAddress, prodPAXGSTAddress } = constants;
-    return { ethstAddress: prodETHSTAddress, wbtcstAddress:prodWBTCSTAddress, usdtstAddress:prodUSDTSTAddress, usdcstAddress:prodUSDCSTAddress, paxgstAddress:prodPAXGSTAddress };
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    const { testnetETHSTAddress, testnetWBTCSTAddress, testnetUSDTSTAddress, testnetUSDCSTAddress, testnetPAXGSTAddress } = constants;
-    return { ethstAddress:testnetETHSTAddress, wbtcstAddress:testnetWBTCSTAddress, usdtstAddress:testnetUSDTSTAddress, usdcstAddress:testnetUSDCSTAddress, paxgstAddress:testnetPAXGSTAddress }
-  } else {
-    return { ethstAddress: prodETHSTAddress, wbtcstAddress:prodWBTCSTAddress, usdtstAddress:prodUSDTSTAddress, usdcstAddress:prodUSDCSTAddress, paxgstAddress:prodPAXGSTAddress };
-  }
-}
-
 function getStratsAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
     return constants.prodStratsAddress;
@@ -277,7 +265,6 @@ export default {
   burnETHST,
   getUSDSTAddress,
   getCataAddress,
-  getBridgeableAddress,
   getStratsAddress,
   getBridgeableTokensAddress
 };

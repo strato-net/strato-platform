@@ -108,7 +108,6 @@ export const Art = {
 export const Tokens = {
   prefix: '/tokens',
   create: '/',
-  getBridgeableAddress: '/bridgeableAddress',
 
   addHash: '/addHash',
   bridgeOut: '/bridgeOut',
