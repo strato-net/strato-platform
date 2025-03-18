@@ -82,7 +82,14 @@ const TransactionTable = ({
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
-  const { bridgeableAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
+    acc[key] = item.address;
+    return acc;
+  }, {});
+
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 
   const formatter = new Intl.NumberFormat('en-US');

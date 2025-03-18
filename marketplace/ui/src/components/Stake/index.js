@@ -122,8 +122,15 @@ const Stake = ({ user }) => {
   const {
     message: ethMsg,
     success: ethSuccess,
-    bridgeableAddress
+    bridgeableTokens
   } = useEthState();
+  
+  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
+    acc[key] = item.address;
+    return acc;
+  }, {});
+
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 
   const linkUrl = window.location.href;

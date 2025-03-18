@@ -53,7 +53,7 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
-  bridgeableTokens,
+  bridgeableTokenss,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -70,7 +70,14 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
-  const { bridgeableAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
+    acc[key] = item.address;
+    return acc;
+  }, {});
+
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
 
@@ -290,8 +297,8 @@ const InventoryCard = ({
 
   const isBridgeableToken = (inventoryRoot) => {
     return (
-      Array.isArray(bridgeableTokens) &&
-      bridgeableTokens.find((address) => address === inventoryRoot)
+      Array.isArray(bridgeableTokenss) &&
+      bridgeableTokenss.find((address) => address === inventoryRoot)
     );
   };
 

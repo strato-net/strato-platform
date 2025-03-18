@@ -25,7 +25,14 @@ const TransactionResponsive = ({
   const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
-  const { bridgeableAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
+    acc[key] = item.address;
+    return acc;
+  }, {});
+
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
 
   const formatter = new Intl.NumberFormat('en-US');

@@ -18,7 +18,6 @@ import { CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 // Actions
 import { actions as categoryActions } from '../../contexts/category/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { actions as ethActions } from '../../contexts/eth/actions';
 // Dispatch and states
 import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 import {
@@ -72,7 +71,6 @@ const CategoryProductList = ({ user }) => {
   // Dispatch
   const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const ethDispatch = useEthDispatch();
   // states
   const { marketplaceList, marketplaceListCount, isMarketplaceLoading } =
     useMarketplaceState();
@@ -80,10 +78,6 @@ const CategoryProductList = ({ user }) => {
   const { categorys } = useCategoryState();
   const { cartList } = useMarketplaceState();
   const isLoading = isMarketplaceLoading;
-
-  useEffect(() => {
-    ethActions.fetchBridgeableAddress(ethDispatch);
-  });
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);

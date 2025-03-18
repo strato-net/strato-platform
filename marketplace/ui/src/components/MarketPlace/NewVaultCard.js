@@ -19,11 +19,11 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const ethDispatch = useEthDispatch();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  const { bridgeableAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      ethActions.fetchBridgeableAddress(ethDispatch);
+      ethActions.fetchBridgeableTokens(ethDispatch);
     };
 
     fetchAddresses();
@@ -55,7 +55,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (Object.values(bridgeableAddress).includes(reserveItem.originAddress)) {
+    if (Object.values(bridgeableTokens).includes(reserveItem.originAddress)) {
       navigate(
         `${routes.bridgeableProductDetail.url.replace(
           ':address',

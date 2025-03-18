@@ -155,7 +155,14 @@ const Inventory = ({ user }) => {
 
   const itemDispatch = useItemDispatch();
   const { message: itemMsg, success: itemSuccess } = useItemState();
-  const { message: ethMsg, success: ethSuccess, bridgeableAddress } = useEthState();
+  const { message: ethMsg, success: ethSuccess, bridgeableTokens } = useEthState();
+
+  const bridgeableAddress = bridgeableTokens.reduce((acc, item) => {
+    const key = `${item.name.toLowerCase()}Address`; // Convert name to lowercase and append 'Address'
+    acc[key] = item.address;
+    return acc;
+  }, {});
+  
   const { ethstAddress, wbtcstAddress, usdtstAddress, usdcstAddress, paxgstAddress } = bridgeableAddress || {};
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } =
@@ -171,7 +178,7 @@ const Inventory = ({ user }) => {
     actions.getUserCataRewards(dispatch);
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
-    ethActions.fetchBridgeableAddress(ethDispatch);
+    ethActions.fetchBridgeableTokens(ethDispatch);
   }, []);
 
   useEffect(() => {
@@ -821,7 +828,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
-                        bridgeableTokens={[ethstAddress, wbtcstAddress]}
+                        bridgeableTokenss={[ethstAddress, wbtcstAddress]}
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
@@ -846,7 +853,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
-                        bridgeableTokens={[ethstAddress, wbtcstAddress]}
+                        bridgeableTokenss={[ethstAddress, wbtcstAddress]}
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces

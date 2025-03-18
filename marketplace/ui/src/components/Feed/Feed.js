@@ -15,19 +15,11 @@ const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const { USDSTAddress, assetsWithEighteenDecimalPlaces, stratsAddress } =
     useMarketplaceState();
-  const { bridgeableAddress, bridgeableTokens } = useEthState();
+  const { bridgeableTokens } = useEthState();
 
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const ethDispatch = useEthDispatch();
-
-  useEffect(() => {
-    const fetchBridgeableTokensAddress = async () => {
-      await ethActions.fetchBridgeableTokens(ethDispatch);
-    };
-
-    fetchBridgeableTokensAddress();
-  }, []);
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -35,7 +27,7 @@ const Feed = ({ user }) => {
       await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
-      await ethActions.fetchBridgeableAddress(ethDispatch);
+      await ethActions.fetchBridgeableTokens(ethDispatch);
     };
 
     fetchAddresses();
@@ -59,7 +51,7 @@ const Feed = ({ user }) => {
           user={user}
           USDSTAddress={USDSTAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          bridgeableAddresses={bridgeableAddress}
+          bridgeableAddresses={bridgeableTokens}
           stratsAddress={stratsAddress}
         />
       )}

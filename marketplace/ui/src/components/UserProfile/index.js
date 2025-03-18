@@ -80,8 +80,6 @@ const UserProfile = ({ user }) => {
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
-      await ethActions.fetchBridgeableAddress(ethDispatch);
-      
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
