@@ -269,12 +269,12 @@ const BridgeWalletModal = ({
 
         const tokenObj = bridgeableTokens?.find((tokenD) => tokenD.name.toLowerCase() === tokenName.toLowerCase())
         tokenAddress = fileServerUrl?.includes('test')
-          ? tokenObj.ethTestnetAddress  // Testnet WBTC
-          : tokenObj.ethMainnetAddress; // Mainnet WBTC
+          ? tokenObj?.ethTestnetAddress  // Testnet WBTC
+          : tokenObj?.ethMainnetAddress; // Mainnet WBTC
         decimals = tokenObj.decimals;
         recipient = fileServerUrl?.includes('test')
-          ? tokenObj.mercataTestnetAddress // Testnet recipient
-          : tokenObj.mercataMainnetAddress; // Mainnet recipient
+          ? tokenObj?.mercataTestnetAddress // Testnet recipient
+          : tokenObj?.mercataMainnetAddress; // Mainnet recipient
 
         if (tokenAddress) {
           const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
