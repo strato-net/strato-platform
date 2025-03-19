@@ -1,3 +1,4 @@
+require('dotenv').config();  // Not used when running with run.sh
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 const config = fsUtil.getYaml(`../../config.yaml`);
 

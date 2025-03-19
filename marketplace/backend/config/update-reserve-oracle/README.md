@@ -3,7 +3,7 @@
 ## Prepare
 - Install dependencies:
   - Node.js v16+ is required
-  - `npm install blockapps-rest`
+  - `npm install blockapps-rest dot-env`
 - Edit config.sh
   - Edit the oracle addresses
     - to obtain the oracle addresses, check oracle deployment log or oracle_deploy.yaml in the oracle container/volume.
@@ -14,8 +14,10 @@
 ## Execute
 - Run with `./run.sh`
 
-## (Alternative for devs) Node.js-only
-One-off execution of the `updateOracleOnReserve.js` script, one oracle-reserve pair per run:
-- ```
-  USERNAME=username PASSWORD=password ORACLE_ADDRESS=oracle_address RESERVE_ADDRESS=reserve_address node updateOracleOnReserve.js 2>&1 | tee -a "$log_file"
+## (Alternative, for devs) Bash-less execution (node.js only)
+- A single js-script run updates one oracle-reserve pair per run.
+- Create `.env` from `.env.updateOracleOnReserve` and edit the values in it
+- Run:
+  ```
+  node updateOracleOnReserve.js 2>&1 | tee -a r.log
   ```
