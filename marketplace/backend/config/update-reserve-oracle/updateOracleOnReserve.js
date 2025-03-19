@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 const config = fsUtil.getYaml(`../../config.yaml`);
 
@@ -101,7 +100,8 @@ async function main() {
     // Process each reserve individually.
     await updateOracle(RESERVE_ADDRESS, ORACLE_ADDRESS, token);
   } catch (error) {
-    console.error('Error updating reserves:', error);
+    console.error('Error updating reserve:', error);
+    process.exit(1);
   }
 }
 
