@@ -66,6 +66,7 @@ import           Debug.Trace                           (trace)
 import           Prelude                               hiding (lookup)
 import           Text.Format
 import           Text.Printf
+--import           Text.ShortDescription
 import           Text.Tools
 import           UnliftIO.Exception
 
@@ -230,36 +231,38 @@ handleEvents peer = awaitForever $ \case
 
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
 
-    currentSyncTask <- lift $ getCurrentSyncTask (pPeerHost peer)
+    currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum $ map (BlockHeader.number . blockBlockData) blocks'
 
-    fetchNumber <-
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+
+    maybeFetchNumber <-
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             lift $ setSyncTaskFinished (pPeerHost peer)
-            syncTask <- lift $ getNewSyncTask (pPeerHost peer)
+            syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
-            return $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+            return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
           else do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            return $ maxBlockNumber + 1
+            return $ Just $ maxBlockNumber + 1
 
-    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: maybeFetchNumber is " ++ show maybeFetchNumber
 
     bodyHashes' <- lift getBodiesToFetch
 
     if null bodyHashes'
       then do -- all the block bodies have been sent, let's try to download more headers
-      if fetchNumber <= worldNumber
-        then syncFetch Forward fetchNumber
-        else do
-            currentSyncTask' <- lift $ getCurrentSyncTask (pPeerHost peer)
-            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
-            lift $ setSyncTaskNotReady (pPeerHost peer)
+      case maybeFetchNumber of
+        Nothing ->
+          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
+        Just fetchNumber | fetchNumber <= worldNumber -> syncFetch Forward fetchNumber
+        _ -> do
+          currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
+          lift $ setSyncTaskNotReady (pPeerHost peer)
       else do
         yieldR $ GetBlockBodies bodyHashes'
 
@@ -383,6 +386,19 @@ handleEvents peer = awaitForever $ \case
     P2pGetMPNodes srs -> yieldR $ GetMPNodes srs
     P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    syncDone <- return $ Just False -- RBDB.withRedisBlockDB $ getSyncStatus
+    unless (syncDone == Just True) $ do
+      maybeSyncTask <- lift $ getCurrentSyncTask $ pPeerHost peer
+      case maybeSyncTask of
+        Just _ -> return () -- Already have a task, do nothing
+        Nothing -> do
+          maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+          $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
+          case maybeNewSyncTask of
+            Nothing -> return ()
+            Just syncTask -> syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
       Just oldTS -> do

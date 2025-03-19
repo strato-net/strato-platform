@@ -48,6 +48,7 @@ import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Text.Printf
+import           Text.ShortDescription
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
@@ -117,14 +118,19 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
-      syncTask <- lift $ getNewSyncTask (pPeerHost peer)
-      $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ show syncTask
-      if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
-        then do
-          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
-        else do
-          $logInfoS "handleMsgClientConduit" "sync task chiliad higher than world highest block, marking the new chiliad as 'NotReady'"
-          lift $ setSyncTaskNotReady (pPeerHost peer)
+      maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) highestBlockNum''
+
+      case maybeSyncTask of
+        Nothing ->
+          $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
+        Just syncTask -> do
+          $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
+          if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
+            then do
+              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+            else do
+              $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show highestBlockNum' ++ "), marking the new chiliad as 'NotReady'"
+              lift $ setSyncTaskNotReady (pPeerHost peer)
 
       lift stampActionTimestamp
     other -> assertHandshake other
@@ -177,9 +183,14 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      syncTask <- lift $ getNewSyncTask (pPeerHost peer)
-      $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ show syncTask
-      yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+      maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) theirHighestBlockNum
+      case maybeSyncTask of
+        Nothing ->
+          $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
+        Just syncTask -> do
+          $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
+          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
@@ -188,8 +199,8 @@ awaitMsg :: (MonadIO m) => ConduitM Event (Either P2PCNC Message) m (Maybe Messa
 awaitMsg =
   await >>= \case
     Just (MsgEvt msg) -> return (Just msg)
-    Nothing -> return Nothing
-    _ -> awaitMsg
+    Nothing           -> return Nothing
+    _                 -> awaitMsg
 
 assertHandshake ::
   (MonadLogger m, MonadIO m) =>

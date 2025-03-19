@@ -120,7 +120,7 @@ getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 getBestSequencedBlockInfo :: Redis (Maybe BestSequencedBlock)
 getBestSequencedBlockInfo =
   REDIS.get bestSequencedBlockInfoKey >>= \case
-    Left e -> error $ "error trying to get BestSequencedBlock: " ++ show e
+    Left e  -> error $ "error trying to get BestSequencedBlock: " ++ show e
     Right v ->  return $ fmap fromValue v
 
 putBestSequencedBlockInfo :: RedisCtx m f => BestSequencedBlock -> m (f REDIS.Status)
@@ -275,8 +275,8 @@ putSyncStatus :: RedisCtx m f => Bool -> m (f REDIS.Status)
 putSyncStatus status = REDIS.set syncStatusKey $ toValue status
 
 class HasSyncDB m where
-  getCurrentSyncTask :: Host -> m SyncTask
-  getNewSyncTask :: Host -> m SyncTask
+  getCurrentSyncTask :: Host -> m (Maybe SyncTask)
+  getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
   setSyncTaskFinished :: Host -> m ()
   setSyncTaskNotReady :: Host -> m ()
 
@@ -296,18 +296,19 @@ instance HasSQL m => HasSyncDB m where
     -- however, this is bad behavior and it is good and right that we throw an erro and hang up on that peer
     -- (hence, "error" is the correct response below).
     case vals of
-      [v] -> return $ SQL.entityVal v
-      [] -> error $ "no current sync task found in call to getCurrentSyncTask: " ++ show host
+      [v] -> return $ Just $ SQL.entityVal v
+      [] -> return Nothing
       _ -> error $ CL.red $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (map (format . entityVal) vals)
 
-  getNewSyncTask host = sqlQuery $ do
+  getNewSyncTask "127.0.0.1" _ = return Nothing -- empirically, I've observed a lot of wasted time trying to sync from the loopback....  Probably should just stop self-connect from even happening, but for now I'll just filter it out here
+  getNewSyncTask host highestBlockNum = sqlQuery $ do
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
 
     result <- rawSql
         [r|
             UPDATE "sync_task"
-            SET "host" = ?, "assignment_time" = ?
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
             WHERE "id" = (
                 SELECT "id"
                 FROM "sync_task"
@@ -322,13 +323,19 @@ instance HasSQL m => HasSyncDB m where
         [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
 
     case result of
-      oneTask:_ -> return $ entityVal oneTask
+      oneTask:_ -> return $ Just $ entityVal oneTask
       [] -> do
         --No existing task, make a new one
-        results <- SQL.rawSql "INSERT INTO sync_task (host) VALUES (?) RETURNING " [toPersistValue host]
+        results <- SQL.rawSql
+          [r|
+            INSERT INTO sync_task (host)
+            SELECT ?
+            WHERE (select count(*) from "sync_task") < ?
+            RETURNING
+          |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
 
         case results of
-          [v] -> return $ SQL.entityVal v
+          [v] -> return $ Just $ SQL.entityVal v
           _   -> error "insert failed in getSyncTask"
 
   setSyncTaskFinished host = sqlQuery $ do
