@@ -341,7 +341,11 @@ instance HasSQL m => HasSyncDB m where
   setSyncTaskFinished host = sqlQuery $ do
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val Finished]
-      where_ (syncTask^.SyncTaskHost ==. val host)
+      where_ (
+        (syncTask^.SyncTaskHost ==. val host)
+        &&.
+        (syncTask^.SyncTaskStatus ==. val Assigned)
+        )
     return ()
 
   setSyncTaskNotReady host = sqlQuery $ do
