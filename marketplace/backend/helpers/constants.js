@@ -102,7 +102,7 @@ export default {
     },
     {
       name: 'PAXGST',
-      ethTestnetAddress: '0x58724DEc334608b375D5e2914FCAc156E019B4D5',
+      ethTestnetAddress: '0x8599eA38e03E9D0A8B9e86A47aC119FC78d6b6D3',
       ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
       decimals: 18,
       mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
