@@ -336,7 +336,8 @@ instance HasSQL m => HasSyncDB m where
 
         case results of
           [v] -> return $ Just $ SQL.entityVal v
-          _   -> error "insert failed in getSyncTask"
+          []  -> return Nothing
+          _   -> error "this seems impossible, getNewSyncTask tried to create one new task, but multiple were created.  Internal error"
 
   setSyncTaskFinished host = sqlQuery $ do
     update $ \syncTask -> do
