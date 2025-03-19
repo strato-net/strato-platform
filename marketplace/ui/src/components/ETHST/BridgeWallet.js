@@ -31,7 +31,14 @@ const BridgeWalletModal = ({
   tabKey = '1',
   pageDetails,
 }) => {
-  const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
+  const updatedAccountDetails = {
+    ...accountDetails,
+    balance:
+      tabKey === '1'
+        ? Math.floor(Number(accountDetails.balance) * 1e6) / 1e6
+        : accountDetails.balance,
+  };
+  const [quantity, setQuantity] = useState(updatedAccountDetails?.balance || 0);
   const [ethereumAddress, setEthereumAddress] = useState('');
   const [loader, setLoader] = useState(false);
   const ethDispatch = useEthDispatch();
@@ -118,7 +125,7 @@ const BridgeWalletModal = ({
       render: () => (
         <div
           className={`${
-            quantity <= 0 || hasExceedPrecision(quantity) ? 'h-auto' : 'h-8'
+            quantity <= 0 || (hasExceedPrecision(quantity) && !hasExceedPrecision(updatedAccountDetails.balance)) ? 'h-auto' : 'h-8'
           }`}
         >
           <InputNumber
@@ -127,7 +134,7 @@ const BridgeWalletModal = ({
             controls={false}
             className="w-full"
             status={
-              quantity < 1 / 1e6 || hasExceedPrecision(quantity) ? 'error' : ''
+              quantity < 1 / 1e6 || (hasExceedPrecision(quantity) && !hasExceedPrecision(updatedAccountDetails.balance)) ? 'error' : ''
             }
           />
           {quantity < 1 / 1e6 && (
@@ -138,7 +145,7 @@ const BridgeWalletModal = ({
               Amount must be greater than 0.000001
             </div>
           )}
-          {hasExceedPrecision(quantity) && (
+          {hasExceedPrecision(quantity) && !hasExceedPrecision(updatedAccountDetails.balance) && (
             <div
               style={{ color: 'red' }}
               className="text-xs my-0.5 absolute w-full"
@@ -168,7 +175,7 @@ const BridgeWalletModal = ({
       <div className="head hidden md:block">
         <Table
           columns={ethToMercataColumns}
-          dataSource={[accountDetails]}
+          dataSource={[updatedAccountDetails]}
           pagination={false}
         />
       </div>
@@ -179,7 +186,7 @@ const BridgeWalletModal = ({
             {tokenName} Available
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p> {accountDetails.balance} </p>
+            <p> {updatedAccountDetails.balance} </p>
           </div>
         </div>
         <div>
@@ -198,7 +205,7 @@ const BridgeWalletModal = ({
             <Input
               className="w-full h-9"
               disabled={true}
-              value={accountDetails.walletAddress}
+              value={updatedAccountDetails.walletAddress}
             />
           </div>
         </div>
@@ -211,7 +218,7 @@ const BridgeWalletModal = ({
       <div className="head hidden md:block">
         <Table
           columns={mercataToEthColumns}
-          dataSource={[accountDetails]}
+          dataSource={[updatedAccountDetails]}
           pagination={false}
         />
       </div>
@@ -291,18 +298,18 @@ const BridgeWalletModal = ({
         isDone = await ethActions.addHash(ethDispatch, body);
       } else {
         // Bridge Out (Mercata -> Eth)
-        if (!ethereumAddress && !accountDetails.assetRootAddress) {
+        if (!ethereumAddress && !updatedAccountDetails.assetRootAddress) {
           throw new Error(
             'Please provide a valid Ethereum address for bridging out.'
           );
         }
         const body = {
           quantity: ethers.utils
-            .parseUnits(quantity.toString(), accountDetails.decimals)
+            .parseUnits(quantity.toString(), updatedAccountDetails.decimals)
             .toString(),
           quantityNumber: quantity,
           externalChainWalletAddress: ethereumAddress,
-          tokenAssetRootAddress: accountDetails.assetRootAddress,
+          tokenAssetRootAddress: updatedAccountDetails.assetRootAddress,
           tokenName,
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
@@ -344,8 +351,8 @@ const BridgeWalletModal = ({
                 onClick={handleSubmit}
                 disabled={
                   quantity < 1 / 1e6 ||
-                  quantity > accountDetails.balance ||
-                  hasExceedPrecision(quantity)
+                  quantity > updatedAccountDetails.balance ||
+                  (!hasExceedPrecision(updatedAccountDetails.balance) && hasExceedPrecision(quantity))
                 }
                 loading={isAddingHash || loader || isBridgingOut}
               >
@@ -361,8 +368,8 @@ const BridgeWalletModal = ({
                 onClick={handleSubmit}
                 disabled={
                   quantity < 1 / 1e6 ||
-                  quantity > accountDetails.balance ||
-                  hasExceedPrecision(quantity)
+                  quantity > updatedAccountDetails.balance ||
+                  (!hasExceedPrecision(updatedAccountDetails.balance) && hasExceedPrecision(quantity))
                 }
                 loading={isAddingHash || loader || isBridgingOut}
               >
