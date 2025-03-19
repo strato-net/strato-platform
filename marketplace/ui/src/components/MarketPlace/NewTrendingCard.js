@@ -29,8 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { ethstAddress, wbtcstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
@@ -44,7 +43,10 @@ const NewTrendingCard = ({
     ? 18
     : topSellingProduct.decimals || 0;
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const [quantity, setQuantity] = useState(saleQuantity < 1 ? saleQuantity : 1);
+  const [quantity, setQuantity] = useState(decimals ? 0.01 : 1);
+  const qty = decimals ? 0.01 : 1;
+  // state to control tooltip visibility
+  const [tooltipVisible, setTooltipVisible] = useState(false);
 
   const ownerSameAsUser = () => {
     if (user?.commonName === topSellingProduct?.ownerCommonName) {
@@ -53,12 +55,73 @@ const NewTrendingCard = ({
     return false;
   };
 
+  // Helper function to check if the value exceeds 6 decimal places
+  const hasExceedPrecision = (value) => {
+    if (value === undefined || value === null) return false;
+    const stringValue = String(value);
+    if (stringValue.includes('.')) {
+      const decimalPart = stringValue.split('.')[1];
+      return decimalPart && decimalPart.length > (decimals ? 6 : 0);
+    }
+    return false;
+  };
+
+  // Helper function to check if the value is below the minimum allowed value
+  const isBelowMinValue = (value) => {
+    if (value === undefined || value === null) return true;
+    return value < (decimals ? 1 / 1e6 : 1);
+  };
+
+  // Helper function to check if the value exceeds maximum available quantity
+  const hasExceededMaxQuantity = (value) => {
+    if (value === undefined || value === null) return false;
+    return value > saleQuantity;
+  };
+
+  // Helper function to round a value to a safe precision
+  const roundToSafePrecision = (value) => {
+    if (value === undefined || value === null) return value;
+
+    // For non-decimal assets, return an integer
+    if (!decimals) {
+      return Math.round(value);
+    }
+
+    // For decimal assets, round to 6 decimal places max
+    // Use a safer approach than toFixed() since it returns a string
+    const multiplier = Math.pow(10, 6); // 6 decimal places max
+    return Math.round(value * multiplier) / multiplier;
+  };
+
+  // useEffect to close tooltip on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (tooltipVisible) {
+        setTooltipVisible(false);
+      }
+    };
+
+    // Add event listener to parent scrollable container
+    const scrollContainer = document.querySelector('.trending_cards');
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      // Clean up event listener
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [tooltipVisible]);
+
   const naviroute = routes.MarketplaceProductDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
-  const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
-  const isDisabled =
-    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress &&
-    (isAvailableForSale || ownerSameAsUser());
+  const isAvailableForSale =
+    topSellingProduct.price > 0 && saleQuantity > 0 && !ownerSameAsUser();
+  const isBridgeable =
+    topSellingProduct.originAddress === ethstAddress ||
+    topSellingProduct.originAddress === wbtcstAddress;
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
@@ -157,23 +220,7 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-              if (topSellingProduct.originAddress === ethstAddress) {
-                navigate(
-                  `${ethNaviroute.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else if (topSellingProduct.originAddress === wbtcstAddress) {
-                navigate(
-                  `${routes.WbtcstProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else {
+              if (isAvailableForSale) {
                 navigate(
                   `${naviroute
                     .replace(':address', topSellingProduct.address)
@@ -183,6 +230,24 @@ const NewTrendingCard = ({
                     )}`,
                   { state: { isCalledFromInventory: false } }
                 );
+              } else {
+                if (topSellingProduct.originAddress === ethstAddress) {
+                  navigate(
+                    `${ethNaviroute.replace(
+                      ':address',
+                      topSellingProduct.address
+                    )}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                  navigate(
+                    `${routes.WbtcstProductDetail.url.replace(
+                      ':address',
+                      topSellingProduct.address
+                    )}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                }
               }
               window.scrollTo(0, 0);
             }
@@ -242,7 +307,7 @@ const NewTrendingCard = ({
                 );
               })()
             : 'No Price Available'}
-          {isDisabled && (
+          {!isAvailableForSale && (
             <Text type="danger" strong>
               {' '}
               Sold Out{' '}
@@ -271,78 +336,116 @@ const NewTrendingCard = ({
             className="truncate-html-content"
           ></div>
         </div>
-        <div
-          className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            (topSellingProduct.originAddress === ethstAddress ||
-            topSellingProduct.originAddress === wbtcstAddress) &&
-            reserve
-              ? 'invisible'
-              : ''
-          }`}
-        >
-          <Typography>Quantity:</Typography>
-          <div className="flex gap-3 p-1 bg-white">
-            <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity === 1
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-              onClick={() => {
-                setQuantity(Math.max(quantity - 1, 1));
-              }}
-            >
-              -
+        <div className="bg-[#EEEFFA] p-2 rounded-[5px]">
+          <div className="flex justify-between items-center">
+            <Typography className="whitespace-nowrap mr-2 text-l">
+              Quantity:
             </Typography>
-            <InputNumber
-              className="w-10"
-              size="small"
-              bordered={false}
-              value={quantity}
-              max={saleQuantity}
-              min={1 / Math.pow(10, topSellingProduct.decimals || 0)}
-              onChange={(e) => {
-                setQuantity(parseFloat(e || 0));
-              }}
-              onPressEnter={(e) => {
-                const newValue = parseFloat(e.target.value, 10);
-                if (newValue <= saleQuantity) {
-                  setQuantity(newValue);
-                } else {
-                  api.error({
-                    message: 'Cannot add more than available quantity',
-                    placement: 'bottom',
-                  });
-                }
-              }}
-              controls={false}
-            />
-            <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                quantity >= Math.min(saleQuantity, topSellingProduct.quantity)
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-              onClick={() => {
-                if (
-                  quantity + 1 <= saleQuantity &&
-                  quantity + 1 <= topSellingProduct.quantity
-                ) {
-                  setQuantity(quantity + 1);
-                }
-              }}
+            <Tooltip
+              title={
+                hasExceededMaxQuantity(quantity)
+                  ? `Maximum quantity is ${saleQuantity}`
+                  : isBelowMinValue(quantity)
+                  ? `Minimum quantity is ${decimals ? 1 / 1e6 : 1}`
+                  : hasExceedPrecision(quantity)
+                  ? `Maximum precision is ${decimals ? 6 : 0} decimal places`
+                  : ''
+              }
+              color="#e2320d"
+              placement="top"
+              open={
+                tooltipVisible &&
+                (isBelowMinValue(quantity) ||
+                  hasExceededMaxQuantity(quantity) ||
+                  hasExceedPrecision(quantity))
+              }
+              onOpenChange={(open) => setTooltipVisible(open)}
             >
-              +
-            </Typography>
+              <div
+                className="flex w-full p-1 bg-white rounded-[5px]"
+                style={{
+                  border:
+                    isBelowMinValue(quantity) ||
+                    hasExceededMaxQuantity(quantity) ||
+                    hasExceedPrecision(quantity)
+                      ? '1px solid #e2320d'
+                      : '1px solid transparent',
+                }}
+              >
+                <Typography
+                  className={`px-2 bg-[#EEEFFA] rounded-sm ${
+                    quantity > qty
+                      ? 'cursor-pointer'
+                      : 'cursor-not-allowed opacity-50'
+                  }`}
+                  onClick={() => {
+                    quantity > qty &&
+                      setQuantity(
+                        roundToSafePrecision(Math.max(quantity - qty, qty))
+                      );
+                  }}
+                >
+                  -
+                </Typography>
+                <InputNumber
+                  className="w-full"
+                  size="small"
+                  bordered={false}
+                  value={quantity}
+                  onChange={(e) => {
+                    setQuantity(roundToSafePrecision(parseFloat(e || 0)));
+                  }}
+                  onPressEnter={(e) => {
+                    const newValue = roundToSafePrecision(
+                      parseFloat(e.target.value, 10)
+                    );
+                    if (newValue <= saleQuantity) {
+                      setQuantity(newValue);
+                    } else {
+                      api.error({
+                        message: 'Cannot add more than available quantity',
+                        placement: 'bottom',
+                      });
+                    }
+                  }}
+                  controls={false}
+                />
+                <Typography
+                  className={`px-2 bg-[#EEEFFA] rounded-sm ${
+                    quantity < saleQuantity
+                      ? 'cursor-pointer'
+                      : 'cursor-not-allowed opacity-50'
+                  }`}
+                  onClick={() =>
+                    quantity < saleQuantity &&
+                    setQuantity(
+                      roundToSafePrecision(
+                        Math.min(quantity + qty, saleQuantity)
+                      )
+                    )
+                  }
+                >
+                  +
+                </Typography>
+              </div>
+            </Tooltip>
           </div>
         </div>
-        <div className={`flex gap-4 mt-1`}>
+        <div className={`flex gap-4`}>
           <Button
             id={`${topSellingProduct?.name?.replace(/ /g, '_')}-buy-now`}
-            disabled={isDisabled}
+            disabled={
+              !isAvailableForSale ||
+              hasExceedPrecision(quantity) ||
+              isBelowMinValue(quantity) ||
+              hasExceededMaxQuantity(quantity)
+            }
             type="primary"
             className={`flex-1 h-9 !text-white ${
-              isDisabled
+              !isAvailableForSale ||
+              hasExceedPrecision(quantity) ||
+              isBelowMinValue(quantity) ||
+              hasExceededMaxQuantity(quantity)
                 ? '!bg-[#808080] cursor-not-allowed'
                 : '!bg-[#13188A] cursor-pointer'
             }`}
@@ -372,66 +475,72 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if (topSellingProduct.originAddress === ethstAddress && reserve) {
-                navigate(
-                  `${ethNaviroute.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else if (topSellingProduct.originAddress === wbtcstAddress && reserve) {
-                navigate(
-                  `${routes.WbtcstProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else {
-                if (
-                  (await addItemToCart(topSellingProduct, quantity)) === true
-                ) {
-                  navigate('/checkout');
-                  window.scrollTo(0, 0);
-                }
+              if ((await addItemToCart(topSellingProduct, quantity)) === true) {
+                navigate('/checkout');
+                window.scrollTo(0, 0);
               }
             }}
           >
-            {(topSellingProduct.originAddress === ethstAddress ||
-              topSellingProduct.originAddress === wbtcstAddress) &&
-            reserve
-              ? 'Bridge'
-              : 'Buy Now'}
+            Buy Now
           </Button>
-          {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
-          {/* <Button
-                        className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                        disabled={isAvailableForSale || ownerSameAsUser()}
-                        onClick={() => {
-                            window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Add To Cart (from Top Selling Product)', {
-                                    product: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                })
-                            }])
-                            TagManager.dataLayer({
-                                dataLayer: {
-                                    event: 'add_to_cart_from_top_selling_product',
-                                    product_name: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                },
-                            });
-                            addItemToCart(topSellingProduct, quantity);
-                        }}
-                        type='primary'
-                    >
-
-                        <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]' />
-                    </Button> */}
+          {isBridgeable && reserve && (
+            <Button
+              id={`${topSellingProduct?.name?.replace(/ /g, '_')}-buy-now`}
+              disabled={!isBridgeable}
+              type="primary"
+              className={`flex-1 h-9 !text-white ${
+                !isBridgeable
+                  ? '!bg-[#808080] cursor-not-allowed'
+                  : '!bg-[#13188A] cursor-pointer'
+              }`}
+              onClick={async () => {
+                const dataLayerEventName = isUserProfile
+                  ? 'buy_now_from_user_profile'
+                  : 'buy_now_from_top_selling_product';
+                window.LOQ.push([
+                  'ready',
+                  async (LO) => {
+                    await LO.$internal.ready('events');
+                    const eventName = isUserProfile
+                      ? 'Buy Now (from User Profile)'
+                      : 'Buy Now (from Top Selling Product)';
+                    LO.events.track(eventName, {
+                      product: topSellingProduct.name,
+                      category: topSellingProduct.category,
+                      productId: topSellingProduct.productId,
+                    });
+                  },
+                ]);
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: dataLayerEventName,
+                    product_name: topSellingProduct.name,
+                    category: topSellingProduct.category,
+                    productId: topSellingProduct.productId,
+                  },
+                });
+                if (topSellingProduct.originAddress === ethstAddress) {
+                  navigate(
+                    `${ethNaviroute.replace(
+                      ':address',
+                      topSellingProduct.address
+                    )}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                  navigate(
+                    `${routes.WbtcstProductDetail.url.replace(
+                      ':address',
+                      topSellingProduct.address
+                    )}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                }
+              }}
+            >
+              Bridge
+            </Button>
+          )}
         </div>
       </div>
       <LoginModal
