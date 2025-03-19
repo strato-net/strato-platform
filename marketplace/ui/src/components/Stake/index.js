@@ -39,7 +39,7 @@ const USDSTIcon = (
   <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items, assetsWithEighteenDecimalPlaces) {
+function combineInventoriess(items, assetsWithEighteenDecimalPlaces) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -132,10 +132,12 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(
-    inventories,
-    assetsWithEighteenDecimalPlaces
-  );
+  const [combinedInventories, setCombinedInventories] = useState([]);
+
+  useEffect(() => {
+    setCombinedInventories(combineInventoriess(inventories,assetsWithEighteenDecimalPlaces));
+  },[inventories, assetsWithEighteenDecimalPlaces])
+
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -345,7 +347,7 @@ const Stake = ({ user }) => {
                 <Title className="px-3 !text-3xl !text-left mt-10">
                   My Stakeable Items
                 </Title>
-                {combinedInventories.map((inventory, index) => (
+                {combinedInventories?.map((inventory, index) => (
                   <StakeInventoryCard
                     id={index}
                     limit={limit}
