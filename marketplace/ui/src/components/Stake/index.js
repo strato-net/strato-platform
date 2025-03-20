@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Breadcrumb,
   notification,
@@ -141,10 +141,13 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(
-    inventories,
-    assetsWithEighteenDecimalPlaces
-  );
+  const combinedInventories = useMemo(() => {
+    return combineInventories(
+      inventories,
+      assetsWithEighteenDecimalPlaces
+    );
+  }, [inventories,assetsWithEighteenDecimalPlaces]);
+
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -315,7 +318,7 @@ const Stake = ({ user }) => {
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <StakeSteps />
           <PurchasableStakeItems />
-          {user && (
+          {user && combinedInventories?.length && (
             <>
               <div className="hidden md:block">
                 <Title className="px-3 !text-3xl !text-left mt-10">
@@ -330,7 +333,7 @@ const Stake = ({ user }) => {
                     USDSTAddress,
                     assetsWithEighteenDecimalPlaces
                   )}
-                  dataSource={combinedInventories.slice(offset, offset + limit)}
+                  dataSource={combinedInventories?.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
                   className="custom-table"
                   pagination={false}
@@ -343,7 +346,7 @@ const Stake = ({ user }) => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={combinedInventories.length}
+                  total={combinedInventories?.length}
                   showTotal={(total) => `Total ${total} items`}
                   className="flex justify-center my-5 custom-pagination"
                 />
