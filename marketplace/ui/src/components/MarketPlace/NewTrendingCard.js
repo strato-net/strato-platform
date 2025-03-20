@@ -326,7 +326,6 @@ const NewTrendingCard = ({
         </div>
         {reserve && (
           <div className="flex justify-between">
-            <p>Est. APY: {reserve?.cataAPYRate}%</p>
             <p>TVL: ${reserve?.tvl.toFixed(2)} </p>
           </div>
         )}

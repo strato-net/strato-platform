@@ -685,9 +685,6 @@ const ProductDetails = ({ user, users }) => {
                                 {isStakeable && (
                                   <>
                                     <div className="text-lg">
-                                      Est. APY: {matchingReserve?.cataAPYRate}%
-                                    </div>
-                                    <div className="text-lg">
                                       TVL: ${matchingReserve?.tvl.toFixed(2)}
                                     </div>
                                   </>

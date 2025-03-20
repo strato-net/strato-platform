@@ -118,10 +118,6 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
                 TVL: ${reserve?.tvl.toFixed(2)}
               </Typography>
 
-              {/* CATA APY */}
-              <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
-                Est. APY: {reserve?.cataAPYRate}%
-              </Typography>
             </div>
           </div>
         </a>
