@@ -16,10 +16,16 @@ const Feed = ({ user }) => {
   const { USDSTAddress, assetsWithEighteenDecimalPlaces, stratsAddress } =
     useMarketplaceState();
   const { bridgeableTokens } = useEthState();
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
 
   const marketplaceDispatch = useMarketplaceDispatch();
-
-  const ethDispatch = useEthDispatch();
 
   useEffect(() => {
     const fetchAddresses = async () => {
