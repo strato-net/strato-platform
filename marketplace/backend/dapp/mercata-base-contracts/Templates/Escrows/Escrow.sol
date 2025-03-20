@@ -19,7 +19,6 @@ abstract contract Escrow is Utils {
     address public borrower;
     string public borrowerCommonName;
     address public assetRootAddress;
-    Asset[] public assets;
 
     string public version;
 
@@ -42,8 +41,8 @@ abstract contract Escrow is Utils {
         version = _version;
     }
 
-    function attachAssets(
-        address[] _assets,
+    function attachAsset(
+        address _asset,
         uint _collateralQuantity,
         decimal _assetPrice,
         uint _loanToValueRatio,
@@ -51,35 +50,9 @@ abstract contract Escrow is Utils {
     ) public {
         require(msg.sender == reserve, "Only the reserve can attach assets to the escrow");
         uint unallocatedQuantity = _collateralQuantity;
-
-        for (uint i = 0; i < _assets.length && unallocatedQuantity > 0; i++) {
-            Asset asset = Asset(_assets[i]);
-
-            asset.attachSale();
-            address assetOwner = asset.owner();
-            address assetRoot = address(asset).root;
-            if (borrower == address(0) && assetRootAddress == address(0)) {
-                borrower = assetOwner;
-                borrowerCommonName = getCommonName(assetOwner);
-                assetRootAddress = assetRoot;
-            } else {
-                string assetOwnerCommonName = getCommonName(assetOwner);
-                require(assetOwnerCommonName == borrowerCommonName, "Not all provided assets are owned by the same owner");
-                require(assetRoot == assetRootAddress, "Not all provided assets are of the same type");
-            }
-
-            uint assetQuantity = asset.quantity();
-            if (assetQuantity > unallocatedQuantity) { // split
-                asset.transferOwnership(assetOwner, assetQuantity - unallocatedQuantity, false, 0, 0.0); // Even though we don't get the new asset address, it's ok because the newly created UTXO is the one we won't be staking
-                unallocatedQuantity = 0;
-            } else {
-                unallocatedQuantity -= assetQuantity;
-            }
-
-            assets.push(asset);
-        }
-
-        collateralQuantity += _collateralQuantity - unallocatedQuantity;
+        Asset asset = Asset(_asset);
+        asset.transferOwnership(address(this), _collateralQuantity, false, 0);
+        collateralQuantity += _collateralQuantity;
         _updateOnPriceChange(_assetPrice, _loanToValueRatio, _liquidationRatio);
     }
 
@@ -101,22 +74,8 @@ abstract contract Escrow is Utils {
         if (_quantity > collateralQuantity) {
             quantityToUnlock = collateralQuantity;
         }
-        uint unallocatedQuantity = quantityToUnlock;
 
-        for (uint i = 0; i < assets.length && unallocatedQuantity > 0; i++) {
-            Asset asset = Asset(assets[i]);
-            if (address(asset) != address(0)) {
-                uint assetQuantity = asset.quantity();
-                if (assetQuantity > unallocatedQuantity) { // split
-                    asset.transferOwnership(asset.owner(), unallocatedQuantity, false, 0, 0.0); // Here we want to transfer the amount we want to unlock, and retain the locked amount
-                    unallocatedQuantity = 0;
-                } else {
-                    asset.closeSale();
-                    assets[i] = Asset(address(0));
-                    unallocatedQuantity -= assetQuantity;
-                }
-            }
-        }
+        Asset(assetRootAddress).transferOwnership(borrower, quantityToUnlock, false, 0);
 
         collateralQuantity -= quantityToUnlock - unallocatedQuantity;
         _updateOnPriceChange(_assetPrice, _loanToValueRatio, _liquidationRatio);

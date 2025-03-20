@@ -43,6 +43,8 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
+    mapping(address => address) public escrows;
+
     constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
@@ -119,7 +121,7 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedOraclePrice = oraclePrice;
     }
 
-    function stakeAsset(address _escrowAddress, address[] _assets, uint _collateralQuantity) public requireActive() returns (address) {
+    function stakeAsset(address[] _assets, uint _collateralQuantity) public requireActive() returns (address) {
         // Calculate required values
         Asset _assetToBeSold = Asset(_assets[0]);
         require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the assets can stake the assets");
@@ -128,7 +130,12 @@ abstract contract Reserve is Utils, Structs {
         (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
         _oraclePrice = _oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = _oraclePrice;
-
+        try{
+            _escrowAddress = escrows[msg.sender];
+        }
+        catch{
+            _escrowAddress = address(0);
+        }
         Escrow escrow = Escrow(_escrowAddress);
         if (_escrowAddress == address(0)) {
             // Create Escrow with all required parameters
@@ -171,7 +178,9 @@ abstract contract Reserve is Utils, Structs {
         return address(escrow);
     }
 
-    function borrow(address _escrowAddress, uint _borrowAmount) public requireActive() {
+    function borrow(uint _borrowAmount) public requireActive() {
+        address _escrowAddress = escrows[msg.sender];
+        require(_escrowAddress != address(0), "No escrow found for the sender");
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
         require(_borrowAmount <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
@@ -184,9 +193,10 @@ abstract contract Reserve is Utils, Structs {
 
     function repayLoan(
         address[] _usdstAssetAddresses,
-        address _escrowAddress,
         uint _amountToRepay
     ) requireActive() external returns (uint) {
+        address _escrowAddress = escrows[msg.sender];
+        require(_escrowAddress != address(0), "No escrow found for the sender");
         require(_usdstAssetAddresses.length > 0, "Pass at least one USDST token address");
 
         Escrow escrow = Escrow(_escrowAddress);
@@ -280,7 +290,10 @@ abstract contract Reserve is Utils, Structs {
         cataAPYRate = _newRate;
     }
 
-    function unstake(address _escrowAddress, uint _quantity) public requireActive() {
+    function unstake(uint _quantity) public requireActive() {
+
+        address _escrowAddress = escrows[msg.sender];
+        require(_escrowAddress != address(0), "No escrow found for the sender");
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only the borrower can unstake");
         // require(escrow.borrowedAmount() == 0, "Must repay borrowed USDST before unstaking"); // The escrow function unstakeAssets() performs a check on the rebalanced collateralization ratio

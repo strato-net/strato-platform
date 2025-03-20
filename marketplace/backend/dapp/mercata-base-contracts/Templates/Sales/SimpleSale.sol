@@ -36,7 +36,9 @@ contract SimpleSale is Sale {
         PaymentServiceInfo[] _paymentServices,
         uint _scheme
     ) external requireSeller("Update Sale") returns (uint) {
-        return _update(_quantity, _price, _paymentServices, _scheme);
+        require(_quantity + totalLockedQuantity <= assetToBeSold.balanceOf(msg.sender), "Cannot sell more units than owned");
+        assetToBeSold.transferOwnership(msg.sender, _quantity, false, 0, 0);
+        return _update(_price, _paymentServices, _scheme);
     }
 
     function completeSale(
@@ -44,32 +46,18 @@ contract SimpleSale is Sale {
         address purchaser
     ) public override requirePaymentService("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(orderHash, purchaser);
-        // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
-        try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
-        } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
-        }
+        // regular transfer - isUserTransfer: false, transferPrice: 0
+        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public override returns (uint) {
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity) public override returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         require(_quantity > 0, "Quantity must be greater than 0");
-        uint assetQuantity = assetToBeSold.quantity();
-        require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
-        if (_quantity > quantity) { // We can transfer more than the Sale quantity
-            quantity = 0;
-        } else {
-            quantity -= _quantity;
-        }
-        // transfer feature - isUserTransfer: true, transferNumber: _transferNumber, transferPrice: _price
-        try {
-            assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
-        } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", _newOwner, _quantity, true, _transferNumber);
-        }
+        uint assetQuantityInSale = getQuantity();
+        require(_quantity <= assetQuantityInSale - totalLockedQuantity, "Cannot transfer more units than are available.");
+        assetToBeSold.transferOwnership(_newOwner, _quantity, true, _price);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }

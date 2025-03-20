@@ -1,10 +1,11 @@
-import "UTXO.sol";
+import "Asset.sol";
 import "../Redemptions/RedemptionService.sol";
 
-abstract contract Redeemable is UTXO {
-    uint public redeemableMagicNumber = 0x52656465656d61626c65; // 'Redeemable'
+abstract contract Redeemable is Asset {
 
     RedemptionService public redemptionService;
+    
+    mapping(address => uint) public redemptionRequests;
 
     constructor(
         string _name,
@@ -15,9 +16,8 @@ abstract contract Redeemable is UTXO {
         uint _createdDate,
         uint _quantity,
         uint _decimals,
-        AssetStatus _status,
         address _redemptionService
-    ) UTXO(
+    ) Asset(
         _name,
         _description,
         _images,
@@ -25,25 +25,9 @@ abstract contract Redeemable is UTXO {
         _fileNames,
         _createdDate,
         _quantity,
-        _decimals,
-        _status
+        _decimals
     ) {
         redemptionService = RedemptionService(_redemptionService);
-    }
-
-    function mint(uint _quantity) internal virtual override returns (UTXO) {
-        require(_quantity > 0, "Quantity must be greater than 0");
-        return UTXO(new Redeemable(name, description, images, files, fileNames, createdDate, _quantity, decimals, status, address(redemptionService)));
-    }
-
-    function _callMint(address _newOwner, uint _quantity) internal virtual override {
-        require(_quantity > 0, "Quantity must be greater than 0");
-        UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
-    }
-    
-    function checkCondition() internal virtual override returns (bool){
-        return true;   
     }
 
     function getRedemptionService() internal returns (RedemptionService) {
@@ -58,25 +42,18 @@ abstract contract Redeemable is UTXO {
     }
 
     function requestRedemption(string _redemptionId, uint _quantity) requireOwner("request redemption") public returns (uint, address) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity > 0, "Quantity must be greater than 0");
 
-        UTXO newAsset = mint(_quantity);
-        quantity -= _quantity;
-        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, owner);
+        uint restStatus = issueRedemptionRequest(_redemptionId, owner);
 
-        return (restStatus, address(newAsset));
+        return (restStatus, address(this));
     }
 
     function issueRedemptionRequest(string _redemptionId, address _newOwner) requireOwner("issue redemption request") public returns (uint) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-
-        _transfer(_newOwner, quantity, false, 0, 0);
+        _transferAsset(_newOwner, quantity, false, 0);
         RedemptionService(getRedemptionService()).redemptionRequested(_redemptionId);
-        status = AssetStatus.PENDING_REDEMPTION;
-
+        redemptionRequests[msg.sender] += quantity;
+        
         return RestStatus.OK;
     }
 

@@ -4,17 +4,10 @@ pragma strict;
 import <509>;
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
+import "../ERC20/ERC20.sol";
 
-abstract contract Asset is Utils {
-    enum AssetStatus {
-        NULL,
-        ACTIVE,
-        PENDING_REDEMPTION,
-        RETIRED,
-        MAX
-    }
+abstract contract Asset is Utils, ERC20 {
 
-    uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
@@ -25,11 +18,8 @@ abstract contract Asset is Utils {
     string[] public fileNames;
     uint public createdDate;
     uint public quantity;
-    uint public decimals;
     uint public itemNumber;
-    AssetStatus public status;
-
-    address public sale;
+    uint public decimals;
 
     event OwnershipTransfer(
         address originAddress,
@@ -51,7 +41,6 @@ abstract contract Asset is Utils {
         uint minItemNumber,
         uint maxItemNumber,
         uint quantity,
-        uint transferNumber,
         uint transferDate,
         decimal price
     );
@@ -64,9 +53,8 @@ abstract contract Asset is Utils {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
-        uint _decimals,
-        AssetStatus _status
-    ) {
+        uint _decimals
+    ) ERC20(_name, _symbol) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
         require(_quantity >= 0, "Quantity must be greater than or equal to 0");
         owner  = msg.sender;
@@ -77,27 +65,8 @@ abstract contract Asset is Utils {
         files = _files; 
         fileNames = _fileNames;
         createdDate = _createdDate;
-        quantity = _quantity;
         decimals = _decimals;
-        status = _status;
-        try {
-            assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
-            originAddress = Asset(msg.sender).originAddress();
-            itemNumber = Asset(msg.sender).itemNumber();
-        } catch {
-            originAddress = address(this);
-            itemNumber = 1;
-            quantity = quantity * (10**_decimals);
-            emit OwnershipTransfer(
-                originAddress,
-                address(0),
-                "",
-                owner,
-                ownerCommonName,
-                itemNumber,
-                itemNumber + _quantity - 1
-            );
-        }
+        _mint(msg.sender, _quantity);
     }
 
     modifier requireOwner(string action) {
@@ -116,43 +85,11 @@ abstract contract Asset is Utils {
         _;
     }
 
-    modifier fromSale(string action) {
-        if (sale == address(0)) {
-            string err = "Only the owner can "
-                       + action
-                       + ".";
-            require(getCommonName(msg.sender) == ownerCommonName, err);
-        } else {
-            string err = "Only the current Sale contract can "
-                       + action
-                       + ".";
-            require(msg.sender == sale, err);
-        }
-        _;
-    }
-
-    // Updated function to add a sale to the whitelist
-    function attachSale() public requireOwnerOrigin("attach sale") {
-        require(sale == address(0), "Sale is already assigned for this asset");
-        sale = msg.sender;
-    }
-
-    // Updated function to remove a sale from the whitelist
-    function closeSale() public fromSale("close sale") {
-        close();
-    }
-
-    function close() internal {
-        sale = address(0);
-    }
-
-    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+    function _transferAsset(address _newOwner, uint _quantity, bool _isUserTransfer, decimal _price) internal virtual {
         require(_quantity > 0, "Quantity must be greater than 0");
         string newOwnerCommonName = getCommonName(_newOwner);
 
-        if(_isUserTransfer && _transferNumber>0){
+        if(_isUserTransfer){
 
             emit ItemTransfers(
                 originAddress,
@@ -164,7 +101,6 @@ abstract contract Asset is Utils {
                 itemNumber,
                 itemNumber + _quantity - 1,
                 _quantity,
-                _transferNumber,
                 block.timestamp,
                 _price
                 );
@@ -180,31 +116,36 @@ abstract contract Asset is Utils {
             itemNumber,
             itemNumber + _quantity - 1
         );
-        owner = _newOwner;
-        ownerCommonName = newOwnerCommonName;
-        close();
-    }
-    
-    function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) public fromSale("transfer ownership") {
-        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
-        // regular transfer - isUserTransfer: false, transferNumber: 0
-        // transfer feature - isUserTransfer: true, transferNumber: >0
-        _transfer(_newOwner, _quantity, _isUserTransfer, _transferNumber, _price);
+        transfer(_newOwner, _quantity);
     }
 
-    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, address _sale) public requireOwner("automatic transfer") returns (uint) {
         require(_quantity > 0, "Quantity must be greater than 0");
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
-        if (sale == address(0)) {
-            // transfer feature - isUserTransfer: true, transferNumber: >0
-            _transfer(_newOwner, _quantity, true, _transferNumber, _price);
-            return RestStatus.OK;
-        } else {
-            // transfer feature - isUserTransfer: true, transferNumber: >0
-            return Sale(sale).automaticTransfer(_newOwner, _price, _quantity, _transferNumber);
+
+        uint currentAmountOwned = balanceOf(msg.sender);
+        uint saleQuantity =  0;
+        if (_sale != address(0)) {
+            saleQuantity = Sale(_sale).getQuantity();
         }
+
+        uint totalQuantity = currentAmountOwned + saleQuantity;
+
+        if (totalQuantity < _quantity) {
+            require(false, "Cannot transfer more than available quantity.");
+        }
+        else{
+            if(_quantity < currentAmountOwned){
+                _transferAsset(_newOwner, _quantity, true, _price);
+                return RestStatus.OK;
+            }
+            else{
+                uint remainingQuantity = _quantity - currentAmountOwned;
+                _transferAsset(_newOwner, currentAmountOwned, true, _price);
+                return Sale(_sale).automaticTransfer(_newOwner, _price, remainingQuantity);
+            }
+        }
+        return RestStatus.OK;
     }
 
     function updateAsset(
@@ -218,16 +159,25 @@ abstract contract Asset is Utils {
         return RestStatus.OK;
     }
 
-    function updateStatus(AssetStatus _status) public returns (uint) {
-        if (status == AssetStatus.ACTIVE) {
-            require(getCommonName(msg.sender) == ownerCommonName, "Only the owner can update the asset's status");
-        } else if (status == AssetStatus.PENDING_REDEMPTION) {
-            string cn = getCommonName(msg.sender);
-            require(cn == ownerCommonName || cn == this.creator, "Only the owner or issuer can update the asset's status");
-        } else {
-            require(false, "The asset's status can no longer be updated");
-        }
-        status = _status;
-        return RestStatus.OK;
+    //work on this 
+    function decimals() public view virtual override returns (uint8) {
+        return decimals;
     }
+    
+    function transfer(address to, uint256 value) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, value);
+        return true;
+    }
+
+    function balanceOf(address accountAddress) public view virtual override returns (uint256) {
+        return _balances[accountAddress];
+    }
+
+    function approve(address spender, uint256 value) public override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, value);
+        return true;
+    }
+
 }

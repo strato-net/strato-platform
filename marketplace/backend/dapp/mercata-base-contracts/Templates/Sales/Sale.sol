@@ -11,7 +11,6 @@ abstract contract Sale is Utils, Structs {
 
     Asset public assetToBeSold;
     decimal public price;
-    uint public quantity;
     PaymentServiceInfo[] public paymentServices;
     mapping (string => mapping (string => uint)) paymentServicesMap;
     mapping (string => uint) lockedQuantity;
@@ -26,13 +25,13 @@ abstract contract Sale is Utils, Structs {
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         require(_quantity > 0, "Quantity must be greater than 0");
-        require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
+        require(assetToBeSold.balanceOf(msg.sender) >= _quantity, "Cannot sell more units than what are owned.");
         price = _price;
-        quantity = _quantity;
         totalLockedQuantity = 0;
         isOpen = true;
         _addPaymentServices(_paymentServices);
-        assetToBeSold.attachSale();
+
+        assetToBeSold.approve(address(this), _quantity);// equivalent of assetToBeSold.attachSale(quantity);
     }
 
     modifier requireSeller(string action) {
@@ -95,12 +94,12 @@ abstract contract Sale is Utils, Structs {
 
     function completeSale( string orderHash, address purchaser ) public virtual requirePaymentService("complete sale") returns (uint);
 
-    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public virtual returns (uint);
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity) public virtual returns (uint);
 
     function closeSale() external virtual returns (uint);
 
     function closeSaleIfEmpty() internal {
-        if (quantity == 0 && totalLockedQuantity == 0) {
+        if (getQuantity() == 0 && totalLockedQuantity == 0) {
             close();
             isOpen = false;
         }
@@ -113,11 +112,7 @@ abstract contract Sale is Utils, Structs {
     }
 
     function close() internal {
-        try {
-            assetToBeSold.closeSale();
-        } catch {
-
-        }
+        assetToBeSold.transfer(msg.sender, getQuantity());
     }
 
     function lockQuantity(
@@ -125,10 +120,10 @@ abstract contract Sale is Utils, Structs {
         string orderHash,
         address purchaser
     ) requirePaymentService("lock quantity") public {
-        require(quantityToLock <= quantity, "Not enough quantity to lock");
+        require(quantityToLock <= getQuantity(), "Not enough quantity to lock");
         string lock = getLock(orderHash, purchaser);
         require(lockedQuantity[lock] == 0, "Order has already locked quantity in this asset.");
-        quantity -= quantityToLock;
+        assetToBeSold.transfer(address(this), quantityToLock);
         lockedQuantity[lock] = quantityToLock;
         totalLockedQuantity += quantityToLock;
     }
@@ -152,7 +147,7 @@ abstract contract Sale is Utils, Structs {
         address purchaser
     ) requireSellerOrPaymentService("unlock quantity") public {
         uint quantityToReturn = takeLockedQuantity(orderHash, purchaser);
-        quantity += quantityToReturn;
+        assetToBeSold.transfer(address(this), quantityToReturn);
     }
 
     function _cancelOrder(
@@ -164,7 +159,6 @@ abstract contract Sale is Utils, Structs {
     }
 
     function _update(
-        uint _quantity,
         decimal _price,
         PaymentServiceInfo[] _paymentServices,
         uint _scheme
@@ -172,11 +166,6 @@ abstract contract Sale is Utils, Structs {
 
       if (_scheme == 0) {
         return RestStatus.OK;
-      }
-
-      if ((_scheme & (1 << 0)) == (1 << 0)) {
-        require(_quantity + totalLockedQuantity <= assetToBeSold.quantity(), "Cannot sell more units than owned");
-        quantity = _quantity;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
         price = _price;
@@ -186,5 +175,9 @@ abstract contract Sale is Utils, Structs {
         _addPaymentServices(_paymentServices);
       }
       return RestStatus.OK;
+    }
+
+    function getQuantity() public returns (uint) {
+        return assetToBeSold.balanceOf(address(this));
     }
 }

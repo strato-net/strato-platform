@@ -45,8 +45,7 @@ abstract contract MinterAuthorization is Utils {
     function mintToken(address _userAddress, uint _amount) public requireActive() {
         require(canMint[msg.sender], "Only minters can mint tokens");
         require(_amount > 0, "Must mint some tokens");
-        LendingToken(address(this)).mintNewUnits(_amount);
-
+        _mint(_userAddress, _amount);
         LendingToken(address(this)).transferByReserve(_userAddress, _amount);
 
         emit MintedToken(_userAddress, _amount);
@@ -59,38 +58,8 @@ abstract contract MinterAuthorization is Utils {
     ) requireActive() public returns (uint) {
         require(canMint[msg.sender], "Only minters can mint tokens");
         require(_tokenAddresses.length > 0, "Pass at least one token address");
-        uint tokenAmountOwed = _quantity;
-        uint tokenAmountNet = tokenAmountOwed;
-        uint tokenQuantity = 0;
-        uint transferNumber = 0;
-
-        for (uint j = 0; j < _tokenAddresses.length; j++) {
-            address tokenAddress = _tokenAddresses[j];
-            Asset tokenAsset = Asset(tokenAddress);
-            require(tokenAsset.root == address(this).root, "Asset is not token");
-            require(tokenAsset.ownerCommonName() == _ownerCommonName, "Burner doesn't own this asset");
-
-            tokenQuantity = tokenAsset.quantity();
-            transferNumber = (uint(string(tokenAddress), 16) + j + block.timestamp) % 1000000;
-
-            tokenAsset.attachSale();
-            if (tokenQuantity > tokenAmountNet) {
-                tokenAsset.transferOwnership(burnerAddress, tokenAmountNet, true, transferNumber, 1.0000000000000000000 / 10**18);
-                tokenAsset.closeSale();
-                tokenAmountNet = 0;
-            } else {
-                tokenAsset.transferOwnership(burnerAddress, tokenQuantity, true, transferNumber, 1.0000000000000000000 / 10**18);
-                tokenAmountNet -= tokenQuantity;
-            }
-
-            if (tokenAmountNet == 0) {
-                break;
-            }
-        }
-        // require(tokenAmountNet == 0, "Your token balance is not high enough to cover the repayment."); // Allow partial repayments
-
-        uint tokenAmountRepaid = tokenAmountOwed - tokenAmountNet;
-        emit BurnedToken(msg.sender, tokenAmountRepaid);
+        _burn(msg.sender, _quantity);
+        emit BurnedToken(msg.sender, _quantity);
 
         return tokenAmountRepaid;
     }
