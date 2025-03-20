@@ -19,10 +19,10 @@ const Feed = ({ user }) => {
   const ethDispatch = useEthDispatch();
 
   useEffect(() => {
-    const fetchBridgeableTokenss = async () => {
+    const fetchBridgeableTokens = async () => {
       await ethActions.fetchBridgeableTokens(ethDispatch);
     };
-    fetchBridgeableTokenss();
+    fetchBridgeableTokens();
   }, []);
 
   const marketplaceDispatch = useMarketplaceDispatch();
