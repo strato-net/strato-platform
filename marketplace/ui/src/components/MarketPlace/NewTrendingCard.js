@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { HeartFilled, HeartTwoTone } from '@ant-design/icons';
 import TagManager from 'react-gtm-module';
 import DOMPurify from 'dompurify';
+import BigNumber from 'bignumber.js';
 // State
 import { useAuthenticateState } from '../../contexts/authentication';
 import { useMarketplaceState } from '../../contexts/marketplace';
@@ -42,9 +43,13 @@ const NewTrendingCard = ({
   )
     ? 18
     : topSellingProduct.decimals || 0;
+  const isWbtcst = topSellingProduct.originAddress === wbtcstAddress;
+  const isEthst = topSellingProduct.originAddress === ethstAddress;
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const [quantity, setQuantity] = useState(decimals ? 0.01 : 1);
-  const qty = decimals ? 0.01 : 1;
+  const step = isWbtcst ? 0.0001 : isEthst ? 0.01 : decimals ? 0.01 : 1;
+  const [quantity, setQuantity] = useState(step > saleQuantity ? saleQuantity : step);
+  const minValue = new BigNumber(1).dividedBy(new BigNumber(10).pow(decimals));
+
   // state to control tooltip visibility
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
@@ -55,13 +60,15 @@ const NewTrendingCard = ({
     return false;
   };
 
-  // Helper function to check if the value exceeds 6 decimal places
+  // Helper function to check if the value exceeds the allowed decimal precision
   const hasExceedPrecision = (value) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value);
     if (stringValue.includes('.')) {
       const decimalPart = stringValue.split('.')[1];
-      return decimalPart && decimalPart.length > (decimals ? 6 : 0);
+      // Use the actual decimals value to determine max precision
+      const maxPrecision = decimals;
+      return decimalPart && decimalPart.length > maxPrecision;
     }
     return false;
   };
@@ -69,13 +76,13 @@ const NewTrendingCard = ({
   // Helper function to check if the value is below the minimum allowed value
   const isBelowMinValue = (value) => {
     if (value === undefined || value === null) return true;
-    return value < (decimals ? 1 / 1e6 : 1);
+    return new BigNumber(value).isLessThan(minValue);
   };
 
   // Helper function to check if the value exceeds maximum available quantity
   const hasExceededMaxQuantity = (value) => {
     if (value === undefined || value === null) return false;
-    return value > saleQuantity;
+    return new BigNumber(value).isGreaterThan(new BigNumber(saleQuantity));
   };
 
   // Helper function to round a value to a safe precision
@@ -87,9 +94,20 @@ const NewTrendingCard = ({
       return Math.round(value);
     }
 
-    // For decimal assets, round to 6 decimal places max
-    // Use a safer approach than toFixed() since it returns a string
-    const multiplier = Math.pow(10, 6); // 6 decimal places max
+    // Calculate precision based on step value
+    let precision = 0;
+    if (step < 1) {
+      const stepStr = step.toString();
+      // Find position after decimal point
+      const decimalPos = stepStr.indexOf('.');
+      if (decimalPos !== -1) {
+        // Count digits after decimal point
+        precision = stepStr.length - decimalPos - 1;
+      }
+    }
+
+    // Use precision derived from step for rounding
+    const multiplier = Math.pow(10, precision);
     return Math.round(value * multiplier) / multiplier;
   };
 
@@ -119,9 +137,7 @@ const NewTrendingCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale =
     topSellingProduct.price > 0 && saleQuantity > 0 && !ownerSameAsUser();
-  const isBridgeable =
-    topSellingProduct.originAddress === ethstAddress ||
-    topSellingProduct.originAddress === wbtcstAddress;
+  const isBridgeable = isWbtcst || isEthst;
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
@@ -231,7 +247,7 @@ const NewTrendingCard = ({
                   { state: { isCalledFromInventory: false } }
                 );
               } else {
-                if (topSellingProduct.originAddress === ethstAddress) {
+                if (isEthst) {
                   navigate(
                     `${ethNaviroute.replace(
                       ':address',
@@ -239,7 +255,7 @@ const NewTrendingCard = ({
                     )}`,
                     { state: { isCalledFromInventory: false } }
                   );
-                } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                } else if (isWbtcst) {
                   navigate(
                     `${routes.WbtcstProductDetail.url.replace(
                       ':address',
@@ -281,7 +297,6 @@ const NewTrendingCard = ({
                     : `${topSellingProduct?.name}`}
                 </span>
               </Tooltip>
-              {/* {topSellingProduct?.name || "N/A"} */}
             </Typography>
             <img
               alt={imgMeta}
@@ -345,9 +360,9 @@ const NewTrendingCard = ({
                 hasExceededMaxQuantity(quantity)
                   ? `Maximum quantity is ${saleQuantity}`
                   : isBelowMinValue(quantity)
-                  ? `Minimum quantity is ${decimals ? 1 / 1e6 : 1}`
+                  ? `Minimum quantity is ${minValue.toFixed(decimals)}`
                   : hasExceedPrecision(quantity)
-                  ? `Maximum precision is ${decimals ? 6 : 0} decimal places`
+                  ? `Maximum precision is ${decimals} decimal places`
                   : ''
               }
               color="#e2320d"
@@ -373,14 +388,14 @@ const NewTrendingCard = ({
               >
                 <Typography
                   className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                    quantity > qty
+                    quantity > step
                       ? 'cursor-pointer'
                       : 'cursor-not-allowed opacity-50'
                   }`}
                   onClick={() => {
-                    quantity > qty &&
+                    quantity > step &&
                       setQuantity(
-                        roundToSafePrecision(Math.max(quantity - qty, qty))
+                        roundToSafePrecision(Math.max(quantity - step, step))
                       );
                   }}
                 >
@@ -392,12 +407,10 @@ const NewTrendingCard = ({
                   bordered={false}
                   value={quantity}
                   onChange={(e) => {
-                    setQuantity(roundToSafePrecision(parseFloat(e || 0)));
+                    setQuantity(parseFloat(e || 0));
                   }}
                   onPressEnter={(e) => {
-                    const newValue = roundToSafePrecision(
-                      parseFloat(e.target.value, 10)
-                    );
+                    const newValue = parseFloat(e.target.value, 10);
                     if (newValue <= saleQuantity) {
                       setQuantity(newValue);
                     } else {
@@ -419,7 +432,7 @@ const NewTrendingCard = ({
                     quantity < saleQuantity &&
                     setQuantity(
                       roundToSafePrecision(
-                        Math.min(quantity + qty, saleQuantity)
+                        Math.min(quantity + step, saleQuantity)
                       )
                     )
                   }
@@ -484,7 +497,7 @@ const NewTrendingCard = ({
           </Button>
           {isBridgeable && reserve && (
             <Button
-              id={`${topSellingProduct?.name?.replace(/ /g, '_')}-buy-now`}
+              id={`${topSellingProduct?.name?.replace(/ /g, '_')}-bridge`}
               disabled={!isBridgeable}
               type="primary"
               className={`flex-1 h-9 !text-white ${
@@ -494,15 +507,15 @@ const NewTrendingCard = ({
               }`}
               onClick={async () => {
                 const dataLayerEventName = isUserProfile
-                  ? 'buy_now_from_user_profile'
-                  : 'buy_now_from_top_selling_product';
+                  ? 'bridge_from_user_profile'
+                  : 'bridge_from_top_selling_product';
                 window.LOQ.push([
                   'ready',
                   async (LO) => {
                     await LO.$internal.ready('events');
                     const eventName = isUserProfile
-                      ? 'Buy Now (from User Profile)'
-                      : 'Buy Now (from Top Selling Product)';
+                      ? 'Bridge (from User Profile)'
+                      : 'Bridge (from Top Selling Product)';
                     LO.events.track(eventName, {
                       product: topSellingProduct.name,
                       category: topSellingProduct.category,
@@ -518,7 +531,7 @@ const NewTrendingCard = ({
                     productId: topSellingProduct.productId,
                   },
                 });
-                if (topSellingProduct.originAddress === ethstAddress) {
+                if (isEthst) {
                   navigate(
                     `${ethNaviroute.replace(
                       ':address',
@@ -526,7 +539,7 @@ const NewTrendingCard = ({
                     )}`,
                     { state: { isCalledFromInventory: false } }
                   );
-                } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                } else if (isWbtcst) {
                   navigate(
                     `${routes.WbtcstProductDetail.url.replace(
                       ':address',

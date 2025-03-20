@@ -425,7 +425,8 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                     type="primary"
                     disabled={
                       !activePaymentProviders ||
-                      activePaymentProviders?.length === 0
+                      activePaymentProviders?.length === 0 || 
+                      cartData.some(item => item.disabled)
                     }
                     className="w-full bg-blue-800 text-white h-10 text-lg"
                     onClick={() =>
