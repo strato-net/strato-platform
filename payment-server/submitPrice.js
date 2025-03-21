@@ -29,11 +29,13 @@ try {
 const {
   oracleUpdateTime: rawOracleUpdateTime,
   saleUpdateTime: rawSaleUpdateTime,
+  saleUpdateTime2: rawSaleUpdateTime2,
   assets: configAssets = [],
 } = oracleConfig;
 
 // Set defaults
 let saleUpdateTime = 13; // Default: 13:00 UTC
+let saleUpdateTime2 = 19;
 let assets = [];
 let oracleUpdateTime = 24 * 60 * 60 * 1000; // 1 day in ms
 
@@ -49,12 +51,16 @@ oracleUpdateTime = Number(rawOracleUpdateTime) || 24 * 60 * 60 * 1000; // 1 day 
 if (process.env.SALE_UPDATE === "true") {
   if (rawSaleUpdateTime) {
     saleUpdateTime = Number(rawSaleUpdateTime);
-  } else {
+  } 
+  else if (rawSaleUpdateTime2) {
+    saleUpdateTime2 = Number(rawSaleUpdateTime2);
+  }
+  else {
     await flagFile.appendToErrorFile(
       "No saleUpdateTime found in oracle.json file, defaulting to 13:00 UTC but please update the file."
     );
   }
-  
+
   if (Array.isArray(configAssets)) {
     assets = configAssets;
   }
@@ -74,7 +80,7 @@ async function submitPrice(token, contract, args) {
 }
 
 // Function to update the price of the Asset Sale price
-async function updateMetalPrice(
+async function updateAssetPrice(
   assetName,
   assetMarkUp,
   token,
@@ -452,6 +458,7 @@ const updateSalePricePeriodically = async () => {
     process.env.METALS_USERNAME,
     process.env.METALS_PASSWORD
   );
+  let metalResult;
   for (const asset of assets) {
     try {
       const searchOptions = {
@@ -473,14 +480,26 @@ const updateSalePricePeriodically = async () => {
         continue;
       }
 
-      const metalResult = await fetchLBMAMetalPrice(
-        asset.name.toLowerCase().replace(/st$/, ""),
-        process.env.METALS_API_KEY
-      );
+      if (asset.type === 'metal') {
+        metalResult = await fetchLBMAMetalPrice(
+          asset.name.toLowerCase().replace(/st$/, ""),
+          process.env.METALS_API_KEY
+        );
+      }
+
+      else if (asset.type === 'ERC20') {
+        await fetchAndSubmitERC20TokenPrice(
+          oracle.name,
+          oracle.address,
+          oracle.decimals,
+          process.env.ALCHEMY_API_KEY,
+          token
+        );
+      }
 
       const decimals = assetResult[0].decimals || 0;
 
-      await updateMetalPrice(
+      await updateAssetPrice(
         asset.name.toLowerCase().replace(/st$/, ""),
         asset.markUp,
         token,
@@ -565,7 +584,7 @@ async function main() {
         // Check if it's time to run the sale price update
         if (
           process.env.SALE_UPDATE === "true" &&
-          now.getHours() === parseInt(saleUpdateTime, 10) &&
+          (now.getHours() === parseInt(saleUpdateTime, 10) || now.getHours() === parseInt(saleUpdateTime2, 10))  &&
           lastSaleRun !== currentDate
         ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
