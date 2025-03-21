@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import BigNumber from 'bignumber.js';
 dayjs.extend(utc);
 
 export default {
