@@ -338,9 +338,12 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
-    const amountWithoutSymbol = totalAmount.split(' ');
+  const amountWithoutSymbol = totalAmount.split(' ');
 
-    const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+  const isDisabled =
+    !activePaymentProviders ||
+    activePaymentProviders?.length === 0 ||
+    (selectedProvider.serviceName === 'Stripe' && amountWithoutSymbol[0] < 10);
 
   return (
     <>
@@ -454,7 +457,11 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                         activePaymentProviders?.length === 0 ||
                         cartData.some((item) => item.disabled)
                       }
-                      className="w-full bg-blue-800 text-white h-10 text-lg"
+                      className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
+                        isDisabled
+                          ? '!bg-[#808080] cursor-not-allowed'
+                          : '!bg-[#13188A] cursor-pointer'
+                      }`}
                       onClick={() =>
                         reserve && stakeChecked
                           ? handlePlaceOrder(
