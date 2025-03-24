@@ -3,6 +3,7 @@ import axios from "axios";
 import { assert } from "chai";
 import { rest, util } from "blockapps-rest";
 import http from "http";
+import BigNumber from "bignumber.js";
 
 import config from "./load.config.js";
 import deployment from "./load.deploy.js";
@@ -83,6 +84,17 @@ async function updateMetalPrice(
   decimals
 ) {
   const parsedPriceMarkup = parseFloat(assetMarkUp) || 1;
+  
+  // Use BigNumber for precise calculation
+  const priceWithMarkup = new BigNumber(price)
+    .times(parsedPriceMarkup)
+    .times(100)
+    .round()
+    .div(100);
+  
+  // Apply decimals adjustment using BigNumber
+  const finalPrice = priceWithMarkup.div(new BigNumber(10).pow(decimals)).toString();
+  
   const callArgs = {
     contract: {
       address: contractAddress,
@@ -90,10 +102,7 @@ async function updateMetalPrice(
     method: "update",
     args: {
       _quantity: 0,
-      _price:
-        Math.round(price * parsedPriceMarkup * 100) /
-        100 /
-        Math.pow(10, decimals),
+      _price: finalPrice,
       _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
@@ -346,11 +355,14 @@ async function fetchAndSubmitERC20TokenPrice(
     console.log(`Calculated TWAP: $${twap}`);
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
+    // Use BigNumber for precise calculation
+    const priceBig = new BigNumber(twap).div(new BigNumber(10).pow(decimals));
+    
     await submitPrice(
       token,
       { address: oracleAddress },
       {
-        price: twap / Math.pow(10, decimals),
+        price: priceBig.toString(),
         timestamp: currentTimestamp,
       }
     );
@@ -415,8 +427,11 @@ const submitOraclePricePeriodically = async () => {
           process.env.METALS_API_KEY
         );
         if (metalResult) {
+          const priceBig = new BigNumber(metalResult.price)
+            .div(new BigNumber(10).pow(oracle.decimals))
+            .toString();
           await submitPrice(token, oracle, {
-            price: metalResult.price / Math.pow(10, oracle.decimals),
+            price: priceBig,
             timestamp: metalResult.timestampInSeconds,
           });
           console.log(
@@ -426,8 +441,11 @@ const submitOraclePricePeriodically = async () => {
           );
         }
       } else if (oracle.type === "Constant") {
+        const priceBig = new BigNumber(oracle.price)
+          .div(new BigNumber(10).pow(oracle.decimals))
+          .toString();
         await submitPrice(token, oracle, {
-          price: oracle.price / Math.pow(10, oracle.decimals),
+          price: priceBig,
           timestamp: Math.floor(Date.now() / 1000),
         });
       } else {
