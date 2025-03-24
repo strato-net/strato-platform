@@ -338,9 +338,12 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
-    const amountWithoutSymbol = totalAmount.split(' ');
+  const amountWithoutSymbol = totalAmount.split(' ');
 
-    const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+  const isDisabled =
+    !activePaymentProviders ||
+    activePaymentProviders?.length === 0 ||
+    (selectedProvider.serviceName === 'Stripe' && amountWithoutSymbol[0] < 10);
 
   return (
     <>
@@ -414,15 +417,23 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                 <div className="p-4 rounded-lg shadow-md w-full">
                   <div className="flex justify-between items-center mb-6">
                     <span className="text-base font-normal">Order Total :</span>
-                    <Tooltip title={isDisabled ? "Minimum Credit Card Order Size $10.Please increase the quantity to proceed." : ""}>
+                    <Tooltip
+                      title={
+                        isDisabled
+                          ? 'Minimum Credit Card Order Size $10.Please increase the quantity to proceed.'
+                          : ''
+                      }
+                    >
                       <span className="text-base font-normal">
                         {totalAmount}{' '}
                       </span>
-                      {isDisabled &&
-                        <span className='pay-summary-span'>
-                          <label className='pay-summary'>Order amount should be greater than $10</label>
+                      {isDisabled && (
+                        <span className="pay-summary-span">
+                          <label className="pay-summary">
+                            Order amount should be greater than $10
+                          </label>
                         </span>
-                      }
+                      )}
                     </Tooltip>
                   </div>
                   {reserve && (
@@ -432,13 +443,25 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       </Checkbox>
                     </div>
                   )}
-                  <Tooltip title={isDisabled ? "The minimum purchase amount is $10. Please increase the quantity to proceed." : ""}>
+                  <Tooltip
+                    title={
+                      isDisabled
+                        ? 'The minimum purchase amount is $10. Please increase the quantity to proceed.'
+                        : ''
+                    }
+                  >
                     <Button
                       type="primary"
                       disabled={
                         !activePaymentProviders ||
-                        activePaymentProviders?.length === 0
+                        activePaymentProviders?.length === 0 ||
+                        cartData.some((item) => item.disabled)
                       }
+                      className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
+                        isDisabled
+                          ? '!bg-[#808080] cursor-not-allowed'
+                          : '!bg-[#13188A] cursor-pointer'
+                      }`}
                       onClick={() =>
                         reserve && stakeChecked
                           ? handlePlaceOrder(
@@ -447,11 +470,6 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                             )
                           : handlePlaceOrder()
                       }
-                      className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
-                        isDisabled
-                          ? '!bg-[#808080] cursor-not-allowed'
-                          : '!bg-[#13188A] cursor-pointer'
-                      }`}
                     >
                       Place Order
                     </Button>
