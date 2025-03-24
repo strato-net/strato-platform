@@ -38,6 +38,7 @@ let saleUpdateTime = 13; // Default: 13:00 UTC
 let saleUpdateTime2 = 19;
 let assets = [];
 let oracleUpdateTime = 24 * 60 * 60 * 1000; // 1 day in ms
+let metalPriceOnUpdate;
 
 if (!rawOracleUpdateTime) {
   await flagFile.appendToErrorFile(
@@ -361,6 +362,11 @@ async function fetchAndSubmitERC20TokenPrice(
       }
     );
 
+    metalPriceOnUpdate={
+      price: prices,
+      timestamp
+    }
+
     console.log(
       `TWAP submitted: $${twap.toFixed(2)} at ${new Date(
         currentTimeMs
@@ -458,7 +464,6 @@ const updateSalePricePeriodically = async () => {
     process.env.METALS_USERNAME,
     process.env.METALS_PASSWORD
   );
-  let metalResult;
   for (const asset of assets) {
     try {
       const searchOptions = {
@@ -481,7 +486,7 @@ const updateSalePricePeriodically = async () => {
       }
 
       if (asset.type === 'metal') {
-        metalResult = await fetchLBMAMetalPrice(
+        metalPriceOnUpdate = await fetchLBMAMetalPrice(
           asset.name.toLowerCase().replace(/st$/, ""),
           process.env.METALS_API_KEY
         );
@@ -504,7 +509,7 @@ const updateSalePricePeriodically = async () => {
         asset.markUp,
         token,
         assetResult[0]?.sale,
-        metalResult.price,
+        metalPriceOnUpdate.price,
         decimals
       );
       console.log(
