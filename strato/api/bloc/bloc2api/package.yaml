@@ -21,6 +21,7 @@ library:
   - aeson-casing
   - binary
   - blockapps-data
+  - blockDB
   - bytestring
   - containers
   - evm-solidity
@@ -37,7 +38,6 @@ library:
   - strato-model
   - swagger2
   - text
-  - type-lits
 
 tests:
   blockapps-strato-api-test:

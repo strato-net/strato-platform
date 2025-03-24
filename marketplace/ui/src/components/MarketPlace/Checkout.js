@@ -57,6 +57,16 @@ const Checkout = () => {
   const [mapData, setmapData] = useState([]);
   const [inputErrors, setInputErrors] = useState({});
 
+  const calculateDecimals = (item) => {
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
+      item.product.originAddress
+    )
+      ? 18
+      : item.product.decimals || 0;
+
+    return decimals;
+  };
+ 
   const calculateTax = (item) => {
     const decimals = assetsWithEighteenDecimalPlaces.includes(
       item.product.originAddress
@@ -352,6 +362,35 @@ const Checkout = () => {
         placement,
         key: 2,
       });
+    }
+  };
+
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct?.decimals) {
+      // Allow decimals for products with defined decimal places
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight"
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      // Prevent decimals
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (!/^[0-9]$/.test(e.key) && 
+          e.key !== "Backspace" && 
+          e.key !== "Delete" && 
+          e.key !== "ArrowLeft" && 
+          e.key !== "ArrowRight") {
+        e.preventDefault();
+      }
     }
   };
 

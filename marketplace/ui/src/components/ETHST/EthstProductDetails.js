@@ -906,6 +906,7 @@ const ProductDetails = ({ user, users }) => {
           accountDetails={{
             walletAddress: address,
             balance: ethBalance,
+            decimals: 18,
           }}
           tokenName="ETH"
         />

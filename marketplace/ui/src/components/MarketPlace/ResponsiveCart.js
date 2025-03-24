@@ -6,6 +6,7 @@ import {
   Checkbox,
   Spin,
   Modal,
+  Tooltip
 } from 'antd';
 import { useState, useEffect } from 'react';
 import { Images } from '../../images';
@@ -243,6 +244,35 @@ const ResponsiveCart = ({
     }
   };
 
+  const onKeyDownPress = (e, topSellingProduct) => {
+    if (topSellingProduct.decimals) {
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+  };
+
   const handleChange = async (value) => {
     const provider = paymentServices.find(
       (provider) => provider?.serviceName === value
@@ -308,6 +338,10 @@ const ResponsiveCart = ({
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+  const amountWithoutSymbol = totalAmount.split(' ');
+
+  const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
       {contextHolderForModal}
@@ -367,11 +401,29 @@ const ResponsiveCart = ({
                     <InputNumber
                       className="w-[7rem] border-none text-[#202020] font-medium bg-[transparent] rounded-none outline-none text-sm text-center flex flex-col justify-center"
                       value={qty}
-                      defaultValue={qty}
                       controls={false}
                       stringMode
                       onChange={(e) => {
-                        ValueQty(product, e);
+                        if (!isNaN(e)) {
+                          let value = e.toString();
+                          let [integer, decimal] = value.split('.');
+
+                          if (
+                            decimal &&
+                            decimal.length > (product?.decimals || 0)
+                          ) {
+                            value = parseFloat(
+                              integer + '.' + decimal.slice(0, product?.decimals)
+                            );
+                          } else {
+                            value = parseFloat(value);
+                          }
+
+                          ValueQty(product, value);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        onKeyDownPress(e, product);
                       }}
                     />
                     <div
@@ -500,7 +552,16 @@ const ResponsiveCart = ({
             )}
             <div className="flex justify-between items-center mb-3 p-2">
               <span className="text-base font-normal">Order Total :</span>
-              <span className="text-base font-normal">{totalAmount} </span>
+              <Tooltip title={isDisabled ? "Minimum Credit Card Order Size $10. Please increase the quantity to proceed." : ""}>
+                <span className="text-base font-normal">
+                  {totalAmount}{' '}
+                </span>
+                {isDisabled &&
+                  <span className='pay-summary-responsive-span'>
+                    <label className='pay-summary'>Order amount should be greater than $10</label>
+                  </span>
+                }
+              </Tooltip>
             </div>
             <Button
               type="primary"

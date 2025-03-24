@@ -1,6 +1,6 @@
-require('dotenv').config();
+require('dotenv').config();  // Not used when running with run.sh
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
-const config = fsUtil.getYaml(`../config.yaml`);
+const config = fsUtil.getYaml(`../../config.yaml`);
 
 /**
  * Obtains a user token using OAuth resource owner credentials.
@@ -84,13 +84,13 @@ const updateOracle = async (reserveAddress, newOracleAddress, token) => {
 async function main() {
   try {
     // Validate required environment variables.
-    const { USERNAME, PASSWORD, ORACLE_ADDRESS, NEW_RESERVE_ADDRESS } =
+    const { USERNAME, PASSWORD, ORACLE_ADDRESS, RESERVE_ADDRESS } =
       process.env;
     if (!USERNAME || !PASSWORD)
       throw new Error('USERNAME and PASSWORD are required.');
     if (!ORACLE_ADDRESS) throw new Error('ORACLE is required.');
-    if (!NEW_RESERVE_ADDRESS)
-      throw new Error('NEW_RESERVE_ADDRESS is required.');
+    if (!RESERVE_ADDRESS)
+      throw new Error('RESERVE_ADDRESS is required.');
 
     // Obtain the user token via OAuth.
     const tokenString = await getUserToken(USERNAME, PASSWORD);
@@ -98,30 +98,11 @@ async function main() {
     console.log('Token acquired:', tokenString);
     const token = { token: tokenString };
 
-    // Fetch active reserves.
-    const reserveQuery = {
-      config,
-      query: {
-        isActive: 'eq.true',
-        creator: 'in.(BlockApps,mercata_usdst)',
-        address: `eq.${NEW_RESERVE_ADDRESS}`,
-      },
-    };
-    const reserves = await rest.search(
-      token,
-      { name: 'BlockApps-Mercata-Reserve' },
-      reserveQuery
-    );
-    if (!reserves || reserves.length === 0) {
-      console.log('No active reserves found.');
-      return;
-    }
-    const reserve = reserves[0];
-
     // Process each reserve individually.
-    await updateOracle(reserve.address, ORACLE_ADDRESS, token);
+    await updateOracle(RESERVE_ADDRESS, ORACLE_ADDRESS, token);
   } catch (error) {
-    console.error('Error updating reserves:', error);
+    console.error('Error updating reserve:', error);
+    process.exit(1);
   }
 }
 

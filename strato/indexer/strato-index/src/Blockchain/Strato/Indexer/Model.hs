@@ -6,6 +6,7 @@ where
 
 import Blockchain.Data.DataDefs (EventDB, LogDB, TransactionResult)
 import Blockchain.Data.TransactionResult ()
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Keccak256
 import Data.Binary

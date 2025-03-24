@@ -3,22 +3,22 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 {-# OPTIONS -fno-warn-deprecations #-}
-module Main where
+module BlockDBSpec (spec) where
 
-import Blockchain.Data.ArbitraryInstances ()
+import qualified Blockchain.BlockDB as RDB
+import qualified Blockchain.SyncDB as RDB
 import Blockchain.Data.BlockHeader
-import Blockchain.Sequencer.Event
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.RedisBlockDB as RDB
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.RedisBlockDB.Test.Chain
 import Control.Exception (bracket)
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
 import Data.Foldable
-import Data.List
+import Data.List (sortBy)
 import Data.Maybe
 import Data.Ord
 import Data.Tree
@@ -32,7 +32,7 @@ import Text.Format
 -- Main and helpers
 --
 main :: IO ()
-main = hspec specTest
+main = hspec spec
 
 openConn :: Integer -> IO Connection
 openConn num = do
@@ -59,8 +59,8 @@ flushDB = it "Should flush the db" $ \conn -> do
 -----------------------------------------------------------------------------
 -- Tests
 --
-specTest :: Spec
-specTest = around (withConn 1) $ do
+spec :: Spec
+spec = around (withConn 1) $ do
   describe "BlockData" $ do
     flushDB
 
@@ -139,7 +139,7 @@ specTest = around (withConn 1) $ do
         (blockHash <$> r)
  
     it "Should get genesis from chain" $ \conn -> do
-      g <- liftIO $ makeGenesisBlock
+      g <- liftIO makeGenesisBlock
       let genHash = blockHeaderHash g
       chain <- liftIO $ buildChain g 2 2
       r <- runRedis conn $ do
@@ -153,17 +153,17 @@ specTest = around (withConn 1) $ do
   describe "ChainTest" $ do
     flushDB
     it "Should get back best block after putting it" $ \conn -> do
-      g <- liftIO $ makeGenesisBlock
+      g <- liftIO makeGenesisBlock
       chain <- liftIO $ buildChain g 10 2
       let bb = last chain
           bbh = blockHeaderHash bb
           bbn = number bb
       r <- runRedis conn $ do
         void $ RDB.forceBestBlockInfo bbh bbn
-        RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
+        RDB.getBestBlockInfo :: Redis (Maybe BestBlock)
       HUnit.assertEqual
         "Couldn't get back best block"
-        (Just (RedisBestBlock bbh bbn))
+        (Just (BestBlock bbh bbn))
         r
 
   describe "ReplaceBestBlock" $ do
@@ -173,7 +173,7 @@ specTest = around (withConn 1) $ do
         g <- liftIO makeGenesisBlock
         tree <- bush g m n :: IO (Tree BlockHeader)
         let bestBlocks = sortBy (comparing number) (leaves tree)
-        let allblocks = toList $ tree
+        let allblocks = toList tree
         let chains = flip stem' allblocks <$> bestBlocks
         -- liftIO . putStrLn . showTree $ pb <$> tree
 
@@ -181,11 +181,11 @@ specTest = around (withConn 1) $ do
           void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
           forM_ allblocks RDB.putHeader
           forM chains $ \chain -> do
-            workChain' RDB.putBestBlockInfo $ (reverse $ chain)
-            res <- RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
+            workChain' RDB.putBestBlockInfo $ reverse chain
+            res <- RDB.getBestBlockInfo :: Redis (Maybe BestBlock)
             return $ bestBlockHash <$> res
 
-        let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb)
+        let bbs = flip map bestBlocks $ \bb -> Just $ blockHeaderHash bb
         HUnit.assertBool
           ("Couldn't get best block iterated from chain (" ++ (show . length $ tree) ++ ", " ++ (show . length . leaves $ tree) ++ ")")
           (bbs == r)
@@ -201,8 +201,8 @@ prettyBlock b = return (number b, showHash . parentHash $ b, showHash . blockHea
 
 callCommonAncestor :: [BlockHeader] -> [BlockHeader] -> Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 callCommonAncestor old new =
-  let oldNumber = (fromIntegral . number . last) old
-      newNumber = (fromIntegral . number . last) new
+  let oldNumber = (number . last) old
+      newNumber = (number . last) new
       oldSha = (blockHeaderHash . last) old
       newSha = (blockHeaderHash . last) new
    in RDB.commonAncestorHelper oldNumber newNumber oldSha newSha
@@ -213,7 +213,7 @@ workChain g chain = forM_ (reverse chain) f
     f b = g (blockHeaderHash b) (number b)
 
 workChain' :: (Keccak256 -> Integer -> Redis (Either Reply Status)) -> [BlockHeader] -> Redis ()
-workChain' g = flip forM_ f
+workChain' g = mapM_ f
   where
     f b = do
       void $ g (blockHeaderHash b) (number b)

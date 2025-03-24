@@ -29,18 +29,19 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
-import Blockchain.Data.Block
+import Blockchain.Model.SyncState
 import Blockchain.EthConf
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.SyncDB
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import qualified Blockchain.Strato.RedisBlockDB.Models as RBDB
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent (threadDelay)
@@ -213,18 +214,13 @@ instance HasBlockstanbulContext SequencerM where
 
 instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo <&> \case
-      Nothing -> BestSequencedBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RBDB.RedisBestBlock s n) -> BestSequencedBlock $ BestBlock s n
-  put _ (BestSequencedBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
+      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) []
+      Just v -> v
+  put _ bestSequencedBlock =
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
-
-instance (() `A.Alters` Checkpoint) SequencerM where
-  lookup = lookupInLDB
-  insert p k v = insertInLDB p k v
-  delete p k = deleteInLDB p k
 
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
@@ -320,7 +316,7 @@ fuseChannels = do
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift)
     <$> mergeSources
-      [ conduitBatchSource "conduitSource" "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
+      [ conduitBatchSource "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
       4096 -- 🙏

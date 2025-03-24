@@ -1,3 +1,4 @@
+import fs from "fs";
 import { assert } from "chai";
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
@@ -12,14 +13,22 @@ const contractDir =
 const assetsDir =
   config.assetsDirPath || "/usr/src/payment-server/dapp/items/contracts";
 
-async function uploadContract(token, type, args) {
+// Read the oracle configuration from /tmp/oracle.json
+const oracleConfigPath = "/tmp/oracle.json";
+if (!fs.existsSync(oracleConfigPath)) {
+  throw new Error("Oracle configuration file not found at " + oracleConfigPath);
+}
+const oracleConfig = JSON.parse(fs.readFileSync(oracleConfigPath, "utf8"));
+const oraclesList = oracleConfig.oracles; // the list of oracles
+
+async function uploadContract(token, type, oracle) {
   const contractName = `SimpleOracleService`;
   const filename = `${contractDir}/${type}s/${contractName}.sol`;
   const source = await importer.combine(filename);
   const contractArgs = {
     name: contractName,
     source,
-    args: util.usc(args),
+    args: util.usc({ name: oracle.name }),
   };
 
   const options = {
@@ -31,9 +40,8 @@ async function uploadContract(token, type, args) {
   const { address } = await createContract(token, contractArgs, options);
 
   return {
-    name: contractName,
-    metal: args.name,
     address,
+    ...oracle,
   };
 }
 
@@ -58,13 +66,7 @@ describe("Payment Server - deploy contracts", function () {
   this.timeout(config.timeout);
 
   let token;
-
-  let silverOracle;
-  let goldOracle;
-  let ethOracle;
-  let btcOracle;
-  let goldstOracle;
-  let usdOracle;
+  let deployedOracles = {};
 
   before(async () => {
     assert.isDefined(
@@ -123,52 +125,23 @@ describe("Payment Server - deploy contracts", function () {
     }
   });
 
-  it("Deploy Silver Oracle", async () => {
-    const silverOracleName = config.silverOracle.name;
-    silverOracle = await uploadContract(token, "Oracle", {
-      name: silverOracleName,
-    });
-  });
-
-  it("Deploy Gold Oracle", async () => {
-    const goldOracleName = config.goldOracle.name;
-    goldOracle = await uploadContract(token, "Oracle", {
-      name: goldOracleName,
-    });
-  });
-
-  it("Deploy Eth Oracle", async () => {
-    const ethOracleName = config.ethOracle.name;
-    ethOracle = await uploadContract(token, "Oracle", { name: ethOracleName });
-  });
-
-  it("Deploy Btc Oracle", async () => {
-    const btcOracleName = config.btcOracle.name;
-    btcOracle = await uploadContract(token, "Oracle", { name: btcOracleName });
-  });
-
-  it("Deploy Goldst Oracle", async () => {
-    const goldstOracleName = config.goldstOracle.name;
-    goldstOracle = await uploadContract(token, "Oracle", {
-      name: goldstOracleName,
-    });
-  });
-
-  it("Deploy USD Oracle", async () => {
-    const usdOracleName = config.usdOracle.name;
-    usdOracle = await uploadContract(token, "Oracle", { name: usdOracleName });
+  // Deploy all oracles found in the JSON file
+  it("Deploy all oracles", async () => {
+    for (const oracle of oraclesList) {
+      // Deploy each oracle contract dynamically
+      const deployedOracle = await uploadContract(token, "Oracle", oracle);
+      // Store the deployed oracle under its name
+      deployedOracles[oracle.name] = deployedOracle;
+    }
+    // Optional: log the deployed oracles for verification
+    console.log("Deployed Oracles:", deployedOracles);
   });
 
   // Create oracle_deploy.yaml
   it("Create oracle_deploy.yaml", async () => {
     const deployArgs = {
       deployFilePath: `${config.configDirPath}/oracle_deploy.yaml`,
-      silverOracle,
-      goldOracle,
-      ethOracle,
-      btcOracle,
-      goldstOracle,
-      usdOracle,
+      ...deployedOracles,
     };
     const deployment = deploy(deployArgs, config);
     assert.isDefined(deployment);

@@ -10,6 +10,7 @@ import Blockchain.Data.Block
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB

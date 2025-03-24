@@ -973,6 +973,7 @@ const ProductDetails = ({ user, users }) => {
           accountDetails={{
             walletAddress: address,
             balance: wbtcBalance,
+            decimals: 8,
           }}
           tokenName="WBTC"
         />

@@ -202,6 +202,70 @@ const NewTrendingCard = ({
     setIsModalVisible(false);
   };
 
+  const handleIncrement = (quantity) => {
+    if (decimals) {
+      let newValue = Number(quantity) + 0.01;
+      newValue = parseFloat(newValue.toFixed(4));
+      setQuantity(newValue);
+    }
+    else {
+      if (
+        quantity + 1 <= saleQuantity &&
+        quantity + 1 <= topSellingProduct.quantity
+      ) {
+        setQuantity(quantity + 1);
+      }
+    }
+  };
+
+  const handleDecrement = (quantity) => {
+    if (decimals) {
+      const minValue = 1 / Math.pow(10, decimals || 0);
+      if (quantity - 0.01 > 0) {
+        setQuantity((prevQuantity) => {
+            const newQuantity = parseFloat(
+              Math.max(prevQuantity - 0.01, minValue)
+            ).toFixed(4);
+            return Number(newQuantity);
+        });
+      }
+    }
+    else {
+      if (quantity - 1 > 0) {
+        setQuantity(Math.max(quantity - 1, 1));
+      }
+    }
+  };
+
+  const onKeyDownPress = (e) => {
+    if (decimals) {
+      if (
+        !/[0-9.]/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      if (e.key === '.' || e.key === ',') {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (
+        !/^[0-9]$/.test(e.key) &&
+        e.key !== 'Backspace' &&
+        e.key !== 'Delete' &&
+        e.key !== 'ArrowLeft' &&
+        e.key !== 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+    }
+  };
+
   return (
     <>
       <div

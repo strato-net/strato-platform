@@ -7,7 +7,6 @@ module Blockchain.Strato.RedisBlockDB.Test.Chain where
 
 -- import qualified Text.PrettyPrint.ANSI.Leijen as L
 
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256

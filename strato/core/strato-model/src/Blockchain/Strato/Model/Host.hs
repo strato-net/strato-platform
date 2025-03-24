@@ -1,14 +1,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Blockchain.Strato.Discovery.Data.Host where
+module Blockchain.Strato.Model.Host where
 
-import Data.IP
-import Data.String
-import Data.Text (Text)
-import qualified Data.Text as T
+import           Data.IP
+import           Data.String
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
 import qualified Database.Persist.Postgresql as SQL
-import Text.Format
-import Text.Read
+import           Text.Format
+import           Text.Read
 
 newtype Host = Host Text deriving (Show, Read, Eq, Ord, IsString, SQL.PersistField, SQL.PersistFieldSql)
 
@@ -22,5 +22,5 @@ isIP :: Host -> Bool
 isIP v =
   case readMaybe $ hostToString v :: Maybe IP of
     Nothing -> False
-    Just _ -> True
+    Just _  -> True
 

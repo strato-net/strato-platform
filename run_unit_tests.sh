@@ -13,6 +13,7 @@ trap "docker rm -f ${REDIS}" EXIT
 cd strato
 
 stack test $5\
+      blockDB \
       blockapps-data \
       blockapps-init \
       blockapps-mpdbs \
@@ -27,7 +28,6 @@ stack test $5\
       fast-keccak256 \
       format \
       labeled-error \
-      merkle-patricia-db \
       seqevents \
       slipstream \
       solid-vm \

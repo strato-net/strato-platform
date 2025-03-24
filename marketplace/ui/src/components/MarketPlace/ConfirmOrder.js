@@ -338,6 +338,10 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+    const amountWithoutSymbol = totalAmount.split(' ');
+
+    const isDisabled = (!activePaymentProviders || activePaymentProviders?.length === 0 || (selectedProvider.serviceName === "Stripe" && amountWithoutSymbol[0] < 10));
+
   return (
     <>
       <div>
@@ -410,9 +414,16 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                 <div className="p-4 rounded-lg shadow-md w-full">
                   <div className="flex justify-between items-center mb-6">
                     <span className="text-base font-normal">Order Total :</span>
-                    <span className="text-base font-normal">
-                      {totalAmount}{' '}
-                    </span>
+                    <Tooltip title={isDisabled ? "Minimum Credit Card Order Size $10.Please increase the quantity to proceed." : ""}>
+                      <span className="text-base font-normal">
+                        {totalAmount}{' '}
+                      </span>
+                      {isDisabled &&
+                        <span className='pay-summary-span'>
+                          <label className='pay-summary'>Order amount should be greater than $10</label>
+                        </span>
+                      }
+                    </Tooltip>
                   </div>
                   {reserve && (
                     <div className="mb-6">
