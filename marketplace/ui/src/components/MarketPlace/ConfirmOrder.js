@@ -414,15 +414,23 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                 <div className="p-4 rounded-lg shadow-md w-full">
                   <div className="flex justify-between items-center mb-6">
                     <span className="text-base font-normal">Order Total :</span>
-                    <Tooltip title={isDisabled ? "Minimum Credit Card Order Size $10.Please increase the quantity to proceed." : ""}>
+                    <Tooltip
+                      title={
+                        isDisabled
+                          ? 'Minimum Credit Card Order Size $10.Please increase the quantity to proceed.'
+                          : ''
+                      }
+                    >
                       <span className="text-base font-normal">
                         {totalAmount}{' '}
                       </span>
-                      {isDisabled &&
-                        <span className='pay-summary-span'>
-                          <label className='pay-summary'>Order amount should be greater than $10</label>
+                      {isDisabled && (
+                        <span className="pay-summary-span">
+                          <label className="pay-summary">
+                            Order amount should be greater than $10
+                          </label>
                         </span>
-                      }
+                      )}
                     </Tooltip>
                   </div>
                   {reserve && (
@@ -432,25 +440,33 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       </Checkbox>
                     </div>
                   )}
-                  <Button
-                    type="primary"
-                    disabled={
-                      !activePaymentProviders ||
-                      activePaymentProviders?.length === 0 || 
-                      cartData.some(item => item.disabled)
-                    }
-                    className="w-full bg-blue-800 text-white h-10 text-lg"
-                    onClick={() =>
-                      reserve && stakeChecked
-                        ? handlePlaceOrder(
-                            reserve?.address,
-                            reserve?.assetRootAddress
-                          )
-                        : handlePlaceOrder()
+                  <Tooltip
+                    title={
+                      isDisabled
+                        ? 'The minimum purchase amount is $10. Please increase the quantity to proceed.'
+                        : ''
                     }
                   >
-                    Place Order
-                  </Button>
+                    <Button
+                      type="primary"
+                      disabled={
+                        !activePaymentProviders ||
+                        activePaymentProviders?.length === 0 ||
+                        cartData.some((item) => item.disabled)
+                      }
+                      className="w-full bg-blue-800 text-white h-10 text-lg"
+                      onClick={() =>
+                        reserve && stakeChecked
+                          ? handlePlaceOrder(
+                              reserve?.address,
+                              reserve?.assetRootAddress
+                            )
+                          : handlePlaceOrder()
+                      }
+                    >
+                      Place Order
+                    </Button>
+                  </Tooltip>
                 </div>
               </Col>
             </Row>
