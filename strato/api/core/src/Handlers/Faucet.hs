@@ -67,7 +67,7 @@ type API =
       :> QueryParam "count" Int
       :> Get '[JSON] [Keccak256]
 
-server :: (MonadLogger m, HasSQL m) => ServerT API m
+server :: (MonadIO m, MonadLogger m, Selectable Address Integer m) => ServerT API m
 server =
   postFaucet
     :<|> postFaucetMultipart
@@ -170,7 +170,7 @@ acquireNewMaxNonce minNonce = do
          in (next, next)
   liftIO $ atomicModifyIORef' appFaucetNonce findNext
 
-instance HasSQL m => Selectable Address Integer m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Integer (SQLM m) where
   select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $
     E.select $
       E.from $ \accStateRef -> do

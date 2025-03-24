@@ -44,6 +44,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import Network.HTTP.Client (defaultManagerSettings, newManager)
+import SelectAccessible ()
 import Servant.Client
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
@@ -134,7 +135,7 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Alters` AddressStat
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` AddressState) m where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` AddressState) (ReaderT SetupDBs m) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where

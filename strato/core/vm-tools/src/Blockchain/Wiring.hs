@@ -215,7 +215,7 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Address AddressState m where
+instance {-# OVERLAPPING #-} (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Address AddressState m where
   select _ = getAddressStateMaybe
 
 instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where

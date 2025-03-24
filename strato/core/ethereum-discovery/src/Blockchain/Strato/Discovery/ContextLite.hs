@@ -75,25 +75,25 @@ data ContextLite = ContextLite
     myTcpPort    :: TCPPort
   }
 
-instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible SQLDB (ReaderT ContextLite m) where
   access _ = asks liteSQLDB
 
 instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT ContextLite m) where
   accessEnv = asks liteSQLDB
 
-instance Monad m => Accessible Socket (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible Socket (ReaderT ContextLite m) where
   access _ = asks sock
 
-instance Monad m => Accessible UDPPort (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible UDPPort (ReaderT ContextLite m) where
   access _ = asks myUdpPort
 
-instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible TCPPort (ReaderT ContextLite m) where
   access _ = asks myTcpPort
 
-instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
   access _ = asks redisBlockDB
 
-instance MonadIO m => Accessible [Validator] (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadIO m => Accessible [Validator] (ReaderT ContextLite m) where
   access _ = do
     bestSequencedBlock <- fromMaybe (error "missing BestSequencedBlock in redis") <$> RBDB.withRedisBlockDB getBestSequencedBlockInfo
     return $ bestSequencedBlockValidators bestSequencedBlock
@@ -116,7 +116,7 @@ instance MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) whe
         where
           actions' = SQL.selectList [PPeerHost SQL.==. host'] []
 
-instance MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
   select _ = getPeerByIP
     where
       getPeerByIP :: IP -> ReaderT ContextLite m (Maybe PPeer)
@@ -159,7 +159,7 @@ instance A.Selectable (Host, UDPPort, B.ByteString) Point IO where
         --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
         timeout 5000000 $ secPubKeyToPoint . processDataStream' <$> NB.recv socket' 2000
 
-instance MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT ContextLite m) where
   select _ (Nothing, UDPPort udpPortNum) = do
     fmap (fmap addrAddress . listToMaybe) . liftIO $
       getAddrInfo
@@ -174,10 +174,10 @@ instance MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT Conte
         (Just $ show udpPortNum))
       (\(err :: IOError) -> runLoggingT ($logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return [])
 
-instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
 
-instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextLite m) where
   select _ _ = do
     sock' <- asks sock
     liftIO . timeout 10000000 $ NB.recvFrom sock' 80000

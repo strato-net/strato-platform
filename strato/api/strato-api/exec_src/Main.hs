@@ -32,7 +32,6 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify (Accessible)
 import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault hiding (httpManager)
@@ -40,6 +39,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
+import Core.API
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -50,21 +50,7 @@ import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
 import Data.Swagger hiding (Http, delete)
 import HFlags
-import qualified Handlers.AccountInfo as Account
-import qualified Handlers.BatchTransactionResult as BatchTransactionResult
-import qualified Handlers.BlkLast as BlkLast
-import qualified Handlers.Block as Block
-import qualified Handlers.Faucet as Faucet
-import qualified Handlers.IdentityServerCallback as Identity
-import qualified Handlers.Metadata as Metadata
 import Handlers.Options
-import qualified Handlers.Peers as Peers
-import qualified Handlers.QueuedTransactions as QueuedTransactions
-import qualified Handlers.Stats as Stats
-import qualified Handlers.Storage as Storage
-import qualified Handlers.Transaction as Transaction
-import qualified Handlers.TransactionResult as TransactionResult
-import qualified Handlers.TxLast as TxLast
 import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
@@ -91,23 +77,23 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Contract (SQL
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
-        . Account.getAccount'
-        $ Account.accountsFilterParams
-          & Account.qaAddress ?~ a
+        . getAccount'
+        $ accountsFilterParams
+          & qaAddress ?~ a
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
-instance Selectable Address Contract m => Selectable Address Contract (ReaderT a m) where
+instance {-# OVERLAPPING #-} Selectable Address Contract m => Selectable Address Contract (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
-  select _ = Account.getCodeFromPostgres
+  select _ = getCodeFromPostgres
 
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
+instance {-# OVERLAPPING #-} (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  lookup _ k = fmap (SolidVM,) <$> getCodeByteStringFromPostgres k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
@@ -121,10 +107,10 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
-        . Account.getAccount'
-        $ Account.accountsFilterParams
-          & Account.qaAddress ?~ a
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
+        . getAccount'
+        $ accountsFilterParams
+          & qaAddress ?~ a
+          & qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     pure $
       AddressState
@@ -134,81 +120,32 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         codePtr
         (Just 0)
 
-instance Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
+instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = Account.getX509CertForAccount
+  select _ = getX509CertForAccount
 
-instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
+instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
-
-type CoreAPI =
-  "eth" :> "v1.2"
-    :> ( Account.API
-           :<|> Account.CodeAPI
-           :<|> BatchTransactionResult.API
-           :<|> BlkLast.API
-           :<|> Block.API
-           :<|> Faucet.API
-           :<|> Identity.API
-           :<|> Metadata.API
-           :<|> Peers.API
-           :<|> QueuedTransactions.API
-           :<|> Stats.API
-           :<|> Storage.API
-           :<|> Transaction.API
-           :<|> TransactionResult.API
-           :<|> TxLast.API
-       )
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-coreServer ::
-  ( MonadLogger m,
-    HasSQL m,
-    Accessible Metadata.UrlMap m,
-    Accessible IdentityData m,
-    Accessible VaultData m,
-    Selectable Keccak256 SourceMap m
-  ) =>
-  ServerT CoreAPI m
-coreServer =
-  Account.server
-    :<|> Account.codeServer
-    :<|> BatchTransactionResult.server
-    :<|> BlkLast.server
-    :<|> Block.server
-    :<|> Faucet.server
-    :<|> Identity.server
-    :<|> Metadata.server
-    :<|> Peers.server
-    :<|> QueuedTransactions.server
-    :<|> Stats.server
-    :<|> Storage.server
-    :<|> Transaction.server flags_txSizeLimit
-    :<|> TransactionResult.server
-    :<|> TxLast.server
-
 fullServer ::
-  ( MonadLogger m,
-    HasSQL m,
+  ( HasSQL m,
     HasBlocEnv m,
-    HasIdentity m,
-    HasVault m,
-    Accessible Metadata.UrlMap m,
     Selectable Address Contract m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,
-    Selectable Keccak256 SourceMap m
+    MonadCoreAPI m
   ) =>
   ServerT FullAPI m
-fullServer = coreServer :<|> bloc
+fullServer = coreApiServer :<|> bloc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> Metadata.UrlMap -> Server FullAPI
+hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
@@ -296,7 +233,7 @@ main = do
           }
   run 3000 $ app env theDoc urlMap
 
-app :: BlocEnv -> Swagger -> Metadata.UrlMap -> Application
+app :: BlocEnv -> Swagger -> UrlMap -> Application
 app blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $

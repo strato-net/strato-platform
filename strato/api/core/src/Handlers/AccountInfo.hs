@@ -162,7 +162,7 @@ uncurryAccountsFilterParams f AccountsFilterParams {..} =
     _qaOffset
     _qaIgnoreChain
 
-server :: HasSQL m => ServerT API m
+server :: Selectable AccountsFilterParams [AddressStateRef] m => ServerT API m
 server = getAccount
 
 ---------------------------
@@ -171,7 +171,7 @@ data NamedChainId
   = UnnamedChainIdsA [ChainId]
   | MainChainA
 
-instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams [AddressStateRef] (SQLM m) where
   select _ a@AccountsFilterParams {..}
     | a == accountsFilterParams =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams

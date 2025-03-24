@@ -11,6 +11,7 @@
 
 module Strato.Lite.Rest.Server where
 
+-- import Bloc.API
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event

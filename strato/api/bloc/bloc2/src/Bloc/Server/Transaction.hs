@@ -39,7 +39,6 @@ import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
 import Blockchain.DB.CodeDB
-import qualified Blockchain.DB.SQLDB as SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
@@ -63,7 +62,6 @@ import Control.Arrow
 import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 import Control.Monad.Extra
 import Control.Monad.Reader
@@ -90,8 +88,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock
 import qualified Data.Vector as V
-import qualified Database.Esqueleto.Legacy as E
-import Handlers.AccountInfo ()
+import Handlers.AccountInfo
 import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
@@ -122,7 +119,6 @@ txWorker ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
   ) =>
   m ()
 txWorker = forever $ do
@@ -139,12 +135,13 @@ txWorker = forever $ do
 
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
-    HasSQL m,
     HasVault m
   ) =>
   -- | jwt
@@ -290,12 +287,13 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
-    HasSQL m,
     HasVault m
   ) =>
   -- | jwt
@@ -450,15 +448,18 @@ getMaybeCodeFromContractPayload p =
     Nothing -> Nothing
 
 postBlocTransactionParallel ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Maybe Text ->
   Maybe ChainId ->
@@ -477,15 +478,18 @@ postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
     else postBlocTransaction' (Do CacheNonce) jwtToken b mUseWallet resolve c
 
 postBlocTransaction ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Maybe Text ->
   Maybe ChainId ->
@@ -496,15 +500,18 @@ postBlocTransaction ::
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransactionParallelExternal ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Maybe Text ->
   Maybe ChainId ->
@@ -516,15 +523,18 @@ postBlocTransactionParallelExternal ::
 postBlocTransactionParallelExternal bearerToken = postBlocTransactionParallel (Text.replace "Bearer " "" <$> bearerToken)
 
 postBlocTransaction' ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   Maybe Text ->
@@ -812,13 +822,16 @@ data TransactionHeader = TransactionHeader
   }
 
 postUsersSend' ::
-  ( A.Selectable Address AddressState m,
+  ( MonadUnliftIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     MonadLogger m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   TransferParameters ->
@@ -840,13 +853,16 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
   getResultAndRespond [txHash] resolve
 
 postUsersContractSolidVM' ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   ContractParameters ->
@@ -888,13 +904,16 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
   getResultAndRespond [txHash] resolve
 
 postUsersUploadListSolidVM' ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   ContractListParameters ->
@@ -937,13 +956,16 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersSendList' ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   TransferListParameters ->
@@ -971,14 +993,17 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethodList' ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   FunctionListParameters ->
@@ -1030,14 +1055,17 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
       getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethod' ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   Should CacheNonce ->
   FunctionParameters ->
@@ -1238,7 +1266,11 @@ constructArgValuesAndSource args argNamesTypes = do
         )
 
 getAccountTxParams ::
-  (MonadLogger m, HasBlocEnv m, HasSQL m) =>
+  ( MonadIO m
+  , MonadLogger m
+  , HasBlocEnv m
+  , A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
   Should CacheNonce ->
   Address ->
   Maybe TxParams ->
@@ -1278,7 +1310,12 @@ cacheLookup c t k = do
   Cache.lookupSTM True k c t
 
 genNonces :: forall a m.
-  (MonadLogger m, HasBlocEnv m, HasSQL m, Show a) =>
+  ( MonadIO m
+  , MonadLogger m
+  , HasBlocEnv m
+  , A.Selectable AccountsFilterParams [AddressStateRef] m
+  , Show a
+  ) =>
   Should CacheNonce ->
   Address ->
   Lens' a (Maybe ChainId) ->
@@ -1332,20 +1369,20 @@ genNonces cacheNonce fromAddr _ l items = do
       Cache.insertSTM fromAddr newCachedNonce nonceCache expTime
       pure txs
 
-getAccountNonce :: (MonadLogger m, HasSQL m) =>
-                   Address -> m Nonce
+getAccountNonce ::
+  ( MonadIO m
+  , MonadLogger m
+  , A.Selectable AccountsFilterParams [AddressStateRef] m
+  )
+  => Address -> m Nonce
 getAccountNonce addr = do
-  let actions = E.select . E.from $ \accStateRef -> do
-        E.where_ (accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
-        return accStateRef
-  mAccts <- SQLDB.sqlQuery actions
+  mAccts <- getAccount' accountsFilterParams{_qaAddress = Just addr}
   $logInfoLS "getAccountNonce lookup" addr
   $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
     [] -> return $ Nonce $ fromInteger 0
-    [acct] -> do
-      let act = E.entityVal acct
-      let mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
+    [act] -> do
+      let mkNonce (AddressStateRef' AddressStateRef{..} _) = Nonce $ fromInteger addressStateRefNonce
       return $ mkNonce act
     _ -> error "returned more than one account with a single address in getAccountNonce"
 {-
@@ -1416,11 +1453,14 @@ getSolidityType _ Xabi.Variadic = Right $ TypeVariadic
 getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 
 getResultAndRespond ::
-  ( A.Selectable Address AddressState m,
+  ( MonadUnliftIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable Address AddressState m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    MonadLogger m,
-    HasSQL m
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
@@ -1433,7 +1473,7 @@ getResultAndRespond txHashes resolve = do
     (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
     (Pending, _, _) -> return result
 
-checkIsSynced :: (HasSQL m) => m ()
+checkIsSynced :: MonadUnliftIO m => m ()
 checkIsSynced = do
   status <- runStratoRedisIO getSyncStatus
   nodeBestBlock <- runStratoRedisIO getBestBlockInfo

@@ -213,7 +213,7 @@ instance RunsServer ContextM (LoggingT IO) where
           ip = fromString . sockAddrToIP $ appSockAddr app
       handler conduits ip
 
-instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
   access _ = asks configPubKey
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
@@ -260,10 +260,10 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
-instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
 
-instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
@@ -324,7 +324,7 @@ instance MonadIO m => ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
       outboundWireMessages %= S.delete k
 
-instance
+instance {-# OVERLAPPING #-}
   ( MonadUnliftIO m
   ) =>
   Mod.Accessible GenesisBlockHash (ReaderT Config m)
@@ -339,7 +339,7 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
 
-instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
@@ -357,7 +357,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {blockHeaders = (k, now)}, ()))
 
-instance MonadIO m => Mod.Accessible [BlockHeader] (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [BlockHeader] (ReaderT Config m) where
   access _ = Mod.get (Proxy @[BlockHeader])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
@@ -376,23 +376,23 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {remainingBlockHeaders = (k, now)}, ()))
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
 
 instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
   get _ = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k}, ()))
 
-instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
   access _ = Mod.get (Proxy @PeerAddress)
 
-instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
   access _ = asks configRedisBlockDB
 
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
   accessEnv = asks configSQLDB
 
-instance MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
   select _ host' =
     sqlQuery actions >>= \case
       [] -> return Nothing
@@ -400,7 +400,7 @@ instance MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
     where
       actions = SQL.selectList [PPeerHost SQL.==. host'] []
 
-instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
     sqlQuery actions >>= \case
       [] -> return Nothing
@@ -424,7 +424,7 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
     waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing pub) vc
 
-instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b

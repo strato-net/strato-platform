@@ -15,7 +15,9 @@ import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
 import Blockchain.Data.CirrusDefs
+import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens (makeLenses, over, (&), (.~), (?~))
@@ -26,6 +28,10 @@ import Control.Monad.Logger
 import Data.HashMap.Strict.InsOrd
 import Data.Source.Map
 import Data.Swagger
+import Handlers.AccountInfo
+import Handlers.Block
+import Handlers.Storage
+import Handlers.Transaction
 import Servant
 import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
@@ -35,9 +41,14 @@ bloc ::
     HasBlocEnv m,
     HasVault m,
     HasSQL m,
+    Selectable AccountsFilterParams [AddressStateRef] m,
     Selectable Address Contract m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
+    Selectable BlocksFilterParams [Block] m,
+    Selectable Keccak256 [TransactionResult] m,
+    Selectable StorageFilterParams [StorageAddress] m,
+    Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `Selectable` SourceMap) m
   ) =>

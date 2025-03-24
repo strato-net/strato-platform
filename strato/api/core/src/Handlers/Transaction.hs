@@ -131,7 +131,7 @@ txsFilterParams =
     []
     Nothing
 
-server :: (MonadLogger m, HasSQL m) => Int -> ServerT API m
+server :: (MonadIO m, MonadLogger m, Selectable TxsFilterParams [RawTransaction] m) => Int -> ServerT API m
 server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
 
 ---------------------------
@@ -141,7 +141,7 @@ data NamedChainId
   | MainChain
   | AllChains
 
-instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawTransaction] (SQLM m) where
   select _ t@TxsFilterParams {..}
     | t == txsFilterParams = throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
     | otherwise = do

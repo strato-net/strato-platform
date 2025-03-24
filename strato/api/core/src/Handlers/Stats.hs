@@ -12,6 +12,7 @@
 module Handlers.Stats
   ( API,
     server,
+    TransactionCount(..)
   )
 where
 
@@ -23,6 +24,7 @@ import Data.Aeson
 import Data.Swagger
 import qualified Database.Esqueleto.Legacy as E
 import Servant
+import UnliftIO
 
 newtype TotalDifficulty = TotalDifficulty Integer
 
@@ -55,12 +57,12 @@ instance ToSchema TransactionCount where
 type API =
   "stats" :> "totaltx" :> Get '[JSON] TransactionCount
 
-server :: HasSQL m => ServerT API m
+server :: Accessible TransactionCount m => ServerT API m
 server = getStatTx
 
 ---------------------
 
-instance HasSQL m => Accessible TransactionCount m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible TransactionCount (SQLM m) where
   access _ = do
     tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
     return . TransactionCount $ myval (tx :: [E.Value Integer])

@@ -30,6 +30,7 @@ import qualified Data.Text                             as T
 import           Data.Time
 import qualified Database.Persist.Postgresql           as SQL
 import           Prometheus
+import           SelectAccessible                      ()
 import           UnliftIO
 
 
@@ -41,9 +42,9 @@ import           UnliftIO
 
 
 
-instance MonadIO m => Mod.Accessible AvailablePeers m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    currentTime <- liftIO getCurrentTime
+instance {-# OVERLAPPING #-} Mod.Accessible AvailablePeers IO where
+  access _ = withGlobalSQLPool $ \sqldb -> do
+    currentTime <- getCurrentTime
     fmap (AvailablePeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
@@ -54,8 +55,8 @@ instance MonadIO m => A.Replaceable (Host, TCPPort) ActivityState m where
       [PPeerHost SQL.==. host, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
 
-instance MonadIO m => Mod.Accessible ActivePeers m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} Mod.Accessible ActivePeers IO where
+  access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
     fmap (ActivePeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
@@ -71,35 +72,35 @@ instance MonadIO m => (A.Replaceable PPeer Point) m where
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerHost SQL.==. pPeerHost peer] [PPeerPubkey SQL.=. Just point]
 
-instance MonadIO m => (A.Selectable (Host, Point) PeerBondingState) m where
-  select _ (host, point) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Selectable (Host, Point) PeerBondingState IO where
+  select _ (host, point) = withGlobalSQLPool $ \sqldb -> do
     fmap (fmap $ PeerBondingState . pPeerBondState . SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectFirst [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] []
 
-instance MonadIO m => Mod.Accessible BondedPeers m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} Mod.Accessible BondedPeers IO where
+  access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
     fmap (BondedPeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => Mod.Accessible BondedPeersForUDP m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} Mod.Accessible BondedPeersForUDP IO where
+  access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
     fmap (BondedPeersForUDP . map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => Mod.Accessible UnbondedPeersForUDP m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} Mod.Accessible UnbondedPeersForUDP IO where
+  access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
     fmap (UnbondedPeersForUDP . map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => A.Selectable Point ClosestPeers m where
-  select _ point = liftIO $ withGlobalSQLPool $ \sqldb ->
+instance {-# OVERLAPPING #-} A.Selectable Point ClosestPeers IO where
+  select _ point = withGlobalSQLPool $ \sqldb ->
     fmap (Just . ClosestPeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerPubkey SQL.!=. Nothing, PPeerPubkey SQL.!=. Just point] []

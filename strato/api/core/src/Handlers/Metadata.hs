@@ -33,7 +33,6 @@ import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
 import Control.Lens
 import Control.Monad.Change.Modify
-import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
@@ -68,7 +67,7 @@ type API = "metadata" :> Get '[JSON] MetadataResponse
 getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
-server :: (HasVault m, MonadLogger m, HasSQL m, Accessible UrlMap m) => ServerT API m
+server :: (HasVault m, MonadUnliftIO m, MonadLogger m, Accessible UrlMap m) => ServerT API m
 server = getMetaData
 
 instance ToSchema MetadataResponse where
@@ -102,9 +101,9 @@ metadataSchemaOptions =
 
 getMetaData ::
   ( MonadLogger m,
+    MonadUnliftIO m,
     HasVault m,
-    Accessible UrlMap m,
-    HasSQL m
+    Accessible UrlMap m
   ) =>
   m MetadataResponse
 getMetaData =
@@ -129,5 +128,5 @@ blocVaultWrapper client' = do
 getPubKeyAndAddress :: (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
 getPubKeyAndAddress = blocVaultWrapper $ getKey Nothing Nothing
 
-checkIsSynced :: (HasSQL m) => m Bool
+checkIsSynced :: MonadIO m => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

@@ -54,7 +54,6 @@ import Control.Concurrent
 import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Lazy
 import Data.ByteString (ByteString)
@@ -75,6 +74,7 @@ import qualified Data.Text as Text
 import Data.Text.Encoding (encodeUtf8)
 import Data.Traversable
 import Handlers.AccountInfo
+import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
@@ -107,11 +107,14 @@ emptyBatchState = BatchState Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadUnliftIO m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
@@ -130,11 +133,14 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   Keccak256 ->
   Bool ->
@@ -144,11 +150,14 @@ getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResu
         unsafeHead (x:_) = pure x
 
 getBatchBlocTransactionResult' ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
@@ -159,11 +168,14 @@ getBatchBlocTransactionResult' hashes resolve =
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   Maybe Text ->
   Bool ->
@@ -172,13 +184,16 @@ postBlocTransactionResults ::
 postBlocTransactionResults _ resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
-  (MonadLogger m, HasSQL m) =>
+  ( MonadIO m
+  , MonadLogger m
+  , A.Selectable Keccak256 [TransactionResult] m
+  , A.Selectable TxsFilterParams [RawTransaction] m
+  ) =>
   Bool ->
   [Keccak256] ->
   m [TRD]
-recurseTRDs resolve hashes = go 0 (toPending hashes)
+recurseTRDs resolve hashes = go (0 :: Integer) (toPending hashes)
   where
-    go :: (MonadLogger m, HasSQL m) => Int -> [TRD] -> m [TRD]
     go num list = do
       let his = map (trdHash &&& trdIndex) list
       statusAndMtxrs <- zip his <$> getBatchBlocTxStatus (map fst his)
@@ -237,11 +252,12 @@ rawTx2PostTx RawTransaction {..} =
     }
 
 evalAndReturn ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    MonadLogger m
   ) =>
   [TRD] ->
   m [BlocTransactionResult]
@@ -264,7 +280,9 @@ nth n
   | otherwise = Text.pack (show $ n + 1) <> "th"
 
 contractResult ::
-  HasSQL m =>
+  ( MonadIO m
+  , A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
   Integer ->
   Keccak256 ->
   TransactionResult ->
@@ -287,10 +305,9 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
       -- Checks if account exists in the address state ref table before returning results
-      details <- lift $ go acct name 0
+      details <- lift $ go acct name (0 :: Integer)
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
   where
-    go :: HasSQL m => Address -> Text -> Integer -> m UploadContractDetails
     go address name num = do
       if num >= 100 
         then throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, num=" ++ show num
@@ -309,11 +326,11 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
 
 
 functionResult ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    MonadLogger m,
-    HasSQL m
+    MonadLogger m
   ) =>
   Integer ->
   Keccak256 ->

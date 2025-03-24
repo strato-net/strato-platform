@@ -270,7 +270,7 @@ instance (Address `A.Alters` AddressState) MemContextM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance A.Selectable Address AddressState MemContextM where
+instance {-# OVERLAPPING #-} A.Selectable Address AddressState MemContextM where
   select _ = getAddressStateMaybe
 
 instance (Maybe Word256 `A.Alters` MP.StateRoot) MemContextM where
