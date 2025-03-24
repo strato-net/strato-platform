@@ -37,13 +37,15 @@
       "address": "addressA",
       "name": "tokenA",
       "markUp": 1.05,
-      "type": "ERC20"
+      "type": "ERC20",
+      "decimals": 8
     },
     {
       "address": "addressB",
       "name": "tokenB",
       "markUp": 1.05,
-      "type": "ERC20"
+      "type": "ERC20",
+      "decimals": 16
     }
   ]
 }

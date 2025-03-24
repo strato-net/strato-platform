@@ -38,7 +38,6 @@ let saleUpdateTime = 13; // Default: 13:00 UTC
 let saleUpdateTime2 = 19;
 let assets = [];
 let oracleUpdateTime = 24 * 60 * 60 * 1000; // 1 day in ms
-let metalPriceOnUpdate;
 
 if (!rawOracleUpdateTime) {
   await flagFile.appendToErrorFile(
@@ -362,16 +361,13 @@ async function fetchAndSubmitERC20TokenPrice(
       }
     );
 
-    metalPriceOnUpdate={
-      price: prices,
-      timestamp
-    }
-
     console.log(
       `TWAP submitted: $${twap.toFixed(2)} at ${new Date(
         currentTimeMs
       ).toISOString()}`
     );
+
+    return {price: twap / Math.pow(10, decimals), timestamp: currentTimestamp}
   } catch (error) {
     console.error("ETH TWAP calculation and submission failed:", error);
     await flagFile.appendToErrorFile(
@@ -464,6 +460,7 @@ const updateSalePricePeriodically = async () => {
     process.env.METALS_USERNAME,
     process.env.METALS_PASSWORD
   );
+  let metalResult;
   for (const asset of assets) {
     try {
       const searchOptions = {
@@ -486,17 +483,17 @@ const updateSalePricePeriodically = async () => {
       }
 
       if (asset.type === 'metal') {
-        metalPriceOnUpdate = await fetchLBMAMetalPrice(
+        metalResult = await fetchLBMAMetalPrice(
           asset.name.toLowerCase().replace(/st$/, ""),
           process.env.METALS_API_KEY
         );
       }
 
       else if (asset.type === 'ERC20') {
-        await fetchAndSubmitERC20TokenPrice(
-          oracle.name,
-          oracle.address,
-          oracle.decimals,
+        metalResult = await fetchAndSubmitERC20TokenPrice(
+          asset.name,
+          asset.address,
+          asset.decimals,
           process.env.ALCHEMY_API_KEY,
           token
         );
@@ -509,7 +506,7 @@ const updateSalePricePeriodically = async () => {
         asset.markUp,
         token,
         assetResult[0]?.sale,
-        metalPriceOnUpdate.price,
+        metalResult.price,
         decimals
       );
       console.log(
