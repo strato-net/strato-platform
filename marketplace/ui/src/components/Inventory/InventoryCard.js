@@ -756,7 +756,7 @@ const InventoryCard = ({
             balance: quantity.toString(),
             decimals,
           }}
-          pageDetails={{ limit, offset, categoryName: category }}
+          pageDetails={{ limit, offset, categoryName: category, reserves }}
           tokenName={inventory.name}
           tabKey={'2'}
         />
