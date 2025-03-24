@@ -91,7 +91,7 @@ async function updateMetalPrice(
   const priceBig = priceWithMarkup
     .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
     .shiftedBy(-decimals)
-    .toString();
+    .toFixed();
 
   const callArgs = {
     contract: {
@@ -359,7 +359,7 @@ async function fetchAndSubmitERC20TokenPrice(
     const priceBig = new BigNumber(twap)
       .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
       .shiftedBy(-decimals)
-      .toString();
+      .toFixed();
 
     await submitPrice(
       token,
@@ -439,7 +439,7 @@ const submitOraclePricePeriodically = async () => {
           const priceBig = new BigNumber(metalResult.price)
             .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
             .shiftedBy(-oracle.decimals)
-            .toString();
+            .toFixed();
           await submitPrice(token, oracle, {
             price: priceBig,
             timestamp: metalResult.timestampInSeconds,
@@ -454,7 +454,7 @@ const submitOraclePricePeriodically = async () => {
         const priceBig = new BigNumber(oracle.price)
           .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
           .shiftedBy(-oracle.decimals)
-          .toString();
+          .toFixed();
         await submitPrice(token, oracle, {
           price: priceBig,
           timestamp: Math.floor(Date.now() / 1000),
