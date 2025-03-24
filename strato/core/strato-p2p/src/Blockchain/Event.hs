@@ -242,6 +242,9 @@ handleEvents peer = awaitForever $ \case
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             lift $ setSyncTaskFinished (pPeerHost peer)
+
+            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+
             syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
             return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
@@ -393,6 +396,7 @@ handleEvents peer = awaitForever $ \case
       case maybeSyncTask of
         Just _ -> return () -- Already have a task, do nothing
         Nothing -> do
+          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
           maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
           $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
           case maybeNewSyncTask of

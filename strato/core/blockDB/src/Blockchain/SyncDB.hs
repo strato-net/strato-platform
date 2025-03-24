@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE QuasiQuotes          #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -275,12 +276,22 @@ putSyncStatus :: RedisCtx m f => Bool -> m (f REDIS.Status)
 putSyncStatus status = REDIS.set syncStatusKey $ toValue status
 
 class HasSyncDB m where
+  clearAllSyncTasks :: Host -> m ()
   getCurrentSyncTask :: Host -> m (Maybe SyncTask)
   getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
   setSyncTaskFinished :: Host -> m ()
   setSyncTaskNotReady :: Host -> m ()
 
 instance HasSQL m => HasSyncDB m where
+  clearAllSyncTasks host = sqlQuery $ do
+    rawExecute
+        [r|
+            UPDATE "sync_task"
+            SET "host" = ''
+            WHERE "host" = ?
+        |]
+        [toPersistValue host]
+
   getCurrentSyncTask host = sqlQuery $ do
     vals <-
         select $ from $ \syncTask -> do

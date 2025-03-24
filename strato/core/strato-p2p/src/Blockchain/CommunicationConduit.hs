@@ -81,6 +81,9 @@ handleMsgClientConduit ::
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgClientConduit myId peer = do
   $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
+
+  lift $ clearAllSyncTasks $ pPeerHost peer
+
   yield $
     Right
       Hello
@@ -118,6 +121,7 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
+      $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show highestBlockNum''
       maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) highestBlockNum''
 
       case maybeSyncTask of
@@ -143,6 +147,8 @@ handleMsgServerConduit ::
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
+
+  lift $ clearAllSyncTasks $ pPeerHost peer
 
   numActivePeers <- liftIO $ fmap length getPeersByThreads
 
@@ -172,7 +178,10 @@ handleMsgServerConduit myPubkey peer = do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
               let highestBlockNum' = if ver < 63 then theirHighestBlockNum - 8192 else theirHighestBlockNum
-              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+              when (peerGH /= genHash) $ throwIO WrongGenesisBlock
+              when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
+
+              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
               return $
                 Right
                   Status
@@ -183,6 +192,7 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
+      $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show theirHighestBlockNum
       maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) theirHighestBlockNum
       case maybeSyncTask of
         Nothing ->
