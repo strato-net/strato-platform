@@ -22,6 +22,7 @@ executables:
       - bytestring
       - hflags
       - strato-lite
+      - strato-model
       - strato-p2p
       - vm-tools
 
@@ -33,6 +34,8 @@ library:
   ghc-options: -Wall -O2 
   dependencies:
   - aeson
+  - bloc2api
+  - core-api2
   - containers
   - crypto-pubkey-types
   - extra
@@ -43,10 +46,10 @@ library:
   - unliftio
   - warp
   - base16-bytestring
+  - blockDB
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
-  - blockapps-privacy
   - blockstanbul
   - bytestring
   - common-log

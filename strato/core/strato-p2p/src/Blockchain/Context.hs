@@ -17,15 +17,18 @@ module Blockchain.Context
     , Outbound(..)
     , Context(..)
     , Config(..)
+    , P2pConduits(..)
     , peerSource
     , peerSink
     , seqSource
     , RunsClient(..)
     , RunsServer(..)
     , ActionTimestamp(..)
+    , emptyActionTimestamp
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
+    , RemainingBlockHeaders(..)
     , initConfig
     , initContext
     , runContextM
@@ -54,7 +57,6 @@ import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.Composable.Kafka
-import           Control.Monad.Composable.SQL
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                         as B
@@ -441,7 +443,7 @@ type MonadP2P m =
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
-    HasSQL m,
+    HasSyncDB m,
     m `Mod.Outputs` [IngestEvent],
     All
       '[Mod.Accessible, Mod.Modifiable]

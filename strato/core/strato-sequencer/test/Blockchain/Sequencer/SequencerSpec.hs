@@ -132,7 +132,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     pkg <- atomically newCablePackage
     tch <- atomically newTMChan
     let
-        cfg  = SequencerConfig { depBlockDBCacheSize   = 0
+        cfg  = SequencerConfig { dependentBlockDB = error "Dependent block DB uninitialized"
+                               , depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False

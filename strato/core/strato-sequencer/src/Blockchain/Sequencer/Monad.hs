@@ -15,6 +15,7 @@
 
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul,
+    Modification(..),
     SequencerContext (..),
     SequencerConfig (..),
     SequencerM,
@@ -25,6 +26,9 @@ module Blockchain.Sequencer.Monad
     createFirstTimer,
     createNewTimer,
     fuseChannels,
+    seenTransactionDB,
+    blockstanbulContext,
+    latestRoundNumber
   )
 where
 
@@ -79,8 +83,7 @@ import Prelude hiding (round)
 data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
-  { _dependentBlockDB :: DependentBlockDB,
-    _seenTransactionDB :: !SeenTransactionDB,
+  { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: Maybe BlockstanbulContext,
     _latestRoundNumber :: IORef RoundNumber
   }
@@ -105,7 +108,8 @@ newtype BlockPeriod = BlockPeriod {unBlockPeriod :: NominalDiffTime}
 newtype RoundPeriod = RoundPeriod {unRoundPeriod :: NominalDiffTime}
 
 data SequencerConfig = SequencerConfig
-  { depBlockDBCacheSize :: Int,
+  { dependentBlockDB :: DependentBlockDB,
+    depBlockDBCacheSize :: Int,
     depBlockDBPath :: String,
     seenTransactionDBSize :: Int,
     blockstanbulBlockPeriod :: BlockPeriod,
@@ -121,11 +125,11 @@ data SequencerConfig = SequencerConfig
 
 type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => HasDependentBlockDB m where
-  getDependentBlockDB = use dependentBlockDB
+instance HasDependentBlockDB SequencerM where
+  getDependentBlockDB = lift $ asks dependentBlockDB
 
-instance MonadState SequencerContext m => Mod.Accessible LDB.DB m where
-  access _ = use dependentBlockDB
+instance Mod.Accessible LDB.DB SequencerM where
+  access _ = lift $ asks dependentBlockDB
 
 class HasNamespace a where
   type NSKey a
@@ -257,17 +261,15 @@ waitOnVault action = do
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) . flip runReaderT c $ do
-    dbCS <- asks depBlockDBCacheSize
-    dbPath <- asks depBlockDBPath
-    stxSize <- asks seenTransactionDBSize
+  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+    let dbCS = depBlockDBCacheSize c
+        dbPath = depBlockDBPath c
+        stxSize = seenTransactionDBSize c
     depBlock <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestRound <- liftIO $ newIORef 0
-    runStateT
-      m
+    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
-        { _dependentBlockDB = depBlock,
-          _seenTransactionDB = mkSeenTxDB stxSize,
+        { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = mbc,
           _latestRoundNumber = latestRound
         }

@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import Blockchain.Options ()
+import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BC

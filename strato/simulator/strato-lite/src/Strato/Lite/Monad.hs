@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
@@ -31,15 +32,14 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB (setStateDBStateRoot)
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction as U
-import Blockchain.Data.ArbitraryInstances ()
-import Blockchain.Data.Block hiding (bestBlockNumber)
+import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB ()
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import qualified Blockchain.Data.DataDefs as DataDefs
-import Blockchain.Data.Enode
 import Blockchain.Data.GenesisInfo
+import Blockchain.Model.SyncTask
 import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
@@ -49,11 +49,11 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified "vm-runner" Blockchain.Event as VMEvent
 import Blockchain.Generation
 import Blockchain.MemVMContext hiding (contextGet, contextGets, contextModify, contextModify', contextPut, dbsGet, dbsGets, dbsModify, dbsModify', dbsPut, get, getMemContext, gets, modify, modify', put)
-import Blockchain.Privacy
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
+import Blockchain.Options
 import qualified Blockchain.Sequencer as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
-import Blockchain.Sequencer.DB.GetChainsDB
-import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
@@ -64,18 +64,19 @@ import Blockchain.Strato.Indexer.ApiIndexer
 import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P (..))
 import Blockchain.Strato.Indexer.Model
 import Blockchain.Strato.Indexer.P2PIndexer
-import Blockchain.Strato.Indexer.TxrIndexer
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
+import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.Model.Wei
+import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
@@ -101,19 +102,19 @@ import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
 import Data.Either.Extra (eitherToMaybe)
-import Data.Foldable (for_, toList, traverse_)
+import Data.Foldable (foldl', for_, toList, traverse_)
+import Data.Function (on)
+import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust)
+import Data.Maybe (fromJust, fromMaybe, isJust)
 import qualified Data.NibbleString as N
-import Data.Ranged
-import qualified Data.Sequence as Q
 import qualified Data.Set as Set
 import qualified Data.Set.Ordered as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
-import Data.Time.Clock (UTCTime (..), diffUTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime (..), addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Traversable (for)
 import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
@@ -127,7 +128,7 @@ import UnliftIO
 import Prelude hiding (round)
 
 loggingFunc :: LoggingT m a -> m a
-loggingFunc = runNoLoggingT
+loggingFunc = runLoggingT
 
 data VSocket = VSocket
   { _inbound :: TQueue B.ByteString,
@@ -140,8 +141,8 @@ newVSocket :: IO VSocket
 newVSocket = liftA2 VSocket newTQueueIO newTQueueIO
 
 data Internet = Internet
-  { _tcpPorts :: Map (IPAsText, TCPPort) (TQueue (VSocket, IPAsText)),
-    _udpPorts :: Map (IPAsText, UDPPort) (TQueue (B.ByteString, SockAddr))
+  { _tcpPorts :: Map (Host, TCPPort) (TQueue (VSocket, Host)),
+    _udpPorts :: Map (Host, UDPPort) (TQueue (B.ByteString, SockAddr))
   }
 
 makeLenses ''Internet
@@ -155,7 +156,7 @@ data P2PContext = P2PContext
     _actionTimestamp :: ActionTimestamp,
     _peerAddr :: PeerAddress,
     _outboundPbftMessages :: S.OSet (Text, Keccak256),
-    _unseqSink :: TQueue [SeqLoopEvent]
+    _unseqSink :: TQueue SeqLoopEvent
   }
 
 makeLenses ''P2PContext
@@ -172,36 +173,27 @@ instance Default P2PContext where
 
 data TestContext = TestContext
   { _blocks :: [Block],
-    _connectionTimeout :: ConnectionTimeout,
-    _maxReturnedHeaders :: MaxReturnedHeaders,
     _prvKey :: PrivateKey,
     _shaBlockDataMap :: Map Keccak256 BlockHeader,
     _p2pWorldBestBlock :: WorldBestBlock,
     _bestBlock :: BestBlock,
+    _bestSequencedBlock :: BestSequencedBlock,
     _canonicalBlockDataMap :: Map Integer (Canonical BlockHeader),
-    _ipAddressIpChainsMap :: Map IPAddress IPChains,
-    _orgIdChainsMap :: Map OrgId OrgIdChains,
-    _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock,
-    _chainMembersMap :: Map Word256 ChainMemberRSet,
-    _chainInfoMap :: Map Word256 ChainInfo,
-    _trueOrgNameChainsMap :: Map ChainMemberParsedSet TrueOrgNameChains,
-    _falseOrgNameChainsMap :: Map ChainMemberParsedSet FalseOrgNameChains,
-    _p2pValidators :: Set.Set ChainMemberParsedSet,
+    _p2pValidators :: Set.Set Validator,
+    _blockHashRegistry :: Map Keccak256 OutputBlock,
     _x509certMap :: Map Address X509CertInfoState,
-    _privateTxMap :: Map Keccak256 (Private (Word256, OutputTx)),
     _genesisBlockHash :: GenesisBlockHash,
-    _bestBlockNumber :: BestBlockNumber,
     _pointPPeerMap :: Map Point PPeer,
     _pbftMessages :: S.OSet Keccak256,
     _unseqEvents :: [IngestEvent],
     _sequencerContext :: SequencerContext,
+    _dbeRegistry :: Map Keccak256 DBDB.DependentBlockEntry,
     _blockPeriod :: BlockPeriod,
     _roundPeriod :: RoundPeriod,
     _timeoutChan :: TMChan RoundNumber,
     _vmContext :: MemContext,
     _apiChainInfoMap :: Map Word256 ChainInfo,
-    _parsedSetMap :: Map ChainMemberParsedSet [ChainMemberParsedSet],
-    _parsedSetToX509Map :: Map ChainMemberParsedSet X509CertInfoState
+    _syncTasks :: [SyncTask]
   }
 
 makeLenses ''TestContext
@@ -231,12 +223,28 @@ instance MonadIO m => Mod.Accessible PublicKey (MonadTest m) where
 instance (Monad m, Mod.Accessible PublicKey m) => Mod.Accessible PublicKey (MonadP2PTest m) where
   access = lift . Mod.access
 
-instance MonadIO m => Stacks Block (MonadTest m) where
-  takeStack _ n = take n <$> use blocks
-  pushStack bs = do
-    let maxNum = maximum $ number . blockBlockData <$> bs
-    bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
-    blocks %= (bs ++)
+-- instance MonadIO m => Stacks Block (MonadTest m) where
+--   takeStack _ n = take n <$> use blocks
+--   pushStack bs = do
+--     let maxNum = maximum $ number . blockBlockData <$> bs
+--     bestBlock %= (\(BestBlock h n) -> BestBlock h $ max maxNum n)
+--     blocks %= (bs ++)
+
+instance Monad m => (Keccak256 `A.Alters` A.Proxy (Inbound WireMessage)) (MonadP2PTest m) where
+  lookup _ _ = pure Nothing
+  insert _ _ _ = pure ()
+  delete _ _ = pure ()
+
+instance Monad m => ((Host, Keccak256) `A.Alters` A.Proxy (Outbound WireMessage)) (MonadP2PTest m) where
+  lookup _ _ = pure Nothing
+  insert _ _ _ = pure ()
+  delete _ _ = pure ()
+
+instance MonadIO m => Mod.Accessible [Validator] (MonadTest m) where
+  access _ = bestSequencedBlockValidators <$> use bestSequencedBlock
+
+instance (Monad m, Mod.Accessible [Validator] m) => Mod.Accessible [Validator] (MonadP2PTest m) where
+  access p = lift $ Mod.access p
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (MonadTest m) where
   lookup _ k = M.lookup k <$> use shaBlockDataMap
@@ -251,43 +259,15 @@ instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
   get _ = use bestBlock
   put _ = assign bestBlock
 
+instance MonadIO m => Mod.Modifiable BestSequencedBlock (MonadTest m) where
+  get _ = use bestSequencedBlock
+  put _ = assign bestSequencedBlock
+
 instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (MonadTest m) where
   select _ i = M.lookup i <$> use canonicalBlockDataMap
 
-instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use ipAddressIpChainsMap
-
-instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use orgIdChainsMap
-
-instance (MonadIO m, MonadLogger m) => A.Selectable ChainMemberParsedSet TrueOrgNameChains (MonadTest m) where
-  select _ ip = use $ trueOrgNameChainsMap . at ip
-  selectWithDefault p ip = fromMaybe (TrueOrgNameChains Set.empty) <$> A.select p ip
-
-instance MonadIO m => A.Selectable ChainMemberParsedSet FalseOrgNameChains (MonadTest m) where
-  select _ ip = use $ falseOrgNameChainsMap . at ip
-  selectWithDefault p ip = fromMaybe (FalseOrgNameChains Set.empty) <$> A.select p ip
-
-instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
-  select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
-
-instance MonadIO m => A.Selectable Word256 ChainMemberRSet (MonadTest m) where
-  select _ cid = M.lookup cid <$> use chainMembersMap
-
-instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
-  select _ cid = M.lookup cid <$> use chainInfoMap
-
-instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (MonadTest m) where
-  select _ tx = M.lookup tx <$> use privateTxMap
-
 instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
   access _ = use genesisBlockHash
-
-instance MonadIO m => Mod.Accessible BestBlockNumber (MonadTest m) where
-  access _ = use bestBlockNumber
-
-instance Show TrueOrgNameChains where
-  show (TrueOrgNameChains unchain) = show unchain
 
 instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadP2PTest m) where
   get _ = use actionTimestamp
@@ -296,13 +276,12 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadP2PTest m) where
 instance MonadIO m => Mod.Accessible ActionTimestamp (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @ActionTimestamp)
 
-instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable [BlockHeader] (MonadP2PTest m) where
+instance MonadIO m => Mod.Modifiable [BlockHeader] (MonadP2PTest m) where
   get _ = do
     (bHeaders, lastUpdateTS) <- use blockHeaders
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Mod.Proxy @ConnectionTimeout)
-    if diffTime > maxTime
+    if diffTime > fromInteger (fromIntegral flags_connectionTimeout)
       then do
         -- stale cache; override it
         Mod.put (Mod.Proxy @[BlockHeader]) []
@@ -312,16 +291,15 @@ instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable [Bloc
     now <- liftIO getCurrentTime
     assign blockHeaders (k, now)
 
-instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible [BlockHeader] (MonadP2PTest m) where
+instance MonadIO m => Mod.Accessible [BlockHeader] (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @[BlockHeader])
 
-instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) where
+instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) where
   get _ = do
     (remBHeaders, lastUpdateTS) <- use remainingBlockHeaders
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Mod.Proxy @ConnectionTimeout)
-    if diffTime > maxTime
+    if diffTime > fromInteger (fromIntegral flags_connectionTimeout)
       then do
         -- stale cache; override it
         let emptyRBH = RemainingBlockHeaders []
@@ -332,14 +310,8 @@ instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable Remai
     now <- liftIO getCurrentTime
     assign remainingBlockHeaders (k, now)
 
-instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible RemainingBlockHeaders (MonadP2PTest m) where
+instance MonadIO m => Mod.Accessible RemainingBlockHeaders (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
-
-instance MonadIO m => Mod.Accessible MaxReturnedHeaders (MonadTest m) where
-  access _ = use maxReturnedHeaders
-
-instance (Monad m, Mod.Accessible MaxReturnedHeaders m) => Mod.Accessible MaxReturnedHeaders (MonadP2PTest m) where
-  access p = lift $ Mod.access p
 
 instance MonadIO m => Mod.Modifiable PeerAddress (MonadP2PTest m) where
   get _ = use peerAddr
@@ -348,13 +320,10 @@ instance MonadIO m => Mod.Modifiable PeerAddress (MonadP2PTest m) where
 instance MonadIO m => Mod.Accessible PeerAddress (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @PeerAddress)
 
-instance MonadIO m => Mod.Accessible ConnectionTimeout (MonadTest m) where
-  access _ = use connectionTimeout
-
-instance HasMemPeerDB m => A.Selectable String PPeer (MonadTest m) where
+instance HasMemPeerDB m => A.Selectable Host PPeer (MonadTest m) where
   select = A.lookup
 
-instance (HasMemPeerDB m, State.MonadState TestContext m) => (String `A.Alters` PPeer) m where
+instance (HasMemPeerDB m, State.MonadState TestContext m) => (Host `A.Alters` PPeer) m where
   lookup _ ip = do
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ M.lookup ip peerMap
@@ -390,10 +359,6 @@ instance (MonadIO m, (Point `A.Alters` PPeer) m) => (Point `A.Alters` PPeer) (Mo
 instance (MonadIO m, (Point `A.Alters` PPeer) m) => A.Selectable Point PPeer (MonadP2PTest m) where
   select = A.lookup
 
-instance (Monad m, Stacks Block m) => Stacks Block (MonadP2PTest m) where
-  takeStack a b = lift $ takeStack a b
-  pushStack bs = lift $ pushStack bs
-
 instance (Keccak256 `A.Alters` BlockHeader) m => (Keccak256 `A.Alters` BlockHeader) (MonadP2PTest m) where
   lookup p k = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
@@ -407,140 +372,44 @@ instance Mod.Modifiable BestBlock m => Mod.Modifiable BestBlock (MonadP2PTest m)
   get p = lift $ Mod.get p
   put p k = lift $ Mod.put p k
 
+instance Mod.Modifiable BestSequencedBlock m => Mod.Modifiable BestSequencedBlock (MonadP2PTest m) where
+  get p = lift $ Mod.get p
+  put p k = lift $ Mod.put p k
+
 instance A.Selectable Integer (Canonical BlockHeader) m => A.Selectable Integer (Canonical BlockHeader) (MonadP2PTest m) where
   select p i = lift $ A.select p i
 
-instance A.Selectable IPAddress IPChains m => A.Selectable IPAddress IPChains (MonadP2PTest m) where
-  select p ip = lift $ A.select p ip
-
-instance A.Selectable OrgId OrgIdChains m => A.Selectable OrgId OrgIdChains (MonadP2PTest m) where
-  select p ip = lift $ A.select p ip
-
-instance A.Selectable Keccak256 ChainTxsInBlock m => A.Selectable Keccak256 ChainTxsInBlock (MonadP2PTest m) where
-  select p sha = lift $ A.select p sha
-
-instance A.Selectable Word256 ChainMemberRSet m => A.Selectable Word256 ChainMemberRSet (MonadP2PTest m) where
-  select p cid = lift $ A.select p cid
-
-instance A.Selectable Word256 ChainInfo m => A.Selectable Word256 ChainInfo (MonadP2PTest m) where
-  select p cid = lift $ A.select p cid
-
-instance A.Selectable Keccak256 (Private (Word256, OutputTx)) m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (MonadP2PTest m) where
-  select p tx = lift $ A.select p tx
-
 instance (Monad m, Mod.Accessible GenesisBlockHash m) => Mod.Accessible GenesisBlockHash (MonadP2PTest m) where
-  access p = lift $ Mod.access p
-
-instance (Monad m, Mod.Accessible BestBlockNumber m) => Mod.Accessible BestBlockNumber (MonadP2PTest m) where
-  access p = lift $ Mod.access p
-
-instance (Monad m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible ConnectionTimeout (MonadP2PTest m) where
   access p = lift $ Mod.access p
 
 instance A.Selectable String PPeer m => A.Selectable String PPeer (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
 
-instance A.Selectable ChainMemberParsedSet TrueOrgNameChains m => A.Selectable ChainMemberParsedSet TrueOrgNameChains (MonadP2PTest m) where
-  select p org = lift $ A.select p org
-
-instance A.Selectable ChainMemberParsedSet FalseOrgNameChains m => A.Selectable ChainMemberParsedSet FalseOrgNameChains (MonadP2PTest m) where
-  select p org = lift $ A.select p org
-
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
   select p addr = lift $ A.select p addr
 
-instance MonadIO m => Mod.Modifiable GetChainsDB (MonadTest m) where
-  get _ = use $ sequencerContext . getChainsDB
-  put _ = assign $ sequencerContext . getChainsDB
-
-instance MonadIO m => Mod.Modifiable GetTransactionsDB (MonadTest m) where
-  get _ = use $ sequencerContext . getTransactionsDB
-  put _ = assign $ sequencerContext . getTransactionsDB
-
-instance MonadIO m => HasPrivateHashDB (MonadTest m) where
-  requestChain = insertGetChainsDB
-  requestTransaction = insertGetTransactionsDB
-
-genericTestLookup ::
-  (State.MonadState s m, Ord k) =>
-  Lens' s (Map k (Modification a)) ->
-  Mod.Proxy a ->
-  k ->
-  m (Maybe a)
-genericTestLookup registry _ k =
-  use (registry . at k) >>= \case
-    Just (Modification a) -> pure $ Just a
-    _ -> pure Nothing
-
-genericTestInsert ::
-  (State.MonadState s m, Ord k) =>
-  Lens' s (Map k (Modification a)) ->
-  Mod.Proxy a ->
-  k ->
-  a ->
-  m ()
-genericTestInsert registry _ k a = registry . at k ?= Modification a
-
-genericTestDelete ::
-  (State.MonadState s m, Ord k) =>
-  Lens' s (Map k (Modification a)) ->
-  Mod.Proxy a ->
-  k ->
-  m ()
-genericTestDelete registry _ k = registry . at k ?= Deletion
-
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . blockHashRegistry
-  insert = genericTestInsert $ sequencerContext . blockHashRegistry
-  delete = genericTestDelete $ sequencerContext . blockHashRegistry
+  lookup _ k = use $ blockHashRegistry . at k
+  insert _ k v = blockHashRegistry . at k ?= v
+  delete _ k = blockHashRegistry . at k .= Nothing
 
 instance (Keccak256 `A.Alters` OutputBlock) m => (Keccak256 `A.Alters` OutputBlock) (MonadP2PTest m) where
   lookup p k = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k = lift $ A.delete p k
 
-instance MonadIO m => (Keccak256 `A.Alters` EmittedBlock) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . emittedBlockRegistry
-  insert = genericTestInsert $ sequencerContext . emittedBlockRegistry
-  delete = genericTestDelete $ sequencerContext . emittedBlockRegistry
-
-instance MonadIO m => (Keccak256 `A.Alters` OutputTx) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . txHashRegistry
-  insert = genericTestInsert $ sequencerContext . txHashRegistry
-  delete = genericTestDelete $ sequencerContext . txHashRegistry
-
-instance MonadIO m => (Keccak256 `A.Alters` ChainHashEntry) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . chainHashRegistry
-  insert = genericTestInsert $ sequencerContext . chainHashRegistry
-  delete = genericTestDelete $ sequencerContext . chainHashRegistry
-
-instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . chainIdRegistry
-  insert = genericTestInsert $ sequencerContext . chainIdRegistry
-  delete = genericTestDelete $ sequencerContext . chainIdRegistry
-
 instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
-  lookup p k =
-    genericTestLookup (sequencerContext . x509certInfoState) p k >>= \case
-      Just x -> pure $ Just x
-      Nothing -> use $ x509certMap . at k
-  insert p k v = do
-    genericTestInsert (sequencerContext . x509certInfoState) p k v
-    x509certMap . at k ?= v
-  delete p k = do
-    genericTestDelete (sequencerContext . x509certInfoState) p k
-    x509certMap . at k .= Nothing
+  lookup _ k = use $ x509certMap . at k
+  insert _ k v = x509certMap . at k ?= v
+  delete _ k = x509certMap . at k .= Nothing
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select = A.lookup
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
-  lookup _ k = use $ sequencerContext . dbeRegistry . at k
-  insert _ k v = sequencerContext . dbeRegistry . at k ?= v
-  delete _ k = sequencerContext . dbeRegistry . at k .= Nothing
-
-instance MonadIO m => A.Selectable Word256 ParentChainIds (MonadTest m) where
-  select _ cId = join . fmap (fmap (ParentChainIds . parentChains . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+  lookup _ k = use $ dbeRegistry . at k
+  insert _ k v = dbeRegistry . at k ?= v
+  delete _ k = dbeRegistry . at k .= Nothing
 
 instance MonadIO m => Mod.Modifiable SeenTransactionDB (MonadTest m) where
   get _ = use $ sequencerContext . seenTransactionDB
@@ -719,12 +588,12 @@ instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
   insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
   delete _ sr = dbsModify' $ stateDB . at sr .~ Nothing
 
-instance (MonadIO m, MonadLogger m) => (Account `A.Alters` AddressState) (MonadTest m) where
+instance (MonadIO m, MonadLogger m) => (Address `A.Alters` AddressState) (MonadTest m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadIO m, MonadLogger m) => A.Selectable Account AddressState (MonadTest m) where
+instance (MonadIO m, MonadLogger m) => A.Selectable Address AddressState (MonadTest m) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
@@ -757,14 +626,14 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
 
 instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
   select _ k = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
 
 instance (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
   select _ (k, t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
@@ -812,51 +681,20 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputTx) (MonadTest m) where
   delete _ _ = pure ()
   insert _ _ _ = pure ()
 
-instance MonadIO m => (Word256 `A.Alters` API ChainInfo) (MonadTest m) where
-  lookup _ k = fmap API <$> use (apiChainInfoMap . at k)
-  delete _ k = apiChainInfoMap . at k .= Nothing
-  insert _ k (API v) = apiChainInfoMap . at k ?= v
-
 instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest m) where
   lookup _ _ = pure Nothing
   delete _ _ = pure ()
   insert _ _ _ = pure ()
 
-instance MonadIO m => (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alters` API (A.Proxy DataDefs.ValidatorRef)) (MonadTest m) where
-  lookup _ _ = pure Nothing
-  delete _ _ = pure ()
-  insert _ _ _ = pure ()
-
-instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (MonadTest m) where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
-  insert _ k (P2P v) = privateTxMap . at k ?= v
-
 instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ k (P2P v@OutputBlock {..}) = do
+  insert _ _ (P2P OutputBlock {..}) = do
     canonicalBlockDataMap . at (number obBlockData) ?= Canonical obBlockData
-    genericTestInsert (sequencerContext . blockHashRegistry) (A.Proxy @OutputBlock) k v
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
   put _ (P2P bb) = bestBlock .= bb
-
-instance MonadIO m => (Word256 `A.Alters` P2P ChainInfo) (MonadTest m) where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainInfo"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Word256" "ChainInfo"
-  insert _ cId (P2P cInfo) = chainInfoMap . at cId ?= cInfo
-
-instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
-  insert _ cId (P2P mems) = chainMembersMap . at cId ?= chainMembersToChainMemberRset mems
-
-instance MonadIO m => (ChainMemberParsedSet `A.Alters` P2P (A.Proxy ChainMemberParsedSet)) (MonadTest m) where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
-  delete _ _ = pure ()
-  insert _ _ _ = pure ()
 
 instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
   output ies = unseqEvents %= (++ ies)
@@ -864,22 +702,17 @@ instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
 instance (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
   output ies = do
     uSink <- use unseqSink
-    atomically . writeTQueue uSink $ UnseqEvent <$> ies
+    atomically . writeTQueue uSink $ UnseqEvents ies
     lift $ Mod.output ies
 
-instance (MonadIO m, (String `A.Alters` PPeer) m, AccessibleEnv MemPeerDBEnv m, State.MonadState TestContext m) => A.Selectable IPAsText PPeer (MonadP2PTest m) where
-  select = A.lookup
+instance A.Selectable Host PPeer m => A.Selectable Host PPeer (MonadP2PTest m) where
+  select p = lift . A.select p
 
-instance (HasMemPeerDB m, State.MonadState TestContext m) => A.Replaceable IPAsText PPeer (MonadP2PTest m) where
-  replace = A.insert
-
-instance (HasMemPeerDB m, State.MonadState TestContext m) => (IPAsText `A.Alters` PPeer) (MonadP2PTest m) where
-  lookup _ (IPAsText ip) = A.lookup (A.Proxy @PPeer) $ T.unpack ip
-  insert _ (IPAsText ip) p = A.insert (A.Proxy @PPeer) (T.unpack ip) p
-  delete _ (IPAsText ip) = A.delete (A.Proxy @PPeer) $ T.unpack ip
+instance (HasMemPeerDB m, State.MonadState TestContext m) => A.Replaceable Host PPeer (MonadP2PTest m) where
+  replace p k = lift . A.insert p k
 
 instance (MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m) => RunsClient (MonadP2PTest m) where
-  runClientConnection ipAsText@(IPAsText ip) tcpPort@(TCPPort p) sSource f = do
+  runClientConnection ipAsText@(Host ip) tcpPort@(TCPPort p) sSource f = do
     inet <- lift $ asks _p2pPeerInternet
     mSock <- M.lookup (ipAsText, tcpPort) . _tcpPorts <$> readTVarIO inet
     case mSock of
@@ -897,7 +730,7 @@ instance (MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m) => RunsClient (M
 instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- lift $ asks _p2pPeerInternet
-    myIP@(IPAsText ip) <- accessEnvVar p2pMyIPAddress
+    myIP@(Host ip) <- accessEnvVar p2pMyIPAddress
     mSock <- liftIO $ M.lookup (myIP, tcpPort) . _tcpPorts <$> readTVarIO inet
     case mSock of
       Nothing -> $logErrorS "runServer" $ "No socket exists for " <> T.pack (show ip) <> ":" <> T.pack (show p)
@@ -913,7 +746,7 @@ instance Monad m => Mod.Accessible TCPPort (MonadP2PTest m) where
 instance Monad m => Mod.Accessible UDPPort (MonadP2PTest m) where
   access _ = pure $ UDPPort 30303
 
-sockAddrToIpAndPort :: SockAddr -> Maybe (IPAsText, UDPPort)
+sockAddrToIpAndPort :: SockAddr -> Maybe (Host, UDPPort)
 sockAddrToIpAndPort (SockAddrInet port host) = case hostAddressToTuple host of
   (a, b, c, d) ->
     let ipStr =
@@ -926,13 +759,13 @@ sockAddrToIpAndPort (SockAddrInet port host) = case hostAddressToTuple host of
               ".",
               show d
             ]
-        ip = IPAsText $ T.pack ipStr
+        ip = Host $ T.pack ipStr
         udpPort = UDPPort $ fromIntegral port
      in Just (ip, udpPort)
 sockAddrToIpAndPort _ = Nothing
 
-ipAndPortToSockAddr :: IPAsText -> UDPPort -> Maybe SockAddr
-ipAndPortToSockAddr (IPAsText ip) (UDPPort port) =
+ipAndPortToSockAddr :: Host -> UDPPort -> Maybe SockAddr
+ipAndPortToSockAddr (Host ip) (UDPPort port) =
   case traverse readMaybe (T.unpack <$> T.splitOn "." ip) of
     Just [(a :: Int), b, c, d] ->
       let addr =
@@ -943,7 +776,7 @@ ipAndPortToSockAddr (IPAsText ip) (UDPPort port) =
        in Just $ SockAddrInet (fromIntegral port) addr
     _ -> Nothing
 
-instance (MonadReader P2PPeer m, HasMemPeerDB m) => A.Selectable (Maybe IPAsText, UDPPort) SockAddr (MonadP2PTest m) where
+instance (MonadReader P2PPeer m, HasMemPeerDB m) => A.Selectable (Maybe Host, UDPPort) SockAddr (MonadP2PTest m) where
   select _ (Just ip, udpPort) = pure $ ipAndPortToSockAddr ip udpPort
   select _ (Nothing, udpPort) = do
     myIP <- accessEnvVar p2pMyIPAddress
@@ -958,7 +791,7 @@ instance
   where
   replace _ addr msg = case sockAddrToIpAndPort addr of
     Nothing -> $logErrorS "Replaceable SockAddr BS" $ "Could not decode " <> T.pack (show addr)
-    Just (ip@(IPAsText ipText), udpPort@(UDPPort port')) -> do
+    Just (ip@(Host ipText), udpPort@(UDPPort port')) -> do
       inet <- lift $ asks _p2pPeerInternet
       mSock <- liftIO $ M.lookup (ip, udpPort) . _udpPorts <$> readTVarIO inet
       case mSock of
@@ -987,12 +820,12 @@ instance
     MonadReader P2PPeer m,
     HasMemPeerDB m
   ) =>
-  A.Selectable (IPAsText, UDPPort, B.ByteString) Point (MonadP2PTest m)
+  A.Selectable (Host, UDPPort, B.ByteString) Point (MonadP2PTest m)
   where
-  select _ (ip@(IPAsText ip'), port@(UDPPort p), bs) = do
+  select _ (ip@(Host ip'), port@(UDPPort p), bs) = do
     inet <- lift $ asks _p2pPeerInternet
     mSock <- M.lookup (ip, port) . _udpPorts <$> readTVarIO inet
-    myIP@(IPAsText myip) <- accessEnvVar p2pMyIPAddress
+    myIP@(Host myip) <- accessEnvVar p2pMyIPAddress
     case mSock of
       Nothing -> do
         $logWarnS "getPubKey" $ "No socket exists for " <> ip' <> ":" <> T.pack (show p)
@@ -1010,29 +843,28 @@ instance
 
 ------------------ extra stuff for HasPeerDB??
 
-instance (MonadIO m, HasMemPeerDB m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText ip, point) (PeerBondingState s) = do
-    A.replace Mod.Proxy (IPAsText ip, undefined :: TCPPort) (PeerBondingState s) -- the instances for TCPPort and UDPPort just ignore the parameter and do the same thing
+instance (MonadIO m, HasMemPeerDB m) => A.Replaceable (Host, Point) PeerBondingState (MonadTest m) where
+  replace _ (Host ip, point) (PeerBondingState s) = do
+    A.replace Mod.Proxy (Host ip, undefined :: TCPPort) (PeerBondingState s) -- the instances for TCPPort and UDPPort just ignore the parameter and do the same thing
     --stringPPeerMap . at (T.unpack ip) . _Just %= (\p -> p {pPeerBondState = s})
     pointPPeerMap . at point . _Just %= (\p -> p {pPeerBondState = s})
 
-instance (Monad m, A.Replaceable (IPAsText, Point) PeerBondingState m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
+instance (Monad m, A.Replaceable (Host, Point) PeerBondingState m) => A.Replaceable (Host, Point) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-instance (MonadIO m, HasMemPeerDB m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadTest m) where
-  select _ (IPAsText t, _) = do
-    let ip = T.unpack t
+instance (MonadIO m, HasMemPeerDB m) => A.Selectable (Host, Point) PeerBondingState (MonadTest m) where
+  select _ (ip, _) = do
     map' <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
 
-instance (A.Selectable (IPAsText, Point) PeerBondingState m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
+instance (A.Selectable (Host, Point) PeerBondingState m) => A.Selectable (Host, Point) PeerBondingState (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
   access _ = do
-    valCMPSs <- Set.toList <$> use p2pValidators
-    cmpsToX509 <- use parsedSetToX509Map
-    let valAdds = catMaybes $ (\valCMPS -> userAddress <$> cmpsToX509 M.!? valCMPS) <$> valCMPSs
+    validatorSet <- use p2pValidators
+    x509s <- M.elems <$> use x509certMap
+    let valAdds = map userAddress $ filter ((`Set.member` validatorSet) . Validator . T.pack . commonName) x509s
     return $ ValidatorAddresses valAdds
 
 instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
@@ -1046,46 +878,50 @@ instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
 instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p
 
--------------------- END extra stuff for HasPeerDB??
+instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
+  getCurrentSyncTask host = do
+    let assignedByHost (SyncTask _ _ h s) = h == host && s == Assigned
+    tasks <- filter assignedByHost <$> use syncTasks
+    case tasks of
+      [t] -> pure t
+      [] -> error $ "no current sync task found in call to getCurrentSyncTask: " ++ show host
+      _ -> error $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (show <$> tasks)
+  getNewSyncTask host = do
+    now <- liftIO getCurrentTime
+    let oneMinuteAgo = addUTCTime (-60) now
+    unsortedTasks <- use syncTasks
+    let sortedTasks = sortBy (compare `on` (\(SyncTask _ t _ _) -> t)) unsortedTasks
+        foldTasks (Nothing, tasks) st@(SyncTask i t _ s) =
+          if t < oneMinuteAgo && s /= Finished
+            then let newTask = SyncTask i now host s
+                  in (Just newTask, newTask:tasks)
+            else (Nothing, st:tasks)
+        foldTasks (newTask, tasks) st = (newTask, st:tasks)
+        (mNewTask, updatedTasks) = foldl' foldTasks (Nothing, []) sortedTasks
+    case mNewTask of
+      Nothing -> do
+        let newTask = SyncTask (1 + maximum (0:((\(SyncTask i _ _ _) -> i) <$> updatedTasks))) now host Assigned
+        syncTasks .= newTask : updatedTasks
+        pure newTask
+      Just newTask -> do
+        syncTasks .= updatedTasks
+        pure newTask
+  setSyncTaskFinished host = syncTasks %= map (\st@(SyncTask i t h _) -> if h == host then SyncTask i t h Finished else st)
+  setSyncTaskNotReady host = syncTasks %= map (\st@(SyncTask i t h s) -> if h == host && s == Assigned then SyncTask i t h NotReady else st)
 
-instance MonadIO m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadTest m) where
-  select _ cm = do
-    db <- use parsedSetMap
-    case cm of
-      CommonName _ _ _ _ -> do
-        pure $ Just [cm]
-      OrgUnit _ _ _ -> do
-        let mems = fromMaybe [] $ M.lookup cm db
-        pure $ Just mems
-      Org _ _ -> do
-        let units = fromMaybe [] $ M.lookup cm db
-            mems = concat $ catMaybes $ map (flip M.lookup db) units
-        pure $ Just mems
-      Everyone _ ->
-        pure $ Nothing
+instance {-# OVERLAPPING #-} (MonadIO m, HasSyncDB m) => HasSyncDB (MonadP2PTest m) where
+  getCurrentSyncTask  = lift . getCurrentSyncTask
+  getNewSyncTask      = lift . getNewSyncTask
+  setSyncTaskFinished = lift . setSyncTaskFinished
+  setSyncTaskNotReady = lift . setSyncTaskNotReady
 
-instance (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadP2PTest m) where
-  select p cm = lift $ A.select p cm
-
-instance MonadIO m => (ChainMemberParsedSet `A.Selectable` IsValidator) (MonadTest m) where
-  select _ cm = Just . IsValidator . Set.member cm <$> use p2pValidators
-
-instance (ChainMemberParsedSet `A.Selectable` IsValidator) m => (ChainMemberParsedSet `A.Selectable` IsValidator) (MonadP2PTest m) where
-  select p cm = lift $ A.select p cm
-
-instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadTest m) where
-  select _ cm = M.lookup cm <$> use parsedSetToX509Map
-
-instance (ChainMemberParsedSet `A.Selectable` X509CertInfoState) m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadP2PTest m) where
-  select p cm = lift $ A.select p cm
-
-startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
+startingCheckpoint :: [Validator] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
 
-newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> Bool -> BlockstanbulContext
+newBlockstanbulContext :: Text -> [Validator] -> Bool -> BlockstanbulContext
 newBlockstanbulContext chainm as valBehav =
   let ckpt = startingCheckpoint as
-   in newContext ckpt Nothing valBehav (Just chainm)
+   in newContext "strato-lite" ckpt Nothing valBehav (Just $ CommonName "" "" chainm True)
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext undefined [] True
@@ -1096,21 +932,8 @@ newSequencerContext bc = do
   latestRound <- newIORef 0
   pure $
     SequencerContext
-      { _dependentBlockDB = error "EventSpec: Evaluating dependentBlockDB",
-        _seenTransactionDB = mkSeenTxDB 1024,
-        _dbeRegistry = M.empty,
-        _blockHashRegistry = M.empty,
-        _emittedBlockRegistry = M.singleton zeroHash $ Modification alreadyEmittedBlock,
-        _txHashRegistry = M.empty,
-        _chainHashRegistry = M.empty,
-        _chainIdRegistry = M.empty,
-        _chainInfoRegistry = M.empty,
-        _x509certInfoState = M.empty,
-        _getChainsDB = emptyGetChainsDB,
-        _getTransactionsDB = emptyGetTransactionsDB,
-        _ldbBatchOps = Q.empty,
+      { _seenTransactionDB = mkSeenTxDB 1024,
         _blockstanbulContext = Just bc,
-        _loopTimeout = error "MonadTest: Evaluating loopTimeout", -- loopCh
         _latestRoundNumber = latestRound
       }
 
@@ -1125,47 +948,37 @@ testContext ::
 testContext prv rNum seqCtx vmCtx =
   TestContext
     { _blocks = [],
-      _connectionTimeout = ConnectionTimeout 60,
-      _maxReturnedHeaders = MaxReturnedHeaders 1000,
       _prvKey = prv,
       _shaBlockDataMap = M.empty,
-      _p2pWorldBestBlock = WorldBestBlock (BestBlock zeroHash (-1) 0),
-      _bestBlock = BestBlock zeroHash (-1) 0,
+      _p2pWorldBestBlock = WorldBestBlock (BestBlock zeroHash (-1)),
+      _bestBlock = BestBlock zeroHash (-1),
+      _bestSequencedBlock = BestSequencedBlock zeroHash (-1) [],
       _canonicalBlockDataMap = M.empty,
-      _ipAddressIpChainsMap = M.empty,
-      _orgIdChainsMap = M.empty,
-      _shaChainTxsInBlockMap = M.empty,
-      _chainMembersMap = M.empty,
-      _chainInfoMap = M.empty,
-      _trueOrgNameChainsMap = M.empty,
-      _falseOrgNameChainsMap = M.empty,
       _p2pValidators = Set.empty,
+      _blockHashRegistry = M.empty,
       _x509certMap = M.empty,
-      _privateTxMap = M.empty,
       _genesisBlockHash = GenesisBlockHash zeroHash,
-      _bestBlockNumber = BestBlockNumber 0,
       _pointPPeerMap = M.empty,
       _pbftMessages = S.empty,
       _unseqEvents = [],
       _sequencerContext = seqCtx,
+      _dbeRegistry = M.empty,
       _blockPeriod = BlockPeriod 1,
       _roundPeriod = RoundPeriod 10,
       _timeoutChan = rNum,
       _vmContext = vmCtx,
       _apiChainInfoMap = M.empty,
-      _parsedSetMap = M.empty,
-      _parsedSetToX509Map = M.empty
+      _syncTasks = []
     }
 
 data P2PPeer = P2PPeer
   { _p2pPeerPrivKey :: PrivateKey,
     _p2pPeerPPeer :: PPeer,
-    _p2pPeerUnseqSource :: TQueue [SeqLoopEvent],
-    _p2pPeerSeqP2pSource :: TMChan (Either TxrResult P2pEvent),
+    _p2pPeerUnseqSource :: TQueue SeqLoopEvent,
+    _p2pPeerSeqP2pSource :: TMChan P2pEvent,
     _p2pPeerSeqVmSource :: TQueue [VmEvent],
     _p2pPeerApiIndexSource :: TQueue [IndexEvent],
     _p2pPeerP2pIndexSource :: TQueue [IndexEvent],
-    _p2pPeerTxrIndexSource :: TQueue IndexEvent,
     _p2pPeerUnseqSink :: [IngestEvent] -> TestContextM (),
     _p2pPeerName :: String,
     _p2pTestContext :: TVar TestContext,
@@ -1176,8 +989,7 @@ data P2PPeer = P2PPeer
     _p2pPeerSequencer :: TestContextM (),
     _p2pPeerVm :: TestContextM (),
     _p2pPeerApiIndexer :: TestContextM (),
-    _p2pPeerP2pIndexer :: TestContextM (),
-    _p2pPeerTxrIndexer :: TestContextM ()
+    _p2pPeerP2pIndexer :: TestContextM ()
   }
 
 makeLenses ''P2PPeer
@@ -1197,17 +1009,14 @@ runNodeWithoutP2P p = do
         (runMonad p (p ^. p2pPeerVm))
     )
     ( concurrently_
-        ( concurrently_
-            (runMonad p (p ^. p2pPeerApiIndexer))
-            (runMonad p (p ^. p2pPeerP2pIndexer))
-        )
-        (runMonad p (p ^. p2pPeerTxrIndexer))
+        (runMonad p (p ^. p2pPeerApiIndexer))
+        (runMonad p (p ^. p2pPeerP2pIndexer))
     )
 
 runNode :: P2PPeer -> IO ()
 runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
-  let s = sourceTMChan chan .| (awaitForever $ either (const $ pure ()) yield)
+  let s = sourceTMChan chan
   ctx <- newIORef $ def & unseqSink .~ p ^. p2pPeerUnseqSource
   concurrently_
     (runNodeWithoutP2P p)
@@ -1217,70 +1026,67 @@ runNode p = do
     )
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
-postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
+postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) e
 
 postEvents :: [SeqLoopEvent] -> P2PPeer -> IO ()
-postEvents es p = atomically $ writeTQueue (_p2pPeerUnseqSource p) es
+postEvents es p = atomically $ traverse_ (writeTQueue $ _p2pPeerUnseqSource p) es
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot MP.NodeData)) where
   lookup _ k = M.lookup k <$> State.gets snd
   insert _ k v = State.modify' $ \(a, b) -> (a, M.insert k v b)
   delete _ k = State.modify' $ \(a, b) -> (a, M.delete k b)
 
-type CertMap = Map Address (Modification X509CertInfoState)
+type CertMap = Map Address X509CertInfoState
 
-addValidatorsToCertMap :: [(Address, ChainMemberParsedSet)] -> CertMap -> CertMap
+addValidatorsToCertMap :: [(Address, Text)] -> CertMap -> CertMap
 addValidatorsToCertMap vals m =
-  let cmpsToXcis a (CommonName o u n True) = X509CertInfoState a rootCert True [] (T.unpack o) (Just $ T.unpack u) (T.unpack n)
-      cmpsToXcis _ _ = error "cmpsToXcis"
-      insertValidatorInfo (a, b) = M.insert a (Modification (cmpsToXcis a b))
+  let cmpsToXcis a n = X509CertInfoState a rootCert True [] "" Nothing (T.unpack n)
+      insertValidatorInfo (a, b) = M.insert a (cmpsToXcis a b)
    in foldr insertValidatorInfo m vals
 
-createPeer' :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
+createPeer' :: PrivateKey -> Text -> [(Address, Text)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
 createPeer' pk identity as certs n ip = do
   inet <- newTVarIO preAlGoreInternet
-  createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) [] True
+  createPeer pk identity as certs inet n (Host ip) (TCPPort 30303) (UDPPort 30303) [] True
 
-createNonvalPeer :: PrivateKey -> ChainMemberParsedSet -> [(Address, ChainMemberParsedSet)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
+createNonvalPeer :: PrivateKey -> Text -> [(Address, Text)] -> [X509Certificate] -> T.Text -> T.Text -> IO P2PPeer
 createNonvalPeer pk identity as certs n ip = do
   inet <- newTVarIO preAlGoreInternet
-  createPeer pk identity as certs inet n (IPAsText ip) (TCPPort 30303) (UDPPort 30303) [] False
+  createPeer pk identity as certs inet n (Host ip) (TCPPort 30303) (UDPPort 30303) [] False
 
 createPeer ::
   PrivateKey ->
-  ChainMemberParsedSet ->
-  [(Address, ChainMemberParsedSet)] ->
+  Text ->
+  [(Address, Text)] ->
   [X509Certificate] ->
   TVar Internet ->
   Text ->
-  IPAsText ->
+  Host ->
   TCPPort ->
   UDPPort ->
-  [IPAsText] ->
+  [Host] ->
   Bool ->
   IO P2PPeer
-createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAsText ipAddr) tcpPort udpPort bootNodes valBehav = do
+createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPort udpPort bootNodes valBehav = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
-  txrIndexerSource <- newTQueueIO
   cht <- atomically newTMChan
   tcpVSock <- newTQueueIO
   udpVSock <- newTQueueIO
   atomically $ do
     modifyTVar inet $ tcpPorts . at (ipAsText, tcpPort) ?~ tcpVSock
     modifyTVar inet $ udpPorts . at (ipAsText, udpPort) ?~ udpVSock
-  seqCtx' <- newSequencerContext $ newBlockstanbulContext selfId (snd <$> initialValidators') valBehav
-  let seqCtx = (x509certInfoState %~ addValidatorsToCertMap initialValidators') seqCtx'
-      initialValidators = fst <$> initialValidators'
+  seqCtx <- newSequencerContext $ newBlockstanbulContext selfId (Validator . snd <$> initialValidators') valBehav
   cache <- TRC.new 64
-  let vals = snd <$> initialValidators'
-      gi = insertMercataGovernanceContract vals (take 1 vals) $ insertCertRegistryContract extraCerts defaultGenesisInfo
+  let vals = Validator . snd <$> initialValidators'
+      cmps = (\c -> CommonName "" "" c True) . snd <$> initialValidators'
+      gi = insertMercataGovernanceContract cmps (take 1 cmps) $ insertCertRegistryContract extraCerts defaultGenesisInfo
       (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
-        for_ initialValidators $ \addr -> do
+        for_ initialValidators' $ \(addr, _) -> do
           sr <- State.gets fst
           let key = addressAsNibbleString addr
               val =
@@ -1367,16 +1173,16 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
       genesisOutputBlock =
         OutputBlock
           { obOrigin = Origin.API,
-            obTotalDifficulty = 0,
             obBlockData = genesisBlock,
             obReceiptTransactions = [],
             obBlockUncles = []
           }
-  testContextTVar <- newTVarIO $ testContext privKey cht seqCtx vmCtx & p2pValidators .~ Set.fromList vals
-  let seqTimerSource = runConduit $ sourceTMChan cht .| mapC ((: []) . TimerFire) .| sinkTQueue unseqSource
+  testContextTVar <- newTVarIO $ testContext privKey cht seqCtx vmCtx
+                               & p2pValidators .~ Set.fromList vals
+                               & x509certMap %~ addValidatorsToCertMap initialValidators'
+  let seqTimerSource = runConduit $ sourceTMChan cht .| mapC TimerFire .| sinkTQueue unseqSource
   let sequencer = do
-        DBDB.bootstrapGenesisBlock genHash 1
-        A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
+        DBDB.bootstrapGenesisBlock genHash
         for_ extraCerts $ \c -> do
           let cis = x509CertToCertInfoState c
               ua = userAddress cis
@@ -1385,21 +1191,8 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         createFirstTimer
         runConduit $
           sourceTQueue unseqSource
-            .| mapMC Seq.runSequencerBatch
-            .| ( awaitForever $ \b -> do
-                   chainIds <- lift $ unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
-                   txHashes <- lift $ unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
-                   let chainIdsList = toList chainIds
-                       txHashesList = toList txHashes
-                       getChains = if null chainIdsList then [] else [P2pGetChain chainIdsList]
-                       getTxs = if null txHashesList then [] else [P2pGetTx txHashesList]
-                       toP2p' = getChains ++ getTxs ++ Seq._toP2p b
-                   atomically $ do
-                     traverse_ (writeTMChan seqP2pSource . Right) $ toP2p'
-                     writeTQueue seqVmSource $ Seq._toVm b
-                   lift clearGetChainsDB
-                   lift clearGetTransactionsDB
-               )
+            .| Seq.eventHandler
+            .| awaitForever (atomically . either (traverse_ $ writeTMChan seqP2pSource) (writeTQueue seqVmSource))
   let vm = do
         MP.initializeBlank
         setStateDBStateRoot Nothing stateRoot
@@ -1407,7 +1200,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
         for_ (genesisInfoCodeInfo gi) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
-        putContextBestBlockInfo $ ContextBestBlockInfo genHash genesisBlock 0 0 0
+        putContextBestBlockInfo $ ContextBestBlockInfo genHash genesisBlock 0
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
         processNewBestBlock genHash genesisBlock [] -- bootstrap Bagger with genesis block
         runConduit $
@@ -1418,11 +1211,12 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
             .| ( awaitForever $ \b -> do
                    $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
                    atomically $ do
-                     writeTQueue unseqSource $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
-                     writeTQueue unseqSource $ UnseqEvent . IEPreprepareResponse <$> toList (VMEvent.outPreprepareResponses b)
+                     writeTQueue unseqSource . UnseqEvents $ concat
+                       [ IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                       , IEPreprepareResponse <$> toList (VMEvent.outPreprepareResponses b)
+                       ]
                      writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                      writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
-                     traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))
                )
       apiIndexer' =
         runConduit $
@@ -1438,57 +1232,17 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                    $logInfoS (name <> "/testP2pIndexer") . T.pack $ show evs
                    lift $ indexP2P evs
                )
-      txrIndexer' =
-        runConduit $
-          sourceTQueue txrIndexerSource
-            .| ( awaitForever $ \ev -> do
-                   $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
-                   yieldMany $ indexEventToTxrResults ev
-               )
-            .| ( awaitForever $ \case
-                   AddOrgName chainId cm -> do
-                     let org = ChainMembers $ Set.singleton cm
-                         newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
-                     chainMembersMap . at chainId %= \case
-                       Nothing -> Just newMemRset
-                       Just (ChainMemberRSet rset') -> Just . ChainMemberRSet $ rSetUnion rset' newMem
-                     trueOrgNameChainsMap
-                       %= ( \m -> case M.lookup cm m of
-                              Nothing -> M.insert cm (TrueOrgNameChains $ Set.singleton chainId) m
-                              Just (TrueOrgNameChains s) -> M.insert cm (TrueOrgNameChains $ Set.insert chainId s) m
-                          )
-                     atomically . writeTQueue unseqSource . (: []) . UnseqEvent $ IENewChainOrgName chainId cm
-                   RemoveOrgName chainId cm -> do
-                     let org = ChainMembers $ Set.singleton cm
-                         newMemRset@(ChainMemberRSet newMem) = chainMembersToChainMemberRset org
-                     chainMembersMap . at chainId %= \case
-                       Nothing -> Just newMemRset
-                       Just (ChainMemberRSet rset') -> Just . ChainMemberRSet $ rSetIntersection rset' newMem
-                     falseOrgNameChainsMap
-                       %= ( \m -> case M.lookup cm m of
-                              Nothing -> M.insert cm (FalseOrgNameChains $ Set.singleton chainId) m
-                              Just (FalseOrgNameChains s) -> M.insert cm (FalseOrgNameChains $ Set.insert chainId s) m
-                          )
-                     atomically . writeTQueue unseqSource . (: []) . UnseqEvent $ IENewChainOrgName chainId cm
-                   TerminateChain _ -> pure ()
-                   PutLogDB _ -> pure ()
-                   PutEventDB _ -> pure ()
-                   PutTxResult _ -> pure ()
-                   ev -> do
-                     $logInfoS (name <> "/testTxrIndexer") . T.pack $ show ev
-                     pure ()
-               )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer =
         buildPeer
           ( Just pubkeystr,
-            T.unpack ipAddr,
+            ipAsText,
             30303
           )
       unseq ies = do
-        atomically . writeTQueue unseqSource $ UnseqEvent <$> ies
+        atomically . writeTQueue unseqSource $ UnseqEvents ies
 
-  memPeerDBEnv <- createMemPeerDBEnv ipAsText $ map (\(IPAsText ip) -> buildPeer (Nothing, T.unpack ip, 30303)) bootNodes
+  memPeerDBEnv <- createMemPeerDBEnv ipAsText $ map (\ip -> buildPeer (Nothing, ip, 30303)) bootNodes
         
   pure $
     P2PPeer
@@ -1499,7 +1253,6 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
       seqVmSource
       apiIndexerSource
       p2pIndexerSource
-      txrIndexerSource
       unseq
       (T.unpack name)
       testContextTVar
@@ -1511,7 +1264,6 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
       vm
       apiIndexer'
       p2pIndexer'
-      txrIndexer'
 
 data P2PConnection = P2PConnection
   { _serverToClient :: TQueue B.ByteString,
@@ -1551,13 +1303,13 @@ createConnectionWithModifications server' client' modifyServerMsgs modifyClientM
                   (_p2pPeerPPeer client')             
                   (sourceTQueue clientToServerTQueue) 
                   (sinkTQueue serverToClientTQueue)   
-                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) (yield . modifyServerMsgs) ))
+                  (sourceTMChan serverSeqSource .| (awaitForever $ yield . modifyServerMsgs ))
                   ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
   let rClient = runEthClientConduit         
                   (_p2pPeerPPeer server')   
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
-                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) (yield . modifyClientMsgs) ))
+                  (sourceTMChan clientSeqSource .| (awaitForever $ yield . modifyClientMsgs ))
                   ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
   pure $
     P2PConnection
@@ -1587,7 +1339,7 @@ createGermophobicConnection server' client' = do
                   (_p2pPeerPPeer server')   
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
-                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  (sourceTMChan clientSeqSource)
                   ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
   pure $
     P2PConnection
@@ -1602,12 +1354,6 @@ createGermophobicConnection server' client' = do
 
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (first fromPrivateKey)
-
-signChain :: PrivateKey -> UnsignedChainInfo -> ChainInfo
-signChain privKey u =
-  let (r', s', v') = getSigVals . signMsg privKey . keccak256ToByteString $ rlpHash u
-      chainSig = ChainSignature r' s' v'
-   in ChainInfo u chainSig
 
 mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
 mkSignedTx privKey utx md =
@@ -1681,19 +1427,19 @@ data NetworkManager = NetworkManager
   { _threads :: TVar ThreadPool,
     _network :: TVar Network,
     _initialCerts :: [X509Certificate],
-    _initialValidators :: [(Address, ChainMemberParsedSet)]
+    _initialValidators :: [(Address, Text)]
   }
 
 makeLenses ''NetworkManager
 
-createNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> TVar Internet -> ReaderT NetworkManager IO P2PPeer
+createNode :: Text -> Text -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager IO P2PPeer
 createNode nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do
   certs <- asks _initialCerts
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
   liftIO $ createPeer pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes True
 
-addNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
+addNode :: Text -> Text -> Host -> TCPPort -> UDPPort -> [Host] -> ReaderT NetworkManager IO Bool
 addNode nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
   mgr <- ask
   inet <- _internet <$> readTVarIO (mgr ^. network)
@@ -1752,14 +1498,13 @@ removeConnection serverLabel clientLabel = do
   liftIO $ traverse_ cancel mAsync
   pure $ isJust mAsync
 
-selfSignCert :: PrivateKey -> ChainMemberParsedSet -> IO X509Certificate
-selfSignCert pk (CommonName o u c True) = flip runReaderT pk $ do
-  let iss = Issuer (T.unpack c) (T.unpack o) (Just $ T.unpack u) Nothing
-      sub = Subject (T.unpack c) (T.unpack o) (Just $ T.unpack u) Nothing (derivePublicKey pk)
+selfSignCert :: PrivateKey -> Text -> IO X509Certificate
+selfSignCert pk c = flip runReaderT pk $ do
+  let iss = Issuer (T.unpack c) "" Nothing Nothing
+      sub = Subject (T.unpack c) "" Nothing Nothing (derivePublicKey pk)
   makeSignedCert Nothing Nothing iss sub
-selfSignCert _ i = error $ "selfSignCert: could not sign cert for identity: " ++ show i
 
-runNetwork :: [(Text, (ChainMemberParsedSet, IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
+runNetwork :: [(Text, (Text, Host, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
 runNetwork nodesList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
   let identities = (\(_, (c, _, _, _)) -> c) <$> nodesList
@@ -1778,7 +1523,7 @@ runNetwork nodesList validatorsFilter = do
   threadsTVar <- newTVarIO threadPool
   pure $ NetworkManager threadsTVar networkTVar certs validators'
 
-runNetworkWithStaticConnections :: [(Text, IPAsText, ChainMemberParsedSet)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
+runNetworkWithStaticConnections :: [(Text, Host, Text)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
 runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
   let identities = (\(_, _, c) -> c) <$> nodesList

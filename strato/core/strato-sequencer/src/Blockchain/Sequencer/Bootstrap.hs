@@ -73,7 +73,8 @@ bootstrapSequencer
 
             dummySequencerCfg =
               SequencerConfig
-                { depBlockDBCacheSize = 0,
+                { dependentBlockDB = error "Dependent Block DB not initialized",
+                  depBlockDBCacheSize = 0,
                   depBlockDBPath = dbDir "h" ++ sequencerDependentBlockDBPath,
                   seenTransactionDBSize = 10,
                   blockstanbulBlockPeriod = BlockPeriod 0,

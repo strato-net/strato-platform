@@ -15,6 +15,8 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Composable.Base
 import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC               (Point)
+import           Data.IP
 import           Data.Map                              (Map)
 import qualified Data.Map                              as M
 import           Data.Maybe
@@ -111,6 +113,13 @@ instance HasMemPeerDB m => A.Selectable Host ClosestPeers m where
     where
       f p = pPeerHost p /= t && isJust (pPeerPubkey p)
 
+instance HasMemPeerDB m => A.Selectable IP PPeer m where
+  select _ ip = do
+    peerMap <- readIORef . stringPPeerMap =<< accessEnv
+    pure . listToMaybe $ filter f $ M.elems peerMap
+    where
+      f p = pPeerIp p == Just ip
+
 instance HasMemPeerDB m => A.Replaceable PPeer UdpEnableTime m where
   replace _ peer' (UdpEnableTime enableTime) = do
     peerMap <- fmap stringPPeerMap accessEnv
@@ -151,6 +160,16 @@ instance HasMemPeerDB m => A.Replaceable T.Text PPeer m where
   replace _ message peer' = do
     peerMap <- fmap stringPPeerMap accessEnv
     modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerLastMsg = message})
+
+instance HasMemPeerDB m => A.Replaceable PPeer IP m where
+  replace _ peer' ip = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerIp = Just ip})
+
+instance HasMemPeerDB m => A.Replaceable PPeer Point m where
+  replace _ peer' point = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerPubkey = Just point})
 
 toActivityState :: Int -> ActivityState
 toActivityState 1 = Active

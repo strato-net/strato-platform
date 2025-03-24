@@ -15,7 +15,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Sequencer (
-  sequencer
+  sequencer,
+  eventHandler
   ) where
 
 import BlockApps.Logging
@@ -52,6 +53,8 @@ import Prometheus as P
 import Text.Format
 import Text.Printf
 
+type SeqOutEvent = Either [P2pEvent] [VmEvent]
+
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
 
@@ -86,13 +89,21 @@ type MonadSequencer m =
   )
 
 sequencer :: SequencerM ()
-sequencer = do
+sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka
+
+initSequencer :: (
+  MonadFail m,
+  MonadSequencer m,
+  Mod.Accessible View m
+  ) =>
+  ConduitT () SeqOutEvent m ()
+initSequencer = do
   let logF = logFF "sequencer"
   hasPBFT <- isJust <$> getBlockstanbulContext
   when (hasPBFT) $ do
     ctx <- fromJust <$> getBlockstanbulContext
     let selfAddr = fromJust $ _selfAddr ctx
-    _ <- writeSeqVmEvents [VmSelfAddress selfAddr]
+    yield $ Right [VmSelfAddress selfAddr]
     -- check for own cert and if val
     maybeCert <- A.lookup (A.Proxy @X509CertInfoState) selfAddr
     ctx'' <- case maybeCert of
@@ -109,17 +120,22 @@ sequencer = do
         return ctx
     putBlockstanbulContext ctx''
   logF "Sequencer startup"
-  source <- fuseChannels
-  bootstrapBlockstanbul
   logF "Sequencer initialized"
-  runConduit $ source .| eventHandler
+  bootstrapBlockstanbul
+
+writeToKafka :: (
+  MonadFail m,
+  MonadSequencer m,
+  HasKafka m
+  ) =>
+  ConduitT SeqOutEvent Void m ()
+writeToKafka = awaitForever $ either writeSeqP2pEvents writeSeqVmEvents
 
 eventHandler :: (
   MonadFail m,
-  HasKafka m,
   MonadSequencer m
   ) =>
-  ConduitT SeqLoopEvent Void m ()
+  ConduitT SeqLoopEvent SeqOutEvent m ()
 eventHandler = forever $ timeAction seqLoopTiming $ do
   logFF "sequencer/events" "Reading from fused channels..."
   maybeEvent <- await
@@ -136,9 +152,9 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
       lift $ timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
 unseqEventHandler ::
-  ( MonadSequencer m, 
-    HasKafka m) =>
-  [IngestEvent] -> m ()
+  ( MonadSequencer m
+  ) =>
+  [IngestEvent] -> ConduitT i SeqOutEvent m ()
 unseqEventHandler events = do
   let record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> Int -> m ()
       record t k num = do
@@ -173,94 +189,93 @@ unseqEventHandler events = do
           A.delete (A.Proxy @DependentBlockEntry) k
         (IEGetMPNodes srs) -> do
           record "inevent_type_get_mp_nodes" "GetMPNodes" 1
-          _ <- writeSeqP2pEvents [P2pGetMPNodes srs]
+          yield $ Left [P2pGetMPNodes srs]
           return ()
         (IEGetMPNodesRequest o srs) -> do
           record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest" 1
-          _ <- writeSeqVmEvents [VmGetMPNodesRequest o srs]
+          yield $ Right [VmGetMPNodesRequest o srs]
           return ()
         (IEMPNodesResponse o nds)-> do
           record "inevent_type_mp_nodes_response" "MPNodesResponse" 1
-          _ <- writeSeqP2pEvents [P2pMPNodesResponse o nds]
+          yield $ Left [P2pMPNodesResponse o nds]
           return ()
         (IEMPNodesReceived nds) -> do
           record "inevent_type_mp_nodes_received" "MPNodesReceived" 1
-          _ <- writeSeqVmEvents [VmMPNodesReceived nds]
+          yield $ Right [VmMPNodesReceived nds]
           return ()
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
 
-bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m, HasKafka m) =>
-                         m ()
+bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
+                         ConduitT i SeqOutEvent m ()
 bootstrapBlockstanbul = do
-  _ <- writeSeqVmEvents [VmCreateBlockCommand]
+  yield $ Right [VmCreateBlockCommand]
   createFirstTimer
 
 blockstanbulSend ::
   ( MonadLogger m,
     MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m,
-    HasKafka m
+    (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  [InEvent] -> m ()
+  [InEvent] -> ConduitT i SeqOutEvent m ()
 blockstanbulSend = mapM_ $ \ie -> do
       blockstanbulSend' ie
 
 blockstanbulSend' ::
   ( MonadLogger m,
     MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m,
-    HasKafka m
+    (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  InEvent -> m ()
+  InEvent -> ConduitT i SeqOutEvent m ()
 blockstanbulSend' msg = do
-  resp <- sendAllMessages [msg]
-  let blocks = [b | ToCommit b <- resp]
-  for_ resp $ \case
-    ResetTimer rn -> createNewTimer rn
-    FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
-    _ -> pure ()
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
+  (p2pevs, vmevs) <- lift $ do
+    resp <- sendAllMessages [msg]
+    let blocks = [b | ToCommit b <- resp]
+    for_ resp $ \case
+      ResetTimer rn -> createNewTimer rn
+      FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
+      _ -> pure ()
+    $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
 
-  let getSequencedBlock =
-        ingestBlockToSequencedBlock
-          . blockToIngestBlock TO.Blockstanbul
-      creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
-  let rBlocks = catMaybes (map getSequencedBlock blocks)
-  committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
-  let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
+    let getSequencedBlock =
+          ingestBlockToSequencedBlock
+            . blockToIngestBlock TO.Blockstanbul
+        creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
+    let rBlocks = catMaybes (map getSequencedBlock blocks)
+    committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+    let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
-  let vmevs =
-        creates
-          ++ (VmBlock <$> committedBlocks)
-          ++ vms
-  let p2pevs =
-        (P2pBlock <$> committedBlocks)
-          ++ p2ps
+    let vmevs =
+          creates
+            ++ (VmBlock <$> committedBlocks)
+            ++ vms
+    let p2pevs =
+          (P2pBlock <$> committedBlocks)
+            ++ p2ps
 
-  case committedBlocks of
-    [] -> pure ()
-    (b:_) -> do
-      let bh = BDB.blockHeader b
-          tLast = blockHeaderTimestamp bh
-      dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
-      let tNext = addUTCTime dt tLast
-      now <- liftIO getCurrentTime
-      when (now < tNext) $
-        liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-      ctx <- fmap (fromMaybe $ error "BlockstanbulContext missing") $ getBlockstanbulContext
-      Mod.put (Mod.Proxy @BestSequencedBlock) $
-        BestSequencedBlock
-            (BDB.blockHeaderHash bh)
-            (BDB.blockHeaderBlockNumber bh)
-            (S.toList $ _validators ctx)
+    case committedBlocks of
+      [] -> pure ()
+      (b:_) -> do
+        let bh = BDB.blockHeader b
+            tLast = blockHeaderTimestamp bh
+        dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
+        let tNext = addUTCTime dt tLast
+        now <- liftIO getCurrentTime
+        when (now < tNext) $
+          liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+        ctx <- fmap (fromMaybe $ error "BlockstanbulContext missing") $ getBlockstanbulContext
+        Mod.put (Mod.Proxy @BestSequencedBlock) $
+          BestSequencedBlock
+              (BDB.blockHeaderHash bh)
+              (BDB.blockHeaderBlockNumber bh)
+              (S.toList $ _validators ctx)
+    pure (p2pevs, vmevs)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
-  _ <- writeSeqP2pEvents p2pevs
+  yield $ Left p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
-  _ <- writeSeqVmEvents vmevs
-  return ()
+  yield $ Right vmevs
   where
     vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
@@ -276,10 +291,9 @@ blockstanbulSend' msg = do
 transformFullTransactions ::
   ( MonadLogger m,
     MonadMonitor m,
-    (Keccak256 `A.Alters` ()) m,
-    HasKafka m
+    (Keccak256 `A.Alters` ()) m
   ) =>
-  [(Timestamp, IngestTx)] -> m ()
+  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts, itx) ->
@@ -301,8 +315,8 @@ transformFullTransactions pairs = do
             
   let txs = catMaybes mOtxs
   logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
-  _ <- writeSeqVmEvents $ map pairToVmTx txs
-  _ <- writeSeqP2pEvents $ map (P2pTx . snd) txs
+  yield . Right $ map pairToVmTx txs
+  yield . Left $ map (P2pTx . snd) txs
   return ()
 
 expandBlock ::
@@ -333,20 +347,16 @@ runConsensus ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m,
-    HasKafka m
+    (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  SequencedBlock -> m ()
+  SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
   hasPBFT <- blockstanbulRunning
   if not hasPBFT
     then do
-      obs <- expandBlock sb
-      flip traverse_ obs $ \ob -> do
-        _ <- writeSeqP2pEvents [P2pBlock ob]
-        return ()
-      _ <- writeSeqVmEvents $ map VmBlock obs
-      return ()
+      obs <- lift $ expandBlock sb
+      for_ obs $ \ob -> yield $ Left [P2pBlock ob]
+      yield . Right $ map VmBlock obs
     else do
       let blk = sequencedBlockToBlock sb
       routed <-
@@ -361,10 +371,9 @@ transformBlocks ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m,
-    HasKafka m
+    (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  [IngestBlock] -> m ()
+  [IngestBlock] -> ConduitT i SeqOutEvent m ()
 transformBlocks ibs = do
   forM_ ibs $ \ib ->
     case (ingestBlockToSequencedBlock ib) of

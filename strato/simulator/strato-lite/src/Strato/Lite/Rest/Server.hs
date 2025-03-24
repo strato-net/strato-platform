@@ -12,18 +12,19 @@
 module Strato.Lite.Rest.Server where
 
 import qualified Blockchain.Data.TXOrigin as Origin
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.MicroTime
-import qualified Control.Concurrent.STM.MonadIO as CCS
 import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+-- import Core.API
 import Data.Bifunctor (first)
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Servant
@@ -46,15 +47,6 @@ getConnections mgr = liftIO . atomically $ do
     mExp <- pollSTM a
     pure $ fmap (first show) mExp
 
-getChainInfo :: NetworkManager -> T.Text -> Handler ThreadResultMap
-getChainInfo mgr nodeLabel = liftIO . atomically $ do
-  ths <- readTVar $ mgr ^. network
-  let theNode = fromMaybe (error "Node not found.") $ M.lookup nodeLabel $ ths ^. nodes
-  ctxt <- (CCS.readTVarSTM . _p2pTestContext) theNode
-  let chainInfo = (Just . Left) $ show $ ctxt ^. chainInfoMap
-      res = M.singleton nodeLabel chainInfo
-  pure $ res
-
 getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
 getPeers mgr label = do
   mPeer <- liftIO $ fmap (M.lookup label . _nodes) . readTVarIO $ mgr ^. network
@@ -62,12 +54,12 @@ getPeers mgr label = do
     Nothing -> return []
     Just peer -> do
       peerMap <- liftIO $ readIORef. stringPPeerMap . _p2pPeerDB $ peer
-      let peers = map T.pack . M.keys $ peerMap
+      let peers = map (\(Host h) -> h) . M.keys $ peerMap
       pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
 postAddNode mgr label (AddNodeParams ip identity bootNodes) =
-  liftIO $ runReaderT (addNode label identity (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
+  liftIO $ runReaderT (addNode label identity (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
 postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
@@ -90,14 +82,13 @@ postTx mgr nodeLabel (PostTxParams tx md) = do
   liftIO . for_ mPeer $ \peer -> do
     ts <- liftIO $ getCurrentMicrotime
     let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
-        ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
+        ev = UnseqEvents [IETx ts $ IngestTx Origin.API signedTx]
     postEvent ev peer
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
   getNodes mgr
     :<|> getConnections mgr
-    :<|> getChainInfo mgr
     :<|> getPeers mgr
     :<|> postAddNode mgr
     :<|> postRemoveNode mgr
@@ -106,5 +97,31 @@ stratoLiteRestServer mgr =
     :<|> postTimeout mgr
     :<|> postTx mgr
 
+
+-- type NodeAPI = CoreAPIT ("nodes" :> Capture "nodeLabel" T.Text :> "strato-api" :>)
+--           :<|> ("bloc" :> "v2.2" :> BlocAPI)
+
+type FullAPI = StratoLiteRestAPI -- :<|> NodeAPI
+
+fullAPI :: Proxy FullAPI
+fullAPI = Proxy
+
+-- hoistNodeEndpoint :: NetworkManager -> ServerT api m -> ServerT ("nodes" :> Capture "nodeLabel" T.Text :> api) (ReaderT P2PPeer m)
+-- hoistNodeEndpoint mgr handler nodeLabel = do
+--   mNode <- M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
+--   case mNode of
+--     Nothing -> error . T.unpack $ "Node " <> nodeLabel <> " not found"
+--     Just p -> runReaderT handler p
+
+-- nodeServer :: NetworkManager -> Server NodeAPI
+-- nodeServer mgr = foldr (:<|>)
+--   mNode <- M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
+--   case mNode of
+--     Nothing -> error . T.unpack $ "Node " <> nodeLabel <> " not found"
+--     Just _ -> error "API support not implemented"
+
+combinedRestServer :: NetworkManager -> Server FullAPI
+combinedRestServer mgr = stratoLiteRestServer mgr -- :<|> nodeServer mgr
+
 stratoLiteRestApp :: NetworkManager -> Application
-stratoLiteRestApp = serve stratoLiteRestAPI . stratoLiteRestServer
+stratoLiteRestApp = serve fullAPI . combinedRestServer
