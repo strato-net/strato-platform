@@ -615,6 +615,7 @@ const ItemActions = ({
           open={bridgeOutModalOpen}
           handleCancel={handleBridgeOutModalClose}
           accountDetails={{
+            assetAddress: inventory.address,
             assetRootAddress: inventory.root,
             balance: quantity.toString(),
             decimals,

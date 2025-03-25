@@ -339,6 +339,7 @@ const BridgeWalletModal = ({
           externalChainWalletAddress: ethereumAddress,
           tokenAssetRootAddress: accountDetails.assetRootAddress,
           tokenName,
+          assetAddress: accountDetails.assetAddress,
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
