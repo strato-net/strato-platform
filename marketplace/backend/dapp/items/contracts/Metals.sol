@@ -19,7 +19,7 @@ enum UnitOfMeasurement {
 }
 
 /// @title A representation of Metals assets
-contract Metals is Mintable, UnitOfMeasurement{
+contract Metals is Redeemable, UnitOfMeasurement{
 
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
@@ -31,30 +31,32 @@ contract Metals is Mintable, UnitOfMeasurement{
 
     constructor(
         string _name,
+        string _symbol,
         string _description,
         string[] _images,
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint _quantity,
-        uint _decimals,
+        uint256 _initialSupply,
+        uint8 _decimals,
         UnitOfMeasurement _unitOfMeasurement,
         uint _leastSellableUnits,
         string _source,
         string _purity,
-        AssetStatus _status,
-        address _redemptionService
-    ) Mintable (
+        address _redemptionService,
+        address _metadataContract
+    ) Redeemable (
         _name,
+        _symbol,
         _description,
         _images,
         _files,
         _fileNames,
         _createdDate,
-        _quantity,
+        _initialSupply,
         _decimals,
-        _status,
-        _redemptionService
+        _redemptionService,
+        _metadataContract
         ) 
     {
         unitOfMeasurement = _unitOfMeasurement;
@@ -63,22 +65,4 @@ contract Metals is Mintable, UnitOfMeasurement{
         purity = _purity;
     }
 
-    function mint(uint splitQuantity) internal override returns (UTXO) {
-        Metals newAsset = new Metals(name,
-                              description, 
-                              images, 
-                              files, 
-                              fileNames,
-                              createdDate, 
-                              splitQuantity,
-                              decimals,
-                              unitOfMeasurement,
-                              leastSellableUnits,
-                              source,
-                              purity,
-                              status,
-                              address(redemptionService)
-                              );
-        return UTXO(address(newAsset)); 
-}
 }

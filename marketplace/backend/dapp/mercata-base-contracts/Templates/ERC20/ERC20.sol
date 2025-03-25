@@ -24,10 +24,10 @@ import "./utils/Context.sol";
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
  */
-abstract contract ERC20 is IERC20, IERC20Metadata{
-    mapping(address => uint256) public record _balances;
+abstract contract ERC20 is IERC20, IERC20Metadata{ //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
+    mapping(address => uint256) public record _balances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream
 
-    mapping(address => mapping(address => uint256)) private _allowances;
+    mapping(address => mapping(address => uint256)) public record _allowances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream. Also, I realize now that nested mappings don't work in slipstream so we need to use a different approach to query the allowances for now.
 
     uint256 private _totalSupply;
 
@@ -40,7 +40,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_) {
+    constructor(string name_, string symbol_) {
         _name = name_;
         _symbol = symbol_;
     }
@@ -48,7 +48,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
     /**
      * @dev Returns the name of the token.
      */
-    function name() public view virtual override returns (string memory) {
+    function name() public view virtual override returns (string) {
         return _name;
     }
 
@@ -56,7 +56,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
      */
-    function symbol() public view virtual override returns (string memory) {
+    function symbol() public view virtual override returns (string ) {
         return _symbol;
     }
 
@@ -182,15 +182,15 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
             _totalSupply += value;
         } else {
             uint256 fromBalance = _balances[from];
-            require(fromBalance >= value, "ERC20: insufficient balance");
+            require(fromBalance >= value, "ERC20: insufficient balance");//MERCATA_COMPATIBILITY: Removed unchecked block as it is not compatible with SolidVM
             // Overflow not possible: value <= fromBalance <= totalSupply.
             _balances[from] = fromBalance - value;
         }
 
-        if (to == address(0)) {
+        if (to == address(0)) {//MERCATA_COMPATIBILITY: Removed unchecked block as it is not compatible with SolidVM
             // Overflow not possible: value <= totalSupply or value <= fromBalance <= totalSupply.
             _totalSupply -= value;
-        } else {
+        } else {//MERCATA_COMPATIBILITY: Removed unchecked block as it is not compatible with SolidVM
             // Overflow not possible: balance + value is at most totalSupply, which we know fits into a uint256.
             _balances[to] += value;
         }
@@ -219,7 +219,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead
      */
-    function _burn(address accountAddress, uint256 value) internal {
+    function _burn(address accountAddress, uint256 value) internal { //MERCATA_COMPATIBILITY: The variable name is account in OpenZepplelin but that is a reserved keyword in solidity so changed to accountAddress
         require(accountAddress != address(0), "ERC20: burn from the zero address");
         _update(accountAddress, address(0), value);
     }
@@ -280,7 +280,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
      */
     function _spendAllowance(address owner, address spender, uint256 value) internal virtual {
         uint256 currentAllowance = allowance(owner, spender);
-        if (currentAllowance < 2^256-1) {
+        if (currentAllowance < 2^256-1) {//MERCATA_COMPATIBILITY: This exists as type(uint256).max in OpenZeppelin type is not recopnized in SolidVM so changed to 2^256-1
             require(currentAllowance >= value, "ERC20: insufficient allowance");
             _approve(owner, spender, currentAllowance - value, false);
         }
@@ -290,7 +290,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{
         return msg.sender;
     }
 
-    function _msgData() internal view virtual returns (bytes memory) {
+    function _msgData() internal view virtual returns (bytes ) {//MERCATA_COMPATIBILITY: This exists as bytes calldata in OpenZeppelin but that is not compatible with solidvm so changed to just bytes.
         return msg.data;
     }
 
