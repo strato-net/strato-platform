@@ -477,7 +477,7 @@ async function unstake(user, args, options) {
  * @throws {Error} - Throws if borrowing fails for any escrow or if validation fails.
  */
 async function borrow(user, args, options) {
-  const { reserve, borrowAmount } = args;
+  const { reserve, borrowAmount, userCommonName } = args;
 
   try {
     // Step 1: Fetch the escrows using the provided reserve and user,
@@ -489,7 +489,7 @@ async function borrow(user, args, options) {
         isActive: IS_ACTIVE,
         select: 'address,borrowedAmount::text,maxLoanAmount::text',
         reserve: `eq.${reserve}`,
-        borrowerCommonName: `eq.${user.username}`,
+        borrowerCommonName: `eq.${userCommonName}`,
       },
     };
 

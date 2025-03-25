@@ -2246,7 +2246,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.borrow = async function (args, options = defaultOptions) {
-    return await reserveJs.borrow(rawAdmin, args, options);
+    return await reserveJs.borrow(rawAdmin, { userCommonName, ...args}, options);
   };
 
   contract.repay = async function (args, options = defaultOptions) {
