@@ -243,7 +243,7 @@ const BridgeWalletModal = ({
 
   const mercataToEth = () => (
     <>
-      <div className="head hidden md:block">
+      <div className="head md:block">
         <Table
           columns={mercataToEthColumns}
           dataSource={[accountDetails]}
