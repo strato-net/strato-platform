@@ -235,7 +235,7 @@ handleEvents peer = awaitForever $ \case
 
     currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
     let maxBlockNumber :: Integer
-        maxBlockNumber = maximum $ map (BlockHeader.number . blockBlockData) blocks'
+        maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
 

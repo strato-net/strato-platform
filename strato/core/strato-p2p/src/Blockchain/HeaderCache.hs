@@ -70,7 +70,7 @@ instance MonadP2P m => HasHeaderCache m where
     let verified = and $ zipWith (\h b -> BlockHeader.transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
     unless verified $ error "headers don't match bodies"
     $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
-    unless (null headers) $ recordMaxBlockNumber "p2p_block_bodies" . maximum $ map BlockHeader.number headers
+    unless (null headers) $ recordMaxBlockNumber "p2p_block_bodies" . maximum . (0:) $ map BlockHeader.number headers
     let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
     $logInfoS "handleEvents/BlockBodies" $ T.pack $ "Recombined blocks range: " ++ showRanges (map (BlockHeader.number . blockBlockData) blocks')
 

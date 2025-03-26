@@ -128,6 +128,7 @@ nodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAP
       runLoggingT
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
+        . runMemPeerDBMUsingEnv (p^.p2pPeerDB)
         . flip runReaderT p
         $ f
 
