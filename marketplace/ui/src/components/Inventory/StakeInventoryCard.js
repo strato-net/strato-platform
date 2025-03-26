@@ -65,7 +65,6 @@ const StakeInventoryCard = ({
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
   collateralQuantity = collateralQuantity / Math.pow(10, decimals);
-
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -77,7 +76,6 @@ const StakeInventoryCard = ({
     : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
     ? inventory?.quantity + (inventory?.saleQuantity || 0)
     : 0;
-
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
     : inventory?.quantity / Math.pow(10, decimals);
