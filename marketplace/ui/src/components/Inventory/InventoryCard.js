@@ -455,7 +455,7 @@ const InventoryCard = ({
                       className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6`}
                       onClick={showBridgeOutModal}
                     >
-                      <RetweetOutlined /> Bridge out
+                      <RetweetOutlined /> Bridge
                     </Button>
                   ) : (
                     <Button
