@@ -8,10 +8,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Strato.Lite.Rest.Server where
 
--- import Bloc.API
+import Bloc.API
+import Bloc.Monad
+import Bloc.Server
+import BlockApps.Logging
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
@@ -20,14 +24,16 @@ import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.MicroTime
 import Control.Lens
+import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
 import Control.Monad.Reader
--- import Core.API
+import Core.API
 import Data.Bifunctor (first)
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Data.Traversable (for)
+import SQLM
 import Servant
 import Strato.Lite.Monad
 import Strato.Lite.Rest.Api
@@ -98,31 +104,35 @@ stratoLiteRestServer mgr =
     :<|> postTimeout mgr
     :<|> postTx mgr
 
+type CombinedAPI = "strato-api" :> CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
+type NodeAPI = "nodes" :> Capture "nodeLabel" T.Text :> CombinedAPI
 
--- type NodeAPI = CoreAPIT ("nodes" :> Capture "nodeLabel" T.Text :> "strato-api" :>)
---           :<|> ("bloc" :> "v2.2" :> BlocAPI)
-
-type FullAPI = StratoLiteRestAPI -- :<|> NodeAPI
+type FullAPI = StratoLiteRestAPI :<|> NodeAPI
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
 
--- hoistNodeEndpoint :: NetworkManager -> ServerT api m -> ServerT ("nodes" :> Capture "nodeLabel" T.Text :> api) (ReaderT P2PPeer m)
--- hoistNodeEndpoint mgr handler nodeLabel = do
---   mNode <- M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
---   case mNode of
---     Nothing -> error . T.unpack $ "Node " <> nodeLabel <> " not found"
---     Just p -> runReaderT handler p
-
--- nodeServer :: NetworkManager -> Server NodeAPI
--- nodeServer mgr = foldr (:<|>)
---   mNode <- M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
---   case mNode of
---     Nothing -> error . T.unpack $ "Node " <> nodeLabel <> " not found"
---     Just _ -> error "API support not implemented"
+nodeServer :: NetworkManager -> BlocEnv -> UrlMap -> T.Text -> Server CombinedAPI
+nodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAPI) (convertErrors runM) (coreApiServer :<|> bloc)
+  where
+    convertErrors r x = Handler $ do
+      mNode <- liftIO $ M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
+      case mNode of
+        Nothing -> throwE . apiErrorToServantErr . UserError $ "Node " <> nodeLabel <> " not found"
+        Just p -> do
+          y <- liftIO . try . r p $ x `catch` handleRuntimeError `catch` handleApiError
+          case y of
+            Right a -> pure a
+            Left e -> throwE $ apiErrorToServantErr e
+    runM p f =
+      runLoggingT
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . flip runReaderT p
+        $ f
 
 combinedRestServer :: NetworkManager -> Server FullAPI
-combinedRestServer mgr = stratoLiteRestServer mgr -- :<|> nodeServer mgr
+combinedRestServer mgr = (stratoLiteRestServer mgr) :<|> (nodeServer mgr undefined undefined)
 
 stratoLiteRestApp :: NetworkManager -> Application
 stratoLiteRestApp = serve fullAPI . combinedRestServer

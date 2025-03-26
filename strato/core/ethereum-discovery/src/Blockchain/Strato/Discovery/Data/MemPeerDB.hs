@@ -47,17 +47,17 @@ runMemPeerDBMUsingEnv env f =
 runMemPeerDBM :: MonadIO m => Host -> [PPeer] -> MemPeerDBM m a -> m a
 runMemPeerDBM me peers f = flip runMemPeerDBMUsingEnv f =<< createMemPeerDBEnv me peers
 
-instance HasMemPeerDB m => Mod.Accessible AvailablePeers m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible AvailablePeers (MemPeerDBM m) where
   access _ = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return $ AvailablePeers $ filter ((< currentTime) . pPeerUdpEnableTime) $ filter ((/= host) . pPeerHost) $ M.elems peerMap
 
-instance A.Replaceable (Host, TCPPort) ActivityState m where
-  replace = error "'A.Replaceable (Host, TCPPort) ActivityState m' not implemented"
+instance HasMemPeerDB m => A.Replaceable (Host, TCPPort) ActivityState m where
+  replace = A.insert
 
-instance HasMemPeerDB m => A.Selectable (Host, TCPPort) ActivityState m where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, TCPPort) ActivityState (MemPeerDBM m) where
   select = A.lookup
 
 instance HasMemPeerDB m => A.Alters (Host, TCPPort) ActivityState m where
@@ -69,8 +69,10 @@ instance HasMemPeerDB m => A.Alters (Host, TCPPort) ActivityState m where
     modifyIORef peerMap $ ix host %~ \p -> p {pPeerActiveState = fromActivityState a}
   delete _ _ = error "Test peer should not be deleting activity states"
 
-instance Mod.Accessible ActivePeers m where
-  access = error "'Mod.Accessible ActivePeers m' not implemented"
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActivePeers (MemPeerDBM m) where
+  access _ = do 
+    peerMap <- readIORef . stringPPeerMap =<< accessEnv
+    return . ActivePeers . filter ((== Active) . toActivityState . pPeerActiveState) $ M.elems peerMap
 
 instance HasMemPeerDB m => A.Replaceable (Host, UDPPort) PeerBondingState m where
   replace _ (host, _) (PeerBondingState s) = do
@@ -82,7 +84,7 @@ instance HasMemPeerDB m => A.Replaceable (Host, TCPPort) PeerBondingState m wher
     peerMap <- fmap stringPPeerMap accessEnv
     modifyIORef peerMap $ ix host %~ (\p -> p {pPeerBondState = s})
 
-instance HasMemPeerDB m => Mod.Accessible BondedPeers m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible BondedPeers (MemPeerDBM m) where
   access _ = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
@@ -90,7 +92,7 @@ instance HasMemPeerDB m => Mod.Accessible BondedPeers m where
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return $ BondedPeers $ filter f $ M.elems peerMap
 
-instance HasMemPeerDB m => Mod.Accessible BondedPeersForUDP m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible BondedPeersForUDP (MemPeerDBM m) where
   access _ = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
@@ -98,7 +100,7 @@ instance HasMemPeerDB m => Mod.Accessible BondedPeersForUDP m where
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return $ BondedPeersForUDP $ filter f $ M.elems peerMap
 
-instance HasMemPeerDB m => Mod.Accessible UnbondedPeersForUDP m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible UnbondedPeersForUDP (MemPeerDBM m) where
   access _ = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
@@ -106,14 +108,14 @@ instance HasMemPeerDB m => Mod.Accessible UnbondedPeersForUDP m where
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return $ UnbondedPeersForUDP $ filter f $ M.elems peerMap
 
-instance HasMemPeerDB m => A.Selectable Host ClosestPeers m where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Host ClosestPeers (MemPeerDBM m) where
   select _ t = do
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return $ Just $ ClosestPeers $ filter f $ M.elems peerMap
     where
       f p = pPeerHost p /= t && isJust (pPeerPubkey p)
 
-instance HasMemPeerDB m => A.Selectable IP PPeer m where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable IP PPeer (MemPeerDBM m) where
   select _ ip = do
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     pure . listToMaybe $ filter f $ M.elems peerMap

@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,7 +23,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens (makeLenses, over, (&), (.~), (?~))
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 import Control.Monad.Logger
 import Data.HashMap.Strict.InsOrd
@@ -35,12 +35,13 @@ import Handlers.Transaction
 import Servant
 import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
+import UnliftIO
 
-bloc ::
-  ( MonadLogger m,
+type MonadBlocAPI m = 
+  ( MonadUnliftIO m,
+    MonadLogger m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m,
     Selectable AccountsFilterParams [AddressStateRef] m,
     Selectable Address Contract m,
     Selectable Address AddressState m,
@@ -51,8 +52,9 @@ bloc ::
     Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     (Keccak256 `Selectable` SourceMap) m
-  ) =>
-  ServerT BlocAPI m
+  )
+
+bloc :: MonadBlocAPI m => ServerT BlocAPI m
 bloc =
   return gitInfo
     :<|> getContracts

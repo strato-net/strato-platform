@@ -36,14 +36,14 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB ()
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
+import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisInfo
 import Blockchain.Model.SyncTask
 import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.Data.Transaction (getSigVals)
+import Blockchain.Data.Transaction (getSigVals, txAndTime2RawTX)
 import Blockchain.Data.TransactionDef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified "vm-runner" Blockchain.Event as VMEvent
@@ -57,6 +57,7 @@ import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
+import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
 import Blockchain.Strato.Discovery.UDP
@@ -67,6 +68,7 @@ import Blockchain.Strato.Indexer.P2PIndexer
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -87,28 +89,32 @@ import Control.Monad (forever, join, void, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
+import Control.Monad.Composable.Identity
+import Control.Monad.Composable.Vault hiding (HasVault)
 import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import qualified Control.Monad.Trans.State as StateT
 import Crypto.Types.PubKey.ECC
+import qualified Data.Aeson as Aeson
 import Data.Bifunctor (first)
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (foldl', for_, toList, traverse_)
-import Data.Function (on)
-import Data.List (sortBy)
+import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromJust, fromMaybe, isJust)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust)
 import qualified Data.NibbleString as N
+import Data.Ord (Down(..))
 import qualified Data.Set as Set
 import qualified Data.Set.Ordered as S
 import Data.Text (Text)
@@ -116,13 +122,22 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock (UTCTime (..), addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Traversable (for)
-import Debugger (DebugSettings)
+import Debugger (DebugSettings, SourceMap(..))
 import Executable.EthereumDiscovery
 import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient 
 import Executable.StratoP2PServer (runEthServerConduit)
+import Handlers.AccountInfo hiding (API, server)
+import Handlers.BlkLast hiding (API, server)
+import Handlers.Block hiding (API, server)
+import Handlers.Stats hiding (API, server)
+import Handlers.Storage hiding (API, server)
+import Handlers.Transaction hiding (API, server)
+import Handlers.TxLast hiding (API, server)
 import Network.Socket
+import SelectAccessible ()
+import SolidVM.Model.CodeCollection hiding (Wei)
 import Text.Read (readMaybe)
 import UnliftIO
 import Prelude hiding (round)
@@ -172,8 +187,7 @@ instance Default P2PContext where
       (error "P2PContext: uninitialized unseqSink")
 
 data TestContext = TestContext
-  { _blocks :: [Block],
-    _prvKey :: PrivateKey,
+  { _prvKey :: PrivateKey,
     _shaBlockDataMap :: Map Keccak256 BlockHeader,
     _p2pWorldBestBlock :: WorldBestBlock,
     _bestBlock :: BestBlock,
@@ -192,7 +206,7 @@ data TestContext = TestContext
     _roundPeriod :: RoundPeriod,
     _timeoutChan :: TMChan RoundNumber,
     _vmContext :: MemContext,
-    _apiChainInfoMap :: Map Word256 ChainInfo,
+    _transactionResults :: [DataDefs.TransactionResult],
     _syncTasks :: [SyncTask]
   }
 
@@ -217,18 +231,11 @@ instance {-# OVERLAPPING #-} MonadIO m => State.MonadState P2PContext (MonadP2PT
     where
       swap ~(a, b) = (b, a)
 
-instance MonadIO m => Mod.Accessible PublicKey (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PublicKey (MonadTest m) where
   access _ = fmap (derivePublicKey . _prvKey) $ asks _p2pTestContext >>= liftIO . atomically . readTVar
 
-instance (Monad m, Mod.Accessible PublicKey m) => Mod.Accessible PublicKey (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible PublicKey m) => Mod.Accessible PublicKey (MonadP2PTest m) where
   access = lift . Mod.access
-
--- instance MonadIO m => Stacks Block (MonadTest m) where
---   takeStack _ n = take n <$> use blocks
---   pushStack bs = do
---     let maxNum = maximum $ number . blockBlockData <$> bs
---     bestBlock %= (\(BestBlock h n) -> BestBlock h $ max maxNum n)
---     blocks %= (bs ++)
 
 instance Monad m => (Keccak256 `A.Alters` A.Proxy (Inbound WireMessage)) (MonadP2PTest m) where
   lookup _ _ = pure Nothing
@@ -240,10 +247,10 @@ instance Monad m => ((Host, Keccak256) `A.Alters` A.Proxy (Outbound WireMessage)
   insert _ _ _ = pure ()
   delete _ _ = pure ()
 
-instance MonadIO m => Mod.Accessible [Validator] (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [Validator] (MonadTest m) where
   access _ = bestSequencedBlockValidators <$> use bestSequencedBlock
 
-instance (Monad m, Mod.Accessible [Validator] m) => Mod.Accessible [Validator] (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible [Validator] m) => Mod.Accessible [Validator] (MonadP2PTest m) where
   access p = lift $ Mod.access p
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (MonadTest m) where
@@ -263,17 +270,17 @@ instance MonadIO m => Mod.Modifiable BestSequencedBlock (MonadTest m) where
   get _ = use bestSequencedBlock
   put _ = assign bestSequencedBlock
 
-instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (MonadTest m) where
   select _ i = M.lookup i <$> use canonicalBlockDataMap
 
-instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
   access _ = use genesisBlockHash
 
 instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadP2PTest m) where
   get _ = use actionTimestamp
   put _ = assign actionTimestamp
 
-instance MonadIO m => Mod.Accessible ActionTimestamp (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockHeader] (MonadP2PTest m) where
@@ -291,7 +298,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (MonadP2PTest m) where
     now <- liftIO getCurrentTime
     assign blockHeaders (k, now)
 
-instance MonadIO m => Mod.Accessible [BlockHeader] (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [BlockHeader] (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @[BlockHeader])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) where
@@ -310,17 +317,17 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) wher
     now <- liftIO getCurrentTime
     assign remainingBlockHeaders (k, now)
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RemainingBlockHeaders (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
 
 instance MonadIO m => Mod.Modifiable PeerAddress (MonadP2PTest m) where
   get _ = use peerAddr
   put _ = assign peerAddr
 
-instance MonadIO m => Mod.Accessible PeerAddress (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PeerAddress (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @PeerAddress)
 
-instance HasMemPeerDB m => A.Selectable Host PPeer (MonadTest m) where
+instance {-# OVERLAPPING #-} HasMemPeerDB m => A.Selectable Host PPeer (MonadTest m) where
   select = A.lookup
 
 instance (HasMemPeerDB m, State.MonadState TestContext m) => (Host `A.Alters` PPeer) m where
@@ -356,7 +363,7 @@ instance (MonadIO m, (Point `A.Alters` PPeer) m) => (Point `A.Alters` PPeer) (Mo
   insert p point = lift . A.insert p point
   delete p point = lift $ A.delete p point
 
-instance (MonadIO m, (Point `A.Alters` PPeer) m) => A.Selectable Point PPeer (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (MonadIO m, (Point `A.Alters` PPeer) m) => A.Selectable Point PPeer (MonadP2PTest m) where
   select = A.lookup
 
 instance (Keccak256 `A.Alters` BlockHeader) m => (Keccak256 `A.Alters` BlockHeader) (MonadP2PTest m) where
@@ -376,16 +383,16 @@ instance Mod.Modifiable BestSequencedBlock m => Mod.Modifiable BestSequencedBloc
   get p = lift $ Mod.get p
   put p k = lift $ Mod.put p k
 
-instance A.Selectable Integer (Canonical BlockHeader) m => A.Selectable Integer (Canonical BlockHeader) (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} A.Selectable Integer (Canonical BlockHeader) m => A.Selectable Integer (Canonical BlockHeader) (MonadP2PTest m) where
   select p i = lift $ A.select p i
 
-instance (Monad m, Mod.Accessible GenesisBlockHash m) => Mod.Accessible GenesisBlockHash (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible GenesisBlockHash m) => Mod.Accessible GenesisBlockHash (MonadP2PTest m) where
   access p = lift $ Mod.access p
 
-instance A.Selectable String PPeer m => A.Selectable String PPeer (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} A.Selectable String PPeer m => A.Selectable String PPeer (MonadP2PTest m) where
   select p tx = lift $ A.select p tx
 
-instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
   select p addr = lift $ A.select p addr
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (MonadTest m) where
@@ -403,7 +410,7 @@ instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
   insert _ k v = x509certMap . at k ?= v
   delete _ k = x509certMap . at k .= Nothing
 
-instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select = A.lookup
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
@@ -415,19 +422,19 @@ instance MonadIO m => Mod.Modifiable SeenTransactionDB (MonadTest m) where
   get _ = use $ sequencerContext . seenTransactionDB
   put _ = assign $ sequencerContext . seenTransactionDB
 
-instance MonadIO m => Mod.Accessible (IORef RoundNumber) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (IORef RoundNumber) (MonadTest m) where
   access _ = use $ sequencerContext . latestRoundNumber
 
-instance MonadIO m => Mod.Accessible (TMChan RoundNumber) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (TMChan RoundNumber) (MonadTest m) where
   access _ = use timeoutChan
 
-instance MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
   access _ = use blockPeriod
 
-instance MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
   access _ = use roundPeriod
 
-instance MonadIO m => Mod.Accessible View (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible View (MonadTest m) where
   access _ = currentView
 
 instance MonadIO m => (Keccak256 `A.Alters` ()) (MonadTest m) where
@@ -534,21 +541,21 @@ instance MonadIO m => Mod.Modifiable ContextState (MonadTest m) where
   get _ = get
   put _ = put
 
-instance MonadIO m => Mod.Accessible MemContext (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemContext (MonadTest m) where
   access _ = getMemContext
 
 instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MonadTest m) where
   get _ = gets $ Lens.view debugSettings
   put _ ds = modify $ debugSettings .~ ds
 
-instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (MonadTest m) where
   access _ = get
 
 instance MonadIO m => Mod.Modifiable GasCap (MonadTest m) where
   get _ = GasCap <$> gets (Lens.view vmGasCap)
   put _ (GasCap g) = modify $ vmGasCap .~ g
 
-instance MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
   access _ = gets $ Lens.view memDBs
 
 instance MonadIO m => Mod.Modifiable MemDBs (MonadTest m) where
@@ -593,7 +600,7 @@ instance (MonadIO m, MonadLogger m) => (Address `A.Alters` AddressState) (MonadT
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadIO m, MonadLogger m) => A.Selectable Address AddressState (MonadTest m) where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Address AddressState (MonadTest m) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
@@ -624,14 +631,14 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k = dbsModify' $ codeDB . at k .~ Nothing
 
-instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
   select _ k = do
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
 
-instance (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
   select _ (k, t) = do
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
@@ -660,21 +667,21 @@ instance MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MonadTest m) where
   insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
   delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
 
-instance MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MonadTest m) where
   access _ = dbsGets $ Lens.view worldBestBlock
 
-instance MonadIO m => Mod.Accessible IsBlockstanbul (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (MonadTest m) where
   access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
 
 instance MonadIO m => Mod.Modifiable BaggerState (MonadTest m) where
   get _ = contextGets _baggerState
   put _ s = contextModify $ baggerState .~ s
 
-instance MonadIO m => Mod.Accessible TRC.Cache (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TRC.Cache (MonadTest m) where
   access _ = contextGets _txRunResultsCache
 
 instance MonadIO m => (MonadTest m) `Mod.Yields` DataDefs.TransactionResult where
-  yield = const (pure ())
+  yield txr = transactionResults %= (txr:)
 
 instance MonadIO m => (Keccak256 `A.Alters` API OutputTx) (MonadTest m) where
   lookup _ _ = pure Nothing
@@ -705,7 +712,7 @@ instance (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Out
     atomically . writeTQueue uSink $ UnseqEvents ies
     lift $ Mod.output ies
 
-instance A.Selectable Host PPeer m => A.Selectable Host PPeer (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} A.Selectable Host PPeer m => A.Selectable Host PPeer (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance (HasMemPeerDB m, State.MonadState TestContext m) => A.Replaceable Host PPeer (MonadP2PTest m) where
@@ -740,11 +747,109 @@ instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m)
             pSink = sinkTQueue o
         void . async $ f (P2pConduits pSource pSink sSource) otherIP
 
-instance Monad m => Mod.Accessible TCPPort (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible TCPPort (MonadP2PTest m) where
   access _ = pure $ TCPPort 30303
 
-instance Monad m => Mod.Accessible UDPPort (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible UDPPort (MonadP2PTest m) where
   access _ = pure $ UDPPort 30303
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Address Integer (MonadTest m) where
+  select _ addr = A.lookup (A.Proxy @AddressState) addr >>= \case
+    Nothing -> pure Nothing
+    Just AddressState{..} -> pure $ Just addressStateNonce
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Address Contract (MonadTest m) where
+  select _ addr = A.lookup (A.Proxy @AddressState) addr >>= \case
+    Nothing -> pure Nothing
+    Just AddressState{..} -> resolveCodePtr addressStateCodeHash >>= \case 
+      Just (SolidVMCode name ch) -> A.lookup (A.Proxy @DBCode) ch >>= \case 
+        Nothing -> pure Nothing
+        Just (_, codeBS) -> case Aeson.decode' $ BL.fromStrict codeBS of
+          Nothing -> case Text.decodeUtf8' codeBS of
+            Left _ -> pure Nothing
+            Right codeText -> compileSource False (M.singleton "" codeText) >>= \case
+              Left _ -> pure Nothing
+              Right CodeCollection{..} -> pure $ M.lookup name _contracts
+          Just codeMap -> compileSource False codeMap >>= \case
+            Left _ -> pure Nothing
+            Right CodeCollection{..} -> pure $ M.lookup name _contracts
+      _ -> pure Nothing
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Keccak256 SourceMap (MonadTest m) where
+  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case 
+    Nothing -> pure Nothing
+    Just (_, codeBS) -> case Aeson.decode' $ BL.fromStrict codeBS of
+      Just codeMap -> pure . Just . SourceMap $ M.toList codeMap
+      Nothing -> case Text.decodeUtf8' codeBS of
+        Left _ -> pure Nothing
+        Right codeText -> pure . Just $ SourceMap [("", codeText)]
+
+instance {-# OVERLAPPING #-} MonadIO m => GetLastBlocks (MonadTest m) where
+  getLastBlocks n = do
+    lastBlockHashes <- map (blockHeaderHash . unCanonical . snd) . take (fromInteger n) . sortOn (Down . fst) . M.toList <$> use canonicalBlockDataMap
+    bhr <- use blockHashRegistry
+    pure . catMaybes $ fmap outputBlockToBlock . flip M.lookup bhr <$> lastBlockHashes
+
+instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (MonadTest m) where
+  getLastTransactions _ n = do
+    lastBlockHashes <- map (blockHeaderHash . unCanonical . snd) . sortOn (Down . fst) . M.toList <$> use canonicalBlockDataMap
+    bhr <- use blockHashRegistry
+    time <- liftIO getCurrentTime
+    let toRawTx blkNum OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx blkNum time
+        getRawTxs OutputBlock{..} = toRawTx (blockHeaderBlockNumber obBlockData) <$> reverse obReceiptTransactions
+    pure . take (fromInteger n) . concat . catMaybes $ fmap getRawTxs . flip M.lookup bhr <$> lastBlockHashes
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [DataDefs.RawTransaction] (MonadTest m) where
+  access _ = do
+    bs <- Mod.get (Mod.Proxy @BaggerState)
+    time <- liftIO getCurrentTime
+    let toRawTx OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx (-1) time
+    pure . sortOn (Down . DataDefs.rawTransactionNonce) . map toRawTx . concat $ (M.elems <$> M.elems (queued bs)) ++ (M.elems <$> M.elems (pending bs))
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] (MonadTest m) where
+  select _ AccountsFilterParams{..} = case _qaAddress of
+    Nothing -> pure $ Just []
+    Just addr -> A.lookup (A.Proxy @AddressState) addr >>= \case
+      Nothing -> pure $ Just []
+      Just AddressState{..} -> do
+        let (mCH, mCN, mCPA) = case addressStateCodeHash of
+              ExternallyOwned h -> (Just h, Nothing, Nothing) 
+              SolidVMCode n h   -> (Just h, Just n, Nothing)
+              CodeAtAccount a n -> (Nothing, Just n, Just a)
+        pure . Just . (:[]) $ DataDefs.AddressStateRef
+          { DataDefs.addressStateRefAddress = addr
+          , DataDefs.addressStateRefNonce = addressStateNonce
+          , DataDefs.addressStateRefBalance = addressStateBalance
+          , DataDefs.addressStateRefContractRoot = addressStateContractRoot
+          , DataDefs.addressStateRefCodeHash = mCH
+          , DataDefs.addressStateRefContractName = mCN
+          , DataDefs.addressStateRefCodePtrAddress = mCPA
+          , DataDefs.addressStateRefLatestBlockDataRefNumber = -1
+          }
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable BlocksFilterParams [Block] (MonadTest m) where
+  select _ _ = Just <$> getLastBlocks 1000
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable StorageFilterParams [StorageAddress] (MonadTest m) where
+  select _ _ = pure $ Just []
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable TxsFilterParams [DataDefs.RawTransaction] (MonadTest m) where
+  select _ _ = Just <$> getLastTransactions Nothing 1000
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Keccak256 [DataDefs.TransactionResult] (MonadTest m) where
+  select _ _ = Just . take 1000 <$> use transactionResults
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TransactionCount (MonadTest m) where
+  access _ = TransactionCount . fromIntegral . length . concat . map obReceiptTransactions . M.elems <$> use blockHashRegistry
+
+instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (MonadTest m) where
+  access _ = error "strato-lite: Accessing IdentityData"
+
+instance {-# OVERLAPPING #-} Mod.Accessible VaultData (MonadTest m) where
+  access _ = error "strato-lite: Accessing VaultData"
+
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Address Certificate (MonadTest m) where
+  select _ _ = pure Nothing
 
 sockAddrToIpAndPort :: SockAddr -> Maybe (Host, UDPPort)
 sockAddrToIpAndPort (SockAddrInet port host) = case hostAddressToTuple host of
@@ -776,7 +881,7 @@ ipAndPortToSockAddr (Host ip) (UDPPort port) =
        in Just $ SockAddrInet (fromIntegral port) addr
     _ -> Nothing
 
-instance (MonadReader P2PPeer m, HasMemPeerDB m) => A.Selectable (Maybe Host, UDPPort) SockAddr (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (MonadReader P2PPeer m, HasMemPeerDB m) => A.Selectable (Maybe Host, UDPPort) SockAddr (MonadP2PTest m) where
   select _ (Just ip, udpPort) = pure $ ipAndPortToSockAddr ip udpPort
   select _ (Nothing, udpPort) = do
     myIP <- accessEnvVar p2pMyIPAddress
@@ -802,7 +907,7 @@ instance
             Nothing -> pure ()
             Just myAddr -> atomically $ writeTQueue s (msg, myAddr)
 
-instance
+instance {-# OVERLAPPING #-}
   ( MonadUnliftIO m,
     MonadLogger m,
     MonadReader P2PPeer m
@@ -814,7 +919,7 @@ instance
     mMsg <- timeout 10000000 . atomically $ readTQueue s
     pure mMsg
 
-instance
+instance {-# OVERLAPPING #-}
   ( MonadUnliftIO m,
     MonadLogger m,
     MonadReader P2PPeer m,
@@ -852,30 +957,30 @@ instance (MonadIO m, HasMemPeerDB m) => A.Replaceable (Host, Point) PeerBondingS
 instance (Monad m, A.Replaceable (Host, Point) PeerBondingState m) => A.Replaceable (Host, Point) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-instance (MonadIO m, HasMemPeerDB m) => A.Selectable (Host, Point) PeerBondingState (MonadTest m) where
+instance {-# OVERLAPPING #-} (MonadIO m, HasMemPeerDB m) => A.Selectable (Host, Point) PeerBondingState (MonadTest m) where
   select _ (ip, _) = do
     map' <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
 
-instance (A.Selectable (Host, Point) PeerBondingState m) => A.Selectable (Host, Point) PeerBondingState (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (A.Selectable (Host, Point) PeerBondingState m) => A.Selectable (Host, Point) PeerBondingState (MonadP2PTest m) where
   select p = lift . A.select p
 
-instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
   access _ = do
     validatorSet <- use p2pValidators
     x509s <- M.elems <$> use x509certMap
     let valAdds = map userAddress $ filter ((`Set.member` validatorSet) . Validator . T.pack . commonName) x509s
     return $ ValidatorAddresses valAdds
 
-instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
   access = lift . Mod.access
 
-instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
   select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
     where
       f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
 
-instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
@@ -890,7 +995,7 @@ instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
     unsortedTasks <- use syncTasks
-    let sortedTasks = sortBy (compare `on` (\(SyncTask _ t _ _) -> t)) unsortedTasks
+    let sortedTasks = sortOn (\(SyncTask _ t _ _) -> t) unsortedTasks
         foldTasks (Nothing, tasks) st@(SyncTask i t _ s) =
           if t < oneMinuteAgo && s /= Finished
             then let newTask = SyncTask i now host s
@@ -947,8 +1052,7 @@ testContext ::
   TestContext
 testContext prv rNum seqCtx vmCtx =
   TestContext
-    { _blocks = [],
-      _prvKey = prv,
+    { _prvKey = prv,
       _shaBlockDataMap = M.empty,
       _p2pWorldBestBlock = WorldBestBlock (BestBlock zeroHash (-1)),
       _bestBlock = BestBlock zeroHash (-1),
@@ -967,7 +1071,7 @@ testContext prv rNum seqCtx vmCtx =
       _roundPeriod = RoundPeriod 10,
       _timeoutChan = rNum,
       _vmContext = vmCtx,
-      _apiChainInfoMap = M.empty,
+      _transactionResults = [],
       _syncTasks = []
     }
 

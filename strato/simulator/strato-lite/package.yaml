@@ -34,6 +34,7 @@ library:
   ghc-options: -Wall -O2 
   dependencies:
   - aeson
+  - bloc2
   - bloc2api
   - core-api2
   - containers
@@ -62,9 +63,11 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - hflags
+  - identity-monad
   - lens
   - merkle-patricia-db
   - monad-alter
+  - monad-logger
   - monadIO
   - mtl
   - network
@@ -72,6 +75,8 @@ library:
   - ordered-containers
   - Ranged-sets
   - seqevents
+  - solid-vm-compiler
+  - solid-vm-model
   - stm-chans
   - stm-conduit
   - strato-genesis
@@ -83,6 +88,7 @@ library:
   - time
   - transformers
   - unliftio
+  - vault-monad
   - vm-runner
   - vm-tools
 
