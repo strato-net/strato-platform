@@ -69,13 +69,12 @@ const BridgeWalletModal = ({
       align: 'center',
       render: () => (
         <div
-          className={`${
-            hasExceedPrecision(quantity) ||
+          className={`${hasExceedPrecision(quantity) ||
             minQuantity.gt(quantity || 0) ||
             quantity > accountDetails?.balance
-              ? 'h-auto'
-              : 'h-8'
-          }`}
+            ? 'h-auto'
+            : 'h-8'
+            }`}
         >
           <InputNumber
             value={quantity}
@@ -84,8 +83,8 @@ const BridgeWalletModal = ({
             className="w-full"
             status={
               minQuantity.gt(quantity || 0) ||
-              hasExceedPrecision(quantity) ||
-              quantity > accountDetails?.balance
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
                 ? 'error'
                 : ''
             }
@@ -137,13 +136,12 @@ const BridgeWalletModal = ({
       align: 'center',
       render: () => (
         <div
-          className={`${
-            minQuantity.gt(quantity || 0) ||
+          className={`${minQuantity.gt(quantity || 0) ||
             hasExceedPrecision(quantity) ||
             quantity > accountDetails?.balance
-              ? 'h-auto'
-              : 'h-8'
-          }`}
+            ? 'h-auto'
+            : 'h-8'
+            }`}
         >
           <InputNumber
             value={quantity}
@@ -152,8 +150,8 @@ const BridgeWalletModal = ({
             className="w-full"
             status={
               minQuantity.gt(quantity || 0) ||
-              hasExceedPrecision(quantity) ||
-              quantity > accountDetails?.balance
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
                 ? 'error'
                 : ''
             }
@@ -221,10 +219,41 @@ const BridgeWalletModal = ({
           <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
           <div>
             <InputNumber
-              className="w-full h-9"
               value={quantity}
               onChange={(value) => setQuantity(value)}
+              controls={false}
+              className="w-full h-9"
+              status={
+                minQuantity.gt(quantity || 0) ||
+                  hasExceedPrecision(quantity) ||
+                  quantity > accountDetails?.balance
+                  ? 'error'
+                  : ''
+              }
             />
+            {accountDetails?.balance < quantity ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Insufficient balance
+              </div>
+            ) : minQuantity.gt(quantity || 0) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Amount must be greater than{' '}
+                {minQuantity.toFixed(accountDetails?.decimals)}
+              </div>
+            ) : hasExceedPrecision(quantity) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Maximum precision is {accountDetails?.decimals} decimal places
+              </div>
+            ) : null}
           </div>
         </div>
         <div>
@@ -249,6 +278,69 @@ const BridgeWalletModal = ({
           dataSource={[accountDetails]}
           pagination={false}
         />
+      </div>
+      <div className="flex flex-col gap-[18px] md:hidden">
+        <div>
+          {' '}
+          <p className="text-[#202020] font-medium text-sm">
+            {tokenName} Available
+          </p>
+          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+            <p> {accountDetails.balance} </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+          <div>
+            <InputNumber
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+              controls={false}
+              className="w-full h-9"
+              status={
+                minQuantity.gt(quantity || 0) ||
+                  hasExceedPrecision(quantity) ||
+                  quantity > accountDetails?.balance
+                  ? 'error'
+                  : ''
+              }
+            />
+            {accountDetails?.balance < quantity ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Insufficient balance
+              </div>
+            ) : minQuantity.gt(quantity || 0) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Amount must be greater than{' '}
+                {minQuantity.toFixed(accountDetails?.decimals)}
+              </div>
+            ) : hasExceedPrecision(quantity) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Maximum precision is {accountDetails?.decimals} decimal places
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Ethereum Wallet Address</p>
+          <div>
+            <Input
+              placeholder="Ethereum Chain address"
+              className="w-full h-9"
+              value={ethereumAddress}
+              onChange={(e) => setEthereumAddress(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
     </>
   );
