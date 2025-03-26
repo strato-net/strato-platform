@@ -334,9 +334,10 @@ const BridgeWalletModal = ({
           <p className="text-[#202020] font-medium text-sm">Ethereum Wallet Address</p>
           <div>
             <Input
+              placeholder="Ethereum Chain address"
               className="w-full h-9"
-              disabled={true}
-              value={accountDetails.walletAddress}
+              value={ethereumAddress}
+              onChange={(e) => setEthereumAddress(e.target.value)}
             />
           </div>
         </div>
