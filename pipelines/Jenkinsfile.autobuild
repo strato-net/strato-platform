@@ -109,7 +109,7 @@ pipeline {
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
-                accountNonceLimit=10000 \\
+                accountNonceLimit=4000 \\
                 ./strato --single
             """
           }
@@ -307,6 +307,7 @@ pipeline {
                   sh './run-vault.sh'
                   // run again but connecting to mercata-hydrogen this time
                   sh 'sed -i "s|./strato --single|network=mercata-hydrogen networkID=7596898649924658542 ./strato|" run.sh'
+                  sh 'sed -i "s/accountNonceLimit=4000/accountNonceLimit=20020/" run.sh'
                   sh './run.sh'
                   sh './check_availability.sh'
                   sh 'sudo docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
