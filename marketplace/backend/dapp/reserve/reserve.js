@@ -1,6 +1,7 @@
 import { util, rest } from '/blockapps-rest-plus';
 import constants, { DECIMAL_FACTOR_18 } from '../../helpers/constants';
 import { searchAllWithQueryArgs } from '/helpers/utils';
+import BigNumber from 'bignumber.js';
 
 const contractName = 'BlockApps-Mercata-Reserve';
 const contractTable = 'Reserve';
@@ -193,7 +194,7 @@ async function fetchTotalCataRewards(user, options) {
       creator: CREATOR,
       select: 'totalCataReward.sum()',
     },
-  }
+  };
 
   const allEscrows = await rest.search(
     user,
@@ -476,20 +477,19 @@ async function unstake(user, args, options) {
  * @throws {Error} - Throws if borrowing fails for any escrow or if validation fails.
  */
 async function borrow(user, args, options) {
-  const { reserve, borrowAmount, escrowAddresses } = args;
+  const { reserve, borrowAmount, userCommonName } = args;
 
-  if (escrowAddresses.length === 0) {
-    throw new Error('At least one escrow address must be provided.');
-  }
   try {
-    // Step 1: Fetch the escrows using the provided escrowAddresses
+    // Step 1: Fetch the escrows using the provided reserve and user,
+    // including maxLoanAmount and borrowedAmount
     const escrowSearchOptions = {
       ...options,
       query: {
         creator: CREATOR,
         isActive: IS_ACTIVE,
-        select: 'address,collateralQuantity',
-        address: `in.(${escrowAddresses.join(',')})`,
+        select: 'address,borrowedAmount::text,maxLoanAmount::text',
+        reserve: `eq.${reserve}`,
+        borrowerCommonName: `eq.${userCommonName}`,
       },
     };
 
@@ -503,51 +503,58 @@ async function borrow(user, args, options) {
       throw new Error('No active escrows found for the provided addresses.');
     }
 
-    // Step 2: Calculate total collateralQuantity
-    const totalCollateral = escrows.reduce(
-      (acc, escrow) => acc + Number(escrow.collateralQuantity || 0),
-      0
-    );
+    // Step 2: Calculate total available loan capacity (maxLoanAmount - borrowedAmount)
+    const totalAvailableLoan = escrows.reduce((acc, escrow) => {
+      const maxLoan = new BigNumber(escrow.maxLoanAmount || 0);
+      const borrowed = new BigNumber(escrow.borrowedAmount || 0);
+      const availableLoan = maxLoan.minus(borrowed);
+      return acc.plus(availableLoan.isGreaterThan(0) ? availableLoan : 0);
+    }, new BigNumber(0));
 
-    if (totalCollateral <= 0) {
+    if (totalAvailableLoan.isLessThanOrEqualTo(0)) {
       throw new Error(
-        'Total collateral quantity is zero or negative. Cannot proceed with borrowing.'
+        'Total available loan capacity is zero or negative. Cannot proceed with borrowing.'
       );
     }
 
-    // Step 3: Distribute borrowAmount proportionally based on collateralQuantity
-    let distributedAmount = 0; // To keep track of the total distributed amount
+    // Step 3: Distribute borrowAmount proportionally based on available loan capacity
+    let distributedAmount = new BigNumber(0);
+    const borrowAmountBN = new BigNumber(borrowAmount);
 
     for (let i = 0; i < escrows.length; i++) {
       const escrow = escrows[i];
+      const maxLoan = new BigNumber(escrow.maxLoanAmount || 0);
+      const borrowed = new BigNumber(escrow.borrowedAmount || 0);
+      const availableLoan = maxLoan.minus(borrowed).isGreaterThan(0)
+        ? maxLoan.minus(borrowed)
+        : new BigNumber(0);
       let amountToBorrow;
 
       if (i < escrows.length - 1) {
-        // Calculate proportional amount and floor it to ensure integer value
-        amountToBorrow = Math.floor(
-          (Number(escrow.collateralQuantity) / totalCollateral) * borrowAmount
-        );
-        distributedAmount += amountToBorrow;
+        // Calculate proportional amount based on available loan capacity
+        amountToBorrow = availableLoan
+          .dividedBy(totalAvailableLoan)
+          .multipliedBy(borrowAmountBN)
+          .integerValue(BigNumber.ROUND_FLOOR);
+        distributedAmount = distributedAmount.plus(amountToBorrow);
       } else {
         // Assign the remaining amount to the last escrow to handle any remainder
-        amountToBorrow = borrowAmount - distributedAmount;
+        amountToBorrow = borrowAmountBN.minus(distributedAmount);
       }
 
-      // Ensure that amountToBorrow is at least 0
-      amountToBorrow = Math.max(amountToBorrow, 0);
+      // Only execute the borrow call if amountToBorrow is greater than 0
+      if (amountToBorrow.isGreaterThan(0)) {
+        const callArgs = {
+          contract: { address: reserve },
+          method: 'borrow',
+          args: util.usc({
+            escrowAddress: escrow.address,
+            borrowAmount: amountToBorrow.toFixed(0, BigNumber.ROUND_DOWN),
+          }),
+        };
 
-      // Prepare callArgs
-      const callArgs = {
-        contract: { address: reserve },
-        method: 'borrow',
-        args: util.usc({
-          escrowAddress: escrow.address,
-          borrowAmount: amountToBorrow,
-        }),
-      };
-
-      // Execute the borrow call
-      await rest.call(user, callArgs, options);
+        await rest.call(user, callArgs, options);
+      }
     }
 
     return;

@@ -154,12 +154,6 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         </div>
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            {averageApy}%
-          </div>
-          <div className="stake-banner-stats-title text-white">Est. APY</div>
-        </div>
-        <div className="text-center">
-          <div className="stake-banner-stats-value font-bold text-white">
             {totalCataReward}
           </div>
           <div className="stake-banner-stats-title text-white">

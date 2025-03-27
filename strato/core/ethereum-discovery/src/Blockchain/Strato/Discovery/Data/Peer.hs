@@ -44,7 +44,6 @@ module Blockchain.Strato.Discovery.Data.Peer
     getActivePeers,
     getBondedPeers,
     jamshidBirth,
-    lengthenPeerDisable,
     lengthenPeerDisableBy,
     pPeerString,
     nonviolentDisable,
@@ -308,12 +307,6 @@ nonviolentDisable peer' = try $ do
 -- window is doubled, but those windows are reset every day. This prevents a mostly healthy node
 -- from building up longer and longer disables, e.g. if it caused an exception once a day
 -- by the end of the month it would be disabled for years.
-lengthenPeerDisable ::
-  (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m) =>
-  PPeer ->
-  m (Either SomeException ())
-lengthenPeerDisable = lengthenPeerDisableBy (24 * 60 * 60)
-
 lengthenPeerDisableBy ::
   (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m) =>
   NominalDiffTime ->

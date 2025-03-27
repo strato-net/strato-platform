@@ -34,6 +34,7 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder,
   reserve,
+  inputErrors,
 }) => {
   // temporary fix to put USDST as top payment option, will be updated in next release
   const activePaymentProviders =
@@ -390,7 +391,7 @@ const ResponsiveCart = ({
                         MinusQty(qty, product);
                       }}
                       className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                        ((qty === 1 && !product?.decimals) || qty === 0.01)
+                        new BigNumber(qty).lte(product.step)
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}
@@ -398,10 +399,10 @@ const ResponsiveCart = ({
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
                     <InputNumber
-                      className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
-                      min={1 / Math.pow(10, product?.decimals || 0)}
+                      className="w-[7rem] border-none text-[#202020] font-medium bg-[transparent] rounded-none outline-none text-sm text-center flex flex-col justify-center"
                       value={qty}
                       controls={false}
+                      stringMode
                       onChange={(e) => {
                         if (!isNaN(e)) {
                           let value = e.toString();
@@ -427,10 +428,12 @@ const ResponsiveCart = ({
                     />
                     <div
                       onClick={() => {
-                        AddQty(product);
+                        AddQty(qty, product);
                       }}
                       className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                        qty >= product.quantity
+                        new BigNumber(qty).isGreaterThanOrEqualTo(
+                          product.saleQuantity
+                        )
                           ? 'cursor-not-allowed opacity-50'
                           : 'cursor-pointer'
                       }`}
@@ -440,6 +443,14 @@ const ResponsiveCart = ({
                   </div>
                 </div>
               </div>
+              {inputErrors[product.key] && (
+                <div
+                  className="text-xs mt-2 text-right"
+                  style={{ color: 'red' }}
+                >
+                  {inputErrors[product.key]}
+                </div>
+              )}
 
               <div className="px-3 h-10 flex justify-between items-center rounded-md mt-[14px] bg-[#F6F6F6]">
                 <Typography className="text-[#202020] text-sm font-semibold">
@@ -556,7 +567,9 @@ const ResponsiveCart = ({
               type="primary"
               loading={isLoading}
               disabled={
-                !activePaymentProviders || activePaymentProviders?.length === 0
+                !activePaymentProviders ||
+                activePaymentProviders?.length === 0 ||
+                cartData.some((item) => item.disabled)
               }
               className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
               onClick={() =>

@@ -208,6 +208,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
               Nothing -> return ()
           e' | Just HeadMacIncorrect <- fromException e' -> do
             disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
+          e' | Just (EventBeforeHandshake _) <- fromException e' -> do
+            disableException thePeer "EventBeforeHandshake" Nothing False
           e' | Just NetworkIDMismatch <- fromException e' -> do
             disableException thePeer "NetworkIDMismatch" Nothing True
             case pPeerPubkey thePeer of 
@@ -223,6 +225,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             case ioErrType of
               NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * flags_connectionTimeout) True
               i -> disableException thePeer ("ioErrType: " <> show i) Nothing True
+          e' | Just HeadCipherTooShort <- fromException e' -> do  -- this is what we get when the remote machine crashes (obviously, it isn't sending us any reason for hangup)
+            disableException thePeer "HeadCipherTooShort" Nothing True
           _ -> return ()
       Right _ -> return ()
 
@@ -232,9 +236,15 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
       disErr <- storeDisableException p (T.pack exception)
       whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
       _ <- case disableBy of 
-        Just secs -> lengthenPeerDisableBy secs p
-        Nothing -> lengthenPeerDisable p
+        Just secs -> logAndLengthenPeerDisableBy secs p
+        Nothing -> logAndLengthenPeerDisableBy (24 * 60 * 60) p
       when disableUDP $ do 
         udpErr <- disableUDPPeerForSeconds p 86400
         whenLeft udpErr $ \theUDPErr -> do
           $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+
+
+logAndLengthenPeerDisableBy :: MonadP2P m => NominalDiffTime -> PPeer -> m (Either SomeException ())
+logAndLengthenPeerDisableBy disableBy peer = do
+  $logInfoS "logAndLengthenPeerDisableBy" $ T.pack $ "Disabling Peer " ++ show (pPeerHost peer) ++ ", exponential reset will occur in " ++ show disableBy ++ " seconds"
+  lengthenPeerDisableBy disableBy peer

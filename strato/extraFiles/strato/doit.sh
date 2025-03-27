@@ -166,7 +166,6 @@ function newnode {
     --blockstanbul=true \
     --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
     --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
-    --genesisBlockName=${genesis:-gettingStarted} \
     --minLogLevel=$seqMinLogLevel \
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
@@ -360,7 +359,6 @@ function doInit {
   --blockTime=${blockTime:-13} \
   --genesisBlockName=${genesis:-gettingStarted} \
   --generateKey=$generateKey \
-  --kafka=./kafka-topics.sh \
   --kafkahost=$kafkaHost \
   --lazyblocks=${lazyBlocks:-true} \
   --minPeers=${numMinPeers:-100} \

@@ -426,7 +426,7 @@ const StakeModal = ({
                     min={0}
                     value={inputQuantity}
                     onChange={handleInputChange}
-                    className="w-full"
+                    className="w-full font-bold"
                     controls={false}
                   />
                   {inputQuantity.gt(maxAllowedQuantity) && (

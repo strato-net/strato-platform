@@ -99,7 +99,7 @@ const WbtcstSteps = () => {
               style={{ color: '#4b5563' }}
             >
               Stake your WBTCST tokens and begin earning daily rewards in the
-              form of CATA, our governance token (Est. APY 10%).
+              form of CATA, our governance token.
             </p>
           </div>
         </div>
