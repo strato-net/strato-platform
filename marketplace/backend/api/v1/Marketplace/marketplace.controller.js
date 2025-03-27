@@ -92,14 +92,23 @@ class MarketplaceController {
     }
   }
 
+  movingGoldToFirst(inventoryData) {
+    const inventoryDataCopy = JSON.parse(JSON.stringify(inventoryData));
+    const indexOfGoldSt = inventoryDataCopy.findIndex(x => x.name === 'Gold');
+    const dataToMove = inventoryDataCopy[indexOfGoldSt];
+    inventoryDataCopy.splice(indexOfGoldSt, 1);
+    inventoryDataCopy.unshift(dataToMove);
+    return inventoryDataCopy;
+  }
+
   static async getStakeableProducts(req, res, next) {
     try {
       const { dapp, query } = req;
       const inventories = await dapp.getStakeableProducts({
         ...query,
       });
-
-      rest.response.status200(res, inventories);
+      const updatedInventory = new MarketplaceController().movingGoldToFirst(inventories);
+      rest.response.status200(res, updatedInventory);
 
       return next();
     } catch (e) {
