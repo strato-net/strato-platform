@@ -400,14 +400,14 @@ const BridgeWalletModal = ({
           const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
           tx = await wbtcContract.transfer(
             fileServerUrl.includes('test')
-              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
+              ? '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE'
               : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             wbtcAmount
           );
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
-              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
+              ? '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE'
               : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             value: ethers.utils.parseEther(quantity.toString()),
           });
