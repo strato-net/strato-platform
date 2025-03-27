@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -57,9 +58,6 @@ instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
 instance Mod.Modifiable r m => Mod.Modifiable r (ConduitT i o m) where
   get = lift . Mod.get
   put p = lift . Mod.put p
-
-instance (Monad m, Mod.Accessible r m) => Mod.Accessible r (ConduitT i o m) where
-  access = lift . Mod.access
 
 instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
   lookup p = lift . A.lookup p
@@ -132,10 +130,10 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
   case event of
     TimerFire roundNumber -> do
       withLabel seqLoopEvents "timeout" (flip unsafeAddCounter 1)
-      blockstanbulSend [Timeout roundNumber]
+      lift $ blockstanbulSend [Timeout roundNumber]
     UnseqEvents unseqEvents -> do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
-      timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
+      lift $ timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
 unseqEventHandler ::
   ( MonadSequencer m, 

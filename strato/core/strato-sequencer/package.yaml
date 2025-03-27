@@ -30,6 +30,7 @@ library:
     - conduit
     - directory
     - format
+    - hflags
     - http-client
     - kafka-monad
     - labeled-error
@@ -80,7 +81,7 @@ executables:
       - text
       - wai-middleware-prometheus
       - warp
-    other-modules: [Flags]
+    other-modules: []
 
   forced-config-change:
     source-dirs: exec-src

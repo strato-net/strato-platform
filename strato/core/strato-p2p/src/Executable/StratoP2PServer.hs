@@ -45,6 +45,7 @@ import qualified Data.Conduit.List                     as CL
 import           Data.Either.Combinators
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
+import           Data.Time.Clock (NominalDiffTime)
 import           GHC.IO.Exception
 import qualified Text.Colors                           as C
 import           UnliftIO
@@ -91,11 +92,11 @@ ethServerHandler pSource pSink seqSrc host = do
                     disErr <- storeDisableException p (T.pack "WrongGenesisBlock")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                     A.replace (A.Proxy @PeerBondingState) (pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
-                    lengthenPeerDisable p
+                    logAndLengthenPeerDisableBy (24 * 60 * 60) p
                   e' | Just HeadMacIncorrect <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                   e' | Just NetworkIDMismatch <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds p 86400
                     whenLeft udpErr $ \theUDPErr -> do
@@ -103,22 +104,22 @@ ethServerHandler pSource pSink seqSrc host = do
                     disErr <- storeDisableException p (T.pack "NetworkIDMismatch")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                     A.replace (A.Proxy @PeerBondingState) (pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
-                    lengthenPeerDisable p
+                    logAndLengthenPeerDisableBy (24 * 60 * 60) p
                   e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                   e' | Just CurrentlyTooManyPeers <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "CurrentlyTooManyPeers")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                   e' | Just NoPeerCertificate <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "NoPeerCertificate")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
                     udpErr <- disableUDPPeerForSeconds p 86400
                     whenLeft udpErr $ \theUDPErr -> do
                       $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
-                    lengthenPeerDisable p
+                    logAndLengthenPeerDisableBy (24 * 60 * 60) p
                   e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
                     case ioErrType of
                       NoSuchThing -> do
@@ -127,7 +128,7 @@ ethServerHandler pSource pSink seqSrc host = do
                           $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                         disErr <- storeDisableException p (T.pack "TimeoutException")
                         whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                        lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                        logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                       _ -> return $ Right ()
                   _ -> return $ Right ()
                 throwIO err
@@ -187,4 +188,9 @@ stratoP2PServer runner = labelTheThread "stratoP2PServer" $ do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
   runEthServer flags_listen runner
+
+logAndLengthenPeerDisableBy :: MonadP2P m => NominalDiffTime -> PPeer -> m (Either SomeException ())
+logAndLengthenPeerDisableBy disableBy peer = do
+  $logInfoS "logAndLengthenPeerDisableBy" $ T.pack $ "Disabling Peer " ++ show (pPeerHost peer) ++ ", exponential reset will occur in " ++ show disableBy ++ " seconds"
+  lengthenPeerDisableBy disableBy peer
 
