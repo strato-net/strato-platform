@@ -69,12 +69,13 @@ const BridgeWalletModal = ({
       align: 'center',
       render: () => (
         <div
-          className={`${hasExceedPrecision(quantity) ||
+          className={`${
+            hasExceedPrecision(quantity) ||
             minQuantity.gt(quantity || 0) ||
             quantity > accountDetails?.balance
-            ? 'h-auto'
-            : 'h-8'
-            }`}
+              ? 'h-auto'
+              : 'h-8'
+          }`}
         >
           <InputNumber
             value={quantity}
@@ -83,8 +84,8 @@ const BridgeWalletModal = ({
             className="w-full"
             status={
               minQuantity.gt(quantity || 0) ||
-                hasExceedPrecision(quantity) ||
-                quantity > accountDetails?.balance
+              hasExceedPrecision(quantity) ||
+              quantity > accountDetails?.balance
                 ? 'error'
                 : ''
             }
@@ -136,12 +137,13 @@ const BridgeWalletModal = ({
       align: 'center',
       render: () => (
         <div
-          className={`${minQuantity.gt(quantity || 0) ||
+          className={`${
+            minQuantity.gt(quantity || 0) ||
             hasExceedPrecision(quantity) ||
             quantity > accountDetails?.balance
-            ? 'h-auto'
-            : 'h-8'
-            }`}
+              ? 'h-auto'
+              : 'h-8'
+          }`}
         >
           <InputNumber
             value={quantity}
@@ -150,8 +152,8 @@ const BridgeWalletModal = ({
             className="w-full"
             status={
               minQuantity.gt(quantity || 0) ||
-                hasExceedPrecision(quantity) ||
-                quantity > accountDetails?.balance
+              hasExceedPrecision(quantity) ||
+              quantity > accountDetails?.balance
                 ? 'error'
                 : ''
             }
@@ -225,8 +227,8 @@ const BridgeWalletModal = ({
               className="w-full h-9"
               status={
                 minQuantity.gt(quantity || 0) ||
-                  hasExceedPrecision(quantity) ||
-                  quantity > accountDetails?.balance
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
                   ? 'error'
                   : ''
               }
@@ -299,8 +301,8 @@ const BridgeWalletModal = ({
               className="w-full h-9"
               status={
                 minQuantity.gt(quantity || 0) ||
-                  hasExceedPrecision(quantity) ||
-                  quantity > accountDetails?.balance
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
                   ? 'error'
                   : ''
               }
@@ -331,7 +333,9 @@ const BridgeWalletModal = ({
           </div>
         </div>
         <div>
-          <p className="text-[#202020] font-medium text-sm">Ethereum Wallet Address</p>
+          <p className="text-[#202020] font-medium text-sm">
+            Ethereum Wallet Address
+          </p>
           <div>
             <Input
               placeholder="Ethereum Chain address"
@@ -397,14 +401,14 @@ const BridgeWalletModal = ({
           tx = await wbtcContract.transfer(
             fileServerUrl.includes('test')
               ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+              : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             wbtcAmount
           );
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
               ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+              : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
