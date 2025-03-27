@@ -128,6 +128,7 @@ class TokensController {
       quantity: Joi.string().required(),
       externalChainWalletAddress: Joi.string().required(),
       tokenAssetRootAddress: Joi.string().required(),
+      assetAddress: Joi.string().required(),
     });
 
     const validation = burnETHSTSchema.validate(args);

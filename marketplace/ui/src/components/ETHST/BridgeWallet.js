@@ -221,10 +221,41 @@ const BridgeWalletModal = ({
           <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
           <div>
             <InputNumber
-              className="w-full h-9"
               value={quantity}
               onChange={(value) => setQuantity(value)}
+              controls={false}
+              className="w-full h-9"
+              status={
+                minQuantity.gt(quantity || 0) ||
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
+                  ? 'error'
+                  : ''
+              }
             />
+            {accountDetails?.balance < quantity ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Insufficient balance
+              </div>
+            ) : minQuantity.gt(quantity || 0) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Amount must be greater than{' '}
+                {minQuantity.toFixed(accountDetails?.decimals)}
+              </div>
+            ) : hasExceedPrecision(quantity) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Maximum precision is {accountDetails?.decimals} decimal places
+              </div>
+            ) : null}
           </div>
         </div>
         <div>
@@ -249,6 +280,71 @@ const BridgeWalletModal = ({
           dataSource={[accountDetails]}
           pagination={false}
         />
+      </div>
+      <div className="flex flex-col gap-[18px] md:hidden">
+        <div>
+          {' '}
+          <p className="text-[#202020] font-medium text-sm">
+            {tokenName} Available
+          </p>
+          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+            <p> {accountDetails.balance} </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+          <div>
+            <InputNumber
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+              controls={false}
+              className="w-full h-9"
+              status={
+                minQuantity.gt(quantity || 0) ||
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
+                  ? 'error'
+                  : ''
+              }
+            />
+            {accountDetails?.balance < quantity ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Insufficient balance
+              </div>
+            ) : minQuantity.gt(quantity || 0) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Amount must be greater than{' '}
+                {minQuantity.toFixed(accountDetails?.decimals)}
+              </div>
+            ) : hasExceedPrecision(quantity) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Maximum precision is {accountDetails?.decimals} decimal places
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">
+            Ethereum Wallet Address
+          </p>
+          <div>
+            <Input
+              placeholder="Ethereum Chain address"
+              className="w-full h-9"
+              value={ethereumAddress}
+              onChange={(e) => setEthereumAddress(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
     </>
   );
@@ -304,15 +400,15 @@ const BridgeWalletModal = ({
           const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
           tx = await wbtcContract.transfer(
             fileServerUrl.includes('test')
-              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+              ? '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE'
+              : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             wbtcAmount
           );
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
-              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+              ? '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE'
+              : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
@@ -339,6 +435,7 @@ const BridgeWalletModal = ({
           externalChainWalletAddress: ethereumAddress,
           tokenAssetRootAddress: accountDetails.assetRootAddress,
           tokenName,
+          assetAddress: accountDetails.assetAddress,
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }

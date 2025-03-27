@@ -1188,7 +1188,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.bridgeOut = async function (args, options = defaultOptions) {
-    const { tokenAssetRootAddress, quantity, externalChainWalletAddress } = args;
+    const { tokenAssetRootAddress, assetAddress, quantity, externalChainWalletAddress } = args;
 
     const bnQauntity = new BigNumber(quantity);
 
@@ -1198,6 +1198,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       {
         ownerCommonName: userCert.commonName,
         originAddress: tokenAssetRootAddress,
+        address: assetAddress,
         status: ASSET_STATUS.ACTIVE,
         queryOptions: { select: 'address, quantity::text, sale' },
         notEqualsField: 'quantity',
@@ -2246,7 +2247,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.borrow = async function (args, options = defaultOptions) {
-    return await reserveJs.borrow(rawAdmin, args, options);
+    return await reserveJs.borrow(rawAdmin, { userCommonName, ...args}, options);
   };
 
   contract.repay = async function (args, options = defaultOptions) {

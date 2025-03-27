@@ -420,7 +420,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                     <Tooltip
                       title={
                         isDisabled
-                          ? 'Minimum Credit Card Order Size $10.Please increase the quantity to proceed.'
+                          ? 'Minimum Credit Card Order Size $10. Please increase the quantity to proceed.'
                           : ''
                       }
                     >
@@ -452,24 +452,24 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                   >
                     <Button
                       type="primary"
-                      disabled={
-                        !activePaymentProviders ||
-                        activePaymentProviders?.length === 0 ||
-                        cartData.some((item) => item.disabled)
-                      }
                       className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
-                        isDisabled
+                        cartData.some((item) => item.disabled) || isDisabled
                           ? '!bg-[#808080] cursor-not-allowed'
                           : '!bg-[#13188A] cursor-pointer'
                       }`}
-                      onClick={() =>
-                        reserve && stakeChecked
-                          ? handlePlaceOrder(
-                              reserve?.address,
-                              reserve?.assetRootAddress
-                            )
-                          : handlePlaceOrder()
-                      }
+                      onClick={() => {
+                        if (
+                          !cartData.some((item) => item.disabled) &&
+                          !isDisabled
+                        ) {
+                          reserve && stakeChecked
+                            ? handlePlaceOrder(
+                                reserve?.address,
+                                reserve?.assetRootAddress
+                              )
+                            : handlePlaceOrder();
+                        }
+                      }}
                     >
                       Place Order
                     </Button>
