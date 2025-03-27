@@ -94,11 +94,20 @@ class MarketplaceController {
 
   movingGoldToFirst(inventoryData) {
     const inventoryDataCopy = JSON.parse(JSON.stringify(inventoryData));
-    const indexOfGoldSt = inventoryDataCopy.findIndex(x => x.name === 'Gold');
-    const dataToMove = inventoryDataCopy[indexOfGoldSt];
-    inventoryDataCopy.splice(indexOfGoldSt, 1);
-    inventoryDataCopy.unshift(dataToMove);
-    return inventoryDataCopy;
+
+    // Move item with name 'gold' (case-insensitive) to the front
+    const indexOfGoldSt = inventoryDataCopy.findIndex(
+      x => x.name?.toLowerCase() === 'gold' || x.name?.toLowerCase() === 'goldst'
+    );
+    if (indexOfGoldSt > -1) {
+      const dataToMove = inventoryDataCopy.splice(indexOfGoldSt, 1)[0];
+      inventoryDataCopy.unshift(dataToMove);
+    }
+
+    // Move items with 'sale' as undefined, null, or falsy to the end
+    const itemsWithSale = inventoryDataCopy.filter(x => x.sale);
+    const itemsWithoutSale = inventoryDataCopy.filter(x => !x.sale);
+    return [...itemsWithSale, ...itemsWithoutSale];
   }
 
   static async getStakeableProducts(req, res, next) {
