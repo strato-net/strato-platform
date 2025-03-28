@@ -10,7 +10,6 @@ import Data.Text
 import Servant.API
 import Data.Aeson
 import qualified Data.Text as T
-import GHC.Generics
 
 --------------------------------------------------------------------------------
 -- Routes and Types
