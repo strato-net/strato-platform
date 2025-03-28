@@ -59,7 +59,6 @@ createBlocEnv = liftIO $ do
         accountNonceLimit = 0,
         gasLimit = 0,
         globalNonceCounter = error ("globalNonceCounter shouldn't be needed in slipstream, it is undefined"),
-        txTBQueue = error ("txTBQueue shouldn't be needed in slipstream, it is undefined"),
         userRegistryAddress = 0x0,
         userRegistryCodeHash = Nothing,
         useWalletsByDefault = error "useWalletsByDefault shouldn't be needed in slipstream"

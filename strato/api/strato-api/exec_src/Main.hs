@@ -26,12 +26,17 @@ import Blockchain.Data.AddressStateRef
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
+import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.RedisBlockDB
+import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
+import Control.Monad.Change.Modify
 import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault hiding (httpManager)
@@ -48,7 +53,8 @@ import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
-import Data.Swagger hiding (Http, delete)
+import Data.Swagger hiding (Header, Http, delete)
+import Data.Text (Text)
 import HFlags
 import Handlers.Options
 import Instrumentation
@@ -65,6 +71,8 @@ import Servant.Client.Core hiding (requestMethod)
 import Servant.Multipart
 import Servant.Swagger
 import Servant.Swagger.UI
+import qualified Strato.Strato23.API.Types as V
+import Strato.Strato23.Client
 import SolidVM.Model.CodeCollection.Contract
 import System.Clock
 import Text.Regex
@@ -129,19 +137,35 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (
 instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
 
-type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
+instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
+  access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
+
+instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
+  access _ = runStratoRedisIO getBestBlockInfo
+
+instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
+  access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
+
+type FullAPI = Header "X-USER-ACCESS-TOKEN" Text :> (CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI)
+
+newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
+  sign msgHash = do
+    AccessToken jwtToken <- ask
+    blocVaultWrapper $ postSignature jwtToken (V.MsgHash msgHash)
+  getPub = do
+    AccessToken jwtToken <- ask
+    fmap V.unPubKey . blocVaultWrapper $ getKey jwtToken Nothing
+  getShared _ = error "getShared ReaderT VaultData: unimplemented"
 
 fullServer ::
-  ( HasSQL m,
-    HasBlocEnv m,
-    Selectable Address Contract m,
-    Selectable Address AddressState m,
-    Selectable Address Certificate m,
-    HasCodeDB m,
-    MonadCoreAPI m
+  ( MonadBlocAPI n,
+    n ~ ReaderT AccessToken m
   ) =>
   ServerT FullAPI m
-fullServer = coreApiServer :<|> bloc
+fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (AccessToken jwtToken)) coreApiServer
+                 :<|> hoistServer (Proxy :: Proxy BlocAPI) (flip runReaderT (AccessToken jwtToken)) bloc
 
 ----------------
 
@@ -214,10 +238,8 @@ main = do
 
   let stateFetchLimit' = 100
       nonceCounterTimeout = 10
-      txQueueSize = 4096
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
-  tbqueue <- newTBQueueIO txQueueSize
 
   let env =
         BlocEnv
@@ -226,7 +248,6 @@ main = do
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,
-            txTBQueue = tbqueue,
             userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
             useWalletsByDefault = flags_useWalletsByDefault

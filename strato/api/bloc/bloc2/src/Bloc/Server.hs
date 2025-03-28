@@ -16,42 +16,30 @@ import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
 import Blockchain.Data.CirrusDefs
-import Blockchain.Data.DataDefs
+import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Keccak256
+import Blockchain.SyncDB
 import Control.Lens (makeLenses, over, (&), (.~), (?~))
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.Vault
-import Control.Monad.Logger
+import qualified Control.Monad.Change.Modify as Mod
+import Core.API
 import Data.HashMap.Strict.InsOrd
-import Data.Source.Map
 import Data.Swagger
-import Handlers.AccountInfo
-import Handlers.Block
-import Handlers.Storage
-import Handlers.Transaction
 import Servant
 import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
-import UnliftIO
 
 type MonadBlocAPI m = 
-  ( MonadUnliftIO m,
-    MonadLogger m,
+  ( MonadCoreAPI m,
     HasBlocEnv m,
-    HasVault m,
-    Selectable AccountsFilterParams [AddressStateRef] m,
+    Mod.Accessible (Maybe SyncStatus) m,
+    Mod.Accessible (Maybe BestBlock) m,
+    Mod.Accessible (Maybe WorldBestBlock) m,
     Selectable Address Contract m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
-    Selectable BlocksFilterParams [Block] m,
-    Selectable Keccak256 [TransactionResult] m,
-    Selectable StorageFilterParams [StorageAddress] m,
-    Selectable TxsFilterParams [RawTransaction] m,
-    HasCodeDB m,
-    (Keccak256 `Selectable` SourceMap) m
+    HasCodeDB m
   )
 
 bloc :: MonadBlocAPI m => ServerT BlocAPI m
@@ -76,7 +64,6 @@ bloc =
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
-    :<|> postBlocTransactionParallelExternal
 
 blocSwagger :: Swagger
 blocSwagger =

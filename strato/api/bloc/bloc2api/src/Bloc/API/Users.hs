@@ -20,6 +20,7 @@ module Bloc.API.Users
     BlocTransactionStatus (..),
     GetBlocTransactionResult,
     PostBlocTransactionResults,
+    PostBlocTransactionResultsExternal,
     TransferParameters (..),
     ContractParameters (..),
     UploadListContract (..),
@@ -315,10 +316,12 @@ type GetBlocTransactionResult =
 type PostBlocTransactionResults =
   "transactions"
     :> "results"
-    :> Header "Authorization" Text
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] [Keccak256]
     :> Post '[JSON] [BlocTransactionResult]
+
+type PostBlocTransactionResultsExternal =
+  Header "Authorization" Text :> PostBlocTransactionResults
 
 instance ToParam (QueryFlag "resolve") where
   toParam _ =

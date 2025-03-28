@@ -20,6 +20,8 @@ executables:
     - blockapps-datadefs
     - blockapps-mpdbs
     - blockapps-init
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - blockDB
     - bytestring
     - cache
@@ -43,7 +45,9 @@ executables:
     - solid-vm-model
     - sql-monad
     - strato-model
+    - strato-redis-blockdb
     - swagger2
+    - text
     - transformers
     - unliftio
     - vault-monad

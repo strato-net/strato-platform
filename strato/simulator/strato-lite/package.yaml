@@ -36,6 +36,8 @@ library:
   - aeson
   - bloc2
   - bloc2api
+  - cache
+  - clock
   - core-api2
   - containers
   - crypto-pubkey-types

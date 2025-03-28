@@ -32,14 +32,15 @@ module Core.API
 import           BlockApps.Logging
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
+import           Blockchain.Sequencer.Event (IngestEvent)
 import           Blockchain.Strato.Discovery.Data.Peer (ActivePeers)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Options
+import           Blockchain.Strato.Model.Secp256k1
 import           Control.Monad.Change.Alter
-import           Control.Monad.Change.Modify       (Accessible)
+import           Control.Monad.Change.Modify       (Accessible, Outputs)
 import           Control.Monad.Composable.Identity
-import           Control.Monad.Composable.Vault    hiding (httpManager)
 import           Data.Source.Map
 import           Handlers.AccountInfo              hiding (API, server)
 import qualified Handlers.AccountInfo              as Account
@@ -93,16 +94,17 @@ type MonadCoreAPI m =
     Accessible IdentityData m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
-    Accessible VaultData m,
     BlkLast.GetLastBlocks m,
     TxLast.GetLastTransactions m,
+    HasVault m,
     Selectable Account.AccountsFilterParams [AddressStateRef] m,
     Selectable Address Integer m,
     Selectable Block.BlocksFilterParams [Block] m,
     Selectable Keccak256 SourceMap m,
     Selectable Keccak256 [TransactionResult] m,
     Selectable Storage.StorageFilterParams [Storage.StorageAddress] m,
-    Selectable Transaction.TxsFilterParams [RawTransaction] m
+    Selectable Transaction.TxsFilterParams [RawTransaction] m,
+    m `Outputs` [IngestEvent]
   )
 
 coreApiServer :: MonadCoreAPI m => ServerT CoreAPI m

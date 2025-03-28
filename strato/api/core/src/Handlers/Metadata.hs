@@ -27,26 +27,23 @@ import BlockApps.Logging
 import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (computeNetworkID)
-import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
+import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
 import Control.Lens
 import Control.Monad.Change.Modify
-import Control.Monad.Composable.Vault
+import Control.Monad.Reader
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map (Map, fromList)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Swagger hiding (url)
 import GHC.Generics
-import GHC.Stack
 import qualified LabeledError
-import SQLM
 import Servant
 import Servant.Client
 import qualified Strato.Strato23.API.Types as V
-import Strato.Strato23.Client hiding (verifyPassword)
 import UnliftIO
 
 type UrlMap = Map String String
@@ -114,19 +111,10 @@ getMetaData =
     urlMap <- access (Proxy @UrlMap)
     pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
 
-blocVaultWrapper ::
-  (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
-  ClientM x ->
-  m x
-blocVaultWrapper client' = do
-  logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
-  resultEither <-
-    liftIO $ runClientM client' (mkClientEnv mgr url)
-  either (blocError . VaultWrapperError) return resultEither
-
-getPubKeyAndAddress :: (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
-getPubKeyAndAddress = blocVaultWrapper $ getKey Nothing Nothing
+getPubKeyAndAddress :: (MonadLogger m, HasVault m) => m V.AddressAndKey
+getPubKeyAndAddress = do
+  pub <- getPub
+  pure $ V.AddressAndKey (fromPublicKey pub) pub
 
 checkIsSynced :: MonadIO m => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

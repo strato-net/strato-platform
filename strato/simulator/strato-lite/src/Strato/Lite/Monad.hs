@@ -80,7 +80,7 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.Model.Wei
 import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
-import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
+import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
@@ -90,7 +90,6 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.Identity
-import Control.Monad.Composable.Vault hiding (HasVault)
 import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import Control.Monad.Trans.Except
@@ -170,8 +169,7 @@ data P2PContext = P2PContext
     _remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime),
     _actionTimestamp :: ActionTimestamp,
     _peerAddr :: PeerAddress,
-    _outboundPbftMessages :: S.OSet (Text, Keccak256),
-    _unseqSink :: TQueue SeqLoopEvent
+    _outboundPbftMessages :: S.OSet (Text, Keccak256)
   }
 
 makeLenses ''P2PContext
@@ -184,22 +182,19 @@ instance Default P2PContext where
       emptyActionTimestamp
       (PeerAddress Nothing)
       S.empty
-      (error "P2PContext: uninitialized unseqSink")
 
 data TestContext = TestContext
   { _prvKey :: PrivateKey,
-    _shaBlockDataMap :: Map Keccak256 BlockHeader,
     _p2pWorldBestBlock :: WorldBestBlock,
     _bestBlock :: BestBlock,
     _bestSequencedBlock :: BestSequencedBlock,
-    _canonicalBlockDataMap :: Map Integer (Canonical BlockHeader),
+    _canonicalBlockHashMap :: Map Integer (Canonical Keccak256),
     _p2pValidators :: Set.Set Validator,
     _blockHashRegistry :: Map Keccak256 OutputBlock,
     _x509certMap :: Map Address X509CertInfoState,
     _genesisBlockHash :: GenesisBlockHash,
     _pointPPeerMap :: Map Point PPeer,
     _pbftMessages :: S.OSet Keccak256,
-    _unseqEvents :: [IngestEvent],
     _sequencerContext :: SequencerContext,
     _dbeRegistry :: Map Keccak256 DBDB.DependentBlockEntry,
     _blockPeriod :: BlockPeriod,
@@ -207,6 +202,7 @@ data TestContext = TestContext
     _timeoutChan :: TMChan RoundNumber,
     _vmContext :: MemContext,
     _transactionResults :: [DataDefs.TransactionResult],
+    _syncStatus :: SyncStatus,
     _syncTasks :: [SyncTask]
   }
 
@@ -254,24 +250,45 @@ instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible [Validator] m) => Mod.Acce
   access p = lift $ Mod.access p
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (MonadTest m) where
-  lookup _ k = M.lookup k <$> use shaBlockDataMap
-  insert _ k v = shaBlockDataMap %= M.insert k v
-  delete _ k = shaBlockDataMap %= M.delete k
+  lookup _ k = fmap obBlockData . M.lookup k <$> use blockHashRegistry
+  insert _ _ _ = error "insert asdlfkajwef" -- shaBlockDataMap %= M.insert k v
+  delete _ _ = error "delete asdlfkajwef" -- shaBlockDataMap %= M.delete k
+
+updateSyncStatus :: MonadIO m => MonadTest m ()
+updateSyncStatus = do
+  status <- unSyncStatus <$> use syncStatus
+  nodeNumber <- bestBlockNumber <$> Mod.get (Mod.Proxy @BestBlock)
+  worldNumber <- bestBlockNumber . unWorldBestBlock <$> Mod.get (Mod.Proxy @WorldBestBlock)
+  case (status, nodeNumber, worldNumber) of
+    (False, ntd, wtd) -> when (ntd >= wtd) (Mod.put (Mod.Proxy @SyncStatus) $ SyncStatus True)
+    (True, ntd, wtd) -> Mod.put (Mod.Proxy @SyncStatus) $ SyncStatus (ntd >= wtd)
 
 instance MonadIO m => Mod.Modifiable WorldBestBlock (MonadTest m) where
   get _ = use p2pWorldBestBlock
-  put _ = assign p2pWorldBestBlock
+  put _ wbb = do
+    assign p2pWorldBestBlock wbb
+    updateSyncStatus
 
 instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
   get _ = use bestBlock
-  put _ = assign bestBlock
+  put _ bb = do
+    assign bestBlock bb
+    updateSyncStatus
 
 instance MonadIO m => Mod.Modifiable BestSequencedBlock (MonadTest m) where
   get _ = use bestSequencedBlock
-  put _ = assign bestSequencedBlock
+  put _ bsb = do
+    assign bestSequencedBlock bsb
+    updateSyncStatus
+
+instance MonadIO m => Mod.Modifiable SyncStatus (MonadTest m) where
+  get _ = use syncStatus
+  put _ = assign syncStatus
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (MonadTest m) where
-  select _ i = M.lookup i <$> use canonicalBlockDataMap
+  select _ i = M.lookup i <$> use canonicalBlockHashMap >>= \case
+    Nothing -> pure Nothing
+    Just (Canonical bh) -> fmap (Canonical . obBlockData) . M.lookup bh <$> use blockHashRegistry
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
   access _ = use genesisBlockHash
@@ -380,6 +397,10 @@ instance Mod.Modifiable BestBlock m => Mod.Modifiable BestBlock (MonadP2PTest m)
   put p k = lift $ Mod.put p k
 
 instance Mod.Modifiable BestSequencedBlock m => Mod.Modifiable BestSequencedBlock (MonadP2PTest m) where
+  get p = lift $ Mod.get p
+  put p k = lift $ Mod.put p k
+
+instance Mod.Modifiable SyncStatus m => Mod.Modifiable SyncStatus (MonadP2PTest m) where
   get p = lift $ Mod.get p
   put p k = lift $ Mod.put p k
 
@@ -667,8 +688,14 @@ instance MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MonadTest m) where
   insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
   delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
 
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe BestBlock) (MonadTest m) where
+  access _ = Just <$> use bestBlock
+
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MonadTest m) where
   access _ = dbsGets $ Lens.view worldBestBlock
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe SyncStatus) (MonadTest m) where
+  access _ = Just <$> use syncStatus
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (MonadTest m) where
   access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
@@ -696,21 +723,22 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest m) where
 instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ (P2P OutputBlock {..}) = do
-    canonicalBlockDataMap . at (number obBlockData) ?= Canonical obBlockData
+  insert _ _ (P2P ob@OutputBlock{..}) = do
+    let bh = blockHeaderHash obBlockData
+    blockHashRegistry . at bh ?= ob
+    canonicalBlockHashMap . at (number obBlockData) ?= Canonical bh
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
   put _ (P2P bb) = bestBlock .= bb
 
-instance MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
-  output ies = unseqEvents %= (++ ies)
-
-instance (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
+instance {-# OVERLAPPING #-} MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEvent] where
   output ies = do
-    uSink <- use unseqSink
-    atomically . writeTQueue uSink $ UnseqEvents ies
-    lift $ Mod.output ies
+    unseqSource <- asks _p2pPeerUnseqSource
+    atomically . writeTQueue unseqSource $ UnseqEvents ies
+
+instance {-# OVERLAPPING #-} (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
+  output = lift . Mod.output
 
 instance {-# OVERLAPPING #-} A.Selectable Host PPeer m => A.Selectable Host PPeer (MonadP2PTest m) where
   select p = lift . A.select p
@@ -786,13 +814,13 @@ instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Keccak25
 
 instance {-# OVERLAPPING #-} MonadIO m => GetLastBlocks (MonadTest m) where
   getLastBlocks n = do
-    lastBlockHashes <- map (blockHeaderHash . unCanonical . snd) . take (fromInteger n) . sortOn (Down . fst) . M.toList <$> use canonicalBlockDataMap
+    lastBlockHashes <- map (unCanonical . snd) . take (fromInteger n) . sortOn (Down . fst) . M.toList <$> use canonicalBlockHashMap
     bhr <- use blockHashRegistry
     pure . catMaybes $ fmap outputBlockToBlock . flip M.lookup bhr <$> lastBlockHashes
 
 instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (MonadTest m) where
   getLastTransactions _ n = do
-    lastBlockHashes <- map (blockHeaderHash . unCanonical . snd) . sortOn (Down . fst) . M.toList <$> use canonicalBlockDataMap
+    lastBlockHashes <- map (unCanonical . snd) . sortOn (Down . fst) . M.toList <$> use canonicalBlockHashMap
     bhr <- use blockHashRegistry
     time <- liftIO getCurrentTime
     let toRawTx blkNum OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx blkNum time
@@ -809,23 +837,25 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [DataDefs.RawTransactio
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] (MonadTest m) where
   select _ AccountsFilterParams{..} = case _qaAddress of
     Nothing -> pure $ Just []
-    Just addr -> A.lookup (A.Proxy @AddressState) addr >>= \case
-      Nothing -> pure $ Just []
-      Just AddressState{..} -> do
-        let (mCH, mCN, mCPA) = case addressStateCodeHash of
-              ExternallyOwned h -> (Just h, Nothing, Nothing) 
-              SolidVMCode n h   -> (Just h, Just n, Nothing)
-              CodeAtAccount a n -> (Nothing, Just n, Just a)
-        pure . Just . (:[]) $ DataDefs.AddressStateRef
-          { DataDefs.addressStateRefAddress = addr
-          , DataDefs.addressStateRefNonce = addressStateNonce
-          , DataDefs.addressStateRefBalance = addressStateBalance
-          , DataDefs.addressStateRefContractRoot = addressStateContractRoot
-          , DataDefs.addressStateRefCodeHash = mCH
-          , DataDefs.addressStateRefContractName = mCN
-          , DataDefs.addressStateRefCodePtrAddress = mCPA
-          , DataDefs.addressStateRefLatestBlockDataRefNumber = -1
-          }
+    Just addr -> do
+      bh <- bestBlockHash <$> use bestBlock
+      withCurrentBlockHash bh $ A.lookup (A.Proxy @AddressState) addr >>= \case
+        Nothing -> pure $ Just []
+        Just AddressState{..} -> do
+          let (mCH, mCN, mCPA) = case addressStateCodeHash of
+                ExternallyOwned h -> (Just h, Nothing, Nothing) 
+                SolidVMCode n h   -> (Just h, Just n, Nothing)
+                CodeAtAccount a n -> (Nothing, Just n, Just a)
+          pure . Just . (:[]) $ DataDefs.AddressStateRef
+            { DataDefs.addressStateRefAddress = addr
+            , DataDefs.addressStateRefNonce = addressStateNonce
+            , DataDefs.addressStateRefBalance = addressStateBalance
+            , DataDefs.addressStateRefContractRoot = addressStateContractRoot
+            , DataDefs.addressStateRefCodeHash = mCH
+            , DataDefs.addressStateRefContractName = mCN
+            , DataDefs.addressStateRefCodePtrAddress = mCPA
+            , DataDefs.addressStateRefLatestBlockDataRefNumber = -1
+            }
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable BlocksFilterParams [Block] (MonadTest m) where
   select _ _ = Just <$> getLastBlocks 1000
@@ -844,9 +874,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TransactionCount (Monad
 
 instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (MonadTest m) where
   access _ = error "strato-lite: Accessing IdentityData"
-
-instance {-# OVERLAPPING #-} Mod.Accessible VaultData (MonadTest m) where
-  access _ = error "strato-lite: Accessing VaultData"
 
 instance {-# OVERLAPPING #-} Monad m => A.Selectable Address Certificate (MonadTest m) where
   select _ _ = pure Nothing
@@ -1053,18 +1080,16 @@ testContext ::
 testContext prv rNum seqCtx vmCtx =
   TestContext
     { _prvKey = prv,
-      _shaBlockDataMap = M.empty,
       _p2pWorldBestBlock = WorldBestBlock (BestBlock zeroHash (-1)),
       _bestBlock = BestBlock zeroHash (-1),
       _bestSequencedBlock = BestSequencedBlock zeroHash (-1) [],
-      _canonicalBlockDataMap = M.empty,
+      _canonicalBlockHashMap = M.empty,
       _p2pValidators = Set.empty,
       _blockHashRegistry = M.empty,
       _x509certMap = M.empty,
       _genesisBlockHash = GenesisBlockHash zeroHash,
       _pointPPeerMap = M.empty,
       _pbftMessages = S.empty,
-      _unseqEvents = [],
       _sequencerContext = seqCtx,
       _dbeRegistry = M.empty,
       _blockPeriod = BlockPeriod 1,
@@ -1072,6 +1097,7 @@ testContext prv rNum seqCtx vmCtx =
       _timeoutChan = rNum,
       _vmContext = vmCtx,
       _transactionResults = [],
+      _syncStatus = SyncStatus False,
       _syncTasks = []
     }
 
@@ -1119,9 +1145,11 @@ runNodeWithoutP2P p = do
 
 runNode :: P2PPeer -> IO ()
 runNode p = do
-  chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
-  let s = sourceTMChan chan
-  ctx <- newIORef $ def & unseqSink .~ p ^. p2pPeerUnseqSource
+  let s = do
+        seqP2pSource <- lift . lift $ asks _p2pPeerSeqP2pSource
+        chan <- atomically $ dupTMChan seqP2pSource
+        sourceTMChan chan
+  ctx <- newIORef (def :: P2PContext)
   concurrently_
     (runNodeWithoutP2P p)
     ( concurrently_
@@ -1322,14 +1350,16 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
                      writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                      writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
                )
-      apiIndexer' =
+      apiIndexer' = do
+        A.insert (A.Proxy @(API OutputBlock)) genHash $ API genesisOutputBlock
         runConduit $
           sourceTQueue apiIndexerSource
             .| ( awaitForever $ \evs -> do
                    $logInfoS (name <> "/testApiIndexer") . T.pack $ show evs
                    lift $ indexAPI evs
                )
-      p2pIndexer' =
+      p2pIndexer' = do
+        A.insert (A.Proxy @(P2P OutputBlock)) genHash $ P2P genesisOutputBlock
         runConduit $
           sourceTQueue p2pIndexerSource
             .| ( awaitForever $ \evs -> do
@@ -1399,8 +1429,8 @@ createConnectionWithModifications server' client' modifyServerMsgs modifyClientM
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
-  serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server'
-  clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
+  serverCtx <- newIORef (def :: P2PContext)
+  clientCtx <- newIORef (def :: P2PContext)
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer = runEthServerConduit
@@ -1434,8 +1464,8 @@ createGermophobicConnection server' client' = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
-  serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server'
-  clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
+  serverCtx <- newIORef (def :: P2PContext)
+  clientCtx <- newIORef (def :: P2PContext)
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer = pure Nothing -- server is germophobic; will not conduct handshake

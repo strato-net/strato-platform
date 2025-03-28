@@ -132,8 +132,8 @@ nodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAP
         . flip runReaderT p
         $ f
 
-combinedRestServer :: NetworkManager -> Server FullAPI
-combinedRestServer mgr = (stratoLiteRestServer mgr) :<|> (nodeServer mgr undefined undefined)
+combinedRestServer :: NetworkManager -> BlocEnv -> UrlMap -> Server FullAPI
+combinedRestServer mgr blocEnv urlMap = (stratoLiteRestServer mgr) :<|> (nodeServer mgr blocEnv urlMap)
 
-stratoLiteRestApp :: NetworkManager -> Application
-stratoLiteRestApp = serve fullAPI . combinedRestServer
+stratoLiteRestApp :: NetworkManager -> BlocEnv -> UrlMap -> Application
+stratoLiteRestApp mgr blocEnv = serve fullAPI . combinedRestServer mgr blocEnv

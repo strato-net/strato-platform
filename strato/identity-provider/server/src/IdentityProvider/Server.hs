@@ -25,12 +25,12 @@ module IdentityProvider.Server (identityProviderApp) where
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResults)
+import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResultsExternal)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Address (deriveAddressWithSalt)
-import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
+import Blockchain.Strato.Model.Secp256k1
 import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
@@ -170,7 +170,7 @@ getPingIdentity = return 1
 putIdentity ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    HasVault m,
+    Accessible VaultData m,
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
@@ -264,7 +264,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
 putIdentityExternal ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    HasVault m,
+    Accessible VaultData m,
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
@@ -462,7 +462,7 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->
@@ -472,7 +472,7 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
           let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
           if (not $ null pending) 
             then do 
-              eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+              eresponse2 <- liftIO $ runClientM (postBlocTransactionResultsExternal (Just $ "Bearer " <> access_token token) True pending) clientEnv
               case eresponse2 of 
                 Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response2
                 err -> do 
@@ -550,7 +550,7 @@ registerUserWallet
                 functionpayloadMetadata = Nothing
               }
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)
     eresponse <- liftIO $ postBlocTx clientEnv
     case eresponse of
       Right response ->
@@ -564,7 +564,7 @@ registerUserWallet
             let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
             if (not $ null pending) 
               then do 
-                eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+                eresponse2 <- liftIO $ runClientM (postBlocTransactionResultsExternal (Just $ "Bearer " <> access_token token) True pending) clientEnv
                 case eresponse2 of
                   Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
                     $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
@@ -595,7 +595,7 @@ registerUserWallet
               $ "Failed to register user wallet; response was: " ++ show err
             return False
 
-getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)
+getVaultKey :: (MonadIO m, MonadLogger m, Accessible VaultData m) => Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
   VaultData url mgr <- access Proxy
   eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
@@ -612,7 +612,7 @@ getVaultKey accessToken = do
       $logInfoS "getVaultKey" $ T.pack $ "Vault error when trying to get user's key: " <> show err
       throwIO $ IdentityError $ T.pack $ "Vault error when trying to get user's key: " <> show err
 
-postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m AddressAndKey
+postVaultKey :: (MonadIO m, MonadLogger m, Accessible VaultData m) => Text -> m AddressAndKey
 postVaultKey accessToken = do
   VaultData url mgr <- access Proxy
   eAddressNKey <- liftIO $ runClientM (postKey (Just accessToken)) (mkClientEnv mgr url)
@@ -627,7 +627,7 @@ postVaultKey accessToken = do
 server ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    HasVault m,
+    Accessible VaultData m,
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,

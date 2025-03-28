@@ -145,7 +145,7 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResults Nothing resolve [txHash]
+getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResults resolve [txHash]
   where unsafeHead [] = throwIO $ AnError "getBlocTransactionResult: No results returned"
         unsafeHead (x:_) = pure x
 
@@ -164,7 +164,7 @@ getBatchBlocTransactionResult' ::
   m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
-    then postBlocTransactionResults Nothing True hashes
+    then postBlocTransactionResults True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults ::
@@ -177,11 +177,10 @@ postBlocTransactionResults ::
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m
   ) =>
-  Maybe Text ->
   Bool ->
   [Keccak256] ->
   m [BlocTransactionResult]
-postBlocTransactionResults _ resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
+postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
   ( MonadIO m
