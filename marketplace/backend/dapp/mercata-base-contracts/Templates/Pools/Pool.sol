@@ -157,7 +157,7 @@ abstract contract Pool is ERC20 {
         decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)));
         require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 token in stablecoins (stable_reserve / token_reserve)
-        return decimal((stable_reserve * 1000000000000000000.000000) / token_reserve) / 1000000000000000000.000000;
+        return decimal((stable_reserve * 1000000000000000000.000000) / token_reserve) / 1000000000000000000.000000;MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
     function getCurrentStablePrice() external view returns (decimal) {
@@ -165,7 +165,7 @@ abstract contract Pool is ERC20 {
         decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)));
         require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 stablecoin in tokens (token_reserve / stable_reserve)
-        return decimal((token_reserve * 1000000000000000000.000000) / stable_reserve) / 1000000000000000000.000000;
+        return decimal((token_reserve * 1000000000000000000.000000) / stable_reserve) / 1000000000000000000.000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
     // Swap functions
