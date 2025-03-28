@@ -985,8 +985,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     options = optionsNoChainIds
   ) {
     const getOptions = { ...options, app: contractName };
-    const rootUTXOs = await inventoryJs.getAll(rawAdmin, args, getOptions);
-    return await inventoryJs.getStakeableProducts(rawAdmin, rootUTXOs, getOptions);
+    return await inventoryJs.getStakeableProducts(rawAdmin, args, getOptions);
   };
 
   contract.getPriceHistory = async function (args, options = defaultOptions) {
@@ -1837,7 +1836,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
-      const saleAddresses = orderList.map((o) => o.saleAddress);
       const quantities = orderList.map((o) =>
         new BigNumber(o.quantity).toFixed(0)
       );
@@ -1848,6 +1846,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         { assetAddresses: assetAddresses },
         options
       );
+
+      const saleAddresses = assets.map((a) => a.saleAddress);
 
       if (assets.length == 0 || assets.length != orderList.length) {
         throw new rest.RestError(RestStatus.NOT_FOUND, 'Inventory not found');

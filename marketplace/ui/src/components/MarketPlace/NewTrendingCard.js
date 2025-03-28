@@ -292,7 +292,7 @@ const NewTrendingCard = ({
         )}
         <a
           href={`${naviroute
-            .replace(':address', topSellingProduct.assetToBeSold)
+            .replace(':address', topSellingProduct.address)
             .replace(':name', topSellingProduct.name)}`}
           onClick={(e) => {
             // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
@@ -303,7 +303,7 @@ const NewTrendingCard = ({
               if (isAvailableForSale) {
                 navigate(
                   `${naviroute
-                    .replace(':address', topSellingProduct.assetToBeSold)
+                    .replace(':address', topSellingProduct.address)
                     .replace(
                       ':name',
                       encodeURIComponent(topSellingProduct.name)
@@ -315,7 +315,7 @@ const NewTrendingCard = ({
                   navigate(
                     `${ethNaviroute.replace(
                       ':address',
-                      topSellingProduct.address
+                      topSellingProduct.root
                     )}`,
                     { state: { isCalledFromInventory: false } }
                   );
@@ -323,7 +323,7 @@ const NewTrendingCard = ({
                   navigate(
                     `${routes.WbtcstProductDetail.url.replace(
                       ':address',
-                      topSellingProduct.address
+                      topSellingProduct.root
                     )}`,
                     { state: { isCalledFromInventory: false } }
                   );

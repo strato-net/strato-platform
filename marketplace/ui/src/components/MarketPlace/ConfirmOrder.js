@@ -202,7 +202,6 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
         unitPrice: unitPrice
           .dividedBy(new BigNumber(10).pow(decimals))
           .toFixed(decimals),
-        saleAddress: item.saleAddress,
       });
     });
 
