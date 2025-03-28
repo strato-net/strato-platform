@@ -3,7 +3,7 @@ pragma strict;
 
 import <5c378a123236dcab013bd1df10d0043e357a4aa4>;
 
-contract SimpleERC20 is ERC20{
+contract ERC20Simple is ERC20{
     address public owner;
     constructor(string name_, string symbol_, uint256 initialSupply_) ERC20(name_, symbol_){
         owner = msg.sender;

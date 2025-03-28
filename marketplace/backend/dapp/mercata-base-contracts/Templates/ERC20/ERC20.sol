@@ -280,7 +280,7 @@ abstract contract ERC20 is IERC20, IERC20Metadata{ //MERCATA_COMPATIBILITY: Inhe
      */
     function _spendAllowance(address owner, address spender, uint256 value) internal virtual {
         uint256 currentAllowance = allowance(owner, spender);
-        if (currentAllowance < 2^256-1) {//MERCATA_COMPATIBILITY: This exists as type(uint256).max in OpenZeppelin type is not recopnized in SolidVM so changed to 2^256-1
+        if (currentAllowance != (2**256 - 1)) {  // Fixed syntax for max uint256 comparison
             require(currentAllowance >= value, "ERC20: insufficient allowance");
             _approve(owner, spender, currentAllowance - value, false);
         }

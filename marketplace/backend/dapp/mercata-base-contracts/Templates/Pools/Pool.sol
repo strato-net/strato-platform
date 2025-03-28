@@ -1,147 +1,207 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
 
-import "../Oracles/OracleService.sol";
 import "../ERC20/ERC20.sol";
 
-/**
- * @title Simple ERC20/Stablecoin Liquidity Pool
- * @notice A basic implementation of x*y=k formula without fees
- */
+//Removed deadlineCheck for now
+//Removed slippage protection as it is pbft
 abstract contract Pool is ERC20 {
-    IERC20 public token;
-    IERC20 public stablecoin;
-    OracleService public oracle;
-    
     // Events
-    event Swap(address indexed user, uint256 amountIn, uint256 amountOut);
-    event AddLiquidity(address indexed provider, uint256 tokenAmount, uint256 stablecoinAmount);
-    event RemoveLiquidity(address indexed provider, uint256 tokenAmount, uint256 stablecoinAmount);
+    event TokenPurchase(address buyer, uint256 stable_sold, uint256 tokens_bought);
+    event StablePurchase(address buyer, uint256 tokens_sold, uint256 stable_bought);
+    event AddLiquidity(address provider, uint256 stable_amount, uint256 token_amount);
+    event RemoveLiquidity(address provider, uint256 stable_amount, uint256 token_amount);
+
+    ERC20 public token;                             // ERC20 token traded on this contract
+    ERC20 public stablecoin;                        // Stablecoin traded on this contract
+
+    bool private locked;
     
+    modifier nonReentrant() {
+        require(!locked, "REENTRANT");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     constructor(
         address tokenAddr, 
-        address stablecoinAddr,
-        address oracleAddr
+        address stablecoinAddr
     ) ERC20("Simple LP", "SLP") {
-        token = IERC20(tokenAddr);
-        stablecoin = IERC20(stablecoinAddr);
-        oracle = OracleService(oracleAddr);
+        token = ERC20(tokenAddr);
+        stablecoin = ERC20(stablecoinAddr);
     }
-    
-    /**
-     * @notice Add liquidity to the pool
-     * @param tokenAmount Amount of tokens to deposit
-     * @param stablecoinAmount Amount of stablecoin to deposit
-     * @return liquidity Amount of LP tokens minted
-     */
-    function addLiquidity(uint256 tokenAmount, uint256 stablecoinAmount) external returns (uint256 liquidity) {
-        require(tokenAmount > 0 && stablecoinAmount > 0, "Amounts must be > 0");
+
+    // Core functions
+    function addLiquidity(
+        uint256 stable_amount,
+        uint256 max_tokens
+    ) external returns (uint256) {
+        require(stable_amount > 0 && max_tokens > 0, "Invalid inputs");
+        uint256 total_liquidity = totalSupply();
         
-        uint256 totalSupplyAmount = totalSupply();
-        
-        // First liquidity provider sets the ratio
-        if (totalSupplyAmount == 0) {
-            liquidity = stablecoinAmount;  // Use stablecoin amount as initial LP tokens
-        } else {
-            // Get oracle price to verify deposit ratio
-            (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+        if (total_liquidity > 0) {
+            require(stable_amount > 0, "Min liquidity required");
+            uint256 stable_reserve = stablecoin.balanceOf(address(this));
+            uint256 token_reserve = token.balanceOf(address(this));
+            uint256 token_amount = (stable_amount * token_reserve / stable_reserve) + 1;
+            uint256 liquidity_minted = stable_amount * total_liquidity / stable_reserve;
             
-            // Check if deposit matches oracle price
-            uint256 expectedStablecoin = (tokenAmount * uint256(oraclePrice)) / (10 ** 18);
-            require(
-                stablecoinAmount >= expectedStablecoin * 99 / 100 &&  // Allow 1% deviation
-                stablecoinAmount <= expectedStablecoin * 101 / 100,
-                "Amount ratio doesn't match oracle price"
-            );
+            require(max_tokens >= token_amount, "Insufficient token amount");
+            _mint(msg.sender, liquidity_minted);
             
-            // Calculate liquidity based on stablecoin proportion
-            liquidity = (stablecoinAmount * totalSupplyAmount) / stablecoin.balanceOf(address(this));
-        }
-        
-        _mint(msg.sender, liquidity);
-        
-        token.transferFrom(msg.sender, address(this), tokenAmount);
-        stablecoin.transferFrom(msg.sender, address(this), stablecoinAmount);
-        
-        emit AddLiquidity(msg.sender, tokenAmount, stablecoinAmount);
-        return liquidity;
-    }
-    
-    /**
-     * @notice Remove liquidity from the pool
-     * @param lpAmount Amount of LP tokens to burn
-     * @return tokenAmount Amount of tokens withdrawn
-     * @return stablecoinAmount Amount of stablecoin withdrawn
-     */
-    function removeLiquidity(uint256 lpAmount) external returns (uint256 tokenAmount, uint256 stablecoinAmount) {
-        require(lpAmount > 0, "Amount must be > 0");
-        
-        uint256 totalSupplyAmount = totalSupply();
-        uint256 tokenReserve = token.balanceOf(address(this));
-        uint256 stablecoinReserve = stablecoin.balanceOf(address(this));
-        
-        // Calculate proportional amounts based on LP tokens
-        tokenAmount = (lpAmount * tokenReserve) / totalSupplyAmount;
-        stablecoinAmount = (lpAmount * stablecoinReserve) / totalSupplyAmount;
-        
-        // Verify the ratio matches oracle price (with 1% tolerance)
-        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
-        uint256 expectedStablecoin = (tokenAmount * uint256(oraclePrice)) / (10 ** 18);
-        require(
-            stablecoinAmount >= expectedStablecoin * 99 / 100 &&
-            stablecoinAmount <= expectedStablecoin * 101 / 100,
-            "Withdrawal ratio doesn't match oracle price"
-        );
-        
-        _burn(msg.sender, lpAmount);
-        
-        token.transfer(msg.sender, tokenAmount);
-        stablecoin.transfer(msg.sender, stablecoinAmount);
-        
-        emit RemoveLiquidity(msg.sender, tokenAmount, stablecoinAmount);
-        return (tokenAmount, stablecoinAmount);
-    }
-    
-    /**
-     * @notice Swap tokens using x*y=k formula
-     * @param isStablecoinToToken True if swapping stablecoin for token
-     * @param amountIn Amount of input token
-     * @return amountOut Amount of output token
-     */
-    function swap(bool isStablecoinToToken, uint256 amountIn) external returns (uint256 amountOut) {
-        require(amountIn > 0, "Amount must be > 0");
-        
-        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
-        
-        if (isStablecoinToToken) {
-            // Converting USDC to TOKEN using oracle price
-            amountOut = (amountIn * (10 ** 18)) / uint256(oraclePrice);
-            stablecoin.transferFrom(msg.sender, address(this), amountIn);
-            token.transfer(msg.sender, amountOut);
+            require(stablecoin.transferFrom(msg.sender, address(this), stable_amount), "Stable transfer failed");
+            require(token.transferFrom(msg.sender, address(this), token_amount), "Token transfer failed");
+            
+            emit AddLiquidity(msg.sender, stable_amount, token_amount);
+            emit Transfer(address(0), msg.sender, liquidity_minted);
+            return liquidity_minted;
         } else {
-            // Converting TOKEN to USDC using oracle price
-            amountOut = (amountIn * uint256(oraclePrice)) / (10 ** 18);
-            token.transferFrom(msg.sender, address(this), amountIn);
-            stablecoin.transfer(msg.sender, amountOut);
+            require(stable_amount >= 1000000000, "Minimum liquidity required");
+            
+            uint256 token_amount = max_tokens;
+            uint256 initial_liquidity = stable_amount;
+            _mint(msg.sender, initial_liquidity);
+            
+            require(stablecoin.transferFrom(msg.sender, address(this), stable_amount), "Stable transfer failed");
+            require(token.transferFrom(msg.sender, address(this), token_amount), "Token transfer failed");
+            
+            emit AddLiquidity(msg.sender, stable_amount, token_amount);
+            emit Transfer(address(0), msg.sender, initial_liquidity);
+            return initial_liquidity;
         }
-        
-        emit Swap(msg.sender, amountIn, amountOut);
-        return amountOut;
     }
-    
-    /**
-     * @notice Get quote for swap
-     * @param isStablecoinToToken True if swapping stablecoin for token
-     * @param amountIn Amount of input token
-     * @return Amount of output token
-     */
-    function getQuote(bool isStablecoinToToken, uint256 amountIn) external view returns (uint256) {
-        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+
+    function removeLiquidity(
+        uint256 amount,
+        uint256 min_stable,
+        uint256 min_tokens
+    ) external returns (uint256, uint256) {
+        require(amount > 0 && min_stable > 0 && min_tokens > 0, "Invalid inputs");
+        uint256 total_liquidity = totalSupply();
+        require(total_liquidity > 0, "No liquidity");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        uint256 stable_amount = amount * stable_reserve / total_liquidity;
+        uint256 token_amount = amount * token_reserve / total_liquidity;
         
-        if (isStablecoinToToken) {
-            return (amountIn * (10 ** 18)) / uint256(oraclePrice);
-        } else {
-            return (amountIn * uint256(oraclePrice)) / (10 ** 18);
-        }
+        require(stable_amount >= min_stable && token_amount >= min_tokens, "Insufficient amounts");
+        
+        require(stablecoin.transfer(msg.sender, stable_amount), "Stable transfer failed");
+        require(token.transfer(msg.sender, token_amount), "Token transfer failed");
+        
+        emit RemoveLiquidity(msg.sender, stable_amount, token_amount);
+        emit Transfer(msg.sender, address(0), amount);
+        
+        _burn(msg.sender, amount);
+        
+        return (stable_amount, token_amount);
+    }
+
+    // Private pricing functions
+    function getInputPrice(
+        uint256 input_amount,
+        uint256 input_reserve,
+        uint256 output_reserve
+    ) pure returns (uint256) {
+        require(input_reserve > 0 && output_reserve > 0, "Invalid reserves");
+        uint256 input_amount_with_fee = input_amount *  1000;//Mercata_Compatibility: Updated from 997 which would be 0.03% fees
+        uint256 numerator = input_amount_with_fee * output_reserve;
+        uint256 denominator = (input_reserve * 1000) + input_amount_with_fee;
+        return numerator / denominator;
+    }
+
+    function getOutputPrice(
+        uint256 output_amount,
+        uint256 input_reserve,
+        uint256 output_reserve
+    ) pure returns (uint256) {
+        require(input_reserve > 0 && output_reserve > 0, "Invalid reserves");
+        require(output_reserve > output_amount, "Invalid output amount");
+        uint256 numerator = input_reserve * output_amount * 1000;
+        uint256 denominator = (output_reserve - output_amount) *  1000;
+        return (numerator / denominator) + 1;
+    }
+
+    // Public price functions
+    function getStableToTokenInputPrice(uint256 stable_sold) external view returns (uint256) {
+        require(stable_sold > 0, "Invalid stable amount");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        return getInputPrice(stable_sold, stable_reserve, token_reserve);
+    }
+
+    function getStableToTokenOutputPrice(uint256 tokens_bought) external view returns (uint256) {
+        require(tokens_bought > 0, "Invalid token amount");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        return getOutputPrice(tokens_bought, stable_reserve, token_reserve);
+    }
+
+    function getTokenToStableInputPrice(uint256 tokens_sold) external view returns (uint256) {
+        require(tokens_sold > 0, "Invalid token amount");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        return getInputPrice(tokens_sold, token_reserve, stable_reserve);
+    }
+
+    function getTokenToStableOutputPrice(uint256 stable_bought) external view returns (uint256) {
+        require(stable_bought > 0, "Invalid stable amount");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        return getOutputPrice(stable_bought, token_reserve, stable_reserve);
+    }
+
+    // Price view functions
+    function getCurrentTokenPrice() external view returns (decimal) {
+        decimal token_reserve = decimal(token.balanceOf(address(this)));
+        decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)));
+        require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
+        // Price of 1 token in stablecoins (stable_reserve / token_reserve)
+        return decimal((stable_reserve * 1000000000000000000.000000) / token_reserve) / 1000000000000000000.000000;
+    }
+
+    function getCurrentStablePrice() external view returns (decimal) {
+        decimal token_reserve = decimal(token.balanceOf(address(this)));
+        decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)));
+        require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
+        // Price of 1 stablecoin in tokens (token_reserve / stable_reserve)
+        return decimal((token_reserve * 1000000000000000000.000000) / stable_reserve) / 1000000000000000000.000000;
+    }
+
+    // Swap functions
+    function stableToToken(
+        uint256 stable_sold,
+        uint256 min_tokens
+    ) external nonReentrant returns (uint256) {
+        require(stable_sold > 0 && min_tokens > 0, "Invalid inputs");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        uint256 tokens_bought = getInputPrice(stable_sold, stable_reserve, token_reserve);
+        
+        require(tokens_bought >= min_tokens, "Insufficient output amount");
+        
+        require(stablecoin.transferFrom(msg.sender, address(this), stable_sold), "Stable transfer failed");
+        require(token.transfer(msg.sender, tokens_bought), "Token transfer failed");
+        
+        emit TokenPurchase(msg.sender, stable_sold, tokens_bought);
+        return tokens_bought;
+    }
+
+    function tokenToStable(
+        uint256 tokens_sold,
+        uint256 min_stable
+    ) external nonReentrant returns (uint256) {
+        require(tokens_sold > 0 && min_stable > 0, "Invalid inputs");
+        uint256 token_reserve = token.balanceOf(address(this));
+        uint256 stable_reserve = stablecoin.balanceOf(address(this));
+        uint256 stable_bought = getInputPrice(tokens_sold, token_reserve, stable_reserve);
+        
+        require(stable_bought >= min_stable, "Insufficient output amount");
+        
+        require(token.transferFrom(msg.sender, address(this), tokens_sold), "Token transfer failed");
+        require(stablecoin.transfer(msg.sender, stable_bought), "Stable transfer failed");
+        
+        emit StablePurchase(msg.sender, tokens_sold, stable_bought);
+        return stable_bought;
     }
 }
