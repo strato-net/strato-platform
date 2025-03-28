@@ -292,7 +292,7 @@ const NewTrendingCard = ({
         )}
         <a
           href={`${naviroute
-            .replace(':address', topSellingProduct.address)
+            .replace(':address', topSellingProduct.assetToBeSold)
             .replace(':name', topSellingProduct.name)}`}
           onClick={(e) => {
             // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
@@ -303,7 +303,7 @@ const NewTrendingCard = ({
               if (isAvailableForSale) {
                 navigate(
                   `${naviroute
-                    .replace(':address', topSellingProduct.address)
+                    .replace(':address', topSellingProduct.assetToBeSold)
                     .replace(
                       ':name',
                       encodeURIComponent(topSellingProduct.name)

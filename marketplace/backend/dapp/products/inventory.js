@@ -674,7 +674,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               });
             }
           } else {
-            if(!userProfile){
+            if (!userProfile) {
               finalInventory.push({ escrow, ...inventory });
             }
           }
@@ -693,6 +693,62 @@ async function getAll(admin, args = {}, defaultOptions) {
         return marshalOut(inventory);
       })
     : undefined;
+}
+
+async function getStakeableProducts(admin, inventories, defaultOptions) {
+  // Merge default options with constant properties.
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+
+  // Build search options using inventory addresses and owners.
+  const searchOptions = {
+    ...options,
+    query: {
+      select: `root,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))`,
+      root: `in.(${inventories.map(inv => inv.address)})`,
+      owner: `in.(${inventories.map(inv => inv.owner)})`,
+    },
+  };
+
+  // Fetch all utxos with sale information.
+  const utxos = await rest.search(
+    admin,
+    { name: 'BlockApps-Mercata-Asset' },
+    searchOptions
+  );
+
+  // For each unique inventory (grouped by root), choose the utxo with the highest sale quantity.
+  const bestSalesByRoot = new Map();
+  utxos.forEach(utxo => {
+    const sale = utxo['BlockApps-Mercata-Sale']?.[0];
+    if (!sale || !sale.isOpen) return;
+    const existing = bestSalesByRoot.get(utxo.root);
+    if (!existing || sale.quantity > existing['BlockApps-Mercata-Sale'][0].quantity) {
+      bestSalesByRoot.set(utxo.root, utxo);
+    }
+  });
+  const filteredSales = Array.from(bestSalesByRoot.values());
+
+  // Update each inventory with sale details when available.
+  return inventories.map(inventory => {
+    // Find a matching utxo by comparing the inventory address to the utxo's root.
+    const utxo = filteredSales.find(u => u.root === inventory.address);
+    if (utxo) {
+      const sale = utxo['BlockApps-Mercata-Sale'][0];
+      return {
+        ...inventory,
+        assetToBeSold: sale ? sale.assetToBeSold : inventory.address,
+        sale: sale.address,
+        ['BlockApps-Mercata-Sale']: utxo['BlockApps-Mercata-Sale'],
+        price: sale.price,
+        saleAddress: sale.address,
+        saleQuantity: sale.quantity,
+        saleDate: sale.block_timestamp,
+        totalLockedQuantity: sale.totalLockedQuantity,
+        paymentServices: sale['BlockApps-Mercata-Sale-paymentServices'],
+      };
+    }
+    return inventory;
+  });
 }
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
@@ -838,6 +894,7 @@ export default {
   checkSaleQuantity,
   get,
   getAll,
+  getStakeableProducts,
   getOwnershipHistory,
   getAllItemTransferEvents,
   inventoryCount,
