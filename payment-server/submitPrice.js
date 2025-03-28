@@ -163,6 +163,9 @@ async function runDistributeRewardsCalls(token) {
       await flagFile.appendToErrorFile(
         `Error executing batch distributeRewards calls: ${error}`
       );
+    } finally {
+      // Clear the call list to avoid reprocessing stale calls
+      distributeRewardsCallList.length = 0;
     }
   } else {
     console.log("No distributeRewards calls to execute.");
