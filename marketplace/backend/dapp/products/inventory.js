@@ -695,16 +695,16 @@ async function getAll(admin, args = {}, defaultOptions) {
     : undefined;
 }
 
-async function getStakeableProducts(admin, inventories, defaultOptions) {
+async function getStakeableProducts(admin, args, defaultOptions) {
   // Merge default options with constant properties.
   const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
-
+  const { assetAddresses: rootAddresses } = args;
   // Build search options using inventory addresses and owners.
   const searchOptions = {
     ...options,
     query: {
       select: constants.attachSalesEscrowsAndImagesAndFiles,
-      root: `in.(${inventories.map((inv) => inv.address)})`,
+      root: `in.(${rootAddresses.join(',')})`,
     },
   };
 
@@ -715,45 +715,60 @@ async function getStakeableProducts(admin, inventories, defaultOptions) {
     searchOptions
   );
 
-  // Build a map of inventories keyed by their address.
-  const inventoryMap = new Map();
-  inventories.forEach((inventory) => {
-    inventoryMap.set(inventory.address, { ...inventory });
-  });
+  const bestSalesByRoot = new Map();
 
-  // Process each utxo and update the corresponding inventory immediately if conditions match.
   utxos.forEach((utxo) => {
     const sale = utxo['BlockApps-Mercata-Sale']?.[0];
-    if (!sale || !sale.isOpen) return;
-
-    // Check that ownerCommonName equals the JSON field data.minterCommonName.
-    if (utxo.ownerCommonName !== utxo.data?.minterCommonName) return;
-
-    // Find the corresponding inventory by comparing utxo.root with inventory address.
-    const inventory = inventoryMap.get(utxo.root);
-    if (!inventory) return;
-
-    // If there is already a sale recorded, only update if this sale has a higher quantity.
-    if (
-      inventory.saleQuantity !== undefined &&
-      sale.quantity <= inventory.saleQuantity
-    ) {
-      return;
+  
+    if (sale) {
+      // For sales, only consider utxos where the owner matches the minter.
+      if (utxo.ownerCommonName !== utxo.data?.minterCommonName) {
+        return;
+      }
+    } else {
+      // For utxos without a sale, only keep them if their owner address equals their root.
+      if (utxo.address !== utxo.root) {
+        return;
+      }
     }
+  
+    // Check if we already have a utxo for this root.
+    const currentBest = bestSalesByRoot.get(utxo.root);
+  
+    // If none exists, add the current utxo.
+    if (!currentBest) {
+      bestSalesByRoot.set(utxo.root, utxo);
+    }
+    // If both the current utxo and the stored one have a sale,
+    // keep the one with the higher quantity.
+    else if (sale) {
+      const currentSale = currentBest['BlockApps-Mercata-Sale']?.[0];
+      if ((currentSale?.quantity || 0) < (sale.quantity || 0)) {
+        bestSalesByRoot.set(utxo.root, utxo);
+      }
+    }
+  });
+  
+  const filteredSales = Array.from(bestSalesByRoot.values());
 
-    // Update the inventory with sale details.
-    inventory.sale = sale.address;
-    inventory.price = sale.price;
-    inventory.saleAddress = sale.address;
-    inventory.saleQuantity = sale.quantity;
-    inventory.saleDate = sale.block_timestamp;
-    inventory.totalLockedQuantity = sale.totalLockedQuantity;
-    inventory.paymentServices = sale['BlockApps-Mercata-Sale-paymentServices'];
-    inventory['BlockApps-Mercata-Sale'] = undefined; // Removing the nested sale data to avoid redundancy
+  // Now map over the inventories (list of addresses) to update each one with sale details if available.
+  const updatedInventories = filteredSales.map((utxo) => {
+    const sale = utxo['BlockApps-Mercata-Sale']?.[0];
+    return {
+      ...utxo,
+      assetToBeSold: sale?.assetToBeSold,
+      sale: sale?.address,
+      price: sale?.price,
+      saleAddress: sale?.address,
+      saleQuantity: sale?.quantity,
+      saleDate: sale?.block_timestamp,
+      totalLockedQuantity: sale?.totalLockedQuantity,
+      paymentServices: sale ? 
+        sale['BlockApps-Mercata-Sale-paymentServices'] : null,
+      'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
+    };
   });
 
-  // Convert the map values back into an array.
-  const updatedInventories = Array.from(inventoryMap.values());
   // Sort the images and files by their order
   return updatedInventories
     ? updatedInventories.map((inventory) => {

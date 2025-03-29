@@ -230,7 +230,7 @@ class OrderController {
           Joi.object({
             quantity: Joi.string().pattern(/^\d+$/).required(),
             decimals: Joi.number().integer().min(0).max(18).required(),
-            saleAddress: Joi.string().required(),
+            assetAddress: Joi.string().required(),
             firstSale: Joi.boolean().required(),
             unitPrice: Joi.string().pattern(/^\d+(\.\d+)?$/).required(),
           })
