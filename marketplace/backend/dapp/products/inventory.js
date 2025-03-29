@@ -718,32 +718,26 @@ async function getStakeableProducts(admin, args, defaultOptions) {
   const bestSalesByRoot = new Map();
 
   utxos.forEach((utxo) => {
-    const sale = utxo['BlockApps-Mercata-Sale']?.[0];
-  
-    if (sale) {
-      // For sales, only consider utxos where the owner matches the minter.
-      if (utxo.ownerCommonName !== utxo.data?.minterCommonName) {
-        return;
-      }
+    const saleArray = utxo['BlockApps-Mercata-Sale'] || [];
+    const openSale = saleArray.find((sale) => sale.isOpen === true);
+    if (openSale) {
+      if (utxo.ownerCommonName !== utxo.data?.minterCommonName) return;
     } else {
-      // For utxos without a sale, only keep them if their owner address equals their root.
-      if (utxo.address !== utxo.root) {
-        return;
-      }
+      if (utxo.address !== utxo.root) return;
     }
   
     // Check if we already have a utxo for this root.
     const currentBest = bestSalesByRoot.get(utxo.root);
   
-    // If none exists, add the current utxo.
     if (!currentBest) {
-      bestSalesByRoot.set(utxo.root, utxo);
-    }
-    // If both the current utxo and the stored one have a sale,
-    // keep the one with the higher quantity.
-    else if (sale) {
-      const currentSale = currentBest['BlockApps-Mercata-Sale']?.[0];
-      if ((currentSale?.quantity || 0) < (sale.quantity || 0)) {
+      bestSalesByRoot.set(utxo.root, openSale ? utxo : {
+        ...utxo,
+        sale: null,
+        'BlockApps-Mercata-Sale': [],
+      });
+    } else if (openSale) {
+      const currentSale = currentBest['BlockApps-Mercata-Sale']?.find(s => s.isOpen);
+      if ((currentSale?.quantity || 0) < (openSale.quantity || 0)) {
         bestSalesByRoot.set(utxo.root, utxo);
       }
     }
