@@ -84,12 +84,12 @@ newtype MemCompilerT m a = MemCompilerT {unMemCompilerT :: MainChainT (MemAddres
 instance MonadTrans MemCompilerT where
   lift = MemCompilerT . MainChainT . MemAddressStateDB . lift . MemCodeDB . lift
 
-instance Monad m => (Address `A.Alters` AddressState) (MemCompilerT m) where
+instance {-# OVERLAPPING #-} Monad m => (Address `A.Alters` AddressState) (MemCompilerT m) where
   lookup p = MemCompilerT . MainChainT . A.lookup p
   insert p k = MemCompilerT . MainChainT . A.insert p k
   delete p = MemCompilerT . MainChainT . A.delete p
 
-instance Monad m => A.Selectable Address AddressState (MemCompilerT m) where
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Address AddressState (MemCompilerT m) where
   select = A.lookup
 
 instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCompilerT m) where

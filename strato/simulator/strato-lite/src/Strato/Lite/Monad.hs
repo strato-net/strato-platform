@@ -277,7 +277,7 @@ instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
     assign bestBlock bb
     updateSyncStatus
 
-instance MonadIO m => Mod.Modifiable BestSequencedBlock (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestSequencedBlock (MonadTest m) where
   get _ = use bestSequencedBlock
   put _ bsb = do
     assign bestSequencedBlock bsb
@@ -398,7 +398,7 @@ instance Mod.Modifiable BestBlock m => Mod.Modifiable BestBlock (MonadP2PTest m)
   get p = lift $ Mod.get p
   put p k = lift $ Mod.put p k
 
-instance Mod.Modifiable BestSequencedBlock m => Mod.Modifiable BestSequencedBlock (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} Mod.Modifiable BestSequencedBlock m => Mod.Modifiable BestSequencedBlock (MonadP2PTest m) where
   get p = lift $ Mod.get p
   put p k = lift $ Mod.put p k
 
@@ -428,7 +428,7 @@ instance (Keccak256 `A.Alters` OutputBlock) m => (Keccak256 `A.Alters` OutputBlo
   insert p k v = lift $ A.insert p k v
   delete p k = lift $ A.delete p k
 
-instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
   lookup _ k = use $ x509certMap . at k
   insert _ k v = x509certMap . at k ?= v
   delete _ k = x509certMap . at k .= Nothing
@@ -436,7 +436,7 @@ instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select = A.lookup
 
-instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ dbeRegistry . at k
   insert _ k v = dbeRegistry . at k ?= v
   delete _ k = dbeRegistry . at k .= Nothing
@@ -460,16 +460,16 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RoundPeriod (MonadTest 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible View (MonadTest m) where
   access _ = currentView
 
-instance MonadIO m => (Keccak256 `A.Alters` ()) (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` ()) (MonadTest m) where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
 
-instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
-instance MonadIO m => HasVault (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
     return $ signMsg pk bs
@@ -482,17 +482,17 @@ instance MonadIO m => HasVault (MonadTest m) where
     pk <- use prvKey
     return $ deriveSharedKey pk pub
 
-instance HasVault m => HasVault (MonadP2PTest m) where
+instance {-# OVERLAPPING #-} HasVault m => HasVault (MonadP2PTest m) where
   sign bs = lift $ sign bs
   getPub = lift getPub
   getShared pub = lift $ getShared pub
 
-instance HasVault IO where
+instance {-# OVERLAPPING #-} HasVault IO where
   sign bs = newPrivateKey >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
-instance HasVault (ReaderT PrivateKey IO) where
+instance {-# OVERLAPPING #-} HasVault (ReaderT PrivateKey IO) where
   sign bs = ask >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
@@ -866,7 +866,14 @@ instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable StorageF
   select _ _ = pure $ Just []
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable TxsFilterParams [DataDefs.RawTransaction] (MonadTest m) where
-  select _ _ = Just <$> getLastTransactions Nothing 1000
+  select _ tfp = case qtHash tfp of
+    Nothing -> Just <$> getLastTransactions Nothing 1000
+    Just h -> do
+      baggerTxs <- Mod.access (Mod.Proxy @[DataDefs.RawTransaction])
+      time <- liftIO getCurrentTime
+      let toRawTx OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx (-1) time
+      blockTxs <- map toRawTx . concatMap obReceiptTransactions . M.elems <$> use blockHashRegistry
+      pure . Just . filter (\r -> DataDefs.rawTransactionTxHash r == h) $ baggerTxs ++ blockTxs
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Keccak256 [DataDefs.TransactionResult] (MonadTest m) where
   select _ h = Just . filter ((==) h . DataDefs.transactionResultTransactionHash) <$> use transactionResults
@@ -1013,14 +1020,16 @@ instance {-# OVERLAPPING #-} A.Selectable Point ClosestPeers m => A.Selectable P
   select p = lift . A.select p
 
 instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
+  clearAllSyncTasks host = syncTasks %= map (\st@(SyncTask i t h s) -> if h == host then SyncTask i t (Host "") s else st)
   getCurrentSyncTask host = do
     let assignedByHost (SyncTask _ _ h s) = h == host && s == Assigned
     tasks <- filter assignedByHost <$> use syncTasks
     case tasks of
-      [t] -> pure t
-      [] -> error $ "no current sync task found in call to getCurrentSyncTask: " ++ show host
+      [t] -> pure $ Just t
+      [] -> pure Nothing
       _ -> error $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (show <$> tasks)
-  getNewSyncTask host = do
+  getNewSyncTask "127.0.0.1" _ = pure Nothing
+  getNewSyncTask host _ = do -- TODO: Figure out what highestBlockNum (second parameter) is used for
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
     unsortedTasks <- use syncTasks
@@ -1036,16 +1045,17 @@ instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
       Nothing -> do
         let newTask = SyncTask (1 + maximum (0:((\(SyncTask i _ _ _) -> i) <$> updatedTasks))) now host Assigned
         syncTasks .= newTask : updatedTasks
-        pure newTask
+        pure $ Just newTask
       Just newTask -> do
         syncTasks .= updatedTasks
-        pure newTask
+        pure $ Just newTask
   setSyncTaskFinished host = syncTasks %= map (\st@(SyncTask i t h _) -> if h == host then SyncTask i t h Finished else st)
   setSyncTaskNotReady host = syncTasks %= map (\st@(SyncTask i t h s) -> if h == host && s == Assigned then SyncTask i t h NotReady else st)
 
 instance {-# OVERLAPPING #-} (MonadIO m, HasSyncDB m) => HasSyncDB (MonadP2PTest m) where
+  clearAllSyncTasks   = lift . clearAllSyncTasks
   getCurrentSyncTask  = lift . getCurrentSyncTask
-  getNewSyncTask      = lift . getNewSyncTask
+  getNewSyncTask    h = lift . getNewSyncTask h
   setSyncTaskFinished = lift . setSyncTaskFinished
   setSyncTaskNotReady = lift . setSyncTaskNotReady
 

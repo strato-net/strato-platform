@@ -50,6 +50,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
+import SelectAccessible ()
 import Text.Format
 import Text.Printf
 
@@ -57,22 +58,6 @@ type SeqOutEvent = Either [P2pEvent] [VmEvent]
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
-
-instance Mod.Modifiable r m => Mod.Modifiable r (ConduitT i o m) where
-  get = lift . Mod.get
-  put p = lift . Mod.put p
-
-instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
-  lookup p = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p = lift . A.delete p
-
-instance (A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
-  select p = lift . A.select p
-
-instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) where
-  getBlockstanbulContext = lift getBlockstanbulContext
-  putBlockstanbulContext = lift . putBlockstanbulContext
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -99,26 +84,26 @@ initSequencer :: (
   ConduitT () SeqOutEvent m ()
 initSequencer = do
   let logF = logFF "sequencer"
-  hasPBFT <- isJust <$> getBlockstanbulContext
-  when (hasPBFT) $ do
-    ctx <- fromJust <$> getBlockstanbulContext
-    let selfAddr = fromJust $ _selfAddr ctx
-    yield $ Right [VmSelfAddress selfAddr]
-    -- check for own cert and if val
-    maybeCert <- A.lookup (A.Proxy @X509CertInfoState) selfAddr
-    ctx'' <- case maybeCert of
-      Just cert -> do
-        let chainm = getChainMemberFromX509 cert
-        logF $ "Node identity verified: " ++ show chainm
-        case chainMemberParsedSetToValidator chainm `S.member` _validators ctx of
-          True -> do
-            logF "You are a validator in this network!"
-            return ctx { _selfCert = Just chainm, _isValidator = True }
-          False -> return ctx { _selfCert = Just chainm }
-      Nothing -> do
-        logF "Awaiting node identity verification..."
-        return ctx
-    putBlockstanbulContext ctx''
+  lift getBlockstanbulContext >>= \case
+    Nothing -> pure ()
+    Just ctx -> do
+      let selfAddr = fromJust $ _selfAddr ctx
+      yield $ Right [VmSelfAddress selfAddr]
+      -- check for own cert and if val
+      maybeCert <- lift $ A.lookup (A.Proxy @X509CertInfoState) selfAddr
+      ctx'' <- case maybeCert of
+        Just cert -> do
+          let chainm = getChainMemberFromX509 cert
+          logF $ "Node identity verified: " ++ show chainm
+          case chainMemberParsedSetToValidator chainm `S.member` _validators ctx of
+            True -> do
+              logF "You are a validator in this network!"
+              return ctx { _selfCert = Just chainm, _isValidator = True }
+            False -> return ctx { _selfCert = Just chainm }
+        Nothing -> do
+          logF "Awaiting node identity verification..."
+          return ctx
+      lift $ putBlockstanbulContext ctx''
   logF "Sequencer startup"
   logF "Sequencer initialized"
   bootstrapBlockstanbul
@@ -146,10 +131,10 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
   case event of
     TimerFire roundNumber -> do
       withLabel seqLoopEvents "timeout" (flip unsafeAddCounter 1)
-      lift $ blockstanbulSend [Timeout roundNumber]
+      blockstanbulSend [Timeout roundNumber]
     UnseqEvents unseqEvents -> do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
-      lift $ timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
+      timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
 unseqEventHandler ::
   ( MonadSequencer m
@@ -186,7 +171,7 @@ unseqEventHandler events = do
           blockstanbulSend [ForcedConfigChange cc]
         (IEDeleteDepBlock k) -> do
           record "inevent_type_delete_dep_block" "DeleteDepBlock" 1
-          A.delete (A.Proxy @DependentBlockEntry) k
+          lift $ A.delete (A.Proxy @DependentBlockEntry) k
         (IEGetMPNodes srs) -> do
           record "inevent_type_get_mp_nodes" "GetMPNodes" 1
           yield $ Left [P2pGetMPNodes srs]
@@ -211,7 +196,7 @@ bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()
 bootstrapBlockstanbul = do
   yield $ Right [VmCreateBlockCommand]
-  createFirstTimer
+  lift createFirstTimer
 
 blockstanbulSend ::
   ( MonadLogger m,
@@ -296,7 +281,7 @@ transformFullTransactions ::
   [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
-  mOtxs <- forM pairs $ \(ts, itx) ->
+  mOtxs <- lift . forM pairs $ \(ts, itx) ->
     wrapTransaction itx >>= \case
       Nothing -> return Nothing
       Just otx -> do
@@ -314,7 +299,7 @@ transformFullTransactions pairs = do
 
             
   let txs = catMaybes mOtxs
-  logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
+  lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
   yield . Right $ map pairToVmTx txs
   yield . Left $ map (P2pTx . snd) txs
   return ()
@@ -351,7 +336,7 @@ runConsensus ::
   ) =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
-  hasPBFT <- blockstanbulRunning
+  hasPBFT <- lift blockstanbulRunning
   if not hasPBFT
     then do
       obs <- lift $ expandBlock sb
@@ -361,7 +346,7 @@ runConsensus sb = do
       let blk = sequencedBlockToBlock sb
       routed <-
         if isHistoricBlock blk
-          then map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+          then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
           else pure [UnannouncedBlock blk]
       -- Blockstanbul will check that the seals and validators match up before
       -- announcing it to the network or forwarding to the EVM.
@@ -380,7 +365,7 @@ transformBlocks ibs = do
       Nothing -> do
         $logWarnS "transformEvents/emitBlocks" . T.pack $
           "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-        P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+        lift $ P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
       Just sb -> do
         runConsensus sb
 

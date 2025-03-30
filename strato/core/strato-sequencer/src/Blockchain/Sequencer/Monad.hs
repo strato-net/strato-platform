@@ -73,6 +73,7 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import qualified Database.LevelDB as LDB
 import qualified LabeledError
+import SelectAccessible ()
 import Servant.Client
 import qualified Strato.Strato23.API.Types as VC hiding (Address (..))
 import qualified Strato.Strato23.Client as VC
@@ -125,11 +126,11 @@ data SequencerConfig = SequencerConfig
 
 type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
 
-instance HasDependentBlockDB SequencerM where
-  getDependentBlockDB = lift $ asks dependentBlockDB
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
+  access _ = asks dependentBlockDB
 
-instance Mod.Accessible LDB.DB SequencerM where
-  access _ = lift $ asks dependentBlockDB
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible LDB.DB (ReaderT SequencerConfig m) where
+  access _ = getDependentBlockDB <$> Mod.access (Mod.Proxy @DependentBlockDB)
 
 class HasNamespace a where
   type NSKey a
@@ -175,47 +176,47 @@ deleteInLDB p k = do
   db <- Mod.access Mod.Proxy
   LDB.delete db LDB.defaultWriteOptions (namespaced p k)
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => (Address `A.Alters` X509CertInfoState) m where
+instance (MonadIO m, Mod.Accessible LDB.DB m) => (Address `A.Alters` X509CertInfoState) m where
   lookup = lookupInLDB
   insert p k v = insertInLDB p k v
   delete p k = deleteInLDB p k
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => A.Selectable Address X509CertInfoState m where
+instance {-# OVERLAPPING #-} A.Selectable Address X509CertInfoState SequencerM where
   select = A.lookup
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
+instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
   lookup _ k = lookupDependentBlockDB k
   insert _ k v = insertDependentBlockDB k v
   delete _ k = deleteDependentBlockDB k
 
-instance (Monad m, MonadState SequencerContext m) => Mod.Modifiable SeenTransactionDB m where
+instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance MonadState SequencerContext m => Mod.Accessible (IORef RoundNumber) m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef RoundNumber) (StateT SequencerContext m) where
   access _ = use latestRoundNumber
 
-instance MonadReader SequencerConfig m => Mod.Accessible (TMChan RoundNumber) m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan RoundNumber) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
 
-instance MonadReader SequencerConfig m => Mod.Accessible BlockPeriod m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible BlockPeriod (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulBlockPeriod
 
-instance MonadReader SequencerConfig m => Mod.Accessible RoundPeriod m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RoundPeriod (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulRoundPeriod
 
-instance Mod.Accessible View SequencerM where
+instance {-# OVERLAPPING #-} Mod.Accessible View SequencerM where
   access _ = currentView
 
-instance Mod.Accessible RBDB.RedisConnection SequencerM where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RBDB.RedisConnection (ReaderT SequencerConfig m) where
   access _ = asks redisConn
 
-instance MonadState SequencerContext m => (Keccak256 `A.Alters` ()) m where
+instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
 
-instance (Monad m, MonadState SequencerContext m) => HasBlockstanbulContext m where
+instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
@@ -265,7 +266,7 @@ runSequencerM c mbc m = do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
-    depBlock <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
+    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestRound <- liftIO $ newIORef 0
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
