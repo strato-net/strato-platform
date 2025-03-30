@@ -57,6 +57,7 @@ import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
+import Blockchain.Slipstream.Processor
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer hiding (createPeer)
@@ -78,6 +79,7 @@ import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.Model.Wei
+import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
@@ -867,7 +869,7 @@ instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable TxsFilte
   select _ _ = Just <$> getLastTransactions Nothing 1000
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Keccak256 [DataDefs.TransactionResult] (MonadTest m) where
-  select _ _ = Just . take 1000 <$> use transactionResults
+  select _ h = Just . filter ((==) h . DataDefs.transactionResultTransactionHash) <$> use transactionResults
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TransactionCount (MonadTest m) where
   access _ = TransactionCount . fromIntegral . length . concat . map obReceiptTransactions . M.elems <$> use blockHashRegistry
@@ -1109,6 +1111,7 @@ data P2PPeer = P2PPeer
     _p2pPeerSeqVmSource :: TQueue [VmEvent],
     _p2pPeerApiIndexSource :: TQueue [IndexEvent],
     _p2pPeerP2pIndexSource :: TQueue [IndexEvent],
+    _p2pPeerSlipstreamSource :: TQueue [VMEvent],
     _p2pPeerUnseqSink :: [IngestEvent] -> TestContextM (),
     _p2pPeerName :: String,
     _p2pTestContext :: TVar TestContext,
@@ -1119,7 +1122,8 @@ data P2PPeer = P2PPeer
     _p2pPeerSequencer :: TestContextM (),
     _p2pPeerVm :: TestContextM (),
     _p2pPeerApiIndexer :: TestContextM (),
-    _p2pPeerP2pIndexer :: TestContextM ()
+    _p2pPeerP2pIndexer :: TestContextM (),
+    _p2pPeerSlipstream :: TestContextM ()
   }
 
 makeLenses ''P2PPeer
@@ -1139,8 +1143,11 @@ runNodeWithoutP2P p = do
         (runMonad p (p ^. p2pPeerVm))
     )
     ( concurrently_
-        (runMonad p (p ^. p2pPeerApiIndexer))
-        (runMonad p (p ^. p2pPeerP2pIndexer))
+        ( concurrently_
+            (runMonad p (p ^. p2pPeerApiIndexer))
+            (runMonad p (p ^. p2pPeerP2pIndexer))
+        )
+        (runMonad p (p ^. p2pPeerSlipstream))
     )
 
 runNode :: P2PPeer -> IO ()
@@ -1205,6 +1212,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
   seqVmSource <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
+  (slipstreamSource :: TQueue [VMEvent]) <- newTQueueIO
   cht <- atomically newTMChan
   tcpVSock <- newTQueueIO
   udpVSock <- newTQueueIO
@@ -1349,6 +1357,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
                        ]
                      writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                      writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
+                     writeTQueue slipstreamSource . concat $ toList (VMEvent.outVMEvents b)
                )
       apiIndexer' = do
         A.insert (A.Proxy @(API OutputBlock)) genHash $ API genesisOutputBlock
@@ -1365,6 +1374,17 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
             .| ( awaitForever $ \evs -> do
                    $logInfoS (name <> "/testP2pIndexer") . T.pack $ show evs
                    lift $ indexP2P evs
+               )
+      slipstream = do
+        runConduit $
+          sourceTQueue slipstreamSource
+            .| ( awaitForever $ \evs -> do
+                   $logInfoS (name <> "/slipstream") . T.pack $ show evs
+                   processTheMessages evs
+               )
+            .| ( awaitForever $ \case
+                 Left txr -> lift $ Mod.yield txr
+                 Right _  -> pure ()
                )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer =
@@ -1387,6 +1407,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
       seqVmSource
       apiIndexerSource
       p2pIndexerSource
+      slipstreamSource
       unseq
       (T.unpack name)
       testContextTVar
@@ -1398,6 +1419,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
       vm
       apiIndexer'
       p2pIndexer'
+      slipstream
 
 data P2PConnection = P2PConnection
   { _serverToClient :: TQueue B.ByteString,

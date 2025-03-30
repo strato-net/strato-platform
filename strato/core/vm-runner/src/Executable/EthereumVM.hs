@@ -40,12 +40,9 @@ import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
-import Blockchain.Stream.Action (Action)
-import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import Blockchain.Timing
@@ -54,23 +51,17 @@ import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
-import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString.Char8 as BC
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
-import qualified Data.Map.Ordered as OMap
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
-import SolidVM.Model.CodeCollection
 import Text.Format (format)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
@@ -191,60 +182,11 @@ routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
 sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
-sendOutEvent (OutAction act) = do
-  let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
-      extractCodeCollectionAddedMessages a =
-        case ( join $ fmap (M.lookup "src") $ a ^. Action.metadata,
-               join $ fmap (M.lookup "name") $ a ^. Action.metadata,
-               OMap.assocs $ a ^. Action.actionData
-             ) of
-          (Just c, Just n, actionDatas) ->
-            let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
-                  Just "EVM" -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
-                cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
-                  if _actionDataCodeHash == cp
-                    then Just _actionDataCreator
-                    else Nothing
-                cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-                abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
-                contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                                  --  . (constructor .~ Nothing)
-                                                   . (modifiers .~ M.empty)
-                                                   )
-                -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
-                abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
-                contracts'' = if S.null abstractNames
-                                then M.filter (isNothing . _importedFrom) contracts'
-                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
-                cc' = emptyCodeCollection & contracts .~ contracts''
-             in Just $
-                  CodeCollectionAdded
-                    { codeCollection = const () <$> cc',
-                      codePtr = cp,
-                      creator = cn,
-                      application = n,
-                      historyList =
-                        case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
-                          Nothing -> []
-                          Just v -> T.splitOn "," v,
-                      abstracts = abstracts',
-                      recordMappings = []
-                    }
-          _ -> Nothing
-      ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-      dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
-      act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
-      actionEvents = [NewAction act']
-      vmes = ccEvents ++ dcEvents ++ actionEvents
-  void . produceVMEvents $ toList vmes
+sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutTXR tr) = void . produceVMEvents $ [NewTransactionResult tr]
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $

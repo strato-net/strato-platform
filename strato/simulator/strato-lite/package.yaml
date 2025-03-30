@@ -77,6 +77,7 @@ library:
   - ordered-containers
   - Ranged-sets
   - seqevents
+  - slipstream
   - solid-vm-compiler
   - solid-vm-model
   - stm-chans
