@@ -13,8 +13,8 @@ import "MinterAuthorization.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
-    address public usdstToken;
-    Asset public cataToken;
+    ERC20Burnable public usdstToken;
+    ERC20Burnable public cataToken;
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
 
@@ -51,7 +51,8 @@ abstract contract Reserve is Utils, Structs {
         name = _name;
         assetRootAddress = _assetRootAddress;
         unitConversionRate = _unitConversionRate;
-        usdstToken = _usdstToken;
+        usdstToken = ERC20Burnable(_usdstToken);
+        cataToken = ERC20Burnable(_cataToken);
         (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
         oraclePrice = oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = oraclePrice;
@@ -71,7 +72,7 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function mintUSDST(address _userAddress, uint _amount) internal requireActive() {
-        MinterAuthorization(usdstToken).mintToken(_userAddress, _amount);
+        usdstToken.mint(_userAddress, _amount);
     }
 
     function burnUSDST(address[] _usdstAssetAddresses, uint _quantity, string _ownerCommonName) internal requireActive() returns (uint) {
@@ -104,15 +105,10 @@ abstract contract Reserve is Utils, Structs {
                 uint cataReward = uint(cataRewardDecimal * 10**18);
                 escrow.updateTotalCataReward(cataReward);
 
-                uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
-
                 // Transfer Cata from reserve to borrower
-                cataToken.transferOwnership(
+                cataToken.transfer(
                     escrow.borrower(),
-                    cataReward,
-                    true,
-                    transferNumber,
-                    0.1000000000000000000 / 10**18
+                    cataReward
                     );
                 emit CataTransferred(address(this), escrow.borrower(), cataReward);
             }
@@ -219,12 +215,12 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function transferCATAbacktoOwner(uint _amount) public requireOwner("transfer CATA back") {
-        cataToken.transferOwnership(owner, _amount, false, 0, 0);
+        cataToken.transfer(owner, _amount);
         emit CataTransferred(address(this), owner, _amount);
     }
 
     function transferCATAtoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer CATA to another reserve") {
-        cataToken.transferOwnership(_newOwner, _amount, false, 0, 0);
+        cataToken.transfer(_newOwner, _amount);
         emit CataTransferred(address(this), _newOwner, _amount);
     }
 
