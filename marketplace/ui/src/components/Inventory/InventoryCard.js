@@ -83,8 +83,8 @@ const InventoryCard = ({
     stratsAddress === inventory.originAddress
       ? 2
       : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-      ? 18
-      : inventory.decimals || 0;
+        ? 18
+        : inventory.decimals || 0;
   const quantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );
@@ -114,8 +114,8 @@ const InventoryCard = ({
   ).toString();
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-        new BigNumber(10).pow(decimals)
-      )
+      new BigNumber(10).pow(decimals)
+    )
     : new BigNumber(0);
   const stakeable =
     inventory.root &&
@@ -462,14 +462,16 @@ const InventoryCard = ({
             {(!stakeable || (!inventory.escrow && stakeable)) && (
               <>
                 {stakeable &&
-                  ((!isBridgeableToken || inventory.escrow) ? (
-                    <Button
-                      type="link"
-                      className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6`}
-                      onClick={showBridgeOutModal}
-                    >
-                      <RetweetOutlined /> Bridge
-                    </Button>
+                  (isBridgeableToken ? (
+                    // Temporarily removing bridge out button
+                    //   <Button
+                    //     type="link"
+                    //     className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6`}
+                    //     onClick={showBridgeOutModal}
+                    //   >
+                    //     <RetweetOutlined /> BridgeOut
+                    //   </Button>
+                    null
                   ) : (
                     <Button
                       type="link"
@@ -514,7 +516,7 @@ const InventoryCard = ({
                     !isTokenSupported(inventory.root) || inventory.escrow
                       ? 'hidden'
                       : ''
-                  }`}
+                    }`}
                   onClick={showBridgeModal}
                 >
                   <RetweetOutlined /> Bridge
@@ -532,12 +534,12 @@ const InventoryCard = ({
                 inventory.status == ASSET_STATUS.PENDING_REDEMPTION
                   ? 'h-[140px]'
                   : 'h-[161px]'
-              }  md:object-contain`}
+                }  md:object-contain`}
               alt={imgMeta}
               title={imgMeta}
               src={
                 inventory['BlockApps-Mercata-Asset-images'] &&
-                inventory['BlockApps-Mercata-Asset-images'].length > 0
+                  inventory['BlockApps-Mercata-Asset-images'].length > 0
                   ? inventory['BlockApps-Mercata-Asset-images'][0].value
                   : image_placeholder
               }
@@ -563,8 +565,8 @@ const InventoryCard = ({
                 <p className="text-[#4D4D4D] text-[13px]">Retired</p>
               </div>
             ) : (inventory.data.isMint &&
-                inventory.data.isMint === 'False' &&
-                quantity.eq(0)) ||
+              inventory.data.isMint === 'False' &&
+              quantity.eq(0)) ||
               (!inventory.data.isMint && quantity.eq(0)) ? (
               <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
@@ -617,9 +619,9 @@ const InventoryCard = ({
               <p className="text-[#202020] font-semibold">
                 {inventory?.escrow
                   ? quantity.toNumber().toLocaleString('en-US', {
-                      maximumFractionDigits: 6,
-                      minimumFractionDigits: 0,
-                    })
+                    maximumFractionDigits: 6,
+                    minimumFractionDigits: 0,
+                  })
                   : 0}
               </p>
             </div>
@@ -765,6 +767,7 @@ const InventoryCard = ({
           open={bridgeOutModalOpen}
           handleCancel={handleBridgeOutModalClose}
           accountDetails={{
+            assetAddress: inventory.address,
             assetRootAddress: inventory.root,
             balance: quantity.toString(),
             decimals,

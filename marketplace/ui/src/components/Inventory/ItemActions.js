@@ -473,7 +473,9 @@ const ItemActions = ({
               >
                 <RetweetOutlined /> Bridge
               </Button>
-              <Button
+
+              {/* Temporarily removing bridge out button*/}
+              {/* <Button
                 type="link"
                 className={`text-[#13188A] font-semibold ${
                   !isBridgeableToken(inventory.root) || inventory.escrow
@@ -483,7 +485,7 @@ const ItemActions = ({
                 onClick={showBridgeOutModal}
               >
                 <RetweetOutlined /> Bridge
-              </Button>
+              </Button> */}
             </div>
           }
         >
@@ -615,6 +617,7 @@ const ItemActions = ({
           open={bridgeOutModalOpen}
           handleCancel={handleBridgeOutModalClose}
           accountDetails={{
+            assetAddress: inventory.address,
             assetRootAddress: inventory.root,
             balance: quantity.toString(),
             decimals,

@@ -187,6 +187,7 @@ const ChildStakeItemActions = ({
           open={bridgeOutModalOpen}
           handleCancel={handleBridgeOutModalClose}
           accountDetails={{
+            assetAddress: inventory.address,
             assetRootAddress: inventory.root,
             balance: displayedQuantity.toString(),
             decimals: decimals,
