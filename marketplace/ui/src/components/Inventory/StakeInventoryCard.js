@@ -64,7 +64,6 @@ const StakeInventoryCard = ({
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  collateralQuantity = collateralQuantity / Math.pow(10, decimals);
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -79,7 +78,8 @@ const StakeInventoryCard = ({
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
     : inventory?.quantity / Math.pow(10, decimals);
-  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+    
+  const stakeQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, inventory.decimals);
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
@@ -111,8 +111,6 @@ const StakeInventoryCard = ({
         return sum;
       }, 0)
     : inventory?.escrow?.borrowedAmount || 0;
-
-  const stakeableQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, inventory.decimals);
 
   const escrows = inventory?.inventories
     ? [
@@ -311,19 +309,28 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
-            {(inventory.totalQuantity || 0) / Math.pow(10, inventory.decimals)}
+            {((inventory.totalQuantity || 0) / Math.pow(10, inventory.decimals)).toLocaleString('en-US', {
+                maximumFractionDigits: 6,
+                minimumFractionDigits: 0,
+              })}
             </p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Stakeable</p>
             <p className="text-[#202020] font-semibold">
-              {stakeableQuantity}
+              {stakeQuantity.toLocaleString('en-US', {
+                maximumFractionDigits: 6,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
             </p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Staked </p>
             <p className="text-[#202020] font-semibold">
-              {collateralQuantity}
+              {(collateralQuantity / Math.pow(10, decimals)).toLocaleString('en-US', {
+                maximumFractionDigits: 6,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
             </p>
           </div>
         </div>
