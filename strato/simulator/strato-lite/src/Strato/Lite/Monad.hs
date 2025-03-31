@@ -1222,7 +1222,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
   seqVmSource <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
-  (slipstreamSource :: TQueue [VMEvent]) <- newTQueueIO
+  slipstreamSource <- newTQueueIO
   cht <- atomically newTMChan
   tcpVSock <- newTQueueIO
   udpVSock <- newTQueueIO
@@ -1394,7 +1394,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
                )
             .| ( awaitForever $ \case
                  Left txr -> lift $ Mod.yield txr
-                 Right _  -> pure ()
+                 Right cmds  -> traverse_ ($logInfoS (name <> "/slipstream/cmds")) $ concatMap T.lines cmds
                )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer =
