@@ -146,7 +146,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString = `$${itemTotal} (${itemTotal} USDST)<br>`;
+      concatenatedOrderString += `$${itemTotal} (${itemTotal} USDST)<br>`;
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice} USDST each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
