@@ -158,8 +158,6 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       }
     }
 
-    console.log(concatenatedOrderString, 'concatenatedOrderString');
-
     htmlContents.push(
       generateHtmlContent(customerFirstName, concatenatedOrderString)
     );
