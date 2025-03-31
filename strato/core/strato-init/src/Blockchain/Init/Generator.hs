@@ -18,6 +18,7 @@ import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.ProductionGenesisBlock
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
+import Blockchain.GenesisBlocks.UraniumGenesisBlock as URANIUM
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
@@ -48,6 +49,7 @@ createGenesisInfo network = do
   let genesisInfo = 
         case network of
           "helium" -> HELIUM.genesisBlock
+          "mercata-uranium" -> URANIUM.genesisBlock
           _ -> productionGenesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
