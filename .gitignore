@@ -45,5 +45,6 @@ strato/tools/genesis-builder/certs.json
 strato/haddock
 strato/hpc
 *.cabal
+!strato/simulator/strato-obelisk/**/*.cabal
 *~
 rewards-server/src/config/latestBlock.json

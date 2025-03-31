@@ -13,7 +13,10 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Strato.Lite.Rest.Api
-  ( ThreadResultMap,
+  ( ThreadResult,
+    NodeStatus (..),
+    ThreadResultMap,
+    NodeResultMap,
     AddNodeParams (..),
     PostTxParams (..),
     StratoLiteRestAPI,
@@ -28,7 +31,18 @@ import qualified Data.Text as T
 import GHC.Generics
 import Servant
 
-type ThreadResultMap = M.Map T.Text (Maybe (Either String ()))
+type ThreadResult = Maybe (Either String ())
+
+data NodeStatus = NodeStatus
+  { ip :: T.Text
+  , roundNumber :: Integer
+  , sequenceNumber :: Integer
+  , isValidator :: Bool
+  , result :: ThreadResult
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+type ThreadResultMap = M.Map T.Text ThreadResult
+type NodeResultMap = M.Map T.Text NodeStatus
 
 type StratoLiteRestAPI =
   GetNodes
@@ -41,7 +55,7 @@ type StratoLiteRestAPI =
     :<|> PostTimeout
     :<|> PostTx
 
-type GetNodes = "nodes" :> Get '[JSON] ThreadResultMap
+type GetNodes = "nodes" :> Get '[JSON] NodeResultMap
 
 type GetPeers = "nodes" :> Capture "nodeLabel" T.Text :> "peers" :> Get '[JSON] [T.Text]
 

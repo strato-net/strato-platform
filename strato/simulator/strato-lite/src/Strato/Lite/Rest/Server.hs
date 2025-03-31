@@ -16,9 +16,11 @@ import Bloc.API
 import Bloc.Monad
 import Bloc.Server
 import BlockApps.Logging
+import Blockchain.Blockstanbul
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
@@ -39,12 +41,23 @@ import Strato.Lite.Monad
 import Strato.Lite.Rest.Api
 import UnliftIO hiding (Handler)
 
-getNodes :: NetworkManager -> Handler ThreadResultMap
+getNodes :: NetworkManager -> Handler NodeResultMap
 getNodes mgr = liftIO . atomically $ do
   ths <- readTVar $ mgr ^. threads
-  for (ths ^. nodeThreads) $ \a -> do
-    mExp <- pollSTM a
-    pure $ fmap (first show) mExp
+  net <- readTVar $ mgr ^. network
+  flip M.traverseWithKey (ths ^. nodeThreads) $ \n a -> do
+    mExp <- fmap (first show) <$> pollSTM a
+    case net ^. nodes . at n of
+      Nothing -> pure $ NodeStatus "0.0.0.0" 0 0 False mExp
+      Just p -> do
+        ctx <- readTVar $ p ^. p2pTestContext
+        let mBCtx = ctx ^. sequencerContext . blockstanbulContext
+            mView = _view <$> mBCtx
+            rNum = maybe 0 (fromIntegral . _round) mView
+            sNum = maybe 0 (fromIntegral . _sequence) mView
+            isVal = maybe False _isValidator mBCtx
+            Host ip = pPeerHost $ p ^. p2pPeerPPeer
+        pure $ NodeStatus ip rNum sNum isVal mExp
 
 getConnections :: NetworkManager -> Handler ThreadResultMap
 getConnections mgr = liftIO . atomically $ do
