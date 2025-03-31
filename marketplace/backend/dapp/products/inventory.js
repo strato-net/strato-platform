@@ -699,81 +699,120 @@ async function getStakeableProducts(admin, args, defaultOptions) {
   // Merge default options with constant properties.
   const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
   const { assetAddresses: rootAddresses } = args;
-  // Build search options using inventory addresses and owners.
+  const queryRoot = `in.(${rootAddresses.join(',')})`;
+
+  // Build search options to get the total count of assets.
   const searchOptions = {
     ...options,
     query: {
-      select: constants.attachSalesEscrowsAndImagesAndFiles,
-      root: `in.(${rootAddresses.join(',')})`,
+      select: 'count',
+      root: queryRoot,
+      offset: 0,
+      limit: undefined,
     },
   };
 
-  // Fetch all utxos with sale information.
-  const utxos = await rest.search(
-    admin,
-    { name: 'BlockApps-Mercata-Asset' },
-    searchOptions
-  );
-
-  const bestSalesByRoot = new Map();
-
-  utxos.forEach((utxo) => {
-    const saleArray = utxo['BlockApps-Mercata-Sale'] || [];
-    const openSale = saleArray.find((sale) => sale.isOpen === true);
-    if (openSale) {
-      if (utxo.ownerCommonName !== utxo.data?.minterCommonName) return;
-    } else {
-      if (utxo.address !== utxo.root) return;
+  try {
+    // Get the total count of assets.
+    const countResponse = await rest.search(
+      admin,
+      { name: 'BlockApps-Mercata-Asset' },
+      searchOptions
+    );
+    const totalCount = countResponse?.[0]?.count || 0;
+    if (totalCount <= 0) {
+      return [];
     }
-  
-    // Check if we already have a utxo for this root.
-    const currentBest = bestSalesByRoot.get(utxo.root);
-  
-    if (!currentBest) {
-      bestSalesByRoot.set(utxo.root, openSale ? utxo : {
-        ...utxo,
-        sale: null,
-        'BlockApps-Mercata-Sale': [],
-      });
-    } else if (openSale) {
-      const currentSale = currentBest['BlockApps-Mercata-Sale']?.find(s => s.isOpen);
-      if ((currentSale?.quantity || 0) < (openSale.quantity || 0)) {
-        bestSalesByRoot.set(utxo.root, utxo);
-      }
-    }
-  });
-  
-  const filteredSales = Array.from(bestSalesByRoot.values());
 
-  // Now map over the inventories (list of addresses) to update each one with sale details if available.
-  const updatedInventories = filteredSales.map((utxo) => {
-    const sale = utxo['BlockApps-Mercata-Sale']?.[0];
-    return {
-      ...utxo,
-      assetToBeSold: sale?.assetToBeSold,
-      sale: sale?.address,
-      price: sale?.price,
-      saleAddress: sale?.address,
-      saleQuantity: sale?.quantity,
-      saleDate: sale?.block_timestamp,
-      totalLockedQuantity: sale?.totalLockedQuantity,
-      paymentServices: sale ? 
-        sale['BlockApps-Mercata-Sale-paymentServices'] : null,
-      'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
-    };
-  });
+    // Map to hold the best sale UTXO per asset root.
+    const bestSalesByRoot = new Map();
+    const batchSize = 100;
 
-  // Sort the images and files by their order
-  return updatedInventories
-    ? updatedInventories.map((inventory) => {
-        if (inventory['BlockApps-Mercata-Asset-images']) {
-          inventory['BlockApps-Mercata-Asset-images'].sort(
-            (a, b) => parseInt(a.key) - parseInt(b.key)
-          );
+    // Process UTXOs in batches.
+    for (let offset = 0; offset < totalCount; offset += batchSize) {
+      const batchOptions = {
+        ...options,
+        query: {
+          select: constants.attachSalesEscrowsAndImagesAndFiles,
+          root: queryRoot,
+          offset,
+          limit: batchSize,
+        },
+      };
+
+      const batchUtxos = await rest.search(
+        admin,
+        { name: 'BlockApps-Mercata-Asset' },
+        batchOptions
+      );
+
+      batchUtxos.forEach((utxo) => {
+        // Retrieve sale data and look for an open sale.
+        const sales = utxo['BlockApps-Mercata-Sale'] || [];
+        const openSale = sales.find((sale) => sale.isOpen === true);
+
+        // Validate UTXO based on sale state.
+        if (openSale) {
+          if (utxo.ownerCommonName !== utxo.data?.minterCommonName) return;
+        } else {
+          if (utxo.address !== utxo.root) return;
         }
-        return marshalOut(inventory);
-      })
-    : undefined;
+
+        // Check and update the best sale for this root.
+        const currentBest = bestSalesByRoot.get(utxo.root);
+        if (!currentBest) {
+          bestSalesByRoot.set(
+            utxo.root,
+            openSale
+              ? utxo
+              : { ...utxo, sale: null, 'BlockApps-Mercata-Sale': [] }
+          );
+        } else if (openSale) {
+          const currentSale = currentBest['BlockApps-Mercata-Sale']?.find(
+            (s) => s.isOpen
+          );
+          if ((currentSale?.quantity || 0) < (openSale.quantity || 0)) {
+            bestSalesByRoot.set(utxo.root, utxo);
+          }
+        }
+      });
+    }
+
+    const filteredSales = Array.from(bestSalesByRoot.values());
+
+    // Map over the filtered UTXOs to update them with sale details.
+    const updatedInventories = filteredSales.map((utxo) => {
+      const sale = utxo['BlockApps-Mercata-Sale']?.[0];
+      return {
+        ...utxo,
+        assetToBeSold: sale?.assetToBeSold,
+        sale: sale?.address,
+        price: sale?.price,
+        saleAddress: sale?.address,
+        saleQuantity: sale?.quantity,
+        saleDate: sale?.block_timestamp,
+        totalLockedQuantity: sale?.totalLockedQuantity,
+        paymentServices: sale
+          ? sale['BlockApps-Mercata-Sale-paymentServices']
+          : null,
+        // Remove the nested sale data to avoid redundancy.
+        'BlockApps-Mercata-Sale': undefined,
+      };
+    });
+
+    // Sort the images by their key order and marshal each inventory.
+    return updatedInventories.map((inventory) => {
+      if (Array.isArray(inventory['BlockApps-Mercata-Asset-images'])) {
+        inventory['BlockApps-Mercata-Asset-images'].sort(
+          (a, b) => parseInt(a.key) - parseInt(b.key)
+        );
+      }
+      return marshalOut(inventory);
+    });
+  } catch (error) {
+    console.error('Error in getStakeableProducts:', error);
+    throw error;
+  }
 }
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
