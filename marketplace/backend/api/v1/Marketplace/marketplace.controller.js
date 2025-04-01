@@ -112,10 +112,8 @@ class MarketplaceController {
 
   static async getStakeableProducts(req, res, next) {
     try {
-      const { dapp, query } = req;
-      const inventories = await dapp.getStakeableProducts({
-        ...query,
-      });
+      const { dapp } = req;
+      const inventories = await dapp.getStakeableProducts();
       const updatedInventory = new MarketplaceController().movingGoldToFirst(inventories);
       rest.response.status200(res, updatedInventory);
 

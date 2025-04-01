@@ -24,12 +24,7 @@ const PurchasableStakeItems = () => {
 
   useEffect(() => {
     if (reserves) {
-      marketplaceActions.fetchStakeableProducts(
-        marketplaceDispatch,
-        reserves
-          .filter((reserve) => !reserve.name.toLowerCase().includes('temp'))
-          .map((reserve) => reserve.assetRootAddress)
-      );
+      marketplaceActions.fetchStakeableProducts(marketplaceDispatch);
     }
   }, [reserves]);
 
