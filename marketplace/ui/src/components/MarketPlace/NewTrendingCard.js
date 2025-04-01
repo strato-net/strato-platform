@@ -32,7 +32,7 @@ const NewTrendingCard = ({
   const location = useLocation();
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-
+  const { ethstAddress, wbtcstAddress } = useEthState();
   const ethDispatch = useEthDispatch();
 
   useEffect(() => {
@@ -148,10 +148,12 @@ const NewTrendingCard = ({
 
   const naviroute = routes.MarketplaceProductDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
-  const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
-  const isDisabled =
-    !bridgeableAddresses?.includes(topSellingProduct.originAddress) &&
-    (isAvailableForSale || ownerSameAsUser());
+  // const isDisabled =
+  //   !bridgeableAddresses?.includes(topSellingProduct.originAddress) &&
+  //   (isAvailableForSale || ownerSameAsUser());
+  const isAvailableForSale =
+    topSellingProduct.price > 0 && saleQuantity > 0 && !ownerSameAsUser();
+  const isBridgeable = isWbtcst || isEthst;
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
@@ -429,18 +431,7 @@ const NewTrendingCard = ({
         >
           <Typography>Quantity:</Typography>
           <div className="flex gap-3 p-1 bg-white">
-            <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                (quantity === 1 && !decimals) || quantity === 0.01
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-              onClick={() => {
-                handleDecrement(quantity);
-              }}
-            >
-              -
-            </Typography>
+
             <Tooltip
               title={
                 hasExceededMaxQuantity(quantity)
@@ -573,28 +564,15 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if (bridgeableAddresses?.includes(topSellingProduct.originAddress) && reserve) {
-                navigate(
-                  `${routes.bridgeableProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
-                  ).replace(':bridgeableAsset', topSellingProduct.name)}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else {
                 if (
                   (await addItemToCart(topSellingProduct, quantity)) === true
                 ) {
                   navigate('/checkout');
                   window.scrollTo(0, 0);
                 }
-              }
             }}
           >
-            {(bridgeableAddresses?.includes(topSellingProduct.originAddress)) &&
-            reserve
-              ? 'Bridge'
-              : 'Buy Now'}
+            Buy Now
           </Button>
           {isBridgeable && reserve && (
             <Button
@@ -632,20 +610,12 @@ const NewTrendingCard = ({
                     productId: topSellingProduct.productId,
                   },
                 });
-                if (isEthst) {
+                if (bridgeableAddresses?.includes(topSellingProduct.originAddress) && reserve) {
                   navigate(
-                    `${ethNaviroute.replace(
+                    `${routes.bridgeableProductDetail.url.replace(
                       ':address',
                       topSellingProduct.address
-                    )}`,
-                    { state: { isCalledFromInventory: false } }
-                  );
-                } else if (isWbtcst) {
-                  navigate(
-                    `${routes.WbtcstProductDetail.url.replace(
-                      ':address',
-                      topSellingProduct.address
-                    )}`,
+                    ).replace(':bridgeableAsset', topSellingProduct.name)}`,
                     { state: { isCalledFromInventory: false } }
                   );
                 }
