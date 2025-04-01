@@ -302,18 +302,10 @@ const updateSalePricePeriodically = async () => {
   for (const asset of assets) {
     try {
       // get the correct asset with sale
-      const searchOptions = {
-        config,
-        query: {
-          root: "eq." + asset.address,
-          select: "sale,name,decimals",
-        },
-      };
-
       const assetResult = await fetchAsset(
         token,
         { address: asset.address },
-        searchOptions
+        config
       );
       console.log("assetResult: ", assetResult);
       if (!assetResult || assetResult.length === 0) {
