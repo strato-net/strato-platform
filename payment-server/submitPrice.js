@@ -226,7 +226,6 @@ const submitOraclePricePeriodically = async () => {
       console.warn(`[Oracle WARN] Skipping invalid oracle ${key}`);
       continue;
     }
-    let priceBig = 0;
     let result = null;
     try {
       if (oracle.type === "ERC20") {
@@ -234,43 +233,24 @@ const submitOraclePricePeriodically = async () => {
           oracle.name,
           process.env.ALCHEMY_API_KEY
         );
-        if (result) {
-          // Round price to 2 decimal places and adjust for token decimals
-          priceBig = new BigNumber(result.price)
-            .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
-            .shiftedBy(-oracle.decimals)
-            .toNumber();
-          console.log(
-            `[Oracle Update] Price submitted for ${
-              oracle.name
-            } at ${new Date().toISOString()}`
-          );
-        }
       } else if (oracle.type === "Metal") {
         result = await fetchMetalPrice(
           oracle.name.toLowerCase().replace(/st$/, ""),
           process.env.METALS_API_KEY
         );
-        if (result) {
-          // Round price to 2 decimal places and adjust for token decimals
-          priceBig = new BigNumber(result.price)
-            .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
-            .shiftedBy(-oracle.decimals)
-            .toNumber();
-          console.log(
-            `[Oracle Update] Price submitted for ${
-              oracle.name
-            } at ${new Date().toISOString()}`
-          );
-        }
-      } else if (oracle.type === "Constant") {
-        priceBig = new BigNumber(oracle.price)
-          .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
-          .shiftedBy(-oracle.decimals)
-          .toNumber();
       } else {
         console.warn(`[Oracle WARN] Skipping unsupported oracle type ${key}`);
+        continue;
       }
+      const priceBig = new BigNumber(result ? result.price : oracle.price)
+        .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
+        .shiftedBy(-oracle.decimals)
+        .toNumber();
+      console.log(
+        `[Oracle Update] Price submitted for ${
+          oracle.name
+        } at ${new Date().toISOString()}`
+      );
       await submitPrice(
         token,
         oracle,
