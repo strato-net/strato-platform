@@ -82,6 +82,7 @@ export default {
       ethTestnetAddress: '0x29f2D40B0605204364af54EC677bD022dA425d03',
       ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
       decimals: 8,
+      precision: 0.0001,
       mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
       mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
     },
@@ -90,6 +91,7 @@ export default {
       ethTestnetAddress: '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6',
       ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
       decimals: 6,
+      precision: 0.01,
       mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
       mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
     },
@@ -98,6 +100,7 @@ export default {
       ethTestnetAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
       ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
       decimals: 6,
+      precision: 0.01,
       mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
       mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
     },
@@ -106,13 +109,15 @@ export default {
       ethTestnetAddress: '0x8599eA38e03E9D0A8B9e86A47aC119FC78d6b6D3',
       ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
       decimals: 18,
+      precision: 0.01,
       mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
       mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
     },
     {
       name: 'ETHST',
       mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+      precision: 0.01
     }
   ]
 

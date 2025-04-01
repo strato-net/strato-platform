@@ -17,7 +17,7 @@ import { SEO } from '../../helpers/seoConstant';
 import routes from '../../helpers/routes';
 import LoginModal from './LoginModal';
 import { actions as ethActions } from '../../contexts/eth/actions';
-import { useEthDispatch, useEthState} from '../../contexts/eth';
+import { useEthDispatch, useEthState } from '../../contexts/eth';
 
 const NewTrendingCard = ({
   topSellingProduct,
@@ -32,7 +32,6 @@ const NewTrendingCard = ({
   const location = useLocation();
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
   const ethDispatch = useEthDispatch();
 
   useEffect(() => {
@@ -43,6 +42,7 @@ const NewTrendingCard = ({
   }, []);
 
   const { bridgeableTokens } = useEthState();
+
   const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const { hasChecked, isAuthenticated, loginUrl, user } =
@@ -56,10 +56,19 @@ const NewTrendingCard = ({
   )
     ? 18
     : topSellingProduct.decimals || 0;
-  const isWbtcst = topSellingProduct.originAddress === wbtcstAddress;
-  const isEthst = topSellingProduct.originAddress === ethstAddress;
+
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  const step = isWbtcst ? 0.0001 : isEthst ? 0.01 : decimals ? 0.01 : 1;
+  let step;
+  const precision = bridgeableTokens?.find((token) => token.address === topSellingProduct.originAddress)?.precision;
+
+  if (precision) {
+    step = precision;
+  } else if (decimals) {
+    step = 0.01;
+  } else {
+    step = 1;
+  }
+
   const [quantity, setQuantity] = useState(step > saleQuantity ? saleQuantity : step);
   const minValue = new BigNumber(1).dividedBy(new BigNumber(10).pow(decimals));
 
@@ -153,7 +162,7 @@ const NewTrendingCard = ({
   //   (isAvailableForSale || ownerSameAsUser());
   const isAvailableForSale = topSellingProduct.price > 0 && saleQuantity > 0 && !ownerSameAsUser();
 
-  const isBridgeable = isWbtcst || isEthst;
+  const isBridgeable = bridgeableAddresses?.includes(topSellingProduct.originAddress);
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
@@ -239,10 +248,10 @@ const NewTrendingCard = ({
       const minValue = 1 / Math.pow(10, decimals || 0);
       if (quantity - 0.01 > 0) {
         setQuantity((prevQuantity) => {
-            const newQuantity = parseFloat(
-              Math.max(prevQuantity - 0.01, minValue)
-            ).toFixed(4);
-            return Number(newQuantity);
+          const newQuantity = parseFloat(
+            Math.max(prevQuantity - 0.01, minValue)
+          ).toFixed(4);
+          return Number(newQuantity);
         });
       }
     }
@@ -286,9 +295,8 @@ const NewTrendingCard = ({
     <>
       <div
         id="productCard"
-        className={`relative trending_cards_container_card bg-white p-3 ${
-          parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
-        }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
+        className={`relative trending_cards_container_card bg-white p-3 ${parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
+          }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
       >
         {contextHolder}
         {!ownerSameAsUser() && (
@@ -380,18 +388,18 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice =
-                  topSellingProduct.price * Math.pow(10, decimals);
+              const adjustedPrice =
+                topSellingProduct.price * Math.pow(10, decimals);
 
-                return (
-                  <Typography className="font-semibold">
-                    {`$${adjustedPrice.toFixed(2)} `}{' '}
-                    <span className="font-normal text-xs mr-2 text-primary">
-                      <b>{`(${adjustedPrice?.toFixed(2)} ${'USDST'})`}</b>
-                    </span>
-                  </Typography>
-                );
-              })()
+              return (
+                <Typography className="font-semibold">
+                  {`$${adjustedPrice.toFixed(2)} `}{' '}
+                  <span className="font-normal text-xs mr-2 text-primary">
+                    <b>{`(${adjustedPrice?.toFixed(2)} ${'USDST'})`}</b>
+                  </span>
+                </Typography>
+              );
+            })()
             : 'No Price Available'}
           {!isAvailableForSale && (
             <Text type="danger" strong>
@@ -402,13 +410,13 @@ const NewTrendingCard = ({
           {topSellingProduct?.contract_name
             .toLowerCase()
             .includes('clothing') && (
-            <Typography className="font-normal text-black">
-              Size:{' '}
-              {topSellingProduct?.data?.size
-                ? topSellingProduct?.data?.size
-                : 'N/A'}
-            </Typography>
-          )}
+              <Typography className="font-normal text-black">
+                Size:{' '}
+                {topSellingProduct?.data?.size
+                  ? topSellingProduct?.data?.size
+                  : 'N/A'}
+              </Typography>
+            )}
         </div>
         {reserve && (
           <div className="flex justify-between">
@@ -432,10 +440,10 @@ const NewTrendingCard = ({
                 hasExceededMaxQuantity(quantity)
                   ? `Maximum quantity is ${saleQuantity}`
                   : isBelowMinValue(quantity)
-                  ? `Minimum quantity is ${minValue.toFixed(decimals)}`
-                  : hasExceedPrecision(quantity)
-                  ? `Maximum precision is ${decimals} decimal places`
-                  : ''
+                    ? `Minimum quantity is ${minValue.toFixed(decimals)}`
+                    : hasExceedPrecision(quantity)
+                      ? `Maximum precision is ${decimals} decimal places`
+                      : ''
               }
               color="#e2320d"
               placement="top"
@@ -452,18 +460,17 @@ const NewTrendingCard = ({
                 style={{
                   border:
                     isBelowMinValue(quantity) ||
-                    hasExceededMaxQuantity(quantity) ||
-                    hasExceedPrecision(quantity)
+                      hasExceededMaxQuantity(quantity) ||
+                      hasExceedPrecision(quantity)
                       ? '1px solid #e2320d'
                       : '1px solid transparent',
                 }}
               >
                 <Typography
-                  className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                    quantity > step
+                  className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity > step
                       ? 'cursor-pointer'
                       : 'cursor-not-allowed opacity-50'
-                  }`}
+                    }`}
                   onClick={() => {
                     quantity > step &&
                       setQuantity(
@@ -495,11 +502,10 @@ const NewTrendingCard = ({
                   controls={false}
                 />
                 <Typography
-                  className={`px-2 bg-[#EEEFFA] rounded-sm ${
-                    quantity < saleQuantity
+                  className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity < saleQuantity
                       ? 'cursor-pointer'
                       : 'cursor-not-allowed opacity-50'
-                  }`}
+                    }`}
                   onClick={() =>
                     quantity < saleQuantity &&
                     setQuantity(
@@ -525,14 +531,13 @@ const NewTrendingCard = ({
               hasExceededMaxQuantity(quantity)
             }
             type="primary"
-            className={`flex-1 h-9 !text-white ${
-              !isAvailableForSale ||
-              hasExceedPrecision(quantity) ||
-              isBelowMinValue(quantity) ||
-              hasExceededMaxQuantity(quantity)
+            className={`flex-1 h-9 !text-white ${!isAvailableForSale ||
+                hasExceedPrecision(quantity) ||
+                isBelowMinValue(quantity) ||
+                hasExceededMaxQuantity(quantity)
                 ? '!bg-[#808080] cursor-not-allowed'
                 : '!bg-[#13188A] cursor-pointer'
-            }`}
+              }`}
             onClick={async () => {
               const dataLayerEventName = isUserProfile
                 ? 'buy_now_from_user_profile'
@@ -559,12 +564,12 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-                if (
-                  (await addItemToCart(topSellingProduct, quantity)) === true
-                ) {
-                  navigate('/checkout');
-                  window.scrollTo(0, 0);
-                }
+              if (
+                (await addItemToCart(topSellingProduct, quantity)) === true
+              ) {
+                navigate('/checkout');
+                window.scrollTo(0, 0);
+              }
             }}
           >
             Buy Now
@@ -574,11 +579,10 @@ const NewTrendingCard = ({
               id={`${topSellingProduct?.name?.replace(/ /g, '_')}-bridge`}
               disabled={!isBridgeable}
               type="primary"
-              className={`flex-1 h-9 !text-white ${
-                !isBridgeable
+              className={`flex-1 h-9 !text-white ${!isBridgeable
                   ? '!bg-[#808080] cursor-not-allowed'
                   : '!bg-[#13188A] cursor-pointer'
-              }`}
+                }`}
               onClick={async () => {
                 const dataLayerEventName = isUserProfile
                   ? 'bridge_from_user_profile'
