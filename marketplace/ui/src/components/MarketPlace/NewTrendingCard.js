@@ -315,7 +315,7 @@ const NewTrendingCard = ({
                   navigate(
                     `${ethNaviroute.replace(
                       ':address',
-                      topSellingProduct.address
+                      topSellingProduct.root
                     )}`,
                     { state: { isCalledFromInventory: false } }
                   );
@@ -323,8 +323,15 @@ const NewTrendingCard = ({
                   navigate(
                     `${routes.WbtcstProductDetail.url.replace(
                       ':address',
-                      topSellingProduct.address
+                      topSellingProduct.root
                     )}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                } else {
+                  navigate(
+                    `${naviroute
+                      .replace(':address', topSellingProduct.root)
+                      .replace(':name', topSellingProduct.name)}`,
                     { state: { isCalledFromInventory: false } }
                   );
                 }
