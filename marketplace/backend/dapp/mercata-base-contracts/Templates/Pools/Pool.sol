@@ -5,6 +5,7 @@ import "../ERC20/ERC20.sol";
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
 abstract contract Pool is ERC20 {
+    
     // Events
     event TokenPurchase(address buyer, uint256 stable_sold, uint256 tokens_bought);
     event StablePurchase(address buyer, uint256 tokens_sold, uint256 stable_bought);
@@ -157,7 +158,7 @@ abstract contract Pool is ERC20 {
         decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)));
         require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 token in stablecoins (stable_reserve / token_reserve)
-        return decimal((stable_reserve * 1000000000000000000.000000) / token_reserve) / 1000000000000000000.000000;MERCATA_COMPATIBILITY: Added decimal division for my testing
+        return decimal((stable_reserve * 1000000000000000000.000000) / token_reserve) / 1000000000000000000.000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
     function getCurrentStablePrice() external view returns (decimal) {

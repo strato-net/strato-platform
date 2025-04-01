@@ -17,9 +17,12 @@ pragma solidvm 11.5;
 // import "Templates/Bridge/MercataETHBridge.sol";
 import "Templates/ERC20/ERC20.sol";
 import "Templates/Pools/Pool.sol";
+import "Templates/Pools/PoolFactory.sol";
 import "Templates/ERC20/extensions/ERC20Burnable.sol";
-
 import "Templates/ERC20/access/Ownable.sol";
+import "Templates/Redemptions/RedemptionService.sol";
+// import "Templates/Redemptions/PhysicalRedemptionService.sol";
+// import "Templates/Redemptions/CryptoRedemptionService.sol";
 
 // Uncomment to test whether all non-base contracts typecheck
 // import "All.sol";

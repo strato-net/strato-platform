@@ -1,19 +1,20 @@
-
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "../Pools/Pool.sol";
+// import "../Bridge/MercataETHBridge.sol";
+
+import "../ERC20/ERC20.sol";
+import "../ERC20/extensions/ERC20Burnable.sol";
+import "../ERC20/access/Ownable.sol";
 
 /**
  * @title RedemptionContract
  * @dev Allows holders to redeem their tokens for usdcTokens at the redemption price,
  * providing an arbitrage mechanism to help balance the pool
  */
-abstract contract RedemptionContract is Ownable, ERC20Burnable {
+abstract contract RedemptionService is Ownable, ERC20Burnable {
     // The token that can be redeemed
-    IERC20 public token;
+    ERC20Burnable public token;
     // The usdcToken used for redemptions
-    IERC20 public usdcToken;
+    ERC20Burnable public usdcToken;
     // The associated liquidity pool
     Pool public pool;
     // The redemption price in usdcTokens (scaled by 1e18)
@@ -22,6 +23,10 @@ abstract contract RedemptionContract is Ownable, ERC20Burnable {
     uint256 public maxRedemptionAmount;
     // Whether redemptions are currently enabled
     bool public redemptionsEnabled;
+    // The bridge contract for crypto assets
+    MercataETHBridge public bridge;
+    // Whether this is a physical or crypto asset
+    bool public isPhysicalAsset;
 
     event Redeemed(address redeemer, uint256 tokenAmount);
     event RedemptionPriceUpdated(uint256 newPrice);
@@ -34,7 +39,9 @@ abstract contract RedemptionContract is Ownable, ERC20Burnable {
         address _usdcToken,
         address _pool,
         uint256 _initialSpotPrice,
-        uint256 _maxRedemptionAmount
+        uint256 _maxRedemptionAmount,
+        address _bridge,
+        bool _isPhysicalAsset
     ) {
         token = ERC20Burnable(_token);
         usdcToken = ERC20Burnable(_usdcToken);
@@ -74,36 +81,11 @@ abstract contract RedemptionContract is Ownable, ERC20Burnable {
     }
 
     /**
-     * @notice Redeem tokens for physical RWAs at the spot price
+     * @notice Redeem tokens for underlying assets at the spot price
      * @param tokenAmount Amount of tokens to redeem
+     * @param baseAddress For crypto assets, the address to receive the native tokens
      */
-    function redeemAtSpot(uint256 tokenAmount) external {
-        require(redemptionsEnabled, "Redemptions disabled");
-        require(tokenAmount > 0, "Amount must be > 0");
-        require(tokenAmount <= maxRedemptionAmount, "Amount exceeds maximum");
-
-        // Transfer tokens from user to contract
-        require(token.transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
-
-        // Burn tokens
-        require(token.burn(tokenAmount), "Token burn failed");
-
-        emit Redeemed(msg.sender, tokenAmount);
-    }
-
-    function sellForSpot(uint256 tokenAmount) external {
-        require(redemptionsEnabled, "Redemptions disabled");
-        require(tokenAmount > 0, "Amount must be > 0");
-        require(tokenAmount <= maxRedemptionAmount, "Amount exceeds maximum");
-
-        uint256 usdcAmount = (tokenAmount * spotPrice) / 1e18;
-
-        //Do a fixed price swap
-        require(token.transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
-        require(usdcToken.transfer(msg.sender, usdcAmount), "Stablecoin transfer failed");
-
-        emit Redeemed(msg.sender, tokenAmount, usdcAmount);
-    }
+    function redeemAtSpot(uint256 tokenAmount, string memory baseAddress) external virtual;
 
     /**
      * @notice Withdraw excess tokens/usdcTokens. Only owner can withdraw.
@@ -119,8 +101,8 @@ abstract contract RedemptionContract is Ownable, ERC20Burnable {
      * @notice Get current pool price for comparison
      * @return Current pool price scaled by 1e18
      */
-    function getPoolPrice() public view returns (uint256) {
-        return uint256(pool.getCurrentTokenPrice() * 1e18);
+    function getPoolPrice() public view returns (uint) {
+        return uint(pool.getCurrentTokenPrice() * 1e18);
     }
 
     /**
