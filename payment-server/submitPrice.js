@@ -232,10 +232,7 @@ const submitOraclePricePeriodically = async () => {
       if (oracle.type === "ERC20") {
         result = await fetchERC20TokenPrice(
           oracle.name,
-          oracle.address,
-          oracle.decimals,
-          process.env.ALCHEMY_API_KEY,
-          token
+          process.env.ALCHEMY_API_KEY
         );
         if (result) {
           // Round price to 2 decimal places and adjust for token decimals
@@ -305,7 +302,6 @@ const updateSalePricePeriodically = async () => {
   for (const asset of assets) {
     try {
       // get the correct asset with sale
-      
       const searchOptions = {
         config,
         query: {
@@ -319,6 +315,7 @@ const updateSalePricePeriodically = async () => {
         { address: asset.address },
         searchOptions
       );
+      console.log("assetResult: ", assetResult);
       if (!assetResult || assetResult.length === 0) {
         console.warn(`[Sale Update] No asset found for ${asset.address}`);
         continue;
@@ -422,7 +419,8 @@ async function main() {
           !lastOracleRun
         ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
-          await submitOraclePricePeriodically();
+          // TODO: uncomment this line to run the oracle update
+          // await submitOraclePricePeriodically();
           lastOracleRun = currentDate;
         } else {
           console.log("[Oracle] Skipping since interval not reached.");

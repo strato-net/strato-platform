@@ -69,7 +69,7 @@ async function fetchAsset(token, args, config) {
   if (totalCount <= 0) {
     return [];
   }
-
+  console.log(`Total UTXOs found: ${totalCount}`);
   // Map to hold the best sale UTXO per asset root.
   const bestSalesByRoot = new Map();
   const batchSize = 100;
