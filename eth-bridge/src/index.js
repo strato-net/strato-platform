@@ -4,7 +4,7 @@ const { setupAlchemyWebSocket } = require("./sockets/alchemyWebSocket");
 const initializeSockets = async () => {
   try {
     // Initialize Marketplace WebSocket
-    await connectMercataWebSocket();
+    // await connectMercataWebSocket();
 
     // Initialize Alchemy WebSocket
     await setupAlchemyWebSocket();

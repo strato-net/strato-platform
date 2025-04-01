@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import BigNumber from 'bignumber.js';
 dayjs.extend(utc);
 
 export default {
@@ -219,8 +220,22 @@ export const calculateAverageSalePrice = (records, decimals) => {
 };
 
 export const calculatePriceFluctuation = (records, decimals) => {
-  const prices = records.map((record) => record.price);
-  return { min: Math.min(...prices) * Math.pow(10, decimals), max: Math.max(...prices) * Math.pow(10, decimals) };
+  const len = records?.length;
+  if (!len) return { min: 0, max: 0 };
+
+  const factor = new BigNumber(10).pow(decimals);
+  // Initialize from the first record
+  const firstScaled = new BigNumber(records[0].price).times(factor);
+  let min = firstScaled;
+  let max = firstScaled;
+
+  for (let i = 1; i < len; i++) {
+    const scaled = new BigNumber(records[i].price).times(factor);
+    if (scaled.lt(min)) min = scaled;
+    if (scaled.gt(max)) max = scaled;
+  }
+
+  return { min: min.toNumber(), max: max.toNumber() };
 };
 
 export const calculateVolumeTraded = (records, decimals) => {

@@ -77,7 +77,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
               <OrdersProvider>
                 <InventoriesProvider>
                   <PaymentServicesProvider>
-                    <Checkout />
+                    <EthProvider>
+                      <Checkout />
+                    </EthProvider>
                   </PaymentServicesProvider>
                 </InventoriesProvider>
               </OrdersProvider>
@@ -208,7 +210,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-            <Route
+      <Route
         exact
         path={routes.bridgeableProductDetail.url}
         element={

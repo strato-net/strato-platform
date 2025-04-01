@@ -7,6 +7,7 @@ import { useInventoryDispatch } from '../../contexts/inventory';
 import { useEthDispatch, useEthState } from '../../contexts/eth';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { ethers } from 'ethers';
+import BigNumber from 'bignumber.js';
 import { fileServerUrl } from '../../helpers/constants';
 
 const ERC20_ABI = [
@@ -31,13 +32,16 @@ const BridgeWalletModal = ({
   tabKey = '1',
   pageDetails,
 }) => {
-  const [quantity, setQuantity] = useState(accountDetails?.balance || 1);
+  const [quantity, setQuantity] = useState(accountDetails?.balance || 0);
   const [ethereumAddress, setEthereumAddress] = useState('');
   const [loader, setLoader] = useState(false);
   const ethDispatch = useEthDispatch();
   const inventoryDispatch = useInventoryDispatch();
   const { user } = useAuthenticateState();
   const { isAddingHash, isBridgingOut } = useEthState();
+  const minQuantity = new BigNumber(1).div(
+    new BigNumber(10).pow(accountDetails?.decimals)
+  );
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -55,9 +59,10 @@ const BridgeWalletModal = ({
   const hasExceedPrecision = (value) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value);
+    const maxDecimals = accountDetails?.decimals;
     if (stringValue.includes('.')) {
       const decimalPart = stringValue.split('.')[1];
-      return decimalPart && decimalPart.length > 6;
+      return decimalPart && decimalPart.length > maxDecimals;
     }
     return false;
   };
@@ -74,7 +79,11 @@ const BridgeWalletModal = ({
       render: () => (
         <div
           className={`${
-            quantity <= 0 || hasExceedPrecision(quantity) ? 'h-auto' : 'h-8'
+            hasExceedPrecision(quantity) ||
+            minQuantity.gt(quantity || 0) ||
+            quantity > accountDetails?.balance
+              ? 'h-auto'
+              : 'h-8'
           }`}
         >
           <InputNumber
@@ -83,25 +92,36 @@ const BridgeWalletModal = ({
             controls={false}
             className="w-full"
             status={
-              quantity < 1 / 1e6 || hasExceedPrecision(quantity) ? 'error' : ''
+              minQuantity.gt(quantity || 0) ||
+              hasExceedPrecision(quantity) ||
+              quantity > accountDetails?.balance
+                ? 'error'
+                : ''
             }
           />
-          {quantity < 1 / 1e6 && (
+          {accountDetails?.balance < quantity ? (
             <div
               style={{ color: 'red' }}
               className="text-xs my-0.5 absolute w-full"
             >
-              Amount must be greater than 0.000001
+              Insufficient balance
             </div>
-          )}
-          {hasExceedPrecision(quantity) && (
+          ) : minQuantity.gt(quantity || 0) ? (
             <div
               style={{ color: 'red' }}
               className="text-xs my-0.5 absolute w-full"
             >
-              Maximum precision is 6 decimal places
+              Amount must be greater than{' '}
+              {minQuantity.toFixed(accountDetails?.decimals)}
             </div>
-          )}
+          ) : hasExceedPrecision(quantity) ? (
+            <div
+              style={{ color: 'red' }}
+              className="text-xs my-0.5 absolute w-full"
+            >
+              Maximum precision is {accountDetails?.decimals} decimal places
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -127,7 +147,11 @@ const BridgeWalletModal = ({
       render: () => (
         <div
           className={`${
-            quantity <= 0 || hasExceedPrecision(quantity) ? 'h-auto' : 'h-8'
+            minQuantity.gt(quantity || 0) ||
+            hasExceedPrecision(quantity) ||
+            quantity > accountDetails?.balance
+              ? 'h-auto'
+              : 'h-8'
           }`}
         >
           <InputNumber
@@ -136,25 +160,36 @@ const BridgeWalletModal = ({
             controls={false}
             className="w-full"
             status={
-              quantity < 1 / 1e6 || hasExceedPrecision(quantity) ? 'error' : ''
+              minQuantity.gt(quantity || 0) ||
+              hasExceedPrecision(quantity) ||
+              quantity > accountDetails?.balance
+                ? 'error'
+                : ''
             }
           />
-          {quantity < 1 / 1e6 && (
+          {accountDetails?.balance < quantity ? (
             <div
               style={{ color: 'red' }}
               className="text-xs my-0.5 absolute w-full"
             >
-              Amount must be greater than 0.000001
+              Insufficient balance
             </div>
-          )}
-          {hasExceedPrecision(quantity) && (
+          ) : minQuantity.gt(quantity || 0) ? (
             <div
               style={{ color: 'red' }}
               className="text-xs my-0.5 absolute w-full"
             >
-              Maximum precision is 6 decimal places
+              Amount must be greater than{' '}
+              {minQuantity.toFixed(accountDetails?.decimals)}
             </div>
-          )}
+          ) : hasExceedPrecision(quantity) ? (
+            <div
+              style={{ color: 'red' }}
+              className="text-xs my-0.5 absolute w-full"
+            >
+              Maximum precision is {accountDetails?.decimals} decimal places
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -195,10 +230,41 @@ const BridgeWalletModal = ({
           <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
           <div>
             <InputNumber
-              className="w-full h-9"
               value={quantity}
               onChange={(value) => setQuantity(value)}
+              controls={false}
+              className="w-full h-9"
+              status={
+                minQuantity.gt(quantity || 0) ||
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
+                  ? 'error'
+                  : ''
+              }
             />
+            {accountDetails?.balance < quantity ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Insufficient balance
+              </div>
+            ) : minQuantity.gt(quantity || 0) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Amount must be greater than{' '}
+                {minQuantity.toFixed(accountDetails?.decimals)}
+              </div>
+            ) : hasExceedPrecision(quantity) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Maximum precision is {accountDetails?.decimals} decimal places
+              </div>
+            ) : null}
           </div>
         </div>
         <div>
@@ -223,6 +289,71 @@ const BridgeWalletModal = ({
           dataSource={[accountDetails]}
           pagination={false}
         />
+      </div>
+      <div className="flex flex-col gap-[18px] md:hidden">
+        <div>
+          {' '}
+          <p className="text-[#202020] font-medium text-sm">
+            {tokenName} Available
+          </p>
+          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+            <p> {accountDetails.balance} </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+          <div>
+            <InputNumber
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+              controls={false}
+              className="w-full h-9"
+              status={
+                minQuantity.gt(quantity || 0) ||
+                hasExceedPrecision(quantity) ||
+                quantity > accountDetails?.balance
+                  ? 'error'
+                  : ''
+              }
+            />
+            {accountDetails?.balance < quantity ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Insufficient balance
+              </div>
+            ) : minQuantity.gt(quantity || 0) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Amount must be greater than{' '}
+                {minQuantity.toFixed(accountDetails?.decimals)}
+              </div>
+            ) : hasExceedPrecision(quantity) ? (
+              <div
+                style={{ color: 'red' }}
+                className="text-xs my-0.5 absolute w-full"
+              >
+                Maximum precision is {accountDetails?.decimals} decimal places
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div>
+          <p className="text-[#202020] font-medium text-sm">
+            Ethereum Wallet Address
+          </p>
+          <div>
+            <Input
+              placeholder="Ethereum Chain address"
+              className="w-full h-9"
+              value={ethereumAddress}
+              onChange={(e) => setEthereumAddress(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
     </>
   );
@@ -284,8 +415,8 @@ const BridgeWalletModal = ({
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
-              ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-              : '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+              ? '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE'
+              : '0x8c458F866e603335ef179A63a2528F357732f5d5',
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
@@ -313,6 +444,7 @@ const BridgeWalletModal = ({
           externalChainWalletAddress: ethereumAddress,
           tokenAssetRootAddress: accountDetails.assetRootAddress,
           tokenName,
+          assetAddress: accountDetails.assetAddress,
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
@@ -354,7 +486,7 @@ const BridgeWalletModal = ({
                 className="w-32 h-9"
                 onClick={handleSubmit}
                 disabled={
-                  quantity < 1 / 1e6 ||
+                  minQuantity.gt(quantity || 0) ||
                   quantity > accountDetails.balance ||
                   hasExceedPrecision(quantity)
                 }
@@ -371,7 +503,7 @@ const BridgeWalletModal = ({
                 className="w-full h-9"
                 onClick={handleSubmit}
                 disabled={
-                  quantity < 1 / 1e6 ||
+                  minQuantity.gt(quantity || 0) ||
                   quantity > accountDetails.balance ||
                   hasExceedPrecision(quantity)
                 }

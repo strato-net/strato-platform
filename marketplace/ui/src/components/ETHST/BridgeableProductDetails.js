@@ -277,7 +277,7 @@ const ProductDetails = ({ user, users }) => {
 
     // Cleanup: remove event listener on unmount
     return () => {
-      walletProvider.removeListener("accountsChanged", handleAccountsChanged);
+      walletProvider.removeListener('accountsChanged', handleAccountsChanged);
     };
   }, [walletProvider, address, chainId]);
 
@@ -684,51 +684,44 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 </div>
 
-                {!ownerSameAsUser() && (
-                  <div className=" pt-4 lg:pt-[22px]">
-                    <Paragraph
-                      level={4}
-                      id="price"
-                      className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold"
-                    >
-                      <div className="text-lg">
-                        Est. APY: {matchingReserve?.cataAPYRate}%
-                      </div>
-                      <div className="text-lg">
-                        TVL: ${matchingReserve?.tvl.toFixed(2)}
-                      </div>
-                    </Paragraph>
-                  </div>
-                )}
-
-                {!ownerSameAsUser() && (
-                  <>
-                    <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
-                      <Button
-                        type="primary"
-                        className={`w-[100%]  h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white`}
-                        onClick={async () => {
-                          if (!isAuthenticated || !user) {
-                            setIsModalVisible(true);
-                          } else {
-                            if (address) {
-                              showBridgeWalletModal();
-                            } else {
-                              appKit.open();
-                            }
-                          }
-                        }}
-                      >
-                        {address ? 'Bridge' : 'Connect Wallet'}
-                      </Button>
+                <div className=" pt-4 lg:pt-[22px]">
+                  <Paragraph
+                    level={4}
+                    id="price"
+                    className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold"
+                  >
+                    <div className="text-lg">
+                      TVL: ${matchingReserve?.tvl.toFixed(2)}
                     </div>
-                    {address && (
-                      <div className="bg-[#13188A] rounded-full mt-2">
-                        <appkit-account-button />
-                      </div>
-                    )}
-                  </>
-                )}
+                  </Paragraph>
+                </div>
+
+                <>
+                  <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
+                    <Button
+                      type="primary"
+                      className={`w-[100%]  h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white`}
+                      onClick={async () => {
+                        if (!isAuthenticated || !user) {
+                          setIsModalVisible(true);
+                        } else {
+                          if (address) {
+                            showBridgeWalletModal();
+                          } else {
+                            appKit.open();
+                          }
+                        }
+                      }}
+                    >
+                      {address ? 'Bridge' : 'Connect Wallet'}
+                    </Button>
+                  </div>
+                  {address && (
+                    <div className="bg-[#13188A] rounded-full mt-2">
+                      <appkit-account-button />
+                    </div>
+                  )}
+                </>
                 {ownerSameAsUser() && (
                   <>
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">

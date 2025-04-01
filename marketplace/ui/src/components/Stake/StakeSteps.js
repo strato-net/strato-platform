@@ -98,7 +98,7 @@ const StakeSteps = () => {
               style={{ color: '#4b5563' }}
             >
               Stake your gold and silver assets and begin earning daily rewards
-              in the form of CATA, our governance token (Est. APY 10%).
+              in the form of CATA, our governance token.
             </p>
           </div>
         </div>

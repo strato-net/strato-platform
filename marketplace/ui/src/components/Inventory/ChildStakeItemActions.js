@@ -119,6 +119,7 @@ const ChildStakeItemActions = ({
         >
           <LogoutOutlined /> Unstake
         </Button>
+        {/* temporary removing bridgeout button
         <Button
           type="link"
           className={`text-[#13188A] font-semibold ${
@@ -130,7 +131,7 @@ const ChildStakeItemActions = ({
           onClick={showBridgeOutModal}
         >
           <RetweetOutlined /> Bridge
-        </Button>
+        </Button> */}
         <Button
           type="link"
           className="text-[#13188A] font-semibold invisible"
@@ -186,6 +187,7 @@ const ChildStakeItemActions = ({
           open={bridgeOutModalOpen}
           handleCancel={handleBridgeOutModalClose}
           accountDetails={{
+            assetAddress: inventory.address,
             assetRootAddress: inventory.root,
             balance: displayedQuantity.toString(),
             decimals: decimals,
