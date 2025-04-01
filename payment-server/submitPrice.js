@@ -3,6 +3,7 @@ import axios from "axios";
 import { assert } from "chai";
 import { rest, util } from "blockapps-rest";
 import http from "http";
+import BigNumber from "bignumber.js";
 
 import config from "./load.config.js";
 import deployment from "./load.deploy.js";
@@ -46,8 +47,6 @@ if (!rawOracleUpdateTime) {
 }
 oracleUpdateTime = Number(rawOracleUpdateTime) || 24 * 60 * 60 * 1000; // 1 day in ms
 
-
-
 if (process.env.SALE_UPDATE === "true") {
   if (rawSaleUpdateTime) {
     saleUpdateTime = Number(rawSaleUpdateTime);
@@ -89,6 +88,17 @@ async function updateAssetPrice(
   decimals
 ) {
   const parsedPriceMarkup = parseFloat(assetMarkUp) || 1;
+
+  // Use BigNumber for precise calculation
+  const priceWithMarkup = new BigNumber(price)
+    .times(parsedPriceMarkup);
+
+  // Round to 2 decimal places using decimalPlaces with ROUND_HALF_UP
+  const priceBig = priceWithMarkup
+    .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
+    .shiftedBy(-decimals)
+    .toNumber();
+
   const callArgs = {
     contract: {
       address: contractAddress,
@@ -96,10 +106,7 @@ async function updateAssetPrice(
     method: "update",
     args: {
       _quantity: 0,
-      _price:
-        Math.round(price * parsedPriceMarkup * 100) /
-        100 /
-        Math.pow(10, decimals),
+      _price: priceBig,
       _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
@@ -138,13 +145,15 @@ async function runDistributeRewardsCalls(token) {
           res.map((r) => r.hash),
           options
         );
-      const waitResult = await util.until(predicate, action, { config, isAsync: true }, 3600000);
+      const waitResult = await util.until(
+        predicate,
+        action,
+        { config, isAsync: true },
+        3600000
+      );
       for (const r of waitResult) {
         if (r.status !== "Success") {
-          console.error(
-            `Error executing distributeRewards for: ${r.hash}`,
-            r
-          );
+          console.error(`Error executing distributeRewards for: ${r.hash}`, r);
           await flagFile.appendToErrorFile(
             `Error executing distributeRewards for: ${r}`
           );
@@ -160,6 +169,9 @@ async function runDistributeRewardsCalls(token) {
       await flagFile.appendToErrorFile(
         `Error executing batch distributeRewards calls: ${error}`
       );
+    } finally {
+      // Clear the call list to avoid reprocessing stale calls
+      distributeRewardsCallList.length = 0;
     }
   } else {
     console.log("No distributeRewards calls to execute.");
@@ -352,11 +364,17 @@ async function fetchAndSubmitERC20TokenPrice(
     console.log(`Calculated TWAP: $${twap}`);
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
+    // Round TWAP to 2 decimal places and adjust for token decimals
+    const priceBig = new BigNumber(twap)
+      .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
+      .shiftedBy(-decimals)
+      .toNumber();
+
     await submitPrice(
       token,
       { address: oracleAddress },
       {
-        price: twap / Math.pow(10, decimals),
+        price: priceBig,
         timestamp: currentTimestamp,
       }
     );
@@ -403,7 +421,12 @@ const submitOraclePricePeriodically = async () => {
   for (const [key, oracle] of Object.entries(deployment.contracts)) {
     console.log(`[Oracle Update] Processing oracle: ${key}`);
 
-    if (!oracle.name || !oracle.address || oracle.decimals == null || !oracle.type) {
+    if (
+      !oracle.name ||
+      !oracle.address ||
+      oracle.decimals == null ||
+      !oracle.type
+    ) {
       console.warn(`[Oracle WARN] Skipping invalid oracle ${key}`);
       continue;
     }
@@ -423,8 +446,13 @@ const submitOraclePricePeriodically = async () => {
           process.env.METALS_API_KEY
         );
         if (metalResult) {
+          // Round price to 2 decimal places and adjust for token decimals
+          const priceBig = new BigNumber(metalResult.price)
+            .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
+            .shiftedBy(-oracle.decimals)
+            .toNumber();
           await submitPrice(token, oracle, {
-            price: metalResult.price / Math.pow(10, oracle.decimals),
+            price: priceBig,
             timestamp: metalResult.timestampInSeconds,
           });
           console.log(
@@ -434,8 +462,12 @@ const submitOraclePricePeriodically = async () => {
           );
         }
       } else if (oracle.type === "Constant") {
+        const priceBig = new BigNumber(oracle.price)
+          .decimalPlaces(2, BigNumber.ROUND_HALF_UP)
+          .shiftedBy(-oracle.decimals)
+          .toNumber();
         await submitPrice(token, oracle, {
-          price: oracle.price / Math.pow(10, oracle.decimals),
+          price: priceBig,
           timestamp: Math.floor(Date.now() / 1000),
         });
       } else {

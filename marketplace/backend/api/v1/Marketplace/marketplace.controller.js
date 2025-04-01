@@ -92,14 +92,32 @@ class MarketplaceController {
     }
   }
 
+  movingGoldToFirst(inventoryData) {
+    const inventoryDataCopy = JSON.parse(JSON.stringify(inventoryData));
+
+    // Move item with name 'gold' (case-insensitive) to the front
+    const indexOfGoldSt = inventoryDataCopy.findIndex(
+      x => x.name?.toLowerCase() === 'gold' || x.name?.toLowerCase() === 'goldst'
+    );
+    if (indexOfGoldSt > -1) {
+      const dataToMove = inventoryDataCopy.splice(indexOfGoldSt, 1)[0];
+      inventoryDataCopy.unshift(dataToMove);
+    }
+
+    // Move items with 'sale' as undefined, null, or falsy to the end
+    const itemsWithSale = inventoryDataCopy.filter(x => x.sale);
+    const itemsWithoutSale = inventoryDataCopy.filter(x => !x.sale);
+    return [...itemsWithSale, ...itemsWithoutSale];
+  }
+
   static async getStakeableProducts(req, res, next) {
     try {
       const { dapp, query } = req;
       const inventories = await dapp.getStakeableProducts({
         ...query,
       });
-
-      rest.response.status200(res, inventories);
+      const updatedInventory = new MarketplaceController().movingGoldToFirst(inventories);
+      rest.response.status200(res, updatedInventory);
 
       return next();
     } catch (e) {

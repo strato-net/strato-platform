@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -24,6 +25,7 @@ import           Database.Persist.Sql
 import           Database.Persist.TH
 import           Text.Format
 import           Text.Format.Template
+import           Text.ShortDescription
 
 data SyncTaskStatus = Assigned | Finished | NotReady deriving (Show, Read, Eq)
 
@@ -43,4 +45,12 @@ SyncTask
 |]
 
 $(deriveFormat ''SyncTask)
+
+instance ShortDescription SyncTask where
+  shortDescription SyncTask{..} = "SyncTask: chiliad #" ++ show syncTaskChiliad ++ " (" ++ 
+    case syncTaskStatus of
+      Assigned -> "assigned to " ++ show syncTaskHost ++ " at " ++ show syncTaskAssignmentTime
+      Finished -> "FINISHED"
+      NotReady -> "Not Ready"
+    ++ ")"
 
