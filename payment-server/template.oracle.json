@@ -19,7 +19,6 @@
     }
   ],
   "saleUpdateTime": 13,
-  "saleUpdateTime2": 19,
   "assets": [
     {
       "address": "addressA",
@@ -37,15 +36,13 @@
       "address": "addressA",
       "name": "tokenA",
       "markUp": 1.05,
-      "type": "ERC20",
-      "decimals": 8
+      "type": "ERC20"
     },
     {
       "address": "addressB",
       "name": "tokenB",
       "markUp": 1.05,
-      "type": "ERC20",
-      "decimals": 16
+      "type": "ERC20"
     }
   ]
 }
