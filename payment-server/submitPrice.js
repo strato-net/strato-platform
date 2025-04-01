@@ -48,8 +48,7 @@ oracleUpdateTime = Number(rawOracleUpdateTime) || 24 * 60 * 60 * 1000; // 1 day 
 if (process.env.SALE_UPDATE === "true") {
   if (rawSaleUpdateTime) {
     saleUpdateTime = Number(rawSaleUpdateTime);
-  }
-  else {
+  } else {
     await flagFile.appendToErrorFile(
       "No saleUpdateTime found in oracle.json file, defaulting to 13:00 UTC but please update the file."
     );
@@ -430,8 +429,6 @@ async function fetchAndSubmitERC20TokenPrice(
         currentTimeMs
       ).toISOString()}`
     );
-
-    return {price: twap / Math.pow(10, decimals), timestamp: currentTimestamp}
   } catch (error) {
     console.error("ETH TWAP calculation and submission failed:", error);
     await flagFile.appendToErrorFile(
@@ -538,7 +535,7 @@ const updateSalePricePeriodically = async () => {
     process.env.METALS_USERNAME,
     process.env.METALS_PASSWORD
   );
-  let metalResult;
+  let result;
   for (const asset of assets) {
     try {
       const searchOptions = {
@@ -561,12 +558,12 @@ const updateSalePricePeriodically = async () => {
       }
 
       if (asset.type === "Metal") {
-        metalResult = await fetchLBMAMetalPrice(
+        result = await fetchLBMAMetalPrice(
           asset.name.toLowerCase().replace(/st$/, ""),
           process.env.METALS_API_KEY
         );
       } else if (asset.type === "ERC20") {
-        metalResult = await fetchERC20TokenPrice(
+        result = await fetchERC20TokenPrice(
           asset.name,
           process.env.ALCHEMY_API_KEY
         );
@@ -578,7 +575,7 @@ const updateSalePricePeriodically = async () => {
         asset.markUp,
         token,
         assetResult[0]?.sale,
-        metalResult.price,
+        result.price,
         decimals
       );
       console.log(
@@ -658,7 +655,7 @@ async function main() {
         // Check if it's time to run the sale price update
         if (
           process.env.SALE_UPDATE === "true" &&
-          now.getHours() === parseInt(saleUpdateTime, 10)  &&
+          now.getHours() === parseInt(saleUpdateTime, 10) &&
           lastSaleRun !== currentDate
         ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
