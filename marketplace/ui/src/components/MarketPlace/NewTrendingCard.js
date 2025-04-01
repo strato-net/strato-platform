@@ -151,8 +151,8 @@ const NewTrendingCard = ({
   // const isDisabled =
   //   !bridgeableAddresses?.includes(topSellingProduct.originAddress) &&
   //   (isAvailableForSale || ownerSameAsUser());
-  const isAvailableForSale =
-    topSellingProduct.price > 0 && saleQuantity > 0 && !ownerSameAsUser();
+  const isAvailableForSale = topSellingProduct.price > 0 && saleQuantity > 0 && !ownerSameAsUser();
+
   const isBridgeable = isWbtcst || isEthst;
 
   const queryParams = new URLSearchParams(location.search);
@@ -422,14 +422,9 @@ const NewTrendingCard = ({
           ></div>
         </div>
         <div
-          className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            (bridgeableAddresses?.includes(topSellingProduct.originAddress)) &&
-            reserve
-              ? 'invisible'
-              : ''
-          }`}
+          className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]`}
         >
-          <Typography>Quantity:</Typography>
+          <Typography className="whitespace-nowrap mr-2 text-l">Quantity:</Typography>
           <div className="flex gap-3 p-1 bg-white">
 
             <Tooltip
