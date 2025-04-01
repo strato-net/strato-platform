@@ -77,7 +77,7 @@ async function fetchAsset(token, args, config) {
   // Process UTXOs in batches.
   for (let offset = 0; offset < totalCount; offset += batchSize) {
     const batchOptions = {
-      ...options,
+      config,
       query: {
         select: constants.attachSalesEscrowsAndImagesAndFiles,
         root: "eq." + asset.address,
