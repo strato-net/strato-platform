@@ -415,8 +415,7 @@ async function main() {
           !lastOracleRun
         ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
-          // TODO: uncomment this line to run the oracle update
-          // await submitOraclePricePeriodically();
+          await submitOraclePricePeriodically();
           lastOracleRun = currentDate;
         } else {
           console.log("[Oracle] Skipping since interval not reached.");
