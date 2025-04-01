@@ -219,7 +219,7 @@ services:
         max-file: "3"
     volumes:
       - stratodata:/var/lib/strato
-      - ./genesis-block.json:/var/lib/strato/genesisOld.json
+      - ./genesis-block.json:/var/lib/strato/genesis.json
   postgrest:
     depends_on:
     - postgres
