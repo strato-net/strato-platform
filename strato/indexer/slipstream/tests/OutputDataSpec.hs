@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -58,9 +59,9 @@ createInserts  (a,b) = do
 createInsertsCollection :: OutputM m
             => [ProcessedCollectionRow]
               -> ConduitM () T.Text m ()
-createInsertsCollection collections = do
-  unless (null collections) $ do
-    let collection = head collections
+createInsertsCollection = \case
+  [] -> pure ()
+  collections@(collection:_) -> do
     _ <- createMappingTable  (creator collection, application collection, contractname collection) (collectionname collection)
     insertCollectionTable collections
 
@@ -128,7 +129,9 @@ spec = do
 
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
-      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let testAdd = case readHex "ADDRESS" of
+                      [] -> error "readHex failed reading \"ADDRESS\""
+                      (x:_) -> Address $ fst x
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,
@@ -200,7 +203,9 @@ spec = do
 
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
-      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let testAdd = case readHex "ADDRESS" of
+                      [] -> error "readHex failed reading \"ADDRESS\""
+                      (x:_) -> Address $ fst x
           cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
       let input =
              ( SE.ProcessedContract
@@ -313,7 +318,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
-      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let testAdd = case readHex "ADDRESS" of
+                      [] -> error "readHex failed reading \"ADDRESS\""
+                      (x:_) -> Address $ fst x
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,

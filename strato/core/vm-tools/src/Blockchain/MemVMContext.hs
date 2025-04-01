@@ -340,7 +340,7 @@ instance (Keccak256 `A.Alters` BlockSummary) MemContextM where
   insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
   delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
 
-instance Mod.Accessible (Maybe WorldBestBlock) MemContextM where
+instance {-# OVERLAPPING #-} Mod.Accessible (Maybe WorldBestBlock) MemContextM where
   access _ = dbsGets $ view worldBestBlock
 
 instance Mod.Modifiable GasCap MemContextM where

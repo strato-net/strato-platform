@@ -616,7 +616,9 @@ spec = do
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm b1]
         map (map otPrivatePayload . obReceiptTransactions) obs `shouldBe` [[Nothing]]
-        let h' = head [h'' | P2pBlockstanbul (WireMessage _ (Commit _ h'' _)) <- _toP2p b1]
+        let h' = case [h'' | P2pBlockstanbul (WireMessage _ (Commit _ h'' _)) <- _toP2p b1] of
+                   [] -> error "No commit messages found"
+                   (h:_) -> h
         b2 <- runBatch $ checkForUnseq [iev6' h']
         let bs' = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b2]
         map (map txType . blockReceiptTransactions) bs' `shouldBe` [[PrivateHash]]
@@ -649,7 +651,9 @@ spec = do
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm b1]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
-        let h' = head [h'' | P2pBlockstanbul (WireMessage _ (Commit _ h'' _)) <- _toP2p b1]
+        let h' = case [h'' | P2pBlockstanbul (WireMessage _ (Commit _ h'' _)) <- _toP2p b1] of
+                   [] -> error "No commit messages found"
+                   (h:_) -> h
         b2 <- runBatch $ checkForUnseq [iev6' h']
         let bs' = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b2]
         map (map txType . blockReceiptTransactions) bs' `shouldBe` [[PrivateHash]]

@@ -20,6 +20,7 @@ module Blockchain.Wiring
     contextModify',
     contextPut,
     compactContextM,
+    gets
   )
 where
 

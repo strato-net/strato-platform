@@ -158,14 +158,17 @@ spec = do
     it "should update the round number after failing on a divided network first" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
       let validatorsPrivKeys' = privKeys
-          primaryValidatorsPrivKeys = [head validatorsPrivKeys']
+          primaryValidatorsPrivKeys = case validatorsPrivKeys' of
+                                        [] -> error "No private keys generated"
+                                        (p:_) -> [p]
           primaryValidatorAddresses = fromPrivateKey <$> primaryValidatorsPrivKeys
+          validatorInfoHead = CommonName "BlockApps" "Engineering" "Admin" True
           validatorInfos =
-            [ CommonName "BlockApps" "Engineering" "Admin" True,
+            [ validatorInfoHead,
               CommonName "Microsoft" "Sales" "Person" True,
               CommonName "Amazon" "Product" "Jeff Bezos" True
             ]
-          primaryValidatorInfos = [head validatorInfos]
+          primaryValidatorInfos = [validatorInfoHead]
           primaryValidators' = zip primaryValidatorAddresses primaryValidatorInfos
           zippedValidators = makeValidators $ zip validatorsPrivKeys' validatorInfos
       certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
@@ -178,8 +181,9 @@ spec = do
               ("node3", "9.10.11.12")
             ]
       let validators' = peers
-          primaryValidators = [head validators']
-          secondaryValidators = tail validators'
+          (primaryValidators, secondaryValidators) = case validators' of
+            [] -> error "No validators created"
+            (v:vs) -> ([v], vs)
       let runForTwoSeconds = void . timeout 2000000
           postTimeoutPrimary1 = do
             threadDelay 1000000
