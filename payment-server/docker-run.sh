@@ -40,6 +40,14 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
       exit 14
     fi
+    if [ -z "$TOKENS_USERNAME" ]; then
+      echo 'Error: TOKENS_USERNAME is not set. Token Sale price update script will not run. Exiting'
+      exit 13
+    fi
+    if [ -z "$TOKENS_PASSWORD" ]; then
+      echo 'Error: TOKENS_PASSWORD is not set. Token Sale price update script will not run. Exiting'
+      exit 14
+    fi
   fi
 
   export CONFIG_DIR_PATH=/config
@@ -50,6 +58,8 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
   export METALS_USERNAME=${METALS_USERNAME}
   export METALS_PASSWORD=${METALS_PASSWORD}
+  export TOKENS_USERNAME=${TOKENS_USERNAME}
+  export TOKENS_PASSWORD=${TOKENS_PASSWORD}
   export OAUTH_SCOPE=${OAUTH_SCOPE}
   export OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
   export METALS_API_KEY=${METALS_API_KEY}
