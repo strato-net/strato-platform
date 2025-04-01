@@ -327,6 +327,13 @@ const NewTrendingCard = ({
                     )}`,
                     { state: { isCalledFromInventory: false } }
                   );
+                } else {
+                  navigate(
+                    `${naviroute
+                      .replace(':address', topSellingProduct.root)
+                      .replace(':name', topSellingProduct.name)}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
                 }
               }
               window.scrollTo(0, 0);

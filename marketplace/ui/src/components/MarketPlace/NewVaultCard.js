@@ -20,6 +20,14 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
   const { ethstAddress, wbtcstAddress } = useEthState();
+  const ownerSameAsUser = () => {
+    if (user?.commonName === reserveItem?.ownerCommonName) {
+      return true;
+    }
+    return false;
+  };
+  const isAvailableForSale =
+    reserveItem.price > 0 && reserveItem.saleQuantity > 0 && !ownerSameAsUser();
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -55,32 +63,42 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (reserveItem.originAddress === ethstAddress) {
+    if (isAvailableForSale) {
       navigate(
-        `${routes.EthstProductDetail.url.replace(
-          ':address',
-          reserveItem.address
-        )}`,
-        {
-          state: { isCalledFromInventory: false },
-        }
-      );
-    } else if (reserveItem.originAddress === wbtcstAddress) {
-      navigate(
-        `${routes.WbtcstProductDetail.url.replace(
-          ':address',
-          reserveItem.address
-        )}`,
-        {
-          state: { isCalledFromInventory: false },
-        }
+        routes.MarketplaceProductDetail.url
+          .replace(':address', reserveItem.address)
+          .replace(':name', reserveItem.name),
+        { state: { isCalledFromInventory: false } }
       );
     } else {
-      navigate(
-        `${routes.MarketplaceProductDetail.url
-          .replace(':address', reserveItem.address)
-          .replace(':name', reserveItem.name)}`
-      );
+      if (reserveItem.originAddress === ethstAddress) {
+        navigate(
+          `${routes.EthstProductDetail.url.replace(
+            ':address',
+            reserveItem.originAddress
+          )}`,
+          {
+            state: { isCalledFromInventory: false },
+          }
+        );
+      } else if (reserveItem.originAddress === wbtcstAddress) {
+        navigate(
+          `${routes.WbtcstProductDetail.url.replace(
+            ':address',
+            reserveItem.originAddress
+          )}`,
+          {
+            state: { isCalledFromInventory: false },
+          }
+        );
+      } else {
+        navigate(
+          `${routes.MarketplaceProductDetail.url
+            .replace(':address', reserveItem.root)
+            .replace(':name', reserveItem.name)}`,
+          { state: { isCalledFromInventory: false } }
+        );
+      }
     }
   };
 
@@ -117,7 +135,6 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
                 TVL: ${reserve?.tvl.toFixed(2)}
               </Typography>
-
             </div>
           </div>
         </a>
