@@ -695,24 +695,41 @@ async function getAll(admin, args = {}, defaultOptions) {
     : undefined;
 }
 
-async function getStakeableProducts(admin, args, defaultOptions) {
+async function getStakeableProducts(admin, defaultOptions) {
   // Merge default options with constant properties.
   const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
-  const { assetAddresses: rootAddresses } = args;
-  const queryRoot = `in.(${rootAddresses.join(',')})`;
-
-  // Build search options to get the total count of assets.
-  const searchOptions = {
-    ...options,
-    query: {
-      select: 'count',
-      root: queryRoot,
-      offset: 0,
-      limit: undefined,
-    },
-  };
-
   try {
+    // Get stakeable asset origin addresses from Reserves
+    const reserveSearchOptions = {
+      ...options,
+      query: {
+        select: 'assetRootAddress',
+        creator: 'in.(BlockApps,mercata_usdst)',
+        isActive: 'eq.true',
+      },
+    };
+    const reserveResponse = await rest.search(
+      admin,
+      { name: 'BlockApps-Mercata-Reserve' },
+      reserveSearchOptions
+    );
+    const stakeableAssets = reserveResponse.map((asset) => asset.assetRootAddress);
+    if (stakeableAssets.length === 0) {
+      return [];
+    }
+    const queryRoot = `in.(${stakeableAssets.join(',')})`;
+
+    // Build search options to get the total count of assets.
+    const searchOptions = {
+      ...options,
+      query: {
+        select: 'count',
+        root: queryRoot,
+        offset: 0,
+        limit: undefined,
+      },
+    };
+
     // Get the total count of assets.
     const countResponse = await rest.search(
       admin,

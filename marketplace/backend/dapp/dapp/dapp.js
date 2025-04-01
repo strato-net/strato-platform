@@ -980,12 +980,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions);
   };
 
-  contract.getStakeableProducts = async function (
-    args = {},
-    options = optionsNoChainIds
-  ) {
+  contract.getStakeableProducts = async function (options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return await inventoryJs.getStakeableProducts(rawAdmin, args, getOptions);
+    return await inventoryJs.getStakeableProducts(rawAdmin, getOptions);
   };
 
   contract.getPriceHistory = async function (args, options = defaultOptions) {

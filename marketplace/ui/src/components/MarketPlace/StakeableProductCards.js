@@ -22,12 +22,7 @@ const StakeableProductCards = () => {
 
   useEffect(() => {
     if (reserves) {
-      actions.fetchStakeableProducts(
-        marketplaceDispatch,
-        reserves
-          .filter((reserve) => !reserve.name.toLowerCase().includes('temp'))
-          .map((reserve) => reserve.assetRootAddress)
-      );
+      actions.fetchStakeableProducts(marketplaceDispatch);
     }
   }, [marketplaceDispatch, reserves]);
 
