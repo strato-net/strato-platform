@@ -69,7 +69,7 @@ async function fetchAsset(token, args, config) {
   if (totalCount <= 0) {
     return [];
   }
-  
+
   // Map to hold the best sale UTXO per asset root.
   const bestSalesByRoot = new Map();
   const batchSize = 100;
@@ -81,7 +81,7 @@ async function fetchAsset(token, args, config) {
       query: {
         select:
           "*,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))",
-        root: "eq." + asset.address,
+        root: "eq." + args.address,
         offset,
         limit: batchSize,
       },
