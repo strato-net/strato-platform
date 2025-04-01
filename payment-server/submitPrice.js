@@ -294,20 +294,24 @@ const submitOraclePricePeriodically = async () => {
 
 // Function to update sale prices periodically
 const updateSalePricePeriodically = async () => {
-  const token = await oauthHelper.getUserToken(
+  const metalToken = await oauthHelper.getUserToken(
     process.env.METALS_USERNAME,
     process.env.METALS_PASSWORD
+  );
+  const erc20Token = await oauthHelper.getUserToken(
+    process.env.TOKENS_USERNAME,
+    process.env.TOKENS_PASSWORD
   );
   let result;
   for (const asset of assets) {
     try {
       // get the correct asset with sale
       const assetResult = await fetchAsset(
-        token,
+        metalToken,
         { address: asset.address },
         config
       );
-      console.log("assetResult: ", assetResult);
+
       if (!assetResult || assetResult.length === 0) {
         console.warn(`[Sale Update] No asset found for ${asset.address}`);
         continue;
@@ -337,7 +341,7 @@ const updateSalePricePeriodically = async () => {
 
       await updateAssetPrice(
         asset.markUp,
-        token,
+        asset.type === "ERC20" ? erc20Token : metalToken,
         assetResult[0]?.sale,
         result.price,
         decimals,
