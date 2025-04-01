@@ -30,13 +30,11 @@ try {
 const {
   oracleUpdateTime: rawOracleUpdateTime,
   saleUpdateTime: rawSaleUpdateTime,
-  saleUpdateTime2: rawSaleUpdateTime2,
   assets: configAssets = [],
 } = oracleConfig;
 
 // Set defaults
 let saleUpdateTime = 13; // Default: 13:00 UTC
-let saleUpdateTime2 = 19;
 let assets = [];
 let oracleUpdateTime = 24 * 60 * 60 * 1000; // 1 day in ms
 
@@ -50,9 +48,6 @@ oracleUpdateTime = Number(rawOracleUpdateTime) || 24 * 60 * 60 * 1000; // 1 day 
 if (process.env.SALE_UPDATE === "true") {
   if (rawSaleUpdateTime) {
     saleUpdateTime = Number(rawSaleUpdateTime);
-  } 
-  else if (rawSaleUpdateTime2) {
-    saleUpdateTime2 = Number(rawSaleUpdateTime2);
   }
   else {
     await flagFile.appendToErrorFile(
@@ -80,7 +75,6 @@ async function submitPrice(token, contract, args) {
 
 // Function to update the price of the Asset Sale price
 async function updateAssetPrice(
-  assetName,
   assetMarkUp,
   token,
   contractAddress,
@@ -308,6 +302,58 @@ async function fetchLBMAMetalPrice(metal, apiKey) {
 }
 
 // Function to fetch and submit ETH price
+async function fetchERC20TokenPrice(
+  name,
+  apiKey
+) {
+  try {
+    const apiUrl = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/historical`;
+    const currentTimeMs = Date.now();
+    const OneDayHoursInMs = 24 * 60 * 60 * 1000;
+    const requestBody = {
+      symbol: name,
+      startTime: Math.floor((currentTimeMs - OneDayHoursInMs) / 1000),
+      endTime: Math.floor(currentTimeMs / 1000),
+      interval: "1h",
+    };
+    const response = await axios.post(apiUrl, requestBody, {
+      headers: { "Content-Type": "application/json" },
+    });
+    const responseData = response.data;
+    if (!responseData?.data || !Array.isArray(responseData.data)) {
+      console.error("Invalid response format:", responseData);
+      throw new Error("Invalid price data format from API");
+    }
+    console.log(`Received ${responseData.data.length} price points`);
+    const prices = responseData.data.map(({ value, timestamp }) => ({
+      price: parseFloat(value),
+      timestamp: new Date(timestamp).getTime() / 1000,
+    }));
+    prices.forEach((point, index) => {
+      if (!Number.isFinite(point.price) || point.price <= 0) {
+        throw new Error(`Invalid price at index ${index}: ${point.price}`);
+      }
+      if (!Number.isFinite(point.timestamp) || point.timestamp <= 0) {
+        throw new Error(
+          `Invalid timestamp at index ${index}: ${point.timestamp}`
+        );
+      }
+    });
+    const twap = calculateTWAP(prices);
+    console.log(`Calculated TWAP: $${twap}`);
+    const currentTimestamp = Math.floor(currentTimeMs / 1000);
+    return {price: twap, timestamp: currentTimestamp}
+  }
+  catch (error) {
+    console.error("ETH TWAP calculation and submission failed:", error);
+    await flagFile.appendToErrorFile(
+      `ETH TWAP calculation and submission failed: ${error}`
+    );
+    throw error;
+  }
+}
+
+// Function to fetch and submit ETH price
 async function fetchAndSubmitERC20TokenPrice(
   name,
   oracleAddress,
@@ -514,27 +560,21 @@ const updateSalePricePeriodically = async () => {
         continue;
       }
 
-      if (asset.type === 'metal') {
+      if (asset.type === "Metal") {
         metalResult = await fetchLBMAMetalPrice(
           asset.name.toLowerCase().replace(/st$/, ""),
           process.env.METALS_API_KEY
         );
-      }
-
-      else if (asset.type === 'ERC20') {
-        metalResult = await fetchAndSubmitERC20TokenPrice(
+      } else if (asset.type === "ERC20") {
+        metalResult = await fetchERC20TokenPrice(
           asset.name,
-          asset.address,
-          asset.decimals,
-          process.env.ALCHEMY_API_KEY,
-          token
+          process.env.ALCHEMY_API_KEY
         );
       }
 
       const decimals = assetResult[0].decimals || 0;
 
       await updateAssetPrice(
-        asset.name.toLowerCase().replace(/st$/, ""),
         asset.markUp,
         token,
         assetResult[0]?.sale,
@@ -618,7 +658,7 @@ async function main() {
         // Check if it's time to run the sale price update
         if (
           process.env.SALE_UPDATE === "true" &&
-          (now.getHours() === parseInt(saleUpdateTime, 10) || now.getHours() === parseInt(saleUpdateTime2, 10))  &&
+          now.getHours() === parseInt(saleUpdateTime, 10)  &&
           lastSaleRun !== currentDate
         ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
