@@ -20,6 +20,14 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
   const { bridgeableTokens } = useEthState();
+  const ownerSameAsUser = () => {
+    if (user?.commonName === reserveItem?.ownerCommonName) {
+      return true;
+    }
+    return false;
+  };
+  const isAvailableForSale =
+    reserveItem.price > 0 && reserveItem.saleQuantity > 0 && !ownerSameAsUser();
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -40,7 +48,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
     categoryQueryValueArr.length === 1
       ? categoryQueryValueArr[0]
       : SEO.IMAGE_META;
- 
+
 
   const handleCancel = () => {
     setIsModalVisible(false);
@@ -55,22 +63,31 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (bridgeableTokens?.map((token) => token.address).includes(reserveItem.originAddress)) {
+    if (isAvailableForSale) {
       navigate(
-        `${routes.bridgeableProductDetail.url.replace(
-          ':address',
-          reserveItem.address
-        ).replace(':bridgeableAsset', reserveItem.name)}`,
-        {
-          state: { isCalledFromInventory: false },
-        }
+        routes.MarketplaceProductDetail.url
+          .replace(':address', reserveItem.address)
+          .replace(':name', reserveItem.name),
+        { state: { isCalledFromInventory: false } }
       );
     } else {
-      navigate(
-        `${routes.MarketplaceProductDetail.url
-          .replace(':address', reserveItem.address)
-          .replace(':name', reserveItem.name)}`
-      );
+      if (bridgeableTokens?.map((token) => token.address).includes(reserveItem.originAddress)) {
+        navigate(
+          `${routes.bridgeableProductDetail.url.replace(
+            ':address',
+            reserveItem.address
+          ).replace(':bridgeableAsset', reserveItem.name)}`,
+          {
+            state: { isCalledFromInventory: false },
+          })
+      } else {
+        navigate(
+          `${routes.MarketplaceProductDetail.url
+            .replace(':address', reserveItem.root)
+            .replace(':name', reserveItem.name)}`,
+          { state: { isCalledFromInventory: false } }
+        );
+      }
     }
   };
 
@@ -78,9 +95,8 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
     <>
       <div
         id="productCard"
-        className={`relative trending_cards_container_card bg-white p-3 ${
-          parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
-        }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
+        className={`relative trending_cards_container_card bg-white p-3 ${parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
+          }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
         onClick={handleCardClick}
       >
         {contextHolder}
@@ -107,7 +123,6 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
                 TVL: ${reserve?.tvl.toFixed(2)}
               </Typography>
-
             </div>
           </div>
         </a>
