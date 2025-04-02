@@ -2,7 +2,7 @@ pragma solidvm 11.5;
 
 import "Templates/Assets/Asset.sol";
 
-import "Templates/Assets/MercataMetadata.sol";
+import "Templates/Assets/Metadata/MercataMetadata.sol";
 
 // import "Templates/Assets/LendingToken.sol";
 // import "Templates/Enums/RestStatus.sol";
