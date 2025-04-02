@@ -93,12 +93,14 @@ const InventoryCard = ({
       ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
       : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
     : undefined;
-  const saleQuantity =
-    inventory.saleQuantity !== undefined
-      ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-        new BigNumber(10).pow(decimals)
-      )
-      : undefined;
+  
+  const saleQuantity = (
+    stratsAddress === inventory.originAddress
+      ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+      : new BigNumber(inventory.saleQuantity || 0).dividedBy(
+          new BigNumber(10).pow(decimals || 0)
+        )
+  ).toString();
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
       new BigNumber(10).pow(decimals)
@@ -570,12 +572,34 @@ const InventoryCard = ({
 
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Price</p>
+            <p className="text-[#202020] font-semibold">
+              {price ? (
+                <p className="flex">
+                  <span>${price.toString()}</span>
+                  <p className="flex text-xs items-center">
+                    &nbsp;(
+                    {price.toString()} {USDSTIcon})
+                  </p>
+                </p>
+              ) : (
+                'N/A'
+              )}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
               {quantity.toNumber().toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
+            <p className="text-[#202020] font-semibold">
+              {saleQuantity}
             </p>
           </div>
           {stakeable ? (
@@ -602,28 +626,6 @@ const InventoryCard = ({
                       maximumFractionDigits: 6,
                       minimumFractionDigits: 0,
                     }) || 'N/A'}
-                </p>
-              </div>
-              <div className="flex justify-between  ">
-                <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-                <p className="text-[#202020] font-semibold">
-                  {saleQuantity ? saleQuantity.toString() : 'N/A'}
-                </p>
-              </div>
-              <div className="flex justify-between  ">
-                <p className="text-[#6A6A6A]">Price</p>
-                <p className="text-[#202020] font-semibold">
-                  {price ? (
-                    <p className="flex">
-                      <span>${price.toString()}</span>
-                      <p className="flex text-xs items-center">
-                        &nbsp;(
-                        {price.toString()} {USDSTIcon})
-                      </p>
-                    </p>
-                  ) : (
-                    'N/A'
-                  )}
                 </p>
               </div>
             </>
