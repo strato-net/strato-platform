@@ -288,10 +288,13 @@ const updateSalePricePeriodically = async () => {
   let result;
   for (const asset of assets) {
     // Check if the hour is in the asset's hours array and if the last update hour is the same as the current hour.
-    if (!asset.hours.includes(currentHour) || lastSaleUpdateMap[asset.address] === currentHourStamp) {
+    if (
+      !asset.hours.includes(currentHour) ||
+      lastSaleUpdateMap[asset.address] === currentHourStamp
+    ) {
       continue;
     }
-
+    console.log("[Sale] Running updateSalePricePeriodically");
     try {
       // Fetch the asset (with sale details) from the blockchain.
       const assetResult = await fetchAsset(
@@ -415,10 +418,9 @@ async function main() {
 
         // Check if it's time to run the sale price update
         if (process.env.SALE_UPDATE === "true") {
-          console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
         } else {
-          console.log("[Sale] Skipping since interval not reached.");
+          console.log("[Sale] Skipping since SALE_UPDATE is not set to true.");
         }
       } catch (error) {
         console.error("Error in main loop:", error);
