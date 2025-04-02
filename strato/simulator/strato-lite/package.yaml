@@ -102,6 +102,7 @@ tests:
     ghc-options: -Wall -Werror -dynamic
     dependencies:
       - QuickCheck
+      - blockDB
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
@@ -122,6 +123,7 @@ tests:
       - seqevents
       - solid-vm-model
       - stm-chans
+      - stm-conduit
       - strato-lite
       - strato-model
       - strato-p2p

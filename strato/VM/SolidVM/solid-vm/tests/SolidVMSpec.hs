@@ -347,7 +347,7 @@ instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => (Address `A.Sel
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
 
 instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => ((Address, T.Text) `A.Selectable` X509CertificateField) (ReaderT Context m) where

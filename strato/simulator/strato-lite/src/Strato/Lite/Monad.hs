@@ -47,7 +47,8 @@ import Blockchain.Data.Transaction (getSigVals, txAndTime2RawTX)
 import Blockchain.Data.TransactionDef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified "vm-runner" Blockchain.Event as VMEvent
-import Blockchain.Generation
+import Blockchain.GenesisBlocks.Contracts.CertRegistry
+import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.MemVMContext hiding (contextGet, contextGets, contextModify, contextModify', contextPut, dbsGet, dbsGets, dbsModify, dbsModify', dbsPut, get, getMemContext, gets, modify, modify', put)
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -659,7 +660,7 @@ instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectabl
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
-      maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+      maybe Nothing (eitherToMaybe . bytesToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
   select _ (k, t) = do
@@ -1231,9 +1232,9 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
     modifyTVar inet $ udpPorts . at (ipAsText, udpPort) ?~ udpVSock
   seqCtx <- newSequencerContext $ newBlockstanbulContext selfId (Validator . snd <$> initialValidators') valBehav
   cache <- TRC.new 64
-  let vals = Validator . snd <$> initialValidators'
-      cmps = (\c -> CommonName "" "" c True) . snd <$> initialValidators'
-      gi = insertMercataGovernanceContract cmps (take 1 cmps) $ insertCertRegistryContract extraCerts defaultGenesisInfo
+  let vals' = snd <$> initialValidators'
+      vals = Validator <$> vals'
+      gi = insertMercataGovernanceContract vals (take 1 vals') $ insertCertRegistryContract extraCerts defaultGenesisInfo
       (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators' $ \(addr, _) -> do
@@ -1348,7 +1349,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText tcpPo
         setStateDBStateRoot Nothing stateRoot
         writeBlockSummary genesisOutputBlock
         for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
-        for_ (genesisInfoCodeInfo gi) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
+        for_ (genesisInfoCodeInfo gi) $ \(CodeInfo src _) -> addCode SolidVM $ Text.encodeUtf8 src
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
         putContextBestBlockInfo $ ContextBestBlockInfo genHash genesisBlock 0
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
