@@ -130,8 +130,8 @@ contract PhysicalRedemptionService is RedemptionService, ERC20Burnable, ERC20 {
         // Transfer tokens from user to contract
         require(ERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
         
-        // Burn tokens and emit event for physical redemption processing
-        token.burn(tokenAmount);
+        // Burn tokens by sending to a zero addressand emit event for physical redemption processing
+        token.transfer(address(0), tokenAmount);
         
         emit Redeemed(msg.sender, tokenAmount);
     }
