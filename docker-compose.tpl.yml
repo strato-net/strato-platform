@@ -149,7 +149,6 @@ services:
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - generateKey=${generateKey:-true}
-    - genesis=${genesis}
     - idServerUrl=${idServerUrl}
     - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
@@ -199,6 +198,7 @@ services:
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
     - useBuiltinUserRegistry=${useBuiltinUserRegistry}
+    - useCustomGenesis=${useCustomGenesis}
     - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
@@ -219,7 +219,6 @@ services:
         max-file: "3"
     volumes:
       - stratodata:/var/lib/strato
-      - ./genesis-block.json:/var/lib/strato/genesis.json
   postgrest:
     depends_on:
     - postgres
