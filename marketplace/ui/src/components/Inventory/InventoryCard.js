@@ -93,23 +93,12 @@ const InventoryCard = ({
       ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
       : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
     : undefined;
-  // const saleQuantity =
-  //   inventory.saleQuantity !== undefined
-  //     ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-  //         new BigNumber(10).pow(decimals)
-  //       )
-  //     : undefined;
-
-  // Added the method same as in desktop
+  
   const saleQuantity = (
     stratsAddress === inventory.originAddress
-      ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(100))
-      : decimals
-      ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-          new BigNumber(10).pow(18)
-        )
+      ? new BigNumber(inventory.saleQuantity).dividedBy(100)
       : new BigNumber(inventory.saleQuantity || 0).dividedBy(
-          new BigNumber(10).pow(inventory.decimals || 0)
+          new BigNumber(10).pow(decimals || 0)
         )
   ).toString();
   const totalLockedQuantity = inventory.totalLockedQuantity

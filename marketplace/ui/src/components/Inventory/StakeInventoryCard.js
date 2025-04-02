@@ -79,7 +79,7 @@ const StakeInventoryCard = ({
     ? inventory.totalQuantity
     : inventory?.quantity / Math.pow(10, decimals);
     
-  const stakeQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, inventory.decimals);
+  const stakeQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, decimals);
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
@@ -309,7 +309,7 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
-            {((inventory.totalQuantity || 0) / Math.pow(10, inventory.decimals)).toLocaleString('en-US', {
+            {((inventory.totalQuantity || 0) / Math.pow(10, decimals)).toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               })}
