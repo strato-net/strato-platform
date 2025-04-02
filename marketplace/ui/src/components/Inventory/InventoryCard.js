@@ -98,7 +98,7 @@ const InventoryCard = ({
     stratsAddress === inventory.originAddress
       ? new BigNumber(inventory.saleQuantity).dividedBy(100)
       : new BigNumber(inventory.saleQuantity || 0).dividedBy(
-          new BigNumber(10).pow(inventory.decimals || 0)
+          new BigNumber(10).pow(decimals || 0)
         )
   ).toString();
   const totalLockedQuantity = inventory.totalLockedQuantity
