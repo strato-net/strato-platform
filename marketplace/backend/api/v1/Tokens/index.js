@@ -29,7 +29,7 @@ router.post(
 
 router.get(
   Tokens.getBridgeableTokens,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   TokensController.getBridgeableTokens
 );
