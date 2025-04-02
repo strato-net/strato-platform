@@ -279,7 +279,6 @@ pipeline {
                   sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
                   sh 'sudo ./strato --wipe'
                   sh 'sudo ./vault --wipe'
-                  sh 'mv genesis-block-official.json genesis-block.json'
                   sh './run-vault.sh'
                   // run again but connecting to mercata-hydrogen this time
                   sh 'sed -i "s|useCustomGenesis=true|useCustomGenesis=false|" run.sh'
