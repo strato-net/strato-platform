@@ -34,14 +34,10 @@ try {
 }
 
 // Destructure with defaults
-const {
-  oracleUpdateTime: rawOracleUpdateTime,
-  saleUpdateTime: rawSaleUpdateTime,
-  assets: configAssets = [],
-} = oracleConfig;
+const { oracleUpdateTime: rawOracleUpdateTime, assets: configAssets = [] } =
+  oracleConfig;
 
 // Set defaults
-let saleUpdateTime = 13; // Default: 13:00 UTC
 let assets = [];
 let oracleUpdateTime = 24 * 60 * 60 * 1000; // 1 day in ms
 
@@ -53,21 +49,22 @@ if (!rawOracleUpdateTime) {
 oracleUpdateTime = Number(rawOracleUpdateTime) || 24 * 60 * 60 * 1000; // 1 day in ms
 
 if (process.env.SALE_UPDATE === "true") {
-  if (rawSaleUpdateTime) {
-    saleUpdateTime = Number(rawSaleUpdateTime);
-  } else {
-    await flagFile.appendToErrorFile(
-      "No saleUpdateTime found in oracle.json file, defaulting to 13:00 UTC but please update the file."
-    );
-  }
-
   if (Array.isArray(configAssets)) {
     assets = configAssets;
+  } else {
+    await flagFile.appendToErrorFile(
+      "Invalid assets format in oracle.json file, should be an array."
+    );
   }
 }
 
 // Global array to store all distributeRewards calls
 const distributeRewardsCallList = [];
+
+// Global map to track the last update hour for each asset.
+// The key is a unique identifier (for example, asset address)
+// and the value is the "hour stamp" (number of hours since the epoch) when it was last updated.
+const lastSaleUpdateMap = {};
 
 // Instead of calling rest.call directly, accumulate call arguments for distributeRewards
 async function distributeRewards(contract, args) {
@@ -282,10 +279,21 @@ const updateSalePricePeriodically = async () => {
     process.env.TOKENS_USERNAME,
     process.env.TOKENS_PASSWORD
   );
+
+  // Get the current UTC hour and current hour stamp.
+  const now = new Date();
+  const currentHour = now.getUTCHours(); // e.g., 13, 19, etc.
+  const currentHourStamp = Math.floor(Date.now() / (60 * 60 * 1000)); // number of hours since epoch
+
   let result;
   for (const asset of assets) {
+    // Check if the hour is in the asset's hours array and if the last update hour is the same as the current hour.
+    if (!asset.hours.includes(currentHour) || lastSaleUpdateMap[asset.address] === currentHourStamp) {
+      continue;
+    }
+
     try {
-      // get the correct asset with sale
+      // Fetch the asset (with sale details) from the blockchain.
       const assetResult = await fetchAsset(
         metalToken,
         { address: asset.address },
@@ -301,6 +309,7 @@ const updateSalePricePeriodically = async () => {
         continue;
       }
 
+      // Fetch the latest price based on asset type.
       if (asset.type === "Metal") {
         result = await fetchLBMAMetalPrice(
           asset.name.toLowerCase().replace(/st$/, ""),
@@ -319,6 +328,7 @@ const updateSalePricePeriodically = async () => {
         ? 18
         : 0;
 
+      // Update the asset's price with the new data.
       await updateAssetPrice(
         asset.markUp,
         asset.type === "ERC20" ? erc20Token : metalToken,
@@ -332,6 +342,9 @@ const updateSalePricePeriodically = async () => {
           asset.address
         } at ${new Date().toISOString()}`
       );
+
+      // Record that this asset has been updated for the current hour.
+      lastSaleUpdateMap[asset.address] = currentHourStamp;
     } catch (error) {
       console.error(
         `[Sale ERROR] Failed to update sale price for asset ${asset.address}:`,
@@ -359,7 +372,6 @@ async function main() {
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   let lastOracleRun = 0;
-  let lastSaleRun = 0;
 
   const heartbeatServer = http.createServer(async (_, res) => {
     const errorFlagRaised = await flagFile.isErrorFlagRaised();
@@ -402,14 +414,9 @@ async function main() {
         }
 
         // Check if it's time to run the sale price update
-        if (
-          process.env.SALE_UPDATE === "true" &&
-          now.getHours() === parseInt(saleUpdateTime, 10) &&
-          lastSaleRun !== currentDate
-        ) {
+        if (process.env.SALE_UPDATE === "true") {
           console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
-          lastSaleRun = currentDate;
         } else {
           console.log("[Sale] Skipping since interval not reached.");
         }
