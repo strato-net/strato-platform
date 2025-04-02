@@ -1,7 +1,9 @@
 pragma solidvm 11.5;
 
-// import "Templates/Assets/Asset.sol";
-// import "Templates/Assets/Redeemable.sol";
+import "Templates/Assets/Asset.sol";
+
+import "Templates/Assets/MercataMetadata.sol";
+
 // import "Templates/Assets/LendingToken.sol";
 // import "Templates/Enums/RestStatus.sol";
 // import "Templates/Escrows/Escrow.sol";
@@ -14,7 +16,7 @@ pragma solidvm 11.5;
 // import "Templates/Staking/MinterAuthorization.sol";
 // import "Templates/Utils/Utils.sol";
 // import "Templates/Structs/Structs.sol";
-// import "Templates/Bridge/MercataETHBridge.sol";
+import "Templates/Bridge/MercataEthBridge.sol";
 import "Templates/ERC20/ERC20.sol";
 import "Templates/Pools/Pool.sol";
 import "Templates/Pools/PoolFactory.sol";

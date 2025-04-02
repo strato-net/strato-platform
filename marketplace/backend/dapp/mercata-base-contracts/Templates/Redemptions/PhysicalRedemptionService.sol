@@ -3,11 +3,8 @@ pragma strict;
 
 import <BASE_CODE_COLLECTION>;
 
-contract PhysicalRedemptionService is RedemptionService {
+contract PhysicalRedemptionService is RedemptionService, ERC20Burnable, ERC20 {
     address public owner;
-    string public ownerCommonName;
-
-    bool public isActive;
 
     string public serviceName;
     string public imageURL;
@@ -22,13 +19,7 @@ contract PhysicalRedemptionService is RedemptionService {
     string public createCustomerAddressRoute;
     string public getCustomerAddressRoute;
 
-    event Redemption (
-        string redemptionId,
-        Redeemable asset,
-        string issuer,
-        string owner,
-        uint quantity
-    );
+    ERC20Burnable public usdst;
 
     constructor (
         string _serviceName,
@@ -43,23 +34,16 @@ contract PhysicalRedemptionService is RedemptionService {
         string _createCustomerAddressRoute,
         string _getCustomerAddressRoute,
         address _token,
-        address _usdcToken,
+        address _usdst,
         address _pool,
         uint256 _initialSpotPrice,
-        uint256 _maxRedemptionAmount,
-        address _bridge,
-        bool _isPhysicalAsset
+        uint256 _maxRedemptionAmount
     ) public RedemptionService(
         _token,
-        _usdcToken,
         _pool,
         _initialSpotPrice,
-        _maxRedemptionAmount,
-        _bridge,
+        _maxRedemptionAmount
     ) {
-                owner = msg.sender;
-        ownerCommonName = getCommonName(msg.sender);
-
         isActive = true;
 
         serviceName = _serviceName;
@@ -78,44 +62,8 @@ contract PhysicalRedemptionService is RedemptionService {
         closeRedemptionRoute = _closeRedemptionRoute;
         createCustomerAddressRoute = _createCustomerAddressRoute;
         getCustomerAddressRoute = _getCustomerAddressRoute;
-    }
 
-    modifier requireOwner(string action) {
-        string err = "Only the owner can "
-                   + action
-                   + ".";
-        require(getCommonName(msg.sender) == ownerCommonName, err);
-        _;
-    }
-
-    modifier requireActive(string action) {
-        string err = "The payment service must be active to "
-                   + action
-                   + ".";
-        require(isActive, err);
-        _;
-    }
-
-    function transferOwnership(address _newOwner) requireOwner("transfer ownership") external {
-        owner = _newOwner;
-        ownerCommonName = getCommonName(owner);
-    }
-
-    function deactivate() requireOwner("deactivate the redemption service") external {
-        isActive = false;
-    }
-
-    function redemptionRequested (
-        string _redemptionId
-    ) public {
-        Redeemable asset = Redeemable(msg.sender);
-        emit Redemption (
-            _redemptionId,
-            Redeemable(msg.sender),
-            msg.sender.creator,
-            asset.ownerCommonName(),
-            asset.getRedemptionQuantity(msg.sender)
-        );
+        usdst = ERC20Burnable(_usdst);
     }
 
     function update(
@@ -130,7 +78,7 @@ contract PhysicalRedemptionService is RedemptionService {
     ,   string _createCustomerAddressRoute
     ,   string _getCustomerAddressRoute
     ,   uint   _scheme
-    ) requireOwner("update the redemption service") public returns (uint) {
+    ) onlyOwner public returns (uint) {
       if (_scheme == 0) {
         return RestStatus.OK;
       }
@@ -174,16 +122,17 @@ contract PhysicalRedemptionService is RedemptionService {
      * @param tokenAmount Amount of tokens to redeem
      * @param baseAddress For crypto assets, the address to receive the native tokens (unused in physical)
      */
-    function redeemAtSpot(uint256 tokenAmount, string memory baseAddress) external override {
-        require(redemptionsEnabled, "Redemptions disabled");
+    function redeemAtSpot(uint256 tokenAmount, string baseAddress) external override {
+        require(isActive, "Redemptions disabled");
         require(tokenAmount > 0, "Amount must be > 0");
         require(tokenAmount <= maxRedemptionAmount, "Amount exceeds maximum");
 
         // Transfer tokens from user to contract
-        require(token.transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
+        require(ERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
         
         // Burn tokens and emit event for physical redemption processing
-        require(token.burn(tokenAmount), "Token burn failed");
+        token.burn(tokenAmount);
+        
         emit Redeemed(msg.sender, tokenAmount);
     }
 
@@ -192,19 +141,19 @@ contract PhysicalRedemptionService is RedemptionService {
      * @param tokenAmount Amount of tokens to sell
      */
     function sellForSpot(uint256 tokenAmount) external {
-        require(redemptionsEnabled, "Redemptions disabled");
+        require(isActive, "Redemptions disabled");
         require(tokenAmount > 0, "Amount must be > 0");
         require(tokenAmount <= maxRedemptionAmount, "Amount exceeds maximum");
 
         uint256 usdcAmount = (tokenAmount * spotPrice) / 1e18;
         
         // Check if pool has enough depth
-        require(usdcToken.balanceOf(address(this)) >= usdcAmount, "Insufficient pool depth");
+        require(ERC20(usdst).balanceOf(address(this)) >= usdcAmount, "Insufficient amount of USDST");
 
         // Execute the fixed price swap
-        require(token.transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
-        require(usdcToken.transfer(msg.sender, usdcAmount), "USDST transfer failed");
+        require(ERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
+        require(ERC20(usdst).transfer(msg.sender, usdcAmount), "USDST transfer failed");
 
-        emit Redeemed(msg.sender, tokenAmount, usdcAmount);
+        emit Redeemed(msg.sender, tokenAmount);
     }
 }

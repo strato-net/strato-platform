@@ -19,9 +19,9 @@ enum UnitOfMeasurement {
 }
 
 /// @title A representation of Metals assets
-contract Metals is Redeemable, UnitOfMeasurement{
+contract Metals is Asset, MercataMetadata, UnitOfMeasurement{
 
-    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
+    MercataMetadata public metadata;
 
     //categorical
     UnitOfMeasurement public unitOfMeasurement;
@@ -45,24 +45,20 @@ contract Metals is Redeemable, UnitOfMeasurement{
         string _purity,
         address _redemptionService,
         address _metadataContract
-    ) Redeemable (
+    ) Asset (
         _name,
-        _symbol,
-        _description,
-        _images,
-        _files,
-        _fileNames,
-        _createdDate,
+        _symbol,    
         _initialSupply,
-        _decimals,
-        _redemptionService,
-        _metadataContract
+        _decimals
         ) 
     {
         unitOfMeasurement = _unitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
         source = _source;
         purity = _purity;
+
+        metadata = MercataMetadata(_metadataContract);
+        metadata.registerMetadata(address(this), _name, _description, _images, _files, _fileNames, _createdDate);
     }
 
 }

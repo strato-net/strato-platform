@@ -13,49 +13,55 @@ import "../ERC20/access/Ownable.sol";
 abstract contract RedemptionService is Ownable, ERC20Burnable {
     // The token that can be redeemed
     ERC20Burnable public token;
-    // The usdcToken used for redemptions
-    ERC20Burnable public usdcToken;
+
+    bool public isActive;
+
     // The associated liquidity pool
     Pool public pool;
     // The redemption price in usdcTokens (scaled by 1e18)
     uint256 public spotPrice;
     // Maximum amount that can be redeemed in a single transaction
     uint256 public maxRedemptionAmount;
-    // Whether redemptions are currently enabled
-    bool public redemptionsEnabled;
-    // The bridge contract for crypto assets
-    MercataETHBridge public bridge;
-    // Whether this is a physical or crypto asset
-    bool public isPhysicalAsset;
 
     event Redeemed(address redeemer, uint256 tokenAmount);
     event RedemptionPriceUpdated(uint256 newPrice);
     event MaxRedemptionAmountUpdated(uint256 newAmount);
-    event RedemptionsToggled(bool enabled);
     event SpotPriceUpdated(uint256 newPrice);
 
     constructor(
         address _token,
-        address _usdcToken,
         address _pool,
         uint256 _initialSpotPrice,
-        uint256 _maxRedemptionAmount,
-        address _bridge,
-        bool _isPhysicalAsset
+        uint256 _maxRedemptionAmount
     ) {
         token = ERC20Burnable(_token);
-        usdcToken = ERC20Burnable(_usdcToken);
         pool = Pool(_pool);
         spotPrice = _initialSpotPrice;
         maxRedemptionAmount = _maxRedemptionAmount;
-        redemptionsEnabled = true;
+    }
+
+    modifier requireActive(string action) {
+        string err = "The redemption service must be active to "
+                   + action
+                   + ".";
+        require(isActive, err);
+        _;
+    }
+
+
+    function deactivate() onlyOwner external {
+        isActive = false;
+    }
+
+    function activate() onlyOwner external {
+        isActive = true;
     }
 
     /**
      * @notice Updates the redemption price. Only owner can update.
      * @param newPrice New redemption price (scaled by 1e18)
      */
-    function updateSpotPrice(uint256 newPrice) external onlyOwner {
+    function updateSpotPrice(uint256 newPrice) external onlyOwner requireActive("update the redemption price") {
         require(newPrice > 0, "Invalid price");
         spotPrice = newPrice;
         emit SpotPriceUpdated(newPrice);
@@ -65,19 +71,10 @@ abstract contract RedemptionService is Ownable, ERC20Burnable {
      * @notice Updates the maximum redemption amount. Only owner can update.
      * @param newAmount New maximum redemption amount
      */
-    function updateMaxRedemptionAmount(uint256 newAmount) external onlyOwner {
+    function updateMaxRedemptionAmount(uint256 newAmount) external onlyOwner requireActive("update the maximum redemption amount") {
         require(newAmount > 0, "Invalid amount");
         maxRedemptionAmount = newAmount;
         emit MaxRedemptionAmountUpdated(newAmount);
-    }
-
-    /**
-     * @notice Toggles whether redemptions are enabled. Only owner can toggle.
-     * @param enabled New enabled state
-     */
-    function setRedemptionsEnabled(bool enabled) external onlyOwner {
-        redemptionsEnabled = enabled;
-        emit RedemptionsToggled(enabled);
     }
 
     /**
@@ -93,7 +90,7 @@ abstract contract RedemptionService is Ownable, ERC20Burnable {
      * @param amount Amount to withdraw
      */
     function withdrawTokens(address tokenAddress, uint256 amount) external onlyOwner {
-        IERC20 tokenToWithdraw = IERC20(tokenAddress);
+        ERC20 tokenToWithdraw = ERC20(tokenAddress);
         require(tokenToWithdraw.transfer(owner(), amount), "Transfer failed");
     }
 

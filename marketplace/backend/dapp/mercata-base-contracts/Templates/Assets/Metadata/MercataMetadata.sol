@@ -3,7 +3,7 @@ pragma strict;
 
 import "../Utils/Utils.sol";
 
-abstract contract Metadata is Utils {
+abstract contract MercataMetadata is Utils {
     address owner;
     string ownerCommonName;
 
