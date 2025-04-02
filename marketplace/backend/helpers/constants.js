@@ -83,8 +83,8 @@ export default {
       ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
       decimals: 8,
       precision: 0.0001,
-      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
     },
     {
       name: 'USDTST',
@@ -92,8 +92,8 @@ export default {
       ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
       decimals: 6,
       precision: 0.01,
-      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
     },
     {
       name: 'USDCST',
@@ -101,8 +101,8 @@ export default {
       ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
       decimals: 6,
       precision: 0.01,
-      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
     },
     {
       name: 'PAXGST',
@@ -110,13 +110,13 @@ export default {
       ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
       decimals: 18,
       precision: 0.01,
-      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825'
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
     },
     {
       name: 'ETHST',
-      mercataTestnetAddress: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
-      mercataMainnetAddress: '0x61275a63dfE00Efb03927316Ad4cc2DBe1faE825',
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5',
       precision: 0.01
     }
   ]
