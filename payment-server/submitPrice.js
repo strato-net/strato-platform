@@ -235,7 +235,7 @@ const submitOraclePricePeriodically = async () => {
           oracle.name.toLowerCase().replace(/st$/, ""),
           process.env.METALS_API_KEY
         );
-      } else if (oracle.type === "Constant")  {
+      } else if (oracle.type !== "Constant") {
         console.warn(`[Oracle WARN] Skipping unsupported oracle type ${key}`);
         continue;
       }
@@ -410,7 +410,7 @@ async function main() {
           !lastOracleRun
         ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
-          // await submitOraclePricePeriodically();
+          await submitOraclePricePeriodically();
           lastOracleRun = currentDate;
         } else {
           console.log("[Oracle] Skipping since interval not reached.");
