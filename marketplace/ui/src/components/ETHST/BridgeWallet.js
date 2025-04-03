@@ -1,5 +1,5 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { actions as ethActions } from '../../contexts/eth/actions';
 import { actions } from '../../contexts/inventory/actions';
@@ -46,7 +46,16 @@ const BridgeWalletModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  // Helper function to check if the value exceeds decimal places
+  const { bridgeableTokens } = useEthState();
+  
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+
+    fetchBridgeableTokenss();
+  }, []);
+  // Helper function to check if the value exceeds 6 decimal places
   const hasExceedPrecision = (value) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value);
@@ -387,23 +396,22 @@ const BridgeWalletModal = ({
       // Use tabKey (or any external control) to determine which bridging logic to run.
       if (tabKey === '1') {
         // Bridge In (Eth -> Mercata)
-        if (tokenName === 'WBTC') {
-          const wbtcAddress = fileServerUrl.includes('test')
-            ? '0x29f2D40B0605204364af54EC677bD022dA425d03'
-            : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599';
+        let tokenAddress, decimals, recipient;
 
-          const wbtcContract = new ethers.Contract(
-            wbtcAddress,
-            ERC20_ABI,
-            signer
-          );
-          const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
-          tx = await wbtcContract.transfer(
-            fileServerUrl.includes('test')
-              ? '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE'
-              : '0x8c458F866e603335ef179A63a2528F357732f5d5',
-            wbtcAmount
-          );
+        const tokenObj = bridgeableTokens?.find((tokenD) => tokenD.name.toLowerCase() === tokenName.toLowerCase())
+        tokenAddress = fileServerUrl?.includes('test')
+          ? tokenObj?.ethTestnetAddress  // Testnet WBTC
+          : tokenObj?.ethMainnetAddress; // Mainnet WBTC
+        decimals = tokenObj.decimals;
+        recipient = fileServerUrl?.includes('test')
+          ? tokenObj?.mercataTestnetAddress // Testnet recipient
+          : tokenObj?.mercataMainnetAddress; // Mainnet recipient
+
+        if (tokenAddress) {
+          const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+          const tokenAmount = ethers.utils.parseUnits(quantity.toString(), decimals);
+
+          tx = await tokenContract.transfer(recipient, tokenAmount);
         } else {
           tx = await signer.sendTransaction({
             to: fileServerUrl.includes('test')
@@ -412,6 +420,7 @@ const BridgeWalletModal = ({
             value: ethers.utils.parseEther(quantity.toString()),
           });
         }
+
         await tx.wait();
         const body = {
           userAddress: user.userAddress,
@@ -439,6 +448,7 @@ const BridgeWalletModal = ({
         };
         isDone = await ethActions.bridgeOut(ethDispatch, body);
       }
+
       if (isDone && tabKey != '1') {
         refreshDataAfterAction();
       }
@@ -450,6 +460,7 @@ const BridgeWalletModal = ({
       handleCancel();
     }
   };
+
 
   return (
     <Modal

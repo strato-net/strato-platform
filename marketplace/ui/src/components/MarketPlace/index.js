@@ -13,8 +13,6 @@ import { SEO } from '../../helpers/seoConstant';
 import { BANNER } from '../../helpers/constants';
 import { bannerArrow } from '../../images/SVGComponents';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
-import { actions as ethActions } from '../../contexts/eth/actions';
-import { useEthDispatch } from '../../contexts/eth';
 import {
   useInventoryDispatch,
   useInventoryState,
@@ -40,7 +38,6 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const navigate = useNavigate();
   const dispatch = useCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
-  const ethDispatch = useEthDispatch();
   const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
   const { reserves, totalCataRewards } = useInventoryState();
@@ -70,8 +67,6 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   useEffect(() => {
     inventoryActions.getAllReserve(inventoryDispatch);
     inventoryActions.fetchTotalCataRewards(inventoryDispatch);
-    ethActions.fetchETHSTAddress(ethDispatch);
-    ethActions.fetchWBTCSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {

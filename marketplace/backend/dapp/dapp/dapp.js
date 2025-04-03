@@ -1183,6 +1183,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return tokensJs.addHash(rawAdmin, args, options);
   };
 
+  contract.getBridgeableAddresses = async function (args, options = defaultOptions) {
+    return tokensJs.getBridge(rawAdmin, args, options);
+  };
+
   contract.bridgeOut = async function (args, options = defaultOptions) {
     const { tokenAssetRootAddress, assetAddress, quantity, externalChainWalletAddress } = args;
 

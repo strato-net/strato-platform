@@ -14,32 +14,21 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message,
       };
-    case actionDescriptors.fetchETHSTAddress:
+    
+    case actionDescriptors.fetchBridgeableTokens:
       return {
         ...state,
       };
-    case actionDescriptors.fetchETHSTAddressSuccessful:
+    case actionDescriptors.fetchBridgeableTokensSuccessful:
       return {
         ...state,
-        ethstAddress: action.payload,
+        bridgeableTokens: action.payload,
       };
-    case actionDescriptors.fetchETHSTAddressFailed:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchWBTCSTAddress:
+    case actionDescriptors.fetchBridgeableTokensFailed:
       return {
         ...state,
       };
-    case actionDescriptors.fetchWBTCSTAddressSuccessful:
-      return {
-        ...state,
-        wbtcstAddress: action.payload,
-      };
-    case actionDescriptors.fetchWBTCSTAddressFailed:
-      return {
-        ...state,
-      };
+      
     case actionDescriptors.addHash:
       return {
         ...state,

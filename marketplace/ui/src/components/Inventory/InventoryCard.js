@@ -34,10 +34,11 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
 import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
 import BridgeWallet from '../ETHST/BridgeWallet';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const USDSTIcon = (
   <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -53,7 +54,6 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
-  bridgeableTokens,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -70,8 +70,20 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const { bridgeableTokens } = useEthState();
+
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokens = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokens();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
+
   const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
-  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -198,12 +210,8 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    if (inventory.originAddress === ethstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (inventory.originAddress === wbtcstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+    if (bridgeableAddresses?.includes(inventory.originAddress)) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address).replace(':bridgeableAsset', inventory.name)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {
@@ -285,8 +293,8 @@ const InventoryCard = ({
 
   const isBridgeableToken = (inventoryRoot) => {
     return (
-      Array.isArray(bridgeableTokens) &&
-      bridgeableTokens.find((address) => address === inventoryRoot)
+      Array.isArray(bridgeableAddresses) &&
+      bridgeableAddresses.find((address) => address === inventoryRoot)
     );
   };
 
