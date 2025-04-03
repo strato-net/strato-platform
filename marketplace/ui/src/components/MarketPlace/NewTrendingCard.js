@@ -325,25 +325,32 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-              if (bridgeableAddresses?.includes(topSellingProduct.originAddress)) {
-                navigate(
-                  `${routes.bridgeableProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
-                  ).replace(':bridgeableAsset', topSellingProduct.name)}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else {
-                navigate(
-                  `${naviroute
-                    .replace(':address', topSellingProduct.address)
-                    .replace(
-                      ':name',
-                      encodeURIComponent(topSellingProduct.name)
-                    )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              }
+                if (isAvailableForSale) {
+                  navigate(
+                    `${naviroute
+                      .replace(':address', topSellingProduct.address)
+                      .replace(
+                        ':name',
+                        encodeURIComponent(topSellingProduct.name)
+                      )}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                } else if (bridgeableAddresses?.includes(topSellingProduct.originAddress)) {
+                  navigate(
+                    `${routes.bridgeableProductDetail.url.replace(
+                      ':address',
+                      topSellingProduct.address
+                    ).replace(':bridgeableAsset', topSellingProduct.name)}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                } else {
+                  navigate(
+                    `${naviroute
+                      .replace(':address', topSellingProduct.root)
+                      .replace(':name', topSellingProduct.name)}`,
+                    { state: { isCalledFromInventory: false } }
+                  );
+                }
               window.scrollTo(0, 0);
             }
           }}
