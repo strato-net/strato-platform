@@ -58,18 +58,30 @@ const NewTrendingCard = ({
     : topSellingProduct.decimals || 0;
 
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
-  let step;
-  const precision = bridgeableTokens?.find((token) => token.address === topSellingProduct.originAddress)?.precision;
+  const [step, setStep] = useState(1);
+  const [quantity, setQuantity] = useState(1);
 
-  if (precision) {
-    step = precision;
-  } else if (decimals) {
-    step = 0.01;
-  } else {
-    step = 1;
-  }
+  useEffect(() => {
+    if (!bridgeableTokens || bridgeableTokens.length === 0) return;
 
-  const [quantity, setQuantity] = useState(step > saleQuantity ? saleQuantity : step);
+    const precision = bridgeableTokens.find(
+      (token) => token.address === topSellingProduct.originAddress
+    )?.precision;
+
+    let newStep;
+    if (precision) {
+      newStep = precision;
+    } else if (decimals) {
+      newStep = 0.01;
+    } else {
+      newStep = 1;
+    }
+
+    const initialQuantity = newStep > saleQuantity ? saleQuantity : newStep;
+
+    setStep(newStep);
+    setQuantity(initialQuantity);
+  }, [bridgeableTokens, topSellingProduct.originAddress, decimals, saleQuantity]);
   const minValue = new BigNumber(1).dividedBy(new BigNumber(10).pow(decimals));
 
   // state to control tooltip visibility
@@ -325,32 +337,32 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-                if (isAvailableForSale) {
-                  navigate(
-                    `${naviroute
-                      .replace(':address', topSellingProduct.address)
-                      .replace(
-                        ':name',
-                        encodeURIComponent(topSellingProduct.name)
-                      )}`,
-                    { state: { isCalledFromInventory: false } }
-                  );
-                } else if (bridgeableAddresses?.includes(topSellingProduct.originAddress)) {
-                  navigate(
-                    `${routes.bridgeableProductDetail.url.replace(
-                      ':address',
-                      topSellingProduct.address
-                    ).replace(':bridgeableAsset', topSellingProduct.name)}`,
-                    { state: { isCalledFromInventory: false } }
-                  );
-                } else {
-                  navigate(
-                    `${naviroute
-                      .replace(':address', topSellingProduct.root)
-                      .replace(':name', topSellingProduct.name)}`,
-                    { state: { isCalledFromInventory: false } }
-                  );
-                }
+              if (isAvailableForSale) {
+                navigate(
+                  `${naviroute
+                    .replace(':address', topSellingProduct.address)
+                    .replace(
+                      ':name',
+                      encodeURIComponent(topSellingProduct.name)
+                    )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
+              } else if (bridgeableAddresses?.includes(topSellingProduct.originAddress)) {
+                navigate(
+                  `${routes.bridgeableProductDetail.url.replace(
+                    ':address',
+                    topSellingProduct.address
+                  ).replace(':bridgeableAsset', topSellingProduct.name)}`,
+                  { state: { isCalledFromInventory: false } }
+                );
+              } else {
+                navigate(
+                  `${naviroute
+                    .replace(':address', topSellingProduct.root)
+                    .replace(':name', topSellingProduct.name)}`,
+                  { state: { isCalledFromInventory: false } }
+                );
+              }
               window.scrollTo(0, 0);
             }
           }}
@@ -475,8 +487,8 @@ const NewTrendingCard = ({
               >
                 <Typography
                   className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity > step
-                      ? 'cursor-pointer'
-                      : 'cursor-not-allowed opacity-50'
+                    ? 'cursor-pointer'
+                    : 'cursor-not-allowed opacity-50'
                     }`}
                   onClick={() => {
                     quantity > step &&
@@ -510,8 +522,8 @@ const NewTrendingCard = ({
                 />
                 <Typography
                   className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity < saleQuantity
-                      ? 'cursor-pointer'
-                      : 'cursor-not-allowed opacity-50'
+                    ? 'cursor-pointer'
+                    : 'cursor-not-allowed opacity-50'
                     }`}
                   onClick={() =>
                     quantity < saleQuantity &&
@@ -539,11 +551,11 @@ const NewTrendingCard = ({
             }
             type="primary"
             className={`flex-1 h-9 !text-white ${!isAvailableForSale ||
-                hasExceedPrecision(quantity) ||
-                isBelowMinValue(quantity) ||
-                hasExceededMaxQuantity(quantity)
-                ? '!bg-[#808080] cursor-not-allowed'
-                : '!bg-[#13188A] cursor-pointer'
+              hasExceedPrecision(quantity) ||
+              isBelowMinValue(quantity) ||
+              hasExceededMaxQuantity(quantity)
+              ? '!bg-[#808080] cursor-not-allowed'
+              : '!bg-[#13188A] cursor-pointer'
               }`}
             onClick={async () => {
               const dataLayerEventName = isUserProfile
@@ -587,8 +599,8 @@ const NewTrendingCard = ({
               disabled={!isBridgeable}
               type="primary"
               className={`flex-1 h-9 !text-white ${!isBridgeable
-                  ? '!bg-[#808080] cursor-not-allowed'
-                  : '!bg-[#13188A] cursor-pointer'
+                ? '!bg-[#808080] cursor-not-allowed'
+                : '!bg-[#13188A] cursor-pointer'
                 }`}
               onClick={async () => {
                 const dataLayerEventName = isUserProfile
