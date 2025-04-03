@@ -28,7 +28,7 @@ main = do
   _ <- $initHFlags "Identity Server"
   putStrLn "parsing issuer cert and private key..."
   certBS <- B.readFile "/identity-provider/certs/rootCert.pem"
-  crt <- case bsToCert certBS of
+  crt <- case bytesToCert certBS of
     Left err -> error $ "Error parsing issuer cert: " <> err
     Right crt -> do
       putStrLn "Succuessfully parsed issuer cert"

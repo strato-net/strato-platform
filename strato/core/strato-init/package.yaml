@@ -93,19 +93,3 @@ executables:
       - strato-model
     other-modules: []
 
-tests:
-  strato-init-test:
-    source-dirs: test/
-    main: Main.hs
-    ghc-options: -dynamic
-    dependencies:
-      - aeson
-      - blockapps-data
-      - bytestring
-      - hspec
-      - json-stream
-      - labeled-error
-      - merkle-patricia-db
-      - strato-genesis
-      - strato-model
-      - time

@@ -109,8 +109,8 @@ def check_table(table, headers1, headers2):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 7 or len(sys.argv) > 9:
-        print('Incorrect number of arguments supplied. Expected 6-8 arguments.')
+    if len(sys.argv) < 7 or len(sys.argv) > 10:
+        print('Incorrect number of arguments supplied. Expected 7-10 arguments.')
         sys.exit(1)
 
     DEFAULT_ATTEMPTS = 0  # 0 for infinite
@@ -124,9 +124,10 @@ if __name__ == "__main__":
     realm_2 = sys.argv[6]
     attempts = sys.argv[7] if len(sys.argv) > 7 else DEFAULT_ATTEMPTS
     sleep_time = sys.argv[8] if len(sys.argv) > 8 else DEFAULT_SLEEP_TIME
+    reference_node_url = sys.argv[9] if len(sys.argv) > 9 else "https://node1.mercata-testnet2.blockapps.net"
 
     node1_url = "http://localhost"
-    node2_url = "https://node1.mercata-testnet2.blockapps.net"
+    node2_url = reference_node_url
 
     token_info1 = (client_id1, client_secret1, realm_1)
     token_info2 = (client_id2, client_secret2, realm_2)

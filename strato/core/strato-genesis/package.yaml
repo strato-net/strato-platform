@@ -42,28 +42,6 @@ library:
       - ethereum-rlp
       - lens
 
-
-executables:
-  generate-genesis:
-    source-dirs: exec_src/
-    main: Main.hs
-    other-modules: []
-    dependencies:
-      - aeson
-      - bytestring
-      - hflags
-      - strato-genesis
-      - strato-model
-      - text
-
-  genesis-setup:
-    source-dirs: exec_src/
-    main: GenesisSetup.hs
-    other-modules: []
-    dependencies:
-      - strato-genesis
-      - hflags
-
 tests:
   strato-genesis-test:
     source-dirs: test

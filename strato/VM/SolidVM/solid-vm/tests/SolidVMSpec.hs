@@ -36,7 +36,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.SQLDB
-import Blockchain.GenesisBlock
+import Blockchain.GenesisBlocks.Builder
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
@@ -215,7 +215,7 @@ rootAcc :: Address
 rootAcc = fromPublicKey X509.rootPubKey
 
 getCert :: X509Certificate
-getCert = fromMaybe (error $ "no idea what's happening") $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
+getCert = either (error $ "no idea what's happening") id . bytesToCert . BC.pack $ myCertString
 
 myCertString :: String
 myCertString =

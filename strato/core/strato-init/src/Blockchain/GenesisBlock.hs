@@ -7,8 +7,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.GenesisBlock
-  ( initializeGenesisBlock,
-    buildGenesisInfo,
+  ( initializeGenesisBlock
   )
 where
 
@@ -36,10 +35,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
 import Blockchain.EthConf
 import Blockchain.Generation
-  ( insertCertRegistryContract,
-    insertMercataGovernanceContract,
-    insertUserRegistryContract,
-    readCertsFromGenesisInfo,
+  ( readCertsFromGenesisInfo,
     readValidatorsFromGenesisInfo,
   )
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
@@ -50,7 +46,6 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import qualified Blockchain.Strato.Model.Address as Ad
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -78,35 +73,9 @@ import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
-import System.Directory
 import Text.Format
-
-readSupplementaryAccounts :: String -> IO [AccountInfo]
-readSupplementaryAccounts genesisBlockName = do
-  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-  exists <- doesFileExist accountInfoFilename
-  if not exists
-    then putStrLn "No AccountInfo file found" >> return []
-    else do
-      accountInfoString <- readFile $ accountInfoFilename
-      let parseAccounts :: String -> [AccountInfo]
-          parseAccounts line = case words line of
-            [] -> []
-            "s" : _ -> []
-            ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (ExternallyOwned $ unsafeCreateKeccak256FromWord256 (parseHex c))]
-            _ -> error $ "invalid AccountInfo line: " ++ line
-      return . concatMap parseAccounts . lines $ accountInfoString
-
-buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
-buildGenesisInfo extraFaucets extraCerts validators admins gi =
-  let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
-      faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in insertUserRegistryContract extraCerts
-        . insertMercataGovernanceContract validators admins
-        . insertCertRegistryContract extraCerts
-        $ gi {genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
 
 getGenesisBlockAndPopulateInitialMPs ::
   ( MonadIO m,
@@ -120,13 +89,11 @@ getGenesisBlockAndPopulateInitialMPs ::
     (Ad.Address `Alters` AddressState) m,
     HasRedis m
   ) =>
-  String ->
   m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
-getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
-  genesisInfo <- getGenesisInfoFromFile genesisBlockName
+getGenesisBlockAndPopulateInitialMPs = do
+  genesisInfo <- getGenesisInfo
   let certs' = readCertsFromGenesisInfo genesisInfo
       validators = readValidatorsFromGenesisInfo genesisInfo
-  extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
   -- Need to insert the X509 certificates INTO Redis
   void . execRedis $ insertRootCertificate
@@ -145,7 +112,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       )
       certs'
 
-  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo genesisBlockName extraAccounts
+  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -160,11 +127,10 @@ initializeGenesisBlock ::
     (Ad.Address `Alters` AddressState) m,
     Selectable Ad.Address AddressState m
   ) =>
-  String ->
   m ()
-initializeGenesisBlock genesisBlockName = do
+initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+  (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
@@ -192,8 +158,8 @@ initializeGenesisBlock genesisBlockName = do
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
-  let rewrite (_, CodeInfo bin src name) =
-        ( hash bin,
+  let rewrite (_, CodeInfo src name) =
+        ( hash $ T.encodeUtf8 src,
           Map.fromList $
             [("src", src)]
               ++ case name of

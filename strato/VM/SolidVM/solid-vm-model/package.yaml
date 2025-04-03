@@ -30,6 +30,7 @@ library:
   - lens
   - QuickCheck
   - quickcheck-instances
+  - regex-tdfa
   - scientific
   - source-tools
   - strato-model

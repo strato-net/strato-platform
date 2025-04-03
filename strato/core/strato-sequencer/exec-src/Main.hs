@@ -89,7 +89,7 @@ main = do
 
         putStrLn $ "ACTUAL validators list: " ++ show validators
       
-        let ckpt = def {checkpointValidators = validators}
+        let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
 
         return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
 
