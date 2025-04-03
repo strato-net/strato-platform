@@ -51,7 +51,7 @@ const Checkout = () => {
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
@@ -66,7 +66,7 @@ const Checkout = () => {
 
     return decimals;
   };
- 
+
   const calculateTax = (item) => {
     const decimals = assetsWithEighteenDecimalPlaces.includes(
       item.product.originAddress
@@ -104,8 +104,7 @@ const Checkout = () => {
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
     inventoryActions.getAllReserve(inventoryDispatch);
-    ethActions.fetchETHSTAddress(ethDispatch);
-    ethActions.fetchWBTCSTAddress(ethDispatch);
+    ethActions.fetchBridgeableTokens(ethDispatch)
   }, [paymentServiceDispatch, inventoryDispatch]);
 
   useEffect(() => {
@@ -133,12 +132,19 @@ const Checkout = () => {
         )
           ? 18
           : item.product.decimals || 0;
-        const isWbtcst = item.product.originAddress === wbtcstAddress;
-        const isEthst = item.product.originAddress === ethstAddress;
         const saleQuantity = new BigNumber(item.product.saleQuantity).dividedBy(
           new BigNumber(10).pow(decimals)
         );
-        const step = isWbtcst ? 0.0001 : isEthst ? 0.01 : decimals ? 0.01 : 1;
+        let step;
+        const precision = bridgeableTokens?.find((token) => token.address === item.product.originAddress)?.precision;
+
+        if (precision) {
+          step = precision;
+        } else if (decimals) {
+          step = 0.01;
+        } else {
+          step = 1;
+        }
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
 
@@ -148,7 +154,7 @@ const Checkout = () => {
             name: item.product.name,
             image:
               item.product['BlockApps-Mercata-Asset-images'] &&
-              item.product['BlockApps-Mercata-Asset-images'].length > 0
+                item.product['BlockApps-Mercata-Asset-images'].length > 0
                 ? item.product['BlockApps-Mercata-Asset-images'][0].value
                 : image_placeholder,
             status: 'Active',
@@ -181,7 +187,7 @@ const Checkout = () => {
       };
     });
     setmapData(mapDataArray);
-  }, [marketplaceDispatch, cartList, wbtcstAddress, ethstAddress]);
+  }, [marketplaceDispatch, cartList, bridgeableTokens]);
 
   const MinusQty = (qty, product) => {
     if (new BigNumber(qty).isGreaterThan(new BigNumber(product.step))) {
@@ -384,11 +390,11 @@ const Checkout = () => {
         e.preventDefault();
       }
       // Prevent non-numeric keys except Backspace, Delete, and navigation keys
-      if (!/^[0-9]$/.test(e.key) && 
-          e.key !== "Backspace" && 
-          e.key !== "Delete" && 
-          e.key !== "ArrowLeft" && 
-          e.key !== "ArrowRight") {
+      if (!/^[0-9]$/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight") {
         e.preventDefault();
       }
     }
@@ -457,11 +463,10 @@ const Checkout = () => {
                 onClick={() => {
                   MinusQty(qty, product);
                 }}
-                className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                  new BigNumber(qty).lte(product.step)
+                className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${new BigNumber(qty).lte(product.step)
                     ? 'cursor-not-allowed opacity-50'
                     : 'cursor-pointer'
-                }`}
+                  }`}
               >
                 -
               </div>
@@ -479,13 +484,12 @@ const Checkout = () => {
                 onClick={() => {
                   AddQty(qty, product);
                 }}
-                className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                  new BigNumber(qty).isGreaterThanOrEqualTo(
-                    product.saleQuantity
-                  )
+                className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${new BigNumber(qty).isGreaterThanOrEqualTo(
+                  product.saleQuantity
+                )
                     ? 'cursor-not-allowed opacity-50'
                     : 'cursor-pointer'
-                }`}
+                  }`}
               >
                 +
               </div>
@@ -547,10 +551,9 @@ const Checkout = () => {
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ||
-      arePaymentServicesLoading ||
-      isReservesLoading ||
-      !wbtcstAddress ||
-      !ethstAddress ? (
+        arePaymentServicesLoading ||
+        isReservesLoading ||
+        !bridgeableTokens ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
