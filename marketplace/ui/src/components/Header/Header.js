@@ -12,11 +12,13 @@ import {
   Select,
   Row,
   Col,
+  message,
 } from 'antd';
 import {
   ArrowLeftOutlined,
   LogoutOutlined,
   RiseOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TagManager from 'react-gtm-module';
@@ -45,6 +47,17 @@ import { Images } from '../../images';
 import './header.css';
 
 const { Header } = Layout;
+
+const copyToClipboard = (text) => {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      message.success('Address copied to clipboard');
+    })
+    .catch(() => {
+      message.error('Failed to copy address');
+    });
+};
 
 const HeaderComponent = ({
   user,
@@ -188,6 +201,32 @@ const HeaderComponent = ({
             ),
         },
         {
+          key: '3',
+          label: (
+            <div
+              className="flex justify-between items-center cursor-pointer py-1"
+              onClick={() =>
+                user.userAddress && copyToClipboard(user.userAddress)
+              }
+            >
+              <span
+                className="text-xs text-gray-500 truncate mr-2"
+                style={{ maxWidth: '180px' }}
+              >
+                {user.userAddress
+                  ? `${user.userAddress.substring(
+                      0,
+                      3
+                    )}...${user.userAddress.substring(
+                      user.userAddress.length - 3
+                    )}`
+                  : 'No address available'}
+              </span>
+              <CopyOutlined className="text-gray-400 hover:text-blue-500" />
+            </div>
+          ),
+        },
+        {
           key: '2',
           label: (
             <div>
@@ -298,6 +337,31 @@ const HeaderComponent = ({
   }, [user]);
 
   const subMenuItems = [
+    user
+      ? {
+          value: 'user-info',
+          path: '#',
+          label: (
+            <div
+              className="border-b border-gray-100 pb-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                user.userAddress && copyToClipboard(user.userAddress);
+                return false;
+              }}
+            >
+              <p className="font-medium mb-1">Username: {user?.commonName}</p>
+              <div className="flex justify-between items-center cursor-pointer">
+                <p className="text-xs text-gray">
+                  User Address:{' '}
+                  {user.userAddress ? user.userAddress : 'No address available'}
+                </p>
+                <CopyOutlined className="text-gray mb-2" />
+              </div>
+            </div>
+          ),
+        }
+      : null,
     {
       value: 'transactions',
       path: routes.Transactions.url,
@@ -330,7 +394,6 @@ const HeaderComponent = ({
           path: '/logout',
           label: (
             <div>
-              <p className="text-gray">{user?.commonName}</p>
               <p className="!mb-0">Logout</p>
             </div>
           ),

@@ -209,8 +209,6 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
 // Function to submit oracle prices periodically
 const submitOraclePricePeriodically = async () => {
-  const token = await oauthHelper.getServiceToken();
-
   for (const [key, oracle] of Object.entries(deployment.contracts)) {
     console.log(`[Oracle Update] Processing oracle: ${key}`);
 
@@ -249,7 +247,7 @@ const submitOraclePricePeriodically = async () => {
         } at ${new Date().toISOString()}`
       );
       await submitPrice(
-        token,
+        await oauthHelper.getServiceToken(),
         oracle,
         {
           price: priceBig,
@@ -257,7 +255,10 @@ const submitOraclePricePeriodically = async () => {
         },
         config
       );
-      await fetchAndSubmitEscrowAddresses(oracle, token);
+      await fetchAndSubmitEscrowAddresses(
+        oracle,
+        await oauthHelper.getServiceToken()
+      );
     } catch (error) {
       console.error(`[Oracle ERROR] Failed to process oracle ${key}:`, error);
       await flagFile.appendToErrorFile(
@@ -265,8 +266,7 @@ const submitOraclePricePeriodically = async () => {
       );
     }
   }
-
-  await runDistributeRewardsCalls(token);
+  await runDistributeRewardsCalls(await oauthHelper.getServiceToken());
 };
 
 // Function to update sale prices periodically
