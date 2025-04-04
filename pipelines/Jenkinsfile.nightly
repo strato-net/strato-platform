@@ -423,7 +423,7 @@ pipeline {
           steps{
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
-              sh 'npm install'
+              sh 'npm ci'
               sh 'npm run test'
               //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
             }
