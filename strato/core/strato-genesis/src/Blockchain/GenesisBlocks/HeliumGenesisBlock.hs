@@ -9,11 +9,15 @@ import BlockApps.X509
 import Blockchain.Data.GenesisInfo
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
+import Blockchain.GenesisBlocks.Contracts.Mercata
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Validator
+import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import Data.Text (Text)
+import Data.Text.Encoding
 import Text.RawString.QQ
 
 genesisBlock :: GenesisInfo
@@ -27,7 +31,8 @@ genesisBlock  =
         genesisInfoCoinbase=Org "00000000000000000000" True,
         genesisInfoAccountInfo=[
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624
-            ]
+            ],
+        genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
 
 certStrings :: [String]
@@ -257,8 +262,8 @@ extraCerts = map (\s -> either (error $ "can't parse cert: " ++ show s) id $ byt
 
 validators :: [Validator]
 validators = [
-  "bluecabinet"
---  "marketplace.mercata-beta.blockapps.net",
+--  "bluecabinet"
+  "marketplace.mercata-beta.blockapps.net"
 --  "blockchainhaberdasher.com"
   ]
 
