@@ -2,5 +2,4 @@ pragma solidvm 11.5;
 
 import "../Utils/Utils.sol";
 
-abstract contract MercataETHBridge is Utils {
-}
+abstract contract MercataETHBridge is Utils {}
