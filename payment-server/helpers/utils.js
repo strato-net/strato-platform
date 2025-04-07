@@ -14,6 +14,7 @@ const { get } = lodash;
 import oauthHelper from "./oauthHelper.js";
 import axios from "axios";
 import BigNumber from "bignumber.js";
+import flagFile from "./flagFile.js";
 
 // Fetches Asset Name based on sale address
 const getAsset = async(saleAddress)=>{
@@ -82,24 +83,30 @@ const sendEmail = async(to, subject, htmlContent) => {
     }
 
   } catch (error) {
+    await flagFile.appendToErrorFile(
+        `Error sending email:: ${error.message}`
+    );
     console.error("Error sending email:", error);
   }
 }
 
-const clientErrorHandler = (err, req, res, next) => {
+const clientErrorHandler = async (err, req, res, next) => {
   const statusCode = get(err, 'statusCode');
 
   if (statusCode) {
     const message = get(err, 'raw.message');
-    res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
-
-    console.log(`Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`);
+    const error_message = `Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`
+    console.log(error_message);
+    await flagFile.appendToErrorFile(
+        error_message
+    );
   }
 
   return next(err)
 }
 
-const commonErrorHandler = (err, req, res, next) => {
+const commonErrorHandler = async (err, req, res, next) => {
+  // TODO: res.redirect assumes no further logic in the route - using next(err) after the redirect will throw warnings that the response cannot be altered after it's sent.
   res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
   return next(err);
 }

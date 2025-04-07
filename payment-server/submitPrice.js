@@ -119,7 +119,7 @@ async function runDistributeRewardsCalls(token) {
         res.map((r) => r.hash)
       );
       await flagFile.appendToErrorFile(
-        `Error executing batch distributeRewards calls: ${error}`
+        `Error executing batch distributeRewards calls: ${error.message}`
       );
     } finally {
       // Clear the call list to avoid reprocessing stale calls
@@ -262,7 +262,7 @@ const submitOraclePricePeriodically = async () => {
     } catch (error) {
       console.error(`[Oracle ERROR] Failed to process oracle ${key}:`, error);
       await flagFile.appendToErrorFile(
-        `Failed to process oracle ${key}: ${error}`
+        `Failed to process oracle ${key}: ${error.message}`
       );
     }
   }
@@ -354,7 +354,7 @@ const updateSalePricePeriodically = async () => {
         error
       );
       await flagFile.appendToErrorFile(
-        `Failed to update sale price for asset ${asset.address}: ${error}`
+        `Failed to update sale price for asset ${asset.address}: ${error.message}`
       );
     }
   }
@@ -424,7 +424,7 @@ async function main() {
         }
       } catch (error) {
         console.error("Error in main loop:", error);
-        await flagFile.appendToErrorFile(`Error in main loop: ${error}`);
+        await flagFile.appendToErrorFile(`Error in main loop: ${error.message}`);
       } finally {
         // Sleep to ensure the loop runs approximately every 1 minutes
         console.log(
