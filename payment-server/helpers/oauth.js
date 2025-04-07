@@ -46,7 +46,6 @@ class Admin {
   }
 
   async _refreshToken() {
-    console.log("Refreshing token...");
     try {
       const { token, expiration } = await oauthHelper.getServiceToken();
       this.token = token;

@@ -56,6 +56,7 @@ const getServiceToken = async () => {
     !expiresAt ||
     expiresAt <= Math.floor(Date.now() / 1000) + 30 // 30 seconds buffer
   ) {
+    console.log("Refreshing token...");
     const tokenObj = await oauth.getAccessTokenByClientSecret();
     token =
       tokenObj.token[
