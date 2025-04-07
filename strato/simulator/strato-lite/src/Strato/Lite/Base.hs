@@ -7,7 +7,6 @@ module Strato.Lite.Base where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate as X509
-import Blockchain.Blockstanbul (Checkpoint)
 import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -58,7 +57,6 @@ type MonadBase m = ( MonadFail m
                    , (Keccak256 `A.Alters` DBDB.DependentBlockEntry) m
                    , (Address `A.Alters` X509CertInfoState) m
                    , A.Selectable Validator X509CertInfoState m
-                   , (() `A.Alters` Checkpoint) m
                    , (Keccak256 `A.Alters` OutputBlock) m
                    -- , (Keccak256 `A.Alters` BlockHeader) m
                    , A.Selectable (Host, UDPPort, BC.ByteString) Point m

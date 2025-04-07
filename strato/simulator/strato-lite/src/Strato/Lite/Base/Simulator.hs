@@ -23,7 +23,6 @@ module Strato.Lite.Base.Simulator where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate as X509
-import Blockchain.Blockstanbul (Checkpoint)
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -193,11 +192,6 @@ instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Replaceable SockAdd
           case ipAndPortToSockAddr ip' (UDPPort 30303) of
             Nothing -> pure ()
             Just myAddr -> atomically $ writeTQueue s (msg, myAddr)
-
-instance {-# OVERLAPPING #-} MonadIO m => (() `A.Alters` Checkpoint) (MonadSimulator m) where
-  lookup _ _   = pure Nothing
-  insert _ _ _ = pure ()
-  delete _ _   = pure ()
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (MonadSimulator m) where
   select _ (Just ip, udpPort) = pure $ ipAndPortToSockAddr ip udpPort

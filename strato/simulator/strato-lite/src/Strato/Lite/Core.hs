@@ -166,11 +166,6 @@ type MonadCoreP2P m = ReaderT (IORef P2PContext) m
 
 type CoreT m = ReaderT CorePeer m
 
-instance {-# OVERLAPPING #-} MonadBase m => (() `A.Alters` Checkpoint) (CoreT m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
-
 instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` OutputBlock) (CoreT m) where
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
