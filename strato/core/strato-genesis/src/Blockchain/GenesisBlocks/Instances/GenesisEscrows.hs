@@ -3,6 +3,7 @@
 module Blockchain.GenesisBlocks.Instances.GenesisEscrows where
 
 import           Blockchain.Strato.Model.Address
+import qualified Data.Map.Strict                 as M
 import           Data.Text                       (Text)
 
 data Escrow = Escrow
