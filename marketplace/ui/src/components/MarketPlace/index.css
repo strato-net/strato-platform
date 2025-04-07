@@ -8,6 +8,23 @@
   > td {
   padding: 14px;
 }
+.pay-summary-responsive-span {
+  position: absolute;
+  top: 11rem;
+  right: 16px;
+  color: rgb(244, 22, 22);
+}
+.pay-summary-span {
+  position: absolute;
+  top: 6.2rem;
+  right: 1rem;
+  color: rgb(244, 22, 22);
+}
+
+.pay-summary {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
 
 img.ant-image-preview-img {
   display: inline-block;
@@ -265,6 +282,7 @@ img.ant-image-preview-img {
 .checkout-card {
   box-shadow: 0px 4px 4px 0px #00000040;
   border-radius: 5px;
+  position: relative;
 }
 
 .mobile-checkout-card {
@@ -632,32 +650,6 @@ img.ant-image-preview-img {
   }
 }
 
-@media (min-width: 769px) and (max-width: 834px) {
-  .staking_banner_text {
-    font-size: 44px;
-    left: 7%;
-    top: -15%;
-    /* line-height: 22px; */
-  }
-
-  .staking_banner_text > h1:nth-child(3){
-    line-height: 28px;
-  }
-
-  .stake-banner-stats{
-    top: -20px !important;
-    left: -60px;
-  }
-
-  .stake-banner-stats-title{
-    font-size: 12px;
-  }
-
-  .stake-banner-stats-value{
-    font-size: 24px;
-  }
-
-}
 @media (min-width: 835px) and (max-width: 999px) {
   .staking_banner_text {
     font-size: 44px;
@@ -683,14 +675,6 @@ img.ant-image-preview-img {
     top: 10%;
     line-height: 42px;
   }
-
-  /* .staking_banner_text {
-    font-size: 44px;
-    left: 7%;
-    top: -5%;
-    line-height: 42px;
-  } */
-
   .clothing_banner_text {
     width: 360px;
     font-size: 44px;
@@ -1084,6 +1068,9 @@ img.ant-image-preview-img {
 }
 
 @media (min-width: 400px) and (max-width: 480px) {
+  /* .pay-summary-responsive-span {
+    right: 9.5%;
+  } */
   .collectible_banner_text {
     width: 180px;
     font-size: 24px;
@@ -1407,11 +1394,6 @@ img.ant-image-preview-img {
 .swiper-slide-active {
   opacity: 1 !important;
 }
-
-/* .swiper-pagination-bullets{
-  margin-top: -40px;
-  position: relative !important;
-} */
 
 .swiper-button-prev:after {
   content: '' !important;

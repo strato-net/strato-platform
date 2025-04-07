@@ -45,6 +45,7 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BL
+import Data.Char
 import Data.Data
 import Data.Hashable
 import Data.Maybe (fromMaybe)
@@ -85,7 +86,8 @@ instance Show Address where
 
 instance Read Address where
   readsPrec _ input =
-    let (hexPart, rest) = splitAt 40 input
+    let trimmed = dropWhile isSpace input
+        (hexPart, rest) = splitAt 40 trimmed
     in case readHex hexPart of
          [(num, "")] -> [(Address num, rest)]
          _           -> []

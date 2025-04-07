@@ -35,18 +35,18 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.Strato.RedisBlockDB.Models
+import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
@@ -260,7 +260,7 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
 
 
@@ -294,8 +294,8 @@ instance HasContext m => Mod.Accessible RBDB.RedisConnection m where
 
 instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (Maybe WorldBestBlock) m where
   access _ = do
-    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num) ->
+    mRBB <- RBDB.withRedisBlockDB getWorldBestBlockInfo
+    for mRBB $ \(BestBlock sha num) ->
       return . WorldBestBlock $ BestBlock sha num
 
 instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where

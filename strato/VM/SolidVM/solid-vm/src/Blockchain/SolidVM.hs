@@ -2722,7 +2722,7 @@ callBuiltin "getCertField" [(SAccount a _), (SString certField)] _ = do
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin "verifyCert" [SString cert, SString pubkey] _ = do
-  let ex509Cert = bsToCert . BC.pack $ cert
+  let ex509Cert = bytesToCert . BC.pack $ cert
   let ePublicKey = bsToPub $ BC.pack pubkey
   case (ex509Cert, ePublicKey) of
     (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
@@ -2744,7 +2744,7 @@ callBuiltin "verifyCert" [SString cert, SString pubkey] _ = do
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] _ = do
-  let ex509Cert = bsToCert . BC.pack $ cert
+  let ex509Cert = bytesToCert . BC.pack $ cert
   let ePublicKey = bsToPub $ BC.pack pubkey
   case (ex509Cert, ePublicKey) of
     (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
@@ -2889,8 +2889,8 @@ certificateMap maybeCert _ =
     Nothing -> SMap stringToString emptyCertMap
     Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
   where
-    subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
-    rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
+    subject cert = getCertSubject =<< (eitherToMaybe . bytesToCert . BC.pack $ cert)
+    rawCert cert = eitherToMaybe . bytesToCert . BC.pack $ cert
     nonEmptyFields cert sub =
       M.fromList
         [ (SString "commonName", Constant . SString $ subCommonName sub),
@@ -2900,7 +2900,7 @@ certificateMap maybeCert _ =
           (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub),
           (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub),
           (SString "certString", Constant . SString $ cert),
-          (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
+          (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bytesToCert . BC.pack $ cert)))
         ]
     emptyFields =
       M.fromList

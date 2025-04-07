@@ -182,12 +182,6 @@ nextRound nt = do
 
   when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` vals)
 
-  yieldR . NewCheckpoint
-    =<< liftA2
-      Checkpoint
-      (use view)
-      (uses validators S.toList)
-
 applyValidatorAndCertChanges ::
   ( (Address `A.Alters` X509CertInfoState) m
   , MonadState BlockstanbulContext m
@@ -550,7 +544,6 @@ recordOutEvent eev =
         ResetTimer {} -> inc "reset_timer"
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
-        NewCheckpoint {} -> inc "new_checkpoint"
         RunPreprepare {} -> inc "run_preprepare"
 
 validatorTimingHack :: (MonadState BlockstanbulContext m)  =>

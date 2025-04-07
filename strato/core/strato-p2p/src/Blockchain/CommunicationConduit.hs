@@ -1,10 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.CommunicationConduit
   ( handleMsgServerConduit,
@@ -15,39 +15,42 @@ module Blockchain.CommunicationConduit
   )
 where
 
-import BlockApps.Logging
-import Blockchain.Constants hiding (ethVersion)
-import Blockchain.Context
-import Blockchain.Data.Block
-import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.RLP
-import Blockchain.Data.Wire as W
-import Blockchain.Event
-import Blockchain.EventException
-import Blockchain.Frame
-import Blockchain.Metrics
-import Blockchain.Options
-import Blockchain.Participation
-import Blockchain.Sequencer.Event
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Options (computeNetworkID)
-import Blockchain.Strato.Model.Util
-import Blockchain.Threads
-import Conduit
-import Control.Monad (forever, when)
-import qualified Control.Monad.Change.Modify as Mod
-import Crypto.Types.PubKey.ECC
-import Data.Bits (shiftL)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.Conduit.Binary as CB
-import Data.Conduit.TQueue
-import Data.List.Split
-import Data.Maybe
-import qualified Data.Text as T
-import Text.Printf
-import UnliftIO.Exception
-import UnliftIO.STM
+import           BlockApps.Logging
+import           Blockchain.Constants                  hiding (ethVersion)
+import           Blockchain.Context
+import           Blockchain.Data.Control               (P2PCNC (..))
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Wire                  as W
+import           Blockchain.Event
+import           Blockchain.EventException
+import           Blockchain.Frame
+import           Blockchain.Metrics
+import           Blockchain.Model.SyncState
+import           Blockchain.Model.SyncTask
+import           Blockchain.Options
+import           Blockchain.Participation
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Options       (computeNetworkID)
+import           Blockchain.Strato.Model.Util
+import           Blockchain.SyncDB
+import           Blockchain.Threads
+import           Conduit
+import           Control.Monad                         (forever, when)
+import qualified Control.Monad.Change.Modify           as Mod
+import           Crypto.Types.PubKey.ECC
+import           Data.Bits                             (shiftL)
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import qualified Data.Conduit.Binary                   as CB
+import           Data.Conduit.TQueue
+import           Data.List.Split
+import           Data.Maybe
+import qualified Data.Text                             as T
+import           Text.Printf
+import           Text.ShortDescription
+import           UnliftIO.Exception
+import           UnliftIO.STM
 
 ethVersion :: Int
 ethVersion = 63
@@ -77,7 +80,10 @@ handleMsgClientConduit ::
   PPeer ->
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgClientConduit myId peer = do
-  $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
+  $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
+
+  lift $ clearAllSyncTasks $ pPeerHost peer
+
   yield $
     Right
       Hello
@@ -90,12 +96,12 @@ handleMsgClientConduit myId peer = do
           port = 0,
           nodeId = myId
         }
-  $logDebugS "handleMsgClientConduit" $ T.pack $ "about to parse message"
+  $logDebugS "handleMsgClientConduit" "about to parse message"
   awaitMsg >>= \case
     Just Hello {} ->
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash highestBlockNum')) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash highestBlockNum' _) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               let s = Status
                       { protocolVersion = fromIntegral ethVersion,
@@ -111,13 +117,25 @@ handleMsgClientConduit myId peer = do
     Just Status {protocolVersion = ver, highestBlockNum = highestBlockNum', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-      when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
+      when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
-      BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
-      mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+      $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show highestBlockNum''
+      maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) highestBlockNum''
+
+      case maybeSyncTask of
+        Nothing ->
+          $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
+        Just syncTask -> do
+          $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
+          if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
+            then do
+              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+            else do
+              $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show highestBlockNum' ++ "), marking the new chiliad as 'NotReady'"
+              lift $ setSyncTaskNotReady (pPeerHost peer)
+
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
@@ -128,14 +146,16 @@ handleMsgServerConduit ::
   PPeer ->
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
-  $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
+  $logDebugS "handleMsgServerConduit" "about to parse message"
+
+  lift $ clearAllSyncTasks $ pPeerHost peer
 
   numActivePeers <- liftIO $ fmap length getPeersByThreads
 
   when (numActivePeers > flags_maxConn) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
-    
+
   awaitMsg >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
@@ -148,17 +168,20 @@ handleMsgServerConduit myPubkey peer = do
                 nodeId = myPubkey
               }
       yield $ Right helloMsg'
-    other -> assertHandshake $ other
+    other -> assertHandshake other
   awaitMsg >>= \case
     Just Status {protocolVersion = ver, highestBlockNum = theirHighestBlockNum, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash myHighestBlockNum)) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash myHighestBlockNum _) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
               let highestBlockNum' = if ver < 63 then theirHighestBlockNum - 8192 else theirHighestBlockNum
-              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+              when (peerGH /= genHash) $ throwIO WrongGenesisBlock
+              when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
+
+              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
               return $
                 Right
                   Status
@@ -169,9 +192,15 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
-      mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+      $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show theirHighestBlockNum
+      maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) theirHighestBlockNum
+      case maybeSyncTask of
+        Nothing ->
+          $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
+        Just syncTask -> do
+          $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
+          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
@@ -180,8 +209,8 @@ awaitMsg :: (MonadIO m) => ConduitM Event (Either P2PCNC Message) m (Maybe Messa
 awaitMsg =
   await >>= \case
     Just (MsgEvt msg) -> return (Just msg)
-    Nothing -> return Nothing
-    _ -> awaitMsg
+    Nothing           -> return Nothing
+    _                 -> awaitMsg
 
 assertHandshake ::
   (MonadLogger m, MonadIO m) =>
@@ -201,7 +230,7 @@ cbSafeTake' i = fromMaybe (error "cb\"Safe\"Take: not enough data") <$> cbSafeTa
 
 getRLPData :: Monad m => forall void. ConduitM B.ByteString void m B.ByteString
 getRLPData =
-  (fromMaybe $ error "no rlp data") <$> CB.head >>= \case
+  fromMaybe (error "no rlp data") <$> CB.head >>= \case
     x | x < 128 -> return $ B.singleton x
     x | x >= 192 && x <= 192 + 55 -> do
       rest <- cbSafeTake' $ fromIntegral $ x - 192

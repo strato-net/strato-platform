@@ -11,6 +11,5 @@ module.exports = {
   alchemyNetwork: process.env.ALCHEMY_NETWORK,
   blockAppsPublicKey: process.env.BLOCKAPPS_PUBLIC_KEY,
   blockAppsPrivateKey: process.env.BLOCKAPPS_PRIVATE_KEY,
-  wbtcContractAddress: process.env.WBTC_CONTRACT_ADDRESS,
   mintAndTransfer: "mintETHST",
 };

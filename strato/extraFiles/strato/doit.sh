@@ -166,7 +166,6 @@ function newnode {
     --blockstanbul=true \
     --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
     --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
-    --genesisBlockName=${genesis:-gettingStarted} \
     --minLogLevel=$seqMinLogLevel \
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
@@ -358,9 +357,7 @@ function doInit {
 
   args="--addBootnodes=$addBootnodes \
   --blockTime=${blockTime:-13} \
-  --genesisBlockName=${genesis:-gettingStarted} \
   --generateKey=$generateKey \
-  --kafka=./kafka-topics.sh \
   --kafkahost=$kafkaHost \
   --lazyblocks=${lazyBlocks:-true} \
   --minPeers=${numMinPeers:-100} \
@@ -420,7 +417,6 @@ function setEnv {
 echo "Processed environment variables:"
 setEnv addBootnodes true
 setEnv bootnode ""
-setEnv genesisBlock ""
 setEnv kafkaHost ${kafkaHost}
 setEnv pgUser ${postgres_user}
 setEnv pgPass ${postgres_password}
@@ -450,9 +446,15 @@ stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 mkdir -p /var/lib/strato
 cd /var/lib/strato
 
-if [[ -n $genesisBlock ]]
-then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
+set +x
+if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]] ; then
+  echo "useCustomGenesis is set to true - waiting for genesis.json to be added to $(pwd)/ path in the container... (Use: \`docker cp myGenesisFile.json strato-strato-1:$(pwd)/genesis.json\`)"
+  while [ ! -f "genesis.json" ]; do
+    sleep 1
+  done
+  echo "File genesis.json found! Continuing with the STRATO boot-up..."
 fi
+set -x
 
 until nc -z $zkHost 2181 >&/dev/null
 do  echo "Waiting for Zookeeper to become available"

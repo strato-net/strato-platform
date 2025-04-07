@@ -1,41 +1,36 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoDeriveAnyClass #-}
+{-# LANGUAGE NoDeriveAnyClass      #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
 module Blockchain.Strato.Discovery.Data.PeerIOWiring where
 
-import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
-import Blockchain.Data.PersistTypes ()
-import Blockchain.MiscJSON ()
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Control.Monad (void)
-import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Reader
-import Crypto.Types.PubKey.ECC (Point)
-import Data.IP
-import qualified Data.Text as T
-import Data.Time
-import qualified Database.Persist.Postgresql as SQL
-import Prometheus
-import UnliftIO
+import           Blockchain.Data.PersistTypes          ()
+import           Blockchain.DB.SQLDB                   (runSqlPool,
+                                                        withGlobalSQLPool)
+import           Blockchain.MiscJSON                   ()
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Host
+import           Control.Monad                         (void)
+import qualified Control.Monad.Change.Alter            as A
+import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC               (Point)
+import           Data.IP
+import qualified Data.Text                             as T
+import           Data.Time
+import qualified Database.Persist.Postgresql           as SQL
+import           Prometheus
+import           UnliftIO
 
 
 

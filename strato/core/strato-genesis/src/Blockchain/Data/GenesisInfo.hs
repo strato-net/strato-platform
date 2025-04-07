@@ -11,15 +11,19 @@ module Blockchain.Data.GenesisInfo
   ( GenesisInfo (..),
     defaultGenesisInfo,
     genesisParser,
-    getGenesisInfoFromFile,
+    getGenesisInfo,
+    convertFromOld,
     module Blockchain.Data.AccountInfo,
     module Blockchain.Data.CodeInfo
   )
 where
 
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.AccountInfo
 import Blockchain.Data.CodeInfo
+import qualified Blockchain.Data.AccountInfoOld as OLD
+import qualified Blockchain.Data.CodeInfoOld as OLD
+import qualified Blockchain.Data.GenesisInfoOld as OLD
+import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
@@ -155,10 +159,44 @@ genesisParser =
     <*> "mixHash" JS..: JS.value
     <*> "nonce" JS..: JS.value
 
-getGenesisInfoFromFile :: MonadIO m => String -> m GenesisInfo
-getGenesisInfoFromFile genesisBlockName = do
-  theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
+getGenesisInfo :: MonadIO m => m GenesisInfo
+getGenesisInfo = do
+  theJSONString <- liftIO $ BLC.readFile "genesis.json"
   let genesis = JS.parseLazyByteString genesisParser theJSONString
   case genesis of
     [x] -> pure x
     _ -> error $ "invalid genesis: " ++ show genesis
+
+convertFromOld :: OLD.GenesisInfo -> GenesisInfo
+convertFromOld OLD.GenesisInfo{..} =
+  GenesisInfo
+    genesisInfoParentHash
+    genesisInfoUnclesHash
+    genesisInfoCoinbase
+    (map convertFromOldAccountInfo genesisInfoAccountInfo)
+    (map convertFromOldCodeInfo genesisInfoCodeInfo)
+    genesisInfoTransactionRoot
+    genesisInfoReceiptsRoot
+    genesisInfoLogBloom
+    genesisInfoDifficulty
+    genesisInfoNumber
+    genesisInfoGasLimit
+    genesisInfoGasUsed
+    genesisInfoTimestamp
+    genesisInfoExtraData
+    genesisInfoMixHash
+    genesisInfoNonce
+  where
+    convertFromOldAccountInfo :: OLD.AccountInfo -> AccountInfo
+    convertFromOldAccountInfo (OLD.NonContract address nonce) = NonContract address nonce
+    convertFromOldAccountInfo (OLD.ContractNoStorage address nonce codeHash) =
+      ContractNoStorage address nonce codeHash
+    convertFromOldAccountInfo (OLD.ContractWithStorage address nonce codeHash storage) =
+      ContractWithStorage address nonce codeHash storage
+    convertFromOldAccountInfo (OLD.SolidVMContractWithStorage address nonce codeHash storage) =
+      SolidVMContractWithStorage address nonce codeHash $
+                            map (\(k, v) ->  (k, rlpDecode $ rlpDeserialize v)) $ storage
+
+
+    convertFromOldCodeInfo :: OLD.CodeInfo -> CodeInfo
+    convertFromOldCodeInfo OLD.CodeInfo{..} = CodeInfo codeInfoSource codeInfoName

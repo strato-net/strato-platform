@@ -15,7 +15,7 @@ import qualified Blockchain.Data.BlockHeader as BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code

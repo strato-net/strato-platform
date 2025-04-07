@@ -12,6 +12,7 @@ module Text.Tools
     tab,
     tab',
     wrap,
+    showRanges
   )
 where
 
@@ -98,3 +99,15 @@ shorten maxLen s = take maxLen s ++ "..."
 wrap :: Int -> String -> [String]
 wrap maxLen s | length s > maxLen = take maxLen s : wrap maxLen (drop maxLen s)
 wrap _ s = [s]
+
+showRanges :: [Integer] -> String
+showRanges [] = "<empty list>"
+showRanges [v] = "(" ++ show v ++ ")"
+showRanges (v1:rest) = "(" ++ show v1 ++ showRangeEnding rest
+
+showRangeEnding :: [Integer] -> String
+showRangeEnding [] = "<empty list>"
+showRangeEnding [v] = ":" ++ show v ++ ")"
+showRangeEnding (v1:v2:rest) | v2 == v1 + 1 = showRangeEnding (v2:rest)
+showRangeEnding (v1:v2:rest) = ":" ++ show v1 ++ "), " ++ showRanges (v2:rest)
+

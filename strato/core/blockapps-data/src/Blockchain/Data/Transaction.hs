@@ -48,8 +48,8 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.PositiveInteger
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
--- import qualified Data.ByteString.Short as B (ShortByteString, toShort, fromShort)
 import Control.DeepSeq
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
@@ -65,8 +65,8 @@ import Data.Time.Clock
 import Data.Word
 import qualified Database.Persist.Postgresql as SQL
 import System.Clock
-
--- import Data.ByteString (ByteString)
+import System.IO.Unsafe (unsafePerformIO)
+import Test.QuickCheck
 
 instance TransactionLike Transaction where
   txHash = \case
@@ -346,3 +346,32 @@ partialTransactionHash :: Transaction -> Keccak256
 partialTransactionHash = \case
   PrivateHashTX {..} -> transactionTxHash -- TODO: Should this be an error instead?
   t -> hash . rlpSerialize $ partialRLPEncode t
+
+
+instance Arbitrary Transaction where
+  arbitrary = do
+    isPrivHash <- arbitrary :: Gen Bool
+    if isPrivHash
+      then do
+        tHash <- arbitrary
+        cHash <- arbitrary
+        return $ PrivateHashTX tHash cHash
+      else do
+        nonce <- unboxPI <$> arbitrary
+        gasPrice <- unboxPI <$> arbitrary
+        gasLimit <- arbitrary `suchThat` (> gasPrice)
+        value <- unboxPI <$> arbitrary
+        prvKey <- arbitrary
+        isMessage <- arbitrary :: Gen Bool
+        chainId <- arbitrary
+        md <- arbitrary
+        case isMessage of
+          True -> do
+            to <- arbitrary
+            txData' <- arbitrary
+            return . unsafePerformIO $
+              createChainMessageTX nonce gasPrice gasLimit to value txData' chainId md prvKey
+          False -> do
+            contractCode <- arbitrary
+            return . unsafePerformIO $
+              createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey

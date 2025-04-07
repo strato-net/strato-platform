@@ -146,8 +146,8 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString = `$${itemTotal} (${itemTotal} ' USDST'})<br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice} ' USDST'} each)<br><br>`;
+      concatenatedOrderString += `$${itemTotal} (${itemTotal} USDST)<br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice} USDST each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
@@ -338,6 +338,13 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
+  const amountWithoutSymbol = totalAmount.split(' ');
+
+  const isDisabled =
+    !activePaymentProviders ||
+    activePaymentProviders?.length === 0 ||
+    (selectedProvider.serviceName === 'Stripe' && amountWithoutSymbol[0] < 10);
+
   return (
     <>
       <div>
@@ -410,9 +417,24 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                 <div className="p-4 rounded-lg shadow-md w-full">
                   <div className="flex justify-between items-center mb-6">
                     <span className="text-base font-normal">Order Total :</span>
-                    <span className="text-base font-normal">
-                      {totalAmount}{' '}
-                    </span>
+                    <Tooltip
+                      title={
+                        isDisabled
+                          ? 'Minimum Credit Card Order Size $10. Please increase the quantity to proceed.'
+                          : ''
+                      }
+                    >
+                      <span className="text-base font-normal">
+                        {totalAmount}{' '}
+                      </span>
+                      {isDisabled && (
+                        <span className="pay-summary-span">
+                          <label className="pay-summary">
+                            Order amount should be greater than $10
+                          </label>
+                        </span>
+                      )}
+                    </Tooltip>
                   </div>
                   {reserve && (
                     <div className="mb-6">
@@ -421,24 +443,37 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                       </Checkbox>
                     </div>
                   )}
-                  <Button
-                    type="primary"
-                    disabled={
-                      !activePaymentProviders ||
-                      activePaymentProviders?.length === 0
-                    }
-                    className="w-full bg-blue-800 text-white h-10 text-lg"
-                    onClick={() =>
-                      reserve && stakeChecked
-                        ? handlePlaceOrder(
-                            reserve?.address,
-                            reserve?.assetRootAddress
-                          )
-                        : handlePlaceOrder()
+                  <Tooltip
+                    title={
+                      isDisabled
+                        ? 'The minimum purchase amount is $10. Please increase the quantity to proceed.'
+                        : ''
                     }
                   >
-                    Place Order
-                  </Button>
+                    <Button
+                      type="primary"
+                      className={`w-full bg-blue-800 text-white h-10 text-lg flex-1 h-9 flex-1 h-9 !text-white ${
+                        cartData.some((item) => item.disabled) || isDisabled
+                          ? '!bg-[#808080] cursor-not-allowed'
+                          : '!bg-[#13188A] cursor-pointer'
+                      }`}
+                      onClick={() => {
+                        if (
+                          !cartData.some((item) => item.disabled) &&
+                          !isDisabled
+                        ) {
+                          reserve && stakeChecked
+                            ? handlePlaceOrder(
+                                reserve?.address,
+                                reserve?.assetRootAddress
+                              )
+                            : handlePlaceOrder();
+                        }
+                      }}
+                    >
+                      Place Order
+                    </Button>
+                  </Tooltip>
                 </div>
               </Col>
             </Row>

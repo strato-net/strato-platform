@@ -108,9 +108,9 @@ export const Art = {
 export const Tokens = {
   prefix: '/tokens',
   create: '/',
-  getETHSTAddress: '/address',
-  getWBTCSTAddress: '/wbtcstAddress',
   addHash: '/addHash',
+  bridgeOut: '/bridgeOut',
+  getBridgeableTokens: '/bridgeableTokens',
 };
 
 export const CarbonOffset = {
@@ -205,6 +205,7 @@ export const Reserve = {
   fetchTotalCataRewards: '/fetchTotalCataRewards',
   oraclePrice: '/oraclePrice/:address',
   stake: '/stake',
+  stakeAfterBridge: '/stakeAfterBridge',
   unstake: '/unstake',
   borrow: '/borrow',
   repay: '/repay',

@@ -4,12 +4,14 @@ import {
   RiseOutlined,
   LogoutOutlined,
   BankOutlined,
-  SolutionOutlined,
+  RetweetOutlined,
 } from '@ant-design/icons';
 import { ASSET_STATUS } from '../../helpers/constants';
 import StakeModal from './StakeModal';
 import BorrowModal from './BorrowModal';
 import RepayModal from './RepayModal';
+import BridgeWallet from '../ETHST/BridgeWallet';
+import BigNumber from 'bignumber.js';
 
 const ChildStakeItemActions = ({
   inventory,
@@ -18,22 +20,32 @@ const ChildStakeItemActions = ({
   debouncedSearchTerm,
   category,
   reserves,
-  assetsWithEighteenDecimalPlaces
+  assetsWithEighteenDecimalPlaces,
+  bridgeableTokens,
 }) => {
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
+  const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
 
   const totalCollateralQuantity = inventory?.escrow?.collateralQuantity || 0;
-  const collateralQuantity = totalCollateralQuantity > inventory?.quantity ? inventory.quantity : totalCollateralQuantity;
+  const collateralQuantity =
+    totalCollateralQuantity > inventory?.quantity
+      ? inventory.quantity
+      : totalCollateralQuantity;
   const saleQuantity = inventory?.saleQuantity || 0;
   const quantity = inventory?.quantity || 0;
   const collateralValue = inventory?.escrow?.collateralValue;
   const maxBorrowableAmount = Math.floor(collateralValue / 2);
   const borrowAmount = inventory?.escrow?.borrowedAmount || 0;
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
+    inventory.root
+  ) ? 18 : inventory.decimals || 0;
+  const displayedQuantity = new BigNumber(inventory.quantity).dividedBy(
+    new BigNumber(10).pow(decimals)
+  );
 
-  
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
@@ -44,6 +56,13 @@ const ChildStakeItemActions = ({
       return true;
     }
   }
+
+  const isBridgeableToken = (inventoryRoot) => {
+    return (
+      Array.isArray(bridgeableTokens) &&
+      bridgeableTokens.find((address) => address === inventoryRoot)
+    );
+  };
 
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
@@ -70,6 +89,14 @@ const ChildStakeItemActions = ({
     setRepayModalOpen(false);
   };
 
+  const showBridgeOutModal = () => {
+    setBridgeOutModalOpen(true);
+  };
+
+  const handleBridgeOutModalClose = () => {
+    setBridgeOutModalOpen(false);
+  };
+
   return (
     <div className="flex justify-center w-full">
       <div className="flex justify-center gap-3">
@@ -77,7 +104,10 @@ const ChildStakeItemActions = ({
           type="primary"
           className="font-semibold flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={(saleQuantity > 0 ? true : collateralQuantity >= quantity) || !isActive()}
+          disabled={
+            (saleQuantity > 0 ? true : collateralQuantity >= quantity) ||
+            !isActive()
+          }
         >
           <RiseOutlined /> Stake
         </Button>
@@ -89,6 +119,19 @@ const ChildStakeItemActions = ({
         >
           <LogoutOutlined /> Unstake
         </Button>
+        {/* temporary removing bridgeout button
+        <Button
+          type="link"
+          className={`text-[#13188A] font-semibold ${
+            !isBridgeableToken(inventory.root) ||
+            (inventory.escrow && inventory.escrow.address)
+              ? 'invisible'
+              : ''
+          }`}
+          onClick={showBridgeOutModal}
+        >
+          <RetweetOutlined /> Bridge
+        </Button> */}
         <Button
           type="link"
           className="text-[#13188A] font-semibold invisible"
@@ -96,15 +139,6 @@ const ChildStakeItemActions = ({
           disabled={true}
         >
           <BankOutlined /> Borrow
-        </Button>
-        <Button
-          type="link"
-          className="text-[#13188A] font-semibold invisible"
-          onClick={() => showRepayModal('Unstake')}
-          disabled={true}
-        >
-          <SolutionOutlined />
-          Repay
         </Button>
       </div>
       {stakeModalOpen && (
@@ -146,6 +180,21 @@ const ChildStakeItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+        />
+      )}
+      {bridgeOutModalOpen && (
+        <BridgeWallet
+          open={bridgeOutModalOpen}
+          handleCancel={handleBridgeOutModalClose}
+          accountDetails={{
+            assetAddress: inventory.address,
+            assetRootAddress: inventory.root,
+            balance: displayedQuantity.toString(),
+            decimals: decimals,
+          }}
+          pageDetails={{ limit, offset, categoryName: category, reserves }}
+          tokenName={inventory.name}
+          tabKey={'2'}
         />
       )}
     </div>

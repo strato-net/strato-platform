@@ -111,6 +111,7 @@ pipeline {
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
+                useCustomGenesis=false \\
                 ./strato --single
             """
           }
@@ -141,8 +142,6 @@ pipeline {
           '''
           sh 'chmod +x check_availability.sh'
           sh './check_availability.sh'
-          // don't want it to get overwritten
-          sh "cp genesis-block.json genesis-block-official.json"
         }
 
         script {
@@ -151,8 +150,10 @@ pipeline {
 
         dir("strato-getting-started") {
           sh './strato --wipe'
-
+          
+          sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
           sh './run.sh'
+          sh 'docker cp genesis-block.json strato-strato-1:/var/lib/strato/genesis.json'
 
           sh 'docker ps'
 

@@ -10,8 +10,8 @@ where
 
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
-import Blockchain.Data.Json
 import Blockchain.Data.TransactionDef
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Data.Aeson

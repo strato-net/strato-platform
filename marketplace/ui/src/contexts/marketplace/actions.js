@@ -354,21 +354,13 @@ const actions = {
     }
   },
 
-  fetchStakeableProducts: async (
-    dispatch,
-    assetAddresses
-  ) => {
+  fetchStakeableProducts: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStakeableProducts });
 
-    const addressQuery = assetAddresses ? `assetAddresses[]=${assetAddresses}` : '';
-
     try {
-      const response = await fetch(
-        `${apiUrl}/marketplace/stake?${addressQuery}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
+      const response = await fetch(`${apiUrl}/marketplace/stake`, {
+        method: HTTP_METHODS.GET,
+      });
 
       const body = await response.json();
 

@@ -11,11 +11,13 @@ where
 
 import Blockchain.Data.RLP
 import Control.DeepSeq
+import Control.Lens.Operators ((?~), (&))
 import Data.Aeson hiding (Array, String)
 import Data.Binary
 import Data.Data
 import Data.Maybe (fromMaybe)
 import Data.String
+import Data.Swagger hiding (Format, format, get, put)
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics
@@ -35,6 +37,18 @@ instance NFData Validator where
 
 instance Format Validator where
   format (Validator c) = T.unpack c
+
+instance ToSchema Validator where
+  declareNamedSchema _ =
+    return $
+      NamedSchema
+        (Just "Validator")
+        ( mempty
+            & type_ ?~ SwaggerString
+            & example ?~ "validator=admin.blockapps.com"
+            & description ?~ "STRATO Validator name, typically the domain name of the peer acting as a validator"
+        )
+
 
 instance Binary Validator
 

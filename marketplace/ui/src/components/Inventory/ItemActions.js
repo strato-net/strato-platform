@@ -25,6 +25,7 @@ import ResellModal from './ResellModal';
 import TransferModal from './TransferModal';
 import RedeemModal from './RedeemModal';
 import BridgeModal from './BridgeModal';
+import BridgeWallet from '../ETHST/BridgeWallet';
 import StakeModal from './StakeModal';
 import BorrowModal from './BorrowModal';
 import RepayModal from './RepayModal';
@@ -37,6 +38,7 @@ const ItemActions = ({
   category,
   allSubcategories,
   user,
+  bridgeableTokens,
   supportedTokens,
   reserves,
   assetsWithEighteenDecimalPlaces,
@@ -71,6 +73,7 @@ const ItemActions = ({
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
+  const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
   const [popoverVisible, setPopoverVisible] = useState({});
 
   const togglePopover = (id, visible) => {
@@ -116,6 +119,15 @@ const ItemActions = ({
       Array.isArray(supportedTokens) &&
       supportedTokens.some(
         (token) => token.mercata_root_address === inventoryRoot
+      )
+    );
+  };
+
+  const isBridgeableToken = (inventoryRoot) => {   
+    return (
+      Array.isArray(bridgeableTokens) &&
+      bridgeableTokens.find(
+        (address) => address === inventoryRoot
       )
     );
   };
@@ -208,6 +220,16 @@ const ItemActions = ({
 
   const handleBridgeModalClose = () => {
     setBridgeModalOpen(false);
+  };
+
+  const showBridgeOutModal = () => {
+    togglePopover(false);
+    setBridgeOutModalOpen(true);
+  };
+
+  const handleBridgeOutModalClose = () => {
+    togglePopover(false);
+    setBridgeOutModalOpen(false);
   };
 
   // Calculate collateralQuantity
@@ -451,6 +473,19 @@ const ItemActions = ({
               >
                 <RetweetOutlined /> Bridge
               </Button>
+
+              {/* Temporarily removing bridge out button*/}
+              {/* <Button
+                type="link"
+                className={`text-[#13188A] font-semibold ${
+                  !isBridgeableToken(inventory.root) || inventory.escrow
+                    ? 'hidden'
+                    : ''
+                }`}
+                onClick={showBridgeOutModal}
+              >
+                <RetweetOutlined /> Bridge
+              </Button> */}
             </div>
           }
         >
@@ -575,6 +610,21 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
+        />
+      )}
+      {bridgeOutModalOpen && (
+        <BridgeWallet
+          open={bridgeOutModalOpen}
+          handleCancel={handleBridgeOutModalClose}
+          accountDetails={{
+            assetAddress: inventory.address,
+            assetRootAddress: inventory.root,
+            balance: quantity.toString(),
+            decimals,
+          }}
+          pageDetails={{ limit, offset, categoryName: category, reserves }}
+          tokenName={inventory.name}
+          tabKey={'2'}
         />
       )}
     </div>

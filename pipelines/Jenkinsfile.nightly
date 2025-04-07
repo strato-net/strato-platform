@@ -89,7 +89,8 @@ pipeline {
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
-                accountNonceLimit=20020 \\
+                accountNonceLimit=4000 \\
+                useCustomGenesis=false \\
                 ./strato --single
             """
           }
@@ -117,19 +118,18 @@ pipeline {
           '''
           sh 'chmod +x check_availability.sh'
           sh './check_availability.sh'
-
-          // don't want it to get overwritten
-          sh "cp genesis-block.json genesis-block-official.json"
         }
 
         script {
-          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started', null)
+          lib.generateGenesisBlock('strato-worktree', 'strato-getting-started', null)  // overwrites the strato-getting-started/genesis-block.json
         }
 
         dir("strato-getting-started") {
           sh './strato --wipe'
-
+          
+          sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
           sh './run.sh'
+          sh 'docker cp genesis-block.json strato-strato-1:/var/lib/strato/genesis.json'
 
           sh 'docker ps'
 
@@ -279,10 +279,11 @@ pipeline {
                   sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
                   sh 'sudo ./strato --wipe'
                   sh 'sudo ./vault --wipe'
-                  sh 'mv genesis-block-official.json genesis-block.json'
                   sh './run-vault.sh'
                   // run again but connecting to mercata-hydrogen this time
+                  sh 'sed -i "s|useCustomGenesis=true|useCustomGenesis=false|" run.sh'
                   sh 'sed -i "s|./strato --single|network=mercata-hydrogen networkID=7596898649924658542 ./strato|" run.sh'
+                  sh 'sed -i "s/accountNonceLimit=4000/accountNonceLimit=20020/" run.sh'
                   sh './run.sh'
                   sh './check_availability.sh'
                   sh 'sudo docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
@@ -422,7 +423,7 @@ pipeline {
           steps{
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
-              sh 'npm install'
+              sh 'npm ci'
               sh 'npm run test'
               //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
             }
