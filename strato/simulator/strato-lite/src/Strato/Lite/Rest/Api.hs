@@ -46,20 +46,15 @@ type NodeResultMap = M.Map T.Text NodeStatus
 
 type StratoLiteRestAPI =
   GetNodes
-    :<|> GetConnections
     :<|> GetPeers
     :<|> PostAddNode
     :<|> PostRemoveNode
-    :<|> PostAddConnection
-    :<|> PostRemoveConnection
     :<|> PostTimeout
     :<|> PostTx
 
 type GetNodes = "nodes" :> Get '[JSON] NodeResultMap
 
 type GetPeers = "nodes" :> Capture "nodeLabel" T.Text :> "peers" :> Get '[JSON] [T.Text]
-
-type GetConnections = "connections" :> Get '[JSON] ThreadResultMap
 
 type PostAddNode =
   "node" :> Capture "nodeLabel" T.Text
@@ -69,18 +64,6 @@ type PostAddNode =
 
 type PostRemoveNode =
   "node" :> Capture "nodeLabel" T.Text
-    :> "remove"
-    :> Post '[JSON] Bool
-
-type PostAddConnection =
-  "connection" :> Capture "server" T.Text
-    :> Capture "client" T.Text
-    :> "add"
-    :> Post '[JSON] Bool
-
-type PostRemoveConnection =
-  "connection" :> Capture "server" T.Text
-    :> Capture "client" T.Text
     :> "remove"
     :> Post '[JSON] Bool
 

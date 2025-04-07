@@ -145,7 +145,7 @@ import UnliftIO
 import Prelude hiding (round)
 
 loggingFunc :: LoggingT m a -> m a
-loggingFunc = runLoggingT
+loggingFunc = runNoLoggingT
 
 data VSocket = VSocket
   { _inbound :: TQueue B.ByteString,
@@ -196,7 +196,6 @@ data TestContext = TestContext
     _blockHashRegistry :: Map Keccak256 OutputBlock,
     _x509certMap :: Map Address X509CertInfoState,
     _genesisBlockHash :: GenesisBlockHash,
-    _pointPPeerMap :: Map Point PPeer,
     _pbftMessages :: S.OSet Keccak256,
     _sequencerContext :: SequencerContext,
     _dbeRegistry :: Map Keccak256 DBDB.DependentBlockEntry,
@@ -347,45 +346,6 @@ instance MonadIO m => Mod.Modifiable PeerAddress (MonadP2PTest m) where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PeerAddress (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @PeerAddress)
 
-instance {-# OVERLAPPING #-} HasMemPeerDB m => A.Selectable Host PPeer (MonadTest m) where
-  select = A.lookup
-
-instance (HasMemPeerDB m, State.MonadState TestContext m) => (Host `A.Alters` PPeer) m where
-  lookup _ ip = do
-    peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
-    return $ M.lookup ip peerMap
-  insert _ ip p = do
-    peerMapIORef <- fmap stringPPeerMap accessEnv
-    peerMap <- readIORef peerMapIORef
-    let mPeer = M.lookup ip peerMap
-    case mPeer of
-      Nothing -> do
-        modifyIORef peerMapIORef $ M.insert ip p
-        case pPeerPubkey p of
-          Nothing -> pure $ ()
-          Just k -> pointPPeerMap . at k ?= p
-      Just oldPeer -> do
-        modifyIORef peerMapIORef $ at ip ?~ oldPeer {pPeerPubkey = pPeerPubkey p}
-        case pPeerPubkey p of
-          Nothing -> pure $ ()
-          Just k -> pointPPeerMap . at k ?= oldPeer {pPeerPubkey = pPeerPubkey p}
-  delete _ ip = do
-    peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ M.delete ip
-
-instance MonadIO m => (Point `A.Alters` PPeer) (MonadTest m) where
-  lookup _ p = use $ pointPPeerMap . at p
-  insert _ _ _ = error "This should not be called."
-  delete _ _ = error "This should not be called."
-
-instance (MonadIO m, (Point `A.Alters` PPeer) m) => (Point `A.Alters` PPeer) (MonadP2PTest m) where
-  lookup p point = lift $ A.lookup p point
-  insert p point = lift . A.insert p point
-  delete p point = lift $ A.delete p point
-
-instance {-# OVERLAPPING #-} (MonadIO m, (Point `A.Alters` PPeer) m) => A.Selectable Point PPeer (MonadP2PTest m) where
-  select = A.lookup
-
 instance (Keccak256 `A.Alters` BlockHeader) m => (Keccak256 `A.Alters` BlockHeader) (MonadP2PTest m) where
   lookup p k = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
@@ -412,9 +372,6 @@ instance {-# OVERLAPPING #-} A.Selectable Integer (Canonical BlockHeader) m => A
 
 instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible GenesisBlockHash m) => Mod.Accessible GenesisBlockHash (MonadP2PTest m) where
   access p = lift $ Mod.access p
-
-instance {-# OVERLAPPING #-} A.Selectable String PPeer m => A.Selectable String PPeer (MonadP2PTest m) where
-  select p tx = lift $ A.select p tx
 
 instance {-# OVERLAPPING #-} A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (MonadP2PTest m) where
   select p addr = lift $ A.select p addr
@@ -740,15 +697,6 @@ instance {-# OVERLAPPING #-} MonadIO m => (MonadTest m) `Mod.Outputs` [IngestEve
     unseqSource <- asks _p2pPeerUnseqSource
     atomically . writeTQueue unseqSource $ UnseqEvents ies
 
-instance {-# OVERLAPPING #-} (MonadIO m, m `Mod.Outputs` [IngestEvent]) => (MonadP2PTest m) `Mod.Outputs` [IngestEvent] where
-  output = lift . Mod.output
-
-instance {-# OVERLAPPING #-} A.Selectable Host PPeer m => A.Selectable Host PPeer (MonadP2PTest m) where
-  select p = lift . A.select p
-
-instance (HasMemPeerDB m, State.MonadState TestContext m) => A.Replaceable Host PPeer (MonadP2PTest m) where
-  replace p k = lift . A.insert p k
-
 instance (MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m) => RunsClient (MonadP2PTest m) where
   runClientConnection ipAsText@(Host ip) tcpPort@(TCPPort p) sSource f = do
     inet <- lift $ asks _p2pPeerInternet
@@ -888,6 +836,16 @@ instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (MonadTest m) where
 instance {-# OVERLAPPING #-} Monad m => A.Selectable Address Certificate (MonadTest m) where
   select _ _ = pure Nothing
 
+instance {-# OVERLAPPING #-} ((Host, TCPPort) `A.Alters` ActivityState) m => ((Host, TCPPort) `A.Alters` ActivityState) (MonadTest m) where
+  lookup p k   = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k   = lift $ A.delete p k
+
+instance {-# OVERLAPPING #-} ((Host, TCPPort) `A.Alters` ActivityState) m => ((Host, TCPPort) `A.Alters` ActivityState) (MonadP2PTest m) where
+  lookup p k   = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k   = lift $ A.delete p k
+
 sockAddrToIpAndPort :: SockAddr -> Maybe (Host, UDPPort)
 sockAddrToIpAndPort (SockAddrInet port host) = case hostAddressToTuple host of
   (a, b, c, d) ->
@@ -924,7 +882,7 @@ instance {-# OVERLAPPING #-} (MonadReader P2PPeer m, HasMemPeerDB m) => A.Select
     myIP <- accessEnvVar p2pMyIPAddress
     pure $ ipAndPortToSockAddr myIP udpPort
 
-instance
+instance {-# OVERLAPPING #-}
   ( MonadLogger m,
     MonadReader P2PPeer m,
     HasMemPeerDB m
@@ -985,23 +943,6 @@ instance {-# OVERLAPPING #-}
 
 ------------------ extra stuff for HasPeerDB??
 
-instance (MonadIO m, HasMemPeerDB m) => A.Replaceable (Host, Point) PeerBondingState (MonadTest m) where
-  replace _ (Host ip, point) (PeerBondingState s) = do
-    A.replace Mod.Proxy (Host ip, undefined :: TCPPort) (PeerBondingState s) -- the instances for TCPPort and UDPPort just ignore the parameter and do the same thing
-    --stringPPeerMap . at (T.unpack ip) . _Just %= (\p -> p {pPeerBondState = s})
-    pointPPeerMap . at point . _Just %= (\p -> p {pPeerBondState = s})
-
-instance (Monad m, A.Replaceable (Host, Point) PeerBondingState m) => A.Replaceable (Host, Point) PeerBondingState (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance {-# OVERLAPPING #-} (MonadIO m, HasMemPeerDB m) => A.Selectable (Host, Point) PeerBondingState (MonadTest m) where
-  select _ (ip, _) = do
-    map' <- readIORef =<< fmap stringPPeerMap accessEnv
-    return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
-
-instance {-# OVERLAPPING #-} (A.Selectable (Host, Point) PeerBondingState m) => A.Selectable (Host, Point) PeerBondingState (MonadP2PTest m) where
-  select p = lift . A.select p
-
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
   access _ = do
     validatorSet <- use p2pValidators
@@ -1011,14 +952,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ValidatorAddresses (Mon
 
 instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
   access = lift . Mod.access
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
-  select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
-    where
-      f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
-
-instance {-# OVERLAPPING #-} A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
-  select p = lift . A.select p
 
 instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
   clearAllSyncTasks host = syncTasks %= map (\st@(SyncTask i t h s) -> if h == host then SyncTask i t (Host "") s else st)
@@ -1101,7 +1034,6 @@ testContext prv rNum seqCtx vmCtx =
       _blockHashRegistry = M.empty,
       _x509certMap = M.empty,
       _genesisBlockHash = GenesisBlockHash zeroHash,
-      _pointPPeerMap = M.empty,
       _pbftMessages = S.empty,
       _sequencerContext = seqCtx,
       _dbeRegistry = M.empty,

@@ -39,6 +39,7 @@ library:
   - cache
   - clock
   - core-api2
+  - conduit-extra
   - containers
   - crypto-pubkey-types
   - extra
@@ -64,6 +65,7 @@ library:
   - ethereum-discovery
   - ethereum-encryption
   - ethereum-rlp
+  - exceptions
   - hflags
   - identity-monad
   - lens
@@ -75,7 +77,9 @@ library:
   - network
   - nibblestring
   - ordered-containers
+  - prometheus-client
   - Ranged-sets
+  - resourcet
   - seqevents
   - slipstream
   - solid-vm-compiler

@@ -17,18 +17,19 @@ import Bloc.Monad
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
+import Blockchain.Strato.Model.Validator
 import qualified Data.Cache as Cache
 import qualified Data.Map.Strict as M
 import Data.Text (Text)
 import Network.Wai.Handler.Warp
-import Strato.Lite.Monad
+import Strato.Lite.Simulator
 import Strato.Lite.Options
 import Strato.Lite.Rest
 import System.Clock
 
 runStratoLite :: [(Text, Text, Text)] -> IO ()
 runStratoLite nodes' = do
-  let nodes'' = (\(a, b, c) -> (a, (b, Host c, TCPPort 30303, UDPPort 30303))) <$> nodes'
+  let nodes'' = (\(a, b, c) -> (a, (Validator b, Host c, TCPPort 30303, UDPPort 30303))) <$> nodes'
   mgr <- runNetwork nodes'' id
 
   let stateFetchLimit' = 100

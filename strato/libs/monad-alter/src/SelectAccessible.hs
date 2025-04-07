@@ -19,5 +19,8 @@ instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
 instance (Monad m, Selectable k v m, MonadTrans t) => Selectable k v (t m) where
   select p = lift . select p
 
+instance (Monad m, Replaceable k v m, MonadTrans t) => Replaceable k v (t m) where
+  replace p k = lift . replace p k
+
 instance (Monad m, Outputs m a, MonadTrans t) => Outputs (t m) a where
   output = lift . output

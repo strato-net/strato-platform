@@ -220,7 +220,7 @@ instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
-instance (MonadIO m, MonadLogger m, Mod.Accessible RBDB.RedisConnection m, MonadReader SequencerConfig m) => Mod.Modifiable BestSequencedBlock m where
+instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
       Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) []
@@ -230,13 +230,17 @@ instance (MonadIO m, MonadLogger m, Mod.Accessible RBDB.RedisConnection m, Monad
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
+instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.Modifiable BestSequencedBlock (StateT SequencerContext m) where
+  get   = lift . Mod.get
+  put p = lift . Mod.put p
+
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
 -- easier than making a whole new SequencerM definition just to get a different HasVault instance
 testPriv :: PrivateKey
 testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-instance (Monad m, MonadIO m, MonadLogger m, MonadReader SequencerConfig m) => HasVault m where
+instance (MonadIO m, MonadLogger m) => HasVault (ReaderT SequencerConfig m) where
   sign mesg = do
     mVc <- asks vaultClient
     case mVc of
@@ -245,6 +249,11 @@ instance (Monad m, MonadIO m, MonadLogger m, MonadReader SequencerConfig m) => H
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
+
+instance (MonadIO m, HasVault m) => HasVault (StateT SequencerContext m) where
+  sign      = lift . sign
+  getPub    = lift getPub
+  getShared = lift . getShared
 
 waitOnVault :: (Show a, MonadIO m, MonadLogger m) => m (Either a b) -> m b
 waitOnVault action = do

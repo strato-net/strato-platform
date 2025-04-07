@@ -49,8 +49,8 @@ instance {-# OVERLAPPING #-} Mod.Accessible AvailablePeers IO where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => A.Replaceable (Host, TCPPort) ActivityState m where
-  replace _ (host, TCPPort port) state = liftIO $ withGlobalSQLPool . runSqlPool $ do
+instance {-# OVERLAPPING #-} A.Replaceable (Host, TCPPort) ActivityState IO where
+  replace _ (host, TCPPort port) state = withGlobalSQLPool . runSqlPool $ do
     SQL.updateWhere
       [PPeerHost SQL.==. host, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
@@ -62,13 +62,13 @@ instance {-# OVERLAPPING #-} Mod.Accessible ActivePeers IO where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => (A.Replaceable (Host, Point) PeerBondingState) m where
-  replace _ (host, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable (Host, Point) PeerBondingState IO where
+  replace _ (host, point) (PeerBondingState state) = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
 
-instance MonadIO m => (A.Replaceable PPeer Point) m where
-  replace _ peer point = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable PPeer Point IO where
+  replace _ peer point = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerHost SQL.==. pPeerHost peer] [PPeerPubkey SQL.=. Just point]
 
@@ -105,22 +105,22 @@ instance {-# OVERLAPPING #-} A.Selectable Point ClosestPeers IO where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerPubkey SQL.!=. Nothing, PPeerPubkey SQL.!=. Just point] []
 
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime m where
-  replace _ peer (UdpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable PPeer UdpEnableTime IO where
+  replace _ peer (UdpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. enableTime]
 
-instance MonadIO m => A.Replaceable PPeer IP m where
-  replace _ peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable PPeer IP IO where
+  replace _ peer ip = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerIp SQL.=. Just ip]
 
-instance MonadIO m => A.Replaceable PPeer TcpEnableTime m where
-  replace _ peer (TcpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable PPeer TcpEnableTime IO where
+  replace _ peer (TcpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. enableTime]
 
-instance MonadIO m => A.Replaceable PPeer PeerDisable m where
+instance {-# OVERLAPPING #-} A.Replaceable PPeer PeerDisable IO where
   replace _ peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
     let selector = thisPeer peer
     flip runSqlPool sqldb $ case d of
@@ -140,8 +140,8 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable m where
             PPeerDisableExpiration SQL.=. disableExpiration
           ]
 
-instance MonadIO m => A.Replaceable PPeer PeerUdpDisable m where
-  replace _ peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable PPeer PeerUdpDisable IO where
+  replace _ peer d = withGlobalSQLPool $ \sqldb -> do
     let selector = thisPeer peer
     currentTime <- liftIO getCurrentTime
     flip runSqlPool sqldb $ case d of
@@ -166,13 +166,13 @@ instance MonadIO m => A.Replaceable PPeer PeerUdpDisable m where
             PPeerDisableExpiration SQL.=. currentTime
           ]
 
-instance MonadIO m => A.Replaceable PPeer T.Text m where
-  replace _ peer exception = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable PPeer T.Text IO where
+  replace _ peer exception = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
 
-instance MonadIO m => A.Replaceable T.Text PPeer m where
-  replace _ message peer = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance {-# OVERLAPPING #-} A.Replaceable T.Text PPeer IO where
+  replace _ message peer = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
 

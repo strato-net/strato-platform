@@ -473,8 +473,7 @@ type MonadP2P m =
       '[ '(Integer, Canonical BlockHeader),
          '(Address, X509CertInfoState),
          '((Host, UDPPort, B.ByteString), Point),
-         '(Host, PPeer),
-         '(Point, PPeer)
+         '(Host, PPeer)
        ]
       m,
     All2

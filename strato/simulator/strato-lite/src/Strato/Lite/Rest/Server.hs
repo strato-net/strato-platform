@@ -25,19 +25,22 @@ import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.MicroTime
+import Blockchain.Strato.Model.Validator
 import Control.Lens
-import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Resource
 import Core.API
 import Data.Bifunctor (first)
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Data.Traversable (for)
 import SQLM
 import Servant
-import Strato.Lite.Monad
+import Strato.Lite.Base.Simulator
+import Strato.Lite.Core
+import Strato.Lite.Simulator
 import Strato.Lite.Rest.Api
 import UnliftIO hiding (Handler)
 
@@ -49,71 +52,55 @@ getNodes mgr = liftIO . atomically $ do
     mExp <- fmap (first show) <$> pollSTM a
     case net ^. nodes . at n of
       Nothing -> pure $ NodeStatus "0.0.0.0" 0 0 False mExp
-      Just p -> do
-        ctx <- readTVar $ p ^. p2pTestContext
-        let mBCtx = ctx ^. sequencerContext . blockstanbulContext
+      Just (s,c) -> do
+        coreCtx <- readTVar $ c ^. corePeerContext
+        let mBCtx = coreCtx ^. sequencerContext . blockstanbulContext
             mView = _view <$> mBCtx
             rNum = maybe 0 (fromIntegral . _round) mView
             sNum = maybe 0 (fromIntegral . _sequence) mView
             isVal = maybe False _isValidator mBCtx
-            Host ip = pPeerHost $ p ^. p2pPeerPPeer
+            Host ip = s ^. simulatorPeerIPAddress
         pure $ NodeStatus ip rNum sNum isVal mExp
-
-getConnections :: NetworkManager -> Handler ThreadResultMap
-getConnections mgr = liftIO . atomically $ do
-  ths <- readTVar $ mgr ^. threads
-  let f (s, c) = "(" <> s <> "," <> c <> ")"
-  fmap (M.mapKeys f) . for (ths ^. connectionThreads) $ \a -> do
-    mExp <- pollSTM a
-    pure $ fmap (first show) mExp
 
 getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
 getPeers mgr label = do
   mPeer <- liftIO $ fmap (M.lookup label . _nodes) . readTVarIO $ mgr ^. network
   case mPeer of
     Nothing -> return []
-    Just peer -> do
-      peerMap <- liftIO $ readIORef. stringPPeerMap . _p2pPeerDB $ peer
+    Just (peer,_) -> do
+      simCtx <- liftIO . atomically . readTVar $ peer ^. simulatorPeerContext
+      peerMap <- liftIO . readIORef . stringPPeerMap $ simCtx ^. simulatorContextPeerMap
       let peers = map (\(Host h) -> h) . M.keys $ peerMap
       pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
 postAddNode mgr label (AddNodeParams ip identity bootNodes) =
-  liftIO $ runReaderT (addNode label identity (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
+  liftIO $ runReaderT (addSimulatorNode "strato-lite" label (Validator identity) (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
-postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
-
-postAddConnection :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postAddConnection mgr s c = liftIO $ runReaderT (addConnection s c) mgr
-
-postRemoveConnection :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postRemoveConnection mgr s c = liftIO $ runReaderT (removeConnection s c) mgr
+postRemoveNode mgr label = liftIO $ runReaderT (removeSimulatorNode label) mgr
 
 postTimeout :: NetworkManager -> Int -> Handler ()
 postTimeout mgr rn = do
   let ev = TimerFire $ fromIntegral rn
   peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
-  liftIO $ traverse_ (postEvent ev) peers
+  liftIO $ traverse_ (postEvent ev . snd) peers
 
 postTx :: NetworkManager -> T.Text -> PostTxParams -> Handler ()
 postTx mgr nodeLabel (PostTxParams tx md) = do
   mPeer <- liftIO $ fmap (M.lookup nodeLabel . _nodes) . readTVarIO $ mgr ^. network
-  liftIO . for_ mPeer $ \peer -> do
+  liftIO . for_ mPeer $ \(s,c) -> do
     ts <- liftIO $ getCurrentMicrotime
-    let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
+    let signedTx = mkSignedTx (s ^. simulatorPeerPrivKey) tx md
         ev = UnseqEvents [IETx ts $ IngestTx Origin.API signedTx]
-    postEvent ev peer
+    postEvent ev c
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
   getNodes mgr
-    :<|> getConnections mgr
     :<|> getPeers mgr
     :<|> postAddNode mgr
     :<|> postRemoveNode mgr
-    :<|> postAddConnection mgr
-    :<|> postRemoveConnection mgr
     :<|> postTimeout mgr
     :<|> postTx mgr
 
@@ -137,12 +124,15 @@ nodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAP
           case y of
             Right a -> pure a
             Left e -> throwE $ apiErrorToServantErr e
-    runM p f =
+    runM (s,c) f = do
+      simCtx <- liftIO . atomically . readTVar $ s ^. simulatorPeerContext
       runLoggingT
+        . runResourceT
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
-        . runMemPeerDBMUsingEnv (p^.p2pPeerDB)
-        . flip runReaderT p
+        . runMemPeerDBMUsingEnv (simCtx ^. simulatorContextPeerMap)
+        . flip runReaderT s
+        . flip runReaderT c
         $ f
 
 combinedRestServer :: NetworkManager -> BlocEnv -> UrlMap -> Server FullAPI

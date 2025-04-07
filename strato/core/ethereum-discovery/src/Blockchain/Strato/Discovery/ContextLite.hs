@@ -98,7 +98,7 @@ instance {-# OVERLAPPING #-} MonadIO m => Accessible [Validator] (ReaderT Contex
     bestSequencedBlock <- fromMaybe (error "missing BestSequencedBlock in redis") <$> RBDB.withRedisBlockDB getBestSequencedBlockInfo
     return $ bestSequencedBlockValidators bestSequencedBlock
 
-instance MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
   replace _ host peer = do
     maybePeer <- getPeerByIP host
     void . sqlQuery $ actions maybePeer
@@ -130,14 +130,14 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable IP PPeer (ReaderT C
         where
           actions = SQL.selectList [PPeerIp SQL.==. Just ip'] []
 
-instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
   replace _ addr' packet = do
     sock' <- asks sock
     liftIO $ catch
       (void $ NB.sendTo sock' packet addr')
       (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
 
-instance A.Selectable (Host, UDPPort, B.ByteString) Point IO where
+instance {-# OVERLAPPING #-} A.Selectable (Host, UDPPort, B.ByteString) Point IO where
   select _ (domain, UDPPort udpPortNum, theMsg) = catch
     (withSocketsDo $ bracket getSocket close (talk theMsg))
     (\(err :: IOError) -> runLoggingT ($logErrorS "withSocketsDo" . T.pack $ "Got error: " <> show err) >> return Nothing)
@@ -159,15 +159,15 @@ instance A.Selectable (Host, UDPPort, B.ByteString) Point IO where
         --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
         timeout 5000000 $ secPubKeyToPoint . processDataStream' <$> NB.recv socket' 2000
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT ContextLite m) where
+instance {-# OVERLAPPING #-} A.Selectable (Maybe Host, UDPPort) SockAddr IO where
   select _ (Nothing, UDPPort udpPortNum) = do
-    fmap (fmap addrAddress . listToMaybe) . liftIO $
+    fmap (fmap addrAddress . listToMaybe) $
       getAddrInfo
         (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
         Nothing
         (Just (show udpPortNum))
   select _ (Just ip, UDPPort udpPortNum) = do
-    fmap (fmap addrAddress . listToMaybe) . liftIO $ catch
+    fmap (fmap addrAddress . listToMaybe) $ catch
       (getAddrInfo
         (Just defaultHints {addrFlags = [AI_ALL]})
         (Just $ hostToString ip)
