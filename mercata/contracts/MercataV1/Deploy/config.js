@@ -23,11 +23,9 @@ const config = {
   ],
   
   // Contract configuration
-  contractsDir: process.env.CONTRACTS_DIR || '../BCC',
+  contractsDir: process.env.CONTRACTS_DIR || './BCC',
   mainFile: process.env.MAIN_FILE || 'BaseCodeCollection.sol',
-  
-  // Timeout in milliseconds
-  timeout: parseInt(process.env.TIMEOUT || '600000'),
+  appName: process.env.APP_NAME || 'Mercata',
   
   // Helper function to resolve paths
   resolvePath: (filePath) => path.resolve(process.cwd(), filePath)

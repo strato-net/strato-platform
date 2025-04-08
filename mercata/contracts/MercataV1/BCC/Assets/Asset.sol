@@ -7,7 +7,7 @@ import "../Utils/Utils.sol";
 
 import "../ERC20/extensions/ERC20Burnable.sol";
 import "../ERC20/access/Ownable.sol";
-import "../Metadata/MercataMetadata.sol";
+import "./Metadata/MercataMetadata.sol";
 
 abstract contract Asset is Utils, ERC20, ERC20Burnable, Ownable, MercataMetadata{
     string public ownerCommonName;

@@ -57,9 +57,7 @@ GLOBAL_ADMIN_PASSWORD=your-password
 # Contract Configuration
 CONTRACTS_DIR=./BCC
 MAIN_FILE=YourContract.sol  # Code collection contract file (optional)
-
-# Deployment Configuration
-TIMEOUT=600000
+APP_NAME=YourAppName        # Name of the app (optional)
 ```
 
 Required environment variables:
