@@ -53,7 +53,7 @@ genesisBlock  =
         }
 
 assetToAccountInfos :: GA.Asset -> [AccountInfo]
-assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{..} -> SolidVMContractWithStorage address 0 (CodeAtAccount 0x100 $ T.unpack assetType) $
+assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{..} -> SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 $ T.unpack assetType) $
   [ (".name", BString $ encodeUtf8 name)
   , (".description", BString $ encodeUtf8 description)
   , (".owner", BAccount $ unspecifiedChain owner)
@@ -68,7 +68,7 @@ escrowToAccountInfos :: GE.Escrow -> [AccountInfo]
 escrowToAccountInfos GE.Escrow{..} =
   if not isActive
     then []
-    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x100 "SimpleEscrow") $
+    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleEscrow") $
              [ (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
              , (".borrowedAmount", BInteger borrowedAmount)
              , (".borrower", BAccount $ unspecifiedChain borrower)
@@ -89,7 +89,7 @@ reserveToAccountInfos :: GR.Reserve -> [AccountInfo]
 reserveToAccountInfos GR.Reserve{..} =
   if not isActive
     then []
-    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x100 "SimpleReserve") $
+    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleReserve") $
              [ (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
              , (".cataAPYRate", BInteger cataAPYRate)
              , (".cataToken", BAccount $ unspecifiedChain cataToken)
