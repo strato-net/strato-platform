@@ -51,7 +51,7 @@ async function uploadDappContract(token, options) {
   const contractFilePath = findMainContractFile(contractsDir, config.mainFile);
 
   // Get contract name
-  const contractName = path.basename(contractFilePath, ".sol");
+  const contractName = config.appName;
 
   console.log(`Code collection contract file: ${contractFilePath}`);
   console.log(`Contract name: ${contractName}`);
@@ -73,9 +73,8 @@ async function uploadDappContract(token, options) {
     const deployOptions = {
       ...options,
       config,
-      history: contractName,
+      history: [contractName],
       cacheNonce: true,
-      isAsync: true,
     };
 
     // Deploy the contract
