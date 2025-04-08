@@ -20,6 +20,7 @@ import qualified Data.Aeson as JSON
 import Data.Attoparsec.ByteString as Atto
 import Data.Attoparsec.ByteString.Char8 (scientific)
 import Data.Binary
+import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Internal as BI
@@ -30,6 +31,9 @@ import Data.Hashable
 import Data.Maybe
 import Data.Scientific (isInteger, toBoundedInteger)
 import Data.String
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Generics
@@ -89,6 +93,15 @@ basicParse input =
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
         ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ C8.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
       ]
+
+textToBasicValue :: Text -> BasicValue
+textToBasicValue v =
+  let v' = fromMaybe (BString $ encodeUtf8 v)
+           $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
+         <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
+         <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
+         <|> (BInteger <$> readMaybe (T.unpack v))
+   in if isDefault v' then BDefault else v'
 
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i) = i == 0

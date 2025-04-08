@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Blockchain.GenesisBlocks.HeliumGenesisBlock (
   genesisBlock
@@ -10,6 +11,10 @@ import           Blockchain.Data.GenesisInfo
 import           Blockchain.GenesisBlocks.Contracts.CertRegistry
 import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import           Blockchain.GenesisBlocks.Contracts.Mercata
+import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
+import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
+import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
@@ -18,8 +23,11 @@ import qualified Data.Aeson                                      as JSON
 import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
+import qualified Data.Map.Strict                                 as M
 import           Data.Text                                       (Text)
+import qualified Data.Text                                       as T
 import           Data.Text.Encoding
+import           SolidVM.Model.Storable
 import           Text.RawString.QQ
 
 genesisBlock :: GenesisInfo
@@ -38,10 +46,68 @@ genesisBlock  =
               720
               (SolidVMCode "Mercata" (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts))
               []
-
-            ],
+            ] ++ concatMap assetToAccountInfos GA.assets 
+              ++ concatMap escrowToAccountInfos GE.escrows 
+              ++ concatMap reserveToAccountInfos GR.reserves,
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
+
+assetToAccountInfos :: GA.Asset -> [AccountInfo]
+assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{..} -> SolidVMContractWithStorage address 0 (CodeAtAccount 0x100 $ T.unpack assetType) $
+  [ (".name", BString $ encodeUtf8 name)
+  , (".description", BString $ encodeUtf8 description)
+  , (".owner", BAccount $ unspecifiedChain owner)
+  , (".ownerCommonName", BString $ encodeUtf8 ownerCommonName)
+  , (".quantity", BInteger quantity)
+  ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
+    ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
+    ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
+    ++ map (\(k,v) -> ("." <> encodeUtf8 (T.pack $ show k), textToBasicValue v)) (M.toList assetData)
+
+escrowToAccountInfos :: GE.Escrow -> [AccountInfo]
+escrowToAccountInfos GE.Escrow{..} =
+  if not isActive
+    then []
+    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x100 "SimpleEscrow") $
+             [ (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
+             , (".borrowedAmount", BInteger borrowedAmount)
+             , (".borrower", BAccount $ unspecifiedChain borrower)
+             , (".borrowerCommonName", BString $ encodeUtf8 borrowerCommonName)
+             , (".collateralQuantity", BInteger collateralQuantity)
+             , (".collateralValue", BInteger collateralValue)
+             , (".isActive", BBool isActive)
+             , (".lastRewardTimestamp", BInteger lastRewardTimestamp)
+             , (".maxLoanAmount", BInteger maxLoanAmount)
+             , (".reserve", BAccount $ unspecifiedChain reserve)
+             , (".totalCataReward", BInteger totalCataReward)
+             , (".liquidationAmount", BInteger liquidationAmount)
+             , (".version", BString $ encodeUtf8 version)
+             ] ++ map (\(k,v) -> (".assets[" <> encodeUtf8 (T.pack $ show k) <> "]", BAccount $ unspecifiedChain v)) (M.toList assets)
+         ]
+
+reserveToAccountInfos :: GR.Reserve -> [AccountInfo]
+reserveToAccountInfos GR.Reserve{..} =
+  if not isActive
+    then []
+    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x100 "SimpleReserve") $
+             [ (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
+             , (".cataAPYRate", BInteger cataAPYRate)
+             , (".cataToken", BAccount $ unspecifiedChain cataToken)
+             , (".isActive", BBool isActive)
+             , (".lastUpdatedOraclePrice", BDecimal . BC.pack $ show lastUpdatedOraclePrice)
+             , (".loanToValueRatio", BInteger loanToValueRatio)
+             , (".name", BString $ encodeUtf8 name)
+             , (".oracle", BAccount $ unspecifiedChain oracle)
+             , (".owner", BAccount $ unspecifiedChain owner)
+             , (".priceOfCATA", BDecimal . BC.pack $ show priceOfCATA)
+             , (".unitConversionRate", BInteger unitConversionRate)
+             , (".liquidationRatio", BInteger liquidationRatio)
+             , (".usdstToken", BAccount $ unspecifiedChain usdstToken)
+             , (".burnerAddress", BAccount $ unspecifiedChain burnerAddress)
+             , (".stratstoUSDSTFactor", BInteger stratstoUSDSTFactor)
+             , (".usdstPrice", BInteger usdstPrice)
+             ]
+         ]
 
 certStrings :: [String]
 certStrings =
