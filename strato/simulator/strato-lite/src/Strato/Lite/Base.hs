@@ -25,7 +25,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Validator
 import Blockchain.SyncDB
 import Conduit
 import Control.Monad.Catch (MonadCatch)
@@ -56,7 +55,6 @@ type MonadBase m = ( MonadFail m
                    , MonadDiscovery m
                    , (Keccak256 `A.Alters` DBDB.DependentBlockEntry) m
                    , (Address `A.Alters` X509CertInfoState) m
-                   , A.Selectable Validator X509CertInfoState m
                    , (Keccak256 `A.Alters` OutputBlock) m
                    -- , (Keccak256 `A.Alters` BlockHeader) m
                    , A.Selectable (Host, UDPPort, BC.ByteString) Point m

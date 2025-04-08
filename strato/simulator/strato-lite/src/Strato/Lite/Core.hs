@@ -94,10 +94,9 @@ import Data.Foldable (for_, toList, traverse_)
 import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import Data.Ord (Down(..))
-import qualified Data.Set as Set
 import qualified Data.Set.Ordered as S
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -603,13 +602,6 @@ instance {-# OVERLAPPING #-} MonadBase m => ((Host, TCPPort) `A.Alters` Activity
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
-
-instance {-# OVERLAPPING #-} MonadBase m => Mod.Accessible ValidatorAddresses (CoreT m) where
-  access _ = do
-    valCMPSs <- maybe [] (Set.toList . _validators) <$> use (sequencerContext . blockstanbulContext)
-    cmpsToX509 <- A.selectMany (A.Proxy @X509CertInfoState) valCMPSs
-    let valAdds = catMaybes $ (\valCMPS -> userAddress <$> cmpsToX509 M.!? valCMPS) <$> valCMPSs
-    return $ ValidatorAddresses valAdds
 
 instance {-# OVERLAPPING #-} MonadBase m => HasSyncDB (CoreT m) where
   clearAllSyncTasks   = lift . clearAllSyncTasks

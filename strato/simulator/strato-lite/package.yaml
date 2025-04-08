@@ -50,6 +50,7 @@ library:
   - unliftio
   - warp
   - base16-bytestring
+  - binary
   - blockDB
   - blockapps-data
   - blockapps-datadefs
@@ -69,6 +70,7 @@ library:
   - hflags
   - identity-monad
   - lens
+  - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
   - monad-logger

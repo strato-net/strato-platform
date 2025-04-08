@@ -943,16 +943,6 @@ instance {-# OVERLAPPING #-}
 
 ------------------ extra stuff for HasPeerDB??
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
-  access _ = do
-    validatorSet <- use p2pValidators
-    x509s <- M.elems <$> use x509certMap
-    let valAdds = map userAddress $ filter ((`Set.member` validatorSet) . Validator . T.pack . commonName) x509s
-    return $ ValidatorAddresses valAdds
-
-instance {-# OVERLAPPING #-} (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
-  access = lift . Mod.access
-
 instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MonadTest m) where
   clearAllSyncTasks host = syncTasks %= map (\st@(SyncTask i t h s) -> if h == host then SyncTask i t (Host "") s else st)
   getCurrentSyncTask host = do

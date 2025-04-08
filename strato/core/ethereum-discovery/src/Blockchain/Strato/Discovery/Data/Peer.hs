@@ -23,7 +23,6 @@ module Blockchain.Strato.Discovery.Data.Peer
     BondedPeersForUDP(..),
     ClosestPeers(..),
     UnbondedPeersForUDP(..),
-    ValidatorAddresses(..),
     buildPeer,
     createPeer,
     pointToNodeID,
@@ -64,7 +63,6 @@ import           Blockchain.DB.SQLDB                             (runSqlPool,
 import           Blockchain.MiscJSON                             ()
 import           Blockchain.Strato.Discovery.Data.PeerDefinition
 import           Blockchain.Strato.Discovery.Metrics
-import           Blockchain.Strato.Model.Address                 (Address)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
@@ -118,8 +116,6 @@ newtype UdpEnableTime = UdpEnableTime UTCTime deriving (Eq, Ord)
 newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
 
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
-
-newtype ValidatorAddresses = ValidatorAddresses {unValidatorAddresses :: [Address]}
 
 type HasPeerDB m = (
   Mod.Accessible AvailablePeers m,
