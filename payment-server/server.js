@@ -18,6 +18,7 @@ import {
   // METAMASK_CONTRACT_ADDRESS, // TODO: Disabled for initial payment server release
   REDEMPTION_CONTRACT_ADDRESS,
 } from './helpers/constants.js';
+import flagFile from "./helpers/flagFile.js";
 import routes from './routes.js';
 
 const config = {
@@ -51,7 +52,10 @@ app.use(commonErrorHandler);
 
 app.listen(config.port, async (e) => {
   if(e) {
-      throw new Error('Internal Server Error');
+    await flagFile.appendToErrorFile(
+      `Internal server error in runtime: ${e.message}`
+    );
+      throw new Error(`Internal server error in runtime: ${e.message}`);
   }
   // TODO: Disabled for initial payment server release
   // console.log(
