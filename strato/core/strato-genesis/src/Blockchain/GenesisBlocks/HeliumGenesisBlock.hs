@@ -1,24 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 module Blockchain.GenesisBlocks.HeliumGenesisBlock (
   genesisBlock
   ) where
 
-import BlockApps.X509
-import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlocks.Contracts.CertRegistry
-import Blockchain.GenesisBlocks.Contracts.GovernanceV2
-import Blockchain.GenesisBlocks.Contracts.Mercata
-import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Validator
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import Data.Text (Text)
-import Data.Text.Encoding
-import Text.RawString.QQ
+import           BlockApps.X509
+import           Blockchain.Data.GenesisInfo
+import           Blockchain.GenesisBlocks.Contracts.CertRegistry
+import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
+import           Blockchain.GenesisBlocks.Contracts.Mercata
+import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.CodePtr
+import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
+import           Blockchain.Strato.Model.Validator
+import qualified Data.Aeson                                      as JSON
+import qualified Data.ByteString                                 as B
+import qualified Data.ByteString.Char8                           as BC
+import qualified Data.ByteString.Lazy                            as BL
+import           Data.Text                                       (Text)
+import           Data.Text.Encoding
+import           Text.RawString.QQ
 
 genesisBlock :: GenesisInfo
 genesisBlock  =
@@ -30,7 +32,13 @@ genesisBlock  =
         genesisInfoGasLimit=22517998136852480000000000000000,
         genesisInfoCoinbase=Org "00000000000000000000" True,
         genesisInfoAccountInfo=[
-            NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624
+            NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624,
+            SolidVMContractWithStorage
+              0x1000
+              720
+              (SolidVMCode "Mercata" (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts))
+              []
+
             ],
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
@@ -254,7 +262,7 @@ R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
 N8txKc8G9R27ZYAUuz15zF0=
 -----END CERTIFICATE-----|]
 
-  
+
   ]
 
 extraCerts :: [X509Certificate]
