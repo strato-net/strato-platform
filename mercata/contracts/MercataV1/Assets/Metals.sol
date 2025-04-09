@@ -1,3 +1,4 @@
+
 pragma es6;
 pragma strict;
 
@@ -47,9 +48,15 @@ contract Metals is Asset, UnitOfMeasurement{
         address _metadataContract
     ) Asset (
         _name,
+        _description,
+        _images,
+        _files,
+        _fileNames,
+        _createdDate,
         _symbol,    
         _initialSupply,
-        _decimals
+        _decimals,
+        _metadataContract
         ) 
     {
         unitOfMeasurement = _unitOfMeasurement;
