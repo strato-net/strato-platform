@@ -194,12 +194,10 @@ populateStorageDBs getMetadata genesisBlock genesisChainId codeInfos = do
   forM_ codeInfos $ \(CodeInfo src mName) -> case mName of
       Just n -> do
         let srcMap = maybe (Map.singleton "" src) Map.fromList . Aeson.decode . BL.fromStrict $ T.encodeUtf8 src
-        $logInfoS "asdfasef" . T.pack $ show srcMap
         case runIdentity . runMemCompilerT $ compileSource False srcMap of
           Right cc -> do
-            $logInfoS "asdfasef" . T.pack $ show cc
             void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
-          Left e -> void $ $logInfoS "asdfasef" . T.pack $ show e
+          Left _ -> pure ()
       _ -> return ()
 
   MP.forEach sr $ \keyHash value -> do
