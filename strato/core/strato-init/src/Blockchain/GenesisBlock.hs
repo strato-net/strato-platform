@@ -62,9 +62,10 @@ import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Lazy as BL
 import Data.Functor.Identity
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
@@ -89,7 +90,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     (Ad.Address `Alters` AddressState) m,
     HasRedis m
   ) =>
-  m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
+  m ([(Ad.Address, X509CertInfoState)], [Validator], [CodeInfo], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
   genesisInfo <- getGenesisInfo
   let certs' = readCertsFromGenesisInfo genesisInfo
@@ -112,7 +113,7 @@ getGenesisBlockAndPopulateInitialMPs = do
       )
       certs'
 
-  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo
+  (extraCertInfoStates, validators, genesisInfoCodeInfo genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -130,7 +131,7 @@ initializeGenesisBlock ::
   m ()
 initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
+  (extraCertInfoStates, validators, codeInfos, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
@@ -168,7 +169,7 @@ initializeGenesisBlock = do
         )
       metadatas = Map.fromList . map rewrite $ srcInfo
       findMetadata = flip Map.lookup metadatas
-  populateStorageDBs findMetadata genesisBlock genesisChainId
+  populateStorageDBs findMetadata genesisBlock genesisChainId codeInfos
   $logInfoS "initgen" "populateStorageDBs is done"
 
 --------------------------------------
@@ -183,14 +184,26 @@ populateStorageDBs ::
   (Keccak256 -> Maybe (Map Text Text)) ->
   Block ->
   Maybe Word256 ->
+  [CodeInfo] ->
   m ()
-populateStorageDBs getMetadata genesisBlock genesisChainId = do
+populateStorageDBs getMetadata genesisBlock genesisChainId codeInfos = do
   sr <- getStateRoot genesisChainId
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
 
+  forM_ codeInfos $ \(CodeInfo src mName) -> case mName of
+      Just n -> do
+        let srcMap = maybe (Map.singleton "" src) Map.fromList . Aeson.decode . BL.fromStrict $ T.encodeUtf8 src
+        $logInfoS "asdfasef" . T.pack $ show srcMap
+        case runIdentity . runMemCompilerT $ compileSource False srcMap of
+          Right cc -> do
+            $logInfoS "asdfasef" . T.pack $ show cc
+            void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
+          Left e -> void $ $logInfoS "asdfasef" . T.pack $ show e
+      _ -> return ()
+
   MP.forEach sr $ \keyHash value -> do
-    address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
+    address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
 
     $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
 
@@ -263,12 +276,6 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
     commitSqlDiffs (statediff fullAccountDiffs)
 
-    forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
-      case (Map.lookup "src" md, Map.lookup "name" md) of
-        (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
-          Left _ -> pure ()
-        _ -> return ()
 
     _ <- produceVMEvents $ map NewAction filteredActions
     return ()

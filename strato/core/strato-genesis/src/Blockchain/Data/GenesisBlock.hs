@@ -53,28 +53,17 @@ initializeBlankStateDB = initializeBlank >> setStateDBStateRoot Nothing emptyTri
 
 putStorageTrie ::
   ( MonadLogger m,
-    HasHashDB m,
-    Mem.HasMemAddressStateDB m,
-    HasStateDB m,
-    HasRawStorageDB m,
-    HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m
+    HasRawStorageDB m
   ) =>
   Address ->
   [(BS.ByteString, BS.ByteString)] ->
   m ()
 putStorageTrie account slots = do
   mapM_ (\slot -> putRawStorageKeyVal' (account, fst slot) (snd slot)) slots
-  flushMemStorageDB
-  Mem.flushMemAddressStateDB
 
 putAccount ::
   ( MonadLogger m,
-    HasHashDB m,
-    Mem.HasMemAddressStateDB m,
-    HasStateDB m,
     HasStorageDB m,
-    HasMemStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
   AccountInfo ->
@@ -123,7 +112,7 @@ initializeStateDB ::
 initializeStateDB addressInfo = do
   initializeBlankStateDB
   mapM_ putAccount addressInfo
-  Mem.flushMemAddressStateDB
+  flushMemDBs
 
 initializeStateDBAndAccountInfos ::
   ( MonadLogger m,
