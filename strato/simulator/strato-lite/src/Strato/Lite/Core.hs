@@ -111,7 +111,6 @@ import Executable.StratoP2P
 import SelectAccessible ()
 import SolidVM.Model.CodeCollection hiding (Wei)
 import Strato.Lite.Base
-import Text.Format
 import Text.Read (readMaybe)
 import UnliftIO
 import Prelude hiding (round)
@@ -454,26 +453,19 @@ instance {-# OVERLAPPING #-} MonadBase m => A.Selectable Address AddressState (C
 
 instance {-# OVERLAPPING #-} MonadBase m => (Maybe Word256 `A.Alters` MP.StateRoot) (CoreT m) where
   lookup _ chainId = do
-    mBH <- gets $ Lens.view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
-      mSR <- gets $ Lens.view $ memDBs . stateRoots . at (bh, chainId)
-      case mSR of
-        Just sr -> pure $ Just sr
-        Nothing -> getChainStateRoot chainId bh
+    bh <- fmap (maybe zeroHash unCurrentBlockHash) . gets $ Lens.view $ memDBs . currentBlock
+    mSR <- gets $ Lens.view $ memDBs . stateRoots . at (bh, chainId)
+    case mSR of
+      Just sr -> pure $ Just sr
+      Nothing -> getChainStateRoot chainId bh
   insert _ chainId sr = do
-    mBH <- gets $ Lens.view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
-        putChainStateRoot chainId bh sr
+    bh <- fmap (maybe zeroHash unCurrentBlockHash) . gets $ Lens.view $ memDBs . currentBlock
+    modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
+    putChainStateRoot chainId bh sr
   delete _ chainId = do
-    mBH <- gets $ Lens.view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
-        deleteChainStateRoot chainId bh
+    bh <- fmap (maybe zeroHash unCurrentBlockHash) . gets $ Lens.view $ memDBs . currentBlock
+    modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
+    deleteChainStateRoot chainId bh
 
 instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Selectable` X509.X509Certificate) (CoreT m) where
   select _ k = do
@@ -877,14 +869,9 @@ corePeerSetup = do
       metadatas = M.fromList $ hashAndMd <$> srcInfo
       findMetadata = flip M.lookup metadatas
   slip <- asks _corePeerSlipstreamSource
-  $logInfoS "asdfasef" . T.pack $ format genHeader
-  $logInfoS "asdfasef" . T.pack $ show genHeader
   sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata gb Nothing (stateRoot genHeader)
-  $logInfoS "asdfasef" "here6"
   for_ sdsAndVMEs $ \(_, vmes) -> do -- TODO: statediff
-    $logInfoS "asdfasef" . T.pack $ show vmes
     atomically $ writeTQueue slip vmes
-  $logInfoS "asdfasef" "here7"
 
 corePeerSequencer :: MonadBase m => CoreT m ()
 corePeerSequencer = do

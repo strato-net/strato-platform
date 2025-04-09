@@ -32,17 +32,14 @@ import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((***))
-import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
 import Data.ByteString as BS hiding (map, zip)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Numeric
-import Text.Format
 
 initializeBlankStateDB ::
   ( (Maybe Word256 `A.Alters` StateRoot) m,
@@ -125,26 +122,6 @@ initializeStateDB addressInfo = do
   mapM_ putAccount addressInfo
   Mem.flushMemAddressStateDB
 
-initializeStateDBAndAccountInfos ::
-  ( MonadLogger m,
-    HasHashDB m,
-    Mem.HasMemAddressStateDB m,
-    HasStorageDB m,
-    HasMemStorageDB m,
-    (Maybe Word256 `A.Alters` StateRoot) m,
-    (Address `A.Alters` AddressState) m,
-    (StateRoot `A.Alters` NodeData) m
-  ) =>
-  [AccountInfo] ->
-  m ()
-initializeStateDBAndAccountInfos addressInfo = do
-  initializeStateDB addressInfo
-
-  forM_ addressInfo $ \account -> do
-    $logInfoS "initializeStateDBAndAccountInfos" . T.pack $ format account
-    putAccount account
-  Mem.flushMemAddressStateDB
-
 parseHex :: (Num a, Eq a) => String -> a
 parseHex theString =
   case readHex theString of
@@ -191,7 +168,7 @@ genesisInfoToGenesisBlock gi = do
   let codes = genesisInfoCodeInfo gi
   let accounts = genesisInfoAccountInfo gi
   initializeCodeDB "SolidVM" codes
-  initializeStateDBAndAccountInfos accounts
+  initializeStateDB accounts
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let sourceInfo = zipSourceInfo accounts codes
       bData =

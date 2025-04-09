@@ -67,7 +67,6 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - exceptions
-  - format
   - hflags
   - identity-monad
   - lens
