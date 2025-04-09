@@ -1,8 +1,8 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
-import "../../../items/contracts/Tokens.sol";
+//import <BASE_CODE_COLLECTION>;
+//import "../../../items/contracts/Tokens.sol";
 
 contract TokenPaymentService is PaymentService {
     address public tokenAddress;

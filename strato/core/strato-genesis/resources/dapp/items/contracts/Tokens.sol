@@ -1,8 +1,8 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
-import "../../mercata-base-contracts/Templates/Payments/TokenPaymentService.sol";
+//import <BASE_CODE_COLLECTION>;
+//import "../../mercata-base-contracts/Templates/Payments/TokenPaymentService.sol";
 
 /// @title A representation of Token assets
 contract Tokens is LendingToken, MinterAuthorization {

@@ -2,8 +2,8 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "../Enums/RestStatus.sol";
-import "../Utils/Utils.sol";
+//import "../Enums/RestStatus.sol";
+//import "../Utils/Utils.sol";
 
 abstract contract OracleService is Utils {
     decimal public consensusPrice;

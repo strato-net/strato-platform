@@ -12,6 +12,7 @@ import           System.FilePath       (takeFileName)
 
 filesToEmbed :: [String]
 filesToEmbed = [
+  "dapp/mercata-base-contracts/BaseCodeCollection.sol",
   "dapp/mercata-base-contracts/Templates/Assets/Asset.sol",
   "dapp/mercata-base-contracts/Templates/Assets/Mintable.sol",
   "dapp/mercata-base-contracts/Templates/Assets/SemiFungible.sol",
@@ -22,6 +23,7 @@ filesToEmbed = [
   "dapp/mercata-base-contracts/Templates/Escrows/Escrow.sol",
   "dapp/mercata-base-contracts/Templates/Escrows/SimpleEscrow.sol",
   "dapp/mercata-base-contracts/Templates/Payments/PaymentService.sol",
+  "dapp/mercata-base-contracts/Templates/Payments/TokenPaymentService.sol",
   "dapp/mercata-base-contracts/Templates/Oracles/OracleService.sol",
   "dapp/mercata-base-contracts/Templates/Redemptions/RedemptionService.sol",
   "dapp/mercata-base-contracts/Templates/Sales/Sale.sol",

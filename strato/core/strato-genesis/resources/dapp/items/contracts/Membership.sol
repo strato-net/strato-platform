@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+//import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Membership assets
 contract Membership is SemiFungible {

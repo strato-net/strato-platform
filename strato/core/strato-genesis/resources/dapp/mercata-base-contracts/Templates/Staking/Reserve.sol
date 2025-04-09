@@ -3,13 +3,13 @@ pragma strict;
 
 import <509>;
 
-import "../Assets/Asset.sol";
-import "../Escrows/Escrow.sol";
-import "../Escrows/SimpleEscrow.sol";
-import "../Oracles/OracleService.sol";
-import "../Structs/Structs.sol";
-import "../Utils/Utils.sol";
-import "MinterAuthorization.sol";
+//import "../Assets/Asset.sol";
+//import "../Escrows/Escrow.sol";
+//import "../Escrows/SimpleEscrow.sol";
+//import "../Oracles/OracleService.sol";
+//import "../Structs/Structs.sol";
+//import "../Utils/Utils.sol";
+//import "MinterAuthorization.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data

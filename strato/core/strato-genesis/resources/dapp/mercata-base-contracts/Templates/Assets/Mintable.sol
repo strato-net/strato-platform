@@ -2,8 +2,8 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "Redeemable.sol";
-import "../Enums/RestStatus.sol";
+//import "Redeemable.sol";
+//import "../Enums/RestStatus.sol";
 
 abstract contract Mintable is Redeemable {
     uint public mintableMagicNumber = 0x4d696e7461626c65; // 'Mintable'
