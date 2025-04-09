@@ -205,8 +205,9 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             else fullAddressState {addressStateContractRoot = MP.blankStateRoot}
         fullAddrStates = [(acct, fullAddressState)]
         filteredAddrStates = [(acct, filteredAddressState)]
-        toAction a d =
-          A.Action
+        toAction a d = do
+          cp <- resolveCodePtr $ codeHash d
+          pure $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock,
               A._blockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock,
@@ -221,10 +222,10 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     Nothing
                     ""
                     ""
-                    ( case codeHash d of
-                        ExternallyOwned _ -> EVM
-                        SolidVMCode _ _ -> SolidVM
-                        CodeAtAccount _ _ -> error "CodeAtAccount not supported in genesis block"
+                    ( case cp of
+                        Just (ExternallyOwned _) -> EVM
+                        Just (SolidVMCode _ _) -> SolidVM
+                        _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
                     )
                     ( case storage d of
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
@@ -234,20 +235,20 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     [A.Create]),
               A._metadata =
                 getMetadata
-                  ( case codeHash d of
-                      ExternallyOwned ch' -> ch'
-                      SolidVMCode _ ch' -> ch'
-                      CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
+                  ( case cp of
+                      Just (ExternallyOwned ch') -> ch'
+                      Just (SolidVMCode _ ch') -> ch'
+                      _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
                   ),
               A._events = S.empty,
               A._delegatecalls = S.empty
             }
         fromDiff :: Diff a 'Eventual -> a
         fromDiff (Value v) = v
-        squashMap f = map (uncurry f) . Map.toList
+        squashMap f = mapM (uncurry f) . Map.toList
 
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
-    filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList $ filteredAddrStates
+    filteredActions <- squashMap toAction =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
 
     let statediff ad =
           StateDiff
