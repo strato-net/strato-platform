@@ -287,7 +287,6 @@ populateStorageDBs' getMetadata genesisBlock genesisChainId sr = do
           Right cc -> pure . Just $ CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []
           Left _ -> pure Nothing
         _ -> pure Nothing
-    $logInfoS "asdfasef" $ T.pack $ show $ length $ ccas ++ map NewAction filteredActions
     return [(statediff fullAccountDiffs, ccas ++ map NewAction filteredActions)]
 
 bootstrapIndexer :: OutputBlock -> IO ()
