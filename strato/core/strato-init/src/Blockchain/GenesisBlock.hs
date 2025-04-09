@@ -8,6 +8,7 @@
 
 module Blockchain.GenesisBlock
   ( initializeGenesisBlock
+  , populateStorageDBs'
   )
 where
 
@@ -65,6 +66,7 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Char8 as C8
+import Data.Foldable (for_)
 import Data.Functor.Identity
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
@@ -185,9 +187,27 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
-  sr <- getStateRoot genesisChainId
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
+  sr <- getStateRoot genesisChainId
+  asdf <- populateStorageDBs' getMetadata genesisBlock genesisChainId sr
+  for_ asdf $ \(sd, vmes) -> do
+    commitSqlDiffs sd
+    void $ produceVMEvents vmes
+
+populateStorageDBs' ::
+  ( MonadLogger m,
+    HasCodeDB m,
+    HasStateDB m,
+    HasHashDB m,
+    Selectable Ad.Address AddressState m
+  ) =>
+  (Keccak256 -> Maybe (Map Text Text)) ->
+  Block ->
+  Maybe Word256 ->
+  MP.StateRoot ->
+  m [(StateDiff.StateDiff, [VMEvent])]
+populateStorageDBs' getMetadata genesisBlock genesisChainId sr = do
 
   MP.forEach sr $ \keyHash value -> do
     address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
@@ -261,17 +281,14 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               updatedAccounts = Map.empty
             }
 
-    commitSqlDiffs (statediff fullAccountDiffs)
-
-    forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
+    ccas <- fmap catMaybes . forM (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
       case (Map.lookup "src" md, Map.lookup "name" md) of
         (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
-          Left _ -> pure ()
-        _ -> return ()
-
-    _ <- produceVMEvents $ map NewAction filteredActions
-    return ()
+          Right cc -> pure . Just $ CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []
+          Left _ -> pure Nothing
+        _ -> pure Nothing
+    $logInfoS "asdfasef" $ T.pack $ show $ length $ ccas ++ map NewAction filteredActions
+    return [(statediff fullAccountDiffs, ccas ++ map NewAction filteredActions)]
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do

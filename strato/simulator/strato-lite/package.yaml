@@ -67,6 +67,7 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - exceptions
+  - format
   - hflags
   - identity-monad
   - lens
@@ -90,6 +91,7 @@ library:
   - stm-conduit
   - strato-genesis
   - strato-index
+  - strato-init
   - strato-model
   - strato-p2p
   - strato-sequencer

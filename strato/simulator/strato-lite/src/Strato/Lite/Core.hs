@@ -45,6 +45,7 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified "vm-runner" Blockchain.Event as VMEvent
 import Blockchain.Generation
+import Blockchain.GenesisBlock
 import Blockchain.MemVMContext hiding (contextGet, contextGets, contextModify, contextModify', contextPut, dbsGet, dbsGets, dbsModify, dbsModify', dbsPut, get, getMemContext, gets, modify, modify', put)
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -71,7 +72,7 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
-import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
+import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap, withCurrentBlockHash)
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
@@ -110,6 +111,7 @@ import Executable.StratoP2P
 import SelectAccessible ()
 import SolidVM.Model.CodeCollection hiding (Wei)
 import Strato.Lite.Base
+import Text.Format
 import Text.Read (readMaybe)
 import UnliftIO
 import Prelude hiding (round)
@@ -790,7 +792,7 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
   seqVmSource <- newTQueueIO
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
-  txrIndexerSource <- newTQueueIO
+  slipstreamSource <- newTQueueIO
   timerChan <- atomically newTMChan
   let validators = readValidatorsFromGenesisInfo genesisInfo
   --     extraCerts = readCertsFromGenesisInfo genesisInfo
@@ -810,7 +812,7 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
       seqVmSource
       apiIndexerSource
       p2pIndexerSource
-      txrIndexerSource
+      slipstreamSource
       coreContextTVar
 
 corePeerUnseqSink :: MonadBase m => [IngestEvent] -> CoreT m ()
@@ -829,7 +831,7 @@ corePeerSeqTimerSource = do
 corePeerSetup :: MonadBase m => CoreT m ()
 corePeerSetup = do
   genesisInfo <- asks _corePeerGenesisInfo
-  gb <- snd <$> genesisInfoToGenesisBlock genesisInfo
+  (srcInfo, gb) <- genesisInfoToGenesisBlock genesisInfo
   let genHash = rlpHash $ blockBlockData gb
   genesisBlock .= gb
   genesisBlockHash .= GenesisBlockHash genHash
@@ -841,11 +843,48 @@ corePeerSetup = do
   Mod.put (Mod.Proxy @BestSequencedBlock) bsb
   A.replace (A.Proxy @(Canonical BlockHeader)) (0 :: Integer) (Canonical $ blockBlockData gb)
   DBDB.bootstrapGenesisBlock genHash
+  let genHeader = blockBlockData gb
+      genesisOutputBlock =
+        OutputBlock
+          { obOrigin = Origin.API,
+            obBlockData = genHeader,
+            obReceiptTransactions = [],
+            obBlockUncles = []
+          }
+  MP.initializeBlank
+  withCurrentBlockHash genHash $ setStateDBStateRoot Nothing $ stateRoot genHeader
+  writeBlockSummary genesisOutputBlock
+  -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
+  -- for_ (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
+  (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot genHeader)]
+  putContextBestBlockInfo $ ContextBestBlockInfo genHash genHeader 0
+  Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
+  processNewBestBlock genHash genHeader [] -- bootstrap Bagger with genesis block
   let extraCerts = readCertsFromGenesisInfo genesisInfo
   for_ extraCerts $ \c -> do
     let cis = x509CertToCertInfoState c
         ua = userAddress cis
     A.insert (A.Proxy @X509CertInfoState) ua cis
+  
+  let hashAndMd (_, CodeInfo src name) =
+        ( hash $ Text.encodeUtf8 src,
+          M.fromList $
+            [("src", src)]
+              ++ case name of
+                Nothing -> []
+                Just n -> [("name", n)]
+        )
+      metadatas = M.fromList $ hashAndMd <$> srcInfo
+      findMetadata = flip M.lookup metadatas
+  slip <- asks _corePeerSlipstreamSource
+  $logInfoS "asdfasef" . T.pack $ format genHeader
+  $logInfoS "asdfasef" . T.pack $ show genHeader
+  sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata gb Nothing (stateRoot genHeader)
+  $logInfoS "asdfasef" "here6"
+  for_ sdsAndVMEs $ \(_, vmes) -> do -- TODO: statediff
+    $logInfoS "asdfasef" . T.pack $ show vmes
+    atomically $ writeTQueue slip vmes
+  $logInfoS "asdfasef" "here7"
 
 corePeerSequencer :: MonadBase m => CoreT m ()
 corePeerSequencer = do
@@ -867,25 +906,6 @@ corePeerVm = do
   apiIndexerSource <- asks _corePeerApiIndexSource
   p2pIndexerSource <- asks _corePeerP2pIndexSource
   slipstreamSource <- asks _corePeerSlipstreamSource
-  genBlock <- use genesisBlock
-  let genHeader = blockBlockData genBlock
-      genHash = rlpHash genHeader
-      genesisOutputBlock =
-        OutputBlock
-          { obOrigin = Origin.API,
-            obBlockData = genHeader,
-            obReceiptTransactions = [],
-            obBlockUncles = []
-          }
-  MP.initializeBlank
-  setStateDBStateRoot Nothing $ stateRoot genHeader
-  writeBlockSummary genesisOutputBlock
-  -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
-  -- for_ (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
-  (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot genHeader)]
-  putContextBestBlockInfo $ ContextBestBlockInfo genHash genHeader 0
-  Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
-  processNewBestBlock genHash genHeader [] -- bootstrap Bagger with genesis block
   runConduit $
     sourceTQueue seqVmSource
       .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)

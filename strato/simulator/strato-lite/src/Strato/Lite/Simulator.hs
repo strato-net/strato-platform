@@ -22,11 +22,12 @@ module Strato.Lite.Simulator where
 import BlockApps.X509.Certificate as X509
 import qualified Blockchain.Data.AlternateTransaction as U
 import Blockchain.Data.BlockDB ()
-import Blockchain.Data.GenesisInfo
+-- import Blockchain.Data.GenesisInfo
 import Blockchain.Data.Transaction (getSigVals)
 import Blockchain.Data.TransactionDef
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
+import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address
@@ -120,7 +121,7 @@ createSimulatorPeerAndCorePeer ::
 createSimulatorPeerAndCorePeer network' privKey selfId initialValidators' extraCerts inet name ipAsText tcpPort udpPort bootNodes valBehav = do
   simPeer <- createSimulatorPeer privKey inet ipAsText tcpPort udpPort bootNodes
   let vals = snd <$> initialValidators'
-      genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract extraCerts defaultGenesisInfo
+      genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract extraCerts Helium.genesisBlock
   corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
   pure (simPeer, corePeer)
 
