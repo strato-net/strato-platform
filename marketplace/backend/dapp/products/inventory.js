@@ -706,6 +706,7 @@ async function getStakeableProducts(admin, defaultOptions) {
         select: 'assetRootAddress',
         creator: 'in.(BlockApps,mercata_usdst)',
         isActive: 'eq.true',
+        name: 'not.like.*TEMP',
       },
     };
     const reserveResponse = await rest.search(
