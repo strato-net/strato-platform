@@ -305,13 +305,19 @@ const ItemActions = ({
 
   const LTV =
     matchedReserve?.name.toLowerCase().includes('ethst') ||
-    matchedReserve?.name.toLowerCase().includes('wbtcst')
+    matchedReserve?.name.toLowerCase().includes('wbtcst') ||
+    matchedReserve?.name.toLowerCase().includes('usdtst') ||
+    matchedReserve?.name.toLowerCase().includes('usdcst') ||
+    matchedReserve?.name.toLowerCase().includes('paxgst')
       ? 0.3
       : 0.5;
   const newMaxLoanAmount = useMemo(() => {
     if (
       matchedReserve?.name.toLowerCase().includes('ethst') ||
-      matchedReserve?.name.toLowerCase().includes('wbtcst')
+      matchedReserve?.name.toLowerCase().includes('wbtcst') ||
+      matchedReserve?.name.toLowerCase().includes('usdtst') ||
+      matchedReserve?.name.toLowerCase().includes('usdcst') ||
+      matchedReserve?.name.toLowerCase().includes('paxgst')
     ) {
       return collateralValue ? collateralValue * LTV : 0;
     } else {
