@@ -706,6 +706,7 @@ async function getStakeableProducts(admin, defaultOptions) {
         select: 'assetRootAddress',
         creator: 'in.(BlockApps,mercata_usdst)',
         isActive: 'eq.true',
+        name: 'not.like.*TEMP',
       },
     };
     const reserveResponse = await rest.search(
@@ -713,7 +714,9 @@ async function getStakeableProducts(admin, defaultOptions) {
       { name: 'BlockApps-Mercata-Reserve' },
       reserveSearchOptions
     );
-    const stakeableAssets = reserveResponse.map((asset) => asset.assetRootAddress);
+    const stakeableAssets = reserveResponse.map(
+      (asset) => asset.assetRootAddress
+    );
     if (stakeableAssets.length === 0) {
       return [];
     }
@@ -781,7 +784,7 @@ async function getStakeableProducts(admin, defaultOptions) {
           bestSalesByRoot.set(
             utxo.root,
             openSale
-              ? utxo
+              ? { ...utxo, 'BlockApps-Mercata-Sale': [openSale] }
               : { ...utxo, sale: null, 'BlockApps-Mercata-Sale': [] }
           );
         } else if (openSale) {

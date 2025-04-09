@@ -111,7 +111,7 @@ async function fetchAsset(token, args, config) {
         bestSalesByRoot.set(
           utxo.root,
           openSale
-            ? utxo
+            ? { ...utxo, 'BlockApps-Mercata-Sale': [openSale] }
             : { ...utxo, sale: null, "BlockApps-Mercata-Sale": [] }
         );
       } else if (openSale) {
