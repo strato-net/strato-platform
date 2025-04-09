@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 
 module Blockchain.GenesisBlocks.HeliumGenesisBlock (
   genesisBlock
@@ -24,6 +25,7 @@ import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
 import qualified Data.Map.Strict                                 as M
+import           Data.Maybe                                      (catMaybes)
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
@@ -62,7 +64,9 @@ assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{.
   ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
     ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
     ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
-    ++ map (\(k,v) -> ("." <> encodeUtf8 (T.pack $ show k), textToBasicValue v)) (M.toList assetData)
+    ++ catMaybes (map (\(k,v) -> ("." <> encodeUtf8 (T.pack $ show k),) <$> maybeDefault (textToBasicValue v)) (M.toList assetData))
+  where maybeDefault BDefault = Nothing
+        maybeDefault v        = Just v
 
 escrowToAccountInfos :: GE.Escrow -> [AccountInfo]
 escrowToAccountInfos GE.Escrow{..} =
