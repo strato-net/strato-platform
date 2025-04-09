@@ -264,7 +264,7 @@ const ItemActions = ({
         }
         return sum;
       }, 0)
-    : 0;
+    : inventory?.escrow?.collateralValue || 0;
 
   // Calculate borrowedAmount
   const uniqueBorrowedAddresses = new Set();
