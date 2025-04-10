@@ -11,12 +11,16 @@ const config = require('./config');
  * @returns {Promise<string>} Access token
  */
 async function getUserToken(username, password) {
+  console.log(username, password);
+  console.log(config.nodes[0].oauth);
   try {
     const oauth = await oauthUtil.init(config.nodes[0].oauth);
+    console.log(oauth);
     const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
       username,
       password
     );
+    console.log(username, password);
     const tokenField = config.nodes[0].oauth.tokenField || 'access_token';
     return tokenObj.token[tokenField];
   } catch (error) {
