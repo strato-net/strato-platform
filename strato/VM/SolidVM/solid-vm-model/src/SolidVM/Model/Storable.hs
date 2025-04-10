@@ -91,7 +91,7 @@ basicParse input =
         ("true", \[] -> Just $ BBool True),
         ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAccount $ read accountString),
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
-        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ C8.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
+        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
       ]
 
 textToBasicValue :: Text -> BasicValue
@@ -99,8 +99,8 @@ textToBasicValue v =
   let v' = fromMaybe (BString $ encodeUtf8 v)
            $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
          <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
-         <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
          <|> (BInteger <$> readMaybe (T.unpack v))
+         <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
    in if isDefault v' then BDefault else v'
 
 isDefault :: BasicValue -> Bool

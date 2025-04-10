@@ -988,7 +988,10 @@ getArrayNamesFromContract c =
    in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
-  MonadSM m =>
+  ( MonadLogger m
+  , A.Selectable Address AddressState m
+  , HasSolidStorageDB m
+  ) =>
   Address ->
   T.Text ->
   T.Text ->
