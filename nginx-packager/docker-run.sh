@@ -77,7 +77,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   else
     sed -i '/#TEMPLATE_SMD_PROD_MODE/d' /tmp/nginx.conf
-    sed -i 's/<SMD_DEV_MODE_HOST_IP>/'"$SMD_DEV_MODE_HOST_IP"'/g' /tmp/nginx.conf
+    sed -i 's/__SMD_DEV_MODE_HOST_IP__/'"$SMD_DEV_MODE_HOST_IP"'/g' /tmp/nginx.conf
   fi
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled

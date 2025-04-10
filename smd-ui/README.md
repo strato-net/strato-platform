@@ -66,7 +66,7 @@ Alternatively, this may done manually by changing the Nginx config inside the Ng
       set $is_ui "true";
       rewrite_by_lua_file  lua/openid.lua;
       proxy_set_header Accept-Encoding "";
-      proxy_pass http://<SMD_DEV_MODE_HOST_IP>:3000/;
+      proxy_pass http://__SMD_DEV_MODE_HOST_IP__:3000/;
     }
     ```
 
@@ -77,7 +77,7 @@ Alternatively, this may done manually by changing the Nginx config inside the Ng
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
       proxy_http_version 1.1;
-      proxy_pass http://<SMD_DEV_MODE_HOST_IP>:3000/sockjs-node;
+      proxy_pass http://__SMD_DEV_MODE_HOST_IP__:3000/sockjs-node;
     }
     ```
 3. Validate and reload config:
