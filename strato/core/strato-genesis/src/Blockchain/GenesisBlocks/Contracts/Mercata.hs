@@ -28,6 +28,7 @@ filesToEmbed = [
   "dapp/mercata-base-contracts/Templates/Redemptions/RedemptionService.sol",
   "dapp/mercata-base-contracts/Templates/Sales/Sale.sol",
   "dapp/mercata-base-contracts/Templates/Staking/Reserve.sol",
+  "dapp/mercata-base-contracts/Templates/Staking/SimpleReserve.sol",
   "dapp/mercata-base-contracts/Templates/Staking/MinterAuthorization.sol",
   "dapp/mercata-base-contracts/Templates/Utils/Utils.sol",
   "dapp/mercata-base-contracts/Templates/Structs/Structs.sol",

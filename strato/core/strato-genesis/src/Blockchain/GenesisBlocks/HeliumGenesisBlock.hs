@@ -62,6 +62,7 @@ assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{.
   [ (".:creator", BString $ encodeUtf8 "BlockApps")
   , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
   , (".:originAddress", BAccount $ unspecifiedChain root)
+  , (".originAddress", BAccount $ unspecifiedChain root)
   , (".name", BString $ encodeUtf8 name)
   , (".description", BString $ encodeUtf8 description)
   , (".owner", BAccount $ unspecifiedChain owner)
