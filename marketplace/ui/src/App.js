@@ -78,36 +78,30 @@ const App = () => {
   const { lastMessage } = useEventStream();
 
   useEffect(() => {
-    if (lastMessage) {
-      try {
-        const eventData = JSON.parse(lastMessage.data);
-        const eventName = eventData?.eventEvent?.eventName;
+    if (!lastMessage) return;
+    try {
+      const { data } = lastMessage;
+      const parsedData = JSON.parse(data);
+      const { eventEvent } = parsedData || {};
+      if (!eventEvent) return;
 
-        const eventArgs = eventData?.eventEvent?.eventArgs.reduce(
-          (acc, [key, value]) => {
-            acc[key] = value;
-            return acc;
-          },
-          {}
-        );
+      const { eventName, eventArgs, eventContractAddress } = eventEvent;
+      if (eventName !== 'MintedETHST') return;
 
-        const eventContractAddress = eventData?.eventEvent?.eventContractAddress;
+      // Convert eventArgs array into an object
+      const args = Object.fromEntries(eventArgs);
 
-        if (eventName === 'MintedETHST') {
-          const { amount: stakeQuantity, username: ownerCommonName } =
-            eventArgs;
+      if (user.commonName !== args.username) return;
 
-          const body = {
-            stakeQuantity: new BigNumber(stakeQuantity).toFixed(0),
-            assetAddress: eventContractAddress,
-            ownerCommonName,
-          };
+      const body = {
+        stakeQuantity: new BigNumber(args.amount).toFixed(0),
+        assetAddress: eventContractAddress,
+        ownerCommonName: args.username,
+      };
 
-          inventoryActions.stakeAfterBridge(inventoryDispatch, body);
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket event:', lastMessage.data);
-      }
+      inventoryActions.stakeAfterBridge(inventoryDispatch, body);
+    } catch (error) {
+      console.error('Error parsing WebSocket event:', lastMessage.data, error);
     }
   }, [lastMessage]);
 
