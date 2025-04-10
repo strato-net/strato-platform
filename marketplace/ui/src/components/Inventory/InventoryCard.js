@@ -112,7 +112,7 @@ const InventoryCard = ({
       : new BigNumber(inventory.saleQuantity || 0).dividedBy(
           new BigNumber(10).pow(decimals || 0)
         )
-  ).toString();
+  )
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
       new BigNumber(10).pow(decimals)
@@ -607,7 +607,7 @@ const InventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
             <p className="text-[#202020] font-semibold">
-              {saleQuantity}
+              {saleQuantity.toString()}
             </p>
           </div>
           {stakeable ? (

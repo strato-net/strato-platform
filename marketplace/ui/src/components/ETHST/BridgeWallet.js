@@ -529,8 +529,8 @@ const BridgeWalletModal = ({
         <Tabs.TabPane
           tab={
             tabKey === '1'
-              ? `Bridge ${tokenName} to Mercata`
-              : `Bridge ${tokenName} to Ethereum`
+              ? `Bridge ${tokenName.replace(/st/gi, '')} to Mercata`
+              : `Bridge ${tokenName.replace(/st/gi, '')} to Ethereum`
           }
           key="1"
         >
