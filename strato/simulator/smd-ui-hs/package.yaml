@@ -1,0 +1,111 @@
+name: smd-ui-hs
+version: 0.1.0.0
+github: "githubuser/smd-ui-hs"
+license: BSD3
+author: "Author name here"
+maintainer: "example@example.com"
+copyright: "2024 Author name here"
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description: Please see the README on GitHub at <https://github.com/githubuser/smd-ui-hs#readme>
+
+dependencies:
+  - base >= 4.7 && < 5
+  - reflex
+  - reflex-dom
+  - reflex-dom-core
+  - aeson
+  - text
+  - containers
+  - lens
+  - websockets
+  - servant
+  - servant-client
+  - servant-websockets
+  - jsaddle
+  - jsaddle-warp
+  - jsaddle-wkwebview
+  - jsaddle-dom
+  - wai
+  - wai-middleware-static
+  - wai-cors
+  - warp
+  - wai-extra
+  - bytestring
+  - filepath
+
+library:
+  source-dirs: 
+    - src
+  exposed-modules:
+    - Types.State
+    - State.Store
+    - Components.NumberCard
+    - Components.NodeCard
+    - Components.TransactionList
+    - Components.BarGraph
+    - Components.PieChart
+    - Components.ValidatorsCard
+    - Routing
+  other-modules:
+    - Paths_smd_ui_hs
+  dependencies:
+    - reflex
+    - reflex-dom
+    - reflex-dom-core
+    - aeson
+    - text
+    - containers
+    - lens
+    - websockets
+    - servant
+    - servant-client
+    - servant-websockets
+    - jsaddle
+    - jsaddle-warp
+    - jsaddle-wkwebview
+    - jsaddle-dom
+    - wai
+    - wai-middleware-static
+    - wai-cors
+    - warp
+    - wai-extra
+    - bytestring
+    - filepath
+
+executables:
+  smd-ui-hs-browser:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - smd-ui-hs
+      - jsaddle-dom
+
+  smd-ui-hs-native:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - smd-ui-hs
+      - jsaddle-wkwebview
+      - jsaddle-dom
+
+tests:
+  smd-ui-hs-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - smd-ui-hs 
