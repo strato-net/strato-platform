@@ -13,8 +13,16 @@ import { handleErrors } from '../../lib/handleErrors';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-export function getContracts(chainid, limit, offset, name) {
-  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${name ? `&name=${name}` : ''}`
+export function getContracts(chainid, limit, offset, searchTerm) {
+  const isAddress = /^0x[a-fA-F0-9]{40}$/.test(searchTerm);
+
+  const queryParam = isAddress
+    ? `&address=${searchTerm}`
+    : searchTerm
+      ? `&name=${searchTerm}`
+      : '';
+
+  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${queryParam}`;
 
   return fetch(
     url,
