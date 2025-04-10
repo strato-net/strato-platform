@@ -12,8 +12,16 @@ import "./Metadata/MercataMetadata.sol";
 abstract contract Asset is Utils, ERC20, ERC20Burnable, Ownable, MercataMetadata{
     string public ownerCommonName;
     uint8 public decimals;
+
+    MercataMetadata metadata;
+    
     constructor(
         string _name,
+        string _description,
+        string[] _images,
+        string[] _files,
+        string[] _fileNames,
+        uint _createdDate,
         string _symbol,
         uint256 _initialSupply,
         uint8 _decimals,
@@ -26,12 +34,9 @@ abstract contract Asset is Utils, ERC20, ERC20Burnable, Ownable, MercataMetadata
         metadata = MercataMetadata(_metadataContract);
         metadata.registerMetadata(address(this), _name, _description, _images, _files, _fileNames, _createdDate);
     }
-    function decimals() public view virtual override returns (uint8) {
-        return decimals;
-    }
 
-    function mint( uint256 amount) public onlyOwner {
-        _mint(owner(), amount);
+    function mint(uint256 amount) public onlyOwner {
+        _mint(owner, amount);
     }
 
 }
