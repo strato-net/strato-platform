@@ -23,7 +23,7 @@ const config = {
   ],
   
   // Contract configuration
-  contractsDir: process.env.CONTRACTS_DIR || './BCC',
+  contractsDir: `./contracts/${process.env.CONTRACT_VERSION || 'v1'}/abstract`,
   mainFile: process.env.MAIN_FILE || 'BaseCodeCollection.sol',
   appName: process.env.APP_NAME || 'Mercata',
   
