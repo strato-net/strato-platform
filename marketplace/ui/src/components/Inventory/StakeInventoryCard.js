@@ -75,11 +75,21 @@ const StakeInventoryCard = ({
     : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
     ? inventory?.quantity + (inventory?.saleQuantity || 0)
     : 0;
-  const quantity = inventory?.inventories
-    ? inventory.totalQuantity
-    : inventory?.quantity / Math.pow(10, decimals);
-    
-  const stakeQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, decimals);
+
+  // Find the reserve for this asset
+  const matchedReserve =
+    reserves?.find((r) => r.assetRootAddress === inventory.root) || null;
+
+  // Get oracle price and total quantity
+  const oraclePrice = matchedReserve?.lastUpdatedOraclePrice || 0;
+  const quantity = inventory?.totalQuantity || inventory?.quantity || 0;
+
+  // Calculate market value (simplified)
+  const marketValue = quantity * oraclePrice || 0;
+
+  const stakeQuantity =
+    (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) /
+    Math.pow(10, decimals);
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
@@ -224,8 +234,20 @@ const StakeInventoryCard = ({
             </div>
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
+                Market Value: {USDSTIcon}
+                {marketValue.toLocaleString('en-US', {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 0,
+                })}
+              </Typography>
+            </div>
+            <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
+              <Typography className="lg:pt-1 flex gap-1">
                 Borrowed Amount: {USDSTIcon}
-                {(borrowAmount / Math.pow(10, 18)).toFixed(2)}
+                {(borrowAmount / Math.pow(10, 18)).toLocaleString('en-US', {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 0,
+                })}
               </Typography>
             </div>
           </div>
@@ -309,7 +331,9 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
-            {((inventory.totalQuantity || 0) / Math.pow(10, decimals)).toLocaleString('en-US', {
+              {(
+                (inventory.totalQuantity || 0) / Math.pow(10, decimals)
+              ).toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               })}
@@ -327,10 +351,13 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Staked </p>
             <p className="text-[#202020] font-semibold">
-              {(collateralQuantity / Math.pow(10, decimals)).toLocaleString('en-US', {
-                maximumFractionDigits: 6,
-                minimumFractionDigits: 0,
-              }) || 'N/A'}
+              {(collateralQuantity / Math.pow(10, decimals)).toLocaleString(
+                'en-US',
+                {
+                  maximumFractionDigits: 6,
+                  minimumFractionDigits: 0,
+                }
+              ) || 'N/A'}
             </p>
           </div>
         </div>

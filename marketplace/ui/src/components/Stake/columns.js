@@ -29,7 +29,7 @@ export const aggregateStakeColumns = (
       render: (_, record) => {
         const uniqueBorrowedAddresses = new Set();
 
-        let borrowedAmount = record?.inventories
+        const borrowedAmount = record?.inventories
           ? record.inventories.reduce((sum, item) => {
               const escrowAddress = item?.escrow?.address;
               const borrowedValue = item?.escrow?.borrowedAmount || 0;
@@ -46,6 +46,17 @@ export const aggregateStakeColumns = (
               return sum;
             }, 0)
           : record?.escrow?.borrowedAmount || 0;
+
+        // Find the reserve for this asset
+        const matchedReserve =
+          reserves?.find((r) => r.assetRootAddress === record.root) || null;
+
+        // Get oracle price and total quantity
+        const oraclePrice = matchedReserve?.lastUpdatedOraclePrice || 0;
+        const totalQuantity = record.totalQuantity || 0;
+
+        // Calculate market value (simplified)
+        const marketValue = totalQuantity * oraclePrice || 0;
 
         return (
           <>
@@ -72,9 +83,23 @@ export const aggregateStakeColumns = (
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              Borrowed Amount: {USDSTIcon}
-              {(borrowedAmount / Math.pow(10, 18)).toFixed(2)}
+            <div className="grid grid-cols-2 text-xs gap-12 whitespace-nowrap overflow-visible mt-2 relative z-10">
+              <div className="flex items-center justify-start gap-1">
+                Market Value:
+                {USDSTIcon}
+                {marketValue.toLocaleString('en-US', {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 0,
+                })}
+              </div>
+              <div className="flex items-center justify-start gap-1">
+                Borrowed Amount:
+                {USDSTIcon}
+                {(borrowedAmount / Math.pow(10, 18)).toLocaleString('en-US', {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 0,
+                })}
+              </div>
             </div>
           </>
         );
@@ -84,7 +109,11 @@ export const aggregateStakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        return <div>{(record.totalQuantity || 0) / Math.pow(10, record.decimals)}</div>;
+        return (
+          <div>
+            {(record.totalQuantity || 0) / Math.pow(10, record.decimals)}
+          </div>
+        );
       },
     },
     {
@@ -117,7 +146,8 @@ export const aggregateStakeColumns = (
             return sum;
           }, 0) + record.totalSaleQuantity;
         const stakeableQuantity =
-          (record.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, record.decimals);
+          (record.totalQuantity - collateralQuantity - quantityNotAvailable) /
+          Math.pow(10, record.decimals);
         return <div>{stakeableQuantity}</div>;
       },
     },
@@ -125,9 +155,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = assetsWithEighteenDecimalPlaces.includes(record.root)
+          ? 18
+          : record.decimals || 0;
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -145,11 +175,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        return (
-          <div>
-            {collateralQuantity / Math.pow(10, decimals)}
-          </div>
-        );
+        return <div>{collateralQuantity / Math.pow(10, decimals)}</div>;
       },
     },
     {
@@ -335,10 +361,10 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
-        const displayedQuantity = record.quantity / Math.pow(10, decimals)
+        const decimals = assetsWithEighteenDecimalPlaces.includes(record.root)
+          ? 18
+          : record.decimals || 0;
+        const displayedQuantity = record.quantity / Math.pow(10, decimals);
         return <div>{displayedQuantity || 0}</div>;
       },
     },
@@ -357,9 +383,9 @@ export const stakeColumns = (
             return true;
           }
         };
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = assetsWithEighteenDecimalPlaces.includes(record.root)
+          ? 18
+          : record.decimals || 0;
         // Parse quantity safely
         const parsedQuantity = parseFloat(record.quantity) || 0;
         const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
@@ -396,14 +422,10 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
-        return (
-          <div>
-            { matchingQuantity / Math.pow(10, decimals) }
-          </div>
-        );
+        const decimals = assetsWithEighteenDecimalPlaces.includes(record.root)
+          ? 18
+          : record.decimals || 0;
+        return <div>{matchingQuantity / Math.pow(10, decimals)}</div>;
       },
     },
     {

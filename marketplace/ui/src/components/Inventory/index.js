@@ -415,6 +415,16 @@ const Inventory = ({ user }) => {
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
         const borrowedAmount = record?.escrow?.borrowedAmount || 0;
+        // Find the reserve for this asset
+        const matchedReserve =
+          reserves?.find((r) => r.assetRootAddress === record.root) || null;
+
+        // Get oracle price and total quantity
+        const oraclePrice = matchedReserve?.lastUpdatedOraclePrice || 0;
+        const totalQuantity = record.quantity || 0;
+
+        // Calculate market value (simplified)
+        const marketValue = totalQuantity * oraclePrice || 0;
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -432,7 +442,7 @@ const Inventory = ({ user }) => {
                 <img
                   src={
                     record['BlockApps-Mercata-Asset-images'] &&
-                      record['BlockApps-Mercata-Asset-images'].length > 0
+                    record['BlockApps-Mercata-Asset-images'].length > 0
                       ? record['BlockApps-Mercata-Asset-images'][0].value
                       : image_placeholder
                   }
@@ -440,7 +450,7 @@ const Inventory = ({ user }) => {
                   className="rounded-md w-full h-full object-contain"
                 />
               </div>
-              <div>
+              <div className="max-w-[150px]">
                 <span
                   className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
                   onClick={callDetailPage}
@@ -454,12 +464,24 @@ const Inventory = ({ user }) => {
               </div>
             </div>
             {isStakeable && (
-              <>
-                <div className="flex items-center gap-2">
-                  Borrowed Amount: {USDSTIcon}
-                  {(borrowedAmount / Math.pow(10, 18)).toFixed(2)}
+              <div className="relative flex text-xs mt-2 z-10">
+                <div className="flex items-center justify-start gap-1 whitespace-nowrap">
+                  Market Value:
+                  {USDSTIcon}
+                  {marketValue.toLocaleString('en-US', {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 0,
+                  })}
                 </div>
-              </>
+                <div className="absolute left-44 flex items-center justify-start gap-1 whitespace-nowrap">
+                  Borrowed Amount:
+                  {USDSTIcon}
+                  {(borrowedAmount / Math.pow(10, 18)).toLocaleString('en-US', {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 0,
+                  })}
+                </div>
+              </div>
             )}
           </>
         );
@@ -484,8 +506,8 @@ const Inventory = ({ user }) => {
           ? stratsAddress === record.originAddress
             ? parseFloat(record.price * 100).toFixed(2)
             : is18DecimalPlaces
-              ? parseFloat(record.price * 10 ** 18).toFixed(2)
-              : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
+            ? parseFloat(record.price * 10 ** 18).toFixed(2)
+            : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
           : 'N/A';
         return (
           <div>
@@ -515,10 +537,10 @@ const Inventory = ({ user }) => {
           stratsAddress === record.originAddress
             ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
             : is18DecimalPlaces
-              ? new BigNumber(record.quantity).dividedBy(
+            ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
-              : new BigNumber(record.quantity).dividedBy(
+            : new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(record.decimals || 0)
               )
         )
@@ -541,10 +563,10 @@ const Inventory = ({ user }) => {
           stratsAddress === record.originAddress
             ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
             : is18DecimalPlaces
-              ? new BigNumber(record.saleQuantity || 0).dividedBy(
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-              : new BigNumber(record.saleQuantity || 0).dividedBy(
+            : new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(record.decimals || 0)
               )
         ).toString();
@@ -597,8 +619,8 @@ const Inventory = ({ user }) => {
               <p className="text-[#4D4D4D] text-[13px]">Retired</p>
             </div>
           ) : (record.data.isMint &&
-            record.data.isMint === 'False' &&
-            record.quantity === 0) ||
+              record.data.isMint === 'False' &&
+              record.quantity === 0) ||
             (!record.data.isMint && record.quantity === 0) ? (
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
