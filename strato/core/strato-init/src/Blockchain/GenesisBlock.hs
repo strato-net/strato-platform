@@ -17,7 +17,6 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.BlockDB
 import Blockchain.CertificateDB
-import Blockchain.DB.AddressStateDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
@@ -34,7 +33,6 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.Database.MerklePatricia.ForEach as MP
 import Blockchain.EthConf
 import Blockchain.Generation
   ( readCertsFromGenesisInfo,
@@ -53,7 +51,6 @@ import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Util
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
@@ -68,8 +65,6 @@ import Control.Monad.Change.Alter (Alters, Selectable)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import Data.Foldable (for_)
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
@@ -96,7 +91,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     (Ad.Address `Alters` AddressState) m,
     HasRedis m
   ) =>
-  m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
+  m ([(Ad.Address, X509CertInfoState)], [Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
   genesisInfo <- getGenesisInfo
   let certs' = readCertsFromGenesisInfo genesisInfo
@@ -119,7 +114,7 @@ getGenesisBlockAndPopulateInitialMPs = do
       )
       certs'
 
-  (extraCertInfoStates, validators,) <$> genesisInfoToGenesisBlock genesisInfo
+  (extraCertInfoStates, validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -137,7 +132,7 @@ initializeGenesisBlock ::
   m ()
 initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
+  (extraCertInfoStates, validators, genesisInfo, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
@@ -175,7 +170,7 @@ initializeGenesisBlock = do
         )
       metadatas = Map.fromList . map rewrite $ srcInfo
       findMetadata = flip Map.lookup metadatas
-  populateStorageDBs findMetadata genesisBlock genesisChainId
+  populateStorageDBs findMetadata genesisInfo genesisBlock genesisChainId
   $logInfoS "initgen" "populateStorageDBs is done"
 
 --------------------------------------
@@ -189,18 +184,25 @@ populateStorageDBs ::
     HasStorageDB m
   ) =>
   (Keccak256 -> Maybe (Map Text Text)) ->
+  GenesisInfo ->
   Block ->
   Maybe Word256 ->
   m ()
-populateStorageDBs getMetadata genesisBlock genesisChainId = do
+populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   sr <- getStateRoot genesisChainId
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
 
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
-  MP.forEach sr $ \keyHash value -> do
-    address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
+  let acctInfoAddress (NonContract a _) = a
+      acctInfoAddress (ContractNoStorage a _ _) = a
+      acctInfoAddress (ContractWithStorage a _ _ _) = a
+      acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
+      addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
+  for_ addresses $ \address -> do
+    -- address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
+    fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
     $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
 
@@ -208,7 +210,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     --since this contract has giant arrays that would choke strato
     --(yes, this temprary feature is hardcoded into the whole platform for one client)
     let acct = address
-        fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
+        -- fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
         filteredAddressState =
           if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
             then fullAddressState
