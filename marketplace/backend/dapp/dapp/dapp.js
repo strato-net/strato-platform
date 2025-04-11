@@ -2318,7 +2318,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.stakeAfterBridge = async function (args, options = defaultOptions) {
-    const { assetAddress, ownerCommonName, stakeQuantity } = args;
+    const { assetRootAddress, ownerCommonName, eventTxHash } = args;
 
     // Use the MercataETHBridge address to find the Reserve address
     const CREATOR = 'in.(BlockApps,mercata_usdst)';
@@ -2328,7 +2328,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       query: {
         creator: CREATOR,
         isActive: IS_ACTIVE,
-        assetRootAddress: `eq.${assetAddress}`,
+        assetRootAddress: `eq.${assetRootAddress}`,
       },
     };
 
@@ -2361,26 +2361,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         : constants.zeroAddress;
 
     // Find the user's latest Asset with the MercataETHBridge address
-    const assetQueryArgs = {
+    const assetSearchOptions = {
       ownerCommonName: ownerCommonName,
-      originAddress: assetAddress,
-      status: ASSET_STATUS.ACTIVE,
-      queryOptions: { select: 'address,quantity' },
-      notEqualsField: 'quantity',
-      notEqualsValue: '0',
-      order: 'block_timestamp.desc',
+      root: `eq.${assetRootAddress}`,
+      address: `neq.${assetRootAddress}`,
+      queryOptions: { select: 'address,quantity::text' },
+      transaction_hash: `eq.${eventTxHash}`,
       limit: 1,
     };
-    const assets = await inventoryJs.getAll(rawAdmin, assetQueryArgs, options);
+    const assets = await rest.searchUntil(
+      rawAdmin,
+      { name: 'BlockApps-Mercata-Asset' },
+      (r) => r.length === 1,
+      assetSearchOptions
+    );
 
     const asset = assets[0];
 
-    // Stake the Asset 
+    // Stake the Asset
     const stakeArgs = {
       reserve,
       escrowAddress,
       assets: [asset.address],
-      collateralQuantity: stakeQuantity,
+      collateralQuantity: asset.quantity,
     };
     return await reserveJs.stake(rawAdmin, stakeArgs, options);
   };

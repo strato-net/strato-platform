@@ -189,13 +189,9 @@ class ReserveController {
 
   static validateStakeAfterBridgeArgs(args) {
     const schema = Joi.object({
-      stakeQuantity: Joi.string().pattern(/^\d+$/).required().messages({
-        'any.required': 'Stake Quantity is required and must be a string.',
-        'string.base': 'Stake Quantity must be a valid string.',
-        'string.pattern.base': 'Stake Quantity must be a valid number.',
-      }),
+      eventTxHash: Joi.string().required(),
+      assetRootAddress: Joi.string().required(),
       ownerCommonName: Joi.string().required(),
-      assetAddress: Joi.string().required(),
     });
     ReserveController.validateArgs(args, schema, 'Stake');
   }

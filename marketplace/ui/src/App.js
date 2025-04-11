@@ -82,8 +82,10 @@ const App = () => {
     try {
       const { data } = lastMessage;
       const parsedData = JSON.parse(data);
-      const { eventEvent } = parsedData || {};
-      if (!eventEvent) return;
+      // TODO: Remove this log when we are in production
+      console.log('WebSocket event:', parsedData);
+      const { eventEvent, eventTxHash } = parsedData || {};
+      if (!eventEvent || !eventTxHash) return;
 
       const { eventName, eventArgs, eventContractAddress } = eventEvent;
       if (eventName !== 'MintedETHST') return;
@@ -94,8 +96,8 @@ const App = () => {
       if (user.commonName !== args.username) return;
 
       const body = {
-        stakeQuantity: new BigNumber(args.amount).toFixed(0),
-        assetAddress: eventContractAddress,
+        eventTxHash,
+        assetRootAddress: eventContractAddress,
         ownerCommonName: args.username,
       };
 
