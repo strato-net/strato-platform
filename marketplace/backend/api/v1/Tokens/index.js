@@ -13,25 +13,25 @@ router.post(
   TokensController.create
 );
 
-router.get(
-  Tokens.getETHSTAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getETHSTAddress
-);
-
-router.get(
-  Tokens.getWBTCSTAddress,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  TokensController.getWBTCSTAddress
-);
-
 router.post(
   Tokens.addHash,
   authHandler.authorizeRequest(),
   loadDapp,
   TokensController.addHash
 )
+
+router.post(
+  Tokens.bridgeOut,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  TokensController.bridgeOut
+);
+
+router.get(
+  Tokens.getBridgeableTokens,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  TokensController.getBridgeableTokens
+);
 
 export default router;

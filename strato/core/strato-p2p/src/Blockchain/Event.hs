@@ -1,16 +1,16 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Blockchain.Event
   ( module Blockchain.EventModel,
@@ -18,52 +18,57 @@ module Blockchain.Event
   )
 where
 
-import BlockApps.Crossmon (recordMaxBlockNumber)
-import BlockApps.Logging
-import BlockApps.X509.Certificate as XC
-import Blockchain.Blockstanbul (blockstanbulSender, WireMessage)
-import Blockchain.Context
-import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader (BlockHeader)
-import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.PubKey
-import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.Data.Transaction
-import Blockchain.Data.Wire
-import Blockchain.EventException
-import Blockchain.EventModel
-import Blockchain.Options
-import Blockchain.Sequencer.Event
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.MicroTime
-import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Verification
-import Control.Arrow (second, (&&&))
-import Control.Monad
-import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify hiding (awaitForever, get, put, yield)
-import qualified Control.Monad.Change.Modify as Mod (get, put)
-import Control.Monad.IO.Class
-import Control.Monad.State
-import qualified Data.ByteString.Base16 as BC16
-import qualified Data.ByteString.Char8 as BS8
-import Data.Conduit
-import Data.List hiding (insert, lookup)
-import qualified Data.Map.Strict as M
-import Data.Maybe
-import qualified Data.Set as S
-import qualified Data.Text as T
-import Data.Time.Clock
-import Debug.Trace (trace)
-import Text.Format
-import Text.Printf
-import Text.Tools
-import UnliftIO.Exception
-import Prelude hiding (lookup)
+import           BlockApps.Logging
+import           BlockApps.X509.Certificate            as XC
+import           Blockchain.Blockstanbul               (WireMessage,
+                                                        blockstanbulSender)
+import           Blockchain.Context
+import           Blockchain.Data.Block
+import           Blockchain.Data.BlockHeader           (BlockHeader)
+import qualified Blockchain.Data.BlockHeader           as BlockHeader
+import           Blockchain.Data.Control               (P2PCNC (..))
+import           Blockchain.Data.PubKey
+import           Blockchain.Data.Transaction
+import qualified Blockchain.Data.TXOrigin              as Origin
+import           Blockchain.Data.Wire
+import           Blockchain.EventException
+import           Blockchain.EventModel
+import           Blockchain.HeaderCache
+import           Blockchain.Model.SyncState
+import           Blockchain.Model.SyncTask
+import           Blockchain.Model.WrappedBlock
+import           Blockchain.Options
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Address       (Address)
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.MicroTime
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.SyncDB
+import           Control.Arrow                         (second, (&&&))
+import           Control.Monad
+import           Control.Monad.Change.Alter
+import           Control.Monad.Change.Modify           hiding (awaitForever,
+                                                        get, put, yield)
+import qualified Control.Monad.Change.Modify           as Mod (get, put)
+import           Control.Monad.IO.Class
+import           Control.Monad.State
+import qualified Data.ByteString.Base16                as BC16
+import qualified Data.ByteString.Char8                 as BS8
+import           Data.Conduit
+import           Data.List                             hiding (insert, lookup)
+import qualified Data.Map.Strict                       as M
+import           Data.Maybe
+import qualified Data.Text                             as T
+import           Data.Time.Clock
+import           Debug.Trace                           (trace)
+import           Prelude                               hiding (lookup)
+import           Text.Format
+import           Text.Printf
+--import           Text.ShortDescription
+import           Text.Tools
+import           UnliftIO.Exception
 
 -- drop every n-th element from the list
 -- e.g. skipEntries 0 [1..20] => [1..20]
@@ -75,14 +80,14 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
   where
     helper xs' = case drop n xs' of
       (y : ys) -> y : helper ys
-      [] -> []
+      []       -> []
 
 peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
   where
     key = p2s (pPeerPubkey peer)
     p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
-    p2s _ = ""
+    p2s _        = ""
 
 yieldR :: Monad m => a -> ConduitT i (Either e a) m ()
 yieldR = yield . Right
@@ -96,7 +101,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
-    $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ (intercalate "\n" (format <$> txs))
+    $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
     lift stampActionTimestamp
     let txo = Origin.PeerString (peerString peer)
     ts <- liftIO getCurrentMicrotime
@@ -104,7 +109,7 @@ handleEvents peer = awaitForever $ \case
     yieldL $ ToUnseq ingestTxs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
-    $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock"
+    $logInfoS "handleEvents/NewBlock" "newBlock"
     let sha = blockHash block'
     let header = blockHeader block'
     let num = blockHeaderBlockNumber header
@@ -114,36 +119,33 @@ handleEvents peer = awaitForever $ \case
     parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
-        BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
-        let bestBlockNum = numberFromBestBlock bestBlock
-            fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
+        BestSequencedBlock _ bestBlockNum _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+        let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-        $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
+        $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
         syncFetch Forward fetchNumber
       Just _ -> do
         let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
         yieldL $ ToUnseq [ingestBlock]
   MsgEvt (NewBlockHashes _) -> do
     lift stampActionTimestamp
-    BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    let bestBlockNum = numberFromBestBlock bestBlock
+    BestSequencedBlock _ bestBlockNum _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
     $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
     syncFetch Forward fetchNumber
   MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
     lift stampActionTimestamp
     start' <- case dir of
-      Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
+      Reverse -> return $ if start > fromIntegral max' then start - fromIntegral max' else 1
       Forward -> return start
-    mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
     -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
     -- 3/4s of the blocks will be dropped when creating the blockheaders
     -- so we overcompensate here.
-    let count = (1 + skip') * min mrh max'
+    let count = (1 + skip') * min flags_maxReturnedHeaders max'
     chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
-        T.concat $
+        T.concat
           [ "Warning: A peer requested blocks starting at #",
             T.pack $ show start,
             ", but we don't have these in our canonical chain....",
@@ -164,53 +166,24 @@ handleEvents peer = awaitForever $ \case
                 if num > fromIntegral max'
                   then num - fromIntegral max'
                   else 1
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        let count = (1 + skip') * min mrh (fromIntegral max')
+        let count = (1 + skip') * min flags_maxReturnedHeaders (fromIntegral max')
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
-    let headers = morphBlockHeader <$> bHeaders
-    --- put bheaders log right here
     lift stampActionTimestamp
-    -- check if blockheaders we recieved have parents.
-    let parents = map BlockHeader.parentHash headers
-    existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
-    let missingParents = S.fromList parents S.\\ (M.keysSet existingParents `S.union` S.fromList (blockHeaderHash <$> bHeaders))
-    unless (S.null missingParents) $ do
-      BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
-      let fetchNumber = numberFromBestBlock bestBlock + 1
-      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-      if M.null existingParents
-        then syncFetch Forward fetchNumber
-        else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
-    
-    alreadyRequestedHeaders <- lift getBlockHeaders -- check what already requested
-    alreadyRequestedRemainingHeaders <- lift getRemainingBHeaders
-    let headerHashes = map (blockHeaderHash &&& id) headers
-        hashes = map fst headerHashes
-    headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockHeader) hashes
-    let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
-        (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
-    case (alreadyRequestedHeaders, alreadyRequestedRemainingHeaders) of
-      ([], _) -> do
-        -- proceed if we are not already requesting bodies
-        lift $ putBlockHeaders neededHeaders'
-        lift $ putRemainingBHeaders remainingHeaders
-        $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
-        unless (null neededHeaders') $ do 
-          yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
-        lift stampActionTimestamp
-      (_, []) -> do
-        lift $ putRemainingBHeaders neededHeaders -- save it to handle later
-        $logInfoS "handleEvents/BlockHeaders" $ 
-          "Not requesting BlockBodies because cache is currently in use, but will request after next batch of BlockBodies arrives."
-      (_, _) -> $logInfoS "handleEvents/BlockHeaders" $
-          T.unlines
-            [ "Tried to request more block bodies but it seems the block headers cache is currenlty being used.",
-              "If this message shows up a lot but the node's best block # doesn't increase,",
-              "there might be something wrong with the cache."
-            ]
+
+    let headers = morphBlockHeader <$> bHeaders
+
+    bodyRequestAlreadyActive <- lift isBodyRequestActive
+
+    lift $ addToHeaderCache headers
+
+    unless bodyRequestAlreadyActive $ do
+      bodyHashes' <- lift getBodiesToFetch
+      yieldR $ GetBlockBodies bodyHashes'
+
+
+
 
   -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
   -- todo: e.g. if they have bodies for Keccak256s [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
@@ -227,8 +200,7 @@ handleEvents peer = awaitForever $ \case
     yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
   MsgEvt (GetBlockBodies shas') -> do
     lift stampActionTimestamp
-    mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-    let shas = take mrh shas'
+    let shas = take flags_maxReturnedHeaders shas'
     lift (getUntilMissing shas) >>= \bodies -> do
       yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
     where
@@ -252,32 +224,51 @@ handleEvents peer = awaitForever $ \case
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
-  MsgEvt (BlockBodies []) -> do 
-    lift stampActionTimestamp
-    lift $ putBlockHeaders [] -- clear cache for other threads
-    lift $ putRemainingBHeaders []
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
-    headers <- lift getBlockHeaders
-    let verified = and $ zipWith (\h b -> BlockHeader.transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
-    unless verified $ error "headers don't match bodies"
-    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
-    unless (null headers) $ recordMaxBlockNumber "p2p_block_bodies" . maximum $ map BlockHeader.number headers
-    let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
+
+    blocks' <- lift $ recombineBlocksFromCache bodies
+
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
-    rHeaders <- lift getRemainingBHeaders
-    let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
-    lift $ putBlockHeaders neededHeaders
-    lift $ putRemainingBHeaders remainingHeaders
-    if null neededHeaders
-      then do
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        let sortedHeaders = sortOn blockHeaderBlockNumber headers
-        yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last sortedHeaders) mrh 0 Forward
-        lift stampActionTimestamp
+
+    currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+    let maxBlockNumber :: Integer
+        maxBlockNumber = maximum $ map (BlockHeader.number . blockBlockData) blocks'
+
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+
+    maybeFetchNumber <-
+        if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
+          then do
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
+            lift $ setSyncTaskFinished (pPeerHost peer)
+
+            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+
+            syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
+            return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
+          else do
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
+            return $ Just $ maxBlockNumber + 1
+
+    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: maybeFetchNumber is " ++ show maybeFetchNumber
+
+    bodyHashes' <- lift getBodiesToFetch
+
+    if null bodyHashes'
+      then do -- all the block bodies have been sent, let's try to download more headers
+      case maybeFetchNumber of
+        Nothing ->
+          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
+        Just fetchNumber | fetchNumber <= worldNumber -> syncFetch Forward fetchNumber
+        _ -> do
+          currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
+          lift $ setSyncTaskNotReady (pPeerHost peer)
       else do
-        yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
-        lift stampActionTimestamp
+        yieldR $ GetBlockBodies bodyHashes'
+
   MsgEvt (Blockstanbul wm) -> do
     lift $ do
       stampActionTimestamp
@@ -316,7 +307,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (MPNodes nds) -> do
     yieldL $ ToUnseq [IEMPNodesReceived nds]
   MsgEvt (Disconnect _) -> do
-    $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
+    $logInfoS "handleEvents/Disconnect" "Disconnect event received in Event handler"
     throwIO PeerDisconnected
   NewSeqEvent oe -> case oe of
     P2pBlock b -> do
@@ -331,7 +322,7 @@ handleEvents peer = awaitForever $ \case
         $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx)
         $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
         yieldR $ Transactions [otBaseTx tx]
-        
+
     P2pBlockstanbul msg -> do
       {-
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
@@ -384,8 +375,7 @@ handleEvents peer = awaitForever $ \case
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        let count = min mrh . fromIntegral $ end - start + 1
+        let count = min flags_maxReturnedHeaders . fromIntegral $ end - start + 1
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start ..]
         when (null chain) $
           $logErrorS "handleEvents/P2pPushBlocks" . T.pack $
@@ -399,14 +389,27 @@ handleEvents peer = awaitForever $ \case
     P2pGetMPNodes srs -> yieldR $ GetMPNodes srs
     P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    syncDone <- return $ Just False -- RBDB.withRedisBlockDB $ getSyncStatus
+    unless (syncDone == Just True) $ do
+      maybeSyncTask <- lift $ getCurrentSyncTask $ pPeerHost peer
+      case maybeSyncTask of
+        Just _ -> return () -- Already have a task, do nothing
+        Nothing -> do
+          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+          maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+          $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
+          case maybeNewSyncTask of
+            Nothing -> return ()
+            Just syncTask -> syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
       Just oldTS -> do
         ts <- liftIO getCurrentTime
         let diffTime = ts `diffUTCTime` oldTS
-        maxTime <- fromIntegral . unConnectionTimeout <$> lift (access (Proxy @ConnectionTimeout))
-        liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
-        when (diffTime > maxTime) $ do
+        liftIO $ setTitle $ "timer: " ++ show (fromIntegral flags_connectionTimeout - diffTime)
+        when (diffTime > fromIntegral flags_connectionTimeout) $ do
           yieldR $ Disconnect UselessPeer
           liftIO $ setTitle "timer timed out!"
           throwIO PeerNonResponsive
@@ -419,26 +422,21 @@ handleEvents peer = awaitForever $ \case
     yieldR $ Disconnect AlreadyConnected
   event -> liftIO . error $ "unrecognized event: " ++ show event
 
-numberFromBestBlock :: BestBlock -> Integer
-numberFromBestBlock (BestBlock _ n) = n
-
 syncFetch ::
   ( MonadIO m,
-    Modifiable ActionTimestamp m,
-    Accessible MaxReturnedHeaders m
+    Modifiable ActionTimestamp m
   ) =>
   Direction ->
   Integer ->
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
-  mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-  yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
+  yieldR $ GetBlockHeaders (BlockNumber num) flags_maxReturnedHeaders 0 d
   lift stampActionTimestamp
 
 shouldRespond :: PPeer -> Origin.TXOrigin -> Bool
 shouldRespond peer txo = case txo of
   Origin.PeerString ps -> ps == peerString peer
-  _ -> False
+  _                    -> False
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of
@@ -451,10 +449,3 @@ shouldSend peer txo = case txo of
     -- probably means it was converted, see if this is a problem
     trace "NewTx of type Morphism came in. Should this even happen?" True
   Origin.Blockstanbul -> True
-
-splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
-splitNeededHeaders neededHeaders =
-  let txsLens = BlockHeader.extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
-      txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
-      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
-   in splitAt (length txsLensInLimit) neededHeaders

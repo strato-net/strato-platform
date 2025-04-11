@@ -2,6 +2,11 @@ import { rest, oauthUtil } from "blockapps-rest";
 import jwtDecode from "jwt-decode";
 import config from "../load.config.js";
 
+const CACHED_DATA = {
+  serviceToken: null,
+  serviceTokenExpiresAt: null,
+};
+
 const options = { config };
 
 const oauth = await oauthUtil.init(config.nodes[0].oauth);
@@ -44,16 +49,27 @@ const getUserToken = async (username, password) => {
 };
 
 const getServiceToken = async () => {
-  const tokenObj = await oauth.getAccessTokenByClientSecret();
-  const new_token =
-    tokenObj.token[
-      config.nodes[0].oauth.tokenField
-        ? config.nodes[0].oauth.tokenField
-        : "access_token"
-    ];
-  const now = Math.floor(Date.now() / 1000);
-  const expiresAt = Math.floor(tokenObj.token.expires_at / 1000);
-  return { token: new_token, expiration: expiresAt - now };
+  let token = CACHED_DATA.serviceToken;
+  const expiresAt = CACHED_DATA.serviceTokenExpiresAt;
+  if (
+    !token ||
+    !expiresAt ||
+    expiresAt <= Math.floor(Date.now() / 1000) + 30 // 30 seconds buffer
+  ) {
+    console.log("Getting a fresh service token...");
+    const tokenObj = await oauth.getAccessTokenByClientSecret();
+    token =
+      tokenObj.token[
+        config.nodes[0].oauth.tokenField
+          ? config.nodes[0].oauth.tokenField
+          : "access_token"
+      ];
+    CACHED_DATA.serviceToken = token;
+    CACHED_DATA.serviceTokenExpiresAt = Math.floor(
+      tokenObj.token.expires_at / 1000
+    );
+  }
+  return { token };
 };
 
 export default {

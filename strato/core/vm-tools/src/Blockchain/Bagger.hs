@@ -29,7 +29,7 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult
 import Blockchain.Database.MerklePatricia (StateRoot (..))
-import Blockchain.Sequencer.Event (OutputBlock (..), OutputTx (..))
+import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta

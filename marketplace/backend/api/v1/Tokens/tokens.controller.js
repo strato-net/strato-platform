@@ -20,26 +20,6 @@ class TokensController {
     }
   }
 
-  static async getETHSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getETHSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getWBTCSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getWBTCSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
   static async addHash(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -50,6 +30,32 @@ class TokensController {
       rest.response.status200(res, result);
 
       return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async bridgeOut(req, res, next) {
+    try {
+      const { dapp, body } = req;
+
+      TokensController.validateBridgeOutArgs(body);
+
+      const result = await dapp.bridgeOut(body);
+      rest.response.status200(res, result);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getBridgeableTokens(req, res, next) {
+    try {
+      const { dapp } = req;
+      const result = await dapp.getBridgeableAddresses({});
+      const tokensArray =  await tokensJs.getBridgeableTokensAddress(result);
+      return rest.response.status200(res, tokensArray);
     } catch (e) {
       return next(e);
     }
@@ -101,6 +107,28 @@ class TokensController {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
         'Add Hash Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
+    }
+  }
+
+  static validateBridgeOutArgs(args) {
+    const burnETHSTSchema = Joi.object({
+      quantity: Joi.string().required(),
+      externalChainWalletAddress: Joi.string().required(),
+      tokenAssetRootAddress: Joi.string().required(),
+      assetAddress: Joi.string().required(),
+    });
+
+    const validation = burnETHSTSchema.validate(args);
+
+    if (validation.error) {
+      console.log(validation.error.message);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Burn ETHST Argument Validation Error',
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }

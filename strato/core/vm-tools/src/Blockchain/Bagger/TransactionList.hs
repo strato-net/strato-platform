@@ -11,7 +11,7 @@ module Blockchain.Bagger.TransactionList
 where
 
 import Blockchain.Data.TransactionDef
-import Blockchain.Sequencer.Event (OutputTx (..))
+import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Data.Foldable (foldl')
 import qualified Data.Map.Strict as M
 

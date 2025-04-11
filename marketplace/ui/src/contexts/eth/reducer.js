@@ -14,32 +14,21 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message,
       };
-    case actionDescriptors.fetchETHSTAddress:
+    
+    case actionDescriptors.fetchBridgeableTokens:
       return {
         ...state,
       };
-    case actionDescriptors.fetchETHSTAddressSuccessful:
+    case actionDescriptors.fetchBridgeableTokensSuccessful:
       return {
         ...state,
-        ethstAddress: action.payload,
+        bridgeableTokens: action.payload,
       };
-    case actionDescriptors.fetchETHSTAddressFailed:
-      return {
-        ...state,
-      };
-    case actionDescriptors.fetchWBTCSTAddress:
+    case actionDescriptors.fetchBridgeableTokensFailed:
       return {
         ...state,
       };
-    case actionDescriptors.fetchWBTCSTAddressSuccessful:
-      return {
-        ...state,
-        wbtcstAddress: action.payload,
-      };
-    case actionDescriptors.fetchWBTCSTAddressFailed:
-      return {
-        ...state,
-      };
+      
     case actionDescriptors.addHash:
       return {
         ...state,
@@ -54,6 +43,21 @@ const reducer = (state, action) => {
       return {
         ...state,
         isAddingHash: false,
+      };
+    case actionDescriptors.bridgeOut:
+      return {
+        ...state,
+        isBridgingOut: true,
+      };
+    case actionDescriptors.bridgeOutSuccessful:
+      return {
+        ...state,
+        isBridgingOut: false,
+      };
+    case actionDescriptors.bridgeOutFailed:
+      return {
+        ...state,
+        isBridgingOut: false,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

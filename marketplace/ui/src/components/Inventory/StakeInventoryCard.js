@@ -64,7 +64,6 @@ const StakeInventoryCard = ({
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  collateralQuantity = collateralQuantity / Math.pow(10, decimals);
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -79,7 +78,8 @@ const StakeInventoryCard = ({
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
     : inventory?.quantity / Math.pow(10, decimals);
-  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+    
+  const stakeQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, decimals);
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
@@ -309,10 +309,10 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
-              {quantity.toLocaleString('en-US', {
+            {((inventory.totalQuantity || 0) / Math.pow(10, decimals)).toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
-              }) || 'N/A'}
+              })}
             </p>
           </div>
           <div className="flex justify-between  ">
@@ -327,10 +327,10 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Staked </p>
             <p className="text-[#202020] font-semibold">
-              {collateralQuantity.toLocaleString('en-US', {
+              {(collateralQuantity / Math.pow(10, decimals)).toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
-              })}
+              }) || 'N/A'}
             </p>
           </div>
         </div>

@@ -34,9 +34,12 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
 import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
+import BridgeWallet from '../ETHST/BridgeWallet';
+import { actions as ethActions } from '../../contexts/eth/actions';
+
 const USDSTIcon = (
   <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
 );
@@ -67,7 +70,20 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokens = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokens();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
+
+  const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -79,8 +95,8 @@ const InventoryCard = ({
     stratsAddress === inventory.originAddress
       ? 2
       : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-      ? 18
-      : inventory.decimals || 0;
+        ? 18
+        : inventory.decimals || 0;
   const quantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );
@@ -89,16 +105,18 @@ const InventoryCard = ({
       ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
       : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
     : undefined;
-  const saleQuantity =
-    inventory.saleQuantity !== undefined
-      ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-          new BigNumber(10).pow(decimals)
+  
+  const saleQuantity = (
+    stratsAddress === inventory.originAddress
+      ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+      : new BigNumber(inventory.saleQuantity || 0).dividedBy(
+          new BigNumber(10).pow(decimals || 0)
         )
-      : undefined;
+  )
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-        new BigNumber(10).pow(decimals)
-      )
+      new BigNumber(10).pow(decimals)
+    )
     : new BigNumber(0);
   const stakeable =
     inventory.root &&
@@ -183,13 +201,17 @@ const InventoryCard = ({
     setBridgeModalOpen(false);
   };
 
+  const showBridgeOutModal = () => {
+    setBridgeOutModalOpen(true);
+  };
+
+  const handleBridgeOutModalClose = () => {
+    setBridgeOutModalOpen(false);
+  };
+
   const callDetailPage = () => {
-    if (inventory.originAddress === ethstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (inventory.originAddress === wbtcstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+    if (bridgeableAddresses?.includes(inventory.originAddress)) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address).replace(':bridgeableAsset', inventory.name)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {
@@ -266,6 +288,13 @@ const InventoryCard = ({
       supportedTokens.some(
         (token) => token.mercata_root_address === inventoryRoot
       )
+    );
+  };
+
+  const isBridgeableToken = (inventoryRoot) => {
+    return (
+      Array.isArray(bridgeableAddresses) &&
+      bridgeableAddresses.find((address) => address === inventoryRoot)
     );
   };
 
@@ -429,22 +458,33 @@ const InventoryCard = ({
             )}
             {(!stakeable || (!inventory.escrow && stakeable)) && (
               <>
-                {stakeable && (
-                  <Button
-                    type="link"
-                    className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-                    onClick={showRedeemModal}
-                    disabled={
-                      inventory.price ||
-                      inventory.address === inventory.originAddress ||
-                      !isActive() ||
-                      disableSADDOGS(inventory) ||
-                      getCategory()?.includes('Tokens')
-                    }
-                  >
-                    <SendOutlined /> Redeem
-                  </Button>
-                )}
+                {stakeable &&
+                  (isBridgeableToken ? (
+                    // Temporarily removing bridge out button
+                    //   <Button
+                    //     type="link"
+                    //     className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6`}
+                    //     onClick={showBridgeOutModal}
+                    //   >
+                    //     <RetweetOutlined /> BridgeOut
+                    //   </Button>
+                    null
+                  ) : (
+                    <Button
+                      type="link"
+                      className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                      onClick={showRedeemModal}
+                      disabled={
+                        inventory.price ||
+                        inventory.address === inventory.originAddress ||
+                        !isActive() ||
+                        disableSADDOGS(inventory) ||
+                        getCategory()?.includes('Tokens')
+                      }
+                    >
+                      <SendOutlined /> Redeem
+                    </Button>
+                  ))}
                 <Button
                   type="link"
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
@@ -473,7 +513,7 @@ const InventoryCard = ({
                     !isTokenSupported(inventory.root) || inventory.escrow
                       ? 'hidden'
                       : ''
-                  }`}
+                    }`}
                   onClick={showBridgeModal}
                 >
                   <RetweetOutlined /> Bridge
@@ -491,12 +531,12 @@ const InventoryCard = ({
                 inventory.status == ASSET_STATUS.PENDING_REDEMPTION
                   ? 'h-[140px]'
                   : 'h-[161px]'
-              }  md:object-contain`}
+                }  md:object-contain`}
               alt={imgMeta}
               title={imgMeta}
               src={
                 inventory['BlockApps-Mercata-Asset-images'] &&
-                inventory['BlockApps-Mercata-Asset-images'].length > 0
+                  inventory['BlockApps-Mercata-Asset-images'].length > 0
                   ? inventory['BlockApps-Mercata-Asset-images'][0].value
                   : image_placeholder
               }
@@ -522,8 +562,8 @@ const InventoryCard = ({
                 <p className="text-[#4D4D4D] text-[13px]">Retired</p>
               </div>
             ) : (inventory.data.isMint &&
-                inventory.data.isMint === 'False' &&
-                quantity.eq(0)) ||
+              inventory.data.isMint === 'False' &&
+              quantity.eq(0)) ||
               (!inventory.data.isMint && quantity.eq(0)) ? (
               <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
@@ -540,9 +580,34 @@ const InventoryCard = ({
 
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Price</p>
+            <p className="text-[#202020] font-semibold">
+              {price ? (
+                <p className="flex">
+                  <span>${price.toString()}</span>
+                  <p className="flex text-xs items-center">
+                    &nbsp;(
+                    {price.toString()} {USDSTIcon})
+                  </p>
+                </p>
+              ) : (
+                'N/A'
+              )}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
               {quantity.toNumber().toLocaleString('en-US', {
+                maximumFractionDigits: 6,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
+            <p className="text-[#202020] font-semibold">
+              {saleQuantity.toNumber().toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
@@ -554,9 +619,9 @@ const InventoryCard = ({
               <p className="text-[#202020] font-semibold">
                 {inventory?.escrow
                   ? quantity.toNumber().toLocaleString('en-US', {
-                      maximumFractionDigits: 6,
-                      minimumFractionDigits: 0,
-                    })
+                    maximumFractionDigits: 6,
+                    minimumFractionDigits: 0,
+                  })
                   : 0}
               </p>
             </div>
@@ -572,28 +637,6 @@ const InventoryCard = ({
                       maximumFractionDigits: 6,
                       minimumFractionDigits: 0,
                     }) || 'N/A'}
-                </p>
-              </div>
-              <div className="flex justify-between  ">
-                <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-                <p className="text-[#202020] font-semibold">
-                  {saleQuantity ? saleQuantity.toString() : 'N/A'}
-                </p>
-              </div>
-              <div className="flex justify-between  ">
-                <p className="text-[#6A6A6A]">Price</p>
-                <p className="text-[#202020] font-semibold">
-                  {price ? (
-                    <p className="flex">
-                      <span>${price.toString()}</span>
-                      <p className="flex text-xs items-center">
-                        &nbsp;(
-                        {price.toString()} {USDSTIcon})
-                      </p>
-                    </p>
-                  ) : (
-                    'N/A'
-                  )}
                 </p>
               </div>
             </>
@@ -717,6 +760,21 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           reserves={reserves}
+        />
+      )}
+      {bridgeOutModalOpen && (
+        <BridgeWallet
+          open={bridgeOutModalOpen}
+          handleCancel={handleBridgeOutModalClose}
+          accountDetails={{
+            assetAddress: inventory.address,
+            assetRootAddress: inventory.root,
+            balance: quantity.toString(),
+            decimals,
+          }}
+          pageDetails={{ limit, offset, categoryName: category, reserves }}
+          tokenName={inventory.name}
+          tabKey={'2'}
         />
       )}
     </div>

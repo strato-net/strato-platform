@@ -14,7 +14,8 @@ import {
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const TransactionResponsive = ({
   data,
@@ -25,7 +26,18 @@ const TransactionResponsive = ({
   const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -194,16 +206,9 @@ const TransactionResponsive = ({
           };
 
           const handleAssetRedirection = () => {
-            const isEthst = assetOriginAddress === ethstAddress;
-            const isWbtcst = assetOriginAddress === wbtcstAddress;
-            if (isEthst) {
-              const url = routes.EthstProductDetail.url;
-              navigate(`${url.replace(':address', assetAddress)}`, {
-                state: { isCalledFromInventory: false },
-              });
-            } else if (isWbtcst) {
-              const url = routes.WbtcstProductDetail.url;
-              navigate(`${url.replace(':address', assetAddress)}`, {
+            if (bridgeableAddresses?.includes(assetOriginAddress)) {
+              const url = routes.bridgeableProductDetail.url;
+              navigate(`${url.replace(':address', assetAddress).replace(':bridgeableAsset', assetName)}`, {
                 state: { isCalledFromInventory: false },
               });
             } else {

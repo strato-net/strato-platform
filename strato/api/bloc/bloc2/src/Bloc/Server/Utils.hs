@@ -26,7 +26,7 @@ import Bloc.API.Users
 import Bloc.API.Utils
 import Blockchain.DB.SQLDB (sqlQuery)
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json (rtPrimeToRt)
+import Blockchain.Model.JsonBlock (rtPrimeToRt)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Concurrent (threadDelay)

@@ -27,7 +27,8 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.EthConf (runKafkaMConfigured)
-import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..))
+import Blockchain.Model.WrappedBlock
+import Blockchain.Sequencer.Event (IngestEvent (IETx))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
