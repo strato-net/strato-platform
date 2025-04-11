@@ -69,7 +69,7 @@ const BridgeWalletModal = ({
 
   const ethToMercataColumns = [
     {
-      title: `${tokenName} Available`,
+      title: `${tokenName.replace(/st/gi, '')} Available`,
       dataIndex: 'balance',
       align: 'center',
     },
@@ -220,7 +220,7 @@ const BridgeWalletModal = ({
         <div>
           {' '}
           <p className="text-[#202020] font-medium text-sm">
-            {tokenName} Available
+            {tokenName.replace(/st/gi, '')} Available
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
             <p> {accountDetails.balance} </p>
@@ -529,7 +529,7 @@ const BridgeWalletModal = ({
         <Tabs.TabPane
           tab={
             tabKey === '1'
-              ? `Bridge ${tokenName} to Mercata`
+              ? `Bridge ${tokenName.replace(/st/gi, '')} to Mercata`
               : `Bridge ${tokenName} to Ethereum`
           }
           key="1"
