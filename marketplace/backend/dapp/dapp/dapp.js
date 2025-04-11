@@ -2362,12 +2362,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     // Find the user's latest Asset with the MercataETHBridge address
     const assetSearchOptions = {
-      ownerCommonName: ownerCommonName,
-      root: `eq.${assetRootAddress}`,
-      address: `neq.${assetRootAddress}`,
-      queryOptions: { select: 'address,quantity::text' },
-      transaction_hash: `eq.${eventTxHash}`,
-      limit: 1,
+      ...options,
+      query: {
+        ownerCommonName: ownerCommonName,
+        root: `eq.${assetRootAddress}`,
+        address: `neq.${assetRootAddress}`,
+        queryOptions: { select: 'address,quantity::text' },
+        transaction_hash: `eq.${eventTxHash}`,
+        limit: 1,
+      },
     };
     const assets = await rest.searchUntil(
       rawAdmin,
