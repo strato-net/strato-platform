@@ -2364,7 +2364,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const assetSearchOptions = {
       ...options,
       query: {
-        ownerCommonName: ownerCommonName,
+        ownerCommonName: `eq.${ownerCommonName}`,
         root: `eq.${assetRootAddress}`,
         address: `neq.${assetRootAddress}`,
         queryOptions: { select: 'address,quantity::text' },
