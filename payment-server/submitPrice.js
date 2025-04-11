@@ -149,7 +149,8 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   );
 
   if (!reserves || reserves.length === 0) {
-    throw new Error("No reserves found");
+    console.log("No reserves found for:", oracleContract.name);
+    return;
   }
 
   for (const reserve of reserves) {
