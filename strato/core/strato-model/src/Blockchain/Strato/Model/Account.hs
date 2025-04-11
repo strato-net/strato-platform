@@ -85,7 +85,7 @@ instance Show NamedAccount where
 
 instance Read NamedAccount where
   readsPrec _ s = case span (/= ':') s of
-    (mAddr, mRem) -> case stringAddress mAddr of
+    (mAddr, mRem) -> case readMaybe mAddr of
       Nothing -> []
       Just addr -> case mRem of
         (':' : rem') -> case rem' of

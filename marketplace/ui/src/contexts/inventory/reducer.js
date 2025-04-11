@@ -154,183 +154,196 @@ const reducer = (state, action) => {
         isUnlisting: false,
       };
 
-     // ------------------------------------------------------------------------------------------------------
+    // ------------------------------------------------------------------------------------------------------
     case actionDescriptors.stakeInventory:
       return {
         ...state,
-        isStaking: true
+        isStaking: true,
       };
     case actionDescriptors.stakeInventorySuccessful:
       return {
         ...state,
-        isStaking: false
+        isStaking: false,
       };
     case actionDescriptors.stakeInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isStaking: false
+        isStaking: false,
       };
-    
+    case actionDescriptors.stakeAfterBridge:
+      return {
+        ...state,
+      };
+    case actionDescriptors.stakeAfterBridgeSuccessful:
+      return {
+        ...state,
+      };
+    case actionDescriptors.stakeAfterBridgeFailed:
+      return {
+        ...state,
+        error: action.error,
+      };
+
     case actionDescriptors.unstakeInventory:
       return {
         ...state,
-        isUnstaking: true
+        isUnstaking: true,
       };
     case actionDescriptors.unstakeInventorySuccessful:
       return {
         ...state,
-        isUnstaking: false
+        isUnstaking: false,
       };
     case actionDescriptors.unstakeInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isUnstaking: false
+        isUnstaking: false,
       };
-    
+
     case actionDescriptors.borrow:
       return {
         ...state,
-        isBorrowing: true
+        isBorrowing: true,
       };
     case actionDescriptors.borrowSuccessful:
       return {
         ...state,
-        isBorrowing: false
+        isBorrowing: false,
       };
     case actionDescriptors.borrowFailed:
       return {
         ...state,
         error: action.error,
-        isBorrowing: false
+        isBorrowing: false,
       };
-    
+
     case actionDescriptors.repay:
       return {
         ...state,
-        isRepaying: true
+        isRepaying: true,
       };
     case actionDescriptors.repaySuccessful:
       return {
         ...state,
-        isRepaying: false
+        isRepaying: false,
       };
     case actionDescriptors.repayFailed:
-        return {
-          ...state,
-          error: action.error,
-          isRepaying: false
-        };
+      return {
+        ...state,
+        error: action.error,
+        isRepaying: false,
+      };
 
     case actionDescriptors.getReserve:
-        return {
-          ...state,
-          isReserveLoading: true
-        };
+      return {
+        ...state,
+        isReserveLoading: true,
+      };
     case actionDescriptors.getReserveSuccessful:
-        return {
-          ...state,
-          reserve: action.payload,
-          isReserveLoading: false
-        };
+      return {
+        ...state,
+        reserve: action.payload,
+        isReserveLoading: false,
+      };
     case actionDescriptors.getReserveFailed:
-        return {
-          ...state,
-          error: action.error,
-          isReserveLoading: false
-        };
-    
+      return {
+        ...state,
+        error: action.error,
+        isReserveLoading: false,
+      };
+
     case actionDescriptors.getAllReserve:
-        return {
-          ...state,
-          isReservesLoading: true
-        };
+      return {
+        ...state,
+        isReservesLoading: true,
+      };
     case actionDescriptors.getAllReserveSuccessful:
-        return {
-          ...state,
-          reserves: action.payload,
-          isReservesLoading: false
-        };
+      return {
+        ...state,
+        reserves: action.payload,
+        isReservesLoading: false,
+      };
     case actionDescriptors.getAllReserveFailed:
-        return {
-          ...state,
-          error: action.error,
-          isReservesLoading: false
-        };
+      return {
+        ...state,
+        error: action.error,
+        isReservesLoading: false,
+      };
 
     case actionDescriptors.fetchTotalCataRewards:
-        return {
-          ...state,
-          isFetchingTotalCataRewards: true
-        };
+      return {
+        ...state,
+        isFetchingTotalCataRewards: true,
+      };
     case actionDescriptors.fetchTotalCataRewardsSuccessful:
-        return {
-          ...state,
-          totalCataRewards: action.payload,
-          isFetchingTotalCataRewards: false
-        };
+      return {
+        ...state,
+        totalCataRewards: action.payload,
+        isFetchingTotalCataRewards: false,
+      };
     case actionDescriptors.fetchTotalCataRewardsFailed:
-        return {
-          ...state,
-          error: action.error,
-          isFetchingTotalCataRewards: false
-        };
-    
+      return {
+        ...state,
+        error: action.error,
+        isFetchingTotalCataRewards: false,
+      };
+
     case actionDescriptors.getEscrowForAsset:
-        return {
-          ...state,
-          isEscrowLoading: true
-        };
+      return {
+        ...state,
+        isEscrowLoading: true,
+      };
     case actionDescriptors.getEscrowForAssetSuccessful:
-        return {
-          ...state,
-          escrow: action.payload,
-          isEscrowLoading: false
-        };
+      return {
+        ...state,
+        escrow: action.payload,
+        isEscrowLoading: false,
+      };
     case actionDescriptors.getEscrowForAssetFailed:
-        return {
-          ...state,
-          error: action.error,
-          isEscrowLoading: false
-        };
+      return {
+        ...state,
+        error: action.error,
+        isEscrowLoading: false,
+      };
 
     case actionDescriptors.getUserCataRewards:
-        return {
-          ...state,
-          isUserCataRewardsLoading: true
-        };
+      return {
+        ...state,
+        isUserCataRewardsLoading: true,
+      };
     case actionDescriptors.getUserCataRewardsSuccessful:
-        return {
-          ...state,
-          totalCataReward: action.payload.totalCataReward,
-          dailyCataReward: action.payload.dailyCataReward,
-          isUserCataRewardsLoading: false
-        };
+      return {
+        ...state,
+        totalCataReward: action.payload.totalCataReward,
+        dailyCataReward: action.payload.dailyCataReward,
+        isUserCataRewardsLoading: false,
+      };
     case actionDescriptors.getUserCataRewardsFailed:
-        return {
-          ...state,
-          error: action.error,
-          isUserCataRewardsLoading: false
-        };
-    
+      return {
+        ...state,
+        error: action.error,
+        isUserCataRewardsLoading: false,
+      };
+
     case actionDescriptors.getOracle:
-          return {
-            ...state,
-            isFetchingOracle: true
-          };
+      return {
+        ...state,
+        isFetchingOracle: true,
+      };
     case actionDescriptors.getOracleSuccessful:
-          return {
-            ...state,
-            oracle: action.payload,
-            isFetchingOracle: false
-          };
+      return {
+        ...state,
+        oracle: action.payload,
+        isFetchingOracle: false,
+      };
     case actionDescriptors.getOracleFailed:
-          return {
-            ...state,
-            error: action.error,
-            isFetchingOracle: false
-          };    
+      return {
+        ...state,
+        error: action.error,
+        isFetchingOracle: false,
+      };
     // ------------------------------------------------------------------------------------------------------
     case actionDescriptors.resellInventory:
       return {

@@ -14,12 +14,13 @@ const { get } = lodash;
 import oauthHelper from "./oauthHelper.js";
 import axios from "axios";
 import BigNumber from "bignumber.js";
+import flagFile from "./flagFile.js";
 
 // Fetches Asset Name based on sale address
 const getAsset = async(saleAddress)=>{
   //fetch asset address
   const assetToBeSold= await rest.search(
-                                        ADMIN.getUser()
+                                        await ADMIN.getUser()
                                       , {name : `${TABLE_PREFIX}Sale`}
                                       , {
                                         ...DEFAULT_OPTIONS,
@@ -41,7 +42,7 @@ const getAsset = async(saleAddress)=>{
     }
   }
 
-  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
+  return await rest.search(await ADMIN.getUser(), tableArgs, searchOptions);
 }
 
 // Prepare the orderData array
@@ -82,24 +83,30 @@ const sendEmail = async(to, subject, htmlContent) => {
     }
 
   } catch (error) {
+    await flagFile.appendToErrorFile(
+        `Error sending email:: ${error.message}`
+    );
     console.error("Error sending email:", error);
   }
 }
 
-const clientErrorHandler = (err, req, res, next) => {
+const clientErrorHandler = async (err, req, res, next) => {
   const statusCode = get(err, 'statusCode');
 
   if (statusCode) {
     const message = get(err, 'raw.message');
-    res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
-
-    console.log(`Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`);
+    const error_message = `Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`
+    console.log(error_message);
+    await flagFile.appendToErrorFile(
+        error_message
+    );
   }
 
   return next(err)
 }
 
-const commonErrorHandler = (err, req, res, next) => {
+const commonErrorHandler = async (err, req, res, next) => {
+  // TODO: res.redirect assumes no further logic in the route - using next(err) after the redirect will throw warnings that the response cannot be altered after it's sent.
   res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
   return next(err);
 }
@@ -180,7 +187,7 @@ const updateStripePayment = async (orderHash, status) => {
 const validatePaymentServiceContract = async (address) => {
   try {
     const contract = { name: "PaymentService", address };
-    const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
+    const res = await rest.getState(await ADMIN.getUser(), contract, DEFAULT_OPTIONS);
   } catch (e) {
     console.error(`Contract could not be found at address ${address}. Now exiting...\nMessage: ${e}`);
     process.exit(1);
@@ -190,7 +197,7 @@ const validatePaymentServiceContract = async (address) => {
 const validateRedemptionServiceContract = async (address) => {
   try {
     const contract = { name: "RedemptionService", address };
-    const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
+    const res = await rest.getState(await ADMIN.getUser(), contract, DEFAULT_OPTIONS);
   } catch (e) {
     console.error(`Contract could not be found at address ${address}. Now exiting...\nMessage: ${e}`);
     process.exit(1);
@@ -205,7 +212,7 @@ const emitOnboardSeller = async (address, args) => {
     method: "onboardSeller",
     args: util.usc({ ...args }),
   };
-  const onboardSellerStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  const onboardSellerStatus = await rest.call(await ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return onboardSellerStatus;
 }
 
@@ -222,7 +229,7 @@ const getCheckoutEvent = async (checkoutHash) => {
     }
   };
 
-  return await rest.searchUntil(ADMIN.getUser(), tableArgs, (r) => r.length === 1, searchOptions);
+  return await rest.searchUntil(await ADMIN.getUser(), tableArgs, (r) => r.length === 1, searchOptions);
 }
 
 const checkSellerOnboarded = async (commonName) => {
@@ -240,14 +247,14 @@ const checkSellerOnboarded = async (commonName) => {
     }
   }
 
-  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
+  return await rest.search(await ADMIN.getUser(), tableArgs, searchOptions);
 }
 
 const validateAndGetOrderDetails = async (quantities, saleAddresses, decimals) => {
   // Get Sale Contracts
   const saleAddressQuery = saleAddresses.map(addr => `address.eq.${addr}`);
   const saleContracts = await rest.search(
-    ADMIN.getUser(), 
+    await ADMIN.getUser(), 
     { 
       name: `${TABLE_PREFIX}Sale` 
     }, 
@@ -261,7 +268,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses, decimals) =
   // Get Asset Contracts
   const assetAddressQuery = saleContracts.map(s => `address.eq.${s.assetToBeSold}`);
   const assetContracts = await rest.search(
-    ADMIN.getUser(), 
+    await ADMIN.getUser(), 
     { 
       name: `${TABLE_PREFIX}Asset`
     }, 
@@ -309,7 +316,7 @@ const completeOrder = async (address, args) => {
     method: "completeOrder",
     args: util.usc({ ...args }),
   };
-  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  const completeOrderStatus = await rest.call(await ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return completeOrderStatus;
 }
 
@@ -321,7 +328,7 @@ const generateIntermediateOrder = async (address, args) => {
     method: "generateIntermediateOrder",
     args: util.usc({ ...args }),
   };
-  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  const completeOrderStatus = await rest.call(await ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return completeOrderStatus;
 }
 
@@ -333,7 +340,7 @@ const cancelOrder = async (address, args) => {
     method: "cancelOrder",
     args: util.usc({ ...args }),
   };
-  const cancelOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  const cancelOrderStatus = await rest.call(await ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return cancelOrderStatus;
 }
 
@@ -345,7 +352,7 @@ const discardCheckoutQuantity = async (address, args) => {
     method: "discardCheckoutQuantity",
     args: util.usc({ ...args }),
   };
-  const discardOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  const discardOrderStatus = await rest.call(await ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return discardOrderStatus;
 }
 

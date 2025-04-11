@@ -7,7 +7,7 @@
 
 module Blockchain.Sequencer.DB.SeenTransactionDB where
 
-import Blockchain.Sequencer.DB.Witnessable
+import Blockchain.DB.Witnessable
 import Blockchain.Strato.Model.Keccak256
 import Control.Applicative
 import Control.Lens

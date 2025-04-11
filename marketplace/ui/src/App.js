@@ -13,11 +13,16 @@ import { useMarketplaceState } from './contexts/marketplace';
 import { getCookie, delete_cookie } from './helpers/cookie';
 import InternalError from './components/500';
 import { CategorysProvider } from './contexts/category';
+import { useEventStream } from './helpers/websocket';
+import { actions as inventoryActions } from './contexts/inventory/actions';
+import { useInventoryDispatch } from './contexts/inventory';
+import { BigNumber } from 'bignumber.js';
 
 const { Content } = Layout;
 
 const App = () => {
   const [showMenu, setShowMenu] = useState(false);
+  const inventoryDispatch = useInventoryDispatch();
   const { isMarketplaceLoading } = useMarketplaceState();
   const tagManagerArgs = {
     gtmId: 'GTM-NHBZ2BX',
@@ -69,6 +74,42 @@ const App = () => {
   const handleMenuTab = (data) => {
     setShowMenu(false);
   };
+
+  const { lastMessage } = useEventStream();
+
+  useEffect(() => {
+    if (lastMessage) {
+      try {
+        const eventData = JSON.parse(lastMessage.data);
+        const eventName = eventData?.eventEvent?.eventName;
+
+        const eventArgs = eventData?.eventEvent?.eventArgs.reduce(
+          (acc, [key, value]) => {
+            acc[key] = value;
+            return acc;
+          },
+          {}
+        );
+
+        const eventContractAddress = eventData?.eventEvent?.eventContractAddress;
+
+        if (eventName === 'MintedETHST') {
+          const { amount: stakeQuantity, username: ownerCommonName } =
+            eventArgs;
+
+          const body = {
+            stakeQuantity: new BigNumber(stakeQuantity).toFixed(0),
+            assetAddress: eventContractAddress,
+            ownerCommonName,
+          };
+
+          inventoryActions.stakeAfterBridge(inventoryDispatch, body);
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket event:', lastMessage.data);
+      }
+    }
+  }, [lastMessage]);
 
   return (
     <BrowserRouter basename="/">

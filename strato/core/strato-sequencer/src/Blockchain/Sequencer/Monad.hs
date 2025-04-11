@@ -9,6 +9,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul,
@@ -29,18 +32,19 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
-import Blockchain.Data.Block
+import Blockchain.Model.SyncState
 import Blockchain.EthConf
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.SyncDB
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import qualified Blockchain.Strato.RedisBlockDB.Models as RBDB
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent (threadDelay)
@@ -117,10 +121,10 @@ data SequencerConfig = SequencerConfig
 
 type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
 
-instance HasDependentBlockDB SequencerM where
+instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => HasDependentBlockDB m where
   getDependentBlockDB = use dependentBlockDB
 
-instance Mod.Accessible LDB.DB SequencerM where
+instance MonadState SequencerContext m => Mod.Accessible LDB.DB m where
   access _ = use dependentBlockDB
 
 class HasNamespace a where
@@ -167,33 +171,33 @@ deleteInLDB p k = do
   db <- Mod.access Mod.Proxy
   LDB.delete db LDB.defaultWriteOptions (namespaced p k)
 
-instance (Address `A.Alters` X509CertInfoState) SequencerM where
+instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => (Address `A.Alters` X509CertInfoState) m where
   lookup = lookupInLDB
   insert p k v = insertInLDB p k v
   delete p k = deleteInLDB p k
 
-instance A.Selectable Address X509CertInfoState SequencerM where
+instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => A.Selectable Address X509CertInfoState m where
   select = A.lookup
 
-instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
+instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
   lookup _ k = lookupDependentBlockDB k
   insert _ k v = insertDependentBlockDB k v
   delete _ k = deleteDependentBlockDB k
 
-instance Mod.Modifiable SeenTransactionDB SequencerM where
+instance (Monad m, MonadState SequencerContext m) => Mod.Modifiable SeenTransactionDB m where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance Mod.Accessible (IORef RoundNumber) SequencerM where
+instance MonadState SequencerContext m => Mod.Accessible (IORef RoundNumber) m where
   access _ = use latestRoundNumber
 
-instance Mod.Accessible (TMChan RoundNumber) SequencerM where
+instance MonadReader SequencerConfig m => Mod.Accessible (TMChan RoundNumber) m where
   access _ = asks blockstanbulTimeouts
 
-instance Mod.Accessible BlockPeriod SequencerM where
+instance MonadReader SequencerConfig m => Mod.Accessible BlockPeriod m where
   access _ = asks blockstanbulBlockPeriod
 
-instance Mod.Accessible RoundPeriod SequencerM where
+instance MonadReader SequencerConfig m => Mod.Accessible RoundPeriod m where
   access _ = asks blockstanbulRoundPeriod
 
 instance Mod.Accessible View SequencerM where
@@ -202,29 +206,24 @@ instance Mod.Accessible View SequencerM where
 instance Mod.Accessible RBDB.RedisConnection SequencerM where
   access _ = asks redisConn
 
-instance (Keccak256 `A.Alters` ()) SequencerM where
+instance MonadState SequencerContext m => (Keccak256 `A.Alters` ()) m where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
 
-instance HasBlockstanbulContext SequencerM where
+instance (Monad m, MonadState SequencerContext m) => HasBlockstanbulContext m where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
-instance Mod.Modifiable BestSequencedBlock SequencerM where
+instance (MonadIO m, MonadLogger m, Mod.Accessible RBDB.RedisConnection m, MonadReader SequencerConfig m) => Mod.Modifiable BestSequencedBlock m where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo <&> \case
-      Nothing -> BestSequencedBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RBDB.RedisBestBlock s n) -> BestSequencedBlock $ BestBlock s n
-  put _ (BestSequencedBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
+      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) []
+      Just v -> v
+  put _ bestSequencedBlock =
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
-
-instance (() `A.Alters` Checkpoint) SequencerM where
-  lookup = lookupInLDB
-  insert p k v = insertInLDB p k v
-  delete p k = deleteInLDB p k
 
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
@@ -232,7 +231,7 @@ instance (() `A.Alters` Checkpoint) SequencerM where
 testPriv :: PrivateKey
 testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-instance HasVault SequencerM where
+instance (Monad m, MonadIO m, MonadLogger m, MonadReader SequencerConfig m) => HasVault m where
   sign mesg = do
     mVc <- asks vaultClient
     case mVc of
@@ -242,7 +241,7 @@ instance HasVault SequencerM where
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
 
-waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
+waitOnVault :: (Show a, MonadIO m, MonadLogger m) => m (Either a b) -> m b
 waitOnVault action = do
   $logInfoS "HasVault" "Asking the vault-proxy to sign a Blockstanbul message"
   res <- action
@@ -320,7 +319,7 @@ fuseChannels = do
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift)
     <$> mergeSources
-      [ conduitBatchSource "conduitSource" "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
+      [ conduitBatchSource "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
       4096 -- 🙏

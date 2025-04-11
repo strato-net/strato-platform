@@ -16,9 +16,11 @@ import Control.Applicative (many)
 
 import Data.Aeson
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.JsonStream.Parser as JS
 --import Data.Swagger hiding (Format, format, name)
 import qualified Data.Vector as V
+import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
 
@@ -26,7 +28,7 @@ data AccountInfo
   = NonContract Address Integer
   | ContractNoStorage Address Integer CodePtr
   | ContractWithStorage Address Integer CodePtr [(Word256, Word256)]
-  | SolidVMContractWithStorage Address Integer CodePtr [(B.ByteString, B.ByteString)]
+  | SolidVMContractWithStorage Address Integer CodePtr [(B.ByteString, BasicValue)]
   deriving (Show, Eq, Read)
 
 instance Format AccountInfo where
@@ -93,7 +95,7 @@ instance FromJSON AccountInfo where
         case ms of
           Nothing -> return $ ContractNoStorage a b c
           Just s -> do
-            return $ SolidVMContractWithStorage a b c s
+            return $ SolidVMContractWithStorage a b c (map (\(k, v) -> (BC.pack k, v)) s)
   parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
 
 instance ToJSON AccountInfo where
@@ -120,7 +122,7 @@ instance ToJSON AccountInfo where
       [ "address" .= a,
         "balance" .= b,
         "codeHash" .= c,
-        "storage" .= s
+        "storage" .= map (\(k, v) -> (BC.unpack k, v)) s
       ]
 
 instance RLPSerializable AccountInfo where

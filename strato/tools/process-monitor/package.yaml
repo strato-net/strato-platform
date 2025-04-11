@@ -9,22 +9,23 @@ description:   A per-process resource monitor for STRATO services
 license:       Apache-2.0
 
 dependencies:
-  - async
   - base
-  - containers
-  - process
   - prometheus-client
-  - text
-  - wai-middleware-prometheus
-  - warp
 
 library:
   source-dirs: src/
-
+  dependencies:
+    - containers
+    - text
+  
 executables:
   process-monitor-exe:
     source-dirs: exec_src/
     main: Main.hs
     other-modules: []
     dependencies:
+      - async
+      - process
       - process-monitor
+      - wai-middleware-prometheus
+      - warp

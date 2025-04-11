@@ -4,7 +4,7 @@
 import BlockApps.Logging
 import Blockchain.Init.Generator
 import Blockchain.Init.Options
-import Blockchain.Strato.Model.Options ()
+import Blockchain.Strato.Model.Options
 import Control.Monad.Composable.Kafka
 import Data.String
 import HFlags
@@ -18,4 +18,4 @@ main = do
 
   runLoggingT $
     runKafkaM "generator" kaddr $
-    mkAll flags_genesisBlockName
+    mkAll flags_network

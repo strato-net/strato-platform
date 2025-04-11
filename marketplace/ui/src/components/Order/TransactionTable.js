@@ -34,7 +34,7 @@ import {
   useTransactionDispatch,
   useTransactionState,
 } from '../../contexts/transaction';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
@@ -49,6 +49,7 @@ import {
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const TransactionTable = ({
   user,
@@ -82,7 +83,17 @@ const TransactionTable = ({
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -291,16 +302,9 @@ const TransactionTable = ({
   };
 
   const handleAssetRedirection = (data) => {
-    const isEthst = data?.assetOriginAddress === ethstAddress;
-    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    if (isEthst) {
-      const url = routes.EthstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (isWbtcst) {
-      const url = routes.WbtcstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
+    if (bridgeableAddresses?.includes(data?.assetOriginAddress)) {
+      const url = routes.bridgeableProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data.assetName)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {

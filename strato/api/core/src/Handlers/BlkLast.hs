@@ -16,8 +16,8 @@ where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
 import Blockchain.Data.Transaction
+import Blockchain.Model.JsonBlock
 import Control.Arrow ((&&&), (***))
 import Control.Monad.Composable.SQL
 import Data.Int

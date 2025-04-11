@@ -9,7 +9,7 @@ import BlockApps.Tools.DumpKafkaSequencer
 import BlockApps.Tools.DumpKafkaStateDiff
 import BlockApps.Tools.DumpKafkaUnSequencer
 import BlockApps.Tools.DumpKafkaVMEvents
-import BlockApps.Tools.DumpRedis
+import BlockApps.Tools.SyncStats
 import BlockApps.Tools.FRawMP as FRawMP
 import BlockApps.Tools.Hash as Hash
 import BlockApps.Tools.InsertP2P
@@ -46,7 +46,7 @@ data Options
   | DumpKafkaUnSequencer {startingBlock :: Int}
 --  | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
   | DumpKafkaStateDiff {startingBlock :: Int}
-  | DumpRedis {databaseNumber :: Integer}
+  | SyncStats {}
   | FRawMP {stateRoot :: String, filename :: String}
   | Hash {hash :: String}
   | InsertTX {}
@@ -70,12 +70,11 @@ stateOptions =
     State {root = undefined}
     [ root := def += typ "StateRoot" += argPos 0 ]
 
-dumpRedisOptions :: Annotate Ann
-dumpRedisOptions =
+syncStatsOptions :: Annotate Ann
+syncStatsOptions =
   record
-    DumpRedis {databaseNumber = undefined}
-    [ databaseNumber := 0 += typ "INT"
-    ]
+    SyncStats {}
+    [ ]
 
 hashOptions :: Annotate Ann
 hashOptions =
@@ -317,7 +316,7 @@ options =
       dumpKafkaSequencerP2pOptions,
       dumpKafkaStateDiffOptions,
       dumpKafkaUnSequencerOptions,
-      dumpRedisOptions,
+      syncStatsOptions,
       fRawMPOptions,
       hashOptions,
       insertTXOptions,
@@ -369,7 +368,7 @@ run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
 --run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
-run DumpRedis {..} = dumpRedis databaseNumber
+run SyncStats = syncStats
 run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
 run Hash {..} = Hash.doit hash
 run Raw {..} = Raw.doit filename

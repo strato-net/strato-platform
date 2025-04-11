@@ -111,8 +111,6 @@ const Inventory = ({ user }) => {
     dailyCataReward,
   } = useInventoryState();
 
-  const { ethstAddress } = useEthState();
-
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -157,6 +155,17 @@ const Inventory = ({ user }) => {
 
   const itemDispatch = useItemDispatch();
   const { message: itemMsg, success: itemSuccess } = useItemState();
+  const { message: ethMsg, success: ethSuccess, bridgeableTokens } = useEthState();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
+  
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } =
     useRedemptionState();
@@ -171,8 +180,7 @@ const Inventory = ({ user }) => {
     actions.getUserCataRewards(dispatch);
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
-    ethActions.fetchETHSTAddress(ethDispatch);
-    ethActions.fetchWBTCSTAddress(ethDispatch);
+    ethActions.fetchBridgeableTokens(ethDispatch);
   }, []);
 
   useEffect(() => {
@@ -341,6 +349,24 @@ const Inventory = ({ user }) => {
     }
   };
 
+  const ethToast = (placement) => {
+    if (ethSuccess) {
+      api.success({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
+        placement,
+        key: 9,
+      });
+    } else {
+      api.error({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
+        placement,
+        key: 10,
+      });
+    }
+  };
+
   const redemptionToast = (placement) => {
     if (redemptionSuccess) {
       api.success({
@@ -406,7 +432,7 @@ const Inventory = ({ user }) => {
                 <img
                   src={
                     record['BlockApps-Mercata-Asset-images'] &&
-                    record['BlockApps-Mercata-Asset-images'].length > 0
+                      record['BlockApps-Mercata-Asset-images'].length > 0
                       ? record['BlockApps-Mercata-Asset-images'][0].value
                       : image_placeholder
                   }
@@ -458,8 +484,8 @@ const Inventory = ({ user }) => {
           ? stratsAddress === record.originAddress
             ? parseFloat(record.price * 100).toFixed(2)
             : is18DecimalPlaces
-            ? parseFloat(record.price * 10 ** 18).toFixed(2)
-            : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
+              ? parseFloat(record.price * 10 ** 18).toFixed(2)
+              : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
           : 'N/A';
         return (
           <div>
@@ -489,10 +515,10 @@ const Inventory = ({ user }) => {
           stratsAddress === record.originAddress
             ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
             : is18DecimalPlaces
-            ? new BigNumber(record.quantity).dividedBy(
+              ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.quantity).dividedBy(
+              : new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(record.decimals || 0)
               )
         )
@@ -515,10 +541,10 @@ const Inventory = ({ user }) => {
           stratsAddress === record.originAddress
             ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
             : is18DecimalPlaces
-            ? new BigNumber(record.saleQuantity || 0).dividedBy(
+              ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.saleQuantity || 0).dividedBy(
+              : new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(record.decimals || 0)
               )
         ).toString();
@@ -539,6 +565,7 @@ const Inventory = ({ user }) => {
             category={category}
             allSubcategories={allSubcategories}
             user={user}
+            bridgeableTokens={bridgeableAddresses}
             supportedTokens={supportedTokens}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
@@ -570,8 +597,8 @@ const Inventory = ({ user }) => {
               <p className="text-[#4D4D4D] text-[13px]">Retired</p>
             </div>
           ) : (record.data.isMint &&
-              record.data.isMint === 'False' &&
-              record.quantity === 0) ||
+            record.data.isMint === 'False' &&
+            record.quantity === 0) ||
             (!record.data.isMint && record.quantity === 0) ? (
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
@@ -878,6 +905,7 @@ const Inventory = ({ user }) => {
       {itemMsg && itemToast('bottom')}
       {redemptionMsg && redemptionToast('bottom')}
       {issuerStatusMsg && issuerStatusToast('bottom')}
+      {ethMsg && ethToast('bottom')}
     </>
   );
 };

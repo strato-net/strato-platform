@@ -20,6 +20,7 @@ executables:
     - blockapps-datadefs
     - blockapps-mpdbs
     - blockapps-init
+    - blockDB
     - bytestring
     - cache
     - clock

@@ -23,7 +23,7 @@ module BlockApps.X509.Certificate
     HasSelectX509FieldDB,
     rootCert,
     certToBytes,
-    bsToCert,
+    bytesToCert,
     makeCert,
     verifyCert,
     verifyCertAgainstCerts,
@@ -128,7 +128,7 @@ instance NFData X509Certificate where
 
 instance Binary X509Certificate where
   put = (put :: C8.ByteString -> Put) <$> certToBytes
-  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
+  get = (fromRight (error "The certificate couldn't be decoded") . bytesToCert) <$> (get :: Get C8.ByteString)
 
 -- | The information we store in Redis DB. We store the information of the certificate, as well
 -- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
@@ -156,7 +156,7 @@ instance Ord X509CertInfoState where
 
 instance Binary X509CertInfoState where
     put = (put :: C8.ByteString -> Put) <$> certToBytes . certificate
-    get = x509CertToCertInfoState <$> (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
+    get = x509CertToCertInfoState <$> (fromRight (error "The certificate couldn't be decoded") . bytesToCert) <$> (get :: Get C8.ByteString)
 
 instance Format X509CertInfoState where
   format X509CertInfoState{..} =
@@ -291,7 +291,7 @@ instance ToSchema Subject where
 instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
 
-  rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bsToCert str
+  rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bytesToCert str
   rlpDecode x = error $ "rlpDecode for SignedCertificate failed: expected RLPString, got " ++ show x
 
 instance RLPSerializable (S.Set X509Certificate) where
@@ -306,7 +306,7 @@ instance ToJSON X509Certificate where
 instance FromJSON X509Certificate where
   parseJSON (String str) =
     let errDump err = fail $ "failed to JSON parse cert " ++ (show str) ++ " because " ++ err
-     in either (errDump) pure $ bsToCert $ C8.pack $ T.unpack str
+     in either (errDump) pure $ bytesToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
 instance ToSchema X509Certificate where
@@ -314,7 +314,7 @@ instance ToSchema X509Certificate where
 
 instance ToSample X509Certificate where
   toSamples _ =
-    singleSample . fromRight (error "NOOO! 😨") . bsToCert . C8.pack $
+    singleSample . fromRight (error "NOOO! 😨") . bytesToCert . C8.pack $
       unlines
         [ "-----BEGIN CERTIFICATE-----",
           "MIIBjDCCATCgAwIBAgIRAIs9fXiIfXIZ22paA1BYggYwDAYIKoZIzj0EAwIFADBH",
@@ -347,7 +347,7 @@ instance ToSample X509Certificate where
 rootCert :: X509Certificate
 rootCert =
   let eCert =
-        bsToCert $
+        bytesToCert $
           C8.pack $
             unlines
               [ "-----BEGIN CERTIFICATE-----",
@@ -380,8 +380,8 @@ signedCertToPem cert =
       pemContent = encodeSignedObject cert
     }
 
-bsToCert :: B.ByteString -> Either String X509Certificate
-bsToCert bs =
+bytesToCert :: B.ByteString -> Either String X509Certificate
+bytesToCert bs =
   case (pemParseBS bs) of
     Left str -> Left str
     Right [] -> Left "nothing parsed...but no errors?"

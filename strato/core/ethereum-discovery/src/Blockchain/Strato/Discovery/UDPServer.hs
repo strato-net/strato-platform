@@ -1,12 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MonoLocalBinds      #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
 
 {-# OPTIONS -fno-warn-deprecations #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
@@ -16,40 +16,40 @@ module Blockchain.Strato.Discovery.UDPServer
   )
 where
 
-import BlockApps.Logging
-import Blockchain.Data.PubKey
-import Blockchain.Strato.Discovery.ContextLite
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Discovery.P2PUtil
-import Blockchain.Strato.Discovery.UDP
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
-import Control.Monad (forM_, when)
-import Control.Monad.Catch
-import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.IO.Class
-import qualified Crypto.Types.PubKey.ECC as ECC
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.Either.Combinators
-import Data.Maybe (fromJust)
-import qualified Data.Text as T
-import Data.Time.Clock.POSIX
-import Network.Socket
-import System.Entropy
-import System.Random
-import qualified Text.Colors as CL
-import Text.Format
+import           BlockApps.Logging
+import           Blockchain.Data.PubKey
+import           Blockchain.Strato.Discovery.ContextLite
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.P2PUtil
+import           Blockchain.Strato.Discovery.UDP
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
+import           Control.Monad                           (forM_, when, unless)
+import           Control.Monad.Catch
+import qualified Control.Monad.Change.Alter              as A
+import qualified Control.Monad.Change.Modify             as Mod
+import           Control.Monad.IO.Class
+import qualified Crypto.Types.PubKey.ECC                 as ECC
+import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Base16                  as B16
+import qualified Data.ByteString.Char8                   as BC
+import           Data.Either.Combinators
+import           Data.Maybe                              (fromJust)
+import qualified Data.Text                               as T
+import           Data.Time.Clock.POSIX
+import           Network.Socket
+import           System.Entropy
+import           System.Random
+import qualified Text.Colors                             as CL
+import           Text.Format
 
 runEthUDPServer :: MonadDiscovery m => Int -> m ()
 runEthUDPServer minPeers = do
   pub <- getPub
   $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
-  $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
+  $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ format (fromPublicKey pub)
   udpHandshakeServer minPeers
 
 connectMe ::
@@ -60,8 +60,8 @@ connectMe (UDPPort port') = do
   (serveraddr : _) <-
     liftIO $
       getAddrInfo
-        (Just 
-          (defaultHints {addrFlags = [AI_PASSIVE] 
+        (Just
+          (defaultHints {addrFlags = [AI_PASSIVE]
           -- NOTE: I believe on day, we will want to use ipv6 addresses by default. Alas, today is not the day.
           -- But I will leave this line here with this comment in the hopes that when we do decide the day has come,
           -- all we need to do is uncomment the line below (will make platform prefer ipv6 over ipv4, so be prepared
@@ -98,7 +98,7 @@ attemptBond = do
   udpPort <- Mod.access (Mod.Proxy @UDPPort)
   tcpPort <- Mod.access (Mod.Proxy @TCPPort)
   unbondedPeers <- getUnbondedPeers
-  when (length unbondedPeers /= 0) . forM_ unbondedPeers $ \p -> do
+  unless (null unbondedPeers) . forM_ unbondedPeers $ \p -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
     forM_ mServerAddr \serverAddr ->
@@ -129,8 +129,8 @@ udpHandshakeServer minPeers = do
   _ <- case maybePacketData of
     Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
     Just (msg, addr) -> do
-      _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
-      catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> (T.pack $ show e)
+      _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ show (B.length msg)
+      catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> T.pack (show e)
   udpHandshakeServer minPeers
   where
     handler msg addr = case argValidator msg addr of
@@ -160,7 +160,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       case mPeer of
         Nothing -> do
           addPeer' otherUdpPort' otherTcpPort
-          fmap fromJust $ getPeerByIP' ip
+          fromJust <$> getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
           return p'
@@ -175,7 +175,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       case mPeer of
         Nothing -> do
           addPeer' otherUdpPort (TCPPort 30303)
-          fmap fromJust $ getPeerByIP' ip
+          fromJust <$> getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
           return p'
@@ -190,30 +190,30 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
   (FindNeighbors targetPubkey _) -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     let nextTime = time + 50
-    getPeerByIP' ip >>= \case 
+    getPeerByIP' ip >>= \case
       Nothing -> $logInfoS "handleValidPacket/FindNeighbors" "Ignoring FindNeigbors request from unknown peer"
-      Just peer -> do 
+      Just peer -> do
         A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
           Just (PeerBondingState b) | b > 1 -> do
             peers <- getPeersClosestTo targetPubkey otherPubKey
             let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
-            sendPacket (peer) $ Neighbors theNeighbors nextTime
+            sendPacket peer $ Neighbors theNeighbors nextTime
           _ -> do
             $logInfoS "handleValidPacket/FindNeighbors" "Recieved FindNeighbors request from a peer we are not bonded to; will attempt to bond first"
             udpPort <- Mod.access (Mod.Proxy @UDPPort)
             tcpPort <- Mod.access (Mod.Proxy @TCPPort)
             mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
-            case getHostAddress <$> mServerAddr of 
-              Just (Right hostAddress) -> sendPacket (peer) $ Ping 4 (Endpoint hostAddress udpPort tcpPort) (mkEndpoint peer) nextTime
+            case getHostAddress <$> mServerAddr of
+              Just (Right hostAddress) -> sendPacket peer $ Ping 4 (Endpoint hostAddress udpPort tcpPort) (mkEndpoint peer) nextTime
               _ -> $logErrorS "handleValidPacket/FindNeighbors" "Attempted to bond to peer but failed"
     where
       mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
       mkNodeId = pointToNodeID . fromJust . pPeerPubkey
   Neighbors neighbors _ -> do
-    let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
+    let neighborIPs = (\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors
     thePeer <- getPeerByIP' ip
     neighborsExist <- doPeersExist $ map read neighborIPs
-    if (neighborsExist == True)
+    if neighborsExist
       then do
         $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
         disErr <- storeDisableException (fromJust thePeer) (T.pack "duplicateNeighbors")
