@@ -4,10 +4,8 @@ A modular JavaScript tool for combining and deploying SOLIDVM contracts to the M
 
 ## Features
 
-- Combines SOLIDVM contracts from your BCC directory
+- Combines abstract SOLIDVM contracts and deploys it as Base Code Collection (bcc)
 - Loads all configuration from a `.env` file
-- Simple deployment with no constructor arguments
-- Clean, modular code structure
 
 ## Prerequisites
 
@@ -30,14 +28,6 @@ cp .env.sample .env
 # Edit .env with your configuration
 ```
 
-4. Add your SOLIDVM contracts to the `BCC` directory:
-
-```bash
-cd BCC
-# Add/Update your .sol files to the BCC directory
-# If new abstract contract is written, add to BaseCodeCollection.sol
-```
-
 ## Configuration
 
 All configuration is loaded from the `.env` file:
@@ -55,9 +45,9 @@ GLOBAL_ADMIN_NAME=your-username
 GLOBAL_ADMIN_PASSWORD=your-password
 
 # Contract Configuration
-CONTRACTS_DIR=./BCC
-MAIN_FILE=YourContract.sol  # Code collection contract file (optional)
-APP_NAME=YourAppName        # Name of the app (optional)
+CONTRACT_VERSION=ContractVersion # Default: v1 (optional)
+MAIN_FILE=YourContract.sol       # Code collection contract file (optional)
+APP_NAME=YourAppName             # Name of the app (optional)
 ```
 
 Required environment variables:
@@ -65,7 +55,9 @@ Required environment variables:
 - `GLOBAL_ADMIN_PASSWORD` - Admin password
 
 Optional environment variables:
-- `MAIN_FILE` - Code collection contract file to start with (if not specified, BaseCodeCollection.sol will be used.)
+- `CONTRACT_VERSION` - Version of Mercata contracts to deploy (if not specified, uses `v1` inside contracts directory.)
+- `MAIN_FILE` - Code collection contract file to start with (if not specified, `BaseCodeCollection.sol` will be used.)
+- `APP_NAME` - Name of the app the bcc will be deployed to (if not specified, `Mercata` will be used)
 
 ## Usage
 
@@ -85,16 +77,19 @@ This will:
 ## Project Structure
 
 ```
-project/
-  |-- Deploy/
+mercata/
+  |-- deploy/
   |    |-- deploy.js        # Main deployment script
   |    |-- auth.js          # Authentication utilities
   |    |-- contract.js      # Contract utilities
   |    |-- config.js        # Configuration loader
-  |-- BCC/                  # Directory for abstract SOLIDVM contracts
-  |-- Assets/               # Directory for concrete SOLIDVM contracts
-  |-- .env                  # Environment variables
+  |-- contracts/
+  |    |-- v#/              # Directory specifying the version of contracts to use  
+  |    |    |-- abstract/   # Directory for abstract SOLIDVM contracts
+  |    |    |-- concrete/   # Directory for concrete SOLIDVM contracts
+  |-- .env.sample           # Environment variable template
   |-- package.json          # Project dependencies
+  |-- README.md             # Project info.
 ```
 
 ## How It Works
@@ -105,22 +100,3 @@ The deployment process follows these steps:
 2. **Contract Combination**: Finds the code collection contract file and uses `importer.combine()` to combine it with all its dependencies
 3. **Deployment**: Deploys the combined contract using `rest.createContract()` with no constructor arguments
 4. **Results**: Returns and logs the deployed contract address
-
-## Programmatic Usage
-
-You can also use this tool programmatically:
-
-```javascript
-const deploy = require('./scripts/deploy');
-
-async function run() {
-  try {
-    const deployedContract = await deploy();
-    console.log(`Contract deployed at: ${deployedContract.address}`);
-  } catch (error) {
-    console.error('Deployment failed:', error);
-  }
-}
-
-run();
-```

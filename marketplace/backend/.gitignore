@@ -34,3 +34,5 @@ config/*.deploy.json
 temp
 
 config.yaml
+testnet.config.yaml
+prod.config.yaml
