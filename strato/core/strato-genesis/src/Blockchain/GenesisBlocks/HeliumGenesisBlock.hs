@@ -77,54 +77,56 @@ assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{.
 
 escrowToAccountInfos :: GE.Escrow -> [AccountInfo]
 escrowToAccountInfos GE.Escrow{..} =
-  if not isActive
-    then []
-    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleEscrow") $
-             [ (".:creator", BString $ encodeUtf8 "BlockApps")
-             , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
-             , (".:originAddress", BAccount $ unspecifiedChain address)
-             , (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
-             , (".borrowedAmount", BInteger borrowedAmount)
-             , (".borrower", BAccount $ unspecifiedChain borrower)
-             , (".borrowerCommonName", BString $ encodeUtf8 borrowerCommonName)
-             , (".collateralQuantity", BInteger collateralQuantity)
-             , (".collateralValue", BInteger collateralValue)
-             , (".isActive", BBool isActive)
-             , (".lastRewardTimestamp", BInteger lastRewardTimestamp)
-             , (".maxLoanAmount", BInteger maxLoanAmount)
-             , (".reserve", BAccount $ unspecifiedChain reserve)
-             , (".totalCataReward", BInteger totalCataReward)
-             , (".liquidationAmount", BInteger liquidationAmount)
-             , (".version", BString $ encodeUtf8 version)
-             ] ++ map (\(k,v) -> (".assets[" <> encodeUtf8 (T.pack $ show k) <> "]", BAccount $ unspecifiedChain v)) (M.toList assets)
-         ]
+  -- if not isActive
+  --   then []
+  --   else
+      [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleEscrow") $
+          [ (".:creator", BString $ encodeUtf8 "BlockApps")
+          , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+          , (".:originAddress", BAccount $ unspecifiedChain address)
+          , (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
+          , (".borrowedAmount", BInteger borrowedAmount)
+          , (".borrower", BAccount $ unspecifiedChain borrower)
+          , (".borrowerCommonName", BString $ encodeUtf8 borrowerCommonName)
+          , (".collateralQuantity", BInteger collateralQuantity)
+          , (".collateralValue", BInteger collateralValue)
+          , (".isActive", BBool isActive)
+          , (".lastRewardTimestamp", BInteger lastRewardTimestamp)
+          , (".maxLoanAmount", BInteger maxLoanAmount)
+          , (".reserve", BAccount $ unspecifiedChain reserve)
+          , (".totalCataReward", BInteger totalCataReward)
+          , (".liquidationAmount", BInteger liquidationAmount)
+          , (".version", BString $ encodeUtf8 version)
+          ] ++ map (\(k,v) -> (".assets[" <> encodeUtf8 (T.pack $ show k) <> "]", BAccount $ unspecifiedChain v)) (M.toList assets)
+      ]
 
 reserveToAccountInfos :: GR.Reserve -> [AccountInfo]
 reserveToAccountInfos GR.Reserve{..} =
-  if not isActive
-    then []
-    else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleReserve") $
-             [ (".:creator", BString $ encodeUtf8 "BlockApps")
-             , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
-             , (".:originAddress", BAccount $ unspecifiedChain address)
-             , (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
-             , (".cataAPYRate", BInteger cataAPYRate)
-             , (".cataToken", BAccount $ unspecifiedChain cataToken)
-             , (".isActive", BBool isActive)
-             , (".lastUpdatedOraclePrice", BDecimal . BC.pack $ show lastUpdatedOraclePrice)
-             , (".loanToValueRatio", BInteger loanToValueRatio)
-             , (".name", BString $ encodeUtf8 name)
-             , (".oracle", BAccount $ unspecifiedChain oracle)
-             , (".owner", BAccount $ unspecifiedChain owner)
-             , (".priceOfCATA", BDecimal . BC.pack $ show priceOfCATA)
-             , (".unitConversionRate", BInteger unitConversionRate)
-             , (".liquidationRatio", BInteger liquidationRatio)
-             , (".usdstToken", BAccount $ unspecifiedChain usdstToken)
-             , (".burnerAddress", BAccount $ unspecifiedChain burnerAddress)
-             , (".stratstoUSDSTFactor", BInteger stratstoUSDSTFactor)
-             , (".usdstPrice", BInteger usdstPrice)
-             ]
-         ]
+  -- if not isActive
+  --   then []
+  --   else
+      [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleReserve") $
+          [ (".:creator", BString $ encodeUtf8 "BlockApps")
+          , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+          , (".:originAddress", BAccount $ unspecifiedChain address)
+          , (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
+          , (".cataAPYRate", BInteger cataAPYRate)
+          , (".cataToken", BAccount $ unspecifiedChain cataToken)
+          , (".isActive", BBool isActive)
+          , (".lastUpdatedOraclePrice", BDecimal . BC.pack $ show lastUpdatedOraclePrice)
+          , (".loanToValueRatio", BInteger loanToValueRatio)
+          , (".name", BString $ encodeUtf8 name)
+          , (".oracle", BAccount $ unspecifiedChain oracle)
+          , (".owner", BAccount $ unspecifiedChain owner)
+          , (".priceOfCATA", BDecimal . BC.pack $ show priceOfCATA)
+          , (".unitConversionRate", BInteger unitConversionRate)
+          , (".liquidationRatio", BInteger liquidationRatio)
+          , (".usdstToken", BAccount $ unspecifiedChain usdstToken)
+          , (".burnerAddress", BAccount $ unspecifiedChain burnerAddress)
+          , (".stratstoUSDSTFactor", BInteger stratstoUSDSTFactor)
+          , (".usdstPrice", BInteger usdstPrice)
+          ]
+      ]
 
 certStrings :: [String]
 certStrings =
