@@ -1,5 +1,5 @@
 import "UTXO.sol";
-import "../Redemptions/RedemptionService.sol";
+//import "../Redemptions/RedemptionService.sol";
 
 abstract contract Redeemable is UTXO {
     uint public redeemableMagicNumber = 0x52656465656d61626c65; // 'Redeemable'

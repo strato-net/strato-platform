@@ -2,9 +2,9 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "../Sales/Sale.sol";
-import "../Enums/RestStatus.sol";
-import "../Utils/Utils.sol";
+//import "../Sales/Sale.sol";
+//import "../Enums/RestStatus.sol";
+//import "../Utils/Utils.sol";
 
 abstract contract PaymentService is Utils {
     address public owner;

@@ -22,6 +22,7 @@ module Blockchain.DB.RawStorageDB
     deleteRawStorageKey',
     flushMemRawStorageTxDBToBlockDB,
     flushMemRawStorageDB,
+    flushMemDBs
   )
 where
 
@@ -35,6 +36,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ExtendedWord
 import Control.Arrow ((***))
 import Control.Monad (forM_, join)
 import qualified Control.Monad.Change.Alter as A
@@ -177,6 +179,28 @@ flushMemRawStorageDB = do
 
   putMemRawStorageBlockMap M.empty
 
+flushMemDBs :: (MonadLogger m, FullRawStorage m) => m ()
+flushMemDBs = do
+  flushMemRawStorageTxDBToBlockDB
+  storageMap <- getMemRawStorageBlockDB
+
+  let changesByAddress :: Map Address [(ByteString, RawStorageValue)]
+      changesByAddress = M.fromListWith (++) $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList storageMap
+
+  forM_ (M.toList changesByAddress) $ \(a, changes) -> do
+    addressState <- A.lookupWithDefault A.Proxy a
+    cr' <- putAllRawStorageKeyValForStateRoot (addressStateContractRoot addressState) changes
+    A.insert A.Proxy a addressState {addressStateContractRoot = cr'}
+
+  flushMemAddressStateTxToBlockDB
+  addrStMap <- getAddressStateBlockDBMap
+  sr <- A.lookupWithDefault (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+  sr' <- putAllAddressStateKeyValForStateRoot sr $ M.toList addrStMap
+  A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr'
+
+  putMemRawStorageBlockMap M.empty
+  putAddressStateBlockDBMap M.empty
+
 --The following are the DB versions of the functions
 
 -- TODO(tim): This is kind of ugly, because it makes the assumption that the
@@ -193,14 +217,42 @@ putAllRawStorageKeyValForAddress ::
   [(ByteString, RawStorageValue)] ->
   m ()
 putAllRawStorageKeyValForAddress owner rawChanges = do
-  let changes :: [(MP.Key, MP.Val)]
-      changes = map (N.EvenNibbleString *** rlpEncode) rawChanges
-      blankValRLP = rlpEncode blankVal
-      (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
-      deleteKeys = map fst allDeletes
-
   addressState <- A.lookupWithDefault A.Proxy owner
   let sr = addressStateContractRoot addressState
+  sr'' <- putAllRawStorageKeyValForStateRoot sr rawChanges
+  A.insert A.Proxy owner addressState {addressStateContractRoot = sr''}
+
+putAllRawStorageKeyValForStateRoot ::
+  (MonadLogger m, FullRawStorage m) =>
+  MP.StateRoot ->
+  [(ByteString, RawStorageValue)] ->
+  m MP.StateRoot
+putAllRawStorageKeyValForStateRoot sr rawChanges = do
+  let changes :: [(MP.Key, MP.Val)]
+      changes = map (N.EvenNibbleString *** rlpEncode) rawChanges
+  putAllKeyValForStateRoot sr changes
+
+putAllAddressStateKeyValForStateRoot ::
+  (MonadLogger m, FullRawStorage m) =>
+  MP.StateRoot ->
+  [(Address, AddressStateModification)] ->
+  m MP.StateRoot
+putAllAddressStateKeyValForStateRoot sr rawChanges = do
+  let changes :: [(MP.Key, MP.Val)]
+      changes = map (addressAsNibbleString *** encodeASM) rawChanges
+      encodeASM (ASModification as) = rlpEncode as
+      encodeASM ASDeleted = rlpEncode blankVal
+  putAllKeyValForStateRoot sr changes
+
+putAllKeyValForStateRoot ::
+  (MonadLogger m, FullRawStorage m) =>
+  MP.StateRoot ->
+  [(MP.Key, MP.Val)] ->
+  m MP.StateRoot
+putAllKeyValForStateRoot sr changes = do
+  let blankValRLP = rlpEncode blankVal
+      (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
+      deleteKeys = map fst allDeletes
 
   for_ allInserts $ hashDBPut . fst
 
@@ -211,7 +263,7 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
 
   sr'' <- deleteManyKeyVal sr' deleteKeys
 
-  A.insert A.Proxy owner addressState {addressStateContractRoot = sr''}
+  pure sr''
 
 deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
 deleteManyKeyVal sr listOfDeletes =

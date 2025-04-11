@@ -71,7 +71,7 @@ putAccount ::
     Mem.HasMemAddressStateDB m,
     HasStateDB m,
     HasStorageDB m,
-    HasMemStorageDB m,
+    HasMemRawStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
   AccountInfo ->

@@ -2,10 +2,10 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "../Assets/Asset.sol";
-import "../Enums/RestStatus.sol";
-import "../Utils/Utils.sol";
-import "../Structs/Structs.sol";
+//import "../Assets/Asset.sol";
+//import "../Enums/RestStatus.sol";
+//import "../Utils/Utils.sol";
+//import "../Structs/Structs.sol";
 
 abstract contract Sale is Utils, Structs { 
 

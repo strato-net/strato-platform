@@ -47,7 +47,10 @@ genesisBlock  =
               0x1000
               720
               (SolidVMCode "Mercata" (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts))
-              []
+              [ (".:creator", BString $ encodeUtf8 "BlockApps")
+              , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+              , (".:originAddress", BAccount $ unspecifiedChain 0x1000)
+              ]
             ] ++ concatMap assetToAccountInfos GA.assets 
               ++ concatMap escrowToAccountInfos GE.escrows 
               ++ concatMap reserveToAccountInfos GR.reserves,
@@ -56,7 +59,11 @@ genesisBlock  =
 
 assetToAccountInfos :: GA.Asset -> [AccountInfo]
 assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{..} -> SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 $ T.unpack assetType) $
-  [ (".name", BString $ encodeUtf8 name)
+  [ (".:creator", BString $ encodeUtf8 "BlockApps")
+  , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+  , (".:originAddress", BAccount $ unspecifiedChain root)
+  , (".originAddress", BAccount $ unspecifiedChain root)
+  , (".name", BString $ encodeUtf8 name)
   , (".description", BString $ encodeUtf8 description)
   , (".owner", BAccount $ unspecifiedChain owner)
   , (".ownerCommonName", BString $ encodeUtf8 ownerCommonName)
@@ -64,7 +71,7 @@ assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{.
   ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
     ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
     ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
-    ++ catMaybes (map (\(k,v) -> ("." <> encodeUtf8 (T.pack $ show k),) <$> maybeDefault (textToBasicValue v)) (M.toList assetData))
+    ++ catMaybes (map (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData))
   where maybeDefault BDefault = Nothing
         maybeDefault v        = Just v
 
@@ -73,7 +80,10 @@ escrowToAccountInfos GE.Escrow{..} =
   if not isActive
     then []
     else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleEscrow") $
-             [ (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
+             [ (".:creator", BString $ encodeUtf8 "BlockApps")
+             , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+             , (".:originAddress", BAccount $ unspecifiedChain address)
+             , (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
              , (".borrowedAmount", BInteger borrowedAmount)
              , (".borrower", BAccount $ unspecifiedChain borrower)
              , (".borrowerCommonName", BString $ encodeUtf8 borrowerCommonName)
@@ -94,7 +104,10 @@ reserveToAccountInfos GR.Reserve{..} =
   if not isActive
     then []
     else [ SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 "SimpleReserve") $
-             [ (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
+             [ (".:creator", BString $ encodeUtf8 "BlockApps")
+             , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+             , (".:originAddress", BAccount $ unspecifiedChain address)
+             , (".assetRootAddress", BAccount $ unspecifiedChain assetRootAddress)
              , (".cataAPYRate", BInteger cataAPYRate)
              , (".cataToken", BAccount $ unspecifiedChain cataToken)
              , (".isActive", BBool isActive)
@@ -330,8 +343,31 @@ BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
 9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
 R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
 N8txKc8G9R27ZYAUuz15zF0=
------END CERTIFICATE-----|]
+-----END CERTIFICATE-----|],
 
+-- CN = BlockApps, O = BlockApps, OU = '', C = ''
+    [r|-----BEGIN CERTIFICATE-----
+MIIBgjCCASegAwIBAgIQP3LNH8vr+118O6J/CIP78jAMBggqhkjOPQQDAgUAMEgx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
+Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjQwNDIzMTcwNzI0WhcNMjUwNDIz
+MTcwNzI0WjA+MRIwEAYDVQQDDAlCbG9ja0FwcHMxEjAQBgNVBAoMCUJsb2NrQXBw
+czEJMAcGA1UECwwAMQkwBwYDVQQGDAAwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATf
+31hXrACSTv/8cNMI0tWeA0GOtrh2rSg7ssDhbduFZvoMIDD50CDKMdknVcWDbMN6
+rrmTpNpDx+lwiQA3fNsTMAwGCCqGSM49BAMCBQADRwAwRAIgZ6z4c630p5S4ubC3
+FnsaXJsWsGrXKNZbaZMeUfRBYugCIGAFGgSqW1PSoLvwXeK1ih9BBjyKFpW+PlE/
+jtQJMv3t
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
+MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
+MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
+9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
+R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
+N8txKc8G9R27ZYAUuz15zF0=
+-----END CERTIFICATE-----|]
 
   ]
 
