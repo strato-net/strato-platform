@@ -2344,16 +2344,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const reserve = reserves[0].address;
 
     // Find the Escrows associated with the Reserve (if any, if not set it as zero address)
-    const escrowQueryArgs = {
-      select: 'address',
-      reserve: `eq.${reserve}`,
-      borrowerCommonName: `eq.${ownerCommonName}`,
-      isActive: IS_ACTIVE,
+    const escrowSearchOptions = {
+      ...options,
+      query: {
+        select: 'address',
+        reserve: `eq.${reserve}`,
+        borrowerCommonName: `eq.${ownerCommonName}`,
+        isActive: IS_ACTIVE,
+        creator: CREATOR,
+      },
     };
-    const escrows = await escrowJs.searchEscrow(
+    const escrows = await rest.search(
       rawAdmin,
-      escrowQueryArgs,
-      options
+      { name: 'BlockApps-Mercata-Escrow' },
+      escrowSearchOptions
     );
     const escrowAddress =
       escrows && escrows.length > 0
