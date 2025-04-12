@@ -82,8 +82,7 @@ const App = () => {
     try {
       const { data } = lastMessage;
       const parsedData = JSON.parse(data);
-      // TODO: Remove this log when we are in production
-      console.log('WebSocket event:', parsedData);
+
       const { eventEvent, eventTxHash } = parsedData || {};
       if (!eventEvent || !eventTxHash) return;
 
