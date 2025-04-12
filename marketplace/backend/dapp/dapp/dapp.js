@@ -2367,7 +2367,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         ownerCommonName: `eq.${ownerCommonName}`,
         root: `eq.${assetRootAddress}`,
         address: `neq.${assetRootAddress}`,
-        queryOptions: { select: 'address,quantity::text' },
+        select: 'address,quantity::text',
         transaction_hash: `eq.${eventTxHash}`,
         limit: 1,
       },
