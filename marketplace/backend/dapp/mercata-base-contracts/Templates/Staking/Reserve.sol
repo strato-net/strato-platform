@@ -142,32 +142,29 @@ abstract contract Reserve is Utils, Structs {
             );
             escrow = Escrow(simpleEscrow);
         } else {
-        try {
-            if (escrow.version() == "2.0") {
-                escrow.attachAssets(
-                    _assets,
-                    _collateralQuantity,
-                    (_oraclePrice * usdstPrice),
-                    loanToValueRatio,
-                    liquidationRatio
-                );
-                }
-            }
-            catch {
-                
+            try {
+                if (escrow.version() == "2.0") {
                     escrow.attachAssets(
                         _assets,
                         _collateralQuantity,
-                        (_oraclePrice * stratstoUSDSTFactor),
+                        (_oraclePrice * usdstPrice),
                         loanToValueRatio,
                         liquidationRatio
                     );
                 }
+            }
+            catch {
+                escrow.attachAssets(
+                    _assets,
+                    _collateralQuantity,
+                    (_oraclePrice * stratstoUSDSTFactor),
+                    loanToValueRatio,
+                    liquidationRatio
+                );
+            }
         }
 
-        uint escrowQuantity = escrow.collateralQuantity();
-
-        emit StakeCreated(escrow.borrower(), address(escrow), escrowQuantity, escrow.maxLoanAmount()); 
+        emit StakeCreated(escrow.borrower(), address(escrow), _collateralQuantity, escrow.maxLoanAmount()); 
         return address(escrow);
     }
 
