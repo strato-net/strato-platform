@@ -1183,12 +1183,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return tokensJs.addHash(rawAdmin, args, options);
   };
 
-  contract.getBridgeableAddresses = async function (args, options = defaultOptions) {
+  contract.getBridgeableAddresses = async function (
+    args,
+    options = defaultOptions
+  ) {
     return tokensJs.getBridge(rawAdmin, args, options);
   };
 
   contract.bridgeOut = async function (args, options = defaultOptions) {
-    const { tokenAssetRootAddress, assetAddress, quantity, externalChainWalletAddress } = args;
+    const {
+      tokenAssetRootAddress,
+      assetAddress,
+      quantity,
+      externalChainWalletAddress,
+    } = args;
 
     const bnQauntity = new BigNumber(quantity);
 
@@ -2247,7 +2255,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.borrow = async function (args, options = defaultOptions) {
-    return await reserveJs.borrow(rawAdmin, { userCommonName, ...args}, options);
+    return await reserveJs.borrow(
+      rawAdmin,
+      { userCommonName, ...args },
+      options
+    );
   };
 
   contract.repay = async function (args, options = defaultOptions) {
@@ -2325,6 +2337,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const IS_ACTIVE = 'eq.true';
 
     // Find the Escrows associated with the Reserve (if any, if not set it as zero address)
+    console.log('stakeAfterBridge - userCommonName: ', userCommonName);
     const escrowSearchOptions = {
       ...options,
       query: {
@@ -2340,11 +2353,36 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       { name: 'BlockApps-Mercata-Escrow' },
       escrowSearchOptions
     );
-    const firstEscrow = escrows?.[0] || { address: constants.zeroAddress, reserve: constants.zeroAddress };
-    const { address: escrowAddress, reserve: escrowReserveAddress } = firstEscrow;
-    
-    if (escrowReserveAddress === constants.zeroAddress) {
-      throw new Error(`Escrow ${escrowAddress} is not associated with a reserve`);
+    console.log('escrows:', escrows);
+    const firstEscrow = escrows?.[0] || {
+      address: constants.zeroAddress,
+      reserve: constants.zeroAddress,
+    };
+    let { address: escrowAddress, reserve } = firstEscrow;
+
+    if (reserve === undefined || reserve === constants.zeroAddress) {
+      const reserveSearchOptions = {
+        ...options,
+        query: {
+          creator: CREATOR,
+          isActive: IS_ACTIVE,
+          assetRootAddress: `eq.${assetRootAddress}`,
+          select: 'address',
+        },
+      };
+
+      const reserves = await rest.search(
+        rawAdmin,
+        { name: 'BlockApps-Mercata-Reserve' },
+        reserveSearchOptions
+      );
+      if (!reserves || reserves.length === 0) {
+        throw new Error(
+          'No active reserves found for asset root address: ' + assetRootAddress
+        );
+      }
+
+      reserve = reserves[0].address;
     }
 
     // Find the user's latest Asset with the MercataETHBridge address
@@ -2370,7 +2408,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     // Stake the Asset
     const stakeArgs = {
-      reserve: escrowReserveAddress,
+      reserve,
       escrowAddress,
       assets: [asset.address],
       collateralQuantity: asset.quantity,
