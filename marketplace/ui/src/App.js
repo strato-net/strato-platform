@@ -97,7 +97,6 @@ const App = () => {
       const body = {
         eventTxHash,
         assetRootAddress: eventContractAddress,
-        ownerCommonName: args.username,
       };
 
       inventoryActions.stakeAfterBridge(inventoryDispatch, body);

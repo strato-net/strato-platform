@@ -2318,38 +2318,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.stakeAfterBridge = async function (args, options = defaultOptions) {
-    const { assetRootAddress, ownerCommonName, eventTxHash } = args;
+    const { assetRootAddress, eventTxHash } = args;
 
     // Use the MercataETHBridge address to find the Reserve address
     const CREATOR = 'in.(BlockApps,mercata_usdst)';
     const IS_ACTIVE = 'eq.true';
-    const reserveSearchOptions = {
-      ...options,
-      query: {
-        creator: CREATOR,
-        isActive: IS_ACTIVE,
-        assetRootAddress: `eq.${assetRootAddress}`,
-      },
-    };
-
-    const reserves = await rest.search(
-      rawAdmin,
-      { name: 'BlockApps-Mercata-Reserve' },
-      reserveSearchOptions
-    );
-    if (!reserves || reserves.length === 0) {
-      throw new Error('No active reserves found for the given address');
-    }
-
-    const reserve = reserves[0].address;
 
     // Find the Escrows associated with the Reserve (if any, if not set it as zero address)
     const escrowSearchOptions = {
       ...options,
       query: {
-        select: 'address',
-        reserve: `eq.${reserve}`,
-        borrowerCommonName: `eq.${ownerCommonName}`,
+        select: 'address,reserve',
+        assetRootAddress: `eq.${assetRootAddress}`,
+        borrowerCommonName: `eq.${userCommonName}`,
         isActive: IS_ACTIVE,
         creator: CREATOR,
       },
@@ -2359,16 +2340,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       { name: 'BlockApps-Mercata-Escrow' },
       escrowSearchOptions
     );
-    const escrowAddress =
-      escrows && escrows.length > 0
-        ? escrows[0].address
-        : constants.zeroAddress;
+    const firstEscrow = escrows?.[0] || { address: constants.zeroAddress, reserve: constants.zeroAddress };
+    const { address: escrowAddress, reserve: escrowReserveAddress } = firstEscrow;
+    
+    if (escrowReserveAddress === constants.zeroAddress) {
+      throw new Error(`Escrow ${escrowAddress} is not associated with a reserve`);
+    }
 
     // Find the user's latest Asset with the MercataETHBridge address
     const assetSearchOptions = {
       ...options,
       query: {
-        ownerCommonName: `eq.${ownerCommonName}`,
+        ownerCommonName: `eq.${userCommonName}`,
         root: `eq.${assetRootAddress}`,
         address: `neq.${assetRootAddress}`,
         select: 'address,quantity::text',
@@ -2387,7 +2370,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     // Stake the Asset
     const stakeArgs = {
-      reserve,
+      reserve: escrowReserveAddress,
       escrowAddress,
       assets: [asset.address],
       collateralQuantity: asset.quantity,

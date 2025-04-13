@@ -191,7 +191,6 @@ class ReserveController {
     const schema = Joi.object({
       eventTxHash: Joi.string().required(),
       assetRootAddress: Joi.string().required(),
-      ownerCommonName: Joi.string().required(),
     });
     ReserveController.validateArgs(args, schema, 'Stake');
   }
