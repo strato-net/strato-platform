@@ -2337,12 +2337,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const IS_ACTIVE = 'eq.true';
 
     // Find the Escrows associated with the Reserve (if any, if not set it as zero address)
-    console.log('stakeAfterBridge - userCommonName: ', userCommonName);
     const escrowSearchOptions = {
       ...options,
       query: {
         select: 'address,reserve',
-        assetRootAddress: `eq.${assetRootAddress}`,
+        assetRootAddress: `eq.${assetRootAddress}:main`,
         borrowerCommonName: `eq.${userCommonName}`,
         isActive: IS_ACTIVE,
         creator: CREATOR,
@@ -2353,7 +2352,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       { name: 'BlockApps-Mercata-Escrow' },
       escrowSearchOptions
     );
-    console.log('escrows:', escrows);
+
     const firstEscrow = escrows?.[0] || {
       address: constants.zeroAddress,
       reserve: constants.zeroAddress,
