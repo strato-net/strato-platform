@@ -1,119 +1,161 @@
-import "../Pools/Pool.sol";
-// import "../Bridge/MercataETHBridge.sol";
+pragma es6;
+pragma strict;
 
-import "../ERC20/ERC20.sol";
-import "../ERC20/extensions/ERC20Burnable.sol";
-import "../ERC20/access/Ownable.sol";
+import <509>;
+import "../Assets/Asset.sol";
+import "../Enums/RestStatus.sol";
+import "../Utils/Utils.sol";
 
-/**
- * @title RedemptionContract
- * @dev Allows holders to redeem their tokens for usdcTokens at the redemption price,
- * providing an arbitrage mechanism to help balance the pool
- */
-abstract contract RedemptionService is Ownable, ERC20Burnable {
-    // The token that can be redeemed
-    ERC20Burnable public token;
+/// @title A representation of PaymentProvider_1 assets
+abstract contract RedemptionService is Utils {
+    address public owner;
+    string public ownerCommonName;
 
     bool public isActive;
 
-    // The associated liquidity pool
-    Pool public pool;
-    // The redemption price in usdcTokens (scaled by 1e18)
-    uint256 public spotPrice;
-    // Maximum amount that can be redeemed in a single transaction
-    uint256 public maxRedemptionAmount;
+    string public serviceName;
+    string public imageURL;
+    string public redeemText;
 
-    event Redeemed(address redeemer, uint256 tokenAmount);
-    event RedemptionPriceUpdated(uint256 newPrice);
-    event MaxRedemptionAmountUpdated(uint256 newAmount);
-    event SpotPriceUpdated(uint256 newPrice);
+    string public serviceURL;
+    string public createRedemptionRoute;
+    string public outgoingRedemptionsRoute;
+    string public incomingRedemptionsRoute;
+    string public getRedemptionRoute;
+    string public closeRedemptionRoute;
+    string public createCustomerAddressRoute;
+    string public getCustomerAddressRoute;
 
-    constructor(
-        address _token,
-        address _pool,
-        uint256 _initialSpotPrice,
-        uint256 _maxRedemptionAmount
-    ) {
-        token = ERC20Burnable(_token);
-        pool = Pool(_pool);
-        spotPrice = _initialSpotPrice;
-        maxRedemptionAmount = _maxRedemptionAmount;
+    event Redemption (
+        string redemptionId,
+        Asset asset,
+        string issuer,
+        string owner,
+        uint quantity
+    );
+
+    constructor (
+        string _serviceName,
+        string _imageURL,
+        string _redeemText,
+        string _serviceURL,
+        string _createRedemptionRoute,
+        string _outgoingRedemptionsRoute,
+        string _incomingRedemptionsRoute,
+        string _getRedemptionRoute,
+        string _closeRedemptionRoute,
+        string _createCustomerAddressRoute,
+        string _getCustomerAddressRoute
+    ) public {
+        owner = msg.sender;
+        ownerCommonName = getCommonName(msg.sender);
+
+        isActive = true;
+
+        serviceName = _serviceName;
+        imageURL = _imageURL;
+        if (_redeemText != "") {
+            redeemText = _redeemText;
+        } else {
+            redeemText = "Redeem";
+        }
+
+        serviceURL = _serviceURL;
+        createRedemptionRoute = _createRedemptionRoute;
+        outgoingRedemptionsRoute = _outgoingRedemptionsRoute;
+        incomingRedemptionsRoute = _incomingRedemptionsRoute;
+        getRedemptionRoute = _getRedemptionRoute;
+        closeRedemptionRoute = _closeRedemptionRoute;
+        createCustomerAddressRoute = _createCustomerAddressRoute;
+        getCustomerAddressRoute = _getCustomerAddressRoute;
+    }
+
+    modifier requireOwner(string action) {
+        string err = "Only the owner can "
+                   + action
+                   + ".";
+        require(getCommonName(msg.sender) == ownerCommonName, err);
+        _;
     }
 
     modifier requireActive(string action) {
-        string err = "The redemption service must be active to "
+        string err = "The payment service must be active to "
                    + action
                    + ".";
         require(isActive, err);
         _;
     }
 
+    function transferOwnership(address _newOwner) requireOwner("transfer ownership") external {
+        owner = _newOwner;
+        ownerCommonName = getCommonName(owner);
+    }
 
-    function deactivate() onlyOwner external {
+    function deactivate() requireOwner("deactivate the redemption service") external {
         isActive = false;
     }
 
-    function activate() onlyOwner external {
-        isActive = true;
+    function redemptionRequested (
+        string _redemptionId
+    ) public {
+        Asset asset = Asset(msg.sender);
+        emit Redemption (
+            _redemptionId,
+            Asset(msg.sender),
+            msg.sender.creator,
+            asset.ownerCommonName(),
+            asset.quantity()
+        );
     }
 
-    /**
-     * @notice Updates the redemption price. Only owner can update.
-     * @param newPrice New redemption price (scaled by 1e18)
-     */
-    function updateSpotPrice(uint256 newPrice) external onlyOwner requireActive("update the redemption price") {
-        require(newPrice > 0, "Invalid price");
-        spotPrice = newPrice;
-        emit SpotPriceUpdated(newPrice);
-    }
+    function update(
+        string _imageURL
+    ,   string _redeemText
+    ,   string _serviceURL
+    ,   string _createRedemptionRoute
+    ,   string _outgoingRedemptionsRoute
+    ,   string _incomingRedemptionsRoute
+    ,   string _getRedemptionRoute
+    ,   string _closeRedemptionRoute
+    ,   string _createCustomerAddressRoute
+    ,   string _getCustomerAddressRoute
+    ,   uint   _scheme
+    ) requireOwner("update the redemption service") public returns (uint) {
+      if (_scheme == 0) {
+        return RestStatus.OK;
+      }
 
-    /**
-     * @notice Updates the maximum redemption amount. Only owner can update.
-     * @param newAmount New maximum redemption amount
-     */
-    function updateMaxRedemptionAmount(uint256 newAmount) external onlyOwner requireActive("update the maximum redemption amount") {
-        require(newAmount > 0, "Invalid amount");
-        maxRedemptionAmount = newAmount;
-        emit MaxRedemptionAmountUpdated(newAmount);
-    }
+      if ((_scheme & (1 << 0)) == (1 << 0)) {
+        imageURL = _imageURL;
+      }
+      if ((_scheme & (1 << 1)) == (1 << 1)) {
+        redeemText = _redeemText;
+      }
+      if ((_scheme & (1 << 2)) == (1 << 2)) {
+        serviceURL = _serviceURL;
+      }
+      if ((_scheme & (1 << 3)) == (1 << 3)) {
+        createRedemptionRoute = _createRedemptionRoute;
+      }
+      if ((_scheme & (1 << 4)) == (1 << 4)) {
+        outgoingRedemptionsRoute = _outgoingRedemptionsRoute;
+      }
+      if ((_scheme & (1 << 5)) == (1 << 5)) {
+        incomingRedemptionsRoute = _incomingRedemptionsRoute;
+      }
+      if ((_scheme & (1 << 6)) == (1 << 6)) {
+        getRedemptionRoute = _getRedemptionRoute;
+      }
+      if ((_scheme & (1 << 7)) == (1 << 7)) {
+        closeRedemptionRoute = _closeRedemptionRoute;
+      }
+      if ((_scheme & (1 << 8)) == (1 << 8)) {
+        createCustomerAddressRoute = _createCustomerAddressRoute;
+      }
+      if ((_scheme & (1 << 9)) == (1 << 9)) {
+        getCustomerAddressRoute = _getCustomerAddressRoute;
+      }
 
-    /**
-     * @notice Redeem tokens for underlying assets at the spot price
-     * @param tokenAmount Amount of tokens to redeem
-     * @param baseAddress For crypto assets, the address to receive the native tokens
-     */
-    function redeemAtSpot(uint256 tokenAmount, string memory baseAddress) external virtual;
-
-    /**
-     * @notice Withdraw excess tokens/usdcTokens. Only owner can withdraw.
-     * @param tokenAddress Address of token to withdraw
-     * @param amount Amount to withdraw
-     */
-    function withdrawTokens(address tokenAddress, uint256 amount) external onlyOwner {
-        ERC20 tokenToWithdraw = ERC20(tokenAddress);
-        require(tokenToWithdraw.transfer(owner(), amount), "Transfer failed");
+      return RestStatus.OK;
     }
-
-    /**
-     * @notice Get current pool price for comparison
-     * @return Current pool price scaled by 1e18
-     */
-    function getPoolPrice() public view returns (uint) {
-        return uint(pool.getCurrentTokenPrice() * 1e18);
-    }
-
-    /**
-     * @notice Check if arbitrage opportunity exists
-     * @return bool Whether arbitrage is possible
-     * @return uint256 Price difference (absolute value, scaled by 1e18)
-     */
-    function checkArbitrage() external view returns (bool, uint256) {
-        uint256 poolPrice = getPoolPrice();
-        if (poolPrice > spotPrice) {
-            return (true, poolPrice - spotPrice);
-        } else if (spotPrice > poolPrice) {
-            return (true, spotPrice - poolPrice);
-        }
-        return (false, 0);
-    }
-} 
+}

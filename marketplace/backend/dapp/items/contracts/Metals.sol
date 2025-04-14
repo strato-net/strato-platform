@@ -19,9 +19,9 @@ enum UnitOfMeasurement {
 }
 
 /// @title A representation of Metals assets
-contract Metals is Asset, MercataMetadata, UnitOfMeasurement{
+contract Metals is Mintable, UnitOfMeasurement{
 
-    MercataMetadata public metadata;
+    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     //categorical
     UnitOfMeasurement public unitOfMeasurement;
@@ -31,34 +31,54 @@ contract Metals is Asset, MercataMetadata, UnitOfMeasurement{
 
     constructor(
         string _name,
-        string _symbol,
         string _description,
         string[] _images,
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint256 _initialSupply,
-        uint8 _decimals,
+        uint _quantity,
+        uint _decimals,
         UnitOfMeasurement _unitOfMeasurement,
         uint _leastSellableUnits,
         string _source,
         string _purity,
-        address _redemptionService,
-        address _metadataContract
-    ) Asset (
+        AssetStatus _status,
+        address _redemptionService
+    ) Mintable (
         _name,
-        _symbol,    
-        _initialSupply,
-        _decimals
+        _description,
+        _images,
+        _files,
+        _fileNames,
+        _createdDate,
+        _quantity,
+        _decimals,
+        _status,
+        _redemptionService
         ) 
     {
         unitOfMeasurement = _unitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
         source = _source;
         purity = _purity;
-
-        metadata = MercataMetadata(_metadataContract);
-        metadata.registerMetadata(address(this), _name, _description, _images, _files, _fileNames, _createdDate);
     }
 
+    function mint(uint splitQuantity) internal override returns (UTXO) {
+        Metals newAsset = new Metals(name,
+                              description, 
+                              images, 
+                              files, 
+                              fileNames,
+                              createdDate, 
+                              splitQuantity,
+                              decimals,
+                              unitOfMeasurement,
+                              leastSellableUnits,
+                              source,
+                              purity,
+                              status,
+                              address(redemptionService)
+                              );
+        return UTXO(address(newAsset)); 
+}
 }
