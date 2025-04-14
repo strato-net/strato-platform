@@ -90,7 +90,7 @@ const actions = {
           type: actionDescriptors.addHashSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, `Successfully initiated the bridging of ${payload.amount} ${payload.tokenName} to ${payload.amount} ${payload.tokenName}ST.`, true);
+        actions.setMessage(dispatch, `Successfully initiated the bridging of ${payload.amount} ${payload.tokenName.toLowerCase().endsWith("st") ? payload.tokenName.slice(0, -2) : payload.tokenName} to ${payload.amount} ${payload.tokenName}.`, true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
@@ -151,7 +151,7 @@ const actions = {
           type: actionDescriptors.bridgeOutSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, `Successfully initiated the bridging of ${quantityNumber} ${tokenName} to ${quantityNumber} ${tokenName.toLowerCase().endsWith("st") ? tokenName.slice(0, -2) : tokenName}.`, true);
+        actions.setMessage(dispatch, `Successfully initiated the bridging of ${quantityNumber} ${tokenName.toLowerCase().endsWith("st") ? tokenName.slice(0, -2) : tokenName} to ${quantityNumber} ${tokenName}.`, true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
