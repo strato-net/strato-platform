@@ -14,7 +14,10 @@ import { handleErrors } from '../../lib/handleErrors';
 const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset, searchTerm) {
+  console.log(searchTerm, 'searchTerm');
   const isAddress = /^0x[a-fA-F0-9]{40}$/.test(searchTerm);
+
+  console.log(isAddress, 'isAddress');
 
   const queryParam = isAddress
     ? `&address=${searchTerm}`
@@ -45,6 +48,7 @@ export function getContracts(chainid, limit, offset, searchTerm) {
 export function* fetchContracts(action) {
   try {
     let response = yield call(getContracts, action.chainId, action.limit, action.offset, action.name);
+    console.log(response, 'response');
     yield put(fetchContractsSuccess(response));
   }
   catch (err) {
