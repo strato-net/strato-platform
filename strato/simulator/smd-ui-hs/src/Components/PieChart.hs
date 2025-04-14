@@ -41,7 +41,7 @@ pieChart config = do
     el "h3" $ text (pcTitle config)
     
     -- Chart container
-    elAttr "svg" (Map.fromList
+    elSvgAttr "svg" (Map.fromList
       [ ("width", T.pack $ show (radius * 2))
       , ("height", T.pack $ show (radius * 2))
       ]) $ do
@@ -52,6 +52,9 @@ pieChart config = do
       
       -- Add legend
       drawLegend (zip (pcData config) slices)
+
+elSvgAttr :: MonadWidget t m => T.Text -> Map.Map T.Text T.Text -> m a -> m a
+elSvgAttr elTag attrs = fmap snd . elDynAttrNS' (Just "http://www.w3.org/2000/svg") elTag (constDyn attrs)
 
 -- Calculate slice angles and percentages
 calculateSlices :: [PieData] -> Double -> [(Double, Double)]
@@ -78,7 +81,7 @@ drawSlice centerX centerY radius index (startAngle, percentage) = do
       endY = centerY + radius * sin endRad
       largeArc = if endAngle - startAngle > 180 then (1 :: Integer) else 0
   
-  elAttr "path" (Map.fromList
+  elSvgAttr "path" (Map.fromList
     [ ("d", T.pack $ concat
         [ "M ", show centerX, ",", show centerY
         , " L ", show startX, ",", show startY

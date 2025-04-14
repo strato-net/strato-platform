@@ -1,43 +1,65 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo #-}
 
 module Main.App where
 
-import Reflex.Dom.Core
-import qualified Data.Text as T
-import qualified Data.Map as Map
+import Reflex.Dom
 import State.Store
-import Routing
+import Types.Route
+import Components.Blocks (blocksWidget)
+import Components.BitcoinBridge.Bridge
+import Components.BitcoinBridge.Overview
+import Components.BitcoinBridge.RPCPanel
+import Components.Contracts (contractsWidget)
+import Components.Dashboard (dashboardWidget)
+import Components.Marketplace.Home
+import Components.Marketplace.MyTransactions
+import Components.Marketplace.MyWallet
+import Components.Marketplace.ActivityFeed
+import Components.Marketplace.Stake
+import Components.Users (usersWidget)
+import Components.Tabs
+import Control.Monad (join)
 
--- | Route configuration mapping URLs to routes
-routeConfig :: Map.Map T.Text Route
-routeConfig = Map.fromList
-  [ ("/", Dashboard)
-  , ("/accounts", Accounts)
-  , ("/contracts", Contracts)
-  , ("/blocks", Blocks)
-  ]
-
--- | Initial route event that never fires
-routeEvent :: Reflex t => Event t Route
-routeEvent = never
-
--- Main application widget
 mainWidget :: MonadWidget t m => m ()
 mainWidget = do
-  -- Initialize state
-  stateDyn <- stateManager
-  
-  -- Create route state
-  routeDyn <- foldDyn ($) Dashboard $ leftmost
-    [ const <$> routeEvent
-    , const <$> routeChangeEvent
-    ]
-  
-  -- Main container
-  elAttr "div" (Map.singleton "class" "container") $ do
-    -- Router
-    router routeDyn stateDyn
+  appStateDyn <- stateManager
+  elClass "div" "layout-root" $ do
+    -- Top-level route tabs
+    topRouteDyn <- topRouteTabs
 
-  where
-    routeChangeEvent = never  -- TODO: Implement proper routing
+    elClass "div" "layout-below-top-tabs" $ do
+      -- Sub-route tabs, scoped to top-level
+      subRouteEv <- elClass "nav" "sidebar-nav" $ do
+        elClass "div" "logo" $ text "STRATO Mercata"
+        routeEv <- dyn $ ffor topRouteDyn $ \case
+          RouteSMD _ -> smdTabs
+          RouteMarketplace _ -> marketplaceTabs
+          RouteBridge _ -> bridgeTabs
+        elClass "div" "footer" $ do
+          text "blockapps"
+          elAttr "img" ( "src" =: "blockapps-logo.png" ) blank
+        pure routeEv
+    
+      subRouteDyn <- join <$> holdDyn (constDyn $ RouteSMD SMDDashboard) subRouteEv
+
+      -- View rendering
+      elClass "div" "content" $ dyn_ $ ffor subRouteDyn $ \case
+        RouteSMD SMDDashboard               -> dashboardWidget appStateDyn
+        RouteSMD SMDUsers                   -> usersWidget appStateDyn
+        RouteSMD SMDTransactions            -> el "h2" $ text "Transactions View"
+        RouteSMD SMDContracts               -> contractsWidget appStateDyn
+        RouteSMD SMDBlocks                  -> blocksWidget appStateDyn
+        RouteSMD SMDContractEditor          -> el "h2" $ text "Contract Editor"
+
+        RouteMarketplace MarketHome         -> marketplaceHome appStateDyn
+        RouteMarketplace MarketTransactions -> myTransactionsWidget appStateDyn
+        RouteMarketplace MarketWallet       -> myWalletWidget appStateDyn
+        RouteMarketplace MarketFeed         -> activityFeedWidget
+        RouteMarketplace MarketStake        -> stakeTabWidget
+
+        RouteBridge BridgeOverview          -> overviewTabWidget appStateDyn
+        RouteBridge BridgeBridge            -> bridgeTabWidget appStateDyn
+        RouteBridge BridgeRPC               -> rpcTabWidget appStateDyn

@@ -24,6 +24,9 @@ defaultBarGraphConfig = BarGraphConfig
   , bgUnits = Nothing
   }
 
+elSvgAttr :: MonadWidget t m => T.Text -> Map.Map T.Text T.Text -> m a -> m a
+elSvgAttr elTag attrs = fmap snd . elDynAttrNS' (Just "http://www.w3.org/2000/svg") elTag (constDyn attrs)
+
 -- BarGraph component
 barGraph :: (MonadWidget t m) => BarGraphConfig -> m ()
 barGraph config = do
@@ -32,14 +35,14 @@ barGraph config = do
         else maximum (bgData config)
       height = 200 :: Double
       width = 300 :: Double
-      barWidth = width / fromIntegral (length (bgData config))
+      barWidth = 25 :: Double
   
   elAttr "div" (Map.singleton "class" "bar-graph") $ do
     -- Graph title
     el "h3" $ text (bgLabel config)
     
     -- Graph container
-    elAttr "svg" (Map.fromList
+    elSvgAttr "svg" (Map.fromList
       [ ("width", T.pack $ show width)
       , ("height", T.pack $ show height)
       , ("id", bgIdentifier config)
@@ -51,7 +54,7 @@ barGraph config = do
       -- Add units if specified
       case bgUnits config of
         Just units -> do
-          elAttr "text" (Map.fromList
+          elSvgAttr "text" (Map.fromList
             [ ("x", "0")
             , ("y", T.pack $ show (height + 20))
             , ("class", "units")
@@ -74,7 +77,7 @@ drawBar totalHeight _ barWidth maxValue index val = do
         else (val / maxValue) * totalHeight
       y = totalHeight - barHeight
   
-  elAttr "rect" (Map.fromList
+  elSvgAttr "rect" (Map.fromList
     [ ("x", T.pack $ show x)
     , ("y", T.pack $ show y)
     , ("width", T.pack $ show (barWidth - 2))  -- -2 for spacing
@@ -83,7 +86,7 @@ drawBar totalHeight _ barWidth maxValue index val = do
     ]) $ return ()
   
   -- Add value label
-  elAttr "text" (Map.fromList
+  elSvgAttr "text" (Map.fromList
     [ ("x", T.pack $ show (x + barWidth/2))
     , ("y", T.pack $ show (y - 5))
     , ("class", "value")

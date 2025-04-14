@@ -28,9 +28,6 @@ executables:
 
 library:
   source-dirs: src/
-  exposed-modules:
-    - Strato.Lite
-    - Strato.Lite.Options
   ghc-options: -Wall -O2 
   dependencies:
   - aeson

@@ -17,67 +17,73 @@ description: Please see the README on GitHub at <https://github.com/githubuser/s
 
 dependencies:
   - base >= 4.7 && < 5
-  - reflex
-  - reflex-dom
-  - reflex-dom-core
   - aeson
-  - text
+  - base16-bytestring
+  - bloc2
+  - bloc2api
+  - bytestring
+  - cache
+  - clock
   - containers
-  - lens
-  - websockets
-  - servant
-  - servant-client
-  - servant-websockets
+  - core-api2
+  - ethereum-discovery
+  - filepath
+  - file-embed
+  - http-client
   - jsaddle
   - jsaddle-warp
   - jsaddle-wkwebview
   - jsaddle-dom
+  - lens
+  - reflex
+  - reflex-dom
+  - reflex-dom-core
+  - scientific
+  - servant
+  - servant-client
+  - servant-server
+  - servant-websockets
+  - strato-lite
+  - strato-model
+  - text
   - wai
-  - wai-middleware-static
   - wai-cors
-  - warp
   - wai-extra
-  - bytestring
-  - filepath
+  - wai-middleware-static
+  - warp
+  - websockets
+  - wreq
 
 library:
   source-dirs: 
     - src
-  exposed-modules:
-    - Types.State
-    - State.Store
-    - Components.NumberCard
-    - Components.NodeCard
-    - Components.TransactionList
-    - Components.BarGraph
-    - Components.PieChart
-    - Components.ValidatorsCard
-    - Routing
   other-modules:
     - Paths_smd_ui_hs
   dependencies:
-    - reflex
-    - reflex-dom
-    - reflex-dom-core
     - aeson
-    - text
+    - bytestring
     - containers
+    - filepath
     - lens
-    - websockets
-    - servant
-    - servant-client
-    - servant-websockets
     - jsaddle
     - jsaddle-warp
     - jsaddle-wkwebview
     - jsaddle-dom
+    - reflex
+    - reflex-dom
+    - reflex-dom-core
+    - servant
+    - servant-client
+    - servant-websockets
+    - strato-lite
+    - text
+    - time
     - wai
     - wai-middleware-static
     - wai-cors
     - warp
     - wai-extra
-    - bytestring
-    - filepath
+    - websockets
 
 executables:
   smd-ui-hs-browser:

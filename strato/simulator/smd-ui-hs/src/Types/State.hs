@@ -2,6 +2,7 @@
 
 module Types.State where
 
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
 -- Main application state
@@ -13,20 +14,30 @@ data AppState = AppState
   , syncStatus :: Bool
   }
 
--- Node state
-data NodeState = NodeState
-  { nodeId :: T.Text
-  , nodeUptime :: Double
-  , nodeVersion :: T.Text
-  , nodeStatus :: NodeStatus
-  }
-
 -- Node status
 data NodeStatus
   = NodeActive
   | NodeInactive
   | NodeSyncing
   deriving (Eq, Show)
+
+-- in Types.State
+data PeerInfo = PeerInfo
+  { pubkey   :: T.Text
+  , host     :: T.Text
+  , tcpPort  :: Int
+  }
+
+type PeerMap = M.Map T.Text PeerInfo -- peerId -> PeerInfo
+
+-- updated NodeState
+data NodeState = NodeState
+  { nodeId :: T.Text
+  , nodeUptime :: Double
+  , nodeVersion :: T.Text
+  , nodeStatus :: NodeStatus
+  , nodePeers :: PeerMap
+  }
 
 -- System metrics
 data SystemMetrics = SystemMetrics
@@ -98,6 +109,7 @@ defaultNodeState = NodeState
   , nodeUptime = 0
   , nodeVersion = ""
   , nodeStatus = NodeInactive
+  , nodePeers = M.empty
   }
 
 defaultSystemMetrics :: SystemMetrics

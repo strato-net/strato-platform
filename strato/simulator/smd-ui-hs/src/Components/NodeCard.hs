@@ -1,34 +1,37 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Components.NodeCard where
 
 import Reflex.Dom
 import qualified Data.Text as T
-import qualified Types.State as TS
+import Data.Bool (bool)
+import Components.PeersCard
+import Control.Monad (when)
+import Types.State
 
-data NodeCardConfig = NodeCardConfig
-  { nodeId :: T.Text
-  , nodeUptime :: Double
-  , nodeVersion :: T.Text
-  , nodeStatus :: TS.NodeStatus
-  } deriving (Show, Eq)
-
-nodeCard :: MonadWidget t m => NodeCardConfig -> m ()
+nodeCard :: MonadWidget t m => NodeState -> m ()
 nodeCard config = do
-  elClass "div" "node-card" $ do
-    elClass "div" "node-card-header" $ do
-      elClass "i" "fa fa-server" blank
-      el "h3" $ text "Node Information"
-    
-    elClass "div" "node-card-content" $ do
-      infoRow "Node ID" (Components.NodeCard.nodeId config)
-      infoRow "Uptime" (T.pack $ show (Components.NodeCard.nodeUptime config) <> " hours")
-      infoRow "Version" (Components.NodeCard.nodeVersion config)
-      infoRow "Status" (T.pack $ show (Components.NodeCard.nodeStatus config))
-  where
-    infoRow label val = do
-      elClass "div" "info-row" $ do
-        elClass "span" "label" $ text label
-        elClass "span" "value" $ text val 
+  rec
+    let arrowClass isOpen = T.unwords
+          [ "col-xs-3 text-right pt-icon-standard"
+          , bool "pt-icon-caret-down" "pt-icon-caret-up" isOpen
+          ]
+
+    (_, isOpenDyn) <- elClass "div" "pt-card pt-elevation-2 node-success pt-interactive" $ do
+      (e, _) <- el' "div" $ do
+        elClass "div" "col-sm-6" $ do
+          el "h3" $ text $ "Peers (" <> T.pack (show $ length (nodePeers config)) <> ")"
+          dynText =<< mapDynM (\open -> pure $ if open then "Close" else "Expand") isOpenDyn
+          elDynAttr "span" (fmap (\open -> "class" =: arrowClass open) isOpenDyn) blank
+      let clickEv' = domEvent Click e
+      isOpenDyn' <- toggle False clickEv'
+      pure (clickEv', isOpenDyn')
+
+    dyn_ $ ffor isOpenDyn $ \isOpen ->
+      when isOpen $ do
+        elClass "div" "peers-card" . peersCard $ nodePeers config
+
+  pure ()

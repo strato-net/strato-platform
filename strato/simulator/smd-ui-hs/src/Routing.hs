@@ -79,12 +79,7 @@ dashboardWidget stateDyn = do
     el "div" $ do
       dyn_ $ ffor stateDyn $ \state -> do
         -- Node card
-        nodeCard $ NodeCardConfig
-          { nodeId = TS.nodeId (TS.nodeState state)
-          , nodeUptime = TS.nodeUptime (TS.nodeState state)
-          , nodeVersion = TS.nodeVersion (TS.nodeState state)
-          , nodeStatus = TS.nodeStatus (TS.nodeState state)
-          }
+        nodeCard $ TS.nodeState state
         
         -- System metrics
         el "div" $ do

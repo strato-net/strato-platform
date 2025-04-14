@@ -869,7 +869,7 @@ corePeerSetup = do
       metadatas = M.fromList $ hashAndMd <$> srcInfo
       findMetadata = flip M.lookup metadatas
   slip <- asks _corePeerSlipstreamSource
-  sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata gb Nothing (stateRoot genHeader)
+  sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader)
   for_ sdsAndVMEs $ \(_, vmes) -> do -- TODO: statediff
     atomically $ writeTQueue slip vmes
 

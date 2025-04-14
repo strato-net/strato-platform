@@ -3,6 +3,7 @@
 
 module State.Store where
 
+import qualified Data.Map.Strict as M
 import Reflex.Dom.Core
 import Types.State
 
@@ -18,6 +19,10 @@ stateManager = do
           , nodeUptime = 3600
           , nodeVersion = "1.0.0"
           , nodeStatus = NodeActive
+          , nodePeers = M.fromList
+             [ ("node-2", PeerInfo "abcd" "node2.mercata.blockapps.net" 30303)
+             , ("node-3", PeerInfo "efgh" "node3.mercata.blockapps.net" 30303)
+             ]
           }
       , systemMetrics = SystemMetrics
           { cpuUsage = 45.5
