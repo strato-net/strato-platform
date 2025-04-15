@@ -36,7 +36,8 @@ import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.Either.Combinators
-import           Data.Maybe                              (fromJust)
+import           Data.Foldable                           (for_)
+import           Data.Maybe                              (catMaybes)
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
@@ -66,6 +67,7 @@ connectMe (UDPPort port') = do
           -- But I will leave this line here with this comment in the hopes that when we do decide the day has come,
           -- all we need to do is uncomment the line below (will make platform prefer ipv6 over ipv4, so be prepared
           -- for some confusion :D)
+          , addrFamily = AF_INET
           -- , addrFamily = AF_INET6  -- AF_INET6 + Datagram allows both ipv4 and ipv6 to be handled by same socket
           }))
         Nothing
@@ -156,37 +158,40 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
   Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
-    peer <-
+    mPeer' <-
       case mPeer of
         Nothing -> do
           addPeer' otherUdpPort' otherTcpPort
-          fromJust <$> getPeerByIP' ip
+          getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
-          return p'
-    sendPacket peer $ Pong ep 4 (time + 50)
-    eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
-    whenLeft eErr' $ \err -> do
-      $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
-      throwM err
+          return $ Just p'
+    case mPeer' of
+      Nothing -> pure ()
+      Just peer -> do
+        sendPacket peer $ Pong ep 4 (time + 50)
+        eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
+        whenLeft eErr' $ \err -> do
+          $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
+          throwM err
   Pong {} -> do
     mPeer <- getPeerByIP' ip
-    peer <-
+    mPeer' <-
       case mPeer of
         Nothing -> do
           addPeer' otherUdpPort (TCPPort 30303)
-          fromJust <$> getPeerByIP' ip
+          getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
-          return p'
-
-    setPeerPubkey peer otherPubKey
-    eErr <- resetPeerUdp peer
-    whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
-    eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
-    whenLeft eErr' $ \err -> do
-      $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
-      throwM err
+          return $ Just p'
+    for_ mPeer' $ \peer -> do
+      setPeerPubkey peer otherPubKey
+      eErr <- resetPeerUdp peer
+      whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
+      eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
+      whenLeft eErr' $ \err -> do
+        $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
+        throwM err
   (FindNeighbors targetPubkey _) -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     let nextTime = time + 50
@@ -196,7 +201,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
         A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
           Just (PeerBondingState b) | b > 1 -> do
             peers <- getPeersClosestTo targetPubkey otherPubKey
-            let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
+            let theNeighbors = catMaybes $ (\p -> Neighbor (mkEndpoint p) <$> mkNodeId p) <$> peers
             sendPacket peer $ Neighbors theNeighbors nextTime
           _ -> do
             $logInfoS "handleValidPacket/FindNeighbors" "Recieved FindNeighbors request from a peer we are not bonded to; will attempt to bond first"
@@ -208,7 +213,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
               _ -> $logErrorS "handleValidPacket/FindNeighbors" "Attempted to bond to peer but failed"
     where
       mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
-      mkNodeId = pointToNodeID . fromJust . pPeerPubkey
+      mkNodeId = fmap pointToNodeID . pPeerPubkey
   Neighbors neighbors _ -> do
     let neighborIPs = (\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors
     thePeer <- getPeerByIP' ip
@@ -216,10 +221,13 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
     if neighborsExist
       then do
         $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
-        disErr <- storeDisableException (fromJust thePeer) (T.pack "duplicateNeighbors")
-        whenLeft disErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to store disable exception: " ++ show err
-        eErr <- lengthenPeerDisable' $ fromJust thePeer
-        whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
+        case thePeer of
+          Nothing -> pure ()
+          Just thePeer' -> do
+            disErr <- storeDisableException thePeer' (T.pack "duplicateNeighbors")
+            whenLeft disErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to store disable exception: " ++ show err
+            eErr <- lengthenPeerDisable' thePeer'
+            whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
       else do
         forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
           $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
@@ -247,8 +255,11 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
                     pPeerDisableExpiration = posixSecondsToUTCTime 0
                   }
           addPeer peer
-        eErr <- resetPeerUdp $ fromJust thePeer
-        whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
+        case thePeer of
+          Nothing -> pure ()
+          Just theP -> do
+            eErr <- resetPeerUdp theP
+            whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
   where
     ip = addressIP addr
     addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do

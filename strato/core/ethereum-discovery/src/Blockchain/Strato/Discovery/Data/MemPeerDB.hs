@@ -54,10 +54,10 @@ instance HasMemPeerDB m => A.Alters Host PPeer m where
     return $ M.lookup host peerMap
   insert _ host p = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ M.insert host p
+    atomicModifyIORef' peerMap $ \m -> (M.insert host p m, ())
   delete _ host = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ M.delete host
+    atomicModifyIORef' peerMap $ \m -> (M.delete host m, ())
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Host PPeer (MemPeerDBM m) where
   select = A.lookup
@@ -94,7 +94,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Alters (Host, TCPPort) ActivityState
     return $ toActivityState . pPeerActiveState <$> M.lookup host peerMap
   insert _ (host, _) a = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix host %~ \p -> p {pPeerActiveState = fromActivityState a}
+    atomicModifyIORef' peerMap $ (,()) . (ix host %~ \p -> p {pPeerActiveState = fromActivityState a})
   delete _ _ = error "Test peer should not be deleting activity states"
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActivePeers (MemPeerDBM m) where
@@ -105,12 +105,12 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActivePeers (MemPeerDBM
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable (Host, UDPPort) PeerBondingState (MemPeerDBM m) where
   replace _ (host, _) (PeerBondingState s) = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix host %~ (\p -> p {pPeerBondState = s})
+    atomicModifyIORef' peerMap $ (,()) . (ix host %~ (\p -> p {pPeerBondState = s}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable (Host, TCPPort) PeerBondingState (MemPeerDBM m) where
   replace _ (host, _) (PeerBondingState s) = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix host %~ (\p -> p {pPeerBondState = s})
+    atomicModifyIORef' peerMap $ (,()) . (ix host %~ (\p -> p {pPeerBondState = s}))
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible BondedPeers (MemPeerDBM m) where
   access _ = do
@@ -161,21 +161,21 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable IP PPeer (MemPeerDBM m) w
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer UdpEnableTime (MemPeerDBM m) where
   replace _ peer' (UdpEnableTime enableTime) = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime})
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer TcpEnableTime (MemPeerDBM m) where
   replace _ peer' (TcpEnableTime enableTime) = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime})
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer PeerDisable (MemPeerDBM m) where
   replace _ peer' d = do
     peerMap <- fmap stringPPeerMap accessEnv
     case d of
       ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
-        modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor})
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor}))
       SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer PeerUdpDisable (MemPeerDBM m) where
   replace _ peer' d = do
@@ -183,31 +183,31 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer PeerUdpDisable (Me
     peerMap <- fmap stringPPeerMap accessEnv
     case d of
       ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
-        modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor}))
       SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
       ResetPeerUdpDisable ->
-        modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer T.Text (MemPeerDBM m) where
   replace _ peer' e = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerDisableException = e})
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerDisableException = e}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable T.Text PPeer (MemPeerDBM m) where
   replace _ message peer' = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerLastMsg = message})
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerLastMsg = message}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer IP (MemPeerDBM m) where
   replace _ peer' ip = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerIp = Just ip})
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerIp = Just ip}))
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer Point (MemPeerDBM m) where
   replace _ peer' point = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ ix (pPeerHost peer') %~ (\p -> p {pPeerPubkey = Just point})
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerPubkey = Just point}))
 
 toActivityState :: Int -> ActivityState
 toActivityState 1 = Active

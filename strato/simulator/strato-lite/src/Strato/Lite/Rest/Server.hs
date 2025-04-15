@@ -38,6 +38,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import SQLM
 import Servant
+import Strato.Lite.Base.Filesystem
 import Strato.Lite.Base.Simulator
 import Strato.Lite.Core
 import Strato.Lite.Simulator
@@ -75,10 +76,10 @@ getPeers mgr label = do
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
 postAddNode mgr label (AddNodeParams ip identity bootNodes) =
-  liftIO $ runReaderT (addSimulatorNode "strato-lite" label (Validator identity) (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
+  liftIO . runLoggingT . runResourceT $ runReaderT (addSimulatorNode "strato-lite" label (Validator identity) (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
-postRemoveNode mgr label = liftIO $ runReaderT (removeSimulatorNode label) mgr
+postRemoveNode mgr label = liftIO . runLoggingT . runResourceT $ runReaderT (removeSimulatorNode label) mgr
 
 postTimeout :: NetworkManager -> Int -> Handler ()
 postTimeout mgr rn = do
@@ -112,8 +113,8 @@ type FullAPI = StratoLiteRestAPI :<|> NodeAPI
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
 
-nodeServer :: NetworkManager -> BlocEnv -> UrlMap -> T.Text -> Server CombinedAPI
-nodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAPI) (convertErrors runM) (coreApiServer :<|> bloc)
+multinodeServer :: NetworkManager -> BlocEnv -> UrlMap -> T.Text -> Server CombinedAPI
+multinodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAPI) (convertErrors runM) (coreApiServer :<|> bloc)
   where
     convertErrors r x = Handler $ do
       mNode <- liftIO $ M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
@@ -135,8 +136,26 @@ nodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAP
         . flip runReaderT c
         $ f
 
-combinedRestServer :: NetworkManager -> BlocEnv -> UrlMap -> Server FullAPI
-combinedRestServer mgr blocEnv urlMap = (stratoLiteRestServer mgr) :<|> (nodeServer mgr blocEnv urlMap)
+singleNodeRestServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server CombinedAPI
+singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy CombinedAPI) (convertErrors runM) (coreApiServer :<|> bloc)
+  where
+    convertErrors r x = Handler $ do
+          y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+          case y of
+            Right a -> pure a
+            Left e -> throwE $ apiErrorToServantErr e
+    runM f = do
+      runLoggingT
+        . runResourceT
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runMemPeerDBMUsingEnv (fPeer ^. filesystemPeerMap)
+        . flip runReaderT fPeer
+        . flip runReaderT cPeer
+        $ f
 
-stratoLiteRestApp :: NetworkManager -> BlocEnv -> UrlMap -> Application
-stratoLiteRestApp mgr blocEnv = serve fullAPI . combinedRestServer mgr blocEnv
+combinedSimulatorRestServer :: NetworkManager -> BlocEnv -> UrlMap -> Server FullAPI
+combinedSimulatorRestServer mgr blocEnv urlMap = (stratoLiteRestServer mgr) :<|> (multinodeServer mgr blocEnv urlMap)
+
+stratoLiteSimulatorRestApp :: NetworkManager -> BlocEnv -> UrlMap -> Application
+stratoLiteSimulatorRestApp mgr blocEnv = serve fullAPI . combinedSimulatorRestServer mgr blocEnv

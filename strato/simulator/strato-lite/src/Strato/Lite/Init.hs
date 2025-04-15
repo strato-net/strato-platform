@@ -14,10 +14,12 @@ module Strato.Lite.Init
 where
 
 import Bloc.Monad
+import BlockApps.Logging
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Validator
+import Control.Monad.Trans.Resource
 import qualified Data.Cache as Cache
 import qualified Data.Map.Strict as M
 import Data.Text (Text)
@@ -30,7 +32,7 @@ import System.Clock
 runStratoLite :: [(Text, Text, Text)] -> IO ()
 runStratoLite nodes' = do
   let nodes'' = (\(a, b, c) -> (a, (Validator b, Host c, TCPPort 30303, UDPPort 30303))) <$> nodes'
-  mgr <- runNetwork nodes'' id
+  mgr <- runLoggingT . runResourceT $ runNetwork nodes'' id
 
   let stateFetchLimit' = 100
       nonceCounterTimeout = 10
@@ -49,4 +51,4 @@ runStratoLite nodes' = do
             useWalletsByDefault = False
           }
 
-  run flags_port $ stratoLiteRestApp mgr env M.empty
+  run flags_port $ stratoLiteSimulatorRestApp mgr env M.empty

@@ -24,11 +24,14 @@ dependencies:
   - bytestring
   - cache
   - clock
+  - common-log
   - containers
   - core-api2
   - ethereum-discovery
+  - ethereum-encryption
   - filepath
   - file-embed
+  - hflags
   - http-client
   - jsaddle
   - jsaddle-warp
@@ -38,6 +41,7 @@ dependencies:
   - reflex
   - reflex-dom
   - reflex-dom-core
+  - resourcet
   - scientific
   - servant
   - servant-client
@@ -45,7 +49,10 @@ dependencies:
   - servant-websockets
   - strato-lite
   - strato-model
+  - strato-p2p
   - text
+  - unliftio
+  - vm-tools
   - wai
   - wai-cors
   - wai-extra

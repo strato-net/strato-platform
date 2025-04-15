@@ -710,10 +710,10 @@ coreContext seqCtx vmCtx =
     , _vmContextState = vmCtx
     }
 
-runMonad :: (m ~> BaseM) -> CorePeer -> CoreT m a -> IO a
-runMonad hoist p = loggingFunc . runResourceT . hoist . flip runReaderT p
+runMonad :: (m ~> BaseM) -> CorePeer -> CoreT m a -> BaseM a
+runMonad hoist p = hoist . flip runReaderT p
 
-runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> IO ()
+runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> BaseM ()
 runNodeWithoutP2P hoist p = do
   runMonad hoist p corePeerSetup
   concurrently_
@@ -732,12 +732,12 @@ runNodeWithoutP2P hoist p = do
         (runMonad hoist p corePeerSlipstream)
     )
 
-runNode :: MonadBase m => (m ~> BaseM) -> CorePeer -> IO ()
-runNode hoist p =
+runNode :: MonadBase m => (m ~> BaseM) -> (m ~> m) -> CorePeer -> BaseM ()
+runNode hoist initDiscovery p =
   concurrently_
     (runNodeWithoutP2P hoist p)
     ( concurrently_
-        (loggingFunc $ stratoP2P (\f -> do
+        (liftIO . runLoggingT $ stratoP2P (\f -> do
           ctx <- newIORef (def :: P2PContext)
           runResourceT . hoist . flip runReaderT p $ do
             let s = do
@@ -746,9 +746,9 @@ runNode hoist p =
                   sourceTMChan chan
             runReaderT (f s) ctx
         ))
-        (loggingFunc $ ethereumDiscovery (\f -> do
+        (liftIO . runLoggingT . runResourceT $ ethereumDiscovery (\f -> do
           ctx <- newIORef (def :: P2PContext)
-          runResourceT . hoist . flip runReaderT p $ runReaderT (f 100) ctx
+          hoist . initDiscovery . flip runReaderT p $ runReaderT (f 100) ctx
         ))
     )
 

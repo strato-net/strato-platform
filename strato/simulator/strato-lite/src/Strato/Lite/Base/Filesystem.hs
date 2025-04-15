@@ -39,6 +39,7 @@ import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P (..))
+import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
@@ -69,6 +70,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock (addUTCTime, getCurrentTime)
 import qualified Database.LevelDB as LDB
+import qualified Database.Persist.Sql as SQL
 import Network.Socket
 import qualified Network.Socket.ByteString as NB
 import Network.Wai.Handler.Warp.Internal
@@ -86,6 +88,7 @@ data FilesystemDBs = FilesystemDBs
   , _canonicalDB :: LDB.DB
   , _blockDB :: LDB.DB
   , _kvDB :: LDB.DB
+  , _sqlPool :: SQL.ConnectionPool
   }
 
 makeLenses ''FilesystemDBs
@@ -95,6 +98,7 @@ data FilesystemPeer = FilesystemPeer
   , _filesystemPeerTCPPort     :: TCPPort
   , _filesystemPeerUDPPort     :: UDPPort
   , _filesystemPeerUDPSocket   :: Socket
+  , _filesystemPeerMap         :: MemPeerDBEnv
   , _filesystemPeerSyncTasks   :: TVar [SyncTask]
   , _filesystemDBs             :: FilesystemDBs
   }
@@ -117,7 +121,11 @@ instance {-# OVERLAPPING #-} MonadIO m => HasVault (FilesystemT m) where
     return $ derivePublicKey pk
   getShared pub = do
     pk <- asks _filesystemPeerPrivKey
-    return $ deriveSharedKey pk pub
+    let sk = deriveSharedKey pk pub
+    liftIO $ putStrLn $ "HASVAULT GETSHARED PRIV   KEY: " ++ show pk
+    liftIO $ putStrLn $ "HASVAULT GETSHARED PUB    KEY: " ++ show pub
+    liftIO $ putStrLn $ "HASVAULT GETSHARED SHARED KEY: " ++ show sk
+    pure sk
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => RunsClient (FilesystemT m) where
   runClientConnection (Host ip) (TCPPort p) sSource handler = do
@@ -155,18 +163,23 @@ createFilesystemPeer ::
   TCPPort ->
   UDPPort ->
   Socket ->
+  MemPeerDBEnv ->
   FilesystemDBs ->
   STM FilesystemPeer
-createFilesystemPeer p t u s d = flip (FilesystemPeer p t u s) d <$> newTVar []
+createFilesystemPeer p t u s m d = flip (FilesystemPeer p t u s m) d <$> newTVar []
 
 createFilesystemPeerIO ::
   PrivateKey ->
   TCPPort ->
   UDPPort ->
   Socket ->
+  Host ->
+  [Host] ->
   FilesystemDBs ->
   IO FilesystemPeer
-createFilesystemPeerIO p t u s d = atomically $ createFilesystemPeer p t u s d
+createFilesystemPeerIO p t u s h bs d = do
+  m <- createMemPeerDBEnv h (buildPeer . (\b -> (Nothing, b, 30303)) <$> bs)
+  atomically $ createFilesystemPeer p t u s m d
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TCPPort (FilesystemT m) where
   access _ = asks _filesystemPeerTCPPort

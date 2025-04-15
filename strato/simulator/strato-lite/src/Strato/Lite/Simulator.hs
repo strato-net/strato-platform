@@ -268,7 +268,7 @@ mkSignedTx privKey utx md =
 
 runSimulatorConnection ::
   SimulatorP2PConnection ->
-  IO ()
+  BaseM ()
 runSimulatorConnection connection = do
   let rServer = do
         let (s,c) :: (SimulatorPeer, CorePeer) = connection ^. serverSimulatorPeer
@@ -287,17 +287,17 @@ hoistSimulator s f = do
   mpdb <- fmap _simulatorContextPeerMap . atomically . readTVar $ _simulatorPeerContext s
   runReaderT (runReaderT f s) mpdb
 
-runSimulatorNode :: SimulatorPeer -> CorePeer -> IO ()
-runSimulatorNode s c = runNode (hoistSimulator s) c
+runSimulatorNode :: SimulatorPeer -> CorePeer -> BaseM ()
+runSimulatorNode s c = runNode (hoistSimulator s) id c
 
-createSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager IO (SimulatorPeer, CorePeer)
+createSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager BaseM (SimulatorPeer, CorePeer)
 createSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do
   certs <- asks _initialCerts
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
   liftIO $ createSimulatorPeerAndCorePeer network' pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes True
 
-addSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> ReaderT NetworkManager IO Bool
+addSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> ReaderT NetworkManager BaseM Bool
 addSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
   mgr <- ask
   inet <- _internet <$> readTVarIO (mgr ^. network)
@@ -309,12 +309,12 @@ addSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes = 
         writeTVar (mgr ^. network) $ net & nodes . at nodeLabel ?~ node
         pure True
       _ -> pure False
-  when didCreate . liftIO $ do
+  when didCreate . lift $ do
     a <- async $ uncurry runSimulatorNode node
     atomically $ modifyTVar (mgr ^. threads) $ nodeThreads . at nodeLabel ?~ a
   pure didCreate
 
-removeSimulatorNode :: Text -> ReaderT NetworkManager IO Bool
+removeSimulatorNode :: Text -> ReaderT NetworkManager BaseM Bool
 removeSimulatorNode nodeLabel = do
   mgr <- ask
   mAsync <- liftIO . atomically $ do
@@ -325,10 +325,10 @@ removeSimulatorNode nodeLabel = do
   liftIO $ traverse_ cancel mAsync
   pure $ isJust mAsync
 
-addSimulatorConnection :: Text -> Text -> ReaderT NetworkManager IO Bool
+addSimulatorConnection :: Text -> Text -> ReaderT NetworkManager BaseM Bool
 addSimulatorConnection serverLabel clientLabel = do
   mgr <- ask
-  mPeers <- liftIO . atomically $ do
+  mPeers <- atomically $ do
     net <- readTVar $ mgr ^. network
     case ( M.lookup serverLabel $ net ^. nodes,
            M.lookup clientLabel $ net ^. nodes,
@@ -338,17 +338,16 @@ addSimulatorConnection serverLabel clientLabel = do
       _ -> pure Nothing
   case mPeers of
     Nothing -> pure False
-    Just (server', client') ->
-      liftIO $ do
-        connection <- createSimulatorConnection server' client'
-        a <- async $ runSimulatorConnection connection
-        atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
-        pure True
+    Just (server', client') -> lift $ do
+      connection <- liftIO $ createSimulatorConnection server' client'
+      a <- async $ runSimulatorConnection connection
+      atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
+      pure True
 
 removeSimulatorConnection :: Text -> Text -> ReaderT NetworkManager IO Bool
 removeSimulatorConnection serverLabel clientLabel = do
   mgr <- ask
-  mAsync <- liftIO . atomically $ do
+  mAsync <- atomically $ do
     modifyTVar (mgr ^. network) $ connections . at (serverLabel, clientLabel) .~ Nothing
     ma <- (^. connectionThreads . at (serverLabel, clientLabel)) <$> readTVar (mgr ^. threads)
     modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) .~ Nothing
@@ -362,17 +361,17 @@ selfSignCert pk (Validator c) = flip runReaderT pk $ do
       sub = Subject (T.unpack c) "" (Just "") Nothing (derivePublicKey pk)
   makeSignedCert Nothing Nothing iss sub
 
-runNetwork :: [(Text, (Validator, Host, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
+runNetwork :: [(Text, (Validator, Host, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> BaseM NetworkManager
 runNetwork nodesList validatorsFilter = do
-  privKeys <- traverse (const newPrivateKey) nodesList
+  privKeys <- liftIO $ traverse (const newPrivateKey) nodesList
   let identities = (\(_, (c, _, _, _)) -> c) <$> nodesList
       privAndIds = zip privKeys identities
       validatorsPrivKeys = validatorsFilter privAndIds
       validators' = makeValidators validatorsPrivKeys
-  certs <- traverse (uncurry selfSignCert) privAndIds
+  certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
   inet <- newTVarIO preAlGoreInternet
   let bootNodes = (\(_, (_, i, _, _)) -> i) <$> nodesList
-  peers <- traverse (\(p, (n, (c, i, t, u))) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i t u bootNodes True) $ zip privKeys nodesList
+  peers <- liftIO $ traverse (\(p, (n, (c, i, t, u))) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i t u bootNodes True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
   nodeThreads' <- for nodesMap $ async . uncurry runSimulatorNode
@@ -381,16 +380,16 @@ runNetwork nodesList validatorsFilter = do
   threadsTVar <- newTVarIO threadPool
   pure $ NetworkManager threadsTVar networkTVar certs validators'
 
-runNetworkWithStaticConnections :: [(Text, Host, Validator)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
+runNetworkWithStaticConnections :: [(Text, Host, Validator)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> BaseM (Either Text NetworkManager)
 runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
-  privKeys <- traverse (const newPrivateKey) nodesList
+  privKeys <- liftIO $ traverse (const newPrivateKey) nodesList
   let identities = (\(_, _, c) -> c) <$> nodesList
       privAndIds = zip privKeys identities
       validatorsPrivKeys = validatorsFilter privAndIds
       validators' = makeValidators validatorsPrivKeys
-  certs <- traverse (uncurry selfSignCert) privAndIds
+  certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
   inet <- newTVarIO preAlGoreInternet
-  peers <- traverse (\(p, (n, i, c)) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i (TCPPort 30303) (UDPPort 30303) [] True) $ zip privKeys nodesList
+  peers <- liftIO $ traverse (\(p, (n, i, c)) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i (TCPPort 30303) (UDPPort 30303) [] True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip ((\(a, _, _) -> a) <$> nodesList) peers
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
@@ -406,7 +405,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
     threadsTVar <- newTVarIO threadPool
     pure $ NetworkManager threadsTVar networkTVar certs validators'
 
-runNetworkOld :: [(SimulatorPeer, CorePeer)] -> [SimulatorP2PConnection] -> IO ()
+runNetworkOld :: [(SimulatorPeer, CorePeer)] -> [SimulatorP2PConnection] -> BaseM ()
 runNetworkOld nodes' connections' =
   concurrently_
     (mapConcurrently (uncurry runSimulatorNode) nodes')

@@ -59,6 +59,7 @@ library:
   - conduit
   - containers
   - data-default
+  - directory
   - debugger
   - ethereum-discovery
   - ethereum-encryption
@@ -76,6 +77,9 @@ library:
   - network
   - nibblestring
   - ordered-containers
+  - pem
+  - persistent
+  - persistent-sqlite
   - prometheus-client
   - Ranged-sets
   - resourcet
