@@ -58,6 +58,7 @@ export const createContract = function(payload) {
 }
 
 export const createContractSuccess = function(response) {
+  console.log(response, 'response after creating contract');
   return {
     type: CREATE_CONTRACT_SUCCESS,
     response: response,
@@ -77,6 +78,7 @@ export const updateToast = function() {
 }
 
 export const createContractFailure = function(error) {
+  console.log(error, 'error came while creating contract');
   return {
     type: CREATE_CONTRACT_FAILURE,
     error,
