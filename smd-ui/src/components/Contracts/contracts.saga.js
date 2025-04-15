@@ -15,15 +15,13 @@ const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset, searchTerm) {
 
-  const isAddress = /^0x[a-fA-F0-9]{40}$/.test(searchTerm);
-
   console.log(isAddress, 'isAddress');
 
-  const queryParam = isAddress
+  const queryParam = searchTerm
+  ? searchTerm.startsWith('0')
     ? `&address=${searchTerm}`
-    : searchTerm
-      ? `&name=${searchTerm}`
-      : '';
+    : `&name=${searchTerm}`
+  : '';
 
   console.log(queryParam, 'queryParam');
 
