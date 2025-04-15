@@ -14,7 +14,20 @@ import { handleErrors } from '../../lib/handleErrors';
 const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset, name) {
-  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${name ? `&name=${name}` : ''}`
+
+  const isAddress = /^0x[a-fA-F0-9]{40}$/.test(searchTerm);
+
+  console.log(isAddress, 'isAddress');
+
+  const queryParam = isAddress
+    ? `&address=${searchTerm}`
+    : searchTerm
+      ? `&name=${searchTerm}`
+      : '';
+
+  console.log(queryParam, 'queryParam');
+  
+  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${queryParam}`;
 
   return fetch(
     url,
@@ -37,6 +50,7 @@ export function getContracts(chainid, limit, offset, name) {
 export function* fetchContracts(action) {
   try {
     let response = yield call(getContracts, action.chainId, action.limit, action.offset, action.name);
+    console.log(response, 'response');
     yield put(fetchContractsSuccess(response));
   }
   catch (err) {
