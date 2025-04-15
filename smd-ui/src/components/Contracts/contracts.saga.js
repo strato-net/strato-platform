@@ -15,8 +15,6 @@ const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset, searchTerm) {
 
-  console.log(isAddress, 'isAddress');
-
   const queryParam = searchTerm
   ? searchTerm.startsWith('0')
     ? `&address=${searchTerm}`
