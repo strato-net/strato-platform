@@ -103,13 +103,22 @@ const RepayModal = ({
       const USDSTBalance = USDST ? new BigNumber(USDST) : new BigNumber(0);
 
       // Set the outstanding loan amount.
-      setRepayAmount(borrowedAmount);
+      setRepayAmount(
+        borrowedAmount.lt(new BigNumber(0.01))
+          ? new BigNumber(0.01)
+          : borrowedAmount
+      );
 
       // Set the repay amount to the lower of the outstanding loan or the user's USDST balance.
-      if (borrowedAmount.gt(USDSTBalance)) {
-        setRepayValue(USDSTBalance);
+      const defaultRepayValue = borrowedAmount.gt(USDSTBalance)
+        ? USDSTBalance
+        : borrowedAmount;
+
+      // Enforce a minimum repay amount of 0.01 tokens.
+      if (defaultRepayValue.lt(new BigNumber(0.01))) {
+        setRepayValue(new BigNumber(0.01));
       } else {
-        setRepayValue(borrowedAmount);
+        setRepayValue(defaultRepayValue);
       }
       setInitialized(true);
       setDisableButton(USDSTBalance.lte(0));
