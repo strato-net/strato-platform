@@ -342,7 +342,8 @@ const TransferModal = ({
           options={filteredUsersList}
           optionFilterProp="value"
           filterOption={(input, option) =>
-            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            ((option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+             (option?.value ?? '').toLowerCase().includes(input.toLowerCase()))
           }
           open={record.openDropdown}
           suffixIcon={<SearchOutlined />}
@@ -499,8 +500,9 @@ const TransferModal = ({
             }
             options={filteredUsersList}
             optionFilterProp="value"
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+          filterOption={(input, option) =>
+              ((option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+               (option?.value ?? '').toLowerCase().includes(input.toLowerCase()))
             }
             open={mobileTransfer.openDropdown}
             suffixIcon={<SearchOutlined />}
