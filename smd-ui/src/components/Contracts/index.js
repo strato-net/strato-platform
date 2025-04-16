@@ -67,11 +67,11 @@ class Contracts extends Component {
     if (this.filterTimeout) {
       clearTimeout(this.filterTimeout);
     }
-    
+
     // Set a new timeout
     this.filterTimeout = setTimeout(() => {
       this.updateFilter(value);
-    }, 300); // Delay in ms
+    }, 1000); // Delay in ms
   }
 
   componentWillUnmount() {
