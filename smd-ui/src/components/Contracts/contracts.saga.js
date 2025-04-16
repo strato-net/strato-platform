@@ -22,10 +22,10 @@ export function getContracts(chainid, limit, offset, searchTerm) {
         Accept: "application/json",
       },
     })
-    .then(handleErrors)
     .then(function (response) {
       console.log(response, 'response');
       const { _contractName } = response;
+      console.log(_contractName, 'contractName');
 
       // Then, use the name from that response to make another fetch call
       const nextUrl = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}${_contractName ? `&name=${_contractName}` : ""}`;
@@ -37,11 +37,11 @@ export function getContracts(chainid, limit, offset, searchTerm) {
         },
       });
     })
-    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
     .catch(function (error) {
+      handleErrors
       throw error;
     });
 
@@ -54,11 +54,11 @@ export function getContracts(chainid, limit, offset, searchTerm) {
         Accept: "application/json",
       },
     })
-    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
     .catch(function (error) {
+      handleErrors;
       throw error;
     });
   }
