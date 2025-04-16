@@ -68,7 +68,7 @@ export async function getContracts(chainid, limit, offset, searchTerm) {
   let url;
 
   if (searchTerm && searchTerm.startsWith("00")) {
-    url = `${contractsUrl}/contract/${searchTerm}${chainid ? `?chainid=${chainid}` : ""}`;
+    url = `${contractsUrl}/contract/${searchTerm}/details/${chainid ? `?chainid=${chainid}` : ""}`;
 
     try {
       const response = await fetch(url, {

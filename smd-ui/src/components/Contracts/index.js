@@ -62,7 +62,6 @@ class Contracts extends Component {
   }
 
   handleInputChange = (value) => {
-
     // Clear previous timeout
     if (this.filterTimeout) {
       clearTimeout(this.filterTimeout);
