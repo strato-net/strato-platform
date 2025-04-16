@@ -11,8 +11,10 @@ const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset, searchTerm) {
   let url;
-  if (searchTerm.startsWith("0")) {
-    url = `${contractsUrl}/contracts/contract/${searchTerm}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}`;
+
+  if (searchTerm.startsWith("00")) {
+    // First, fetch the contract detail using address/hash
+    url = `${contractsUrl}/contracts/contract/${searchTerm}${chainid ? `&chainid=${chainid}` : ""}`;
     return fetch(url, {
       method: "GET",
       credentials: "include",
@@ -22,15 +24,27 @@ export function getContracts(chainid, limit, offset, searchTerm) {
     })
     .then(handleErrors)
     .then(function (response) {
-      console.log(response, 'response');
+      const { _contractName } = response;
+
+      // Then, use the name from that response to make another fetch call
+      const nextUrl = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}${_contractName ? `&name=${_contractName}` : ""}`;
+      return fetch(nextUrl, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+    })
+    .then(handleErrors)
+    .then(function (response) {
       return response.json();
     })
     .catch(function (error) {
       throw error;
     });
-  } 
 
-  else {
+  } else {
     url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}${searchTerm ? `&name=${searchTerm}` : ""}`;
     return fetch(url, {
       method: "GET",
