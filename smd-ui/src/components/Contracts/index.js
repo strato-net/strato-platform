@@ -41,6 +41,7 @@ class Contracts extends Component {
       chainSearchQueryField: "chainid",
       chainQuery: "",
     }
+    this.filterTimeout = null;
   }
 
   componentWillMount() {
@@ -57,6 +58,26 @@ class Contracts extends Component {
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain) {
       this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+    }
+  }
+
+  handleInputChange = (value) => {
+
+    // Clear previous timeout
+    if (this.filterTimeout) {
+      clearTimeout(this.filterTimeout);
+    }
+    
+    // Set a new timeout
+    this.filterTimeout = setTimeout(() => {
+      this.updateFilter(value);
+    }, 300); // Delay in ms
+  }
+
+  componentWillUnmount() {
+    // Clear timeout on unmount
+    if (this.filterTimeout) {
+      clearTimeout(this.filterTimeout);
     }
   }
 
@@ -145,7 +166,7 @@ class Contracts extends Component {
                 className="pt-input"
                 type="search"
                 placeholder="Search contracts"
-                onChange={e => this.updateFilter(e.target.value)}
+                onChange={e => this.handleInputChange(e.target.value)}
                 dir="auto" />
             </div>
           </div>
