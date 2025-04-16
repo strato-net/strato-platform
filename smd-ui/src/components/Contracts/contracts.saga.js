@@ -24,6 +24,7 @@ export function getContracts(chainid, limit, offset, searchTerm) {
     })
     .then(handleErrors)
     .then(function (response) {
+      console.log(response, 'response');
       const { _contractName } = response;
 
       // Then, use the name from that response to make another fetch call
