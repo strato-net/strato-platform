@@ -1,55 +1,66 @@
-import {
-  takeEvery,
-  put,
-  call
-} from 'redux-saga/effects';
+import { takeEvery, put, call } from "redux-saga/effects";
 import {
   FETCH_CONTRACTS,
   fetchContractsSuccess,
-  fetchContractsFailure
-} from './contracts.actions';
-import { env } from '../../env';
-import { handleErrors } from '../../lib/handleErrors';
+  fetchContractsFailure,
+} from "./contracts.actions";
+import { env } from "../../env";
+import { handleErrors } from "../../lib/handleErrors";
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
 export function getContracts(chainid, limit, offset, searchTerm) {
 
-  const queryParam = searchTerm
-  ? searchTerm.startsWith('0')
-    ? `&address=${searchTerm}`
-    : `&name=${searchTerm}`
-  : '';
-
-  console.log(queryParam, 'queryParam');
-
-  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${queryParam}`;
-
-  return fetch(
-    url,
-    {
-      method: 'GET',
+  if (searchTerm.startsWith("0")) {
+    url = `${contractsUrl}/contracts/contract/${searchTerm}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}`;
+    return fetch(url, {
+      method: "GET",
       credentials: "include",
       headers: {
-        'Accept': 'application/json'
+        Accept: "application/json",
       },
     })
     .then(handleErrors)
     .then(function (response) {
-      return response.json()
+      console.log(response, 'response');
+      return response.json();
     })
     .catch(function (error) {
       throw error;
     });
+  } 
+
+  else {
+    url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}${searchTerm ? `&name=${searchTerm}` : ""}`;
+    return fetch(url, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    })
+    .then(handleErrors)
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
+  }
 }
 
 export function* fetchContracts(action) {
   try {
-    let response = yield call(getContracts, action.chainId, action.limit, action.offset, action.name);
-    console.log(response, 'response');
+    let response = yield call(
+      getContracts,
+      action.chainId,
+      action.limit,
+      action.offset,
+      action.name
+    );
+    console.log(response, "response");
     yield put(fetchContractsSuccess(response));
-  }
-  catch (err) {
+  } catch (err) {
     yield put(fetchContractsFailure(err));
   }
 }
