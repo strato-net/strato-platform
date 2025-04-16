@@ -41,7 +41,6 @@ class Contracts extends Component {
       chainSearchQueryField: "chainid",
       chainQuery: "",
     }
-    this.filterTimeout = null;
   }
 
   componentWillMount() {
