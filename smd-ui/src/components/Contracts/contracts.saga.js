@@ -12,9 +12,9 @@ const contractsUrl = env.BLOC_URL + "/contracts";
 export function getContracts(chainid, limit, offset, searchTerm) {
   let url;
 
-  if (searchTerm.startsWith("00")) {
+  if (searchTerm?.startsWith("00")) {
     // First, fetch the contract detail using address/hash
-    url = `${contractsUrl}/contracts/contract/${searchTerm}${chainid ? `&chainid=${chainid}` : ""}`;
+    url = `${contractsUrl}/contract/${searchTerm}${chainid ? `&chainid=${chainid}` : ""}`;
     return fetch(url, {
       method: "GET",
       credentials: "include",
