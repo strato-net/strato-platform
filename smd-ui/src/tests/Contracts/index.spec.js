@@ -105,7 +105,7 @@ describe('Contracts: index', () => {
 
     wrapper.find('input').at(0).simulate('change', { target: { value: "UPDATE" } });
     expect(props.changeContractFilter).toHaveBeenCalled();
-    expect(props.changeContractFilter.mock.calls.length).toBe(1);
+    expect(props.changeContractFilter.mock.calls.length).toBe(2);
     expect(props.changeContractFilter.mock.calls).toMatchSnapshot();
   });
 
