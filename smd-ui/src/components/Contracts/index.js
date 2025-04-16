@@ -61,25 +61,6 @@ class Contracts extends Component {
     }
   }
 
-  handleInputChange = (value) => {
-    // Clear previous timeout
-    if (this.filterTimeout) {
-      clearTimeout(this.filterTimeout);
-    }
-
-    // Set a new timeout
-    this.filterTimeout = setTimeout(() => {
-      this.updateFilter(value);
-    }, 1000); // Delay in ms
-  }
-
-  componentWillUnmount() {
-    // Clear timeout on unmount
-    if (this.filterTimeout) {
-      clearTimeout(this.filterTimeout);
-    }
-  }
-
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
@@ -165,7 +146,7 @@ class Contracts extends Component {
                 className="pt-input"
                 type="search"
                 placeholder="Search contracts"
-                onChange={e => this.handleInputChange(e.target.value)}
+                onChange={e => this.updateFilter(e.target.value)}
                 dir="auto" />
             </div>
           </div>
