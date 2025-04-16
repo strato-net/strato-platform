@@ -12,6 +12,7 @@ import { actions as orderActions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { getCookie } from '../../helpers/cookie';
 
 function useQuery() {
   const { search } = useLocation();
@@ -109,6 +110,20 @@ const ProcessingOrder = () => {
       orderActions.resetMessage(orderDispatch);
     }
   }, [message, success, openNotification, orderDispatch]);
+
+  // Stores the referral purchase to a backend db
+  useEffect(() => {
+    if (success) {
+      const referralAddress = getCookie('mercata_referrer_address');
+      if (referralAddress) {
+        console.log('See the following order referral information, please store in external db',{
+          referralAddress: referralAddress,
+          orderHash: orderHash,
+          assetAddresses: assetAddresses,
+        });
+      }
+    }
+  }, [success, orderHash, assetAddresses]);
 
   return (
     <div>

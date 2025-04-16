@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+import <cbe1614a16d9c75447f40ede6b711e0bb996536b>;
 import "../../mercata-base-contracts/Templates/Payments/TokenPaymentService.sol";
 
 /// @title A representation of Token assets
