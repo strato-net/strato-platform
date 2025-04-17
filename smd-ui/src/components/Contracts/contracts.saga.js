@@ -7,6 +7,13 @@ import {
 import { env } from "../../env";
 import { handleErrors } from "../../lib/handleErrors";
 
+import { 
+  selectContractInstance,
+  fetchState,
+  fetchAccount,
+  fetchContractInfoRequest
+} from './components/ContractCard/contractCard.actions';
+
 const contractsUrl = env.BLOC_URL + "/contracts";
 
 function isValidContractAddress(address) {
@@ -33,6 +40,11 @@ export async function getContracts(chainid, limit, offset, searchTerm) {
     const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
     const { _contractName } = await fetchJson(detailUrl);
 
+    fetchState(_contractName, searchTerm, chainid);
+    fetchAccount(_contractName, searchTerm);
+    fetchContractInfoRequest(`card-data-${searchTerm}-${chainid}`, _contractName, searchTerm, chainid)
+    selectContractInstance(_contractName, searchTerm);
+    
     if (_contractName) params.set("name", _contractName);
 
     const listUrl = `${contractsUrl}?${params}`;
