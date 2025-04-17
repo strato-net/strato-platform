@@ -8,6 +8,7 @@ import {
   submitPrice,
   updateAssetPrice,
   fetchLBMAMetalPrice,
+  fetchCurrentERC20TokenPrice,
   fetchERC20TokenPrice,
   fetchMetalPrice,
   fetchAsset,
@@ -148,7 +149,8 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   );
 
   if (!reserves || reserves.length === 0) {
-    throw new Error("No reserves found");
+    console.log("No reserves found for:", oracleContract.name);
+    return;
   }
 
   for (const reserve of reserves) {
@@ -319,7 +321,7 @@ const updateSalePricePeriodically = async () => {
           process.env.METALS_API_KEY
         );
       } else if (asset.type === "ERC20") {
-        result = await fetchERC20TokenPrice(
+        result = await fetchCurrentERC20TokenPrice(
           asset.name,
           process.env.ALCHEMY_API_KEY
         );

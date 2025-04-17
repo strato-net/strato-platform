@@ -174,7 +174,42 @@ async function fetchLBMAMetalPrice(metal, apiKey) {
   }
 }
 
-// Function to fetch and submit ETH price
+// Function to fetch the current price of an ERC20 token
+async function fetchCurrentERC20TokenPrice(name, apiKey) {
+  try {
+    const apiUrl = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/by-symbol?symbols=${name}`;
+    const response = await axios.get(apiUrl, {
+      headers: { "accept": "application/json" },
+    });
+    const responseData = response.data;
+    if (!responseData?.data || !Array.isArray(responseData.data)) {
+      console.error("Invalid response format:", responseData);
+      throw new Error("Invalid price data format from API");
+    }
+    console.log(`Received ${responseData.data.length} token entries`);
+    
+    // Find the token data entry matching the given symbol
+    const tokenEntry = responseData.data.find(entry => entry.symbol === name);
+    if (!tokenEntry || !tokenEntry.prices || tokenEntry.prices.length === 0) {
+      throw new Error("No price data available for token");
+    }
+    
+    // Use the first available price data
+    const priceData = tokenEntry.prices[0];
+    const price = parseFloat(priceData.value);
+    // Convert the ISO date string to a Unix timestamp in seconds
+    const timestamp = Math.floor(new Date(priceData.lastUpdatedAt).getTime() / 1000);
+    
+    console.log(`Fetched price for ${name}: $${price} at timestamp ${timestamp}`);
+    return { price, timestamp };
+  } catch (error) {
+    console.error("Failed to fetch current ERC20 token price:", error);
+    throw error;
+  }
+}
+
+// Function to fetch the current historical price (last 24hrs) of an ERC20 token
+// This function uses TWAP (Time Weighted Average Price) to calculate the price
 async function fetchERC20TokenPrice(name, apiKey) {
   try {
     const apiUrl = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/historical`;
@@ -243,5 +278,6 @@ export {
   fetchMetalPrice,
   fetchLBMAMetalPrice,
   fetchERC20TokenPrice,
+  fetchCurrentERC20TokenPrice,
   fetchAsset,
 };
