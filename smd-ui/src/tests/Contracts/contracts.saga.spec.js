@@ -16,6 +16,7 @@ import {
 } from '../../components/Contracts/contracts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
 import { contracts, error } from './contractsMock';
+global.URLSearchParams = require('url').URLSearchParams;
 
 describe('Contracts: saga', () => {
 
