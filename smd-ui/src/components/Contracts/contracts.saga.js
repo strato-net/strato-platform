@@ -14,65 +14,35 @@ function isValidContractAddress(address) {
   return regex.test(address);
 }
 
+async function fetchJson(url) {
+  const res = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function getContracts(chainid, limit, offset, searchTerm) {
-  let url;
+  const params = new URLSearchParams({ limit, offset });
+
+  if (chainid) params.set("chainid", chainid);
 
   if (searchTerm && isValidContractAddress(searchTerm)) {
+    const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
+    const { _contractName } = await fetchJson(detailUrl);
 
-    url = `${contractsUrl}/contract/${searchTerm}/details/${chainid ? `?chainid=${chainid}` : ""}`;
+    if (_contractName) params.set("name", _contractName);
 
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      const { _contractName } = data;
-
-      const nextUrl = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}${_contractName ? `&name=${_contractName}` : ""}`;
-
-      const nextResponse = await fetch(nextUrl, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!nextResponse.ok) {
-        throw new Error(`HTTP error! status: ${nextResponse.status}`);
-      }
-
-      return await nextResponse.json();
-    } catch (error) {
-      handleErrors(error);
-      throw error;
-    }
-  } else {
-    url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ""}${searchTerm ? `&name=${searchTerm}` : ""}`;
-
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      handleErrors(error);
-      throw error;
-    }
+    const listUrl = `${contractsUrl}?${params}`;
+    return fetchJson(listUrl);
   }
+
+  if (searchTerm) params.set("name", searchTerm);
+
+  const listUrl = `${contractsUrl}?${params}`;
+  return fetchJson(listUrl);
 }
 
 export function* fetchContracts(action) {
@@ -84,7 +54,6 @@ export function* fetchContracts(action) {
       action.offset,
       action.name
     );
-    console.log(response, "response");
     yield put(fetchContractsSuccess(response));
   } catch (err) {
     yield put(fetchContractsFailure(err));
