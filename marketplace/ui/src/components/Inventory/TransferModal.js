@@ -18,6 +18,13 @@ import { SearchOutlined, DeleteOutlined } from '@ant-design/icons';
 import { OLD_SADDOG_ORIGIN_ADDRESS } from '../../helpers/constants';
 import { useLocation } from 'react-router-dom';
 
+const truncateAddress = (address) => {
+  if (!address) return '';
+  return (
+    address.substring(0, 6) + '...' + address.substring(address.length - 4)
+  );
+};
+
 const TransferModal = ({
   open,
   handleCancel,
@@ -144,8 +151,8 @@ const TransferModal = ({
     )
     .map((record) => ({
       label: isBurner
-        ? `burner - ${record.organization}`
-        : `${record.commonName} - ${record.organization}`,
+        ? `burner - ${truncateAddress(record.userAddress)}`
+        : `${record.commonName} - ${truncateAddress(record.userAddress)}`,
       value: record.userAddress,
     }));
 
@@ -342,7 +349,8 @@ const TransferModal = ({
           options={filteredUsersList}
           optionFilterProp="value"
           filterOption={(input, option) =>
-            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+            (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
           }
           open={record.openDropdown}
           suffixIcon={<SearchOutlined />}
@@ -351,6 +359,7 @@ const TransferModal = ({
           popupClassName="custom-select-dropdown"
           defaultValue={isBurner ? filteredUsersList[0] : null}
           disabled={index !== transfers.length - 1}
+          placeholder={'Search by username or user address'}
         />
       ),
     },
@@ -500,7 +509,10 @@ const TransferModal = ({
             options={filteredUsersList}
             optionFilterProp="value"
             filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              (option?.label ?? '')
+                .toLowerCase()
+                .includes(input.toLowerCase()) ||
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
             }
             open={mobileTransfer.openDropdown}
             suffixIcon={<SearchOutlined />}
@@ -508,6 +520,7 @@ const TransferModal = ({
             onBlur={() => handleDropdownOpenChange(mobileTransfer.id, false)}
             popupClassName="custom-select-dropdown"
             defaultValue={isBurner ? filteredUsersList[0] : null}
+            placeholder="Search by username or user address"
           />
         </div>
       </div>
