@@ -28,10 +28,10 @@ class ContractCard extends Component {
     const name = this.props.contract.name;
     const searchTerm = this.props.contract.searchTerm;
     if(searchTerm){
-      self.props.fetchState(name, searchTerm, self.props.selectedChain);
-      self.props.fetchAccount(name, searchTerm);
-      self.props.fetchContractInfoRequest(`card-data-${searchTerm}-${self.props.selectedChain}`, name, searchTerm)
-      self.props.selectContractInstance(name, searchTerm);
+      this.props.fetchState(name, searchTerm, this.props.selectedChain);
+      this.props.fetchAccount(name, searchTerm);
+      this.props.fetchContractInfoRequest(`card-data-${searchTerm}-${this.props.selectedChain}`, name, searchTerm)
+      this.props.selectContractInstance(name, searchTerm);
     }
   }
 
