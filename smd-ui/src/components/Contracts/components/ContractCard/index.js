@@ -23,6 +23,18 @@ class ContractCard extends Component {
     this.state = { isOpen: false };
   }
 
+  componentWillMount(){
+    console.log("Called when ?", searchTerm, this.props.contract)
+    const name = this.props.contract.name;
+    const searchTerm = this.props.contract.searchTerm;
+    if(searchTerm){
+      self.props.fetchState(name, searchTerm, self.props.selectedChain);
+      self.props.fetchAccount(name, searchTerm);
+      self.props.fetchContractInfoRequest(`card-data-${searchTerm}-${self.props.selectedChain}`, name, searchTerm)
+      self.props.selectContractInstance(name, searchTerm);
+    }
+  }
+
   render() {
     let cardData = [];
     const name = this.props.contract.name;

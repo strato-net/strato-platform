@@ -39,11 +39,6 @@ export async function getContracts(chainid, limit, offset, searchTerm) {
   if (searchTerm && isValidContractAddress(searchTerm)) {
     const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
     const { _contractName } = await fetchJson(detailUrl);
-
-    fetchState(_contractName, searchTerm, chainid);
-    fetchAccount(_contractName, searchTerm);
-    fetchContractInfoRequest(`card-data-${searchTerm}-${chainid}`, _contractName, searchTerm, chainid)
-    selectContractInstance(_contractName, searchTerm);
     
     if (_contractName) params.set("name", _contractName);
 

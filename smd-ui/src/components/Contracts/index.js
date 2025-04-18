@@ -29,6 +29,11 @@ const tourSteps = [
   },
 ];
 
+function isValidContractAddress(address) {
+  const regex = /\b[a-fA-F0-9]{40}\b/;
+  return regex.test(address);
+}
+
 class Contracts extends Component {
   constructor(props) {
     super(props);
@@ -114,6 +119,7 @@ class Contracts extends Component {
   render() {
     const contracts = this.props.contracts;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
+    console.log("this.props.filter.name", this.props.filter.name, this.props)
 
     const returnedInstances = contracts && contractNames.length > 0 ? Object.values(contracts).reduce((prev, cur) => {
       return prev + cur.instances.length
@@ -124,7 +130,7 @@ class Contracts extends Component {
         return (
           <div className="row pt-dark" key={'contract-card-' + i}>
             <div className="col-sm-12">
-              {value && <ContractCard contract={{ name: value, contract: contracts[value] }} />}
+              {value && <ContractCard contract={{ name: value, contract: contracts[value], searchTerm: isValidContractAddress(this.props.filter.name) ?? this.props.filter.name }} />}
               <br />
             </div>
           </div>
