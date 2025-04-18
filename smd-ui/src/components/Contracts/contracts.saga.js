@@ -17,9 +17,7 @@ import {
 const contractsUrl = env.BLOC_URL + "/contracts";
 
 function isValidContractAddress(address) {
-  console.log(address, 'address');
   const regex = /\b[a-fA-F0-9]{40}\b/;
-  console.log(regex.test(address), 'address');
   return regex.test(address);
 }
 
