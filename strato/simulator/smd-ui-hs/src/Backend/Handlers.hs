@@ -1,82 +1,120 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Backend.Handlers where
 
 import Backend.Types
 import Backend.BitcoinRPC
+import Bloc.API.Transaction
+import Bloc.Client
+import BlockApps.Solidity.ArgValue
 import Control.Exception (throwIO)
 import Control.Monad (guard)
+import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Foldable (toList)
-import Data.Maybe (mapMaybe, maybeToList)
-import Data.Scientific (Scientific, toRealFloat)
+import qualified Data.Map.Strict as M
+import Data.Maybe (catMaybes, mapMaybe)
+import Data.Proxy
+import Data.Scientific (toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Control.Monad.IO.Class (liftIO)
-import Servant
-
-sci2Int :: Scientific -> Integer
-sci2Int n = round (toRealFloat n :: Double) 
+import Frontend.BridgeClient (blocBaseUrl)
+import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Servant hiding (HNil)
+import Servant.Client
 
 -- Exposed to Servant
-getBlockSummaries :: Handler [BlockSummary]
+getBlockSummaries :: Handler [BitcoinBlockSummary]
 getBlockSummaries = liftIO $ do
   -- Get latest 5 blocks
-  Right tip' <- callBitcoinRPC "getblockcount" []
-  let tip :: Integer
-      tip = case tip' of
-              Number n -> sci2Int n
-              _        -> 0
-  blockHashes <- mapM (\h -> callBitcoinRPC "getblockhash" [toJSON (tip - h)]) [(0 :: Integer)..4]
-  blockInfos <- mapM (\case Right (Data.Aeson.Types.String bh) -> callBitcoinRPC "getblock" [toJSON bh]; _ -> pure $ Left "hash error") blockHashes
-  pure $ concatMap (either (const []) toBlockSummary) blockInfos
-
-toBlockSummary :: Value -> [BlockSummary]
-toBlockSummary v = maybeToList $ parseMaybe (withObject "blocksummary"  $ \o -> do
-  ht <- sci2Int <$> o .: "height"
-  h  <- o .: "hash"
-  n  <- sci2Int <$> o .: "nTx"
-  t <- sci2Int <$> o .: "time"
-  pure $ BlockSummary ht h n t) v
+  Right tip <- callBitcoinRPC (Proxy @GetBlockCount) HNil
+  blockHashes <- mapM (\h -> callBitcoinRPC (Proxy @GetBlockHash) (HEnd $ tip - h)) [(0 :: Integer)..4]
+  catMaybes . map (either (const Nothing) Just) <$> mapM (\case Right bh -> callBitcoinRPC (Proxy @GetBlock) (HEnd bh); _ -> pure $ Left "hash error") blockHashes
 
 getGlobalUtxos :: Handler [UtxoSummary]
-getGlobalUtxos = liftIO $ do
-  res <- callBitcoinRPC "listunspent" []
-  return $ either (const []) (mapMaybe toUtxoSummary) (parseMaybeArray res)
+getGlobalUtxos = getWalletUtxos  -- for now, same as above (can be filtered later)
 
 getWalletUtxos :: Handler [UtxoSummary]
-getWalletUtxos = getGlobalUtxos  -- for now, same as above (can be filtered later)
+getWalletUtxos = liftIO $ either (const []) id <$> callBitcoinRPC (Proxy @GetWalletUTXOSummaries) HNil
+
+listWalletUtxos :: IO [UTXO]
+listWalletUtxos = either (const []) id <$> callBitcoinRPC (Proxy @GetWalletUTXOs) HNil
 
 getWalletBalance :: Handler Double
 getWalletBalance = liftIO $ do
-  result <- callBitcoinRPC "getbalance" []
+  result <- callBitcoinRPC (Proxy @GetBalance) HNil
   case result of
-    Right (Number n) -> pure $ toRealFloat n
-    Right other -> throwIO . BackendException . T.pack $ "Unexpected result: " <> show other
+    Right bal -> pure bal
     Left err -> throwIO . BackendException $ T.pack err
 
 getMultisigUtxos :: Text -> Handler [UtxoSummary]
 getMultisigUtxos addr = liftIO $ do
-  res <- callBitcoinRPC "listunspent" []
+  res <- callBitcoinRPCRaw "listunspent" []
   case res of
     Right (Array arr) -> pure $ mapMaybe (parseUtxoFor addr) (toList arr)
     Right _ -> pure []
     Left err -> throwIO . BackendException $ T.pack err
 
 postSendToMultisig :: PostSendToMultisigArgs -> Handler Text
-postSendToMultisig (PostSendToMultisigArgs addr amt) = liftIO $ do
-  res <- callBitcoinRPC "sendtoaddress" [toJSON addr, toJSON amt]
-  case res of
-    Right (String txid) -> pure txid
-    Right other -> throwIO . BackendException . T.pack $ "Unexpected result: " <> show other
-    Left err -> throwIO . BackendException $ T.pack err
+postSendToMultisig (PostSendToMultisigArgs funcName amt) = liftIO $ do
+  if funcName == "bridgeIn"
+    then do
+      addrs'' <- sequence (replicate 1 $ callBitcoinRPC (Proxy @GetNewAddress) HNil >>= \a -> a <$ putStrLn ("MULTISIG Address: " ++ show a))
+      case sequence addrs'' of
+        Left e -> throwIO . BackendException $ T.pack e
+        Right [] -> throwIO . BackendException $ T.pack "Empty list"
+        Right (addrs':_) -> do
+          -- vals' <- traverse (\a -> callBitcoinRPC (Proxy @ValidateAddress) (HEnd a) >>= \a' -> a' <$ putStrLn ("MULTISIG Address Validation: " ++ show a')) addrs'
+          -- case sequence vals' of
+          --   Left e -> throwIO . BackendException $ T.pack e
+          --   Right vals -> do
+          --     callBitcoinRPC (Proxy @CreateMultiSig) (2 ::: HEnd (avScriptPubKey <$> vals)) >>= \case
+          --       Left e -> throwIO . BackendException $ T.pack e
+          --       Right multisig -> do
+          --         putStrLn $ "MULTISIG Script: " ++ show multisig
+                  callBitcoinRPC (Proxy @SendToAddress) (addrs' ::: HEnd amt) >>= \case
+                    Left e -> throwIO . BackendException $ T.pack e
+                    Right txid -> do
+                      mgr <- newManager defaultManagerSettings -- tlsManagerSettings
+                      let payload = BlocFunction $ FunctionPayload
+                            { functionpayloadContractAddress = 0x1234567890,
+                              functionpayloadMethod = funcName,
+                              functionpayloadArgs = M.fromList [("_txid", ArgString txid), ("_amount", ArgInt (round $ amt * 100000000))],
+                              functionpayloadValue = Nothing,
+                              functionpayloadTxParams = Nothing,
+                              functionpayloadChainid = Nothing,
+                              functionpayloadMetadata = Just $ M.fromList [("VM", "SolidVM")]
+                            }
+                          pbtr = PostBlocTransactionRequest Nothing [payload] Nothing Nothing
+                      result <- runClientM (postBlocTransaction Nothing (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
+                      pure . T.pack $ show result
+    else do
+      mgr <- newManager defaultManagerSettings -- tlsManagerSettings
+      let payload = BlocFunction $ FunctionPayload
+            { functionpayloadContractAddress = 0x1234567890,
+              functionpayloadMethod = funcName,
+              functionpayloadArgs = M.fromList [("_txid", ArgString . T.pack $ "dummy" ++ show amt), ("_amount", ArgInt (round $ amt * 100000000))],
+              functionpayloadValue = Nothing,
+              functionpayloadTxParams = Nothing,
+              functionpayloadChainid = Nothing,
+              functionpayloadMetadata = Just $ M.fromList [("VM", "SolidVM")]
+            }
+          pbtr = PostBlocTransactionRequest Nothing [payload] Nothing Nothing
+      result <- runClientM (postBlocTransaction Nothing (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
+      pure . T.pack $ show result
+  -- callBitcoinRPC (Proxy @GetNewAddress) HNil >>= \case
+  --   Left e -> throwIO . BackendException $ T.pack e
+  --   Right addr -> callBitcoinRPC (Proxy @SendToAddress) (addr ::: HEnd amt) >>= \case
+  --     Right txid -> pure txid
+  --     Left err -> throwIO . BackendException $ T.pack err
 
 postBitcoinRpcCommand :: RpcCommand -> Handler Value
 postBitcoinRpcCommand (RpcCommand m ps) = do
-  result <- liftIO $ callBitcoinRPC (T.unpack m) ps
+  result <- liftIO $ callBitcoinRPCRaw (T.unpack m) ps
   case result of
     Left err -> throwError err500 { errBody = encode (String $ T.pack err) }
     Right val -> pure val

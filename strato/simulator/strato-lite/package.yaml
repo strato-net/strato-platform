@@ -65,6 +65,7 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - exceptions
+  - format
   - hflags
   - identity-monad
   - lens
@@ -83,6 +84,7 @@ library:
   - prometheus-client
   - Ranged-sets
   - resourcet
+  - resource-pool
   - seqevents
   - slipstream
   - solid-vm-compiler
@@ -95,6 +97,7 @@ library:
   - strato-model
   - strato-p2p
   - strato-sequencer
+  - strato-statediff
   - text
   - time
   - transformers

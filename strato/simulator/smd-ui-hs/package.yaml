@@ -19,18 +19,24 @@ dependencies:
   - base >= 4.7 && < 5
   - aeson
   - base16-bytestring
+  - binary
   - bloc2
   - bloc2api
+  - bloc2client
+  - blockstanbul
   - bytestring
   - cache
   - clock
   - common-log
   - containers
   - core-api2
+  - cryptonite
   - ethereum-discovery
   - ethereum-encryption
+  - evm-solidity
   - filepath
   - file-embed
+  - haskoin-core
   - hflags
   - http-client
   - jsaddle
@@ -38,6 +44,7 @@ dependencies:
   - jsaddle-wkwebview
   - jsaddle-dom
   - lens
+  - memory
   - reflex
   - reflex-dom
   - reflex-dom-core
@@ -110,7 +117,7 @@ executables:
     ghc-options:
       - -threaded
       - -rtsopts
-      - -with-rtsopts=-N
+      - -with-rtsopts=-N8
     dependencies:
       - smd-ui-hs
       - jsaddle-wkwebview

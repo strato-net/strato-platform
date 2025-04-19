@@ -52,6 +52,6 @@ PPeer
     disableException T.Text
     nextDisableWindowSeconds Int default=5
     nextUdpDisableWindowSeconds Int default=5
-    disableExpiration UTCTime default=now()
+    disableExpiration UTCTime default=0
     deriving Show Read Eq
 |]

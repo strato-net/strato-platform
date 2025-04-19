@@ -15,6 +15,7 @@
 
 module Bloc.Database.Queries
   ( sourceToContractDetails,
+    getContractByAddress,
     getContractDetailsForContract,
     getContractDetailsByCodeHash,
     getCodeCollectionByCodePtr,
@@ -24,26 +25,52 @@ where
 
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB (AddressState, unsafeResolveCodePtr)
+import Blockchain.Data.AddressStateRef
+import Blockchain.Data.DataDefs (AddressStateRef(..))
+import Blockchain.Model.JsonBlock
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
+import Control.Lens ((&), (?~))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
+import Control.Monad.Trans.Maybe
 import qualified Data.Map.Strict as Map
+import Data.Maybe (listToMaybe)
 import Data.Source.Annotation
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import Handlers.AccountInfo
 import SQLM
 import SolidVM.Model.CodeCollection
 import Text.Format
 import UnliftIO
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
+
+getContractByAddress ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
+  Address ->
+  m (Maybe Contract)
+getContractByAddress a = runMaybeT $ do
+  (AddressStateRef' r _) <-
+    MaybeT
+      . fmap listToMaybe
+      . getAccount'
+      $ accountsFilterParams
+        & qaAddress ?~ a
+  codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+  MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
 getContractDetailsByCodeHash ::
   ( MonadIO m,

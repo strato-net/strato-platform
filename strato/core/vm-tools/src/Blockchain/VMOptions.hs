@@ -39,7 +39,7 @@ defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to p
 defineFlag "transactionRootVerification" False "Flag to turn transaction root verification or/off"
 defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
-defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
+defineFlag "svmTrace" (False :: Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "requireCerts" (True :: Bool) "Flag to enable the requirement of a cert to send transactions"
 defineFlag "creatorForkBlockNumber" (-1 :: Integer) "The block number at which to use commonName for the creator value instead of organization"
 defineFlag "strictGas" (True :: Bool) "Whether to restrict transactions to approximately 2 second gas timeout"

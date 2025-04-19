@@ -28,7 +28,6 @@ import Data.HashMap.Strict.InsOrd
 import Data.Swagger
 import Servant
 import Servant.Swagger
-import SolidVM.Model.CodeCollection.Contract
 
 type MonadBlocAPI m = 
   ( MonadCoreAPI m,
@@ -36,7 +35,6 @@ type MonadBlocAPI m =
     Mod.Accessible (Maybe SyncStatus) m,
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
-    Selectable Address Contract m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m

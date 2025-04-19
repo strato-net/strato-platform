@@ -8,7 +8,7 @@ import Data.Aeson (Value)
 import Data.Text (Text)
 import Servant
 
-type GetBlockSummaries = "bitcoin" :> "blocks" :> Get '[JSON] [BlockSummary]
+type GetBlockSummaries = "bitcoin" :> "blocks" :> Get '[JSON] [BitcoinBlockSummary]
 type GetGlobalUtxos = "bitcoin" :> "utxos" :> Get '[JSON] [UtxoSummary]
 type GetWalletUtxos = "bitcoin" :> "wallet" :> Get '[JSON] [UtxoSummary]
 type GetWalletBalance = "bitcoin" :> "wallet" :> "balance" :> Get '[JSON] Double

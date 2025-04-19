@@ -25,6 +25,7 @@ import BlockApps.X509.Certificate as X509
 import Blockchain.Bagger
 import Blockchain.Bagger.BaggerState
 import Blockchain.Blockstanbul
+import Blockchain.Blockstanbul.StateMachine (validators)
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
@@ -36,12 +37,11 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB ()
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
+import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified "vm-runner" Blockchain.Event as VMEvent
 import Blockchain.Generation
@@ -54,9 +54,9 @@ import qualified Blockchain.Sequencer as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Monad
 import Blockchain.Slipstream.Processor
-import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.ApiIndexer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
@@ -77,7 +77,7 @@ import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
-import Control.Monad (join)
+import Control.Monad (forever, join)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Identity
@@ -85,35 +85,32 @@ import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import qualified Control.Monad.Trans.State as StateT
 import Core.API
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_, toList, traverse_)
-import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import Data.Ord (Down(..))
+import qualified Data.Set as Set
 import qualified Data.Set.Ordered as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock (UTCTime (..), diffUTCTime, getCurrentTime)
 import Data.Traversable (for)
-import Debugger (DebugSettings, SourceMap(..))
+import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM2
 import Executable.StratoP2P
 import SelectAccessible ()
-import SolidVM.Model.CodeCollection hiding (Wei)
+import SolidVM.Model.Storable hiding (toList)
 import Strato.Lite.Base
 import Text.Read (readMaybe)
 import UnliftIO
-import Prelude hiding (round)
+import Prelude hiding (round, sequence)
 
 type m ~> n = forall a. m a -> n a
 
@@ -137,12 +134,10 @@ instance Default P2PContext where
       S.empty
 
 data CoreContext = CoreContext
-  { _genesisBlock :: Block
-  , _genesisBlockHash :: GenesisBlockHash
-  , _sequencerContext :: SequencerContext
-  , _blockPeriod :: BlockPeriod
-  , _roundPeriod :: RoundPeriod
-  , _vmContextState :: ContextState
+  { _genesisBlock :: TVar Block
+  , _genesisBlockHash :: TVar GenesisBlockHash
+  , _sequencerContext :: TVar SequencerContext
+  , _vmContextState :: TVar ContextState
   }
 
 makeLenses ''CoreContext
@@ -150,6 +145,8 @@ makeLenses ''CoreContext
 data CorePeer = CorePeer
   { _corePeerName :: Text
   , _corePeerGenesisInfo :: GenesisInfo
+  , _corePeerBlockPeriod :: BlockPeriod
+  , _corePeerRoundPeriod :: RoundPeriod
   , _corePeerTimerChan :: TMChan RoundNumber
   , _corePeerUnseqSource :: TQueue SeqLoopEvent
   , _corePeerSeqP2pSource :: TMChan P2pEvent
@@ -157,7 +154,7 @@ data CorePeer = CorePeer
   , _corePeerApiIndexSource :: TQueue [IndexEvent]
   , _corePeerP2pIndexSource :: TQueue [IndexEvent]
   , _corePeerSlipstreamSource :: TQueue [VMEvent]
-  , _corePeerContext :: TVar CoreContext
+  , _corePeerContext :: CoreContext
   }
 
 makeLenses ''CorePeer
@@ -176,18 +173,18 @@ instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` OutputBlock) (
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
-instance {-# OVERLAPPING #-} MonadIO m => State.MonadState CoreContext (CoreT m) where
-  state f =
-    asks _corePeerContext >>= \ctx -> liftIO . atomically $ do
-      s <- readTVar ctx
-      let (a, s') = f s
-      writeTVar ctx s'
-      pure a
+-- instance {-# OVERLAPPING #-} MonadIO m => State.MonadState CoreContext (CoreT m) where
+--   state f =
+--     asks _corePeerContext >>= \ctx -> liftIO . atomically $ do
+--       s <- readTVar ctx
+--       let (a, s') = f s
+--       writeTVar ctx s'
+--       pure a
 
 instance {-# OVERLAPPING #-} MonadIO m => State.MonadState P2PContext (MonadCoreP2P m) where
   state f = ask >>= liftIO . flip atomicModifyIORef' (swap . f)
     where
-      swap ~(a, b) = (b, a)
+      swap (a, b) = (b, a)
 
 instance {-# OVERLAPPING #-} MonadBase m => Mod.Accessible PublicKey (CoreT m) where
   access = lift . Mod.access
@@ -221,7 +218,7 @@ instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable SyncStatus (CoreT m) 
   put p = lift . Mod.put p
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible GenesisBlockHash (CoreT m) where
-  access _ = use genesisBlockHash
+  access _ = asks (_genesisBlockHash . _corePeerContext) >>= readTVarIO
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable ActionTimestamp (MonadCoreP2P m) where
   get _ = use actionTimestamp
@@ -298,8 +295,8 @@ instance {-# OVERLAPPING #-} Mod.Modifiable BestBlock m => Mod.Modifiable BestBl
   put p k = lift $ Mod.put p k
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable SequencerContext (CoreT m) where
-  get _ = use sequencerContext
-  put _ = assign sequencerContext
+  get _   = asks (_sequencerContext . _corePeerContext) >>= readTVarIO
+  put _ s = asks (_sequencerContext . _corePeerContext) >>= atomically . flip writeTVar s
 
 instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Alters` X509CertInfoState) (CoreT m) where
   lookup p k = lift $ A.lookup p k
@@ -315,20 +312,20 @@ instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` DBDB.Dependent
   delete p k = lift $ A.delete p k
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable SeenTransactionDB (CoreT m) where
-  get _ = use $ sequencerContext . seenTransactionDB
-  put _ = assign $ sequencerContext . seenTransactionDB
+  get _   = asks (_sequencerContext . _corePeerContext) >>= fmap _seenTransactionDB . readTVarIO
+  put _ s = asks (_sequencerContext . _corePeerContext) >>= atomically . flip modifyTVar' (seenTransactionDB .~ s)
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (IORef RoundNumber) (CoreT m) where
-  access _ = use $ sequencerContext . latestRoundNumber
+  access _   = asks (_sequencerContext . _corePeerContext) >>= fmap _latestRoundNumber . readTVarIO
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (TMChan RoundNumber) (CoreT m) where
   access _ = asks _corePeerTimerChan
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible BlockPeriod (CoreT m) where
-  access _ = use blockPeriod
+  access _ = asks _corePeerBlockPeriod
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RoundPeriod (CoreT m) where
-  access _ = use roundPeriod
+  access _ = asks _corePeerRoundPeriod
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible View (CoreT m) where
   access _ = currentView
@@ -339,8 +336,12 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` ()) (CoreT m) wh
   delete _ = genericDeleteSeenTransactionDB
 
 instance {-# OVERLAPPING #-} MonadIO m => HasBlockstanbulContext (CoreT m) where
-  getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
-  putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
+  getBlockstanbulContext = do
+    i <- asks $ _sequencerContext . _corePeerContext
+    liftIO $ _blockstanbulContext <$> readTVarIO i
+  putBlockstanbulContext s = do
+    i <- asks $ _sequencerContext . _corePeerContext
+    liftIO $ atomically $ modifyTVar' i (blockstanbulContext ?~ s)
 
 instance {-# OVERLAPPING #-} HasVault m => HasVault (CoreT m) where
   sign bs = lift $ sign bs
@@ -363,7 +364,7 @@ instance {-# OVERLAPPING #-} HasVault (ReaderT PrivateKey IO) where
   getShared _ = error "called getShared, but this should never happen"
 
 getContextState :: MonadIO m => CoreT m ContextState
-getContextState = asks _corePeerContext >>= fmap _vmContextState . readTVarIO
+getContextState = asks (_vmContextState . _corePeerContext) >>= readTVarIO
 
 get :: MonadIO m => CoreT m ContextState
 get = getContextState
@@ -374,15 +375,15 @@ gets f = f <$> get
 {-# INLINE gets #-}
 
 put :: MonadIO m => ContextState -> CoreT m ()
-put c = asks _corePeerContext >>= \i -> atomically . modifyTVar' i $ vmContextState .~ c
+put c = asks (_vmContextState . _corePeerContext) >>= atomically . flip writeTVar c
 {-# INLINE put #-}
 
 modify :: MonadIO m => (ContextState -> ContextState) -> CoreT m ()
-modify f = asks _corePeerContext >>= \i -> atomically . modifyTVar' i $ vmContextState %~ f
+modify f = asks (_vmContextState . _corePeerContext) >>= atomically . flip modifyTVar' f
 {-# INLINE modify #-}
 
 modify' :: MonadIO m => (ContextState -> ContextState) -> CoreT m ()
-modify' f = asks _corePeerContext >>= \i -> atomically . modifyTVar' i $ vmContextState %~ f
+modify' f = asks (_vmContextState . _corePeerContext) >>= atomically . flip modifyTVar' f
 {-# INLINE modify' #-}
 
 contextGet :: MonadIO m => CoreT m ContextState
@@ -471,8 +472,11 @@ instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Selectable` X509.X509Cer
   select _ k = do
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress ->
-      maybe Nothing (eitherToMaybe . bytesToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
+    fmap join . for mCertAddress $ \certAddress -> do
+      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+      case mBString of
+        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
+        _ -> pure Nothing
 
 instance {-# OVERLAPPING #-} MonadBase m => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (CoreT m) where
   select _ (k, t) = do
@@ -578,13 +582,13 @@ instance {-# OVERLAPPING #-} (Monad m, RunsClient m) => RunsClient (CoreT m) whe
 instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m (LoggingT IO)) => RunsServer (MonadCoreP2P m) (LoggingT IO) where
   runServer p runner f = runner $ \_ -> do
     c <- ask
-    liftIO . runLoggingT $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
+    liftIO . loggingFunc $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
     pure ()
 
 instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m (LoggingT IO)) => RunsServer (CoreT m) (LoggingT IO) where
   runServer p runner f = runner $ \_ -> do
     c <- ask
-    liftIO . runLoggingT $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
+    liftIO . loggingFunc $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
     pure ()
 
 instance {-# OVERLAPPING #-} MonadBase m => ((Host, TCPPort) `A.Alters` ActivityState) (CoreT m) where
@@ -629,49 +633,8 @@ instance {-# OVERLAPPING #-} MonadBase m => GetLastBlocks (CoreT m) where
 instance {-# OVERLAPPING #-} MonadBase m => GetLastTransactions (CoreT m) where
   getLastTransactions a b = lift $ getLastTransactions a b
 
-instance {-# OVERLAPPING #-} MonadBase m => A.Selectable Address Integer (CoreT m) where
-  select _ addr = A.lookup (A.Proxy @AddressState) addr >>= \case
-    Nothing -> pure Nothing
-    Just AddressState{..} -> pure $ Just addressStateNonce
-
-instance {-# OVERLAPPING #-} MonadBase m => A.Selectable Address Contract (CoreT m) where
-  select _ addr = A.lookup (A.Proxy @AddressState) addr >>= \case
-    Nothing -> pure Nothing
-    Just AddressState{..} -> resolveCodePtr addressStateCodeHash >>= \case 
-      Just (SolidVMCode name ch) -> A.lookup (A.Proxy @DBCode) ch >>= \case 
-        Nothing -> pure Nothing
-        Just (_, codeBS) -> case Aeson.decode' $ BL.fromStrict codeBS of
-          Nothing -> case Text.decodeUtf8' codeBS of
-            Left _ -> pure Nothing
-            Right codeText -> compileSource False (M.singleton "" codeText) >>= \case
-              Left _ -> pure Nothing
-              Right CodeCollection{..} -> pure $ M.lookup name _contracts
-          Just codeMap -> compileSource False codeMap >>= \case
-            Left _ -> pure Nothing
-            Right CodeCollection{..} -> pure $ M.lookup name _contracts
-      _ -> pure Nothing
-
-instance {-# OVERLAPPING #-} MonadBase m => A.Selectable Keccak256 SourceMap (CoreT m) where
-  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case 
-    Nothing -> pure Nothing
-    Just (_, codeBS) -> case Aeson.decode' $ BL.fromStrict codeBS of
-      Just codeMap -> pure . Just . SourceMap $ M.toList codeMap
-      Nothing -> case Text.decodeUtf8' codeBS of
-        Left _ -> pure Nothing
-        Right codeText -> pure . Just $ SourceMap [("", codeText)]
-
-instance {-# OVERLAPPING #-} MonadBase m => Mod.Accessible [DataDefs.RawTransaction] (CoreT m) where
-  access _ = do
-    bs <- Mod.get (Mod.Proxy @BaggerState)
-    time <- liftIO getCurrentTime
-    let toRawTx OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx (-1) time
-    pure . sortOn (Down . DataDefs.rawTransactionNonce) . map toRawTx . concat $ (M.elems <$> M.elems (queued bs)) ++ (M.elems <$> M.elems (pending bs))
-
 instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (CoreT m) where
   access _ = error "strato-lite: Accessing IdentityData"
-
-instance {-# OVERLAPPING #-} Monad m => A.Selectable Address Certificate (CoreT m) where
-  select _ _ = pure Nothing
 
 startingCheckpoint :: [Validator] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
@@ -696,61 +659,55 @@ newSequencerContext bc = do
 
 -- coreContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-coreContext ::
+coreContextIO ::
   SequencerContext ->
   ContextState ->
-  CoreContext
-coreContext seqCtx vmCtx =
-  CoreContext
-    { _genesisBlock = error "CORE CONTEXT GENESIS BLOCK"
-    , _genesisBlockHash = GenesisBlockHash zeroHash
-    , _sequencerContext = seqCtx
-    , _blockPeriod = BlockPeriod 1
-    , _roundPeriod = RoundPeriod 10
-    , _vmContextState = vmCtx
+  IO CoreContext
+coreContextIO seqCtx vmCtx = do
+  gb <- newTVarIO (error "CORE CONTEXT GENESIS BLOCK")
+  gh <- newTVarIO (GenesisBlockHash zeroHash)
+  sc <- newTVarIO seqCtx
+  vc <- newTVarIO vmCtx
+  pure $ CoreContext
+    { _genesisBlock = gb
+    , _genesisBlockHash = gh
+    , _sequencerContext = sc
+    , _vmContextState = vc
     }
 
 runMonad :: (m ~> BaseM) -> CorePeer -> CoreT m a -> BaseM a
 runMonad hoist p = hoist . flip runReaderT p
 
-runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> BaseM ()
-runNodeWithoutP2P hoist p = do
-  runMonad hoist p corePeerSetup
-  concurrently_
-    ( concurrently_
-        ( concurrently_
-            (runMonad hoist p corePeerSequencer)
-            (runMonad hoist p corePeerSeqTimerSource)
-        )
-        (runMonad hoist p corePeerVm)
-    )
-    ( concurrently_
-        ( concurrently_
-            (runMonad hoist p corePeerApiIndexer)
-            (runMonad hoist p corePeerP2pIndexer)
-        )
-        (runMonad hoist p corePeerSlipstream)
-    )
+runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> BaseM [Async ()]
+runNodeWithoutP2P hoist p = traverse (uncurry asyncOn) . zip [0..] $ nonP2pThreads hoist p
 
-runNode :: MonadBase m => (m ~> BaseM) -> (m ~> m) -> CorePeer -> BaseM ()
-runNode hoist initDiscovery p =
-  concurrently_
-    (runNodeWithoutP2P hoist p)
-    ( concurrently_
-        (liftIO . runLoggingT $ stratoP2P (\f -> do
-          ctx <- newIORef (def :: P2PContext)
-          runResourceT . hoist . flip runReaderT p $ do
-            let s = do
-                  seqP2pSource <- lift . lift $ asks _corePeerSeqP2pSource
-                  chan <- atomically $ dupTMChan seqP2pSource
-                  sourceTMChan chan
-            runReaderT (f s) ctx
-        ))
-        (liftIO . runLoggingT . runResourceT $ ethereumDiscovery (\f -> do
-          ctx <- newIORef (def :: P2PContext)
-          hoist . initDiscovery . flip runReaderT p $ runReaderT (f 100) ctx
-        ))
-    )
+nonP2pThreads :: MonadBase m => (m ~> BaseM) -> CorePeer -> [BaseM ()]
+nonP2pThreads hoist p =
+  [ runMonad hoist p corePeerSequencer `catch` (\(e :: SomeException) -> $logErrorS "Sequencer ERROR" . T.pack $ show e)
+  , runMonad hoist p corePeerSeqTimerSource `catch` (\(e :: SomeException) -> $logErrorS "Seq Timer ERROR" . T.pack $ show e)
+  , runMonad hoist p corePeerVm `catch` (\(e :: SomeException) -> $logErrorS "VM ERROR" . T.pack $ show e)
+  , runMonad hoist p corePeerApiIndexer `catch` (\(e :: SomeException) -> $logErrorS "API Indexer ERROR" . T.pack $ show e)
+  , runMonad hoist p corePeerP2pIndexer `catch` (\(e :: SomeException) -> $logErrorS "P2P Indexer ERROR" . T.pack $ show e)
+  , runMonad hoist p corePeerSlipstream `catch` (\(e :: SomeException) -> $logErrorS "Slipstream ERROR" . T.pack $ show e)
+  ]
+
+runNode :: MonadBase m => (m ~> BaseM) -> (m ~> m) -> CorePeer -> BaseM [Async ()]
+runNode hoist initDiscovery p = do
+  runMonad hoist p corePeerSetup
+  traverse (uncurry asyncOn) . zip [0..] $ runP2P : runEthDisc : nonP2pThreads hoist p
+  where runP2P = liftIO . loggingFunc $ stratoP2P (\f -> do
+            ctx <- newIORef (def :: P2PContext)
+            runResourceT . hoist . flip runReaderT p $ do
+              let s = do
+                    seqP2pSource <- lift . lift $ asks _corePeerSeqP2pSource
+                    chan <- atomically $ dupTMChan seqP2pSource
+                    sourceTMChan chan
+              runReaderT (f s) ctx
+          ) `catch` (\(e :: SomeException) -> $logErrorS "STRATO P2P ERROR" . T.pack $ show e)
+        runEthDisc  = liftIO . loggingFunc . runResourceT $ ethereumDiscovery (\f -> do
+            ctx <- newIORef (def :: P2PContext)
+            hoist . initDiscovery . flip runReaderT p $ runReaderT (f 100) ctx
+          ) `catch` (\(e :: SomeException) -> $logErrorS "Ethereum Discovery ERROR" . T.pack $ show e)
 
 postEvent :: SeqLoopEvent -> CorePeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_corePeerUnseqSource p) e
@@ -786,18 +743,20 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
   p2pIndexerSource <- newTQueueIO
   slipstreamSource <- newTQueueIO
   timerChan <- atomically newTMChan
-  let validators = readValidatorsFromGenesisInfo genesisInfo
+  let validators' = readValidatorsFromGenesisInfo genesisInfo
   --     extraCerts = readCertsFromGenesisInfo genesisInfo
   --     certMap = M.fromList $ (userAddress &&& id) . x509CertToCertInfoState <$> extraCerts
-  seqCtx <- newSequencerContext $ newBlockstanbulContext network' selfValidator validators valBehav
+  seqCtx <- newSequencerContext $ newBlockstanbulContext network' selfValidator validators' valBehav
   cache <- TRC.new 64
   let cstate = def & txRunResultsCache .~ cache
-  coreContextTVar <- newTVarIO $ coreContext seqCtx cstate
+  coreContext <- coreContextIO seqCtx cstate
 
   pure $
     CorePeer
       (T.pack name)
       genesisInfo
+      (BlockPeriod 1)
+      (RoundPeriod 10)
       timerChan
       unseqSource
       seqP2pSource
@@ -805,7 +764,7 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
       apiIndexerSource
       p2pIndexerSource
       slipstreamSource
-      coreContextTVar
+      coreContext
 
 corePeerUnseqSink :: MonadBase m => [IngestEvent] -> CoreT m ()
 corePeerUnseqSink ies = do
@@ -825,53 +784,76 @@ corePeerSetup = do
   genesisInfo <- asks _corePeerGenesisInfo
   (srcInfo, gb) <- genesisInfoToGenesisBlock genesisInfo
   let genHash = rlpHash $ blockBlockData gb
-  genesisBlock .= gb
-  genesisBlockHash .= GenesisBlockHash genHash
-  A.insert (A.Proxy @OutputBlock) genHash $ OutputBlock Origin.API (blockBlockData gb) [] []
-  let bb = BestBlock genHash 0
-      bsb = BestSequencedBlock genHash 0 []
-  Mod.put (Mod.Proxy @WorldBestBlock) $ WorldBestBlock bb
-  Mod.put (Mod.Proxy @BestBlock) bb
-  Mod.put (Mod.Proxy @BestSequencedBlock) bsb
-  A.replace (A.Proxy @(Canonical BlockHeader)) (0 :: Integer) (Canonical $ blockBlockData gb)
-  DBDB.bootstrapGenesisBlock genHash
-  let genHeader = blockBlockData gb
-      genesisOutputBlock =
-        OutputBlock
-          { obOrigin = Origin.API,
-            obBlockData = genHeader,
-            obReceiptTransactions = [],
-            obBlockUncles = []
-          }
-  MP.initializeBlank
-  withCurrentBlockHash genHash $ setStateDBStateRoot Nothing $ stateRoot genHeader
-  writeBlockSummary genesisOutputBlock
-  -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
-  -- for_ (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
-  (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot genHeader)]
-  putContextBestBlockInfo $ ContextBestBlockInfo genHash genHeader 0
-  Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
-  processNewBestBlock genHash genHeader [] -- bootstrap Bagger with genesis block
-  let extraCerts = readCertsFromGenesisInfo genesisInfo
-  for_ extraCerts $ \c -> do
-    let cis = x509CertToCertInfoState c
-        ua = userAddress cis
-    A.insert (A.Proxy @X509CertInfoState) ua cis
+  asks (_genesisBlock . _corePeerContext) >>= atomically . flip writeTVar gb
+  asks (_genesisBlockHash . _corePeerContext) >>= atomically . flip writeTVar (GenesisBlockHash genHash)
+  bsb' <- Mod.get (Mod.Proxy @BestSequencedBlock)
+  if bestSequencedBlockNumber bsb' > 0
+    then do
+      bCtx <- getBlockstanbulContext
+      for_ bCtx $ putBlockstanbulContext . (view . sequence .~ fromIntegral (bestSequencedBlockNumber bsb'))
+                                         . (validators .~ (Set.fromList $ bestSequencedBlockValidators bsb'))
+      let bh = bestSequencedBlockHash bsb'
+      mOB <- A.lookup (A.Proxy @OutputBlock) bh
+      case mOB of
+        Nothing -> error $ "Couldn't locate best sequenced block: " ++ formatKeccak256WithoutColor bh
+        Just ob -> do
+          putContextBestBlockInfo $ ContextBestBlockInfo bh (obBlockData ob) (fromIntegral . number $ obBlockData ob)
+          processNewBestBlock bh (obBlockData ob) (rlpHash . otBaseTx <$> obReceiptTransactions ob)
+          withCurrentBlockHash bh . setStateDBStateRoot Nothing . stateRoot $ obBlockData ob
+    else do
+      let bb = BestBlock genHash 0
+          bsb = BestSequencedBlock genHash 0 []
+      Mod.put (Mod.Proxy @WorldBestBlock) $ WorldBestBlock bb
+      Mod.put (Mod.Proxy @BestBlock) bb
+      Mod.put (Mod.Proxy @BestSequencedBlock) bsb
+      let genHeader = blockBlockData gb
+          genesisOutputBlock =
+            OutputBlock
+              { obOrigin = Origin.API,
+                obBlockData = genHeader,
+                obReceiptTransactions = [],
+                obBlockUncles = []
+              }
+      (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot genHeader)]
+      putContextBestBlockInfo $ ContextBestBlockInfo genHash genHeader 0
+      Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
+      processNewBestBlock genHash genHeader [] -- bootstrap Bagger with genesis block
+      A.insert (A.Proxy @OutputBlock) genHash genesisOutputBlock
+      A.insert (A.Proxy @(API OutputBlock)) genHash $ API genesisOutputBlock
+      A.replace (A.Proxy @(Canonical BlockHeader)) (0 :: Integer) (Canonical $ blockBlockData gb)
+      DBDB.bootstrapGenesisBlock genHash
+      MP.initializeBlank
+      withCurrentBlockHash genHash $ setStateDBStateRoot Nothing $ stateRoot genHeader
+      writeBlockSummary genesisOutputBlock
+      -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
+      -- for_ (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
+      let extraCerts = readCertsFromGenesisInfo genesisInfo
+      for_ extraCerts $ \c -> do
+        let cis = x509CertToCertInfoState c
+            ua = userAddress cis
+        A.insert (A.Proxy @X509CertInfoState) ua cis
+      for_ extraCertsHack . uncurry $ A.insert (A.Proxy @X509CertInfoState)
   
-  let hashAndMd (_, CodeInfo src name) =
-        ( hash $ Text.encodeUtf8 src,
-          M.fromList $
-            [("src", src)]
-              ++ case name of
-                Nothing -> []
-                Just n -> [("name", n)]
-        )
-      metadatas = M.fromList $ hashAndMd <$> srcInfo
-      findMetadata = flip M.lookup metadatas
-  slip <- asks _corePeerSlipstreamSource
-  sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader)
-  for_ sdsAndVMEs $ \(_, vmes) -> do -- TODO: statediff
-    atomically $ writeTQueue slip vmes
+      let hashAndMd (_, CodeInfo src name) =
+            ( hash $ Text.encodeUtf8 src,
+              M.fromList $
+                [("src", src)]
+                  ++ case name of
+                    Nothing -> []
+                    Just n -> [("name", n)]
+            )
+          metadatas = M.fromList $ hashAndMd <$> srcInfo
+          findMetadata = flip M.lookup metadatas
+      slip <- asks _corePeerSlipstreamSource
+      sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader)
+      for_ sdsAndVMEs $ \(sd, vmes) -> do
+        Mod.output sd
+        atomically $ writeTQueue slip vmes
+
+-- | A simple wrapper around a "TQueue". As data is pushed into the queue, the
+--   source will read it and pass it down the conduit pipeline.
+sourceFlushTQueue :: MonadIO m => TQueue a -> ConduitT z [a] m ()
+sourceFlushTQueue q = forever $ liftIO (atomically $ (:) <$> readTQueue q <*> flushTQueue q) >>= yield
 
 corePeerSequencer :: MonadBase m => CoreT m ()
 corePeerSequencer = do
@@ -894,8 +876,8 @@ corePeerVm = do
   p2pIndexerSource <- asks _corePeerP2pIndexSource
   slipstreamSource <- asks _corePeerSlipstreamSource
   runConduit $
-    sourceTQueue seqVmSource
-      .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
+    sourceFlushTQueue seqVmSource
+      .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch . concat)
       .| handleVmEvents
       .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
       .| ( awaitForever $ \b -> do
@@ -913,8 +895,9 @@ corePeerApiIndexer = do
   name <- asks _corePeerName
   apiIndexerSource <- asks _corePeerApiIndexSource
   runConduit $
-    sourceTQueue apiIndexerSource
-      .| ( awaitForever $ \evs -> do
+    sourceFlushTQueue apiIndexerSource
+      .| ( awaitForever $ \evss -> do
+             let evs = concat evss
              $logInfoS (name <> "/testApiIndexer") . T.pack $ show evs
              lift $ indexAPI evs
          )
@@ -924,8 +907,9 @@ corePeerP2pIndexer = do
   name <- asks _corePeerName
   p2pIndexerSource <- asks _corePeerP2pIndexSource
   runConduit $
-    sourceTQueue p2pIndexerSource
-      .| ( awaitForever $ \evs -> do
+    sourceFlushTQueue p2pIndexerSource
+      .| ( awaitForever $ \evss -> do
+             let evs = concat evss
              $logInfoS (name <> "/testP2pIndexer") . T.pack $ show evs
              lift $ indexP2P evs
          )
@@ -935,12 +919,13 @@ corePeerSlipstream = do
   name <- asks _corePeerName
   slipstreamSource <- asks _corePeerSlipstreamSource
   runConduit $
-    sourceTQueue slipstreamSource
-      .| ( awaitForever $ \evs -> do
+    sourceFlushTQueue slipstreamSource
+      .| ( awaitForever $ \evss -> do
+             let evs = concat evss
              $logInfoS (name <> "/slipstream") . T.pack $ show evs
              processTheMessages evs
          )
       .| ( awaitForever $ \case
            Left txr -> lift $ Mod.yield txr
-           Right cmds  -> traverse_ ($logInfoS (name <> "/slipstream/cmds")) $ concatMap T.lines cmds
+           Right cmds  -> lift . Mod.output $ SlipstreamCommands cmds
          )

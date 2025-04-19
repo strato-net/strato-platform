@@ -17,4 +17,4 @@ import Strato.Lite.Core
 import Strato.Lite.Filesystem
 import Strato.Lite.Init
 import Strato.Lite.Rest
-import Strato.Lite.Simulator
+import Strato.Lite.Simulator hiding (makeValidators, selfSignCert)

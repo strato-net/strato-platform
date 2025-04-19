@@ -42,7 +42,7 @@ library:
     - monad-logger
     - mtl
     - parsec
-    - secp256k1-haskell
+    - blockapps-secp256k1-haskell
     - seqevents
     - servant-client
     - servant-server

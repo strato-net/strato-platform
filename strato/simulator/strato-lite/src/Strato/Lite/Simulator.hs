@@ -89,7 +89,7 @@ data Network = Network
 makeLenses ''Network
 
 data ThreadPool = ThreadPool
-  { _nodeThreads :: Map Text (Async ()),
+  { _nodeThreads :: Map Text [Async ()],
     _connectionThreads :: Map (Text, Text) (Async ())
   }
 
@@ -287,7 +287,7 @@ hoistSimulator s f = do
   mpdb <- fmap _simulatorContextPeerMap . atomically . readTVar $ _simulatorPeerContext s
   runReaderT (runReaderT f s) mpdb
 
-runSimulatorNode :: SimulatorPeer -> CorePeer -> BaseM ()
+runSimulatorNode :: SimulatorPeer -> CorePeer -> BaseM [Async ()]
 runSimulatorNode s c = runNode (hoistSimulator s) id c
 
 createSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager BaseM (SimulatorPeer, CorePeer)
@@ -310,20 +310,20 @@ addSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes = 
         pure True
       _ -> pure False
   when didCreate . lift $ do
-    a <- async $ uncurry runSimulatorNode node
+    a <- uncurry runSimulatorNode node
     atomically $ modifyTVar (mgr ^. threads) $ nodeThreads . at nodeLabel ?~ a
   pure didCreate
 
 removeSimulatorNode :: Text -> ReaderT NetworkManager BaseM Bool
 removeSimulatorNode nodeLabel = do
   mgr <- ask
-  mAsync <- liftIO . atomically $ do
+  asyncs <- liftIO . atomically $ do
     modifyTVar (mgr ^. network) $ nodes . at nodeLabel .~ Nothing
     ma <- (^. nodeThreads . at nodeLabel) <$> readTVar (mgr ^. threads)
     modifyTVar (mgr ^. threads) $ nodeThreads . at nodeLabel .~ Nothing
-    pure ma
-  liftIO $ traverse_ cancel mAsync
-  pure $ isJust mAsync
+    pure $ maybe [] id ma
+  liftIO $ traverse_ cancel asyncs
+  pure . not $ null asyncs
 
 addSimulatorConnection :: Text -> Text -> ReaderT NetworkManager BaseM Bool
 addSimulatorConnection serverLabel clientLabel = do
@@ -374,7 +374,7 @@ runNetwork nodesList validatorsFilter = do
   peers <- liftIO $ traverse (\(p, (n, (c, i, t, u))) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i t u bootNodes True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
-  nodeThreads' <- for nodesMap $ async . uncurry runSimulatorNode
+  nodeThreads' <- for nodesMap $ uncurry runSimulatorNode
   let threadPool = ThreadPool nodeThreads' M.empty
   networkTVar <- newTVarIO network'
   threadsTVar <- newTVarIO threadPool
@@ -398,7 +398,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   for eConnections $ \connections' -> do
     let connectionsMap = M.fromList $ zip connectionsList connections'
         network' = Network nodesMap connectionsMap inet
-    nodeThreads' <- for nodesMap $ \(s,c) -> async $ runNodeWithoutP2P (hoistSimulator s) c
+    nodeThreads' <- for nodesMap $ \(s,c) -> runNodeWithoutP2P (hoistSimulator s) c
     connectionThreads' <- for connectionsMap $ async . runSimulatorConnection
     let threadPool = ThreadPool nodeThreads' connectionThreads'
     networkTVar <- newTVarIO network'

@@ -281,7 +281,7 @@ processTheMessages messages = do
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
+  fkeys' <- mapOutput Right . outputData . forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 

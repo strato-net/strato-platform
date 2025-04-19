@@ -27,6 +27,7 @@ import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockH
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
+import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.PubKey
 import Blockchain.Data.Transaction
@@ -48,6 +49,7 @@ import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Blockchain.Strato.StateDiff
 import Blockchain.SyncDB
 import Conduit
 import Control.Lens hiding (Context, view)
@@ -60,9 +62,12 @@ import qualified Control.Monad.State as State
 import Core.API
 import Crypto.Types.PubKey.ECC
 import Data.Bits
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
+import Data.Foldable (traverse_)
 import Data.List (foldl', sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -70,8 +75,10 @@ import Data.Maybe (catMaybes, listToMaybe)
 import qualified Data.NibbleString as N
 import Data.Ord (Down(..))
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as Text
 import Data.Time.Clock (addUTCTime)
 import Data.Time.Clock.POSIX
+import Debugger (SourceMap(..))
 import Network.Socket
 import Strato.Lite.Base
 import Text.Read (readMaybe)
@@ -245,6 +252,12 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible UDPPort (MonadSimulator
 instance {-# OVERLAPPING #-} MonadIO m => (MonadSimulator m) `Mod.Yields` DataDefs.TransactionResult where
   yield txr = simulatorContextTransactionResults %= (txr:)
 
+instance {-# OVERLAPPING #-} Monad m => (MonadSimulator m) `Mod.Outputs` StateDiff where
+  output _ = pure () 
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (MonadSimulator m) `Mod.Outputs` SlipstreamCommands where
+  output (SlipstreamCommands cmds) = traverse_ ($logInfoS ("slipstream/cmds")) $ concatMap T.lines cmds
+
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` API OutputTx) (MonadSimulator m) where
   lookup _ _ = pure Nothing
   delete _ _ = pure ()
@@ -379,36 +392,6 @@ instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (MonadSimulator m)
         getRawTxs OutputBlock{..} = toRawTx (blockHeaderBlockNumber obBlockData) <$> reverse obReceiptTransactions
     pure . take (fromInteger n) . concat . catMaybes $ fmap getRawTxs . flip M.lookup bhr <$> lastBlockHashes
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] (MonadSimulator m) where
-  -- TODO: Add AddressStateRef map to SimulatorContext
-  select _ _ = pure Nothing -- AccountsFilterParams{..} = case _qaAddress of
-    -- Nothing -> pure $ Just []
-    -- Just addr -> do
-    --   bh <- bestBlockHash <$> use simulatorContextBestBlock
-    --   withCurrentBlockHash bh $ A.lookup (A.Proxy @AddressState) addr >>= \case
-    --     Nothing -> pure $ Just []
-    --     Just AddressState{..} -> do
-    --       let (mCH, mCN, mCPA) = case addressStateCodeHash of
-    --             ExternallyOwned h -> (Just h, Nothing, Nothing) 
-    --             SolidVMCode n h   -> (Just h, Just n, Nothing)
-    --             CodeAtAccount a n -> (Nothing, Just n, Just a)
-    --       pure . Just . (:[]) $ DataDefs.AddressStateRef
-    --         { DataDefs.addressStateRefAddress = addr
-    --         , DataDefs.addressStateRefNonce = addressStateNonce
-    --         , DataDefs.addressStateRefBalance = addressStateBalance
-    --         , DataDefs.addressStateRefContractRoot = addressStateContractRoot
-    --         , DataDefs.addressStateRefCodeHash = mCH
-    --         , DataDefs.addressStateRefContractName = mCN
-    --         , DataDefs.addressStateRefCodePtrAddress = mCPA
-    --         , DataDefs.addressStateRefLatestBlockDataRefNumber = -1
-    --         }
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable BlocksFilterParams [Block] (MonadSimulator m) where
-  select _ _ = Just <$> getLastBlocks 1000
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable StorageFilterParams [StorageAddress] (MonadSimulator m) where
-  select _ _ = pure $ Just []
-
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable TxsFilterParams [DataDefs.RawTransaction] (MonadSimulator m) where
   select _ tfp = case qtHash tfp of
     Nothing -> Just <$> getLastTransactions Nothing 1000
@@ -513,6 +496,39 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` BlockSummary) (M
   lookup _ k = dbsGets $ Lens.view (blockSummaryDB . at k)
   insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
   delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address Integer (MonadSimulator m) where
+  select _ _ = pure $ Just 0
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Keccak256 SourceMap (MonadSimulator m) where
+  select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case 
+    Nothing -> pure Nothing
+    Just (_, codeBS) -> case Aeson.decode' $ BL.fromStrict codeBS of
+      Just codeMap -> pure . Just . SourceMap $ M.toList codeMap
+      Nothing -> case Text.decodeUtf8' codeBS of
+        Left _ -> pure Nothing
+        Right codeText -> pure . Just $ SourceMap [("", codeText)]
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [DataDefs.RawTransaction] (MonadSimulator m) where
+  access _ = pure []
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] (MonadSimulator m) where
+  select _ _ = pure Nothing
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable BlocksFilterParams [Block] (MonadSimulator m) where
+  select _ BlocksFilterParams{..} = case qbHash of
+    Just bh -> Just . maybe [] (:[]) . fmap outputBlockToBlock <$> A.lookup (A.Proxy @OutputBlock) bh
+    Nothing -> case qbNumber of
+      Just n -> A.select (A.Proxy @(Canonical BlockHeader)) (fromIntegral n :: Integer) >>= \case
+        Nothing -> pure $ Just []
+        Just (Canonical bd) -> Just . maybe [] (:[]) . fmap outputBlockToBlock <$> A.lookup (A.Proxy @OutputBlock) (headerHash bd)
+      Nothing -> Just <$> getLastBlocks 100 -- TODO
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable StorageFilterParams [StorageAddress] (MonadSimulator m) where
+  select _ _ = pure Nothing
+
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Address Certificate (MonadSimulator m) where
+  select _ _ = pure Nothing
 
 preAlGoreInternet :: Internet
 preAlGoreInternet = Internet M.empty M.empty

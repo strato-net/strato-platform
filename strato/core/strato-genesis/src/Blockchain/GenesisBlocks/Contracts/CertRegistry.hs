@@ -27,14 +27,16 @@ import Text.RawString.QQ
 insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertCertRegistryContract certs gi =
   gi
-    { genesisInfoAccountInfo = initialAccounts ++ registryAcct : rootAcct : certAccts,
+    { genesisInfoAccountInfo = initialAccounts ++ bitcoinAcct : registryAcct : rootAcct : certAccts,
       genesisInfoCodeInfo = initialCode ++ [CodeInfo certificateRegistryContract (Just "CertificateRegistry")]
+                                        ++ [CodeInfo bitcoinBridgeContract (Just "BitcoinBridge")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
     encodedRegistry = encodeUtf8 certificateRegistryContract
+    encodedBridge = encodeUtf8 bitcoinBridgeContract
 
     rootAddress' = fromPublicKey rootPubKey
     rootAddress = BAccount (NamedAccount rootAddress' UnspecifiedChain)
@@ -76,6 +78,11 @@ insertCertRegistryContract certs gi =
             (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
           ]
           ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c) ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
+    bitcoinAcct =
+      SolidVMContractWithStorage
+        0x1234567890
+        509
+        (SolidVMCode "BitcoinBridge" (KECCAK256.hash encodedBridge)) []
 
     certAccts =
       map
@@ -225,5 +232,38 @@ contract CertificateRegistry {
         }
         
         return false;
+    }
+}|]
+
+bitcoinBridgeContract :: Text
+bitcoinBridgeContract =
+  [r|
+pragma es6;
+pragma strict;
+
+contract BitcoinBridge {
+    mapping (address => uint) public record balances;
+    mapping (string => uint) txidMap;
+    string[] public utxoTXIDs;
+    uint[] public utxoAmounts;
+
+    constructor() {
+
+    }
+
+    function bridgeIn(string _txid, uint _amount) public {
+        uint bal = balances[msg.sender];
+        balances[msg.sender] = bal + _amount;
+        utxoTXIDs.push(_txid);
+        utxoAmounts.push(_amount);
+        txidMap[_txid] = utxoTXIDs.length;
+    }
+
+    function bridgeOut(string _txid, uint _amount) public {
+        uint bal = balances[msg.sender];
+        require (_amount <= bal, "You cannot withdraw more BTCST than your balance");
+        balances[msg.sender] = bal - _amount;
+        utxoTXIDs[txidMap[_txid] - 1] = "";
+        utxoAmounts[txidMap[_txid] - 1] = 0;
     }
 }|]

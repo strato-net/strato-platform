@@ -147,5 +147,5 @@ tests:
       - cryptonite
       - hspec
       - labeled-error
-      - secp256k1-haskell
+      - blockapps-secp256k1-haskell
       - strato-model

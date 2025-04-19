@@ -24,7 +24,7 @@ import Bloc.API.Transaction
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.API.Utils
-import Bloc.Database.Queries (getContractDetailsForContract)
+import Bloc.Database.Queries (getContractByAddress, getContractDetailsForContract)
 import Bloc.Monad
 import Bloc.Server.Contracts (getSourceMapFromAddress)
 import Bloc.Server.TransactionResult hiding (constructArgValuesAndSource)
@@ -114,8 +114,8 @@ postBlocTransactionBody ::
   ( MonadIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 SourceMap m,
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m
@@ -221,7 +221,7 @@ postBlocTransactionBody cid (PostBlocTransactionRequest mAddr txList txParams ms
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
+              mContract' <- lift $ getContractByAddress methodcallContractAddress
               x <- case mContract' of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
@@ -263,8 +263,8 @@ postBlocTransactionUnsigned ::
   ( MonadIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
+    A.Selectable Keccak256 SourceMap m,
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m
@@ -366,7 +366,7 @@ postBlocTransactionUnsigned cid (PostBlocTransactionRequest mAddr txList txParam
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
+              mContract' <- lift $ getContractByAddress methodcallContractAddress
               x <- case mContract' of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
@@ -424,7 +424,6 @@ postBlocTransactionParallel ::
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -449,7 +448,6 @@ postBlocTransaction ::
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -474,7 +472,6 @@ postBlocTransaction' ::
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -492,6 +489,7 @@ postBlocTransaction' ::
   PostBlocTransactionRequest ->
   m [BlocChainOrTransactionResult]
 postBlocTransaction' cacheNonce chainId mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  $logInfoS "HERE_I_AM" "YOOOOOOO"
   checkIsSynced
   accountNonceLimit <- fmap accountNonceLimit getBlocEnv
   userRegistry <- fmap userRegistryAddress getBlocEnv
@@ -940,7 +938,6 @@ postUsersContractMethodList' ::
   ( MonadUnliftIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
@@ -966,7 +963,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
+              mContract' <- lift $ getContractByAddress methodcallContractAddress
               x <- case mContract' of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
                 Just x -> pure x
@@ -1002,7 +999,6 @@ postUsersContractMethod' ::
   ( MonadUnliftIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
@@ -1027,7 +1023,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} = do
             ]
   contract <-
     maybe (throwIO err) pure
-      =<< A.select (A.Proxy @Contract) contractAddr
+      =<< getContractByAddress contractAddr
   sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
     Just _ -> return $ Text.encodeUtf8 funcName
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"

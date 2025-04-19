@@ -25,6 +25,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.StateDiff
 import Blockchain.SyncDB
 import Conduit
 import Control.Monad.Catch (MonadCatch)
@@ -42,6 +43,8 @@ loggingFunc :: LoggingT m a -> m a
 loggingFunc = runLoggingT
 
 type BaseM = ResourceT (LoggingT IO)
+
+newtype SlipstreamCommands = SlipstreamCommands { getSlipstreamCommands :: [Text] }
 
 type MonadBase m = ( MonadFail m
                    , MonadMonitor m
@@ -81,6 +84,8 @@ type MonadBase m = ( MonadFail m
                    , A.Replaceable PPeer PeerDisable m
                    , A.Replaceable PPeer Text m
                    , m `Mod.Yields` DataDefs.TransactionResult
+                   , m `Mod.Outputs` StateDiff
+                   , m `Mod.Outputs` SlipstreamCommands
                    , (Keccak256 `A.Alters` API OutputTx) m
                    , (Keccak256 `A.Alters` API OutputBlock) m
                    , (Keccak256 `A.Alters` P2P OutputBlock) m
@@ -108,9 +113,9 @@ type MonadBaseVM m = ( Mod.Modifiable BlockHashRoot m
 type MonadBaseAPI m = ( GetLastBlocks m
                       , GetLastTransactions m
                       -- , Mod.Accessible [DataDefs.RawTransaction] m
-                      , A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] m
-                      , A.Selectable BlocksFilterParams [Block] m
-                      , A.Selectable StorageFilterParams [StorageAddress] m
+                      -- , A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] m
+                      -- , A.Selectable BlocksFilterParams [Block] m
+                      -- , A.Selectable StorageFilterParams [StorageAddress] m
                       , A.Selectable TxsFilterParams [DataDefs.RawTransaction] m
                       , A.Selectable Keccak256 [DataDefs.TransactionResult] m
                       , Mod.Accessible TransactionCount m

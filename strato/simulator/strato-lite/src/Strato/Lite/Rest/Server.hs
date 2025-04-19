@@ -18,6 +18,7 @@ import Bloc.Server
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import qualified Blockchain.Data.TXOrigin as Origin
+import Blockchain.DB.SQLDB
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
@@ -35,6 +36,7 @@ import Core.API
 import Data.Bifunctor (first)
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map.Strict as M
+import Data.Maybe (catMaybes, listToMaybe)
 import qualified Data.Text as T
 import SQLM
 import Servant
@@ -50,13 +52,13 @@ getNodes mgr = liftIO . atomically $ do
   ths <- readTVar $ mgr ^. threads
   net <- readTVar $ mgr ^. network
   flip M.traverseWithKey (ths ^. nodeThreads) $ \n a -> do
-    mExp <- fmap (first show) <$> pollSTM a
+    mExp <- listToMaybe . catMaybes <$> traverse (fmap (fmap (first show)) . pollSTM) a
     case net ^. nodes . at n of
       Nothing -> pure $ NodeStatus "0.0.0.0" 0 0 False mExp
       Just (s,c) -> do
-        coreCtx <- readTVar $ c ^. corePeerContext
-        let mBCtx = coreCtx ^. sequencerContext . blockstanbulContext
-            mView = _view <$> mBCtx
+        let coreCtx = c ^. corePeerContext
+        mBCtx <- _blockstanbulContext <$> readTVar (coreCtx ^. sequencerContext)
+        let mView = _view <$> mBCtx
             rNum = maybe 0 (fromIntegral . _round) mView
             sNum = maybe 0 (fromIntegral . _sequence) mView
             isVal = maybe False _isValidator mBCtx
@@ -150,6 +152,7 @@ singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy Co
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runMemPeerDBMUsingEnv (fPeer ^. filesystemPeerMap)
+        . flip runReaderT (SQLDB . _sqlPool $ _filesystemDBs fPeer)
         . flip runReaderT fPeer
         . flip runReaderT cPeer
         $ f

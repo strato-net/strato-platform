@@ -181,6 +181,7 @@ getContractsState ::
   Bool ->
   m GetContractsStateResponses -- state-translation
 getContractsState _ address chainId mName mCount mOffset _ = do
+  $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
   contract' <- getContractsDetails' address chainId
 
   storage' <- case mName of

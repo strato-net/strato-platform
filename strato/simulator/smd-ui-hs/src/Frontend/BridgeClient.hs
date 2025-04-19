@@ -1,23 +1,34 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Frontend.BridgeClient where
 
 import Backend.Types
+import Bloc.API.Utils
+import Bloc.Client
+import BlockApps.Solidity.SolidityValue
 import Control.Exception (throwIO)
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Map.Strict as M
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Frontend.Client
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
+import Text.Read (readMaybe)
 -- import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 -- This must match your server base URL
 backendBaseUrl :: BaseUrl
 backendBaseUrl = BaseUrl Http "localhost" 8889 ""
 
-fetchBlockSummaries :: IO [BlockSummary]
+-- This must match your server base URL
+blocBaseUrl :: BaseUrl
+blocBaseUrl = BaseUrl Http "localhost" 8889 "/bloc/v2.2"
+
+fetchBlockSummaries :: IO [BitcoinBlockSummary]
 fetchBlockSummaries = do
   mgr <- newManager defaultManagerSettings -- tlsManagerSettings
   result <- runClientM getBlockSummaries (mkClientEnv mgr backendBaseUrl)
@@ -84,3 +95,16 @@ fetchMarketplaceTransactions = do
 
 encodeText :: Value -> Text
 encodeText = T.decodeUtf8 . BL.toStrict . encode
+
+fetchBridgeState :: IO Double
+fetchBridgeState = do
+  mgr <- newManager defaultManagerSettings -- tlsManagerSettings
+  result <- runClientM (getContractsState (ContractName "BitcoinBrige") 0x1234567890 Nothing Nothing Nothing Nothing False) (mkClientEnv mgr blocBaseUrl)
+  case result of
+    Left e -> throwIO e
+    Right stateMap -> pure $ case M.lookup "balances" stateMap of
+      Just (SolidityObject bals) -> ((*0.00000001) . fromInteger) . sum $ map (\case
+          SolidityValueAsString s -> maybe 0 id . readMaybe $ T.unpack s
+          _ -> 0
+        ) (snd <$> bals)
+      _ -> 0.0

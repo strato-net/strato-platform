@@ -978,6 +978,7 @@ expressionType (CC.NumberLiteral _ _ _) = SVMType.Int (Just True) Nothing
 expressionType (CC.StringLiteral _ _) = SVMType.String $ Just True
 expressionType (CC.AccountLiteral _ _) = SVMType.Account False
 expressionType (CC.ArrayExpression _ (x:_)) = SVMType.Array (expressionType x) Nothing
+expressionType (CC.ArrayExpression _ []) = SVMType.Array (expressionType $ error "expressionType: evaluated something with an empty list") Nothing
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
 constant :: Variable -> Maybe Value

@@ -15,7 +15,6 @@ module Main where
 
 import Bloc.API
 -- hiding (handleRuntimeError)
-import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server
 import BlockApps.Init
@@ -73,26 +72,11 @@ import Servant.Swagger
 import Servant.Swagger.UI
 import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
-import SolidVM.Model.CodeCollection.Contract
 import System.Clock
 import Text.Regex
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Contract (SQLM m) where
-  select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <-
-      MaybeT
-        . fmap listToMaybe
-        . getAccount'
-        $ accountsFilterParams
-          & qaAddress ?~ a
-    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
-
-instance {-# OVERLAPPING #-} Selectable Address Contract m => Selectable Address Contract (ReaderT a m) where
-  select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = getCodeFromPostgres

@@ -28,7 +28,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
 import qualified LabeledError
 import System.Console.CmdArgs
-import System.Process
+-- import System.Process
 
 data Options
   = AddTx {txJson :: String}
@@ -58,7 +58,7 @@ data Options
   | Redis {key :: String}
   | RedisMatch {pattern :: String}
   | SetParticipationMode {mode :: ParticipationMode}
-  | State {root :: String}
+  | State {stateFileName :: String, hashFileName :: String, root :: String}
   | ValidatorBehavior {valB :: Bool}
   | GetPrivacy {registry :: String, key :: String}
   | PutPrivacy {registry :: String, key :: String, value :: String}
@@ -67,8 +67,11 @@ data Options
 stateOptions :: Annotate Ann
 stateOptions =
   record
-    State {root = undefined}
-    [ root := def += typ "StateRoot" += argPos 0 ]
+    State {stateFileName = undefined, hashFileName = undefined, root = undefined}
+    [ stateFileName := def += typ "DBSTRING" += argPos 0,
+      hashFileName := def += typ "DBSTRING" += argPos 1,
+      root := def += typ "StateRoot" += argPos 2
+    ]
 
 syncStatsOptions :: Annotate Ann
 syncStatsOptions =
@@ -338,11 +341,6 @@ options =
 
 main :: IO ()
 main = do
-  -- the tools should use /tmp/.ethereumH/ to access levelDB data 
-  -- while avoiding the LOCK while the node is running
-  let (cmd, args') = ("cp", ["-r", "/var/lib/strato/.ethereumH/", "/tmp/.ethereumH/"])
-  (_, _, _, processHandle) <- createProcess (proc cmd args')
-  _ <- waitForProcess processHandle
   opts <- cmdArgs_ options
   run opts
 
@@ -381,7 +379,7 @@ run PushBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pPushBlocks startBlock endBlock i)
 run SetParticipationMode {..} = remoteSetParticipationMode mode
-run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr
+run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit stateFileName hashFileName sr
 run ValidatorBehavior {..} = validatorBehavior valB
 run Migrate {..} = migrate tables
 run GetPrivacy {} = error "strato-barometer: the getPrivacy tool has been deprecated."

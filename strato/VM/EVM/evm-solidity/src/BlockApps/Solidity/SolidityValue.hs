@@ -5,11 +5,13 @@ module BlockApps.Solidity.SolidityValue where
 
 import Control.Lens ((&), (?~))
 import Data.Aeson
+import Data.Aeson.KeyMap (toMapText)
 import qualified Data.Aeson.Key as DAK
 import qualified Data.Bifunctor as BF
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import Data.Foldable
+import qualified Data.Map.Strict as M
 import Data.Swagger
 import Data.Text (Text)
 import GHC.Generics
@@ -42,12 +44,12 @@ instance FromJSON SolidityValue where
   parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
   --TODO - figure out how to decode a struct....  it looks to me like it could conflict with thie SolidityBytes thing
   parseJSON (Object obj) = do
-    ty <- obj .: "type"
-    if ty == ("Buffer" :: Text)
+    ty <- obj .:? "type"
+    if ty == Just ("Buffer" :: Text)
       then do
         bytes <- obj .: "data"
         return $ SolidityBytes (ByteString.pack bytes)
-      else fail "Failed to parse SolidityBytes"
+      else SolidityObject . M.toList <$> traverse parseJSON (toMapText obj)
   parseJSON _ = fail "Failed to parse solidity value"
 
 instance Arbitrary SolidityValue where

@@ -199,12 +199,6 @@ h3 {
   fill: #36a2eb;
 }
 
-.value {
-  fill: #ccc;
-  font-size: 0.75rem;
-  text-anchor: middle;
-}
-
 /* === Pie Chart === */
 .pie-chart svg {
   width: 100%;

@@ -288,18 +288,18 @@ eventLoop ctx = execStateC ctx $
            -- nodes here will be syncing and looking to verify each block in the chain
           realValidators <- use validators
           seqNo <- use $ view . sequence
-          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
+          network' <- use network
+          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock network' realValidators seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
             Left err -> do
               rejectHistoric
-              $logWarnS "blockstanbul" . T.pack
+              $logErrorS "blockstanbul" . T.pack
                 . printf "Rejecting historical block #%d: %s" blockNo
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
-              network' <- use network
               lift . validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo

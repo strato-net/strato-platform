@@ -6,7 +6,7 @@
 module Components.BitcoinBridge.Overview where
 
 import Reflex.Dom
-import Backend.Types  -- for BlockSummary, UtxoSummary
+import Backend.Types  -- for BitcoinBlockSummary, UtxoSummary
 import Components.Utils
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
@@ -20,11 +20,11 @@ overviewTabWidget _ = do
   postBuild <- getPostBuild
 
   blockEv  <- backendGET fetchBlockSummaries postBuild
-  utxoEv   <- backendGET fetchGlobalUtxos    blockEv
-  walletEv <- backendGET fetchWalletUtxos    utxoEv
+  -- utxoEv   <- backendGET fetchGlobalUtxos    blockEv
+  walletEv <- backendGET fetchWalletUtxos    blockEv -- utxoEv
 
   blockDyn  <- holdDyn [] blockEv
-  utxoDyn   <- holdDyn [] utxoEv
+  -- utxoDyn   <- holdDyn [] utxoEv
   walletDyn <- holdDyn [] walletEv
 
   -- === Section: Latest Blocks
@@ -33,16 +33,16 @@ overviewTabWidget _ = do
     dyn_ $ latestBlocksTable <$> blockDyn
 
   -- === Section: Global UTXOs
-  elClass "div" "overview-section" $ do
-    el "h3" $ text "Global UTXO Pool"
-    dyn_ $ utxoTable <$> utxoDyn
+  -- elClass "div" "overview-section" $ do
+  --   el "h3" $ text "Global UTXO Pool"
+  --   dyn_ $ utxoTable <$> utxoDyn
 
   -- === Section: My Wallet UTXOs
   elClass "div" "overview-section" $ do
     el "h3" $ text "My Wallet's UTXOs"
     dyn_ $ utxoTable <$> walletDyn
 
-latestBlocksTable :: MonadWidget t m => [BlockSummary] -> m ()
+latestBlocksTable :: MonadWidget t m => [BitcoinBlockSummary] -> m ()
 latestBlocksTable blocks = elClass "table" "table-blocks" $ do
   el "thead" $ el "tr" $ do
     el "th" $ text "Height"
@@ -51,7 +51,7 @@ latestBlocksTable blocks = elClass "table" "table-blocks" $ do
     el "th" $ text "Time"
   el "tbody" $ mapM_ blockRow blocks
 
-blockRow :: MonadWidget t m => BlockSummary -> m ()
+blockRow :: MonadWidget t m => BitcoinBlockSummary -> m ()
 blockRow b = el "tr" $ do
   formattedTime <- liftIO $ formatUnixTime (blockTime b)
   el "td" $ text (T.pack $ show $ blockHeight b)
@@ -69,6 +69,6 @@ utxoTable utxos = elClass "table" "table-utxos" $ do
 
 utxoRow :: MonadWidget t m => UtxoSummary -> m ()
 utxoRow u = el "tr" $ do
-  el "td" $ text (T.take 20 (address u) <> "…")
-  el "td" $ text (T.pack $ show (amount u))
-  el "td" $ text (T.pack $ show (confirmations u))
+  el "td" $ text (T.take 20 (usAddress u) <> "…")
+  el "td" $ text (T.pack $ show (usAmount u))
+  el "td" $ text (T.pack $ show (usConfirmations u))

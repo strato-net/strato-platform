@@ -24,16 +24,20 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.Data.Block
+import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
+import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.P2PUtil (sockAddrToIP)
+import Blockchain.DBM
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
+import Blockchain.DB.SQLDB
 import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
@@ -46,12 +50,15 @@ import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Blockchain.Strato.StateDiff (StateDiff)
+import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.SyncDB
 import Conduit
 import Control.Lens hiding (Context, view)
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import Core.API
@@ -61,16 +68,19 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.Network
 import Data.Default
+import Data.Foldable (for_)
 import qualified Data.Map.Strict as M
 import Data.List (foldl', sortOn)
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.NibbleString as N
 import Data.Ord (Down(..))
+import Data.Pool (withResource)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock (addUTCTime, getCurrentTime)
 import qualified Database.LevelDB as LDB
 import qualified Database.Persist.Sql as SQL
+import Debugger (SourceMap(..))
 import Network.Socket
 import qualified Network.Socket.ByteString as NB
 import Network.Wai.Handler.Warp.Internal
@@ -121,11 +131,7 @@ instance {-# OVERLAPPING #-} MonadIO m => HasVault (FilesystemT m) where
     return $ derivePublicKey pk
   getShared pub = do
     pk <- asks _filesystemPeerPrivKey
-    let sk = deriveSharedKey pk pub
-    liftIO $ putStrLn $ "HASVAULT GETSHARED PRIV   KEY: " ++ show pk
-    liftIO $ putStrLn $ "HASVAULT GETSHARED PUB    KEY: " ++ show pub
-    liftIO $ putStrLn $ "HASVAULT GETSHARED SHARED KEY: " ++ show sk
-    pure sk
+    return $ deriveSharedKey pk pub
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => RunsClient (FilesystemT m) where
   runClientConnection (Host ip) (TCPPort p) sSource handler = do
@@ -190,6 +196,16 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible UDPPort (FilesystemT m)
 instance {-# OVERLAPPING #-} MonadIO m => (FilesystemT m) `Mod.Yields` DataDefs.TransactionResult where
   yield _ = pure () -- TODO
 
+instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` StateDiff where
+  output = commitSqlDiffs
+
+instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` SlipstreamCommands where
+  output (SlipstreamCommands cmds) = do
+    conn <- asks $ _sqlPool . _filesystemDBs
+    flip for_ ($logInfoS ("slipstream/cmds")) $ concatMap T.lines cmds
+    liftIO . withResource conn $ \c -> loggingFunc $ flip SQL.runSqlConn c . for_ cmds $ \cmd ->
+      (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) []) `catch` (\(e :: SomeException) -> $logErrorS "slipstream/error" . T.pack $ show e)
+
 lookupLDB :: (MonadIO m, Binary k, Binary v) => (r -> LDB.DB) -> k -> ReaderT r m (Maybe v)
 lookupLDB getDB k = do
   db <- asks getDB
@@ -210,15 +226,32 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` OutputBlock) (Fi
   insert _ = insertLDB $ _blockDB . _filesystemDBs
   delete _ = deleteLDB $ _blockDB . _filesystemDBs
 
-instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` API OutputTx) (FilesystemT m) where
-  lookup _ _ = pure Nothing
-  delete _ _ = pure ()
-  insert _ _ _ = pure ()
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (FilesystemT m) where
+  accessEnv = asks $ SQLDB . _sqlPool . _filesystemDBs
 
-instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (FilesystemT m) where
-  lookup _ _ = pure Nothing
-  delete _ _ = pure ()
-  insert _ _ _ = pure ()
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv CirrusDB (FilesystemT m) where
+  accessEnv = asks $ CirrusDB . _sqlPool . _filesystemDBs
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Address Certificate (FilesystemT m) where
+  select _ = getX509CertForAccount
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Selectable` SourceMap) (FilesystemT m) where
+  select _ = getCodeFromPostgres
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Alters` API OutputTx) (FilesystemT m) where
+  lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
+  delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
+  insert _ _ (API OutputTx {..}) = void $ insertTX Log otOrigin Nothing [otBaseTx]
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `A.Alters` API OutputBlock) (FilesystemT m) where
+  lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
+  delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
+  insert _ _ (API ob) = void $ putBlocks [outputBlockToBlockRetainPayloads ob] False
+  insertMany _ =
+    void
+      . flip putBlocks False
+      . map (outputBlockToBlockRetainPayloads . unAPI)
+      . M.elems
 
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (FilesystemT m) where
   lookup _ k         = fmap P2P <$> lookupLDB (_blockDB . _filesystemDBs) k
@@ -227,6 +260,12 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock)
     insertLDB (_canonicalDB . _filesystemDBs) (number $ obBlockData v) k
     txCount <- fromMaybe 0 <$> lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "transaction_count")
     insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "transaction_count") (txCount + length (obReceiptTransactions v))
+    let bsb = BestSequencedBlock
+                (headerHash $ obBlockData v)
+                (number $ obBlockData v)
+                (getBlockValidators $ obBlockData v)
+    insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_sequenced_block") bsb
+    updateSyncStatus'
   delete _ k         = deleteLDB (_blockDB . _filesystemDBs) k
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable (P2P BestBlock) (FilesystemT m) where
@@ -269,9 +308,9 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe BestBlock) (File
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestSequencedBlock (FilesystemT m) where
   get _ = fromMaybe def <$> lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_sequenced_block")
-  put _ v = do
-    insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_sequenced_block") v
-    updateSyncStatus'
+  put _ _ = pure () -- do
+    -- insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_sequenced_block") v
+    -- updateSyncStatus'
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe BestSequencedBlock) (FilesystemT m) where
   access _ = lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_sequenced_block")
@@ -318,36 +357,6 @@ instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (FilesystemT m) wh
         toRawTx blkNum OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx blkNum now
     map (uncurry toRawTx) <$> go 0 [] i
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] (FilesystemT m) where
-  -- TODO: Add AddressStateRef map to filesystemContext
-  select _ _ = pure Nothing -- AccountsFilterParams{..} = case _qaAddress of
-    -- Nothing -> pure $ Just []
-    -- Just addr -> do
-    --   bh <- bestBlockHash <$> use filesystemContextBestBlock
-    --   withCurrentBlockHash bh $ A.lookup (A.Proxy @AddressState) addr >>= \case
-    --     Nothing -> pure $ Just []
-    --     Just AddressState{..} -> do
-    --       let (mCH, mCN, mCPA) = case addressStateCodeHash of
-    --             ExternallyOwned h -> (Just h, Nothing, Nothing) 
-    --             SolidVMCode n h   -> (Just h, Just n, Nothing)
-    --             CodeAtAccount a n -> (Nothing, Just n, Just a)
-    --       pure . Just . (:[]) $ DataDefs.AddressStateRef
-    --         { DataDefs.addressStateRefAddress = addr
-    --         , DataDefs.addressStateRefNonce = addressStateNonce
-    --         , DataDefs.addressStateRefBalance = addressStateBalance
-    --         , DataDefs.addressStateRefContractRoot = addressStateContractRoot
-    --         , DataDefs.addressStateRefCodeHash = mCH
-    --         , DataDefs.addressStateRefContractName = mCN
-    --         , DataDefs.addressStateRefCodePtrAddress = mCPA
-    --         , DataDefs.addressStateRefLatestBlockDataRefNumber = -1
-    --         }
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable BlocksFilterParams [Block] (FilesystemT m) where
-  select _ _ = Just <$> getLastBlocks 1000 -- TODO
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable StorageFilterParams [StorageAddress] (FilesystemT m) where
-  select _ _ = pure $ Just [] -- TODO
-
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable TxsFilterParams [DataDefs.RawTransaction] (FilesystemT m) where
   select _ tfp = case qtHash tfp of
     Nothing -> Just <$> getLastTransactions Nothing 1000
@@ -368,7 +377,7 @@ instance {-# OVERLAPPING #-} MonadIO m => State.MonadState [SyncTask] (Filesyste
       pure a
 
 instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (FilesystemT m) where
-  clearAllSyncTasks host = State.modify' $ map (\st@(SyncTask i t h s) -> if h == host then SyncTask i t (Host "") s else st)
+  clearAllSyncTasks host = State.modify' $ filter (\(SyncTask _ _ h _) -> h /= host)
   getCurrentSyncTask host = do
     let assignedByHost (SyncTask _ _ h s) = h == host && s == Assigned
     tasks <- filter assignedByHost <$> State.get
@@ -391,7 +400,7 @@ instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (FilesystemT m) where
         (mNewTask, updatedTasks) = foldl' foldTasks (Nothing, []) sortedTasks
     case mNewTask of
       Nothing -> do
-        let newTask = SyncTask (maximum (0:((\(SyncTask i _ _ _) -> i) <$> updatedTasks))) now host Assigned
+        let newTask = SyncTask (maximum (0:((\(SyncTask i _ _ _) -> i + 1) <$> updatedTasks))) now host Assigned
         State.put $ newTask : updatedTasks
         pure $ Just newTask
       Just newTask -> do
@@ -413,9 +422,9 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlockRoot (Filesyst
   put _ = insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_block_root") . unBestBlockRoot
 
 instance {-# OVERLAPPING #-} MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (FilesystemT m) where
-  lookup _ = lookupLDB $ MP.unStateDB . _stateDB . _filesystemDBs
-  insert _ = insertLDB $ MP.unStateDB . _stateDB . _filesystemDBs
-  delete _ = deleteLDB $ MP.unStateDB . _stateDB . _filesystemDBs
+  lookup _ = MP.genericLookupDB . asks $ MP.unStateDB . _stateDB . _filesystemDBs
+  insert _ = MP.genericInsertDB . asks $ MP.unStateDB . _stateDB . _filesystemDBs
+  delete _ = MP.genericDeleteDB . asks $ MP.unStateDB . _stateDB . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` DBCode) (FilesystemT m) where
   lookup _ = lookupLDB $ unCodeDB . _codeDB . _filesystemDBs
