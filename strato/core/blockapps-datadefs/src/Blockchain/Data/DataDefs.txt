@@ -7,10 +7,10 @@ BlockDataRef
     transactionsRoot StateRoot
     receiptsRoot StateRoot
     logBloom BS.ByteString
-    difficulty Integer sqltype=numeric(1000,0)
+    difficulty Word256 sqltype=numeric(1000,0)
     number Integer sqltype=numeric(1000,0)
-    gasLimit Integer sqltype=numeric(1000,0)
-    gasUsed Integer sqltype=numeric(1000,0)
+    gasLimit Word256 sqltype=numeric(1000,0)
+    gasUsed Word256 sqltype=numeric(1000,0)
     timestamp UTCTime
     extraData BS.ByteString
     nonce Word64
@@ -68,7 +68,7 @@ BlockTransaction
 AddressStateRef
     address Address
     nonce Integer sqltype=numeric(1000,0)
-    balance Integer sqltype=numeric(1000,0)
+    balance Word256 sqltype=numeric(1000,0)
     contractRoot StateRoot
     codeHash Keccak256 Maybe
     contractName String Maybe
@@ -87,16 +87,16 @@ RawTransaction
     timestamp UTCTime
     fromAddress Address
     nonce Integer sqltype=numeric(1000,0)
-    gasPrice Integer sqltype=numeric(1000,0)
-    gasLimit Integer sqltype=numeric(1000,0)
+    gasPrice Word256 sqltype=numeric(1000,0)
+    gasLimit Word256 sqltype=numeric(1000,0)
     toAddress Address Maybe
-    value Integer sqltype=numeric(1000,0)
+    value Word256 sqltype=numeric(1000,0)
     codeOrData BS.ByteString Maybe
     contractName String Maybe
     codePtrAddress Address Maybe
     chainId Word256
-    r Integer
-    s Integer
+    r Word256
+    s Word256
     v Word8
     metadata [TextPair] Maybe
     blockNumber Int
@@ -169,7 +169,7 @@ EventDB
 
 AccountInfoRef
     address Address
-    balance Integer
+    balance Word256
     codeHash CodePtr Maybe
     map [MapPair] Maybe
     deriving Eq Generic Show

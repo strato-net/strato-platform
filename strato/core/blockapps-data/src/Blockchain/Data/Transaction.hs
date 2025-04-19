@@ -152,25 +152,25 @@ codePtrAddress _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Just dat) _ _ cid r s v md _ _ _) =
-  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) (fromIntegral r) (fromIntegral s) v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 (Just init') _ _ 0 h ch 0 Nothing _ _ _)
   | init' == B.empty =
     PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val (Just init') _ _ cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val (Code init') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+  ContractCreationTX nonce' gp gl val (Code init') (if (0 == cid) then Nothing else Just cid) (fromIntegral r) (fromIntegral s) v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val Nothing (Just contractName') (Just codePtrAddress') cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val(PtrToCode $ CodeAtAccount codePtrAddress' contractName') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+  ContractCreationTX nonce' gp gl val(PtrToCode $ CodeAtAccount codePtrAddress' contractName') (if (0 == cid) then Nothing else Just cid) (fromIntegral r) (fromIntegral s) v (M.fromList <$> md)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     (MessageTX nonce' gp gl to' val dat cid r s v md) ->
-      RawTransaction time signer nonce' gp gl (Just to') val (Just dat) Nothing Nothing (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce' gp gl (Just to') val (Just dat) Nothing Nothing (fromMaybe 0 cid) (fromIntegral r) (fromIntegral s) v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX nonce' gp gl val( Code init') cid r s v md) ->
-      RawTransaction time signer nonce' gp gl Nothing val (Just init') Nothing Nothing  (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce' gp gl Nothing val (Just init') Nothing Nothing  (fromMaybe 0 cid) (fromIntegral r) (fromIntegral s) v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX nonce' gp gl val (PtrToCode init') cid r s v md) ->
-      RawTransaction time signer nonce' gp gl Nothing val Nothing (codePtrName init') (codePtrAddress init')  (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce' gp gl Nothing val Nothing (codePtrName init') (codePtrAddress init')  (fromMaybe 0 cid) (fromIntegral r) (fromIntegral s) v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
       RawTransaction time signer 0 0 0 Nothing 0 (Just B.empty) Nothing Nothing 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
