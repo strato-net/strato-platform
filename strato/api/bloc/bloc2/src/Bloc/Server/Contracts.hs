@@ -28,8 +28,6 @@ import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
-import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Blockchain.SolidVM.Model
@@ -47,9 +45,9 @@ import Data.Maybe
 import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Handlers.AccountInfo
-import Handlers.Block
 import Handlers.Storage
 import qualified MaybeNamed
 import SQLM
@@ -62,8 +60,7 @@ hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
 
 getContracts ::
   ( MonadIO m,
-    A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable BlocksFilterParams [Block] m
+    A.Selectable AccountsFilterParams [AddressStateRef] m -- ,
   ) =>
   Maybe Text ->
   Maybe Integer ->
@@ -77,15 +74,8 @@ getContracts mName mOffset mLimit chainId = do
           ( \(AddressStateRef' AddressStateRef {..} _) m -> case addressStateRefContractName of
               Nothing -> pure m
               Just n -> do
-                blocks' <- getBlockInfo'
-                  blocksFilterParams
-                    { qbNumber = Just $ fromIntegral addressStateRefLatestBlockDataRefNumber
-                    }
-                case blocks' of
-                  [] -> pure m
-                  ((Block' b _):_) ->
-                    let ts = timestamp $ blockBlockData b
-                     in pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
+                ts <- liftIO getCurrentTime
+                pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
           )
           Map.empty
   addrStateRefs <-

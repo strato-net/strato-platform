@@ -84,14 +84,14 @@ bitcoinBridgeServer = getBlockSummaries
                  :<|> postBitcoinRpcCommand
                  :<|> getMarketplaceTransactions
 
-fullServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> CombinedAPI)
-fullServer f c blocEnv urlMap = bitcoinBridgeServer :<|> (singleNodeRestServer f c blocEnv urlMap) 
+fullServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> (CombinedAPI :<|> CirrusAPI))
+fullServer d f c blocEnv urlMap = bitcoinBridgeServer :<|> (singleNodeRestServer d f c blocEnv urlMap) 
 
-api :: Proxy (BitcoinBridgeAPI :<|> CombinedAPI)
+api :: Proxy (BitcoinBridgeAPI :<|> (CombinedAPI :<|> CirrusAPI))
 api = Proxy
 
-app :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
-app f c blocEnv urlMap = serve api $ fullServer f c blocEnv urlMap
+app :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
+app d f c blocEnv urlMap = serve api $ fullServer d f c blocEnv urlMap
 
 -- CSS file path
 css :: BS.ByteString
@@ -114,9 +114,11 @@ main :: IO ()
 main = do
   _ <- $initHFlags "STRATO Lite"
   createHaskoinMultiSigScript
+  let sqlitePath = "strato.sqlite"
   runLoggingT . runResourceT $ do
     (f,c) <- createFilesystemNode
                "/Users/dustinnorwood/blockchain/strato"
+               sqlitePath
                "mercata-francium"
                "/Users/dustinnorwood/.ssh/strato.pem"
                "dnorwood"
@@ -150,5 +152,5 @@ main = do
               useWalletsByDefault = False
             }
     a <- runFilesystemNode f c
-    b <- liftIO . async $ Wai.run 8889 $ app f c env M.empty
+    b <- liftIO . async $ Wai.run 8889 $ app sqlitePath f c env M.empty
     finally (liftIO mainNative) (traverse cancel a >> cancel b)

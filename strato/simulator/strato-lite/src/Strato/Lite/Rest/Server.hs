@@ -33,6 +33,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
 import Core.API
+import Data.Aeson (Value)
 import Data.Bifunctor (first)
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map.Strict as M
@@ -42,6 +43,7 @@ import SQLM
 import Servant
 import Strato.Lite.Base.Filesystem
 import Strato.Lite.Base.Simulator
+import Strato.Lite.Cirrus
 import Strato.Lite.Core
 import Strato.Lite.Simulator
 import Strato.Lite.Rest.Api
@@ -107,6 +109,8 @@ stratoLiteRestServer mgr =
     :<|> postTimeout mgr
     :<|> postTx mgr
 
+type CirrusAPI = "cirrus" :> "search" :> Capture "contractName" T.Text :> Get '[JSON] Value
+
 type CombinedAPI = "strato-api" :> CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 type NodeAPI = "nodes" :> Capture "nodeLabel" T.Text :> CombinedAPI
 
@@ -138,8 +142,11 @@ multinodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy Combi
         . flip runReaderT c
         $ f
 
-singleNodeRestServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server CombinedAPI
-singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy CombinedAPI) (convertErrors runM) (coreApiServer :<|> bloc)
+cirrusHandler :: MonadIO m => FilePath -> T.Text -> m Value
+cirrusHandler dbFileName tableName = liftIO $ queryCirrus dbFileName tableName
+
+singleNodeRestServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
+singleNodeRestServer dbFileName fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler dbFileName)
   where
     convertErrors r x = Handler $ do
           y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError

@@ -17,17 +17,18 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Short as BSS
 import qualified Data.Text as T
 import Data.Text.Encoding
+import Data.Word (Word32)
 import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
 import qualified LabeledError
 import Numeric
+import Text.Read (readMaybe)
 
-derivePersistField "Integer"
 -- derivePersistField "Point"
 derivePersistFieldJSON "Xabi"
 
-integerCap :: Integer
+integerCap :: Word32
 integerCap = 1000
 
 showHexFixed :: (Integral a) => Int -> a -> String
@@ -35,15 +36,20 @@ showHexFixed len val = pad $ showHex val ""
   where
     pad s = if length s >= len then s else pad ('0' : s)
 
-{-
-instance PersistField Integer where
-  toPersistValue i = PersistText . T.pack $ show i
-  fromPersistValue (PersistText s) = Right $ read $ T.unpack s --
-  fromPersistValue x = Left $ T.pack $ "PersistField Integer: expected PersistText: " ++ (show x)
-
 instance PersistFieldSql Integer where
-  sqlType _ = SqlNumeric integerCap 0
--}
+  sqlType _ = SqlString
+
+instance PersistField Integer where
+  toPersistValue = PersistText . T.pack . show
+  fromPersistValue v = case fromPersistValue v of
+    Left e -> Left e
+    Right t ->
+      let s = T.unpack t
+       in case readMaybe s of
+            Just i -> Right i
+            Nothing -> case readMaybe s :: Maybe Double of
+              Just d -> Right $ round d
+              Nothing -> Left $ "Invalid Integer: " <> t
 
 instance PersistField CodeKind where
   toPersistValue = PersistText . T.pack . show

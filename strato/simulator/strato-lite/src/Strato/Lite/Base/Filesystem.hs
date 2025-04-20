@@ -30,6 +30,7 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.CirrusDefs
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.Transaction
+import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.P2PUtil (sockAddrToIP)
 import Blockchain.DBM
@@ -193,8 +194,8 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TCPPort (FilesystemT m)
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible UDPPort (FilesystemT m) where
   access _ = asks _filesystemPeerUDPPort
 
-instance {-# OVERLAPPING #-} MonadIO m => (FilesystemT m) `Mod.Yields` DataDefs.TransactionResult where
-  yield _ = pure () -- TODO
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (FilesystemT m) `Mod.Yields` DataDefs.TransactionResult where
+  yield = void . putTransactionResults . (:[])
 
 instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` StateDiff where
   output = commitSqlDiffs
