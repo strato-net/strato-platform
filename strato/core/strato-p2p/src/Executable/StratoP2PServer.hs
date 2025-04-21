@@ -131,7 +131,6 @@ ethServerHandler pSource pSink seqSrc host = do
                         logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                       _ -> return $ Right ()
                   _ -> return $ Right ()
-                throwIO err
 
 runEthServerConduit ::
   MonadP2P m =>
