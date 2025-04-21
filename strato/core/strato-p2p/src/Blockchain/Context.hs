@@ -202,7 +202,9 @@ instance RunsClient ContextM where
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
-      handler conduits
+      catch
+        (handler conduits)
+        (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
 
 instance RunsServer ContextM (LoggingT IO) where
   runServer (TCPPort listenPort) runner handler = do
