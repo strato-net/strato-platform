@@ -174,6 +174,6 @@ ghc-options:
 
 docker:
   enable: true # set to false for MacOS
-  image: "strato-buildbase:lts-22.4"
+  image: "strato-buildbase:lts-23.14"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

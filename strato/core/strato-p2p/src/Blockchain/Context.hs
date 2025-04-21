@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -52,7 +53,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Exception                       hiding (bracket)
+import           Control.Exception                       hiding (bracket, catch)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
@@ -211,7 +212,9 @@ instance RunsServer ContextM (LoggingT IO) where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
-      handler conduits ip
+      catch
+        (handler conduits ip)
+        (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
   access _ = asks configPubKey
