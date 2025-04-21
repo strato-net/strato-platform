@@ -135,22 +135,13 @@ replayHistoricBlock network' realValidators seqNo blk = do
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
                ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
 
-  enoughSeals <- hasEnoughCommitmentSeals network' blk (S.size signerRes) (S.size realValidators)
-  unless enoughSeals $
+  unless (3 * S.size signerRes > 2 * S.size realValidators) $
     blockstanbulError $
       printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
         
   return (fromIntegral $ seqNo + 1, propValidator)
-
-hasEnoughCommitmentSeals :: MonadLogger m => String -> Block -> Int -> Int -> m Bool
-hasEnoughCommitmentSeals network' blk numSigners numValidators = case (network', number $ blockBlockData blk) of
-  ("mercata", n) | n >= 5257 -> do
-    $logErrorS "hasEnoughCommitmentSeals" . T.pack $ printf "not enough commit seals for block %d (have %d out of %d)" n numSigners numValidators
-    pure True
-  -- ("mercata", 5258) -> numSigners >= 3
-  _ -> pure $ 3 * numSigners > 2 * numValidators
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = fromMaybe False . evalIstanbulExtra (fmap $ not . null . _commitment) -- check if signatures list from IstanbulExtra is empty
