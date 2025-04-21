@@ -96,7 +96,7 @@ class AuthHandler {
         res
           .status(RestStatus.UNAUTHORIZED)
           .json({
-            error: 'Authorization required',
+            message: 'Authorization required',
             loginUrl: '/login/'
           });
         return next(new Error('Authorization required'));
