@@ -14,7 +14,6 @@ import Blockchain.Options (flags_address, flags_listen)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Options ()
-import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Control.Monad.Trans.Resource
 import Crypto.Random.Entropy
@@ -122,17 +121,11 @@ main = do
                "mercata-francium"
                "/Users/dustinnorwood/.ssh/strato.pem"
                "dnorwood"
-               (fmap (Validator . ("Node" <>)) <$> [ (0x44f1b8c88be13021806e1c3a7a2d5204a1bda57a, "One")
-                                                   , (0xdc93154cbfa39b4138b15a8921cf43a8762eacbd, "Two")
-                                                   , (0x889f1b7a9ad12141b3ee6551dae5a19cac19d2be, "Three")
-                                                   , (0xd4b34e1cdd1592d266ec95baf9195ac0c80b8d4a, "Four")
-                                                   ])
-               []
                "Dustin's local node"
                (TCPPort flags_listen)
                (UDPPort flags_listen)
                (Host $ T.pack flags_address)
-               [] -- Host "44.209.149.47"] --  "3.84.124.109"]
+               [Host "52.4.166.179"] -- Host "44.209.149.47"] --  "3.84.124.109"]
                True
 
     let stateFetchLimit' = 100
