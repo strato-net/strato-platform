@@ -7,7 +7,7 @@ const router = Router();
 
 router.get(
   Users.me,
-  authHandler.authorizeRequest(false),
+  authHandler.authorizeRequest(true),
   UsersController.me
 );
 

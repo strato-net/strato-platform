@@ -19,16 +19,28 @@ export const getServiceToken = async (): Promise<string> => {
   }
 
   try {
+    console.log("Fetching new service token...");
+    if (!clientId || !clientSecret) {
+      throw new Error("Client ID or Client Secret is not defined");
+    }
+    if (!openIdDiscoveryUrl) {
+      throw new Error("OpenID Discovery URL is not defined");
+    }
+
     const tokenResponse = await axios.post(
       openIdDiscoveryUrl ?? "",
       new URLSearchParams({
         grant_type: "client_credentials",
-        client_id: clientId ?? "",
-        client_secret: clientSecret ?? "",
-        scope: "email openid",
       }),
       {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization:
+            "Basic " +
+            Buffer.from(`${clientId ?? ""}:${clientSecret ?? ""}`).toString(
+              "base64"
+            ),
+        },
       }
     );
 
