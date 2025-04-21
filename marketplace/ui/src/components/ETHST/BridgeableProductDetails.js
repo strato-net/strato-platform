@@ -18,7 +18,7 @@ import {
   SolutionOutlined,
   RiseOutlined,
 } from '@ant-design/icons';
-import { useMatch, useNavigate, useLocation } from 'react-router-dom';
+import { useMatch, useNavigate, useLocation, useParams } from 'react-router-dom';
 //actions
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -45,7 +45,6 @@ import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
 import TimeRangeTabs from '../MarketPlace/TimeRangeTabs';
 import Statistics from '../MarketPlace/Statistics';
-import WbtcstSteps from './WbtcstSteps';
 import LoginModal from '../MarketPlace/LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 import BorrowModal from '../Inventory/BorrowModal';
@@ -84,6 +83,7 @@ import 'swiper/css/autoplay';
 
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+import StakeSteps from './StakeSteps';
 
 const ERC20_ABI = [
   {
@@ -120,6 +120,15 @@ const ProductDetails = ({ user, users }) => {
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
   const { success, message } = useEthState();
+  const { bridgeableTokens } = useEthState();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+
+    fetchBridgeableTokenss();
+  }, []);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -148,8 +157,10 @@ const ProductDetails = ({ user, users }) => {
     isCalledFromInventory = true;
   }
 
+  const { bridgeableAsset } = useParams();
+
   const routeMatch = useMatch({
-    path: routes.WbtcstProductDetail.url,
+    path: routes.bridgeableProductDetail.url,
     strict: true,
   });
 
@@ -207,7 +218,7 @@ const ProductDetails = ({ user, users }) => {
   const disconnect = useDisconnect();
   const { address } = useAppKitAccount();
   const { chainId } = useAppKitNetwork();
-  const [wbtcBalance, setWbtcBalance] = useState(0);
+  const [tokenBalance, setTokenBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
   // *** New useEffect: Listen for wallet account changes ***
@@ -223,38 +234,40 @@ const ProductDetails = ({ user, users }) => {
     };
 
     // Attach the event listener
-    walletProvider.on('accountsChanged', handleAccountsChanged);
+    walletProvider.on("accountsChanged", handleAccountsChanged);
 
     // Function to fetch balance using the same provider
     const fetchBalance = async () => {
-      if (
-        address &&
-        chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id
-      ) {
-        const wbtcAddress = fileServerUrl.includes('test')
-          ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
-          : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
+      if (address && chainId === (fileServerUrl.includes('test') ? sepolia : mainnet).id) {
+        let tokenAddress, decimals;
+
+        const tokenObj = bridgeableTokens?.find((tokenD) => tokenD.name.toLowerCase() === bridgeableAsset.toLowerCase())
+        if (tokenObj) {
+          tokenAddress = fileServerUrl?.includes('test')
+            ? tokenObj.ethTestnetAddress  // Testnet WBTC
+            : tokenObj.ethMainnetAddress; // Mainnet WBTC
+          decimals = tokenObj.decimals;
+        } else {
+          console.error(`Unsupported token: ${bridgeableAsset}`);
+          return;
+        }
 
         const provider = new ethers.providers.Web3Provider(walletProvider);
         const signer = provider.getSigner();
         setSigner(signer);
 
-        // Create WBTC contract instance
-        const wbtcContract = new ethers.Contract(
-          wbtcAddress,
-          ERC20_ABI,
-          provider
-        );
-
         try {
-          // Get WBTC balance
-          const wbtcBalance = await wbtcContract.balanceOf(address);
+          // Create ERC20 contract instance
+          const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+          const balance = await tokenContract.balanceOf(address);
 
-          // WBTC has 8 decimals (like BTC), format accordingly
-          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-          setWbtcBalance(formattedBalance); // Set WBTC balance
+          // Format balance according to token decimals
+          const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+
+          // Set the balance for the specific token
+          setTokenBalance(formattedBalance);
         } catch (error) {
-          console.error('Failed to fetch WBTC balance:', error);
+          console.error(`Failed to fetch ${bridgeableAsset} balance:`, error);
         }
       }
     };
@@ -273,40 +286,6 @@ const ProductDetails = ({ user, users }) => {
       disconnect.disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (address) {
-        const wbtcAddress = fileServerUrl.includes('test')
-          ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
-          : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
-
-        const provider = new ethers.providers.Web3Provider(walletProvider);
-        const signer = provider.getSigner();
-        setSigner(signer);
-
-        // Create WBTC contract instance
-        const wbtcContract = new ethers.Contract(
-          wbtcAddress,
-          ERC20_ABI,
-          provider
-        );
-
-        try {
-          // Get WBTC balance
-          const wbtcBalance = await wbtcContract.balanceOf(address);
-
-          // WBTC has 8 decimals (like BTC), format accordingly
-          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-          setWbtcBalance(formattedBalance); // Set WBTC balance
-        } catch (error) {
-          console.error('Failed to fetch WBTC balance:', error);
-        }
-      }
-    };
-
-    fetchBalance();
-  }, [address, chainId]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -615,7 +594,7 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <WbtcstSteps />
+          <StakeSteps name={bridgeableAsset} />
           <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
             <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
@@ -971,10 +950,9 @@ const ProductDetails = ({ user, users }) => {
           signer={signer}
           accountDetails={{
             walletAddress: address,
-            balance: wbtcBalance,
-            decimals: 8,
+            balance: tokenBalance,
           }}
-          tokenName="WBTC"
+          tokenName={bridgeableAsset}
         />
       )}
       {borrowModalOpen && (

@@ -18,17 +18,34 @@
       "price": 1
     }
   ],
-  "saleUpdateTime": 13,
   "assets": [
     {
       "address": "addressA",
       "name": "assetA",
-      "markUp": 1.02
+      "markUp": 1.02,
+      "type": "Metal",
+      "hours": [13]
     },
     {
       "address": "addressB",
       "name": "assetB",
-      "markUp": 1.05
+      "markUp": 1.05,
+      "type": "Metal",
+      "hours": [13]
+    },
+    {
+      "address": "addressA",
+      "name": "tokenA",
+      "markUp": 1.05,
+      "type": "ERC20",
+      "hours": [13, 19, 1, 7]
+    },
+    {
+      "address": "addressB",
+      "name": "tokenB",
+      "markUp": 1.05,
+      "type": "ERC20",
+      "hours": [13, 19, 1, 7]
     }
   ]
 }

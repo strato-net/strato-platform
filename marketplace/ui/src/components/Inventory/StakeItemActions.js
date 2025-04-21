@@ -73,7 +73,7 @@ const StakeItemActions = ({
         }
         return sum;
       }, 0)
-    : 0;
+    : inventory?.escrow?.collateralValue || 0;
 
   // Calculate borrowedAmount
   const uniqueBorrowedAddresses = new Set();
@@ -114,13 +114,19 @@ const StakeItemActions = ({
 
   const LTV =
     matchedReserve?.name.toLowerCase().includes('ethst') ||
-    matchedReserve?.name.toLowerCase().includes('wbtcst')
+    matchedReserve?.name.toLowerCase().includes('wbtcst') ||
+    matchedReserve?.name.toLowerCase().includes('usdtst') ||
+    matchedReserve?.name.toLowerCase().includes('usdcst') ||
+    matchedReserve?.name.toLowerCase().includes('paxgst')
       ? 0.3
       : 0.5;
   const newMaxLoanAmount = useMemo(() => {
     if (
       matchedReserve?.name.toLowerCase().includes('ethst') ||
-      matchedReserve?.name.toLowerCase().includes('wbtcst')
+      matchedReserve?.name.toLowerCase().includes('wbtcst') ||
+      matchedReserve?.name.toLowerCase().includes('usdtst') ||
+      matchedReserve?.name.toLowerCase().includes('usdcst') ||
+      matchedReserve?.name.toLowerCase().includes('paxgst')
     ) {
       return collateralValue ? collateralValue * LTV : 0;
     } else {
