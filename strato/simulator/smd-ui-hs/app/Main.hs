@@ -118,14 +118,14 @@ main = do
     (f,c) <- createFilesystemNode
                "/Users/dustinnorwood/blockchain/strato"
                sqlitePath
-               "mercata-francium"
+               "mercata"
                "/Users/dustinnorwood/.ssh/strato.pem"
                "dnorwood"
                "Dustin's local node"
                (TCPPort flags_listen)
                (UDPPort flags_listen)
                (Host $ T.pack flags_address)
-               [Host "52.4.166.179"] -- Host "44.209.149.47"] --  "3.84.124.109"]
+               [Host "44.209.149.47"] --  "3.84.124.109"]
                True
 
     let stateFetchLimit' = 100
