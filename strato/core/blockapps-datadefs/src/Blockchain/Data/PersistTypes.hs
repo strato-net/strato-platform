@@ -15,6 +15,7 @@ import Data.Bifunctor (bimap)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Short as BSS
+import Data.Ratio
 import qualified Data.Text as T
 import Data.Text.Encoding
 import Data.Word (Word32)
@@ -41,6 +42,9 @@ instance PersistFieldSql Integer where
 
 instance PersistField Integer where
   toPersistValue = PersistText . T.pack . show
+  fromPersistValue (PersistRational r) = case denominator r of
+    1 -> Right $ fromIntegral $ numerator r
+    _ -> Left $ "Invalid Integer: " <> T.pack (show r)
   fromPersistValue v = case fromPersistValue v of
     Left e -> Left e
     Right t ->
