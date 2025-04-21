@@ -7,13 +7,13 @@ import "../Utils/Utils.sol";
 
 import "../ERC20/extensions/ERC20Burnable.sol";
 import "../ERC20/access/Ownable.sol";
-import "./Metadata/MercataMetadata.sol";
+import "./Metadata/TokenMetadata.sol";
 
-abstract contract Asset is Utils, ERC20, ERC20Burnable, Ownable, MercataMetadata{
+abstract contract Token is Utils, ERC20, ERC20Burnable, Ownable, TokenMetadata{
     string public ownerCommonName;
     uint8 public decimals;
 
-    MercataMetadata metadata;
+    TokenMetadata metadata;
     
     constructor(
         string _name,
@@ -31,7 +31,7 @@ abstract contract Asset is Utils, ERC20, ERC20Burnable, Ownable, MercataMetadata
         decimals = _decimals;
         mint(_initialSupply);
 
-        metadata = MercataMetadata(_metadataContract);
+        metadata = TokenMetadata(_metadataContract);
         metadata.registerMetadata(address(this), _name, _description, _images, _files, _fileNames, _createdDate);
     }
 

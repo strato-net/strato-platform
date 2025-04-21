@@ -3,7 +3,7 @@ pragma strict;
 
 import "../Utils/Utils.sol";
 
-abstract contract MercataMetadata is Utils {
+abstract contract TokenMetadata is Utils {
     address owner;
     string ownerCommonName;
 
@@ -12,7 +12,7 @@ abstract contract MercataMetadata is Utils {
         ownerCommonName = getCommonName(msg.sender);
     }
 
-    struct TokenMetadata {
+    struct MetadataInfo {
         string name;
         string description;
         string[] images;
@@ -21,7 +21,7 @@ abstract contract MercataMetadata is Utils {
         uint createdDate;
     }
 
-    mapping(address => TokenMetadata) public record tokenMetadata;
+    mapping(address => MetadataInfo) public record metadataInfo;
 
     function registerMetadata(
         address tokenAddress,
@@ -33,7 +33,7 @@ abstract contract MercataMetadata is Utils {
         uint _createdDate
         ) public virtual {
         require(getCommonName(msg.sender) == tokenAddress.creator || msg.sender == tokenAddress, "Only the the creator or the token can register metadata");
-        tokenMetadata[tokenAddress] = TokenMetadata(
+        metadataInfo[tokenAddress] = MetadataInfo(
             _name,
             _description,
             _images,
