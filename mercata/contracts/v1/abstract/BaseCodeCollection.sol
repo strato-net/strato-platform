@@ -1,6 +1,6 @@
 pragma solidvm 11.5;
 
-import "Assets/Asset.sol";
+import "Tokens/Token.sol";
 import "Bridge/MercataEthBridge.sol";
 import "ERC20/ERC20.sol";
 import "Pools/Pool.sol";

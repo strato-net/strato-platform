@@ -20,9 +20,7 @@ enum UnitOfMeasurement {
 }
 
 /// @title A representation of Metals assets
-contract Metals is Asset, UnitOfMeasurement{
-
-    MercataMetadata public metadata;
+contract Metals is Token, UnitOfMeasurement{
 
     //categorical
     UnitOfMeasurement public unitOfMeasurement;
@@ -46,7 +44,7 @@ contract Metals is Asset, UnitOfMeasurement{
         string _purity,
         address _redemptionService,
         address _metadataContract
-    ) Asset (
+    ) Token (
         _name,
         _description,
         _images,
