@@ -289,7 +289,7 @@ eventLoop ctx = execStateC ctx $
           realValidators <- use validators
           seqNo <- use $ view . sequence
           network' <- use network
-          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock network' realValidators seqNo blk
+          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of

@@ -94,8 +94,8 @@ getValidatorFromAddress' address = do
     Just v -> return v
 
 replayHistoricBlock :: (MonadLogger m, MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       String -> Set Validator -> Word256 -> Block -> m (Word256, Validator)
-replayHistoricBlock network' realValidators seqNo blk = do
+                       Set Validator -> Word256 -> Block -> m (Word256, Validator)
+replayHistoricBlock realValidators seqNo blk = do
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
   let mProp = verifyProposerSeal blk =<< _proposedSig
       blockNo = fromIntegral . number . blockBlockData $ blk
