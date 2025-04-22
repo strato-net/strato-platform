@@ -1,11 +1,9 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express';
-import RestStatus from 'http-status-codes';
-import { jwtDecode } from 'jwt-decode';
-import { serverHost } from '../config/config';
-import { getServiceToken, createOrGetKey } from '../utils/authHelper';
-import axios from 'axios';
+import { Request, Response, NextFunction, RequestHandler } from "express";
+import RestStatus from "http-status-codes";
+import { jwtDecode, JwtPayload } from "jwt-decode";
+import { getServiceToken, createOrGetKey } from "../utils/authHelper";
 
-declare module 'express-serve-static-core' {
+declare module "express-serve-static-core" {
   interface Request {
     address?: string;
     accessToken?: { token: string };
@@ -17,13 +15,13 @@ declare module 'express-serve-static-core' {
 // ————————————————————————————————————————————————————————————————
 
 async function getTokenFromHeader(req: Request): Promise<string | null> {
-  const headerToken = req.headers['x-user-access-token'] as string | undefined;
+  const headerToken = req.headers["x-user-access-token"] as string | undefined;
   if (headerToken) return headerToken;
 
-  const auth = req.headers['authorization'];
-  if (typeof auth === 'string') {
-    const [bearer, token] = auth.split(' ');
-    if (bearer === 'Bearer' && token) return token;
+  const auth = req.headers["authorization"];
+  if (typeof auth === "string") {
+    const [bearer, token] = auth.split(" ");
+    if (bearer === "Bearer" && token) return token;
   }
   return null;
 }
@@ -47,29 +45,30 @@ class AuthHandler {
         }
 
         if (token) {
-          let decoded: any;
+          let payload: JwtPayload;
           try {
-            decoded = jwtDecode(token);
+            payload = jwtDecode(token);
           } catch (err) {
             res
               .status(RestStatus.BAD_REQUEST)
-              .json({ error: 'Access token is not a valid JWT' });
+              .json({ error: "Access token is not a valid JWT" });
             return next(err);
           }
 
           // fetch or create user key in Strato
           let address: string;
           try {
-            address = await createOrGetKey(
-              { username: decoded.preferred_username, token },
-            );
+            address = await createOrGetKey({
+              token,
+            });
           } catch (err) {
-            console.error('STRATO API is unreachable or unhealthy. Error:', err);
-            res
-              .status(RestStatus.INTERNAL_SERVER_ERROR)
-              .json({
-                error: 'Internal Server Error 101'
-              });
+            console.error(
+              "STRATO API is unreachable or unhealthy. Error:",
+              err
+            );
+            res.status(RestStatus.INTERNAL_SERVER_ERROR).json({
+              error: "Internal Server Error 101",
+            });
             return next(err);
           }
 
@@ -79,35 +78,6 @@ class AuthHandler {
         }
       } catch (err) {
         return next(err);
-      }
-
-      // check server health before deciding how to respond
-      let healthy = true;
-      try {
-        const response = await axios.get<{ health: boolean }>(
-          `${serverHost}/health`
-        );
-        healthy = response.data.health;
-      } catch (error) {
-        console.log('Health check failed:', error);
-      }
-
-      if (healthy) {
-        res
-          .status(RestStatus.UNAUTHORIZED)
-          .json({
-            message: 'Authorization required',
-            loginUrl: '/login/'
-          });
-        return next(new Error('Authorization required'));
-
-      } else {
-        res
-          .status(RestStatus.INTERNAL_SERVER_ERROR)
-          .json({
-            error: 'Internal Server Error 101'
-          });
-        return next(new Error('Internal Server Error 101'));
       }
     };
   }

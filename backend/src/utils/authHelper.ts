@@ -1,6 +1,6 @@
 import axios from "axios";
-import { clientSecret, clientId, openIdDiscoveryUrl } from "../config/config";
-import { getNetworkApiClient } from "./mercataApiHelper";
+import { clientSecret, clientId, openIdTokenEndpoint } from "../config/config";
+import { strato } from "./mercataApiHelper";
 
 interface TokenCache {
   serviceToken?: string;
@@ -19,16 +19,15 @@ export const getServiceToken = async (): Promise<string> => {
   }
 
   try {
-    console.log("Fetching new service token...");
     if (!clientId || !clientSecret) {
       throw new Error("Client ID or Client Secret is not defined");
     }
-    if (!openIdDiscoveryUrl) {
+    if (!openIdTokenEndpoint) {
       throw new Error("OpenID Discovery URL is not defined");
     }
 
     const tokenResponse = await axios.post(
-      openIdDiscoveryUrl ?? "",
+      openIdTokenEndpoint ?? "",
       new URLSearchParams({
         grant_type: "client_credentials",
       }),
@@ -58,24 +57,17 @@ export const getServiceToken = async (): Promise<string> => {
   }
 };
 
-export const createOrGetKey = async (user: any) => {
-  const apiClient = getNetworkApiClient(user.token);
-
+export const createOrGetKey = async ({ token }: { token: string }) => {
   try {
-    const { status, data } = await apiClient.get("/key");
-    if (status !== 200 || !data || !data.address) {
-      throw new Error("Failed to fetch key");
-    }
-    return data.address;
-  } catch (getError) {
-    console.warn("Key not found, attempting creation:", getError);
-  }
-
-  try {
-    const response = await apiClient.post("/key", {});
-    return response.data;
-  } catch (createError) {
-    console.error("Failed to create key:", createError);
-    throw new Error("Key creation failed");
+    // Attempt to fetch existing key
+    const {
+      data: { address },
+    } = await strato.get(token, "/key");
+    if (address) return address;
+    throw new Error("No address returned");
+  } catch {
+    // Create a new key if fetch failed or no address
+    const { data } = await strato.post(token, "/key");
+    return data.address ?? data;
   }
 };

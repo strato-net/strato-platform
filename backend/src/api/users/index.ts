@@ -1,14 +1,9 @@
-import { Router } from 'express';
-import UsersController from './users.controller';
-import { Users } from '../endpoints';
-import authHandler from '../../middleware/authHandler';
+import { Router } from "express";
+import UsersController from "./users.controller";
+import authHandler from "../../middleware/authHandler";
 
 const router = Router();
 
-router.get(
-  Users.me,
-  authHandler.authorizeRequest(true),
-  UsersController.me
-);
+router.get("/me", authHandler.authorizeRequest(true), UsersController.me);
 
 export default router;

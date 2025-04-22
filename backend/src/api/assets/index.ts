@@ -1,30 +1,21 @@
-import { Router } from 'express';
-import AssetsController from './assets.controller';
-import { Assets } from '../endpoints';
-import authHandler from '../../middleware/authHandler';
+import { Router } from "express";
+import AssetsController from "./assets.controller";
+import authHandler from "../../middleware/authHandler";
 
 const router = Router();
 
 router.get(
-  Assets.get,
+  "/:address",
   authHandler.authorizeRequest(true),
   AssetsController.get
 );
 
-router.get(
-  Assets.getAll,
-  authHandler.authorizeRequest(true),
-  AssetsController.getAll
-);
+router.get("/", authHandler.authorizeRequest(true), AssetsController.getAll);
+
+router.post("/", authHandler.authorizeRequest(), AssetsController.create);
 
 router.post(
-  Assets.create,
-  authHandler.authorizeRequest(),
-  AssetsController.create
-);
-
-router.post(
-  Assets.transfer,
+  "/transfer",
   authHandler.authorizeRequest(),
   AssetsController.transfer
 );
