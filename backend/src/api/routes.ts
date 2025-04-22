@@ -1,11 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 
 import packageJson from "../../package.json";
+import { ExtendedRequest } from "../types/types";
 
 import authHandler from "./middleware/authHandler";
-import AssetsController from "./controllers/assets/assets.controller";
-import AuthenticationController from "./controllers/authentication/authentication.controller";
-import UsersController from "./controllers/users/users.controller";
+import AssetsController from "./controllers/assets.controller";
+import AuthenticationController from "./controllers/authentication.controller";
+import UsersController from "./controllers/users.controller";
 
 
 const router = Router();
@@ -19,7 +20,7 @@ router.get("/assets/", authHandler.authorizeRequest(true), AssetsController.getA
 router.post("/assets/", authHandler.authorizeRequest(), AssetsController.create);
 router.post("/assets/transfer", authHandler.authorizeRequest(), AssetsController.transfer);
 
-router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
+router.get("/health", (_req: ExtendedRequest, res: Response, next: NextFunction) => {
   res.json({
     name: packageJson.name,
     version: packageJson.version,
