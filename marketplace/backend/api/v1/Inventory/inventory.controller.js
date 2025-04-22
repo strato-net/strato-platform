@@ -11,6 +11,11 @@ import sendEmail from '../../../helpers/email';
 import constants from '/helpers/constants';
 import BigNumber from 'bignumber.js';
 
+/**
+ * Returns the appropriate token server URL based on the network ID
+ * 
+ * @returns {string} The token server URL
+ */
 function getTokenServerUrl() {
   if (process.env.networkID === constants.prodNetworkId) {
     return constants.prodTokenServerUrl;
@@ -23,7 +28,24 @@ function getTokenServerUrl() {
 
 const options = { config, cacheNonce: true };
 
+/**
+ * Controller for handling Inventory-related API endpoints.
+ * Provides functionality for managing inventory items including creating, retrieving,
+ * updating, listing, unlisting, transferring, and bridging items.
+ */
 class InventoryController {
+  /**
+   * Retrieves a specific inventory item by its address.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.params - Request parameters
+   * @param {string} req.params.address - Blockchain address of the inventory item
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving the inventory item
+   */
   static async get(req, res, next) {
     try {
       const { dapp, params } = req;
@@ -46,6 +68,19 @@ class InventoryController {
     }
   }
 
+  /**
+   * Retrieves all inventory items in the system with optional pagination.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.query - Query parameters
+   * @param {number} req.query.limit - Maximum number of items to return
+   * @param {number} req.query.offset - Number of items to skip
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving inventory items
+   */
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req;
@@ -69,6 +104,19 @@ class InventoryController {
     }
   }
 
+  /**
+   * Retrieves all inventory items owned by the authenticated user.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.query - Query parameters
+   * @param {number} req.query.limit - Maximum number of items to return
+   * @param {number} req.query.offset - Number of items to skip
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving user inventory items
+   */
   static async getAllUserInventories(req, res, next) {
     try {
       const { dapp, query } = req;
@@ -97,6 +145,24 @@ class InventoryController {
     }
   }
 
+  /**
+   * Creates a new inventory item with the provided details.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body containing inventory item details
+   * @param {string} req.body.productAddress - Address of the product
+   * @param {number} req.body.quantity - Quantity of items
+   * @param {number} req.body.decimals - Number of decimal places
+   * @param {number} req.body.pricePerUnit - Price per unit
+   * @param {string} req.body.batchId - Batch identifier
+   * @param {number} req.body.status - Status of the inventory item (1 = active, 2 = inactive)
+   * @param {string} req.body.inventoryType - Type of inventory
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error creating the inventory item
+   */
   static async create(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -111,6 +177,22 @@ class InventoryController {
     }
   }
 
+  /**
+   * Updates an existing inventory item.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.itemContract - Contract address
+   * @param {string} req.body.itemAddress - Item address
+   * @param {Object} req.body.updates - Update details
+   * @param {number} req.body.updates.status - New status
+   * @param {number} req.body.updates.price - New price
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error updating the inventory item
+   */
   static async update(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -126,6 +208,21 @@ class InventoryController {
     }
   }
 
+  /**
+   * Lists an inventory item for sale.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.assetToBeSold - Address of the asset to be sold
+   * @param {Array} req.body.paymentServices - Array of payment service objects
+   * @param {number} req.body.price - Price of the item
+   * @param {string} req.body.quantity - Quantity to be sold
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error listing the item
+   */
   static async list(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -141,6 +238,18 @@ class InventoryController {
     }
   }
 
+  /**
+   * Unlists an item from sale.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.saleAddress - Address of the sale to unlist
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error unlisting the item
+   */
   static async unlist(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -156,6 +265,19 @@ class InventoryController {
     }
   }
 
+  /**
+   * Resells a previously sold item.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.assetAddress - Address of the asset to resell
+   * @param {string} req.body.quantity - Quantity to resell
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error reselling the item
+   */
   static async resell(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -171,6 +293,25 @@ class InventoryController {
     }
   }
 
+  /**
+   * Transfers items between users and sends email notifications.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Array} req.body - Array of transfer objects
+   * @param {string} req.body[].assetAddress - Address of the asset to transfer
+   * @param {string} req.body[].newOwner - Address of the new owner
+   * @param {string} req.body[].quantity - Quantity to transfer
+   * @param {number} req.body[].price - Price of the transfer
+   * @param {string} req.body[].senderCommonName - Common name of the sender
+   * @param {string} req.body[].recipientCommonName - Common name of the recipient
+   * @param {string} req.body[].itemName - Name of the item
+   * @param {string} req.body[].decimal - Decimal places
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error transferring the items
+   */
   static async transfer(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -238,6 +379,15 @@ class InventoryController {
     }
   }
 
+  /**
+   * Retrieves the list of supported tokens.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving supported tokens
+   */
   static async getSupportedTokens(req, res, next) {
     try {
       const url = await getTokenServerUrl();
@@ -264,6 +414,23 @@ class InventoryController {
     }
   }
 
+  /**
+   * Bridges items to another chain.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.rootAddress - Root address
+   * @param {string} req.body.assetAddress - Address of the asset to bridge
+   * @param {number} req.body.quantity - Quantity to bridge
+   * @param {number} req.body.price - Price of the bridge
+   * @param {string} req.body.baseAddress - Base address
+   * @param {string} req.body.mercataAddress - Mercata address
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error bridging the items
+   */
   static async bridge(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -301,6 +468,17 @@ class InventoryController {
     }
   }
 
+  /**
+   * Retrieves all item transfer events.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.query - Query parameters for filtering transfer events
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving transfer events
+   */
   static async getAllItemTransferEvents(req, res, next) {
     try {
       const { dapp, query } = req;
@@ -314,6 +492,21 @@ class InventoryController {
     }
   }
 
+  /**
+   * Updates a sale record.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.saleAddress - Address of the sale to update
+   * @param {Object} req.body.updates - Update details
+   * @param {number} req.body.updates.status - New status
+   * @param {number} req.body.updates.price - New price
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error updating the sale
+   */
   static async updateSale(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -329,6 +522,20 @@ class InventoryController {
     }
   }
 
+  /**
+   * Retrieves the ownership history of items.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.query - Query parameters
+   * @param {string} req.query.originAddress - Original address
+   * @param {string} req.query.minItemNumber - Minimum item number
+   * @param {string} req.query.maxItemNumber - Maximum item number
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving ownership history
+   */
   static async getOwnershipHistory(req, res, next) {
     try {
       const { dapp, query } = req;
@@ -343,6 +550,21 @@ class InventoryController {
     }
   }
 
+  /**
+   * Retrieves the price history of items.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.query - Query parameters
+   * @param {string} req.query.assetToBeSold - Asset address
+   * @param {number} req.query.limit - Number of records to return
+   * @param {number} req.query.offset - Number of records to skip
+   * @param {string} req.query.timeFilter - Time filter
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error retrieving price history
+   */
   static async getPriceHistory(req, res, next) {
     try {
       const { dapp, query } = req;
@@ -376,6 +598,20 @@ class InventoryController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
+  /**
+   * Validates the arguments for creating an inventory item.
+   * 
+   * @param {Object} args - Arguments for creating an inventory item
+   * @param {string} args.productAddress - Address of the product
+   * @param {number} args.quantity - Quantity of items
+   * @param {number} args.decimals - Number of decimal places
+   * @param {number} args.pricePerUnit - Price per unit
+   * @param {string} args.batchId - Batch identifier
+   * @param {number} args.status - Status of the inventory item (1 = active, 2 = inactive)
+   * @param {string} args.inventoryType - Type of inventory
+   * @param {Array} args.serialNumber - Array of serial number objects
+   * @throws {rest.RestError} - If validation fails with a BAD_REQUEST status
+   */
   static validateCreateInventoryArgs(args) {
     const createInventorySchema = Joi.object({
       productAddress: Joi.string().required(),

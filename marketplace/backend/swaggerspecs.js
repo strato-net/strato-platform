@@ -1,3 +1,9 @@
+import fs from 'fs';
+import path from 'path';
+import yaml from 'js-yaml';
+
+// TODO: The parted swagger paths approach - path described in the related subfolders
+/*
 import swaggerJsdoc from 'swagger-jsdoc';
 
 const options = {
@@ -42,5 +48,10 @@ const options = {
 };
 
 const specs = swaggerJsdoc(options);
+*/
+
+// Read the swagger.yaml file
+const swaggerFile = path.join(__dirname, 'swagger.yaml');
+const specs = yaml.load(fs.readFileSync(swaggerFile, 'utf8'));
 
 export default specs;

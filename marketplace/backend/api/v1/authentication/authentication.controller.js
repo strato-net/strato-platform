@@ -12,7 +12,28 @@ import dappJs from '/dapp/dapp/dapp';
 import certificateJs from '/dapp/certificates/certificate';
 
 const options = { config };
+
+/**
+ * @class AuthenticationController
+ * @description Controller for handling authentication-related API endpoints
+ */
 class AuthenticationController {
+  /**
+   * @method callback
+   * @description Handles the OAuth callback after user authentication
+   * @summary OAuth authentication callback endpoint
+   * @param {Object} req - Express request object
+   * @param {Object} req.query - Query parameters
+   * @param {string} req.query.code - The authorization code received from the OAuth provider
+   * @param {Object} req.app - Express application object
+   * @param {Object} req.app.oauth - OAuth configuration
+   * @param {Object} req.cookies - Request cookies
+   * @param {string} [req.cookies.returnUrl] - URL to return to after authentication
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<boolean>} - Returns true on successful authentication
+   * @throws {Error} - When authentication fails or user doesn't have valid certificates
+   */
   static async callback(req, res, next) {
     const oauth = req.app.oauth;
     const { code } = req.query;
@@ -163,6 +184,16 @@ class AuthenticationController {
     return true;
   }
 
+  /**
+   * @method logout
+   * @description Logs out the currently authenticated user
+   * @summary User logout endpoint
+   * @param {Object} req - Express request object
+   * @param {Object} req.app - Express application object
+   * @param {Object} req.app.oauth - OAuth configuration
+   * @param {Object} res - Express response object
+   * @returns {Promise<void>} - Returns logout URL in the response
+   */
   static async logout(req, res) {
     const oauth = req.app.oauth;
     let oauthSignOutUrl;

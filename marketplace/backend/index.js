@@ -93,12 +93,18 @@ let server;
   app.use(ErrorHandlers.clientErrorHandler);
   app.use(ErrorHandlers.commonErrorHandler);
 
+  // Setup Swagger UI on https
+  app.use('/api/v1/docs', swaggerUi.serve);
+  app.get('/api/v1/docs', swaggerUi.setup(swaggerSpecs, {
+    explorer: true,
+    customSiteTitle: "STRATO Mercata Marketplace API"
+  }));
+
   // Start the server
   const port = process.env.PORT || 3030;
   server = app.listen(port, () => console.log(`Listening on ${port}`));
   websocket(server);
 
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
   if (isLocalHost) {
     cronFunc();

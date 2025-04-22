@@ -1,3 +1,17 @@
+/**
+ * @fileoverview Transaction Controller Module
+ * @description Controller for managing transaction operations in the STRATO Mercata Marketplace.
+ * This controller handles retrieving transaction data for both authenticated users and global transactions.
+ * It processes various transaction types including orders, transfers, redemptions, stakes, and unstakes.
+ */
+
+/**
+ * @function getItemQuantity
+ * @description Helper function to extract quantity from various transaction item formats
+ * @param {Object} item - Transaction item object
+ * @returns {string} - Extracted quantity value as a string, or empty string if not found
+ * @private
+ */
 const getItemQuantity = (item) => {
   if (item.quantity) {
     return item.quantity;
@@ -9,7 +23,32 @@ const getItemQuantity = (item) => {
     return '';
   }
 };
+
+/**
+ * @class TransactionController
+ * @description Controller class for handling transaction-related operations
+ */
 class TransactionController {
+  
+  /**
+   * @method getAllTransactions
+   * @description Retrieves all transactions for the authenticated user
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Loaded STRATO dapp instance
+   * @param {Object} req.query - Query parameters for filtering transactions
+   * @param {string} [req.query.limit='2000'] - Maximum number of transactions to return
+   * @param {string} [req.query.offset='0'] - Number of transactions to skip (for pagination)
+   * @param {string} [req.query.order] - Sort order for transactions
+   * @param {string} [req.query.search=''] - Search term to filter transactions
+   * @param {string} [req.query.type] - Transaction type filter (Order, Transfer, Redemption, Stake, Unstake)
+   * @param {string} [req.query.user] - User identifier to filter transactions
+   * @param {string} [req.query.userAddress] - User blockchain address to filter transactions
+   * @param {string} [req.query.startDate] - Start date for date range filtering (ISO format)
+   * @param {string} [req.query.endDate] - End date for date range filtering (ISO format)
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - Returns transaction data via Express response
+   */
   static async getAllTransactions(req, res, next) {
     try {
       const { dapp, params, query } = req;
@@ -205,6 +244,24 @@ class TransactionController {
     }
   }
 
+  /**
+   * @method getGlobalTransactions
+   * @description Retrieves global transactions from across the platform
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Loaded STRATO dapp instance
+   * @param {Object} req.query - Query parameters for filtering transactions
+   * @param {string} [req.query.limit] - Maximum number of transactions to return
+   * @param {string} [req.query.offset='0'] - Number of transactions to skip (for pagination)
+   * @param {string} [req.query.order] - Sort order for transactions
+   * @param {string} [req.query.search=''] - Search term to filter transactions
+   * @param {string} [req.query.type] - Transaction type filter(s) - can be comma-separated list
+   * @param {string} [req.query.user] - User identifier to filter transactions
+   * @param {string} [req.query.startDate] - Start date for date range filtering (ISO format)
+   * @param {string} [req.query.endDate] - End date for date range filtering (ISO format)
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - Returns transaction data via Express response
+   */
   static async getGlobalTransactions(req, res, next) {
     try {
       const { dapp, params, query } = req;

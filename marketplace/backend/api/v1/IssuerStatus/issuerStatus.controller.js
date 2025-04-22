@@ -6,7 +6,26 @@ import { searchAllWithQueryArgs } from '../../../helpers/utils';
 import constants from '../../../helpers/constants';
 const options = { config, cacheNonce: true };
 
+/**
+ * Controller for handling IssuerStatus-related API endpoints.
+ * Provides functionality for managing issuer status and admin privileges.
+ */
 class IssuerStatusController {
+  /**
+   * Submits a request for an issuer to be reviewed and authorized.
+   * Sends an email notification to all admin users about the request.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.emailAddr - Email address of the user requesting issuer status
+   * @param {string} req.body.commonName - Common name of the user requesting issuer status
+   * @param {Object} req.accessToken - Access token for authentication
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {rest.RestError} - If there is an error submitting the review request or sending notifications
+   */
   static async requestReview(req, res, next) {
     try {
       const { dapp, body, accessToken } = req;
@@ -45,6 +64,19 @@ class IssuerStatusController {
     }
   }
 
+  /**
+   * Grants issuer authorization to a user.
+   * This endpoint requires admin privileges.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.address - Blockchain address of the user to be authorized as an issuer
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error authorizing the issuer
+   */
   static async authorizeIssuer(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -56,6 +88,19 @@ class IssuerStatusController {
     }
   }
 
+  /**
+   * Revokes issuer authorization from a user.
+   * This endpoint requires admin privileges.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.address - Blockchain address of the user to be deauthorized as an issuer
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error deauthorizing the issuer
+   */
   static async deauthorizeIssuer(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -67,6 +112,20 @@ class IssuerStatusController {
     }
   }
 
+  /**
+   * Sets or removes admin privileges for a user.
+   * This endpoint requires admin privileges.
+   * 
+   * @param {Object} req - Express request object
+   * @param {Object} req.dapp - Dapp instance for blockchain interaction
+   * @param {Object} req.body - Request body
+   * @param {string} req.body.address - Blockchain address of the user to set admin status
+   * @param {boolean} req.body.isAdmin - Whether to grant (true) or revoke (false) admin privileges
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next middleware function
+   * @returns {Promise<void>} - A promise that resolves when the response has been sent
+   * @throws {Error} - If there is an error setting admin status
+   */
   static async setIsAdmin(req, res, next) {
     try {
       const { dapp, body } = req;

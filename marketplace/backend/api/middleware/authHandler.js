@@ -1,10 +1,17 @@
 import RestStatus from 'http-status-codes';
-import oauthHelper from '/helpers/oauthHelper';
+import oauthHelper from '../../helpers/oauthHelper';
 import { oauthUtil, rest } from 'blockapps-rest';
 import jwtDecode from 'jwt-decode';
 import config from '/load.config';
 import axios from 'axios';
 
+/**
+ * Attempts to retrieve the access token from cookies.
+ * If a token exists, it tries to validate and refresh it using the OAuth helper.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ * @returns {Promise<string|null>} The access token if found and valid/refreshed, otherwise null.
+ */
 const getTokenFromCookie = async (req, res) => {
   const tokenName = req.app.oauth.getCookieNameAccessToken();
   if (req.cookies[tokenName]) {
@@ -20,6 +27,11 @@ const getTokenFromCookie = async (req, res) => {
   return null;
 };
 
+/**
+ * Attempts to retrieve the access token from request headers ('x-user-access-token' or 'Authorization: Bearer').
+ * @param {import('express').Request} req - The Express request object.
+ * @returns {Promise<string|null>} The access token if found in headers, otherwise null.
+ */
 const getTokenFromHeader = async (req) => {
   if (req.headers['x-user-access-token'])
     return req.headers['x-user-access-token'];
@@ -32,10 +44,32 @@ const getTokenFromHeader = async (req) => {
   return null;
 };
 
+/**
+ * Determines the appropriate login URL based on the environment configuration.
+ * @param {import('express').Request} req - The Express request object.
+ * @returns {string} The login URL.
+ */
 const getLoginUrl = (req) =>
   config.dockerized ? '/login/' : req.app.oauth.getSigninURL();
 
+/**
+ * Provides middleware handlers for authentication and authorization using OAuth.
+ */
 class AuthHandler {
+  /**
+   * Creates an Express middleware function to authorize incoming requests.
+   * It checks for a valid JWT access token in cookies or headers.
+   * If a valid token is found, it decodes it, retrieves or creates the corresponding user address
+   * using blockapps-rest, and attaches user information (`address`, `accessToken`, `decodedToken`, `username`)
+   * to the `req` object.
+   * If `allowAnonAccess` is true, it attempts to get a service token for anonymous access.
+   * If no valid token is found and anonymous access is not allowed, it checks server health.
+   * If the server is healthy, it responds with UNAUTHORIZED and the login URL.
+   * If the server is unhealthy, it responds with INTERNAL_SERVER_ERROR.
+   *
+   * @param {boolean} [allowAnonAccess=false] - Whether to allow anonymous access using a service token.
+   * @returns {import('express').RequestHandler} An Express middleware function.
+   */
   static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
       try {
@@ -119,6 +153,12 @@ class AuthHandler {
     };
   }
 
+  /**
+   * Initializes the OAuth utility based on the configuration.
+   * Logs an error and exits the process if initialization fails.
+   * @returns {Promise<object>} The initialized OAuth utility object.
+   * @throws {Error} If OAuth initialization fails.
+   */
   static async initOauth() {
     let oauth;
     try {
@@ -130,6 +170,17 @@ class AuthHandler {
     return oauth;
   }
 
+  /**
+   * Creates an Express middleware function specifically for webhook authentication.
+   * It attempts to obtain a token for a predefined global admin user using environment variables.
+   * If successful, it validates the token, retrieves the admin's address, and attaches
+   * user information (`address`, `accessToken`, `decodedToken`, `username`) to the `req` object.
+   * It handles potential errors gracefully by calling `next()`, allowing subsequent middleware or route handlers
+   * to manage the response if authentication fails (e.g., logging an error but not blocking the request).
+   * This middleware is intended for internal use cases where a webhook needs to act with admin privileges.
+   *
+   * @returns {import('express').RequestHandler} An Express middleware function.
+   */
   static getDeployersTokenForWebhook() {
     return async function (req, res, next) {
       try {

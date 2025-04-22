@@ -36,3 +36,5 @@ temp
 config.yaml
 testnet.config.yaml
 prod.config.yaml
+
+.nyc_output
