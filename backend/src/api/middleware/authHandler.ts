@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import RestStatus from "http-status-codes";
 import { jwtDecode, JwtPayload } from "jwt-decode";
-import { getServiceToken, createOrGetKey } from "../utils/authHelper";
-import { ExtendedRequest } from "../types/types";
+import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
+import { ExtendedRequest } from "../../types/types";
 
 // ————————————————————————————————————————————————————————————————
 // Helper functions, with explicit return types
