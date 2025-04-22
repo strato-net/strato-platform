@@ -1,24 +1,31 @@
-import express from "express";
+import { Router, Request, Response, NextFunction } from 'express';
+
 import packageJson from "../../package.json";
 
-import assetsRouter from "./assets";
-import authenticationRouter from "./authentication";
-import usersRouter from "./users";
+import authHandler from "./middleware/authHandler";
+import AssetsController from "./controllers/assets/assets.controller";
+import AuthenticationController from "./controllers/authentication/authentication.controller";
+import UsersController from "./controllers/users/users.controller";
 
-const router = express.Router();
 
-// mount sub‑routers
-router.use("/authentication", authenticationRouter);
-router.use("/users", assetsRouter);
-router.use("/assets", usersRouter);
+const router = Router();
 
-// health check endpoint
-router.get("/health", (_req, res) => {
+router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
+
+router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
+
+router.get("/assets/:address", authHandler.authorizeRequest(true), AssetsController.get);
+router.get("/assets/", authHandler.authorizeRequest(true), AssetsController.getAll);
+router.post("/assets/", authHandler.authorizeRequest(), AssetsController.create);
+router.post("/assets/transfer", authHandler.authorizeRequest(), AssetsController.transfer);
+
+router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({
     name: packageJson.name,
     version: packageJson.version,
     timestamp: new Date().toISOString(),
   });
+  return next()
 });
 
 export default router;
