@@ -13,6 +13,7 @@ const createApiClient = (baseURL: string): AxiosInstance =>
 
 const _strato = createApiClient(`${nodeUrl}/strato/v2.3`);
 const _cirrus = createApiClient(`${nodeUrl}/cirrus/search`);
+const _bloc = createApiClient(`${nodeUrl}/bloc/v2.2`);
 
 function makeTokenClient(client: AxiosInstance) {
   return {
@@ -49,3 +50,4 @@ function makeTokenClient(client: AxiosInstance) {
 
 export const strato = makeTokenClient(_strato);
 export const cirrus = makeTokenClient(_cirrus);
+export const bloc = makeTokenClient(_bloc);
