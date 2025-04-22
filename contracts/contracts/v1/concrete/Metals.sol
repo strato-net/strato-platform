@@ -1,4 +1,3 @@
-
 pragma es6;
 pragma strict;
 
@@ -21,13 +20,6 @@ enum UnitOfMeasurement {
 
 /// @title A representation of Metals assets
 contract Metals is Token, UnitOfMeasurement{
-
-    //categorical
-    UnitOfMeasurement public unitOfMeasurement;
-    uint public leastSellableUnits;
-    string public source; 
-    string purity;
-
     constructor(
         string _name,
         string _symbol,
@@ -57,10 +49,6 @@ contract Metals is Token, UnitOfMeasurement{
         _metadataContract
         ) 
     {
-        unitOfMeasurement = _unitOfMeasurement;
-        leastSellableUnits = _leastSellableUnits;
-        source = _source;
-        purity = _purity;
+        metadata.registerMetadataAttribute(address(this), "unitOfMeasurement: " + string(_unitOfMeasurement) + ",leastSellableUnits: " + string(_leastSellableUnits) + ", source: " + string(_source) + ", purity: " + string(_purity));
     }
-
 }
