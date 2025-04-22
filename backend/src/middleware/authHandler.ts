@@ -2,13 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from "express";
 import RestStatus from "http-status-codes";
 import { jwtDecode, JwtPayload } from "jwt-decode";
 import { getServiceToken, createOrGetKey } from "../utils/authHelper";
-
-declare module "express-serve-static-core" {
-  interface Request {
-    address?: string;
-    accessToken?: { token: string };
-  }
-}
+import { ExtendedRequest } from "../types/types";
 
 // ————————————————————————————————————————————————————————————————
 // Helper functions, with explicit return types
@@ -36,7 +30,7 @@ class AuthHandler {
    * @param allowAnonAccess if true, will fall back to a service-token.
    */
   static authorizeRequest(allowAnonAccess = false): RequestHandler {
-    return async (req: Request, res: Response, next: NextFunction) => {
+    return async (req: ExtendedRequest, res: Response, next: NextFunction) => {
       try {
         let token = await getTokenFromHeader(req);
 

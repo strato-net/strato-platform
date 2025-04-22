@@ -1,11 +1,7 @@
 import axios from "axios";
 import { clientSecret, clientId, openIdTokenEndpoint } from "../config/config";
 import { strato } from "./mercataApiHelper";
-
-interface TokenCache {
-  serviceToken?: string;
-  expiresAt?: number;
-}
+import { TokenCache } from "../types/types";
 
 const CACHED_TOKEN: TokenCache = {};
 
