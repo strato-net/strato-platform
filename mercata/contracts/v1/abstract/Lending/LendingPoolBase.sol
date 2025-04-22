@@ -21,7 +21,7 @@ abstract contract LendingPoolBase {
         uint256 collateralAmount;
       }
 
-    mapping(bytes32 => LoanInfo) public record loans;
+    mapping(string => LoanInfo) public record loans;
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;
     mapping(address => uint256) public record assetLiquidationBonus;
@@ -82,7 +82,7 @@ abstract contract LendingPoolBase {
         emit Borrowed(msg.sender, asset, amount, collateralAsset, collateralAmount);
     }
 
-    function repayLoan(bytes32 loanId, uint256 amount) public {
+    function repayLoan(string loanId, uint256 amount) public {
         LoanInfo storage loan = loans[loanId];
         require(loan.active, "No active loan");
 
@@ -107,7 +107,7 @@ abstract contract LendingPoolBase {
         emit Repaid(msg.sender, loan.collateralAsset, amount);
     }
 
-    function liquidate(bytes32 loanId, address borrower) public {
+    function liquidate(string loanId, address borrower) public {
         LoanInfo storage loan = loans[loanId];
         require(loan.active, "Loan inactive");
 

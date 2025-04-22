@@ -11,16 +11,10 @@ contract LendingRegistry is LendingRegistryBase {
         address _liquidityPool,
         address _collateralVault,
         address _rateStrategy
-    ) {
-        lendingPool = _lendingPool;
-        liquidityPool = _liquidityPool;
-        collateralVault = _collateralVault;
-        rateStrategy = _rateStrategy;
-
-        emit LendingPoolUpdated(_lendingPool);
-        emit LiquidityPoolUpdated(_liquidityPool);
-        emit CollateralVaultUpdated(_collateralVault);
-        emit RateStrategyUpdated(_rateStrategy);
-    }
+    ) LendingRegistryBase (
+         _lendingPool,
+        _liquidityPool,
+        _collateralVault,
+        _rateStrategy) {}
 
 }

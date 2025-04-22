@@ -12,6 +12,7 @@ abstract contract PoolConfiguratorBase {
     LendingPoolBase public lendingPool;
 
     constructor(address _lendingPool) {
+        require(_lendingPool != address(0), "Invalid LendingPool address");
         lendingPool = LendingPoolBase(_lendingPool);
     }
 
