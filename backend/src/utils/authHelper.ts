@@ -2,6 +2,7 @@ import axios from "axios";
 import { clientSecret, clientId, openIdTokenEndpoint } from "../config/config";
 import { strato } from "./mercataApiHelper";
 import { TokenCache } from "../types/types";
+import { StratoPaths } from "../config/constants";
 
 const CACHED_TOKEN: TokenCache = {};
 
@@ -58,12 +59,12 @@ export const createOrGetKey = async ({ token }: { token: string }) => {
     // Attempt to fetch existing key
     const {
       data: { address },
-    } = await strato.get(token, "/key");
+    } = await strato.get(token, StratoPaths.key);
     if (address) return address;
     throw new Error("No address returned");
   } catch {
     // Create a new key if fetch failed or no address
-    const { data } = await strato.post(token, "/key");
+    const { data } = await strato.post(token, StratoPaths.key);
     return data.address ?? data;
   }
 };
