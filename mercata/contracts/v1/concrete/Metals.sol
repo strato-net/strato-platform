@@ -80,6 +80,6 @@ contract Metals is Token, UnitOfMeasurement{
         _metadataContract
         ) 
     {
-        metadata.registerMetadataAttribute(address(this), + ",leastSellableUnits: " + string(_leastSellableUnits) + "Unit of Measurement: " + getUnitOfMeasurement(_unitOfMeasurement) + ", source: " + string(_source) + ", purity: " + string(_purity));
+        metadata.registerMetadataAttribute(address(this), + "Attributes: leastSellableUnits: " + string(_leastSellableUnits) + ", Unit of Measurement: " + getUnitOfMeasurement(_unitOfMeasurement) + ", source: " + string(_source) + ", purity: " + string(_purity));
     }
 }
