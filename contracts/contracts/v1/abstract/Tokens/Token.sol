@@ -39,4 +39,8 @@ abstract contract Token is Utils, ERC20, ERC20Burnable, Ownable, TokenMetadata{
         _mint(owner, amount);
     }
 
+    function decimals() public view virtual override returns (uint8) {
+        return decimals;
+    }
+
 }
