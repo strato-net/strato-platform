@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+import <65774cbfc1e06559e2fd8875287e065d583454a8>;
 
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
@@ -49,6 +49,6 @@ contract Metals is Token, UnitOfMeasurement{
         _metadataContract
         ) 
     {
-        metadata.registerMetadataAttribute(address(this), "unitOfMeasurement: " + string(_unitOfMeasurement) + ",leastSellableUnits: " + string(_leastSellableUnits) + ", source: " + string(_source) + ", purity: " + string(_purity));
+        metadata.registerMetadataAttribute(address(this), + ",leastSellableUnits: " + string(_leastSellableUnits) + ", source: " + string(_source) + ", purity: " + string(_purity));
     }
 }
