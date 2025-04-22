@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <65774cbfc1e06559e2fd8875287e065d583454a8>;
+import <BASE_CODE_COLLECTION>;
 
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
@@ -15,6 +15,37 @@ enum UnitOfMeasurement {
     TON,            // Metric Ton
     TONNE           // Imperial Ton
 
+}
+
+function getUnitOfMeasurement(UnitOfMeasurement _unitOfMeasurement) public pure returns (string) {
+    if (_unitOfMeasurement == UnitOfMeasurement.NULL) {
+        return "NULL";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.G) {
+        return "G";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.KG) {
+        return "KG";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.TROY_OUNCE) {
+        return "TROY_OUNCE";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.TROY_POUND) {
+        return "TROY_POUND";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.AVDP_POUND) {
+        return "AVDP_POUND";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.AVDP_OUNCE) {
+        return "AVDP_OUNCE";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.TON) {
+        return "TON";
+    }
+    if (_unitOfMeasurement == UnitOfMeasurement.TONNE) {
+        return "TONNE";
+    }
+    return "NULL";
 }
 }
 
@@ -49,6 +80,6 @@ contract Metals is Token, UnitOfMeasurement{
         _metadataContract
         ) 
     {
-        metadata.registerMetadataAttribute(address(this), + ",leastSellableUnits: " + string(_leastSellableUnits) + ", source: " + string(_source) + ", purity: " + string(_purity));
+        metadata.registerMetadataAttribute(address(this), + ",leastSellableUnits: " + string(_leastSellableUnits) + "Unit of Measurement: " + getUnitOfMeasurement(_unitOfMeasurement) + ", source: " + string(_source) + ", purity: " + string(_purity));
     }
 }
