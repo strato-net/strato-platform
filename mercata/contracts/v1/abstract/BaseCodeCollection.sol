@@ -8,5 +8,12 @@ import "Pools/PoolFactory.sol";
 import "ERC20/extensions/ERC20Burnable.sol";
 import "ERC20/access/Ownable.sol";
 import "Redemptions/RedemptionService.sol";
+import "Lending/CollateralVaultBase.sol";
+import "Lending/LendingPoolBase.sol";
+import "Lending/LendingRegistryBase.sol";
+import "Lending/PoolConfiguratorBase.sol";
+import "Lending/PriceOracleBase.sol";
+import "Lending/RateStrategyBase.sol";
+import "Lending/LiquidityPoolBase.sol";
 
 contract Mercata{}
