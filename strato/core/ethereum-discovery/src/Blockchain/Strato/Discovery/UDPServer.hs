@@ -125,8 +125,7 @@ udpHandshakeServer minPeers = do
   _ <- addPeersIfNeeded minPeers
   _ <- attemptBond
   -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
-  maybePacketData <- A.select (A.Proxy @(B.ByteString, SockAddr)) ()
-  _ <- case maybePacketData of
+  Mod.await >>= \case
     Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
     Just (msg, addr) -> do
       _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ show (B.length msg)

@@ -175,8 +175,8 @@ instance MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT Conte
 instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
 
-instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextLite m) where
-  select _ _ = do
+instance MonadIO m => Mod.Awaits (ReaderT ContextLite m) (B.ByteString, SockAddr) where
+  await = do
     sock' <- asks sock
     liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
 
@@ -204,12 +204,12 @@ type MonadDiscovery m =
     MonadLogger m,
     MonadUnliftIO m,
     A.Selectable IP PPeer m,
-    A.Selectable () (B.ByteString, SockAddr) m,
     A.Replaceable Host PPeer m,
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
     Mod.Accessible [Validator] m,
+    Mod.Awaits m (B.ByteString, SockAddr),
     A.Selectable (Maybe Host, UDPPort) SockAddr m
   )
 
