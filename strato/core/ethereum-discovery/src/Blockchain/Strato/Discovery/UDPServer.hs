@@ -40,6 +40,7 @@ import           Data.Maybe                              (fromJust)
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
+import           Numeric.Natural
 import           System.Entropy
 import           System.Random
 import qualified Text.Colors                             as CL
@@ -194,7 +195,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       Just peer -> do
         A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
           Just (PeerBondingState b) | b > 1 -> do
-            peers <- getPeersClosestTo targetPubkey otherPubKey
+            peers <- getPeersClosestTo (20 :: Natural) targetPubkey otherPubKey
             let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
             sendPacket peer $ Neighbors theNeighbors nextTime
           _ -> do
