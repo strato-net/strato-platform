@@ -10,7 +10,7 @@ export const getServiceToken = async (): Promise<string> => {
   if (
     CACHED_TOKEN.serviceToken &&
     CACHED_TOKEN.expiresAt &&
-    CACHED_TOKEN.expiresAt > Math.floor(Date.now() / 1000) + 60 // 60 seconds buffer
+    CACHED_TOKEN.expiresAt > Math.floor(Date.now() / 1000) + 120 // 120 seconds leeway threshold
   ) {
     return CACHED_TOKEN.serviceToken;
   }
