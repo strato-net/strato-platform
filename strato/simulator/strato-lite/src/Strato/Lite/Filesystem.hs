@@ -23,16 +23,16 @@ import BlockApps.X509.Certificate as X509
 import BlockApps.X509.Keys as X509
 import Blockchain.Data.BlockDB ()
 import qualified Blockchain.Data.DataDefs as DataDefs
--- import Blockchain.Data.GenesisInfo
+import Blockchain.Data.GenesisInfo
 import Blockchain.Database.MerklePatricia.MPDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
--- import Blockchain.GenesisBlocks.Contracts.CertRegistry
+import Blockchain.GenesisBlocks.Contracts.CertRegistry
 -- import Blockchain.GenesisBlocks.Contracts.Governance
--- import Blockchain.GenesisBlocks.Contracts.GovernanceV2
+import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 -- import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
-import qualified Blockchain.GenesisBlocks.ProductionGenesisBlock as Production
+-- import qualified Blockchain.GenesisBlocks.ProductionGenesisBlock as Production
 import Blockchain.Sequencer.DB.DependentBlockDB (DependentBlockDB(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
@@ -84,14 +84,14 @@ createFilesystemPeerAndCorePeer ::
   FilesystemDBs ->
   IO (FilesystemPeer, CorePeer)
 createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost bootNodes valBehav sock fsDBs = do
-  -- let privAndIds = [(privKey, Validator "dnorwood")]
-  --     validatorsPrivKeys = id privAndIds
-  --     vals' = makeValidators validatorsPrivKeys
-  -- certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
+  let privAndIds = [(privKey, Validator "dnorwood")]
+      validatorsPrivKeys = id privAndIds
+      vals' = makeValidators validatorsPrivKeys
+  certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
-  -- let vals = snd <$> vals'
-  --     genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract certs defaultGenesisInfo -- Helium.genesisBlock
-  let genesisInfo = Production.productionGenesisBlock
+  let vals = snd <$> vals'
+      genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract certs defaultGenesisInfo -- Helium.genesisBlock
+  -- let genesisInfo = Production.productionGenesisBlock
   -- let genesisInfo = Helium.genesisBlock
   corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
   pure (fsPeer, corePeer)
