@@ -5,3 +5,7 @@ export enum StratoPaths {
   identity = "/identity",
   result = "/transactions/results"
 }
+
+export const constants = {
+  poolFactory: "91b7ff2cce57ba17439b73132617c58075055b23"
+}

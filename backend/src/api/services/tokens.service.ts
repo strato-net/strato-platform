@@ -1,5 +1,4 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
-import axios from "axios";
 import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { combine, usc, cwd } from "../../utils/importer";
@@ -90,20 +89,6 @@ export const transferToken = async (
       hash,
     };
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      console.error("Blockchain error:", error.response.data);
-      throw new Error(
-        `Blockchain error: ${
-          error.response.data.message || error.response.data
-        }`
-      );
-    }
-
-    if (error instanceof Error) {
-      console.error("Transfer error:", error.message);
-      throw new Error(`Transfer error: ${error.message}`);
-    }
-
     console.error("Unknown error:", error);
     throw error;
   }

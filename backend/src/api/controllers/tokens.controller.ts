@@ -50,7 +50,7 @@ class TokensController {
     try {
       const { accessToken, body } = req;
 
-      TokensController.validateCreateInventoryArgs(body);
+      TokensController.validateCreateTokensArgs(body);
 
       const result = await createToken(accessToken, body);
       res.status(200).json(result);
@@ -73,6 +73,7 @@ class TokensController {
       return next(e);
     }
   }
+
   // ----------------------- ARG VALIDATION ------------------------
   static validateAddressArgs(args: any) {
     const addressSchema = Joi.object({
@@ -102,15 +103,17 @@ class TokensController {
       throw new Error("Query Argument Validation Error");
     }
   }
-  static validateCreateInventoryArgs(args: any) {
-    const createInventorySchema = Joi.object({
+
+  static validateCreateTokensArgs(args: any) {
+    const createTokensSchema = Joi.object({
+
       name: Joi.string().required(),
       symbol: Joi.string().required(),
       initialSupply: Joi.number().integer().min(0).required(),
       decimals: Joi.number().integer().min(0).max(18).required(),
-    }).unknown(true);
+    });
 
-    const validation = createInventorySchema.validate(args);
+    const validation = createTokensSchema.validate(args);
 
     if (validation.error) {
       throw new Error(
