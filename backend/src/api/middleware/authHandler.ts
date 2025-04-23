@@ -1,9 +1,7 @@
-import { Request, Response, NextFunction, RequestHandler } from "express";
+import { Request, RequestHandler } from "express";
 import RestStatus from "http-status-codes";
 import { jwtDecode, JwtPayload } from "jwt-decode";
 import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
-import { ExtendedRequest } from "../../types/types";
-
 // ————————————————————————————————————————————————————————————————
 // Helper functions, with explicit return types
 // ————————————————————————————————————————————————————————————————
@@ -30,7 +28,7 @@ class AuthHandler {
    * @param allowAnonAccess if true, will fall back to a service-token.
    */
   static authorizeRequest(allowAnonAccess = false): RequestHandler {
-    return async (req: ExtendedRequest, res: Response, next: NextFunction) => {
+    return async (req, res, next) => {
       try {
         let token = await getTokenFromHeader(req);
 
@@ -50,24 +48,10 @@ class AuthHandler {
           }
 
           // fetch or create user key in Strato
-          let address: string;
-          try {
-            address = await createOrGetKey({
-              token,
-            });
-          } catch (err) {
-            console.error(
-              "STRATO API is unreachable or unhealthy. Error:",
-              err
-            );
-            res.status(RestStatus.INTERNAL_SERVER_ERROR).json({
-              error: "Internal Server Error 101",
-            });
-            return next(err);
-          }
+          let address = await createOrGetKey(token);
 
           req.address = address;
-          req.accessToken = { token };
+          req.accessToken = token;
           return next();
         }
       } catch (err) {

@@ -1,6 +1,7 @@
 export enum StratoPaths {
-  transactionparallel = '/transaction/parallel',
-  transaction = '/transaction',
-  key = '/key',
-  state= '/contracts/tate/:contractAddress/state',
+  transactionParallel = "/transaction/parallel?resolve=true",
+  key = "/key",
+  state = "/contracts/tate/:contractAddress/state",
+  identity = "/identity",
+  result = "/transactions/results"
 }

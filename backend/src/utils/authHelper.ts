@@ -1,7 +1,7 @@
 import axios from "axios";
 import { clientSecret, clientId, openIdTokenEndpoint } from "../config/config";
-import { strato } from "./mercataApiHelper";
-import { TokenCache } from "../types/types";
+import { strato, eth } from "./mercataApiHelper";
+import { TokenCache, StratoKeyResponse } from "../types/types";
 import { StratoPaths } from "../config/constants";
 
 const CACHED_TOKEN: TokenCache = {};
@@ -54,17 +54,63 @@ export const getServiceToken = async (): Promise<string> => {
   }
 };
 
-export const createOrGetKey = async ({ token }: { token: string }) => {
+/**
+ * Try to fetch an existing Strato key.
+ * @returns the address, or null if none exists yet.
+ * @throws on non-404 failures.
+ */
+async function fetchKey(token: string): Promise<string | null> {
   try {
-    // Attempt to fetch existing key
-    const {
-      data: { address },
-    } = await strato.get(token, StratoPaths.key);
-    if (address) return address;
-    throw new Error("No address returned");
-  } catch {
-    // Create a new key if fetch failed or no address
-    const { data } = await strato.post(token, StratoPaths.key);
-    return data.address ?? data;
+    const { data } = await strato.get<StratoKeyResponse>(
+      token,
+      StratoPaths.key
+    );
+    return data.address ?? null;
+  } catch (err) {
+    // 404 means “no key yet”, rest bubble up
+    if (axios.isAxiosError(err) && err.response?.status === 404) {
+      return null;
+    }
+    console.error("Error fetching key:", err);
+    throw new Error("Key retrieval failed");
   }
-};
+}
+
+/**
+ * Hit the identity endpoint to create the key.
+ * We fire‐and‐forget any errors here so they don’t block you.
+ */
+async function createKeyViaIdentity(token: string): Promise<void> {
+  try {
+    await eth.get(token, StratoPaths.identity);
+  } catch (err) {
+    console.warn("Failed to create key via identity endpoint:", err);
+  }
+}
+
+/**
+ * Fetches an existing Strato key, or creates one (and registers its identity) if none exists.
+ *
+ * @param token - Bearer token for authorization
+ * @returns the address string
+ */
+export async function createOrGetKey(token: string): Promise<string> {
+  // 1️⃣ Try to fetch an existing key
+  let address = await fetchKey(token);
+  if (address) {
+    return address;
+  }
+
+  console.info("No key found, creating a new one via identity endpoint…");
+
+  // 2️⃣ Create it
+  await createKeyViaIdentity(token);
+
+  // 3️⃣ Re-fetch; if still no address, that’s a real failure
+  address = await fetchKey(token);
+  if (!address) {
+    throw new Error("Key creation failed: no address after identity call");
+  }
+
+  return address;
+}
