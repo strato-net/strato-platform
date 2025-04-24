@@ -462,6 +462,7 @@ async function getAll(admin, args = {}, defaultOptions) {
   const {
     range,
     ownerCommonName,
+    owner,
     assetAddresses,
     status,
     isMarketplaceSearch,
@@ -534,13 +535,13 @@ async function getAll(admin, args = {}, defaultOptions) {
     }
   } else {
     // Fetch all Inventories and join sales table.
-    if (ownerCommonName) {
+    if (owner) {
       inventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           status,
-          ownerCommonName: ownerCommonName,
+	  owner: owner,
           queryOptions: queryOptions
             ? queryOptions
             : { select: constants.attachSalesEscrowsAndImagesAndFiles },

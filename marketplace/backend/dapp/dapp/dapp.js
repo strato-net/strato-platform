@@ -1239,12 +1239,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return tokensJs.burnETHST(rawAdmin, burnETHSTArgs, options);
   };
 
-  contract.getUSDSTBalance = async function (_, options = defaultOptions) {
+    contract.getUSDSTBalance = async function ({userAddress}, options = defaultOptions) {
     const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
     const balance = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
+	  owner: userAddress,
         originAddress: USDSTOriginAddress,
         queryOptions: { select: 'quantity.sum()' },
       },
