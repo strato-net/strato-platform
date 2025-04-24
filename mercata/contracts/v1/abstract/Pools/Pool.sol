@@ -37,9 +37,9 @@ abstract contract Pool is ERC20 {
     // Core functions
     function addLiquidity(
         uint256 tokenB_amount,
-        uint256 max_tokens
+        uint256 max_tokenA_amount
     ) external returns (uint256) {
-        require(tokenB_amount > 0 && max_tokens > 0, "Invalid inputs");
+        require(tokenB_amount > 0 && max_tokenA_amount > 0, "Invalid inputs");
         uint256 total_liquidity = totalSupply();
         
         if (total_liquidity > 0) {
@@ -49,7 +49,7 @@ abstract contract Pool is ERC20 {
             uint256 tokenA_amount = (tokenB_amount * tokenA_reserve / tokenB_reserve) + 1;
             uint256 liquidity_minted = tokenB_amount * total_liquidity / tokenB_reserve;
             
-            require(max_tokens >= tokenA_amount, "Insufficient tokenA amount");
+            require(max_tokenA_amount >= tokenA_amount, "Insufficient tokenA amount");
             _mint(msg.sender, liquidity_minted);
             
             require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
@@ -61,7 +61,7 @@ abstract contract Pool is ERC20 {
         } else {
             require(tokenB_amount >= 1000000000, "Minimum liquidity required");
             
-            uint256 tokenA_amount = max_tokens;
+            uint256 tokenA_amount = max_tokenA_amount;
             uint256 initial_liquidity = tokenB_amount;
             _mint(msg.sender, initial_liquidity);
             
@@ -77,9 +77,9 @@ abstract contract Pool is ERC20 {
     function removeLiquidity(
         uint256 amount,
         uint256 min_tokenB,
-        uint256 min_tokens
+        uint256 min_tokenA_amount
     ) external returns (uint256, uint256) {
-        require(amount > 0 && min_tokenB > 0 && min_tokens > 0, "Invalid inputs");
+        require(amount > 0 && min_tokenB > 0 && min_tokenA_amount > 0, "Invalid inputs");
         uint256 total_liquidity = totalSupply();
         require(total_liquidity > 0, "No liquidity");
         uint256 tokenA_reserve = tokenA.balanceOf(address(this));
@@ -87,7 +87,7 @@ abstract contract Pool is ERC20 {
         uint256 tokenB_amount = amount * tokenB_reserve / total_liquidity;
         uint256 tokenA_amount = amount * tokenA_reserve / total_liquidity;
         
-        require(tokenB_amount >= min_tokenB && tokenA_amount >= min_tokens, "Insufficient amounts");
+        require(tokenB_amount >= min_tokenB && tokenA_amount >= min_tokenA_amount, "Insufficient amounts");
         
         require(tokenB.transfer(msg.sender, tokenB_amount), "TokenB transfer failed");
         require(tokenA.transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
