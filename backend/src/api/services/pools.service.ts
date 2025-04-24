@@ -1,12 +1,11 @@
 import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
-import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
+import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { combine, usc, cwd } from "../../utils/importer";
+import { usc } from "../../utils/importer";
 import { StratoPaths, constants } from "../../config/constants";
 
 const Pool = "DemoPool";
 const PoolFactory = "DemoPoolFactory";
-const contractPathFactory = `${cwd}/src/api/contracts/${PoolFactory}.sol`;
 
 export const getPools = async (
   accessToken: string,
@@ -111,9 +110,10 @@ export const createPool = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildDeployTx({
+    const tx = buildFunctionTx({
       contractName: PoolFactory,
-      source: await combine(contractPathFactory),
+      contractAddress: constants.poolFactory,
+      method: "createPool",
       args: usc(body),
     });
 
