@@ -184,6 +184,7 @@ class LendingController {
     const schema = Joi.object({
       address: Joi.string().required(),
       loanId: Joi.string().required(),
+      asset: Joi.string().required(),
       amount: Joi.string().required(),
     });
     const { error } = schema.validate(args);

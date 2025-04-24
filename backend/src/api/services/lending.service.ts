@@ -5,6 +5,7 @@ import { combine, usc, cwd } from "../../utils/importer";
 import { StratoPaths } from "../../config/constants";
 
 const Pool = "DemoLending";
+const ERC20 = "ERC20";
 const contractPathFactory = `${cwd}/src/api/contracts/${Pool}.sol`;
 
 export const getPools = async (
@@ -70,7 +71,26 @@ export const manageLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    let tx = buildFunctionTx({
+      contractName: ERC20,
+      contractAddress: body.asset || "",
+      method: "approve",
+      args: {
+        asset: body.address,
+        value: body.amount,
+      },
+    });
+
+    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+      accessToken,
+      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    if (approveStatus !== "Success") {
+      throw new Error(`Error approving asset with hash: ${approveHash}`);
+    }
+
+    tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: body.address || "",
       method: body.method || "",
@@ -99,7 +119,26 @@ export const getLoan = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    let tx = buildFunctionTx({
+      contractName: ERC20,
+      contractAddress: body.asset || "",
+      method: "approve",
+      args: {
+        asset: body.address,
+        value: body.amount,
+      },
+    });
+
+    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+      accessToken,
+      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    if (approveStatus !== "Success") {
+      throw new Error(`Error approving asset with hash: ${approveHash}`);
+    }
+
+    tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: body.address || "",
       method: "getLoan",
@@ -130,7 +169,26 @@ export const repayLoan = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    let tx = buildFunctionTx({
+      contractName: ERC20,
+      contractAddress: body.asset || "",
+      method: "approve",
+      args: {
+        asset: body.address,
+        value: body.amount,
+      },
+    });
+
+    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+      accessToken,
+      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    if (approveStatus !== "Success") {
+      throw new Error(`Error approving asset with hash: ${approveHash}`);
+    }
+
+    tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: body.address || "",
       method: "repayLoan",
