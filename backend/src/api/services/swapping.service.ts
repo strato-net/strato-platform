@@ -3,11 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { StratoPaths, constants } from "../../config/constants";
-import {
-  getInputPrice,
-  getOutputPrice,
-  getPoolBalances,
-} from "../helpers/pools.helper";
+import { getInputPrice } from "../helpers/swapping.helper";
 
 const Pool = "DemoPool";
 const PoolFactory = "DemoPoolFactory";
@@ -158,120 +154,34 @@ export const swap = async (
   }
 };
 
-export const getStableToTokenInputPrice = async (
+export const calculateSwap = async (
   accessToken: string,
-  params: { stable_sold: bigint; address: string }
-): Promise<bigint> => {
-  if (params.stable_sold <= 0n) {
-    throw new Error("Invalid stable amount");
-  }
-
+  address: string,
+  direction: boolean,
+  amount: string
+) => {
   try {
-    const { tokenBalance, stableBalance } = await getPoolBalances(
-      accessToken,
-      params.address
-    );
+    const pools = await getPools(accessToken, { address: "eq." + address });
 
-    return getInputPrice(params.stable_sold, stableBalance, tokenBalance);
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+    const pool = pools[0];
+    if (direction) {
+      return getInputPrice(
+        BigInt(amount),
+        BigInt(pool.data.tokenBBalance),
+        BigInt(pool.data.tokenABalance)
+      );
+    } else {
+      return getInputPrice(
+        BigInt(amount),
+        BigInt(pool.data.tokenABalance),
+        BigInt(pool.data.tokenBBalance)
+      );
+    }
   } catch (error) {
-    console.error("Error calculating price:", error);
-    throw error;
-  }
-};
-
-export const getStableToTokenOutputPrice = async (
-  accessToken: string,
-  params: { tokens_bought: bigint; address: string }
-): Promise<bigint> => {
-  if (params.tokens_bought <= 0n) {
-    throw new Error("Invalid token amount");
-  }
-
-  try {
-    const { tokenBalance, stableBalance } = await getPoolBalances(
-      accessToken,
-      params.address
-    );
-
-    return getOutputPrice(params.tokens_bought, stableBalance, tokenBalance);
-  } catch (error) {
-    console.error("Error calculating price:", error);
-    throw error;
-  }
-};
-
-export const getTokenToStableInputPrice = async (
-  accessToken: string,
-  params: { tokens_sold: bigint; address: string }
-): Promise<bigint> => {
-  if (params.tokens_sold <= 0n) {
-    throw new Error("Invalid token amount");
-  }
-
-  try {
-    const { tokenBalance, stableBalance } = await getPoolBalances(
-      accessToken,
-      params.address
-    );
-
-    return getInputPrice(params.tokens_sold, tokenBalance, stableBalance);
-  } catch (error) {
-    console.error("Error calculating price:", error);
-    throw error;
-  }
-};
-
-export const getTokenToStableOutputPrice = async (
-  accessToken: string,
-  params: { stable_bought: bigint; address: string }
-): Promise<bigint> => {
-  if (params.stable_bought <= 0n) {
-    throw new Error("Invalid stable amount");
-  }
-
-  try {
-    const { tokenBalance, stableBalance } = await getPoolBalances(
-      accessToken,
-      params.address
-    );
-
-    return getOutputPrice(params.stable_bought, tokenBalance, stableBalance);
-  } catch (error) {
-    console.error("Error calculating price:", error);
-    throw error;
-  }
-};
-
-export const getCurrentTokenPrice = async (
-  accessToken: string,
-  params: { address: string }
-): Promise<string> => {
-  try {
-    const { tokenBalance, stableBalance } = await getPoolBalances(
-      accessToken,
-      params.address
-    );
-
-    return ((stableBalance * constants.DECIMALS) / tokenBalance).toString();
-  } catch (error) {
-    console.error("Error calculating current token price:", error);
-    throw error;
-  }
-};
-
-export const getCurrentStablePrice = async (
-  accessToken: string,
-  params: { address: string }
-): Promise<bigint> => {
-  try {
-    const { tokenBalance, stableBalance } = await getPoolBalances(
-      accessToken,
-      params.address
-    );
-
-    return (tokenBalance * constants.DECIMALS) / stableBalance;
-  } catch (error) {
-    console.error("Error calculating current stable price:", error);
+    console.error("Error calculating swap:", error);
     throw error;
   }
 };

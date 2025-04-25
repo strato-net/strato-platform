@@ -4,8 +4,11 @@ import RestStatus from "http-status-codes";
 import {
   getTokens,
   getBalance,
+  getState,
   createToken,
   transferToken,
+  approveToken,
+  transferFromToken,
 } from "../services/tokens.service";
 
 class TokensController {
@@ -72,11 +75,28 @@ class TokensController {
     try {
       const { accessToken, query } = req;
 
-      const tokens = await getBalance(
+      const balances = await getBalance(
         accessToken,
         query as Record<string, string | undefined>
       );
-      res.status(RestStatus.OK).json(tokens);
+      res.status(RestStatus.OK).json(balances);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getState(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      const allowances = await getState(
+        accessToken,
+        params.address as string,
+      );
+      res.status(RestStatus.OK).json(allowances);
     } catch (error) {
       next(error);
     }
@@ -110,6 +130,29 @@ class TokensController {
     }
   }
 
+  static async approve(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, body } = req;
+      const result = await approveToken(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async transferFrom(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, body } = req;
+
+      const result = await transferFromToken(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   // ----------------------- ARG VALIDATION ------------------------
   static validateAddressArgs(args: any) {
     const addressSchema = Joi.object({
@@ -120,23 +163,6 @@ class TokensController {
 
     if (validation.error) {
       throw new Error("Address Argument Validation Error");
-    }
-  }
-
-  static validateQueryArgs(args: any) {
-    const querySchema = Joi.object({
-      limit: Joi.string().optional(),
-      offset: Joi.string().optional(),
-      address: Joi.string().optional(),
-      owner: Joi.string().optional(),
-      creator: Joi.string().optional(),
-      order: Joi.string().optional(),
-    });
-
-    const validation = querySchema.validate(args);
-
-    if (validation.error) {
-      throw new Error("Query Argument Validation Error");
     }
   }
 

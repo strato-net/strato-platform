@@ -7,15 +7,10 @@ import {
   addLiquidity,
   removeLiquidity,
   swap,
-  getStableToTokenInputPrice,
-  getStableToTokenOutputPrice,
-  getTokenToStableInputPrice,
-  getTokenToStableOutputPrice,
-  getCurrentTokenPrice,
-  getCurrentStablePrice,
-} from "../services/pools.service";
+  calculateSwap,
+} from "../services/swapping.service";
 
-class PoolsController {
+class SwappingController {
   static async get(
     req: Request,
     res: Response,
@@ -24,7 +19,7 @@ class PoolsController {
     try {
       const { accessToken, params } = req;
 
-      PoolsController.validateAddressArgs(params);
+      SwappingController.validateAddressArgs(params);
 
       const token = await getPools(accessToken, {
         address: "eq." + params.address,
@@ -57,7 +52,7 @@ class PoolsController {
     try {
       const { accessToken, body } = req;
 
-      PoolsController.validateCreatePoolsArgs(body);
+      SwappingController.validateCreatePoolsArgs(body);
 
       const result = await createPool(accessToken, body);
       res.status(200).json(result);
@@ -71,7 +66,7 @@ class PoolsController {
     try {
       const { accessToken, body } = req;
 
-      PoolsController.validateAddLiquidityArgs(body);
+      SwappingController.validateAddLiquidityArgs(body);
 
       const result = await addLiquidity(accessToken, body);
       res.status(200).json(result);
@@ -89,7 +84,7 @@ class PoolsController {
     try {
       const { accessToken, body } = req;
 
-      PoolsController.validateRemoveLiquidityArgs(body);
+      SwappingController.validateRemoveLiquidityArgs(body);
 
       const result = await removeLiquidity(accessToken, body);
       res.status(200).json(result);
@@ -103,7 +98,7 @@ class PoolsController {
     try {
       const { accessToken, body } = req;
 
-      PoolsController.validateSwapArgs(body);
+      SwappingController.validateSwapArgs(body);
 
       const result = await swap(accessToken, body);
       res.status(200).json(result);
@@ -113,109 +108,99 @@ class PoolsController {
     }
   }
 
-  static async getStableToTokenInputPrice(
+  static async calculateSwap(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query, params } = req;
-      PoolsController.validatePriceQueryArgs(query, "stable_sold");
-      const stableSold = BigInt(query.stable_sold as string);
-      const price = await getStableToTokenInputPrice(accessToken, {
-        stable_sold: stableSold,
-        address: params.address as string,
-      });
-      res.status(RestStatus.OK).json({ price: price.toString() });
+      const { accessToken, query } = req;
+
+      const price = await calculateSwap(
+        accessToken,
+        query.address as string,
+        Boolean(query.direction) as boolean,
+        query.amount as string
+      );
+      res.status(RestStatus.OK).json(price);
     } catch (error) {
       next(error);
     }
   }
 
-  static async getStableToTokenOutputPrice(
+  static async getSwapableTokens(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query, params } = req;
-      PoolsController.validatePriceQueryArgs(query, "tokens_bought");
-      const tokensBought = BigInt(query.tokens_bought as string);
-      const price = await getStableToTokenOutputPrice(accessToken, {
-        tokens_bought: tokensBought,
-        address: params.address as string,
+      const { accessToken } = req;
+      const pools = await getPools(accessToken, {
+        select: "data->>tokenA,data->>tokenB",
       });
-      res.status(RestStatus.OK).json({ price: price.toString() });
+
+      const uniqueTokens = [
+        ...new Set(
+          pools
+            .flatMap((pool: any) => [pool.tokenA, pool.tokenB])
+            .filter(Boolean)
+        ),
+      ];
+
+      res.status(RestStatus.OK).json(uniqueTokens);
     } catch (error) {
       next(error);
     }
   }
 
-  static async getTokenToStableInputPrice(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query, params } = req;
-      PoolsController.validatePriceQueryArgs(query, "tokens_sold");
-      const tokensSold = BigInt(query.tokens_sold as string);
-      const price = await getTokenToStableInputPrice(accessToken, {
-        tokens_sold: tokensSold,
-        address: params.address as string,
-      });
-      res.status(RestStatus.OK).json({ price: price.toString() });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getTokenToStableOutputPrice(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query, params } = req;
-      PoolsController.validatePriceQueryArgs(query, "stable_bought");
-      const stableBought = BigInt(query.stable_bought as string);
-      const price = await getTokenToStableOutputPrice(accessToken, {
-        stable_bought: stableBought,
-        address: params.address as string,
-      });
-      res.status(RestStatus.OK).json({ price: price.toString() });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getCurrentTokenPrice(
+  static async getSwapableTokenPairs(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const { accessToken, params } = req;
-      const price = await getCurrentTokenPrice(accessToken, {
-        address: params.address as string,
+
+      SwappingController.validateAddressArgs({ address: params.address });
+
+      const poolA = await getPools(accessToken, {
+        "data->>tokenA": "eq." + params.address,
+        select: "token:data->>tokenB",
       });
-      res.status(RestStatus.OK).json({ price });
+
+      const poolB = await getPools(accessToken, {
+        "data->>tokenB": "eq." + params.address,
+        select: "token:data->>tokenA",
+      });
+
+      const uniqueTokenPairs = [
+        ...new Set(
+          [
+            ...poolA.map((pool: any) => pool.token),
+            ...poolB.map((pool: any) => pool.token),
+          ].filter(Boolean)
+        ),
+      ];
+
+      res.status(RestStatus.OK).json(uniqueTokenPairs);
     } catch (error) {
       next(error);
     }
   }
 
-  static async getCurrentStablePrice(
+  static async getPoolByTokenPair(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params } = req;
-      const price = await getCurrentStablePrice(accessToken, {
-        address: params.address as string,
+      const { accessToken, query } = req;
+
+      const pools = await getPools(accessToken, {
+        "data->>tokenA": "eq." + query.tokenA,
+        "data->>tokenB": "eq." + query.tokenB,
       });
-      res.status(RestStatus.OK).json({ price: price.toString() });
+      res.status(RestStatus.OK).json(pools);
     } catch (error) {
       next(error);
     }
@@ -231,23 +216,6 @@ class PoolsController {
 
     if (validation.error) {
       throw new Error("Address Argument Validation Error");
-    }
-  }
-
-  static validateQueryArgs(args: any) {
-    const schema = Joi.object({
-      limit: Joi.string().optional(),
-      offset: Joi.string().optional(),
-      address: Joi.string().optional(),
-      owner: Joi.string().optional(),
-      creator: Joi.string().optional(),
-      order: Joi.string().optional(),
-    });
-
-    const validation = schema.validate(args);
-
-    if (validation.error) {
-      throw new Error("Query Argument Validation Error");
     }
   }
 
@@ -330,4 +298,4 @@ class PoolsController {
   }
 }
 
-export default PoolsController;
+export default SwappingController;
