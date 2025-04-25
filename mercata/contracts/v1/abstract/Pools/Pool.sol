@@ -13,7 +13,7 @@ abstract contract Pool is ERC20{
     event RemoveLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
 
     ERC20 public tokenA;                             // ERC20 tokenA traded on this contract
-    ERC20 public tokenB;                        // ERC20 tokenB traded on this contract
+    ERC20 public tokenB;                        // ERC20 traded on this contract
 
     bool private locked;   
     
@@ -144,16 +144,16 @@ abstract contract Pool is ERC20{
         decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)));
         require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 tokenA in stablecoins (tokenB_reserve / tokenA_reserve)
-        return decimal((tokenB_reserve * 1000000000000000000.000000) / tokenA_reserve) / 1000000000000000000.000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
+        return decimal((tokenB_reserve * 1.000000000000000000 ) / tokenA_reserve) / 1.000000000000000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
 
     function getCurrentTokenBARatio() public view returns (decimal) {
-        decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)))* 1000000000000000000.000000;
-        decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)))* 1000000000000000000.000000;
+        decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)))* 1.000000000000000000;
+        decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)))* 1.000000000000000000;
         require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 tokenB in tokens (tokenA_reserve / tokenB_reserve)
-        return decimal((tokenA_reserve * 1000000000000000000.000000) / tokenB_reserve) / 1000000000000000000.000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
+        return decimal((tokenA_reserve * 1.000000000000000000) / tokenB_reserve) / 1.000000000000000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
     // Swap functions
@@ -173,6 +173,8 @@ abstract contract Pool is ERC20{
         
         aToBRatio = getCurrentTokenABRatio();
         bToARatio = getCurrentTokenBARatio();
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
         emit TokenAPurchase(msg.sender, tokenB_sold, tokens_bought);
         return tokens_bought;
     }
