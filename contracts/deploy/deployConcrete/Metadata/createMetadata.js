@@ -1,5 +1,5 @@
 // Load environment variables from .env file.
-require('dotenv').config();
+const config = require('../../config');
 
 const { rest, util, importer, fsUtil, oauthUtil } = require('blockapps-rest');
 const fs = require('fs');
@@ -96,7 +96,7 @@ async function main() {
       status: final.status
     };
     
-    const deploymentDir = path.join(__dirname, '../../../deployment-logs');
+    const deploymentDir = path.join(__dirname, 'deployment-logs');
     if (!fs.existsSync(deploymentDir)) {
       fs.mkdirSync(deploymentDir, { recursive: true });
     }
