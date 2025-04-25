@@ -38,6 +38,13 @@ abstract contract Pool is ERC20{
         tokenB = ERC20(tokenBAddr);
     }
 
+    function updateStateVars() internal {
+        aToBRatio = getCurrentTokenABRatio();
+        bToARatio = getCurrentTokenBARatio();
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
+    }
+
     // Core functions
     function addLiquidity(
         uint256 tokenB_amount,
@@ -61,6 +68,9 @@ abstract contract Pool is ERC20{
             
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
             emit Transfer(address(0), msg.sender, liquidity_minted);
+
+            updateStateVars();
+
             return liquidity_minted;
         } else {
             require(tokenB_amount >= 1000000000, "Minimum liquidity required");
@@ -74,12 +84,12 @@ abstract contract Pool is ERC20{
             
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
             emit Transfer(address(0), msg.sender, initial_liquidity);
+            
+            updateStateVars();
+
             return initial_liquidity;
         }
-        aToBRatio = getCurrentTokenABRatio();
-        bToARatio = getCurrentTokenBARatio();
-        tokenABalance = tokenA.balanceOf(address(this));
-        tokenBBalance = tokenB.balanceOf(address(this));
+
     }
 
     function removeLiquidity(
@@ -105,10 +115,8 @@ abstract contract Pool is ERC20{
         
         _burn(msg.sender, amount);
         
-        aToBRatio = getCurrentTokenABRatio();
-        bToARatio = getCurrentTokenBARatio();
-        tokenABalance = tokenA.balanceOf(address(this));
-        tokenBBalance = tokenB.balanceOf(address(this));
+        updateStateVars();
+
         return (tokenB_amount, tokenA_amount);
     }
 
@@ -171,10 +179,8 @@ abstract contract Pool is ERC20{
         require(tokenB.transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
         require(tokenA.transfer(msg.sender, tokens_bought), "TokenA transfer failed");
         
-        aToBRatio = getCurrentTokenABRatio();
-        bToARatio = getCurrentTokenBARatio();
-        tokenABalance = tokenA.balanceOf(address(this));
-        tokenBBalance = tokenB.balanceOf(address(this));
+        updateStateVars();
+
         emit TokenAPurchase(msg.sender, tokenB_sold, tokens_bought);
         return tokens_bought;
     }
@@ -193,10 +199,7 @@ abstract contract Pool is ERC20{
         require(tokenA.transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
         require(tokenB.transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
         
-        aToBRatio = getCurrentTokenABRatio();
-        bToARatio = getCurrentTokenBARatio();
-        tokenABalance = tokenA.balanceOf(address(this));
-        tokenBBalance = tokenB.balanceOf(address(this));
+        updateStateVars();
         
         emit TokenBPurchase(msg.sender, tokenA_sold, tokenB_bought);
         return tokenB_bought;
