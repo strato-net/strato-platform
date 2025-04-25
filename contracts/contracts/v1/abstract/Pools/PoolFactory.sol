@@ -5,7 +5,7 @@
  *
  * The factory serves three main purposes:
  * 1. Standardized pool creation (owner only)
- * 2. Pool registry - lookup existing pools for token pairs
+ * 2. Pool registry - lookup existing pools for tokenA pairs
  * 3. Pool tracking - maintain list of all created pools
  *
  * Similar to Uniswap's factory pattern:
@@ -16,31 +16,31 @@
 import "SimplePool.sol";
 
 abstract contract PoolFactory is Ownable {
-    event NewPool(address indexed token, address indexed stablecoin, address pool);
+    event NewPool(address indexed tokenA, address indexed tokenB, address pool);
 
     mapping(address => mapping(address => address)) public getPool;
     address[] public allPools;
 
     constructor() Ownable(msg.sender) {}
 
-    /// @notice Create a new pool for token/stablecoin
-    function createPool(address token, address stablecoin) external returns (address pool) onlyOwner {
-        require(token != address(0) && stablecoin != address(0), "Zero address");
-        require(token != stablecoin, "Identical addresses");
-        require(getPool[token][stablecoin] == address(0) && getPool[stablecoin][token] == address(0), "Pool exists");
+    /// @notice Create a new pool for tokenA/tokenB
+    function createPool(address tokenA, address tokenB) external returns (address pool) onlyOwner {
+        require(tokenA != address(0) && tokenB != address(0), "Zero address");
+        require(tokenA != tokenB, "Identical addresses");
+        require(getPool[tokenA][tokenB] == address(0) && getPool[tokenB][tokenA] == address(0), "Pool exists");
 
         // deploy new pool
-        pool = address(new SimplePool(token, stablecoin));
+        pool = address(new SimplePool(tokenA, tokenB));
 
-        getPool[token][stablecoin] = pool;
-        getPool[stablecoin][token] = pool; // support both directions
+        getPool[tokenA][tokenB] = pool;
+        getPool[tokenB][tokenA] = pool; // support both directions
 
         allPools.push(pool);
-        emit NewPool(token, stablecoin, pool);
+        emit NewPool(tokenA, tokenB, pool);
     }
 
-    function getPool(address token, address stablecoin) external view returns (address pool) {
-        return getPool[token][stablecoin];
+    function getPool(address tokenA, address tokenB) external view returns (address pool) {
+        return getPool[tokenA][tokenB];
     }
 
     function allPoolsLength() external view returns (uint256) {
