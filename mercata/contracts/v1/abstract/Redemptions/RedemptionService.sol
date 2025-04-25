@@ -99,7 +99,7 @@ abstract contract RedemptionService is Ownable, ERC20Burnable {
      * @return Current pool price scaled by 1e18
      */
     function getPoolPrice() public view returns (uint) {
-        return uint(pool.getCurrentTokenAPrice() * 1e18);
+        return uint(pool.getCurrentTokenABRatio() * 1e18);
     }
 
     /**
