@@ -1,12 +1,10 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
-import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
+import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { combine, usc, cwd } from "../../utils/importer";
-import { StratoPaths } from "../../config/constants";
+import { StratoPaths, constants } from "../../config/constants";
 
-const Pool = "DemoLending";
+const Pool = "LendingPoolBase";
 const ERC20 = "ERC20";
-const contractPathFactory = `${cwd}/src/api/contracts/${Pool}.sol`;
 
 export const getPools = async (
   accessToken: string,
@@ -17,6 +15,24 @@ export const getPools = async (
     const params = Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
+    params.address = "eq." + constants.lendingPool;
+    // Ensure all required relations are selected
+    const requiredRelations = [
+      "BlockApps-Mercata-LendingPoolBase-loans(*)",
+      "BlockApps-Mercata-LendingPoolBase-assetInterestRate(*)",
+      "BlockApps-Mercata-LendingPoolBase-assetCollateralRatio(*)",
+      "BlockApps-Mercata-LendingPoolBase-assetLiquidationBonus(*)",
+    ];
+    // Clean and build select parameter
+    const existingSelect = params.select
+      ? Array.from(new Set(params.select.split(",")))
+      : ["*"];
+    requiredRelations.forEach((rel) => {
+      if (!existingSelect.includes(rel)) {
+        existingSelect.push(rel);
+      }
+    });
+    params.select = existingSelect.join(",");
 
     const response = await cirrus.get(
       accessToken,
@@ -36,32 +52,7 @@ export const getPools = async (
 
     return response.data;
   } catch (error) {
-    console.error("Error fetching leding pools:", error);
-    throw error;
-  }
-};
-
-export const createPool = async (
-  accessToken: string,
-  body: Record<string, string | undefined>
-) => {
-  try {
-    const tx = buildDeployTx({
-      contractName: Pool,
-      source: await combine(contractPathFactory),
-      args: usc(body),
-    });
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return {
-      status,
-      hash,
-    };
-  } catch (error) {
-    console.error("Error creating lending pool:", error);
+    console.error("Error fetching lending pools:", error);
     throw error;
   }
 };
@@ -76,7 +67,7 @@ export const manageLiquidity = async (
       contractAddress: body.asset || "",
       method: "approve",
       args: {
-        asset: body.address,
+        asset: constants.lendingPool,
         value: body.amount,
       },
     });
@@ -92,7 +83,7 @@ export const manageLiquidity = async (
 
     tx = buildFunctionTx({
       contractName: Pool,
-      contractAddress: body.address || "",
+      contractAddress: constants.lendingPool,
       method: body.method || "",
       args: {
         asset: body.asset,
@@ -121,10 +112,10 @@ export const getLoan = async (
   try {
     let tx = buildFunctionTx({
       contractName: ERC20,
-      contractAddress: body.asset || "",
+      contractAddress: constants.lendingPool,
       method: "approve",
       args: {
-        asset: body.address,
+        asset: constants.lendingPool,
         value: body.amount,
       },
     });
@@ -140,7 +131,7 @@ export const getLoan = async (
 
     tx = buildFunctionTx({
       contractName: Pool,
-      contractAddress: body.address || "",
+      contractAddress: constants.lendingPool,
       method: "getLoan",
       args: {
         asset: body.asset,
@@ -174,7 +165,7 @@ export const repayLoan = async (
       contractAddress: body.asset || "",
       method: "approve",
       args: {
-        asset: body.address,
+        asset: constants.lendingPool,
         value: body.amount,
       },
     });
@@ -190,7 +181,7 @@ export const repayLoan = async (
 
     tx = buildFunctionTx({
       contractName: Pool,
-      contractAddress: body.address || "",
+      contractAddress: constants.lendingPool,
       method: "repayLoan",
       args: {
         loanId: body.loanId,
