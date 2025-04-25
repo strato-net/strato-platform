@@ -288,12 +288,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const inventories = await inventoryJs.getAll(
       rawAdmin,
-      { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' },
+      { ...args, owner: userCert.userAddress, sort: '-createdDate' },
       getOptions
     );
     const inventoryCount = await inventoryJs.inventoryCount(
       rawAdmin,
-      { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' },
+      { ...args, owner: userCert.userAddress, sort: '-createdDate' },
       getOptions
     );
     return { inventories: inventories, inventoryCount: inventoryCount };
@@ -325,7 +325,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName };
     const newArgs = {
       ...restArgs,
-      ownerCommonName: user || userCert?.commonName,
+      owner: user,
+      //ownerCommonName: user || userCert?.commonName,
       notEqualsField: 'sale',
       notEqualsValue: constants.zeroAddress,
       userProfile: true,
@@ -1196,7 +1197,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const userTokenAssets = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
+        owner: userCert.userAddress,
         originAddress: tokenAssetRootAddress,
         address: assetAddress,
         status: ASSET_STATUS.ACTIVE,
@@ -1258,7 +1259,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const balance = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
+        owner: userCert.userAddress,
         originAddress: CataOriginAddress,
         queryOptions: { select: 'quantity.sum()' },
       },
@@ -1895,7 +1896,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const userUSDSTAssets = await inventoryJs.getAll(
           rawAdmin,
           {
-            ownerCommonName: userCert.commonName,
+            owner: userCert.userAddress,
             originAddress: USDSTOriginAddress,
             status: ASSET_STATUS.ACTIVE,
             queryOptions: { select: 'address, quantity' },
