@@ -28,7 +28,7 @@ abstract contract PoolFactory is Ownable {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(getPool[tokenA][tokenB] == address(0) && getPool[tokenB][tokenA] == address(0), "Pool exists");
-
+        
         // deploy new pool
         pool = address(new SimplePool(tokenA, tokenB));
 

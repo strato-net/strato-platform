@@ -4,7 +4,7 @@ import "../ERC20/ERC20.sol";
 
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
-abstract contract Pool is ERC20 {
+abstract contract Pool is ERC20{
     
     // Events
     event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
@@ -15,9 +15,13 @@ abstract contract Pool is ERC20 {
     ERC20 public tokenA;                             // ERC20 tokenA traded on this contract
     ERC20 public tokenB;                        // Stablecoin traded on this contract
 
-    bool private locked;
+    bool private locked;   
+    
+    decimal public aToBRatio;
+    decimal public bToARatio;
 
-
+    uint public tokenABalance;
+    uint public tokenBBalance;
     
     modifier nonReentrant() {
         require(!locked, "REENTRANT");
@@ -72,10 +76,14 @@ abstract contract Pool is ERC20 {
             emit Transfer(address(0), msg.sender, initial_liquidity);
             return initial_liquidity;
         }
+        aToBRatio = getCurrentTokenABRatio();
+        bToARatio = getCurrentTokenBARatio();
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
     }
 
     function removeLiquidity(
-        uint256 amount,
+        uint256 amount, 
         uint256 min_tokenB,
         uint256 min_tokenA_amount
     ) external returns (uint256, uint256) {
@@ -97,6 +105,10 @@ abstract contract Pool is ERC20 {
         
         _burn(msg.sender, amount);
         
+        aToBRatio = getCurrentTokenABRatio();
+        bToARatio = getCurrentTokenBARatio();
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
         return (tokenB_amount, tokenA_amount);
     }
 
@@ -113,49 +125,21 @@ abstract contract Pool is ERC20 {
         return numerator / denominator;
     }
 
-    function getOutputPrice(
-        uint256 output_amount,
-        uint256 input_reserve,
-        uint256 output_reserve
-    ) pure returns (uint256) {
-        require(input_reserve > 0 && output_reserve > 0, "Invalid reserves");
-        require(output_reserve > output_amount, "Invalid output amount");
-        uint256 numerator = input_reserve * output_amount * 1000;
-        uint256 denominator = (output_reserve - output_amount) *  1000;
-        return (numerator / denominator) + 1;
-    }
-
     // Public price functions
-    function getTokenBToTokenAInputPrice(uint256 tokenB_sold) external view returns (uint256) {
-        require(tokenB_sold > 0, "Invalid stable amount");
+    function getTokenAQuantityNeededForTokenBQuantity(uint256 amount, bool isTokenBToTokenA) external view returns (uint256) {
+        require(amount > 0, "Invalid stable amount");
         uint256 tokenA_reserve = tokenA.balanceOf(address(this));
         uint256 tokenB_reserve = tokenB.balanceOf(address(this));
-        return getInputPrice(tokenB_sold, tokenB_reserve, tokenA_reserve);
-    }
 
-    function getTokenBToTokenAOutputPrice(uint256 tokens_bought) external view returns (uint256) {
-        require(tokens_bought > 0, "Invalid tokenA amount");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
-        return getOutputPrice(tokens_bought, tokenB_reserve, tokenA_reserve);
-    }
-
-    function getTokenAToTokenBInputPrice(uint256 tokenA_sold) external view returns (uint256) {
-        require(tokenA_sold > 0, "Invalid tokenA amount");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
-        return getInputPrice(tokenA_sold, tokenA_reserve, tokenB_reserve);
-    }
-
-    function getTokenAToTokenBOutputPrice(uint256 tokenB_bought) external view returns (uint256) {
-        require(tokenB_bought > 0, "Invalid stable amount");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
-        return getOutputPrice(tokenB_bought, tokenA_reserve, tokenB_reserve);
+        if (isTokenBToTokenA) {
+            return getInputPrice(amount, tokenB_reserve, tokenA_reserve);
+        } else {
+            return getInputPrice(amount, tokenA_reserve, tokenB_reserve);
+        }
     }
 
     // Price view functions
-    function getCurrentTokenAPrice() external view returns (decimal) {
+    function getCurrentTokenABRatio() public view returns (decimal) {
         decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)));
         decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)));
         require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
@@ -163,7 +147,8 @@ abstract contract Pool is ERC20 {
         return decimal((tokenB_reserve * 1000000000000000000.000000) / tokenA_reserve) / 1000000000000000000.000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
-    function getCurrentTokenBPrice() external view returns (decimal) {
+
+    function getCurrentTokenBARatio() public view returns (decimal) {
         decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)))* 1000000000000000000.000000;
         decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)))* 1000000000000000000.000000;
         require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
@@ -186,6 +171,8 @@ abstract contract Pool is ERC20 {
         require(tokenB.transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
         require(tokenA.transfer(msg.sender, tokens_bought), "TokenA transfer failed");
         
+        aToBRatio = getCurrentTokenABRatio();
+        bToARatio = getCurrentTokenBARatio();
         emit TokenAPurchase(msg.sender, tokenB_sold, tokens_bought);
         return tokens_bought;
     }
@@ -203,6 +190,11 @@ abstract contract Pool is ERC20 {
         
         require(tokenA.transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
         require(tokenB.transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
+        
+        aToBRatio = getCurrentTokenABRatio();
+        bToARatio = getCurrentTokenBARatio();
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
         
         emit TokenBPurchase(msg.sender, tokenA_sold, tokenB_bought);
         return tokenB_bought;
