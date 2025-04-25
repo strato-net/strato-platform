@@ -13,7 +13,7 @@ abstract contract Pool is ERC20{
     event RemoveLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
 
     ERC20 public tokenA;                             // ERC20 tokenA traded on this contract
-    ERC20 public tokenB;                        // Stablecoin traded on this contract
+    ERC20 public tokenB;                        // ERC20 tokenB traded on this contract
 
     bool private locked;   
     
