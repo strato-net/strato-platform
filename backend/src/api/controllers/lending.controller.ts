@@ -3,7 +3,6 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPools,
-  createPool,
   manageLiquidity,
   getLoan,
   repayLoan,
@@ -11,23 +10,6 @@ import {
 
 class LendingController {
   static async get(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, params } = req;
-      LendingController.validateGetArgs(params);
-      const pools = await getPools(accessToken, {
-        address: "eq." + params.address,
-      });
-      res.status(RestStatus.OK).json(pools);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getAll(
     req: Request,
     res: Response,
     next: NextFunction
@@ -41,23 +23,6 @@ class LendingController {
       res.status(RestStatus.OK).json(pools);
     } catch (error) {
       next(error);
-    }
-  }
-
-  static async create(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body } = req;
-      LendingController.validateCreateArgs(body);
-
-      const result = await createPool(accessToken, body);
-      res.status(RestStatus.OK).json(result);
-      return next();
-    } catch (error) {
-      return next(error);
     }
   }
 
@@ -153,7 +118,6 @@ class LendingController {
       method: Joi.string()
         .valid("depositLiquidity", "withdrawLiquidity")
         .required(),
-      address: Joi.string().required(),
       asset: Joi.string().required(),
       amount: Joi.string().required(),
     });
@@ -167,7 +131,6 @@ class LendingController {
 
   static validateGetLoanArgs(args: any) {
     const schema = Joi.object({
-      address: Joi.string().required(),
       asset: Joi.string().required(),
       amount: Joi.string().required(),
       collateralAsset: Joi.string().required(),
@@ -181,7 +144,6 @@ class LendingController {
 
   static validateRepayLoanArgs(args: any) {
     const schema = Joi.object({
-      address: Joi.string().required(),
       loanId: Joi.string().required(),
       asset: Joi.string().required(),
       amount: Joi.string().required(),
