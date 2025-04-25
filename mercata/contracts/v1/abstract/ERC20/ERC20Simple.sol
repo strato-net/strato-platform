@@ -1,13 +1,21 @@
 pragma es6;
 pragma strict;
 
-import <5c378a123236dcab013bd1df10d0043e357a4aa4>;
+import <db9c5aee50c5a9044f7d22f888c89f63e21bea51>;
 
 contract ERC20Simple is ERC20{
     address public owner;
-    constructor(string name_, string symbol_, uint256 initialSupply_) ERC20(name_, symbol_){
+
+    uint public decimals;
+
+    constructor(string _name, string _symbol, uint256 _initialSupply, uint _decimals) ERC20(_name, _symbol){
         owner = msg.sender;
-        _mint(msg.sender, initialSupply_);
+        decimals = _decimals;
+        _mint(msg.sender, _initialSupply);
+    }
+
+    function decimals() public view virtual override returns (uint) {
+        return decimals;
     }
 
     function mint(uint256 amount) public{
