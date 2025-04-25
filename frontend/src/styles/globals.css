@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --f-family: Basel, -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --f-weight-normal: 485;
+  --f-size-base: 18px;
+  --f-line-height: 24px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.custom-tabs-vibrant .ant-tabs-nav {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 9999px;
+  box-shadow: 2px 4px 6px rgba(79, 70, 229, 0.3); /* soft indigo glow */
+}
+
+.custom-tabs-vibrant .ant-tabs-tab {
+  padding: 12px 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e7ff;
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin: 0 6px;
+  backdrop-filter: blur(6px);
+  transition: all 0.3s ease;
+}
+
+.custom-tabs-vibrant .ant-tabs-tab-active {
+  background: linear-gradient(to right, #1f1f5f, #293b7d, #16737d);
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(38, 128, 150, 0.4); /* aqua glow */
+}
+
+.custom-tabs-vibrant .ant-tabs-tab-active .ant-tabs-tab-btn span {
+  color: aqua;
+}
+.custom-tabs-vibrant .ant-tabs-ink-bar {
+  display: none;
+}
+
+.custom-subTabs .ant-tabs-tab {
+  padding: 12px 28px;
+  padding-top: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #1f1f5f;
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0 6px;
+  backdrop-filter: blur(6px);
+  transition: all 0.3s ease; 
+}
+
+
