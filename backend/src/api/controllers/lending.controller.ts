@@ -34,7 +34,6 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
-      LendingController.validateQueryArgs(query);
       const pools = await getPools(
         accessToken,
         query as Record<string, string | undefined>

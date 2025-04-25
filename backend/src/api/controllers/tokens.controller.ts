@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getTokens,
+  getBalance,
   createToken,
   transferToken,
 } from "../services/tokens.service";
@@ -35,8 +36,6 @@ class TokensController {
     try {
       const { accessToken, query } = req;
 
-      TokensController.validateQueryArgs(query);
-
       const tokens = await getTokens(
         accessToken,
         query as Record<string, string | undefined>
@@ -46,6 +45,25 @@ class TokensController {
       next(error);
     }
   }
+
+  static async getBalance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+
+      const tokens = await getBalance(
+        accessToken,
+        query as Record<string, string | undefined>
+      );
+      res.status(RestStatus.OK).json(tokens);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
@@ -53,7 +71,7 @@ class TokensController {
       TokensController.validateCreateTokensArgs(body);
 
       const result = await createToken(accessToken, body);
-      res.status(200).json(result);
+      res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
       return next(e);
@@ -67,7 +85,7 @@ class TokensController {
       TokensController.validateTransferItemArgs(body);
 
       const result = await transferToken(accessToken, body);
-      res.status(200).json(result);
+      res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
       return next(e);
@@ -106,7 +124,6 @@ class TokensController {
 
   static validateCreateTokensArgs(args: any) {
     const createTokensSchema = Joi.object({
-
       name: Joi.string().required(),
       symbol: Joi.string().required(),
       initialSupply: Joi.number().integer().min(0).required(),

@@ -19,11 +19,18 @@ router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
 
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
+router.get("/tokens/table/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 
 router.get("/pools/:address", authHandler.authorizeRequest(true), PoolsController.get);
 router.get("/pools/", authHandler.authorizeRequest(true), PoolsController.getAll);
+router.get("/pools/getStableToTokenInputPrice/:address", authHandler.authorizeRequest(true), PoolsController.getStableToTokenInputPrice);
+router.get("/pools/getStableToTokenOutputPrice/:address", authHandler.authorizeRequest(true), PoolsController.getStableToTokenOutputPrice);
+router.get("/pools/getTokenToStableInputPrice/:address", authHandler.authorizeRequest(true), PoolsController.getTokenToStableInputPrice);
+router.get("/pools/getTokenToStableOutputPrice/:address", authHandler.authorizeRequest(true), PoolsController.getTokenToStableOutputPrice);
+router.get("/pools/getCurrentTokenPrice/:address", authHandler.authorizeRequest(true), PoolsController.getCurrentTokenPrice);
+router.get("/pools/getCurrentStablePrice/:address", authHandler.authorizeRequest(true), PoolsController.getCurrentStablePrice);
 router.post("/pools/", authHandler.authorizeRequest(), PoolsController.create);
 router.post("/pools/addLiquidity", authHandler.authorizeRequest(), PoolsController.addLiquidity);
 router.post("/pools/removeLiquidity", authHandler.authorizeRequest(), PoolsController.removeLiquidity);

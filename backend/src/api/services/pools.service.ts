@@ -1,8 +1,13 @@
-import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
+import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { StratoPaths, constants } from "../../config/constants";
+import {
+  getInputPrice,
+  getOutputPrice,
+  getPoolBalances,
+} from "../helpers/pools.helper";
 
 const Pool = "DemoPool";
 const PoolFactory = "DemoPoolFactory";
@@ -17,62 +22,7 @@ export const getPools = async (
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
 
-    // Fetch pool factory data (for allPools only)
-    const factoryResponse = await bloc.get(
-      accessToken,
-      StratoPaths.state.replace(":contractAddress", constants.poolFactory)
-    );
-
-    const allPools: string[] =
-      factoryResponse?.data?.allPools?.map((p: string) => p.toLowerCase()) ||
-      [];
-
-    if (!allPools.length) {
-      throw new Error("No pools found in PoolFactory");
-    }
-
-    // Fetch all ERC20 tokens (includes pool contracts)
-    if (params.address) {
-      const rawAddressParam = params.address.trim().toLowerCase();
-
-      let extractedAddresses: string[] = [];
-
-      if (rawAddressParam.startsWith("eq.")) {
-        extractedAddresses = [rawAddressParam.slice(3)];
-      } else if (rawAddressParam.startsWith("neq.")) {
-        extractedAddresses = [rawAddressParam.slice(4)];
-      }else if (rawAddressParam.startsWith("in.(")) {
-        extractedAddresses = rawAddressParam
-          .slice(4)
-          .replace(/[()]/g, "")
-          .split(",")
-          .map((addr) => addr.trim());
-      } else if (rawAddressParam.startsWith("not.in.(")) {
-        extractedAddresses = rawAddressParam
-          .slice(8)
-          .replace(/[()]/g, "")
-          .split(",")
-          .map((addr) => addr.trim());
-      } else {
-        // fallback: assume it’s a single address
-        extractedAddresses = [rawAddressParam];
-      }
-
-      // Validate each extracted address
-      const invalidAddresses = extractedAddresses.filter(
-        (addr) => !allPools.includes(addr)
-      );
-
-      if (invalidAddresses.length > 0) {
-        throw new Error(
-          `Invalid pool address(es) not found in all pools: ${invalidAddresses.join(
-            ", "
-          )}`
-        );
-      }
-    } else {
-      params.address = `in.(${allPools.join(",")})`;
-    }
+    params.root = `eq.${constants.poolFactory}`;
 
     const cirrusResponse = await cirrus.get(
       accessToken,
@@ -86,19 +36,7 @@ export const getPools = async (
 
     const poolData = cirrusResponse.data;
 
-    // Filter to only known pool addresses
-    const formatted = poolData.map((pool: any) => ({
-      poolAddress: pool.address,
-      token: pool.data?.token,
-      stablecoin: pool.data?.stablecoin,
-      locked: pool.data?.locked,
-      name: pool?._name,
-      symbol: pool?._symbol,
-      totalSupply: pool?._totalSupply,
-      decimals: pool?.decimals,
-    }));
-
-    return formatted;
+    return poolData;
   } catch (error) {
     console.error("Error fetching pools:", error);
     throw error;
@@ -216,6 +154,124 @@ export const swap = async (
     };
   } catch (error) {
     console.error("Error swapping:", error);
+    throw error;
+  }
+};
+
+export const getStableToTokenInputPrice = async (
+  accessToken: string,
+  params: { stable_sold: bigint; address: string }
+): Promise<bigint> => {
+  if (params.stable_sold <= 0n) {
+    throw new Error("Invalid stable amount");
+  }
+
+  try {
+    const { tokenBalance, stableBalance } = await getPoolBalances(
+      accessToken,
+      params.address
+    );
+
+    return getInputPrice(params.stable_sold, stableBalance, tokenBalance);
+  } catch (error) {
+    console.error("Error calculating price:", error);
+    throw error;
+  }
+};
+
+export const getStableToTokenOutputPrice = async (
+  accessToken: string,
+  params: { tokens_bought: bigint; address: string }
+): Promise<bigint> => {
+  if (params.tokens_bought <= 0n) {
+    throw new Error("Invalid token amount");
+  }
+
+  try {
+    const { tokenBalance, stableBalance } = await getPoolBalances(
+      accessToken,
+      params.address
+    );
+
+    return getOutputPrice(params.tokens_bought, stableBalance, tokenBalance);
+  } catch (error) {
+    console.error("Error calculating price:", error);
+    throw error;
+  }
+};
+
+export const getTokenToStableInputPrice = async (
+  accessToken: string,
+  params: { tokens_sold: bigint; address: string }
+): Promise<bigint> => {
+  if (params.tokens_sold <= 0n) {
+    throw new Error("Invalid token amount");
+  }
+
+  try {
+    const { tokenBalance, stableBalance } = await getPoolBalances(
+      accessToken,
+      params.address
+    );
+
+    return getInputPrice(params.tokens_sold, tokenBalance, stableBalance);
+  } catch (error) {
+    console.error("Error calculating price:", error);
+    throw error;
+  }
+};
+
+export const getTokenToStableOutputPrice = async (
+  accessToken: string,
+  params: { stable_bought: bigint; address: string }
+): Promise<bigint> => {
+  if (params.stable_bought <= 0n) {
+    throw new Error("Invalid stable amount");
+  }
+
+  try {
+    const { tokenBalance, stableBalance } = await getPoolBalances(
+      accessToken,
+      params.address
+    );
+
+    return getOutputPrice(params.stable_bought, tokenBalance, stableBalance);
+  } catch (error) {
+    console.error("Error calculating price:", error);
+    throw error;
+  }
+};
+
+export const getCurrentTokenPrice = async (
+  accessToken: string,
+  params: { address: string }
+): Promise<string> => {
+  try {
+    const { tokenBalance, stableBalance } = await getPoolBalances(
+      accessToken,
+      params.address
+    );
+
+    return ((stableBalance * constants.DECIMALS) / tokenBalance).toString();
+  } catch (error) {
+    console.error("Error calculating current token price:", error);
+    throw error;
+  }
+};
+
+export const getCurrentStablePrice = async (
+  accessToken: string,
+  params: { address: string }
+): Promise<bigint> => {
+  try {
+    const { tokenBalance, stableBalance } = await getPoolBalances(
+      accessToken,
+      params.address
+    );
+
+    return (tokenBalance * constants.DECIMALS) / stableBalance;
+  } catch (error) {
+    console.error("Error calculating current stable price:", error);
     throw error;
   }
 };

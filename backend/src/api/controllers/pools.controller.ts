@@ -7,6 +7,12 @@ import {
   addLiquidity,
   removeLiquidity,
   swap,
+  getStableToTokenInputPrice,
+  getStableToTokenOutputPrice,
+  getTokenToStableInputPrice,
+  getTokenToStableOutputPrice,
+  getCurrentTokenPrice,
+  getCurrentStablePrice,
 } from "../services/pools.service";
 
 class PoolsController {
@@ -37,8 +43,6 @@ class PoolsController {
     try {
       const { accessToken, query } = req;
 
-      PoolsController.validateQueryArgs(query);
-
       const tokens = await getPools(
         accessToken,
         query as Record<string, string | undefined>
@@ -48,6 +52,7 @@ class PoolsController {
       next(error);
     }
   }
+
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
@@ -105,6 +110,114 @@ class PoolsController {
       return next();
     } catch (e) {
       return next(e);
+    }
+  }
+
+  static async getStableToTokenInputPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query, params } = req;
+      PoolsController.validatePriceQueryArgs(query, "stable_sold");
+      const stableSold = BigInt(query.stable_sold as string);
+      const price = await getStableToTokenInputPrice(accessToken, {
+        stable_sold: stableSold,
+        address: params.address as string,
+      });
+      res.status(RestStatus.OK).json({ price: price.toString() });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getStableToTokenOutputPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query, params } = req;
+      PoolsController.validatePriceQueryArgs(query, "tokens_bought");
+      const tokensBought = BigInt(query.tokens_bought as string);
+      const price = await getStableToTokenOutputPrice(accessToken, {
+        tokens_bought: tokensBought,
+        address: params.address as string,
+      });
+      res.status(RestStatus.OK).json({ price: price.toString() });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getTokenToStableInputPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query, params } = req;
+      PoolsController.validatePriceQueryArgs(query, "tokens_sold");
+      const tokensSold = BigInt(query.tokens_sold as string);
+      const price = await getTokenToStableInputPrice(accessToken, {
+        tokens_sold: tokensSold,
+        address: params.address as string,
+      });
+      res.status(RestStatus.OK).json({ price: price.toString() });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getTokenToStableOutputPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query, params } = req;
+      PoolsController.validatePriceQueryArgs(query, "stable_bought");
+      const stableBought = BigInt(query.stable_bought as string);
+      const price = await getTokenToStableOutputPrice(accessToken, {
+        stable_bought: stableBought,
+        address: params.address as string,
+      });
+      res.status(RestStatus.OK).json({ price: price.toString() });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getCurrentTokenPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      const price = await getCurrentTokenPrice(accessToken, {
+        address: params.address as string,
+      });
+      res.status(RestStatus.OK).json({ price });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getCurrentStablePrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      const price = await getCurrentStablePrice(accessToken, {
+        address: params.address as string,
+      });
+      res.status(RestStatus.OK).json({ price: price.toString() });
+    } catch (error) {
+      next(error);
     }
   }
 
@@ -189,6 +302,7 @@ class PoolsController {
 
   static validateSwapArgs(args: any) {
     const schema = Joi.object({
+      address: Joi.string().required(),
       method: Joi.string().valid("stableToToken", "tokenToStable").required(),
       amount: Joi.string().required(),
       min_tokens: Joi.string().required(),
@@ -200,6 +314,18 @@ class PoolsController {
       throw new Error(
         "Swap Argument Validation Error: " + validation.error.message
       );
+    }
+  }
+
+  static validatePriceQueryArgs(args: any, field: string) {
+    const schema = Joi.object({
+      [field]: Joi.string()
+        .pattern(/^[0-9]+$/)
+        .required(),
+    });
+    const { error } = schema.validate(args);
+    if (error) {
+      throw new Error(`Invalid query parameter: ${field}`);
     }
   }
 }

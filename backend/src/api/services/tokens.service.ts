@@ -7,8 +7,7 @@ import { StratoPaths } from "../../config/constants";
 const ERC20 = "Demo";
 const contractPath = `${cwd}/src/api/contracts/${ERC20}.sol`;
 
-// Get all tokens with optional filtering
-export const getTokens = async (
+export const getBalance = async (
   accessToken: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
@@ -17,6 +16,48 @@ export const getTokens = async (
     const params = Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
+    const response = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-ERC20-_balances`,
+      {
+        params,
+      }
+    );
+    if (response.status !== 200) {
+      throw new Error(`Error fetching balance: ${response.statusText}`);
+    }
+    if (!response.data) {
+      throw new Error("Balance data is empty");
+    }
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching balance:", error);
+    throw error;
+  }
+};
+
+// Get all tokens with optional filtering
+export const getTokens = async (
+  accessToken: string,
+  rawParams: Record<string, string | undefined> = {}
+) => {
+  try {
+    // Filter out undefined values (cleaning for axios)
+    let params = Object.fromEntries(
+      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+    ) as Record<string, string>;
+
+    // Handle select param for balances
+    if (params.select) {
+      // Append BlockApps-Mercata-ERC20-_balances(*) if not already present
+      const selectParts = params.select.split(",");
+      if (!selectParts.includes("BlockApps-Mercata-ERC20-_balances(*)")) {
+        selectParts.push("BlockApps-Mercata-ERC20-_balances(*)");
+        params.select = selectParts.join(",");
+      }
+    } else {
+      params.select = "*,BlockApps-Mercata-ERC20-_balances(*)";
+    }
 
     const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {
       params,
