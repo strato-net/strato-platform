@@ -7,15 +7,17 @@ import "../ERC20/ERC20.sol";
 abstract contract Pool is ERC20 {
     
     // Events
-    event TokenPurchase(address buyer, uint256 stable_sold, uint256 tokens_bought);
-    event StablePurchase(address buyer, uint256 tokens_sold, uint256 stable_bought);
-    event AddLiquidity(address provider, uint256 stable_amount, uint256 token_amount);
-    event RemoveLiquidity(address provider, uint256 stable_amount, uint256 token_amount);
+    event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
+    event TokenBPurchase(address buyer, uint256 tokenA_sold, uint256 tokenB_bought);
+    event AddLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
+    event RemoveLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
 
-    ERC20 public token;                             // ERC20 token traded on this contract
-    ERC20 public stablecoin;                        // Stablecoin traded on this contract
+    ERC20 public tokenA;                             // ERC20 tokenA traded on this contract
+    ERC20 public tokenB;                        // Stablecoin traded on this contract
 
     bool private locked;
+
+
     
     modifier nonReentrant() {
         require(!locked, "REENTRANT");
@@ -25,48 +27,48 @@ abstract contract Pool is ERC20 {
     }
 
     constructor(
-        address tokenAddr, 
-        address stablecoinAddr
-    ) ERC20("Simple LP", "SLP") {
-        token = ERC20(tokenAddr);
-        stablecoin = ERC20(stablecoinAddr);
+        address tokenAAddr, 
+        address tokenBAddr
+    ) {
+        tokenA = ERC20(tokenAAddr);
+        tokenB = ERC20(tokenBAddr);
     }
 
     // Core functions
     function addLiquidity(
-        uint256 stable_amount,
-        uint256 max_tokens
+        uint256 tokenB_amount,
+        uint256 max_tokenA_amount
     ) external returns (uint256) {
-        require(stable_amount > 0 && max_tokens > 0, "Invalid inputs");
+        require(tokenB_amount > 0 && max_tokenA_amount > 0, "Invalid inputs");
         uint256 total_liquidity = totalSupply();
         
         if (total_liquidity > 0) {
-            require(stable_amount > 0, "Min liquidity required");
-            uint256 stable_reserve = stablecoin.balanceOf(address(this));
-            uint256 token_reserve = token.balanceOf(address(this));
-            uint256 token_amount = (stable_amount * token_reserve / stable_reserve) + 1;
-            uint256 liquidity_minted = stable_amount * total_liquidity / stable_reserve;
+            require(tokenB_amount > 0, "Min liquidity required");
+            uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+            uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+            uint256 tokenA_amount = (tokenB_amount * tokenA_reserve / tokenB_reserve) + 1;
+            uint256 liquidity_minted = tokenB_amount * total_liquidity / tokenB_reserve;
             
-            require(max_tokens >= token_amount, "Insufficient token amount");
+            require(max_tokenA_amount >= tokenA_amount, "Insufficient tokenA amount");
             _mint(msg.sender, liquidity_minted);
             
-            require(stablecoin.transferFrom(msg.sender, address(this), stable_amount), "Stable transfer failed");
-            require(token.transferFrom(msg.sender, address(this), token_amount), "Token transfer failed");
+            require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
+            require(tokenA.transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
             
-            emit AddLiquidity(msg.sender, stable_amount, token_amount);
+            emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
             emit Transfer(address(0), msg.sender, liquidity_minted);
             return liquidity_minted;
         } else {
-            require(stable_amount >= 1000000000, "Minimum liquidity required");
+            require(tokenB_amount >= 1000000000, "Minimum liquidity required");
             
-            uint256 token_amount = max_tokens;
-            uint256 initial_liquidity = stable_amount;
+            uint256 tokenA_amount = max_tokenA_amount;
+            uint256 initial_liquidity = tokenB_amount;
             _mint(msg.sender, initial_liquidity);
             
-            require(stablecoin.transferFrom(msg.sender, address(this), stable_amount), "Stable transfer failed");
-            require(token.transferFrom(msg.sender, address(this), token_amount), "Token transfer failed");
+            require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
+            require(tokenA.transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
             
-            emit AddLiquidity(msg.sender, stable_amount, token_amount);
+            emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
             emit Transfer(address(0), msg.sender, initial_liquidity);
             return initial_liquidity;
         }
@@ -74,28 +76,28 @@ abstract contract Pool is ERC20 {
 
     function removeLiquidity(
         uint256 amount,
-        uint256 min_stable,
-        uint256 min_tokens
+        uint256 min_tokenB,
+        uint256 min_tokenA_amount
     ) external returns (uint256, uint256) {
-        require(amount > 0 && min_stable > 0 && min_tokens > 0, "Invalid inputs");
+        require(amount > 0 && min_tokenB > 0 && min_tokenA_amount > 0, "Invalid inputs");
         uint256 total_liquidity = totalSupply();
         require(total_liquidity > 0, "No liquidity");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        uint256 stable_amount = amount * stable_reserve / total_liquidity;
-        uint256 token_amount = amount * token_reserve / total_liquidity;
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokenB_amount = amount * tokenB_reserve / total_liquidity;
+        uint256 tokenA_amount = amount * tokenA_reserve / total_liquidity;
         
-        require(stable_amount >= min_stable && token_amount >= min_tokens, "Insufficient amounts");
+        require(tokenB_amount >= min_tokenB && tokenA_amount >= min_tokenA_amount, "Insufficient amounts");
         
-        require(stablecoin.transfer(msg.sender, stable_amount), "Stable transfer failed");
-        require(token.transfer(msg.sender, token_amount), "Token transfer failed");
+        require(tokenB.transfer(msg.sender, tokenB_amount), "TokenB transfer failed");
+        require(tokenA.transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
         
-        emit RemoveLiquidity(msg.sender, stable_amount, token_amount);
+        emit RemoveLiquidity(msg.sender, tokenB_amount, tokenA_amount);
         emit Transfer(msg.sender, address(0), amount);
         
         _burn(msg.sender, amount);
         
-        return (stable_amount, token_amount);
+        return (tokenB_amount, tokenA_amount);
     }
 
     // Private pricing functions
@@ -124,85 +126,85 @@ abstract contract Pool is ERC20 {
     }
 
     // Public price functions
-    function getStableToTokenInputPrice(uint256 stable_sold) external view returns (uint256) {
-        require(stable_sold > 0, "Invalid stable amount");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        return getInputPrice(stable_sold, stable_reserve, token_reserve);
+    function getTokenBToTokenAInputPrice(uint256 tokenB_sold) external view returns (uint256) {
+        require(tokenB_sold > 0, "Invalid stable amount");
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        return getInputPrice(tokenB_sold, tokenB_reserve, tokenA_reserve);
     }
 
-    function getStableToTokenOutputPrice(uint256 tokens_bought) external view returns (uint256) {
-        require(tokens_bought > 0, "Invalid token amount");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        return getOutputPrice(tokens_bought, stable_reserve, token_reserve);
+    function getTokenBToTokenAOutputPrice(uint256 tokens_bought) external view returns (uint256) {
+        require(tokens_bought > 0, "Invalid tokenA amount");
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        return getOutputPrice(tokens_bought, tokenB_reserve, tokenA_reserve);
     }
 
-    function getTokenToStableInputPrice(uint256 tokens_sold) external view returns (uint256) {
-        require(tokens_sold > 0, "Invalid token amount");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        return getInputPrice(tokens_sold, token_reserve, stable_reserve);
+    function getTokenAToTokenBInputPrice(uint256 tokenA_sold) external view returns (uint256) {
+        require(tokenA_sold > 0, "Invalid tokenA amount");
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        return getInputPrice(tokenA_sold, tokenA_reserve, tokenB_reserve);
     }
 
-    function getTokenToStableOutputPrice(uint256 stable_bought) external view returns (uint256) {
-        require(stable_bought > 0, "Invalid stable amount");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        return getOutputPrice(stable_bought, token_reserve, stable_reserve);
+    function getTokenAToTokenBOutputPrice(uint256 tokenB_bought) external view returns (uint256) {
+        require(tokenB_bought > 0, "Invalid stable amount");
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        return getOutputPrice(tokenB_bought, tokenA_reserve, tokenB_reserve);
     }
 
     // Price view functions
-    function getCurrentTokenPrice() external view returns (decimal) {
-        decimal token_reserve = decimal(token.balanceOf(address(this)));
-        decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)));
-        require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
-        // Price of 1 token in stablecoins (stable_reserve / token_reserve)
-        return decimal((stable_reserve * 1000000000000000000.000000) / token_reserve) / 1000000000000000000.000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
+    function getCurrentTokenAPrice() external view returns (decimal) {
+        decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)));
+        decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)));
+        require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
+        // Price of 1 tokenA in stablecoins (tokenB_reserve / tokenA_reserve)
+        return decimal((tokenB_reserve * 1000000000000000000.000000) / tokenA_reserve) / 1000000000000000000.000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
-    function getCurrentStablePrice() external view returns (decimal) {
-        decimal token_reserve = decimal(token.balanceOf(address(this)))* 1000000000000000000.000000;
-        decimal stable_reserve = decimal(stablecoin.balanceOf(address(this)))* 1000000000000000000.000000;
-        require(token_reserve > 0.000000000000000000 && stable_reserve > 0.000000000000000000, "No liquidity");
-        // Price of 1 stablecoin in tokens (token_reserve / stable_reserve)
-        return decimal((token_reserve * 1000000000000000000.000000) / stable_reserve) / 1000000000000000000.000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
+    function getCurrentTokenBPrice() external view returns (decimal) {
+        decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)))* 1000000000000000000.000000;
+        decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)))* 1000000000000000000.000000;
+        require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
+        // Price of 1 tokenB in tokens (tokenA_reserve / tokenB_reserve)
+        return decimal((tokenA_reserve * 1000000000000000000.000000) / tokenB_reserve) / 1000000000000000000.000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
     // Swap functions
-    function stableToToken(
-        uint256 stable_sold,
+    function tokenBToTokenA(
+        uint256 tokenB_sold,
         uint256 min_tokens  
     ) external nonReentrant returns (uint256) {
-        require(stable_sold > 0 && min_tokens > 0, "Invalid inputs");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        uint256 tokens_bought = getInputPrice(stable_sold, stable_reserve, token_reserve);
+        require(tokenB_sold > 0 && min_tokens > 0, "Invalid inputs");
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokens_bought = getInputPrice(tokenB_sold, tokenB_reserve, tokenA_reserve);
         
         require(tokens_bought >= min_tokens, "Insufficient output amount");
         
-        require(stablecoin.transferFrom(msg.sender, address(this), stable_sold), "Stable transfer failed");
-        require(token.transfer(msg.sender, tokens_bought), "Token transfer failed");
+        require(tokenB.transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
+        require(tokenA.transfer(msg.sender, tokens_bought), "TokenA transfer failed");
         
-        emit TokenPurchase(msg.sender, stable_sold, tokens_bought);
+        emit TokenAPurchase(msg.sender, tokenB_sold, tokens_bought);
         return tokens_bought;
     }
 
-    function tokenToStable(
-        uint256 tokens_sold,
-        uint256 min_stable
+    function tokenAToTokenB(
+        uint256 tokenA_sold,
+        uint256 min_tokenB
     ) external nonReentrant returns (uint256) {
-        require(tokens_sold > 0 && min_stable > 0, "Invalid inputs");
-        uint256 token_reserve = token.balanceOf(address(this));
-        uint256 stable_reserve = stablecoin.balanceOf(address(this));
-        uint256 stable_bought = getInputPrice(tokens_sold, token_reserve, stable_reserve);
+        require(tokenA_sold > 0 && min_tokenB > 0, "Invalid inputs");
+        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokenB_bought = getInputPrice(tokenA_sold, tokenA_reserve, tokenB_reserve);
         
-        require(stable_bought >= min_stable, "Insufficient output amount");
+        require(tokenB_bought >= min_tokenB, "Insufficient output amount");
         
-        require(token.transferFrom(msg.sender, address(this), tokens_sold), "Token transfer failed");
-        require(stablecoin.transfer(msg.sender, stable_bought), "Stable transfer failed");
+        require(tokenA.transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
+        require(tokenB.transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
         
-        emit StablePurchase(msg.sender, tokens_sold, stable_bought);
-        return stable_bought;
+        emit TokenBPurchase(msg.sender, tokenA_sold, tokenB_bought);
+        return tokenB_bought;
     }
 }
