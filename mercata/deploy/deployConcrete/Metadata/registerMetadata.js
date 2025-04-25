@@ -1,4 +1,5 @@
-require('dotenv').config();
+const config = require('../../config');
+
 const axios = require('axios');
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 const config = fsUtil.getYaml(`../../config.yaml`);

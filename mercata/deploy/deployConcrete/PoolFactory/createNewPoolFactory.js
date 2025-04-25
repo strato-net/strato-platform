@@ -1,30 +1,29 @@
-// Load environment variables from .env file.
-require('dotenv').config();
 
+const config = require('../../config');
 const auth = require('../../auth');
-const { rest, util, importer, fsUtil, oauthUtil } = require('blockapps-rest');
+const { rest, util, importer} = require('blockapps-rest');
 const fs = require('fs');
 const path = require('path');
-
-// Load configuration from a YAML file.
-const config = fsUtil.getYaml(`../../config.yaml`);
 
 async function main() {
   try {
     // Destructure and validate required environment variables.
     const {
-      USERNAME,
-      PASSWORD
+      GLOBAL_ADMIN_NAME,
+      GLOBAL_ADMIN_PASSWORD
     } = process.env;
 
-    if (!USERNAME || !PASSWORD) {
+    if (!GLOBAL_ADMIN_NAME || !GLOBAL_ADMIN_PASSWORD) {
       throw new Error(
-        'USERNAME and PASSWORD environment variables are required.'
+        'GLOBAL_ADMIN_NAME and GLOBAL_ADMIN_PASSWORD environment variables are required.'
       );
     }
 
+    console.log('GLOBAL_ADMIN_NAME:', GLOBAL_ADMIN_NAME);
+    console.log('GLOBAL_ADMIN_PASSWORD:', GLOBAL_ADMIN_PASSWORD);
+
     // 1. Obtain the user token via OAuth.
-    const tokenString = await auth.getUserToken(USERNAME, PASSWORD);
+    const tokenString = await auth.getUserToken(GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD);
     if (!tokenString) {
       throw new Error('Failed to acquire token.');
     }
@@ -35,7 +34,7 @@ async function main() {
     // Be sure to have updated the SimpleReserve.sol contract with the correct Base Code Collection.
     const contractName = 'SimplePoolFactory';
     const contractFilename =
-      '../../dapp/mercata-base-contracts/Templates/Pools/SimplePoolFactory.sol';
+      '../../../contracts/v1/abstract/Pools/SimplePoolFactory.sol';
     const source = await importer.combine(contractFilename);
 
     // Build the constructor arguments.
@@ -87,12 +86,12 @@ async function main() {
     const deploymentInfo = {
       contractName: contractName,
       deploymentTime: new Date().toISOString(),
-      contractAddress: final.contractAddress || final.address,
+      contractAddress: final.txResult.contractsCreated,
       transactionHash: final.hash,
       status: final.status
     };
     
-    const deploymentDir = path.join(__dirname, '../../../deployment-logs');
+    const deploymentDir = path.join(__dirname, 'deployment-logs');
     if (!fs.existsSync(deploymentDir)) {
       fs.mkdirSync(deploymentDir, { recursive: true });
     }

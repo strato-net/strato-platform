@@ -1,0 +1,10 @@
+{
+  "operation": "Pool Creation",
+  "timestamp": "2025-04-25T21:21:13.422Z",
+  "factoryAddress": "b84fcfea929da83fda9b854784cef4119b495c11",
+  "tokenA": "65a4f2d36e3c26c924877bf99f68c893cd4785e7",
+  "tokenB": "a24067e36eb380064ed19a0d76644e5840448f5e",
+  "transactionHash": "a78544e13179e2c0ef7e8571160d357b475229c08f16deb256d30024abc51c40",
+  "status": "Failure",
+  "poolAddress": "Failed"
+}

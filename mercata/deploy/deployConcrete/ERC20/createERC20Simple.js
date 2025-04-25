@@ -9,17 +9,17 @@ async function main() {
   try {
     // Destructure and validate required environment variables.
     const {
-      USERNAME,
-      PASSWORD,
+      GLOBAL_ADMIN_NAME,
+      GLOBAL_ADMIN_PASSWORD,
       TOKEN_NAME,
       TOKEN_SYMBOL,
       TOKEN_DECIMALS,
       TOKEN_INITIAL_SUPPLY
     } = process.env;
 
-    if (!USERNAME || !PASSWORD) {
+    if (!GLOBAL_ADMIN_NAME || !GLOBAL_ADMIN_PASSWORD) {
       throw new Error(
-        'USERNAME and PASSWORD environment variables are required.'
+        'GLOBAL_ADMIN_NAME and GLOBAL_ADMIN_PASSWORD environment variables are required.'
       );
     }
 
@@ -30,7 +30,7 @@ async function main() {
     }
 
     // 1. Obtain the user token via OAuth.
-    const tokenString = await auth.getUserToken('mercata_usdst', 'Bl0ckApps');
+    const tokenString = await auth.getUserToken(GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD);
     
     if (!tokenString) {
       throw new Error('Failed to acquire token.');
