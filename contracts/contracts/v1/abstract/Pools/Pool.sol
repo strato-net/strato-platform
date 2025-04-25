@@ -29,7 +29,7 @@ abstract contract Pool is ERC20 {
     constructor(
         address tokenAAddr, 
         address tokenBAddr
-    ) {
+    ) ERC20("Simple LP", "SLP"){
         tokenA = ERC20(tokenAAddr);
         tokenB = ERC20(tokenBAddr);
     }
