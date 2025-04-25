@@ -22,6 +22,7 @@ abstract contract TokenMetadata is Utils {
     }
 
     mapping(address => MetadataInfo) public record metadataInfo;
+    mapping(address => string) public record metadataAttributes;
 
     function registerMetadata(
         address tokenAddress,
@@ -41,5 +42,13 @@ abstract contract TokenMetadata is Utils {
             _fileNames,
             _createdDate
         );
+    }
+
+    function registerMetadataAttribute(
+        address tokenAddress,
+        string attributes
+    ) public virtual {
+        require(getCommonName(msg.sender) == tokenAddress.creator || msg.sender == tokenAddress, "Only the the creator or the token can register metadata");
+        metadataAttributes[tokenAddress] = attributes;
     }
 }
