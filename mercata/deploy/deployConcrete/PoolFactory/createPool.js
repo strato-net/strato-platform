@@ -1,9 +1,3 @@
-const config = require('../../config');
-const axios = require('axios');
-const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
-const auth = require('../../auth');
-const fs = require('fs');
-const path = require('path');
 const { callListAndWait, saveCallListTXDataAsFile, getEnvVar } = require('../../util');
 
 async function createPool(tokenAAddress, tokenBAddress, poolFactoryAddress) {

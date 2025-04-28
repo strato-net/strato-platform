@@ -38,7 +38,7 @@ const callListAndWait = async (callListArgs) => {
     if (!tokenString) {
         throw new Error('Failed to acquire token.');
     }
-    console.log('Token acquired:', tokenString);
+    console.log('Token acquired:', tokenString.slice(0, 10), '...');//printing the first 10 characters of the token 
     const token = { token: tokenString };
 
 
@@ -74,7 +74,7 @@ const createContractArgs = async (contractArgs) => {
     if (!tokenString) {
         throw new Error('Failed to acquire token.');
     }
-    console.log('Token acquired:', tokenString);
+      console.log('Token acquired:', tokenString.slice(0, 10), '...');
     const token = { token: tokenString };
 
     // Deployment options.
