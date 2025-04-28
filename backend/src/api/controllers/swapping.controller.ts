@@ -282,7 +282,7 @@ class SwappingController {
   static validateSwapArgs(args: any) {
     const schema = Joi.object({
       address: Joi.string().required(),
-      method: Joi.string().valid("stableToToken", "tokenToStable").required(),
+      method: Joi.string().valid("tokenAToTokenB", "tokenBToTokenA").required(),
       amount: Joi.string().required(),
       min_tokens: Joi.string().required(),
     });
