@@ -63,7 +63,7 @@ export const getBalance = async (
       accessToken,
       `/BlockApps-Mercata-ERC20-_balances`,
       {
-        params,
+        params: { select: "*,BlockApps-Mercata-ERC20(*)", ...params },
       }
     );
     if (response.status !== 200) {

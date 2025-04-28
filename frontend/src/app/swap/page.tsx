@@ -100,8 +100,17 @@ const SwapPanel: FC = () => {
           console.log(err);
         }
       };
+      const fetchPools = async () => {
+        try {
+          const res = await axios.get("api/swap");
+          setPool(res.data);
+        } catch (err) {
+          console.log(err);
+        }
+      };
 
       fetchTokens();
+      fetchPools();
     }, []);
 
     useEffect(() => {
