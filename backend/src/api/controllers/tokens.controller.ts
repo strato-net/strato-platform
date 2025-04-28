@@ -49,6 +49,24 @@ class TokensController {
     }
   }
 
+  static async getBalance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+
+      const balances = await getBalance(
+        accessToken,
+        query as Record<string, string | undefined>
+      );
+      res.status(RestStatus.OK).json(balances);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getState(
     req: Request,
     res: Response,
