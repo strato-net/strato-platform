@@ -79,12 +79,12 @@ async function distributeRewards(contract, args) {
 }
 
 // After all calls are collected, we run them at once
-async function runDistributeRewardsCalls(token) {
+async function runDistributeRewardsCalls() {
   if (distributeRewardsCallList.length > 0) {
     console.log("Executing batch callList for distributeRewards...");
     let res;
     try {
-      res = await rest.callList(token, distributeRewardsCallList, {
+      res = await rest.callList(await oauthHelper.getServiceToken(), distributeRewardsCallList, {
         config,
         cacheNonce: true,
         isAsync: true,
@@ -94,7 +94,7 @@ async function runDistributeRewardsCalls(token) {
         results.filter((r) => r.status === "Pending").length === 0;
       const action = async (options) =>
         rest.getBlocResults(
-          token,
+          await oauthHelper.getServiceToken(),
           res.map((r) => r.hash),
           options
         );
@@ -108,19 +108,19 @@ async function runDistributeRewardsCalls(token) {
         if (r.status !== "Success") {
           console.error(`Error executing distributeRewards for: ${r.hash}`, r);
           await flagFile.appendToErrorFile(
-            `Error executing distributeRewards for: ${r}`
+            `Error executing distributeRewards for hash: ${r.hash}, r.status=${r.status}. See oracle container logs for more details.`
           );
         }
       }
       console.log("Batch distributeRewards calls completed.");
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
-      console.log(
+      console.error(
         "The hashes of distribute rewards transactions in a failed batch:",
         res.map((r) => r.hash)
       );
       await flagFile.appendToErrorFile(
-        `Error executing batch distributeRewards calls: ${error.message}`
+        `Error executing batch distributeRewards calls: ${error.message}. See oracle container logs for more details and the failed transaction hashes.`
       );
     } finally {
       // Clear the call list to avoid reprocessing stale calls
@@ -132,7 +132,7 @@ async function runDistributeRewardsCalls(token) {
 }
 
 // Function to fetch all escrow addresses for a given reserve and call distributeRewards
-async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
+async function fetchAndSubmitEscrowAddresses(oracleContract) {
   const reserveSearchOptions = {
     config,
     query: {
@@ -143,7 +143,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   };
 
   const reserves = await rest.search(
-    token,
+    await oauthHelper.getServiceToken(),
     { name: "BlockApps-Mercata-Reserve" },
     reserveSearchOptions
   );
@@ -170,7 +170,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
     // Fetch escrows from Cirrus
     const escrows = await rest.search(
-      token,
+      await oauthHelper.getServiceToken(),
       { name: "BlockApps-Mercata-Escrow" },
       searchOptions
     );
@@ -257,10 +257,7 @@ const submitOraclePricePeriodically = async () => {
         },
         config
       );
-      await fetchAndSubmitEscrowAddresses(
-        oracle,
-        await oauthHelper.getServiceToken()
-      );
+      await fetchAndSubmitEscrowAddresses(oracle);
     } catch (error) {
       console.error(`[Oracle ERROR] Failed to process oracle ${key}:`, error);
       await flagFile.appendToErrorFile(
@@ -268,19 +265,21 @@ const submitOraclePricePeriodically = async () => {
       );
     }
   }
-  await runDistributeRewardsCalls(await oauthHelper.getServiceToken());
+  await runDistributeRewardsCalls();
 };
 
 // Function to update sale prices periodically
 const updateSalePricePeriodically = async () => {
-  const metalToken = await oauthHelper.getUserToken(
-    process.env.METALS_USERNAME,
-    process.env.METALS_PASSWORD
-  );
-  const erc20Token = await oauthHelper.getUserToken(
-    process.env.TOKENS_USERNAME,
-    process.env.TOKENS_PASSWORD
-  );
+  const getMetalAccessToken = async () => 
+      await oauthHelper.getUserToken(
+          process.env.METALS_USERNAME,
+          process.env.METALS_PASSWORD
+      );
+  const getErc20AccessToken = async () => 
+      await oauthHelper.getUserToken(
+          process.env.TOKENS_USERNAME,
+          process.env.TOKENS_PASSWORD
+      );
 
   // Get the current UTC hour and current hour stamp.
   const now = new Date();
@@ -300,7 +299,7 @@ const updateSalePricePeriodically = async () => {
     try {
       // Fetch the asset (with sale details) from the blockchain.
       const assetResult = await fetchAsset(
-        metalToken,
+        await getMetalAccessToken(),
         { address: asset.address },
         config
       );
@@ -336,7 +335,7 @@ const updateSalePricePeriodically = async () => {
       // Update the asset's price with the new data.
       await updateAssetPrice(
         asset.markUp,
-        asset.type === "ERC20" ? erc20Token : metalToken,
+        asset.type === "ERC20" ? await getErc20AccessToken() : await getMetalAccessToken(),
         assetResult[0]?.sale,
         result.price,
         decimals,
