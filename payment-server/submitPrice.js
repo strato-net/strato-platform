@@ -397,6 +397,22 @@ async function main() {
     console.log(`Heartbeat server started on port ${port}.`);
   });
 
+  // Custom TimeoutError class
+  class TimeoutError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = 'TimeoutError';
+    }
+  }
+
+  function createTimeoutPromise(seconds, breachMessage) {
+    return new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new TimeoutError(breachMessage));
+      }, seconds * 1000);
+    });
+  }
+
   // Periodically fetch prices and update
   const runTasks = async () => {
     while (true) {
@@ -411,17 +427,45 @@ async function main() {
           !lastOracleRun
         ) {
           console.log("[Oracle] Running submitOraclePricePeriodically...");
-          await submitOraclePricePeriodically();
-          lastOracleRun = currentDate;
+          try {
+            await Promise.race([
+              submitOraclePricePeriodically(),
+              createTimeoutPromise(seconds=4200, breachMessage="submitOraclePricePeriodically timed out after 4200 seconds")
+            ]);
+            lastOracleRun = currentDate;
+          } catch (error) {
+            if (error instanceof TimeoutError) {
+              console.error("[Oracle] submitOraclePricePeriodically did not respond within the timeout period:", error.message);
+              await flagFile.appendToErrorFile(`submitOraclePricePeriodically did not respond within the timeout period: ${error.message}`);
+              lastOracleRun = currentDate; // still setting that Oracle ran on the currentDate to keep the behavior it had before the timeout implementation
+            } else {
+              console.error("[Oracle] Unhandled error in submitOraclePricePeriodically:", error);
+              await flagFile.appendToErrorFile(`Unhandled error in submitOraclePricePeriodically: ${error.message}`);
+            }
+          }
         } else {
-          console.log("[Oracle] Skipping since interval not reached.");
+          console.log("[Oracle] Skipping 'submitOraclePricePeriodically' since interval not reached.");
         }
 
         // Check if it's time to run the sale price update
         if (process.env.SALE_UPDATE === "true") {
-          await updateSalePricePeriodically();
+          console.log("[Sale] Running updateSalePricePeriodically...");
+          try {
+            await Promise.race([
+              updateSalePricePeriodically(),
+              createTimeoutPromise(seconds=3600, breachMessage="updateSalePricePeriodically timed out after 3600 seconds")
+            ]);
+          } catch (error) {
+            if (error instanceof TimeoutError) {
+              console.error("[Sale] updateSalePricePeriodically did not respond within the timeout period:", error.message);
+              await flagFile.appendToErrorFile(`updateSalePricePeriodically did not respond within the timeout period: ${error.message}`);
+            } else {
+              console.error("[Sale] Unhandled error in updateSalePricePeriodically:", error);
+              await flagFile.appendToErrorFile(`Unhandled error in updateSalePricePeriodically: ${error.message}`);
+            }
+          }
         } else {
-          console.log("[Sale] Skipping since SALE_UPDATE is not set to true.");
+          console.log("[Sale] Skipping 'updateSalePricePeriodically' since SALE_UPDATE is not set to true.");
         }
       } catch (error) {
         console.error("Error in main loop:", error);
