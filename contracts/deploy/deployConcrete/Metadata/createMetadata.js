@@ -1,10 +1,5 @@
 // Load environment variables from .env file.
-const config = require('../../config');
-
-const { rest, util, importer, fsUtil, oauthUtil } = require('blockapps-rest');
-const fs = require('fs');
-const path = require('path');
-const auth = require('../../auth');
+const { util, importer } = require('blockapps-rest');
 const { createContractArgs, saveCreateTXDataAsFile } = require('../../util');
 
 async function createMetadata(username, password) {
