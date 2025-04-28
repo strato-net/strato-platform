@@ -226,6 +226,7 @@ handleEvents peer = awaitForever $ \case
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
+  MsgEvt (BlockBodies []) -> () <$ lift stampActionTimestamp
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
 

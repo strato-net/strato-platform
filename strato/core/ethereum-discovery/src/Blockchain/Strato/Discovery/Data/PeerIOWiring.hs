@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoDeriveAnyClass      #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -20,6 +21,7 @@ import           Blockchain.DB.SQLDB                   (runSqlPool,
 import           Blockchain.MiscJSON                   ()
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256     (zeroHash)
 import           Control.Monad                         (void)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
@@ -28,7 +30,9 @@ import           Crypto.Types.PubKey.ECC               (Point)
 import           Data.IP
 import qualified Data.Text                             as T
 import           Data.Time
+import qualified Database.Esqueleto.Experimental       as E
 import qualified Database.Persist.Postgresql           as SQL
+import           Numeric.Natural
 import           Prometheus
 import           SelectAccessible                      ()
 import           UnliftIO
@@ -78,6 +82,10 @@ instance {-# OVERLAPPING #-} A.Selectable (Host, Point) PeerBondingState IO wher
       flip runSqlPool sqldb $
         SQL.selectFirst [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] []
 
+instance {-# OVERLAPPING #-} (A.Replaceable PPeer PeerLastBestBlockHash) IO where
+  replace _ p (PeerLastBestBlockHash h) = withGlobalSQLPool $ runSqlPool $
+    SQL.updateWhere [PPeerHost SQL.==. pPeerHost p, PPeerPubkey SQL.==. pPeerPubkey p] [PPeerLastBestBlockHash SQL.=. h]
+
 instance {-# OVERLAPPING #-} Mod.Accessible BondedPeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
@@ -90,7 +98,7 @@ instance {-# OVERLAPPING #-} Mod.Accessible BondedPeersForUDP IO where
     currentTime <- getCurrentTime
     fmap (BondedPeersForUDP . map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
+        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime, PPeerLastBestBlockHash SQL.!=. zeroHash] []
 
 instance {-# OVERLAPPING #-} Mod.Accessible UnbondedPeersForUDP IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
@@ -99,11 +107,32 @@ instance {-# OVERLAPPING #-} Mod.Accessible UnbondedPeersForUDP IO where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance {-# OVERLAPPING #-} A.Selectable Point ClosestPeers IO where
-  select _ point = withGlobalSQLPool $ \sqldb ->
+instance {-# OVERLAPPING #-} A.Selectable (Point, Natural) ClosestPeers IO where
+  select _ (point, limit) = withGlobalSQLPool $ \sqldb -> do
     fmap (Just . ClosestPeers . map SQL.entityVal) $
-      flip runSqlPool sqldb $
-        SQL.selectList [PPeerPubkey SQL.!=. Nothing, PPeerPubkey SQL.!=. Just point] []
+      flip runSqlPool sqldb $ do
+        lowers <- E.select $ do
+          peer <- E.from $ E.table @PPeer
+          E.where_ (       (peer E.^. PPeerPubkey E.>. E.val (Just point))
+                     E.&&. (peer E.^. PPeerBondState E.==. E.val 2)
+                     E.&&. (peer E.^. PPeerLastBestBlockHash E.!=. E.val zeroHash)
+                   )
+          E.orderBy [E.asc $ peer E.^. PPeerPubkey]
+          E.limit (fromIntegral limit * 2)
+          pure peer
+        highers <- E.select $ do
+          peer <- E.from $ E.table @PPeer
+          E.where_ (       (peer E.^. PPeerPubkey E.<. E.val (Just point))
+                     E.&&. (peer E.^. PPeerBondState E.==. E.val 2)
+                     E.&&. (peer E.^. PPeerLastBestBlockHash E.!=. E.val zeroHash)
+                   )
+          E.orderBy [E.desc $ peer E.^. PPeerPubkey]
+          E.limit (fromIntegral limit * 2)
+          pure peer
+        let zipAll (a:as) (b:bs) = [a, b] ++ zipAll as bs
+            zipAll as [] = as
+            zipAll [] bs = bs
+        pure . take (fromIntegral limit) $ zipAll lowers highers
 
 instance {-# OVERLAPPING #-} A.Replaceable PPeer UdpEnableTime IO where
   replace _ peer (UdpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do

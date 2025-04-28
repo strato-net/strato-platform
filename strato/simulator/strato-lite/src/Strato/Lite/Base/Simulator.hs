@@ -39,6 +39,7 @@ import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
+import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDP
@@ -206,11 +207,11 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Maybe Host, UDPPort) Soc
     myIP <- asks _simulatorPeerIPAddress
     pure $ ipAndPortToSockAddr myIP udpPort
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable () (B.ByteString, SockAddr) (MonadSimulator m) where
-  select _ _ = do
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Mod.Awaitable UDPPacket (MonadSimulator m) where
+  await = do
     s <- asks _simulatorMyUDPSocket
     mMsg <- timeout 10000000 . atomically $ readTQueue s
-    pure mMsg
+    pure $ UDPPacket <$> mMsg
 
 instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => A.Selectable (Host, UDPPort, B.ByteString) Point (MonadSimulator m) where
   select _ (ip@(Host ip'), port@(UDPPort p), bs) = do

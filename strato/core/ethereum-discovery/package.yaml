@@ -42,6 +42,7 @@ library:
     - either
     - entropy
     - errors
+    - esqueleto
     - ethereum-encryption
     - ethereum-rlp
     - exceptions

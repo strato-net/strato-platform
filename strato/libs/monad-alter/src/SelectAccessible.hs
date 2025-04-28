@@ -24,3 +24,6 @@ instance (Monad m, Replaceable k v m, MonadTrans t) => Replaceable k v (t m) whe
 
 instance (Monad m, Outputs m a, MonadTrans t) => Outputs (t m) a where
   output = lift . output
+
+instance (Monad m, Awaitable a m, MonadTrans t) => Awaitable a (t m) where
+  await = lift await

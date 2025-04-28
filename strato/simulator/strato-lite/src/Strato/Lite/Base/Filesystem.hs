@@ -44,6 +44,7 @@ import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P (..))
+import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address
@@ -160,10 +161,10 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable SockAddr B.ByteString (F
       (void $ NB.sendTo sock' packet addr) 
       (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable () (B.ByteString, SockAddr) (FilesystemT m) where
-  select _ _ = do
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (FilesystemT m) where
+  await = do
     s <- asks _filesystemPeerUDPSocket
-    liftIO . timeout 10000000 $ NB.recvFrom s 80000
+    fmap (fmap UDPPacket) . liftIO . timeout 10000000 $ NB.recvFrom s 80000
 
 createFilesystemPeer ::
   PrivateKey ->

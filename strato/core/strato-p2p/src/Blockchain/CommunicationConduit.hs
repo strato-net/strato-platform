@@ -38,6 +38,7 @@ import           Blockchain.SyncDB
 import           Blockchain.Threads
 import           Conduit
 import           Control.Monad                         (forever, when)
+import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
@@ -121,6 +122,7 @@ handleMsgClientConduit myId peer = do
       when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
+      lift . A.replace (A.Proxy @PeerLastBestBlockHash) peer $ PeerLastBestBlockHash peerBestHash
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
       $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show highestBlockNum''
       maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) highestBlockNum''
@@ -182,6 +184,7 @@ handleMsgServerConduit myPubkey peer = do
               when (peerGH /= genHash) $ throwIO WrongGenesisBlock
               when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
 
+              A.replace (Mod.Proxy @PeerLastBestBlockHash) peer $ PeerLastBestBlockHash peerBestHash
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
               return $
                 Right
