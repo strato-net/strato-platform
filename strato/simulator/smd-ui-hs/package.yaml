@@ -31,6 +31,7 @@ dependencies:
   - containers
   - core-api2
   - cryptonite
+  - data-default
   - ethereum-discovery
   - ethereum-encryption
   - evm-solidity

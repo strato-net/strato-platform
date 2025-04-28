@@ -3,10 +3,10 @@
 
 module Frontend.BridgeClient where
 
-import Backend.Types
 import Bloc.API.Utils
 import Bloc.Client
 import BlockApps.Solidity.SolidityValue
+import Common.Types
 import Control.Exception (throwIO)
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL

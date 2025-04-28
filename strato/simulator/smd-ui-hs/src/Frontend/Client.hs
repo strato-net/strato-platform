@@ -2,7 +2,7 @@
 
 module Frontend.Client where
 
-import Backend.API
+import Common.API
 import Servant
 import Servant.Client
 

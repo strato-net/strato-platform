@@ -5,11 +5,11 @@
 
 module Backend.Handlers where
 
-import Backend.Types
 import Backend.BitcoinRPC
 import Bloc.API.Transaction
 import Bloc.Client
 import BlockApps.Solidity.ArgValue
+import Common.Types
 import Control.Exception (throwIO)
 import Control.Monad (guard)
 import Control.Monad.IO.Class (liftIO)
@@ -76,14 +76,14 @@ postSendToMultisig (PostSendToMultisigArgs funcName amt) = liftIO $ do
           --       Left e -> throwIO . BackendException $ T.pack e
           --       Right multisig -> do
           --         putStrLn $ "MULTISIG Script: " ++ show multisig
-                  callBitcoinRPC (Proxy @SendToAddress) (addrs' ::: HEnd amt) >>= \case
-                    Left e -> throwIO . BackendException $ T.pack e
-                    Right txid -> do
+                  -- callBitcoinRPC (Proxy @SendToAddress) (addrs' ::: HEnd amt) >>= \case
+                  --   Left e -> throwIO . BackendException $ T.pack e
+                  --   Right txid -> do
                       mgr <- newManager defaultManagerSettings -- tlsManagerSettings
                       let payload = BlocFunction $ FunctionPayload
                             { functionpayloadContractAddress = 0x1234567890,
                               functionpayloadMethod = funcName,
-                              functionpayloadArgs = M.fromList [("_txid", ArgString txid), ("_amount", ArgInt (round $ amt * 100000000))],
+                              functionpayloadArgs = M.fromList [("_txid", ArgString addrs'), ("_amount", ArgInt (round $ amt * 100000000))],
                               functionpayloadValue = Nothing,
                               functionpayloadTxParams = Nothing,
                               functionpayloadChainid = Nothing,

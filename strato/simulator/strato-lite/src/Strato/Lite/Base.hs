@@ -65,7 +65,7 @@ type MonadBase m = ( MonadFail m
                    , A.Replaceable Host PPeer m
                    , (Host `A.Alters` PPeer) m
                    , A.Selectable Point ClosestPeers m
-                   , A.Selectable Keccak256 [DataDefs.TransactionResult] m
+                   -- , A.Selectable Keccak256 [DataDefs.TransactionResult] m
                    , Mod.Accessible TCPPort m
                    , Mod.Accessible UDPPort m
                    , Mod.Accessible PublicKey m
@@ -110,14 +110,14 @@ type MonadBaseVM m = ( Mod.Modifiable BlockHashRoot m
                      , Mod.Accessible (Maybe WorldBestBlock) m
                      )
 
-type MonadBaseAPI m = ( GetLastBlocks m
-                      , GetLastTransactions m
+type MonadBaseAPI m = ( -- GetLastBlocks m
+                      -- , GetLastTransactions m
                       -- , Mod.Accessible [DataDefs.RawTransaction] m
                       -- , A.Selectable AccountsFilterParams [DataDefs.AddressStateRef] m
                       -- , A.Selectable BlocksFilterParams [Block] m
                       -- , A.Selectable StorageFilterParams [StorageAddress] m
-                      , A.Selectable TxsFilterParams [DataDefs.RawTransaction] m
-                      , A.Selectable Keccak256 [DataDefs.TransactionResult] m
-                      , Mod.Accessible TransactionCount m
+                      -- , A.Selectable TxsFilterParams [DataDefs.RawTransaction] m
+                      -- , A.Selectable Keccak256 [DataDefs.TransactionResult] m
+                      Mod.Accessible TransactionCount m
                       , HasSyncDB m
                       )

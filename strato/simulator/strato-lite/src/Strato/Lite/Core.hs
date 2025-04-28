@@ -84,7 +84,7 @@ import Control.Monad.Composable.Identity
 import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import qualified Control.Monad.Trans.State as StateT
-import Core.API
+-- import Core.API
 import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
@@ -627,12 +627,6 @@ instance {-# OVERLAPPING #-} MonadIO m => ((Host, Keccak256) `A.Alters` (A.Proxy
   insert _ _ _ = pure ()
   delete _ _   = pure ()
 
-instance {-# OVERLAPPING #-} MonadBase m => GetLastBlocks (CoreT m) where
-  getLastBlocks n = lift $ getLastBlocks n
-
-instance {-# OVERLAPPING #-} MonadBase m => GetLastTransactions (CoreT m) where
-  getLastTransactions a b = lift $ getLastTransactions a b
-
 instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (CoreT m) where
   access _ = error "strato-lite: Accessing IdentityData"
 
@@ -882,6 +876,7 @@ corePeerVm = do
       .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
       .| ( awaitForever $ \b -> do
              $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
+             traverse_ Mod.output . toList $ VMEvent.outStateDiffs b
              atomically $ do
                writeTQueue unseqSource . UnseqEvents $ IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
                writeTQueue unseqSource . UnseqEvents $ IEPreprepareResponse <$> toList (VMEvent.outPreprepareResponses b)
@@ -916,14 +911,10 @@ corePeerP2pIndexer = do
 
 corePeerSlipstream :: MonadBase m => CoreT m ()
 corePeerSlipstream = do
-  name <- asks _corePeerName
   slipstreamSource <- asks _corePeerSlipstreamSource
   runConduit $
     sourceFlushTQueue slipstreamSource
-      .| ( awaitForever $ \evss -> do
-             let evs = concat evss
-             $logInfoS (name <> "/slipstream") . T.pack $ show evs
-             processTheMessages evs
+      .| ( awaitForever $ processTheMessages . concat
          )
       .| ( awaitForever $ \case
            Left txr -> lift $ Mod.yield txr

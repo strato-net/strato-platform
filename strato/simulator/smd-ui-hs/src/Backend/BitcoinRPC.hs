@@ -10,7 +10,7 @@
 
 module Backend.BitcoinRPC where
 
-import Backend.Types
+import Common.Types
 import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Aeson.Types (parseEither, parseMaybe)

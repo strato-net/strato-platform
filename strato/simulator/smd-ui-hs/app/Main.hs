@@ -1,10 +1,10 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Main where
 
-import Backend.API
 import Backend.Handlers
 import Bitcoin.TxBuilder
 import Bloc.Monad (BlocEnv(..))
@@ -15,6 +15,7 @@ import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
+import Common.API
 import Control.Monad.Trans.Resource
 import Crypto.Random.Entropy
 import qualified Data.Binary as Binary
@@ -22,6 +23,7 @@ import qualified Data.Cache as Cache
 import Data.FileEmbed
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
 import Executable.EVMFlags ()
 import Handlers.Metadata (UrlMap)
 import Language.Javascript.JSaddle.Warp (run)
@@ -36,7 +38,7 @@ import HFlags
 import qualified Main.App as App
 import Network.Wai
 import Network.Wai.Handler.Warp as Wai
-import Reflex.Dom.Core (mainWidget, mainWidgetWithCss)
+import Reflex.Dom.Core
 import Servant as Servant
 import Strato.Lite.Base.Filesystem
 import Strato.Lite.Core
@@ -96,17 +98,28 @@ app d f c blocEnv urlMap = serve api $ fullServer d f c blocEnv urlMap
 css :: BS.ByteString
 css = $(embedFile "static/style.css")
 
+appCss :: BS.ByteString
+appCss = $(embedFile "static/App.css")
+
+header :: MonadWidget t m => m ()
+header = do
+  elAttr "meta" ("charset" =: "UTF-8") blank
+  elAttr "meta" (("name" =: "viewport") <> ("content" =: "width=device-width, initial-scale=1.0")) blank
+  elAttr "script" ("src" =: "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4") blank
+  el "style" $ text $ decodeUtf8 appCss
+  el "style" $ text $ decodeUtf8 css
+
 -- Main function for browser-based interface
 mainBrowser :: IO ()
 mainBrowser = do
   putStrLn "Starting browser-based interface..."
-  Language.Javascript.JSaddle.Warp.run 3000 $ mainWidget App.mainWidget
+  Language.Javascript.JSaddle.Warp.run 3000 $ mainWidgetWithHead header App.mainWidget
 
 -- Main function for native window interface
 mainNative :: IO ()
 mainNative = do
   putStrLn "Starting native window interface..."
-  Language.Javascript.JSaddle.WKWebView.run $ mainWidgetWithCss css App.mainWidget
+  Language.Javascript.JSaddle.WKWebView.run $ mainWidgetWithHead header App.mainWidget
 
 -- Default main function (can be changed to mainBrowser or mainNative)
 main :: IO ()
@@ -118,7 +131,7 @@ main = do
     (f,c) <- createFilesystemNode
                "/Users/dustinnorwood/blockchain/strato"
                sqlitePath
-               "mercata"
+               "mercata-francium"
                "/Users/dustinnorwood/.ssh/strato.pem"
                "dnorwood"
                "Dustin's local node"

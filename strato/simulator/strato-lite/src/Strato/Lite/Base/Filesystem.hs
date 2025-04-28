@@ -72,9 +72,9 @@ import Data.Default
 import Data.Foldable (for_)
 import qualified Data.Map.Strict as M
 import Data.List (foldl', sortOn)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe) -- (catMaybes, fromMaybe)
 import qualified Data.NibbleString as N
-import Data.Ord (Down(..))
+-- import Data.Ord (Down(..))
 import Data.Pool (withResource)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
@@ -334,37 +334,29 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockH
 instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable Integer (Canonical BlockHeader) (FilesystemT m) where
   replace _ i (Canonical b) = insertLDB (_canonicalDB . _filesystemDBs) i (headerHash b)
 
-instance {-# OVERLAPPING #-} MonadIO m => GetLastBlocks (FilesystemT m) where
-  getLastBlocks n = do
-    BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)
-    hashes :: [Keccak256] <- catMaybes <$> traverse (lookupLDB $ _canonicalDB . _filesystemDBs) [(max 0 (i-n))..i]
-    obs <- A.lookupMany (A.Proxy @OutputBlock) hashes
-    pure . map (outputBlockToBlock . snd) . sortOn (Down . fst) $ M.toList obs
-
-instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (FilesystemT m) where
-  getLastTransactions _ n = do
-    BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)
-    now <- liftIO getCurrentTime
-    let go :: Integer -> [(Integer, OutputTx)] -> Integer -> FilesystemT m [(Integer, OutputTx)]
-        go l ts j
-          | j <= 0 = pure ts
-          | otherwise = lookupLDB (_canonicalDB . _filesystemDBs) j >>= \case
-              Nothing -> go l ts (j - 1)
-              Just (bh :: Keccak256) -> A.lookup (A.Proxy @OutputBlock) bh >>= \case
-                Nothing -> go l ts (j - 1)
-                Just ob -> let !l' = l + fromIntegral (length (obReceiptTransactions ob))
-                               ts' = ts ++ ((number $ obBlockData ob,) <$> reverse (obReceiptTransactions ob))
-                            in if l' >= n then pure $ take (fromIntegral n) ts' else go l' ts' (j - 1)
-        toRawTx blkNum OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx blkNum now
-    map (uncurry toRawTx) <$> go 0 [] i
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable TxsFilterParams [DataDefs.RawTransaction] (FilesystemT m) where
-  select _ tfp = case qtHash tfp of
-    Nothing -> Just <$> getLastTransactions Nothing 1000
-    Just _ -> pure Nothing -- TODO
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Keccak256 [DataDefs.TransactionResult] (FilesystemT m) where
-  select _ _ = pure Nothing -- TODO
+-- instance {-# OVERLAPPING #-} MonadIO m => GetLastBlocks (FilesystemT m) where
+--   getLastBlocks n = do
+--     BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)
+--     hashes :: [Keccak256] <- catMaybes <$> traverse (lookupLDB $ _canonicalDB . _filesystemDBs) [(max 0 (i-n))..i]
+--     obs <- A.lookupMany (A.Proxy @OutputBlock) hashes
+--     pure . map (outputBlockToBlock . snd) . sortOn (Down . fst) $ M.toList obs
+-- 
+-- instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (FilesystemT m) where
+--   getLastTransactions _ n = do
+--     BestBlock _ i <- Mod.get (Mod.Proxy @BestBlock)
+--     now <- liftIO getCurrentTime
+--     let go :: Integer -> [(Integer, OutputTx)] -> Integer -> FilesystemT m [(Integer, OutputTx)]
+--         go l ts j
+--           | j <= 0 = pure ts
+--           | otherwise = lookupLDB (_canonicalDB . _filesystemDBs) j >>= \case
+--               Nothing -> go l ts (j - 1)
+--               Just (bh :: Keccak256) -> A.lookup (A.Proxy @OutputBlock) bh >>= \case
+--                 Nothing -> go l ts (j - 1)
+--                 Just ob -> let !l' = l + fromIntegral (length (obReceiptTransactions ob))
+--                                ts' = ts ++ ((number $ obBlockData ob,) <$> reverse (obReceiptTransactions ob))
+--                             in if l' >= n then pure $ take (fromIntegral n) ts' else go l' ts' (j - 1)
+--         toRawTx blkNum OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx blkNum now
+--     map (uncurry toRawTx) <$> go 0 [] i
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TransactionCount (FilesystemT m) where
   access _ = TransactionCount . fromMaybe 0 <$> lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "transaction_count")
