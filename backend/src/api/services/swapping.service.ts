@@ -157,7 +157,7 @@ export const swap = async (
 export const calculateSwap = async (
   accessToken: string,
   address: string,
-  direction: boolean,
+  direction: string,
   amount: string
 ) => {
   try {
@@ -167,7 +167,7 @@ export const calculateSwap = async (
       throw new Error("No pools found for the given address");
     }
     const pool = pools[0];
-    if (direction) {
+    if (direction === "true") {
       return getInputPrice(
         BigInt(amount),
         BigInt(pool.data.tokenBBalance),

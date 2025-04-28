@@ -62,23 +62,47 @@ export const manageLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    let tx = buildFunctionTx({
-      contractName: ERC20,
-      contractAddress: body.asset || "",
-      method: "approve",
-      args: {
-        asset: constants.lendingPool,
-        value: body.amount,
-      },
-    });
+    let tx: any = null;
+    if (body.method === "depositLiquidity") {
+      const response = await cirrus.get(
+        accessToken,
+        `/BlockApps-Mercata-LendingPoolBase`,
+        {
+          params: {
+            address: "eq." + constants.lendingPool,
+            select: "liquidityPool",
+          },
+        }
+      );
 
-    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
-      accessToken,
-      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
+      if (response.status !== 200) {
+        throw new Error(
+          `Error fetching lending pool address: ${response.statusText}`
+        );
+      }
+      if (!response.data || response.data.length === 0) {
+        throw new Error("Pool data is empty");
+      }
+      const liquidityPool = response.data[0].liquidityPool;
 
-    if (approveStatus !== "Success") {
-      throw new Error(`Error approving asset with hash: ${approveHash}`);
+      tx = buildFunctionTx({
+        contractName: ERC20,
+        contractAddress: body.asset || "",
+        method: "approve",
+        args: {
+          spender: liquidityPool,
+          value: body.amount,
+        },
+      });
+
+      let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+        accessToken,
+        () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
+
+      if (approveStatus !== "Success") {
+        throw new Error(`Error approving asset with hash: ${approveHash}`);
+      }
     }
 
     tx = buildFunctionTx({
@@ -110,13 +134,34 @@ export const getLoan = async (
   body: Record<string, string | undefined>
 ) => {
   try {
+    const response = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-LendingPoolBase`,
+      {
+        params: {
+          address: "eq." + constants.lendingPool,
+          select: "collateralVault",
+        },
+      }
+    );
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Error fetching lending pool address: ${response.statusText}`
+      );
+    }
+    if (!response.data || response.data.length === 0) {
+      throw new Error("Pool data is empty");
+    }
+    const collateralVault = response.data[0].collateralVault;
+
     let tx = buildFunctionTx({
       contractName: ERC20,
-      contractAddress: constants.lendingPool,
+      contractAddress: body.collateralAsset || "",
       method: "approve",
       args: {
-        asset: constants.lendingPool,
-        value: body.amount,
+        spender: collateralVault,
+        value: body.collateralAmount,
       },
     });
 
@@ -160,12 +205,33 @@ export const repayLoan = async (
   body: Record<string, string | undefined>
 ) => {
   try {
+    const response = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-LendingPoolBase`,
+      {
+        params: {
+          address: "eq." + constants.lendingPool,
+          select: "liquidityPool",
+        },
+      }
+    );
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Error fetching lending pool address: ${response.statusText}`
+      );
+    }
+    if (!response.data || response.data.length === 0) {
+      throw new Error("Pool data is empty");
+    }
+    const liquidityPool = response.data[0].liquidityPool;
+
     let tx = buildFunctionTx({
       contractName: ERC20,
       contractAddress: body.asset || "",
       method: "approve",
       args: {
-        asset: constants.lendingPool,
+        spender: liquidityPool,
         value: body.amount,
       },
     });

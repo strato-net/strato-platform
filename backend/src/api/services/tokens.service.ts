@@ -22,12 +22,12 @@ export const getTokens = async (
     if (params.select) {
       // Append BlockApps-Mercata-ERC20-_balances(*) if not already present
       const selectParts = params.select.split(",");
-      if (!selectParts.includes("BlockApps-Mercata-ERC20-_balances(*)")) {
-        selectParts.push("BlockApps-Mercata-ERC20-_balances(*)");
+      if (!selectParts.includes("BlockApps-Mercata-ERC20-_balances(key,value)")) {
+        selectParts.push("BlockApps-Mercata-ERC20-_balances(key,value)");
         params.select = selectParts.join(",");
       }
     } else {
-      params.select = "*,BlockApps-Mercata-ERC20-_balances(*)";
+      params.select = "*,BlockApps-Mercata-ERC20-_balances(key,value)";
     }
 
     const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {

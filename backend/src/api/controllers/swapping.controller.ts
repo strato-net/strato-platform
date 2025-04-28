@@ -9,6 +9,7 @@ import {
   swap,
   calculateSwap,
 } from "../services/swapping.service";
+import { getTokens } from "../services/tokens.service";
 
 class SwappingController {
   static async get(
@@ -119,7 +120,7 @@ class SwappingController {
       const price = await calculateSwap(
         accessToken,
         query.address as string,
-        Boolean(query.direction) as boolean,
+        query.direction as string,
         query.amount as string
       );
       res.status(RestStatus.OK).json(price);
@@ -147,7 +148,12 @@ class SwappingController {
         ),
       ];
 
-      res.status(RestStatus.OK).json(uniqueTokens);
+      const tokenDetails = await getTokens(accessToken, {
+        address: "in.(" + uniqueTokens.join(",")+")",
+        select: "address,_name,_symbol",
+      });
+
+      res.status(RestStatus.OK).json(tokenDetails);
     } catch (error) {
       next(error);
     }
@@ -182,7 +188,12 @@ class SwappingController {
         ),
       ];
 
-      res.status(RestStatus.OK).json(uniqueTokenPairs);
+      const tokenDetails = await getTokens(accessToken, {
+        address: "in.(" + uniqueTokenPairs.join(",")+")",
+        select: "address,_name,_symbol",
+      });
+
+      res.status(RestStatus.OK).json(tokenDetails);
     } catch (error) {
       next(error);
     }
