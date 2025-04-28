@@ -2,19 +2,25 @@
 
 import TokenIcon from '@/app/icons/TokenIcon';
 import TokenDropdown from '@/components/_dropdown/page';
-import { popularTokens } from '@/context/TokenContext';
+import { useTokens } from '@/context/TokenContext';
+import { TokenData } from '@/interface/token';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 export default function V4PositionCreate() {
-
-  const [selectedToken1, setSelectedToken1] = useState<any>(popularTokens[0]);
-  const [selectedToken2, setSelectedToken2] = useState<any | null>(null);
+  const { tokens } = useTokens()
+  const [selectedToken1, setSelectedToken1] = useState<TokenData | null>(null);
+  const [selectedToken2, setSelectedToken2] = useState<TokenData | null>(null);
     const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
   const [showTokenSelector, setShowTokenSelector] = useState(false);
     const [tokenSearchQuery, setTokenSearchQuery] = useState('');
 
-    const handleTokenSelect = (token: typeof popularTokens[0]) => {
+     useEffect(() => {
+        if (tokens && tokens.length > 0) {
+          setSelectedToken1(tokens[0]);
+        }
+      }, [tokens]);
+    
+    const handleTokenSelect = (token: TokenData) => {
       if (selectingToken === 1) {
         setSelectedToken1(token);
       } else if (selectingToken === 2) {
@@ -23,7 +29,6 @@ export default function V4PositionCreate() {
       setShowTokenSelector(false);
       setSelectingToken(null);
     };
-  const router = useRouter();
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4">
@@ -152,7 +157,7 @@ export default function V4PositionCreate() {
           onClose={() => setShowTokenSelector(false)}
           tokenSearchQuery={tokenSearchQuery}
           setTokenSearchQuery={setTokenSearchQuery}
-          popularTokens={popularTokens}
+          popularTokens={tokens}
           handleTokenSelect={handleTokenSelect}
         />
       )}

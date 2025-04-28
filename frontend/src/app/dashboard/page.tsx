@@ -6,6 +6,7 @@ import { FaHandHoldingUsd } from 'react-icons/fa';
 import { IoMdSwap } from "react-icons/io";
 import { FaMoneyBillTransfer } from "react-icons/fa6";
 import { MdAttachMoney } from "react-icons/md";
+import Image from "next/image";
 
 type Token = {
   id: number;
@@ -160,7 +161,7 @@ export default function Dashboard() {
                   <tr key={token.id} className="border-t border-gray-200">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <img src={token.icon} alt={token.name} className="w-6 h-6" />
+                        <Image width={24} height={24} src={token.icon} alt={token.name} className="w-6 h-6" />
                         <div>
                           <p className="font-medium">{token.name}</p>
                           <p className="text-sm text-gray-500">{token.symbol}</p>
@@ -229,7 +230,7 @@ export default function Dashboard() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className="bg-white rounded shadow-lg p-6 w-96 space-y-4">
               <div className="flex items-center gap-3 mb-4">
-                <img src={selectedToken.icon} alt={selectedToken.name} className="w-8 h-8" />
+                <Image width={32} height={32} src={selectedToken.icon} alt={selectedToken.name} className="w-8 h-8" />
                 <h3 className="text-lg font-semibold text-gray-800">{selectedToken.name}</h3>
               </div>
               <div className="space-y-2">

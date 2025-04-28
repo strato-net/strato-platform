@@ -62,11 +62,15 @@ const HoldingsDashboard: React.FC = () => {
     </motion.div>
   );
 };
+
+type liquidityTabKey = "deposit" | "borrow";
+type TabKey = "swap" | "liquidity"
+
 /*─────────────────────────────────────────────────────────────────────────────
   SwapPanel – Uniswap‑style swaps + liquidity
 ─────────────────────────────────────────────────────────────────────────────*/
 const SwapPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"swap" | "liquidity">("swap");
+  const [activeTab, setActiveTab] = useState<TabKey>("swap");
   /* Swap state */
   const [fromToken, setFromToken] = useState("STR");
   const [toToken, setToToken] = useState("ETH");
@@ -210,7 +214,7 @@ const SwapPanel: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <Card title="Swap & Liquidity" className="w-full max-w-md mx-auto rounded-2xl shadow-lg">
-        <Tabs activeKey={activeTab} onChange={(k) => setActiveTab(k as any)} centered>
+        <Tabs activeKey={activeTab} onChange={(k) => setActiveTab(k as TabKey)} centered>
           <TabPane tab="Swap" key="swap" />
           <TabPane tab="Liquidity" key="liquidity" />
         </Tabs>
@@ -225,7 +229,7 @@ const SwapPanel: React.FC = () => {
   LendingPanel – Aave‑style deposit / borrow
 ─────────────────────────────────────────────────────────────────────────────*/
 const LendingPanel: React.FC = () => {
-  const [tab, setTab] = useState<"deposit" | "borrow">("deposit");
+  const [tab, setTab] = useState<liquidityTabKey>("deposit");
   const [asset, setAsset] = useState("USDC");
   const [amount, setAmount] = useState<number>(0);
   const onAction = () => {
@@ -235,7 +239,7 @@ const LendingPanel: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <Card title="Lend / Borrow" className="w-full max-w-md mx-auto rounded-2xl shadow-lg">
-        <Tabs activeKey={tab} onChange={(k) => setTab(k as any)} centered>
+        <Tabs activeKey={tab} onChange={(k) => setTab(k as liquidityTabKey)} centered>
           <TabPane tab="Deposit" key="deposit" />
           <TabPane tab="Borrow" key="borrow" />
         </Tabs>

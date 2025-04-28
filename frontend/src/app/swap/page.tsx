@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import {
   Card,
-  Select,
   Tabs,
   TabsProps,
 } from "antd";
 import { motion } from "framer-motion";
 const { TabPane } = Tabs;
-import Link from "next/link";
 import TokenDropdown from "@/components/_dropdown/page";
-import axios from "axios";
-import { popularTokens } from "@/context/TokenContext";
 import TokenIcon from "../icons/TokenIcon";
-
+import { useTokens } from "@/context/TokenContext";
+import { Tabkey, TabKey2, TokenData } from "@/interface/token";
+import axios from "axios";
+// import { popularTokens } from "@/components/_dropdown/page";
 
 const positions = [
   {
@@ -69,123 +68,154 @@ const positions = [
   },
 ];
 
-const SwapPanel: any = () => {
-  const [activeTab, setActiveTab] = useState<"swap" | "liquidity">("swap");
-  const [activeTab2, setActiveTab2] = useState<"deposits" | "withdraw">(
+const SwapPanel: FC = () => {
+  const { tokens } = useTokens()
+  const [activeTab, setActiveTab] = useState<Tabkey>("swap");
+  const [activeTab2, setActiveTab2] = useState<TabKey2>(
     "deposits"
   );
-  const [tokenSearchQuery, setTokenSearchQuery] = useState("");
-  const [showTokenSelector, setShowTokenSelector] = useState(false);
-  const [selectedToken1, setSelectedToken1] = useState<any>();
-  const [selectedToken2, setSelectedToken2] = useState<any | null>(null);
-  const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
-
-  // const [tokenList, setTokenList] = useState([{
-  //   name: '',
-  //   symbol: '',
-  //   address: ''
-  // }])
-
-  // useEffect(() => {
-  //   axios.get('http://localhost:3001/api/tokens/')
-  //     .then(res => {
-  //       console.log(res, 'res');
-  //       const formattedData = res.data.map((d: any) => {
-  //         const name = d._name || '';
-  //         return {
-  //           name,
-  //           symbol: name.slice(0, 2).toUpperCase(), // Get first 2 letters as symbol
-  //           address: d.address || ''
-  //         };
-  //       });
-  //       console.log(formattedData, 'formattedData');
-  //       setTokenList(formattedData);
-  //     })
-  //     .catch(err => console.log(err))
-  // }, []);
-
-  // useEffect(() => {
-  //   console.log(tokenList, 'tokenList');
-  // }, [tokenList])
-
-
-
-  const handleTokenSelect = (token: (typeof popularTokens)[0]) => {
-    if (selectingToken === 1) {
-      setSelectedToken1(token);
-    } else if (selectingToken === 2) {
-      setSelectedToken2(token);
-    }
-    setShowTokenSelector(false);
-    setSelectingToken(null);
-  };
-
-  const handleClick = () => {
-    console.log("conditionallay rendered button");
-  };
 
   const RenderSwap = () => {
-    const [tokenSearchQuery, setTokenSearchQuery] = useState('');
-    const [showTokenSelector, setShowTokenSelector] = useState(false);
-    const [selectedToken1, setSelectedToken1] = useState<any | null>(popularTokens[0]);
-    const [selectedToken2, setSelectedToken2] = useState<any | null>(null);
-    const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
+    const [tokenSearchQuerySell, setTokenSearchQuerySell] = useState('');
+    const [tokenSearchQueryBuy, setTokenSearchQueryBuy] = useState('');
+    const [showTokenSelectorSell, setShowTokenSelectorSell] = useState(false);
+    const [showTokenSelectorBuy, setShowTokenSelectorBuy] = useState(false);
+    const [selectedSellToken, setSelectedSellToken] = useState<TokenData | null>(null);
+    const [selectedBuyToken, setSelectedBuyToken] = useState<TokenData | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [slippage, setSlippage] = useState('0.5');
     const [sellAmount, setSellAmount] = useState('');
     const [buyAmount, setBuyAmount] = useState('');
-    // const [tokenList, setTokenList] = useState([{
-    //   name: '',
-    //   symbol: '',
-    //   address: ''
-    // }])
 
-    // useEffect(() => {
-    //   axios.get('http://localhost:3001/api/tokens/')
-    //     .then(res => {
-    //       console.log(res, 'res');
-    //       const formattedData = res.data.map((d: any) => {
-    //         const name = d._name || '';
-    //         return {
-    //           name,
-    //           symbol: name.slice(0, 2).toUpperCase(), // Get first 2 letters as symbol
-    //           address: d.address || ''
-    //         };
-    //       });
-    //       console.log(formattedData, 'formattedData');
-    //       setTokenList(formattedData);
-    //     })
-    //     .catch(err => console.log(err))
-    // }, []);
+    const [tokenList, setTokenList] = useState<TokenData[]>([]);
 
-    // useEffect(() => {
-    //   console.log(tokenList, 'tokenList');
-    // }, [tokenList])
+    const [tokenList2, setTokenList2] = useState<TokenData[]>([]);
 
+    const [selectedToken1Amount, setSelectedToken1Amount] = useState(0);
 
-    const handleTokenSelect = (token: typeof popularTokens[0]) => {
-      if (selectingToken === 1) {
-        // If the selected token is the same as the token in the second field, swap them
-        if (token._symbol === selectedToken2?._symbol) {
-          setSelectedToken2(selectedToken1);
-          setSelectedToken1(token);
-        } else {
-          setSelectedToken1(token);
+    useEffect(() => {
+      const fetchTokens = async () => {
+        try {
+          const res = await axios.get('api/swapableTokens');
+          console.log(res, 'res');
+
+          const responseAddresses = new Set(res.data.map((addr: string) => addr.toLowerCase()));
+
+          const filteredTokens = tokens ? tokens.filter(token => 
+            responseAddresses.has(token?.address?.toLowerCase())
+          ) : [];
+  
+          console.log(filteredTokens, 'filteredTokens');
+          setTokenList(filteredTokens);
+        } catch (err) {
+          console.log(err);
         }
-      } else if (selectingToken === 2) {
-        // If the selected token is the same as the token in the first field, swap them
-        if (token._symbol === selectedToken1?._symbol) {
-          setSelectedToken1(selectedToken2);
-          setSelectedToken2(token);
-        } else {
-          setSelectedToken2(token);
-        }
+      };
+
+      fetchTokens();
+    }, []);
+
+    useEffect(() => {
+      // if (tokenList && tokenList.length > 0) {
+      //   setSelectedSellToken(tokenList[0]);
+      // }
+      console.log(tokenList, 'tokenList');
+    }, [])
+
+    const handleSwapTokenSelectSell = (token: TokenData) => {
+      console.log(token, "selected token sell");
+
+      if (token._symbol === selectedBuyToken?._symbol) {
+        setSelectedBuyToken(selectedSellToken);
+        setSelectedSellToken(token);
+      } else {
+        setSelectedSellToken(token);
+
       }
-      setShowTokenSelector(false);
-      setSelectingToken(null);
+      getPairedSwapableTokens(token?.address || '');
+      getTokenBalance(token?.address || '');
+      setShowTokenSelectorSell(false);
+      setSellAmount('')
+      setBuyAmount('')
     };
 
-    console.log(selectedToken1, "token>>");
+    const handleSwapTokenSelectBuy = (token: TokenData) => {
+      console.log(token, "selected token sell");
+
+      if (token._symbol === selectedSellToken?._symbol) {
+        setSelectedSellToken(selectedBuyToken);
+        setSelectedBuyToken(token);
+      } else {
+        setSelectedBuyToken(token);
+      }
+      setShowTokenSelectorBuy(false);
+      setSellAmount('')
+      setBuyAmount('')
+    }
+
+    // useEffect(() => {
+    // }, [selectedSellToken])
+
+    console.log(selectedSellToken, "<<");
+
+
+    const getPairedSwapableTokens = async (address: string) => {
+      try {
+        const res = await axios.get(`/api/swapableTokenPairs/${address}`);
+
+        const responseAddresses = new Set(res.data.map((addr: string) => addr.toLowerCase()));
+
+        const filteredTokens = tokens ? tokens.filter(token => 
+          responseAddresses.has(token?.address?.toLowerCase())
+        ) : [];
+
+        console.log(filteredTokens, 'filteredTokens');
+        setTokenList2(filteredTokens);
+        console.log(res, 'res on token 2 select');
+      } catch (err) {
+        console.log(err);
+      }
+    };
+
+    const getTokenBalance = async (address: string) => {
+      try {
+        const res = await axios.get(`api/tokens/table/balance?key=eq.${address}`);
+        console.log(res, 'res');
+        setSelectedToken1Amount(res?.data[0]?.value || 0);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+
+    const handleInputChange = async (isSellInput: boolean, value: string) => {
+      if (selectedSellToken && selectedBuyToken) {
+        // Fetch the conversion rate from API
+        try {
+          const conversionRes = await axios.get(`/api/poolByTokenPair?tokenA=${selectedSellToken?.address}&tokenB=${selectedBuyToken?.address}`);
+          
+          const conversionRate = conversionRes?.data[0]?.data;
+  
+          if (isSellInput) {
+            // Update buyAmount based on sellAmount and conversion rate
+            setSellAmount(value);
+            setBuyAmount((parseFloat(value) * conversionRate?.aToBRatio || 0).toFixed(6));  // Adjust precision as necessary
+          } else {
+            // Update sellAmount based on buyAmount and conversion rate
+            setBuyAmount(value);
+            setSellAmount((parseFloat(value) / conversionRate?.bToARatio || 0).toFixed(6));  // Adjust precision as necessary
+          }
+        } catch (err) {
+          console.log(err);
+        }
+      } else {
+        // If either token is not selected, don't perform conversion
+        if (isSellInput) {
+          setSellAmount(value);
+        } else {
+          setBuyAmount(value);
+        }
+      }
+    };
 
 
     return (
@@ -207,19 +237,18 @@ const SwapPanel: any = () => {
                       type="number"
                       placeholder="0"
                       value={sellAmount}
-                      onChange={(e) => setSellAmount(e.target.value)}
+                      onChange={(e) => handleInputChange(true,e.target.value)}
                       className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
-                      disabled={!selectedToken1}
+                      disabled={!selectedSellToken}
                     />
                   </div>
                 </div>
                 <div className="flex items-center">
                   <div className="flex flex-col cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full border border-gray-200 shadow-md transform scale-100 opacity-100">
-                    {!selectedToken1 ? (
+                    {!selectedSellToken ? (
                       <button
                         onClick={() => {
-                          setShowTokenSelector(true);
-                          setSelectingToken(1);
+                          setShowTokenSelectorSell(true);
                         }}
                         className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
                       >
@@ -228,13 +257,12 @@ const SwapPanel: any = () => {
                     ) : (
                       <button
                         onClick={() => {
-                          setShowTokenSelector(true);
-                          setSelectingToken(1);
+                          setShowTokenSelectorSell(true);
                         }}
                         className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
                       >
-                        <TokenIcon symbol={selectedToken1?._symbol || 'NA'} size="md" />
-                        <span className="font-medium text-base text-gray-900">{selectedToken1._name}</span>
+                        <TokenIcon symbol={selectedSellToken?._symbol || 'NA'} size="md" />
+                        <span className="font-medium text-base text-gray-900">{selectedSellToken._name}</span>
                         <svg className="w-6 h-6 text-gray-400 rotate-90" viewBox="0 0 24 24" fill="none">
                           <path d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z" fill="currentColor" />
                         </svg>
@@ -247,7 +275,7 @@ const SwapPanel: any = () => {
               <div className="flex justify-between items-center pt-2 text-sm text-gray-500">
                 <span>${sellAmount ? sellAmount : 0}</span>
                 <div className="flex items-center gap-2">
-                  <span>0 {selectedToken1 ? selectedToken1._symbol : 'ETH'}</span>
+                  <span>{selectedToken1Amount}</span>
                   <button className="bg-gray-100 rounded-xl px-2 py-1 border border-gray-200 cursor-default">Max</button>
                 </div>
               </div>
@@ -258,9 +286,9 @@ const SwapPanel: any = () => {
             <div
               onClick={() => {
                 // Swap tokens
-                const tempToken = selectedToken1;
-                setSelectedToken1(selectedToken2 || null);
-                setSelectedToken2(tempToken || null);
+                const tempToken = selectedSellToken;
+                setSelectedSellToken(selectedBuyToken || null);
+                setSelectedBuyToken(tempToken || null);
 
                 // Swap amounts
                 const tempAmount = sellAmount;
@@ -310,19 +338,18 @@ const SwapPanel: any = () => {
                         type="number"
                         placeholder="0"
                         value={buyAmount}
-                        onChange={(e) => setBuyAmount(e.target.value)}
+                        onChange={(e) => handleInputChange(false,e.target.value)}
                         className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
-                        disabled={!selectedToken2}
+                        disabled={!selectedBuyToken}
                       />
                     </div>
                   </div>
                   <div className="flex items-center">
                     <div className="flex flex-col cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full border border-gray-200 shadow-md transform scale-100 opacity-100">
-                      {!selectedToken2 ? (
+                      {!selectedBuyToken ? (
                         <button
                           onClick={() => {
-                            setShowTokenSelector(true);
-                            setSelectingToken(2);
+                            setShowTokenSelectorBuy(true)
                           }}
                           className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
                         >
@@ -331,13 +358,12 @@ const SwapPanel: any = () => {
                       ) : (
                         <button
                           onClick={() => {
-                            setShowTokenSelector(true);
-                            setSelectingToken(2);
+                            setShowTokenSelectorBuy(true)
                           }}
                           className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
                         >
-                          <TokenIcon symbol={selectedToken2?._symbol || 'NA'} size="md" />
-                          <span className="font-medium text-base text-gray-900">{selectedToken2._name}</span>
+                          <TokenIcon symbol={selectedBuyToken?._symbol || 'NA'} size="md" />
+                          <span className="font-medium text-base text-gray-900">{selectedBuyToken._name}</span>
                           <svg className="w-6 h-6 text-gray-400 rotate-90" viewBox="0 0 24 24" fill="none">
                             <path d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z" fill="currentColor" />
                           </svg>
@@ -364,14 +390,24 @@ const SwapPanel: any = () => {
             </button>
           </div>
 
-          {showTokenSelector && (
+          {showTokenSelectorSell && (
             <TokenDropdown
-              show={showTokenSelector}
-              onClose={() => setShowTokenSelector(false)}
-              tokenSearchQuery={tokenSearchQuery}
-              setTokenSearchQuery={setTokenSearchQuery}
-              popularTokens={popularTokens}
-              handleTokenSelect={handleTokenSelect}
+              show={showTokenSelectorSell}
+              onClose={() => setShowTokenSelectorSell(false)}
+              tokenSearchQuery={tokenSearchQuerySell}
+              setTokenSearchQuery={setTokenSearchQuerySell}
+              popularTokens={tokenList}
+              handleTokenSelect={handleSwapTokenSelectSell}
+            />
+          )}
+          {showTokenSelectorBuy && (
+            <TokenDropdown
+              show={showTokenSelectorBuy}
+              onClose={() => setShowTokenSelectorBuy(false)}
+              tokenSearchQuery={tokenSearchQueryBuy}
+              setTokenSearchQuery={setTokenSearchQueryBuy}
+              popularTokens={tokenList2}
+              handleTokenSelect={handleSwapTokenSelectBuy}
             />
           )}
 
@@ -456,7 +492,7 @@ const SwapPanel: any = () => {
     );
   };
 
-  const renderLiquidity = () => (
+  const RenderLiquidity = () => (
     <>
       <motion.div
         className="w-[100%]"
@@ -466,7 +502,7 @@ const SwapPanel: any = () => {
         <Card className="w-full w-[100%] rounded-2xl shadow-lg">
           <Tabs
             activeKey={activeTab2}
-            onChange={(k) => setActiveTab2(k as any)}
+            onChange={(k) => setActiveTab2(k as TabKey2)}
             centered
             className="custom-subTabs"
           >
@@ -482,200 +518,235 @@ const SwapPanel: any = () => {
   );
 
   const RenderDeposits = () => {
+    const [tokenSearchQueryDeposit1, setTokenSearchQueryDeposit1] = useState("");
+    const [tokenSearchQueryDeposit2, setTokenSearchQueryDeposit2] = useState("");
+    const [showTokenSelectorDeposit, setShowTokenSelectorDeposit] = useState(false);
+    const [selectedTokenDeposit1, setSelectedDepositToken1] = useState<TokenData>();
+    const [selectedTokenDeposit2, setSelectedDepositToken2] = useState<TokenData | null>(null);
+    const [selectingDepositToken, setSelectingDepositToken] = useState<1 | 2 | null>(null);
+
+    useEffect(() => {
+      if (tokens && tokens.length > 0) {
+        setSelectedDepositToken1(tokens[0])
+      }
+    }, [])
+
+    const handleTokenSelectDeposit = (token: TokenData) => {
+      if (selectingDepositToken === 1) {
+        setSelectedDepositToken1(token);
+      } else if (selectingDepositToken === 2) {
+        setSelectedDepositToken2(token);
+      }
+      setShowTokenSelectorDeposit(false);
+      setSelectingDepositToken(null);
+    };
+
     return (
       <div className="space-y-4">
-        <div className="bg-white min-h-screen p-6 text-gray-900">
-          <div className="max-w-6xl mx-auto">
-            <div className="relative inline-flex items-center mb-4">
-              <div className="w-full max-w-6xl mx-auto p-4">
+        <div className="h-full flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 px-4 py-12">
+          <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 w-full max-w-lg">
+            <div className="max-w-6xl mx-auto">
+              <div className="relative inline-flex items-center mb-4">
+                <div className="w-full max-w-6xl mx-auto p-4">
 
-                <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    Deposits
-                  </h1>
-                </div>
+                  <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      Deposits
+                    </h1>
+                  </div>
 
-                <div className="sticky top-24 w-[100%] self-start flex justify-between">
-                  <div className="flex flex-col flex-grow max-w-[660px] mb-8">
-                    <div className="w-full p-6 border rounded-2xl border-gray-200 flex flex-col gap-8">
-                      <div className="flex flex-col gap-4">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                          Select pair
-                        </h2>
-                        <p className="text-sm text-gray-600">
-                          Choose the tokens you want to provide liquidity for. You
-                          can select tokens on all supported networks.
-                        </p>
-                        <div className="flex flex-col md:flex-row gap-4">
-                          <button
-                            onClick={() => {
-                              setShowTokenSelector(true);
-                              setSelectingToken(1);
-                            }}
-                            className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
-                          >
-                            <div className="flex items-center gap-2">
-                              <TokenIcon symbol={selectedToken1?._symbol || ''} size="md" />
-                              <span className="text-gray-800 font-medium">
-                                {selectedToken1?._name ?? "ETH"}
+                  <div className="sticky top-24 w-[100%] self-start flex justify-between">
+                    <div className="flex flex-col flex-grow max-w-[660px] mb-8">
+                      <div className="w-full p-6 border rounded-2xl border-gray-200 flex flex-col gap-8">
+                        <div className="flex flex-col gap-4">
+                          <h2 className="text-2xl font-bold text-gray-900">
+                            Select pair
+                          </h2>
+                          <p className="text-sm text-gray-600">
+                            Choose the tokens you want to provide liquidity for. You
+                            can select tokens on all supported networks.
+                          </p>
+                          <div className="flex flex-col gap-8 mb-4">
+                            <button
+                              onClick={() => {
+                                setShowTokenSelectorDeposit(true);
+                                setSelectingDepositToken(1);
+                              }}
+                              className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
+                            >
+                              <div className="flex items-center gap-2">
+                                <TokenIcon symbol={selectedTokenDeposit1?._symbol || ''} size="md" />
+                                <span className="text-gray-800 font-medium">
+                                  {selectedTokenDeposit1?._name ?? "ETH"}
+                                </span>
+                              </div>
+                              <svg
+                                className="w-5 h-5 rotate-90"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowTokenSelectorDeposit(true);
+                                setSelectingDepositToken(2);
+                              }}
+                              className="flex items-center justify-between p-4 border rounded-xl border-gray-300 bg-gray-900 text-white w-full"
+                            >
+                              <span className="font-medium">
+                                {" "}
+                                {selectedTokenDeposit2?._name ?? "Choose token"}
                               </span>
-                            </div>
-                            <svg
-                              className="w-5 h-5 rotate-90"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowTokenSelector(true);
-                              setSelectingToken(2);
-                            }}
-                            className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-900 text-white w-full"
-                          >
-                            <span className="font-medium">
-                              {" "}
-                              {selectedToken2?._name ?? "Choose token"}
-                            </span>
-                            <svg
-                              className="w-5 h-5 rotate-90"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
-                            </svg>
-                          </button>
+                              <svg
+                                className="w-5 h-5 rotate-90"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
+                              </svg>
+                            </button>
+                          </div>
+                          {selectedTokenDeposit1 && selectedTokenDeposit2 && (
+                            <>
+                              <div className="flex items-center">
+                                <span className="text-lg font-bold text-neutral-900 flex-grow">
+                                  Set price range
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-3 relative min-w-0 min-h-0 flex-shrink-0 box-border">
+                                <span className="inline whitespace-pre-wrap text-neutral-800 font-bold text-lg leading-snug">
+                                  Deposit tokens
+                                </span>
+
+                                <span className="inline whitespace-pre-wrap text-neutral-600 font-semibold text-sm leading-relaxed">
+                                  Specify the token amounts for your liquidity
+                                  contribution.
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-6 py-4">
+                                <div className="flex flex-col bg-white rounded-[16px] px-4 py-4 overflow-hidden">
+                                  <div className="flex items-center justify-between min-h-[59px]">
+                                    <div className="flex flex-grow items-center overflow-hidden mr-4">
+                                      <div className="flex flex-col flex-grow">
+                                        <input
+                                          type="text"
+                                          placeholder="0"
+                                          className="w-full text-[36px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 px-2 py-2">
+                                      <div className="relative w-7 h-7">
+                                        <TokenIcon symbol={selectedTokenDeposit1?._symbol || ''} size="md" />
+                                      </div>
+                                      <span className="text-lg font-medium text-gray-800">
+                                        {selectedTokenDeposit1._symbol ?? 'ETH'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between mt-3 text-sm text-gray-600">
+                                    <span className="font-bold whitespace-nowrap">
+                                      $0
+                                    </span>
+
+                                    <div className="flex items-center gap-2 ml-auto">
+                                      <span className="font-bold">0 {selectedTokenDeposit1._symbol ?? 'PAXG'}</span>
+                                      <button
+                                        className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
+                                        disabled
+                                      >
+                                        Max
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-6 py-4">
+                                <div className="flex flex-col bg-white rounded-[16px] px-4 py-4 overflow-hidden">
+                                  <div className="flex items-center justify-between min-h-[59px]">
+                                    <div className="flex flex-grow items-center overflow-hidden mr-4">
+                                      <div className="flex flex-col flex-grow">
+                                        <input
+                                          type="text"
+                                          placeholder="0"
+                                          className="w-full text-[36px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 px-2 py-2">
+                                      <div className="relative w-7 h-7">
+                                        <TokenIcon symbol={selectedTokenDeposit2?._symbol || ''} size="md" />
+                                      </div>
+                                      <span className="text-lg font-medium text-gray-800">
+                                        {selectedTokenDeposit2._symbol ?? 'PAXG'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between mt-3 text-sm text-gray-600">
+                                    <span className="font-bold whitespace-nowrap">
+                                      $0
+                                    </span>
+
+                                    <div className="flex items-center gap-2 ml-auto">
+                                      <span className="font-bold">0 {selectedTokenDeposit2._symbol ?? 'PAXG'}</span>
+                                      <button
+                                        className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
+                                        disabled
+                                      >
+                                        Max
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
-                        {selectedToken1 && selectedToken2 && (
-                          <>
-                            <div className="flex items-center">
-                              <span className="text-lg font-bold text-neutral-900 flex-grow">
-                                Set price range
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-3 relative min-w-0 min-h-0 flex-shrink-0 box-border">
-                              <span className="inline whitespace-pre-wrap text-neutral-800 font-bold text-lg leading-snug">
-                                Deposit tokens
-                              </span>
+                      </div>
 
-                              <span className="inline whitespace-pre-wrap text-neutral-600 font-semibold text-sm leading-relaxed">
-                                Specify the token amounts for your liquidity
-                                contribution.
-                              </span>
-                            </div>
-
-                            <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-6 py-4">
-                              <div className="flex flex-col bg-white rounded-[16px] px-4 py-4 overflow-hidden">
-                                <div className="flex items-center justify-between min-h-[59px]">
-                                  <div className="flex flex-grow items-center overflow-hidden mr-4">
-                                    <div className="flex flex-col flex-grow">
-                                      <input
-                                        type="text"
-                                        placeholder="0"
-                                        className="w-full text-[36px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 px-2 py-2">
-                                    <div className="relative w-7 h-7">
-                                      <TokenIcon symbol={selectedToken1?._symbol || ''} size="md" />
-                                    </div>
-                                    <span className="text-lg font-medium text-gray-800">
-                                      {selectedToken1._symbol ?? 'ETH'}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between mt-3 text-sm text-gray-600">
-                                  <span className="font-bold whitespace-nowrap">
-                                    $0
-                                  </span>
-
-                                  <div className="flex items-center gap-2 ml-auto">
-                                    <span className="font-bold">0 {selectedToken1._symbol ?? 'PAXG'}</span>
-                                    <button
-                                      className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
-                                      disabled
-                                    >
-                                      Max
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-6 py-4">
-                              <div className="flex flex-col bg-white rounded-[16px] px-4 py-4 overflow-hidden">
-                                <div className="flex items-center justify-between min-h-[59px]">
-                                  <div className="flex flex-grow items-center overflow-hidden mr-4">
-                                    <div className="flex flex-col flex-grow">
-                                      <input
-                                        type="text"
-                                        placeholder="0"
-                                        className="w-full text-[36px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 px-2 py-2">
-                                    <div className="relative w-7 h-7">
-                                      <TokenIcon symbol={selectedToken2?._symbol || ''} size="md" />
-                                    </div>
-                                    <span className="text-lg font-medium text-gray-800">
-                                      {selectedToken2._symbol ?? 'PAXG'}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between mt-3 text-sm text-gray-600">
-                                  <span className="font-bold whitespace-nowrap">
-                                    $0
-                                  </span>
-
-                                  <div className="flex items-center gap-2 ml-auto">
-                                    <span className="font-bold">0 {selectedToken2._symbol ?? 'PAXG'}</span>
-                                    <button
-                                      className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
-                                      disabled
-                                    >
-                                      Max
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                      <div className="mt-10">
+                        <button
+                          className={`w-full px-6 py-4 font-semibold rounded-xl ${selectedTokenDeposit1 && selectedTokenDeposit2
+                            ? "bg-blue-600 text-white cursor-pointer"
+                            : "bg-gray-100 text-gray-500 cursor-not-allowed"
+                            }`}
+                          disabled={!(selectedTokenDeposit1 && selectedTokenDeposit2)}
+                        >
+                          Continue
+                        </button>
                       </div>
                     </div>
-
-                    <div className="mt-10">
-                      <button
-                        className={`w-full px-6 py-4 font-semibold rounded-xl ${selectedToken1 && selectedToken2
-                          ? "bg-blue-600 text-white cursor-pointer"
-                          : "bg-gray-100 text-gray-500 cursor-not-allowed"
-                          }`}
-                        disabled={!(selectedToken1 && selectedToken2)}
-                      >
-                        Continue
-                      </button>
-                    </div>
                   </div>
-                </div>
 
-                {showTokenSelector && (
-                  <TokenDropdown
-                    show={showTokenSelector}
-                    onClose={() => setShowTokenSelector(false)}
-                    tokenSearchQuery={tokenSearchQuery}
-                    setTokenSearchQuery={setTokenSearchQuery}
-                    popularTokens={popularTokens}
-                    handleTokenSelect={handleTokenSelect}
-                  />
-                )}
+                  {showTokenSelectorDeposit && (
+                    <TokenDropdown
+                      show={showTokenSelectorDeposit}
+                      onClose={() => setShowTokenSelectorDeposit(false)}
+                      tokenSearchQuery={tokenSearchQueryDeposit1}
+                      setTokenSearchQuery={setTokenSearchQueryDeposit1}
+                      popularTokens={tokens}
+                      handleTokenSelect={handleTokenSelectDeposit}
+                    />
+                  )}
+                  {showTokenSelectorDeposit && (
+                    <TokenDropdown
+                      show={showTokenSelectorDeposit}
+                      onClose={() => setShowTokenSelectorDeposit(false)}
+                      tokenSearchQuery={tokenSearchQueryDeposit2}
+                      setTokenSearchQuery={setTokenSearchQueryDeposit2}
+                      popularTokens={tokens}
+                      handleTokenSelect={handleTokenSelectDeposit}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -686,74 +757,82 @@ const SwapPanel: any = () => {
 
   const RenderWithdraw = () => {
     const [withdrawAmount, setWithdrawAmount] = useState<number>(0)
-    const [showTokenSelector, setShowTokenSelector] = useState(false);
-    const [selectedWithdrawToken, setSelectedWithdrawToken] = useState(popularTokens[0])
+    const [showTokenSelectorWithdraw, setShowTokenSelectorWithdraw] = useState(false);
+    const [selectedWithdrawToken, setSelectedWithdrawToken] = useState<TokenData | null>(null)
+    const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] = useState("")
 
-    const handleTokenSelect = (token: any) => {
+    useEffect(() => {
+      if (tokens && tokens.length > 0) {
+        setSelectedWithdrawToken(tokens[0]);
+      }
+    }, []);
+
+    const handleTokenSelectWIthdraw = (token: TokenData) => {
       setSelectedWithdrawToken(token)
-      setShowTokenSelector(false)
+      setShowTokenSelectorWithdraw(false)
 
     }
     return (
-      <div className="flex flex-col flex-grow mb-8">
-        <div className="w-full p-6 border rounded-2xl border-gray-200 flex flex-col gap-8">
-          <div className="flex flex-col gap-4">
-            <h2 className="text-2xl font-bold text-gray-900">Select pool</h2>
-            <div className="flex flex-col md:flex-row gap-4">
-              <button
-                onClick={() => {
-                  setShowTokenSelector(true);
-                  setSelectingToken(1);
-                }}
-                className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
-              >
-                <div className="flex items-center gap-2">
-                  <TokenIcon symbol={selectedWithdrawToken?._symbol || ''} size="md" />
-                  <span className="text-gray-800 font-medium">
-                    {selectedWithdrawToken._name ?? "ETH"}
-                  </span>
-                </div>
-                <svg
-                  className="w-5 h-5 rotate-90"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 px-4 py-12">
+        <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 w-full max-w-md">
+          <div className="w-full p-6 border rounded-2xl border-gray-200 flex flex-col gap-8">
+            <div className="flex flex-col gap-4">
+              <h2 className="text-2xl font-bold text-gray-900">Select pool</h2>
+              <div className="flex flex-col gap-8">
+                <button
+                  onClick={() => {
+                    setShowTokenSelectorWithdraw(true);
+                  }}
+                  className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
                 >
-                  <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
-                </svg>
-              </button>
-              <input
-                type="number"
-                placeholder="0"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(Number(e.target.value))}
-                className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
-                disabled={!selectedWithdrawToken}
-              />
+                  <div className="flex items-center gap-2">
+                    <TokenIcon symbol={selectedWithdrawToken?._symbol || ''} size="md" />
+                    <span className="text-gray-800 font-medium">
+                      {selectedWithdrawToken?._name ?? "ETH"}
+                    </span>
+                  </div>
+                  <svg
+                    className="w-5 h-5 rotate-90"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
+                  </svg>
+                </button>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(Number(e.target.value))}
+                  className="w-full p-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800 placeholder-gray-400"
+                  disabled={!selectedWithdrawToken}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-10">
-          <button
-            className={`w-full px-6 py-4 font-semibold rounded-xl transition 
+          <div className="mt-10">
+            <button
+              className={`w-full px-6 py-4 font-semibold rounded-xl transition 
     ${withdrawAmount > 0 && selectedWithdrawToken
-                ? 'bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white cursor-pointer hover:bg-gray-900'
-                : 'bg-gray-100 text-gray-500 cursor-not-allowed'
-              }`}
-            disabled={!(withdrawAmount > 0 && selectedWithdrawToken)}
-          >
-            Withdraw
-          </button>
-        </div>{showTokenSelector && (
-          <TokenDropdown
-            show={showTokenSelector}
-            onClose={() => setShowTokenSelector(false)}
-            tokenSearchQuery={tokenSearchQuery}
-            setTokenSearchQuery={setTokenSearchQuery}
-            popularTokens={popularTokens}
-            handleTokenSelect={handleTokenSelect}
-          />
-        )}
+                  ? 'bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white cursor-pointer hover:bg-gray-900'
+                  : 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                }`}
+              disabled={!(withdrawAmount > 0 && selectedWithdrawToken)}
+            >
+              Withdraw
+            </button>
+          </div>{showTokenSelectorWithdraw && (
+            <TokenDropdown
+              show={showTokenSelectorWithdraw}
+              onClose={() => setShowTokenSelectorWithdraw(false)}
+              tokenSearchQuery={tokenSearchQueryWithdraw}
+              setTokenSearchQuery={setTokenSearchQueryWithdraw}
+              popularTokens={tokens}
+              handleTokenSelect={handleTokenSelectWIthdraw}
+            />
+          )}
+        </div>
       </div>
     )
   }
@@ -796,12 +875,12 @@ const SwapPanel: any = () => {
         <Tabs
           items={tabItems}
           activeKey={activeTab}
-          onChange={(k) => setActiveTab((k as any))}
+          onChange={(k) => setActiveTab((k as Tabkey))}
           centered
           className="custom-tabs-vibrant"
         />
         <div className={`mt-4 mb-20 ${activeTab === "swap" ? "h-[440px]" : "h-auto"}`}>
-          {activeTab === "swap" ? <RenderSwap /> : renderLiquidity()}
+          {activeTab === "swap" ? <RenderSwap /> : <RenderLiquidity />}
         </div>
         <div className="px-2 mb-4 font-medium flex items-center justify-between">
           <span>My positions</span>

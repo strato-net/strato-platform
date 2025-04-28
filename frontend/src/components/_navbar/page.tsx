@@ -2,18 +2,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import axios from 'axios';
 
 export default function Navbar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [showPopover, setShowPopover] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [userAddress, setUserAddress] = useState('');
 
-  const isActiveRoute = (route: string) => pathname === route;
   const isActiveParentRoute = (routes: string[]) =>
     routes.some(route => pathname.startsWith(route));
 

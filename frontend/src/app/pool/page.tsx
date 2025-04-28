@@ -11,7 +11,7 @@ const positions = [
   { pool: 'ETH/wstETH', protocol: 'v4', fee: '0.01%', tvl: '-', apr: '-', vol1D: '-', vol30D: '-', volRatio: '-' },
 ];
 
-export const PositionsPage = () => {
+export default function PositionsPage () {
 
   const router = useRouter();
 
@@ -65,5 +65,3 @@ export const PositionsPage = () => {
     </div>
   );
 }
-
-export default PositionsPage;

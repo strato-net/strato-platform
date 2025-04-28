@@ -3,14 +3,15 @@ import React, { useEffect, useState } from 'react';
 import useDebouncedValue from '../_hooks/useDebounce';
 import TokenIcon from '@/app/icons/TokenIcon';
 import { Spin } from 'antd';
+import { TokenData } from '@/interface/token';
 
 interface Props {
   show: boolean;
   onClose: () => void;
   tokenSearchQuery: string;
   setTokenSearchQuery: (value: string) => void;
-  popularTokens: any[];
-  handleTokenSelect: (token: any) => void;
+  popularTokens: TokenData[] | null;
+  handleTokenSelect: (token: TokenData) => void;
 }
 
 const TokenDropdown: React.FC<Props> = ({
@@ -29,17 +30,22 @@ const TokenDropdown: React.FC<Props> = ({
       setLoading(false)
     }, 1000);
   }, [])
+  
+  const debouncedQuery = useDebouncedValue(tokenSearchQuery, 300);
 
   if (!show) return null;
 
   // Apply debounce to the search input
-  const debouncedQuery = useDebouncedValue(tokenSearchQuery, 300);
 
   // Filter tokens based on debounced search
-  const filteredTokens = popularTokens.filter((token) =>
-    token._name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
-    token._symbol.toLowerCase().includes(debouncedQuery.toLowerCase())
-  );
+  const filteredTokens = popularTokens
+  ? popularTokens.filter((token) =>
+      (token?._name || '').toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+      (token?._symbol || '').toLowerCase().includes(debouncedQuery.toLowerCase())
+    )
+  : [];
+
+  console.log(filteredTokens, 'filteredTokens');
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex items-center justify-center">
@@ -74,11 +80,11 @@ const TokenDropdown: React.FC<Props> = ({
              :
               filteredTokens.map((token) => (
                 <button
-                  key={token._symbol + Math.random()}
+                  key={`${token._symbol}-${token.address}`}
                   onClick={() => handleTokenSelect(token)}
                   className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg"
                 >
-                  <TokenIcon symbol={token._symbol} size="md" />
+                  <TokenIcon symbol={token?._symbol || ''} size="md" />
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{token._name}</span>
                     <div className="flex items-center gap-2">

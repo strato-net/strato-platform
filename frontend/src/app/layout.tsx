@@ -3,7 +3,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../styles/globals.css";
-import { usePathname } from "next/navigation";
 import CustomNavbar from "../components/_navbar/page";
 import { TokenProvider } from "@/context/TokenContext";
 
@@ -30,7 +29,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
 
   return (
     <html lang="en">
@@ -39,8 +37,8 @@ export default function RootLayout({
       >
         <TokenProvider>
         <CustomNavbar/>
-        </TokenProvider>
         {children}
+        </TokenProvider>
       </body>
     </html>
   );

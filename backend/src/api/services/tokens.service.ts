@@ -7,6 +7,7 @@ import { StratoPaths } from "../../config/constants";
 const ERC20 = "Demo";
 const contractPath = `${cwd}/src/api/contracts/${ERC20}.sol`;
 
+
 // Get all tokens with optional filtering
 export const getTokens = async (
   accessToken: string,
@@ -28,6 +29,18 @@ export const getTokens = async (
       }
     } else {
       params.select = "*,BlockApps-Mercata-ERC20-_balances(key,value)";
+    }
+
+    // Handle select param for balances
+    if (params.select) {
+      // Append BlockApps-Mercata-ERC20-_balances(*) if not already present
+      const selectParts = params.select.split(",");
+      if (!selectParts.includes("BlockApps-Mercata-ERC20-_balances(*)")) {
+        selectParts.push("BlockApps-Mercata-ERC20-_balances(*)");
+        params.select = selectParts.join(",");
+      }
+    } else {
+      params.select = "*,BlockApps-Mercata-ERC20-_balances(*)";
     }
 
     const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {

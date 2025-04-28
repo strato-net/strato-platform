@@ -1,19 +1,27 @@
 "use client"
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import TokenDropdown from "@/components/_dropdown/page";
-import { popularTokens } from "@/context/TokenContext";
 import TokenIcon from "../icons/TokenIcon";
+import { useTokens } from "@/context/TokenContext";
+import { TokenData } from "@/interface/token";
 
 const TransferPanel = () => {
+  const { tokens } = useTokens()
   const [tokenSearchQuery, setTokenSearchQuery] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState(0);
   const [showTokenSelector, setShowTokenSelector] = useState(false);
-  const [selectedToken, setSelectedToken] = useState(popularTokens[0])
+  const [selectedToken, setSelectedToken] = useState<TokenData | null>(null);
 
-  const handleTokenSelect = (token: any) => {
+  useEffect(() => {
+    if (tokens && tokens.length > 0) {
+      setSelectedToken(tokens[0]);
+    }
+  }, [tokens]);
+
+  const handleTokenSelect = (token: TokenData) => {
     setSelectedToken(token)
     setShowTokenSelector(false)
 
@@ -112,7 +120,7 @@ const TransferPanel = () => {
           onClose={() => setShowTokenSelector(false)}
           tokenSearchQuery={tokenSearchQuery}
           setTokenSearchQuery={setTokenSearchQuery}
-          popularTokens={popularTokens}
+          popularTokens={tokens}
           handleTokenSelect={handleTokenSelect}
         />
       )}
