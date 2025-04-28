@@ -422,7 +422,7 @@ async function main() {
 
         // Check if it's time to run the oracle update
         if (
-          (now.getHours() === parseInt(oracleUpdateTime, 10) &&
+          (now.getHours() > parseInt(oracleUpdateTime, 10) &&
             lastOracleRun !== currentDate) ||
           !lastOracleRun
         ) {
