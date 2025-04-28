@@ -4,86 +4,80 @@ const axios = require('axios');
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 const config = fsUtil.getYaml(`../../config.yaml`);
 const auth = require('../../auth');
+const { callListAndWait, getEnvVar } = require('../../util');
 
-/**
- * Calls a list of function calls and polls until all transactions have completed.
- *
- * @param {Object} token - The token object.
- * @param {Array} callListArgs - Array of call arguments.
- * @returns {Promise<Array>} - Final transaction results.
- */
-const callListAndWait = async (token, callListArgs) => {
-  const options = { config, cacheNonce: true, isAsync: true };
-  const pendingTxResultList = await rest.callList(token, callListArgs, options);
-  const responseArray = Array.isArray(pendingTxResultList)
-    ? pendingTxResultList
-    : [pendingTxResultList];
+async function registerMetadataAttribute(
+  tokenAddress,
+  tokenAttributes,
+  metadataAddress
+) {
+  try {
 
-  // Poll until there are no pending transactions.
-  const predicate = (results) =>
-    results.filter((r) => r.status === 'Pending').length === 0;
-  const action = async (options) =>
-    await rest.getBlocResults(
-      token,
-      responseArray.map((r) => r.hash),
-      options
+    if (!tokenAddress || !tokenAttributes || !metadataAddress) {
+      throw new Error('Token address, token attributes, and metadata address are required.');
+    }
+
+    // Obtain the first access token.
+    console.log('Obtaining first access token...');
+    let token = await auth.getUserToken(username, password);
+    console.log('Access token of owner:', token);
+
+    // Call registerMetadata.
+    console.log('Calling registerMetadataAttribute...');
+    // Prepare call arguments for the registerMetadataAttribute call.
+    let callListArgs = [
+      {
+        contract: { address: metadataAddress, name: 'SimpleTokenMetadata' },
+        method: 'registerMetadataAttribute',
+        args: util.usc({
+          tokenAddress: tokenAddress,
+          attributes: tokenAttributes
+        }),
+      },
+    ];
+    const finalResults = await callListAndWait(callListArgs);
+    console.log(
+      'registerMetadataAttribute result:',
+      JSON.stringify(finalResults, null, 2)
     );
-  const finalResults = await util.until(
-    predicate,
-    action,
-    { config, isAsync: true },
-    3600000
-  );
-  return finalResults;
-};
-
-/**
- * Obtains an environment variable.
- * Throws an error if the variable is not set.
- * @param {string} name - The environment variable name.
- * @returns {string} - The environment variable value.
- */
-function getEnvVar(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Invalid ${name}`);
+    return finalResults;
+  } catch (error) {
+    console.error('Error in registerMetadataAttribute:', error);
+    throw error;
   }
-  return value;
 }
 
 async function main() {
   try {
+    // Read environment variables
     const USERNAME = getEnvVar('USERNAME');
     const PASSWORD = getEnvVar('PASSWORD');
     const TOKEN_ADDRESS = getEnvVar('TOKEN_ADDRESS');
     const TOKEN_ATTRIBUTES = getEnvVar('TOKEN_ATTRIBUTES');
     const METADATA_ADDRESS = getEnvVar('METADATA_ADDRESS');
 
-    // Obtain the first access token.
-    console.log('Obtaining first access token...');
-    let token = await auth.getUserToken(USERNAME, PASSWORD);
-    console.log('Access token of owner:', token);
+    // Validate environment variables
+    if (!USERNAME || !PASSWORD) {
+      throw new Error('USERNAME and PASSWORD environment variables are required.');
+    }
 
-    // Call registerMetadata.
-    console.log('Calling registerMetadata...');
-    // Prepare call arguments for the registerMetadata call.
-    let callListArgs = [
-      {
-        contract: { address: METADATA_ADDRESS, name: 'SimpleTokenMetadata' },
-        method: 'registerMetadataAttribute',
-        args: util.usc({
-          tokenAddress: TOKEN_ADDRESS,
-          attributes: TOKEN_ATTRIBUTES
-        }),
-      },
-    ];
-    const finalResults = await callListAndWait({ token: token }, callListArgs);
-    console.log(
-      'registerMetadata result:',
-      JSON.stringify(finalResults, null, 2)
+    if (!TOKEN_ADDRESS || !TOKEN_ATTRIBUTES || !METADATA_ADDRESS) {
+      throw new Error('TOKEN_ADDRESS, TOKEN_ATTRIBUTES, and METADATA_ADDRESS environment variables are required.');
+    }
+
+    // Call registerMetadataAttribute with environment variables as parameters
+    const result = await registerMetadataAttribute(
+      USERNAME,
+      PASSWORD,
+      TOKEN_ADDRESS,
+      TOKEN_ATTRIBUTES,
+      METADATA_ADDRESS
     );
+    console.log("Register metadata attribute result:", result);
   } catch (error) {
-}
+    console.error("Error in main:", error);
+    process.exit(1);
+  }
 }
 
 main();
