@@ -31,18 +31,6 @@ export const getTokens = async (
       params.select = "*,BlockApps-Mercata-ERC20-_balances(key,value)";
     }
 
-    // Handle select param for balances
-    if (params.select) {
-      // Append BlockApps-Mercata-ERC20-_balances(*) if not already present
-      const selectParts = params.select.split(",");
-      if (!selectParts.includes("BlockApps-Mercata-ERC20-_balances(*)")) {
-        selectParts.push("BlockApps-Mercata-ERC20-_balances(*)");
-        params.select = selectParts.join(",");
-      }
-    } else {
-      params.select = "*,BlockApps-Mercata-ERC20-_balances(*)";
-    }
-
     const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {
       params,
     });
@@ -75,7 +63,7 @@ export const getBalance = async (
       accessToken,
       `/BlockApps-Mercata-ERC20-_balances`,
       {
-        params,
+        params: { select: "*,BlockApps-Mercata-ERC20(*)", ...params },
       }
     );
     if (response.status !== 200) {

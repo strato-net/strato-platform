@@ -149,7 +149,7 @@ class SwappingController {
       ];
 
       const tokenDetails = await getTokens(accessToken, {
-        address: "in.(" + uniqueTokens.join(",")+")",
+        address: "in.(" + uniqueTokens.join(",") + ")",
         select: "address,_name,_symbol",
       });
 
@@ -189,7 +189,7 @@ class SwappingController {
       ];
 
       const tokenDetails = await getTokens(accessToken, {
-        address: "in.(" + uniqueTokenPairs.join(",")+")",
+        address: "in.(" + uniqueTokenPairs.join(",") + ")",
         select: "address,_name,_symbol",
       });
 
@@ -208,8 +208,8 @@ class SwappingController {
       const { accessToken, query } = req;
 
       const pools = await getPools(accessToken, {
-        "data->>tokenA": "eq." + query.tokenA,
-        "data->>tokenB": "eq." + query.tokenB,
+        "data->>tokenA": "in.(" + query.tokenPair + ")",
+        "data->>tokenB": "in.(" + query.tokenPair + ")",
       });
       res.status(RestStatus.OK).json(pools);
     } catch (error) {
@@ -282,7 +282,7 @@ class SwappingController {
   static validateSwapArgs(args: any) {
     const schema = Joi.object({
       address: Joi.string().required(),
-      method: Joi.string().valid("stableToToken", "tokenToStable").required(),
+      method: Joi.string().valid("tokenAToTokenB", "tokenBToTokenA").required(),
       amount: Joi.string().required(),
       min_tokens: Joi.string().required(),
     });

@@ -12,6 +12,7 @@ export interface TokenData {
   _name?: string;
   _symbol?: string;
   _totalSupply?: number;
+  value?: string;
   "BlockApps-Mercata-ERC20-_balances"?: TokenBalance[];
 }
 

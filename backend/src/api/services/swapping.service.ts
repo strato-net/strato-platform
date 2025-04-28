@@ -129,14 +129,52 @@ export const swap = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const isStableToToken = body.method === "stableToToken";
-    const tx = buildFunctionTx({
+    const isTokenAToTokenB = body.method === "tokenAToTokenB";
+    const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {
+      params: {
+        address: "eq." + body.address,
+        select: "data->>tokenA,data->>tokenB",
+      },
+    });
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Error fetching swap pool address: ${response.statusText}`
+      );
+    }
+    if (!response.data || response.data.length === 0) {
+      throw new Error("Pool data is empty");
+    }
+    const token = isTokenAToTokenB
+      ? response.data[0].tokenA
+      : response.data[0].tokenB;
+
+    let tx = buildFunctionTx({
+      contractName: "ERC20",
+      contractAddress: token || "",
+      method: "approve",
+      args: {
+        spender: body.address,
+        value: body.amount,
+      },
+    });
+
+    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+      accessToken,
+      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    if (approveStatus !== "Success") {
+      throw new Error(`Error approving asset with hash: ${approveHash}`);
+    }
+
+    tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: body.address || "",
       method: body.method || "",
       args: {
-        [isStableToToken ? "stable_sold" : "tokens_sold"]: body.amount,
-        min_stable: body.min_stable,
+        [isTokenAToTokenB ? "tokenA_sold" : "tokenB_sold"]: body.amount,
+        [isTokenAToTokenB ? "min_tokenB" : "min_tokens"]: body.min_tokens,
       },
     });
 

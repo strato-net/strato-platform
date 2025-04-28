@@ -1,11 +1,7 @@
 "use client";
 
 import React, { FC, useEffect, useState } from "react";
-import {
-  Card,
-  Tabs,
-  TabsProps,
-} from "antd";
+import { Card, Tabs, TabsProps } from "antd";
 import { motion } from "framer-motion";
 const { TabPane } = Tabs;
 import TokenDropdown from "@/components/_dropdown/page";
@@ -69,23 +65,25 @@ const positions = [
 ];
 
 const SwapPanel: FC = () => {
-  const { tokens } = useTokens()
+  const { tokens } = useTokens();
   const [activeTab, setActiveTab] = useState<Tabkey>("swap");
-  const [activeTab2, setActiveTab2] = useState<TabKey2>(
-    "deposits"
-  );
+  const [activeTab2, setActiveTab2] = useState<TabKey2>("deposits");
 
   const RenderSwap = () => {
-    const [tokenSearchQuerySell, setTokenSearchQuerySell] = useState('');
-    const [tokenSearchQueryBuy, setTokenSearchQueryBuy] = useState('');
+    const [tokenSearchQuerySell, setTokenSearchQuerySell] = useState("");
+    const [tokenSearchQueryBuy, setTokenSearchQueryBuy] = useState("");
     const [showTokenSelectorSell, setShowTokenSelectorSell] = useState(false);
     const [showTokenSelectorBuy, setShowTokenSelectorBuy] = useState(false);
-    const [selectedSellToken, setSelectedSellToken] = useState<TokenData | null>(null);
-    const [selectedBuyToken, setSelectedBuyToken] = useState<TokenData | null>(null);
+    const [selectedSellToken, setSelectedSellToken] =
+      useState<TokenData | null>(null);
+    const [selectedBuyToken, setSelectedBuyToken] = useState<TokenData | null>(
+      null
+    );
+    const [pool, setPool] = useState<any>(null);
     const [showSettings, setShowSettings] = useState(false);
-    const [slippage, setSlippage] = useState('0.5');
-    const [sellAmount, setSellAmount] = useState('');
-    const [buyAmount, setBuyAmount] = useState('');
+    const [slippage, setSlippage] = useState("0.5");
+    const [sellAmount, setSellAmount] = useState("");
+    const [buyAmount, setBuyAmount] = useState("");
 
     const [tokenList, setTokenList] = useState<TokenData[]>([]);
 
@@ -96,52 +94,51 @@ const SwapPanel: FC = () => {
     useEffect(() => {
       const fetchTokens = async () => {
         try {
-          const res = await axios.get('api/swapableTokens');
-          console.log(res, 'res');
-
-          const responseAddresses = new Set(res.data.map((addr: string) => addr.toLowerCase()));
-
-          const filteredTokens = tokens ? tokens.filter(token => 
-            responseAddresses.has(token?.address?.toLowerCase())
-          ) : [];
-  
-          console.log(filteredTokens, 'filteredTokens');
-          setTokenList(filteredTokens);
+          const res = await axios.get("api/swapableTokens");
+          setTokenList(res.data);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+      const fetchPools = async () => {
+        try {
+          const res = await axios.get("api/swap");
+          setPool(res.data);
         } catch (err) {
           console.log(err);
         }
       };
 
       fetchTokens();
+      fetchPools();
     }, []);
 
     useEffect(() => {
-      // if (tokenList && tokenList.length > 0) {
-      //   setSelectedSellToken(tokenList[0]);
-      // }
-      console.log(tokenList, 'tokenList');
-    }, [])
+      if (
+        selectedSellToken &&
+        selectedSellToken.address &&
+        selectedBuyToken &&
+        selectedBuyToken.address
+      ) {
+        getPoolByTokenPair(selectedSellToken.address, selectedBuyToken.address);
+      }
+    }, [selectedSellToken, selectedBuyToken]);
 
     const handleSwapTokenSelectSell = (token: TokenData) => {
-      console.log(token, "selected token sell");
-
       if (token._symbol === selectedBuyToken?._symbol) {
         setSelectedBuyToken(selectedSellToken);
         setSelectedSellToken(token);
       } else {
         setSelectedSellToken(token);
-
       }
-      getPairedSwapableTokens(token?.address || '');
-      getTokenBalance(token?.address || '');
+      getPairedSwapableTokens(token?.address || "");
+      getTokenBalance(token?.address || "");
       setShowTokenSelectorSell(false);
-      setSellAmount('')
-      setBuyAmount('')
+      setSellAmount("");
+      setBuyAmount("");
     };
 
     const handleSwapTokenSelectBuy = (token: TokenData) => {
-      console.log(token, "selected token sell");
-
       if (token._symbol === selectedSellToken?._symbol) {
         setSelectedSellToken(selectedBuyToken);
         setSelectedBuyToken(token);
@@ -149,29 +146,26 @@ const SwapPanel: FC = () => {
         setSelectedBuyToken(token);
       }
       setShowTokenSelectorBuy(false);
-      setSellAmount('')
-      setBuyAmount('')
-    }
+      setSellAmount("");
+      setBuyAmount("");
+    };
 
-    // useEffect(() => {
-    // }, [selectedSellToken])
-
-    console.log(selectedSellToken, "<<");
-
+    const getPoolByTokenPair = async (tokenA: string, tokenB: string) => {
+      try {
+        const res = await axios.get(
+          `/api/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
+        );
+        setPool(res.data[0]);
+        return res.data[0];
+      } catch (err) {
+        console.log(err);
+      }
+    };
 
     const getPairedSwapableTokens = async (address: string) => {
       try {
         const res = await axios.get(`/api/swapableTokenPairs/${address}`);
-
-        const responseAddresses = new Set(res.data.map((addr: string) => addr.toLowerCase()));
-
-        const filteredTokens = tokens ? tokens.filter(token => 
-          responseAddresses.has(token?.address?.toLowerCase())
-        ) : [];
-
-        console.log(filteredTokens, 'filteredTokens');
-        setTokenList2(filteredTokens);
-        console.log(res, 'res on token 2 select');
+        setTokenList2(res.data);
       } catch (err) {
         console.log(err);
       }
@@ -179,8 +173,9 @@ const SwapPanel: FC = () => {
 
     const getTokenBalance = async (address: string) => {
       try {
-        const res = await axios.get(`api/tokens/table/balance?key=eq.${address}`);
-        console.log(res, 'res');
+        const res = await axios.get(
+          `api/tokens/table/balance?key=eq.${address}`
+        );
         setSelectedToken1Amount(res?.data[0]?.value || 0);
       } catch (err) {
         console.log(err);
@@ -191,18 +186,36 @@ const SwapPanel: FC = () => {
       if (selectedSellToken && selectedBuyToken) {
         // Fetch the conversion rate from API
         try {
-          const conversionRes = await axios.get(`/api/poolByTokenPair?tokenA=${selectedSellToken?.address}&tokenB=${selectedBuyToken?.address}`);
-          
-          const conversionRate = conversionRes?.data[0]?.data;
-  
+          if (!selectedSellToken.address || !selectedBuyToken?.address) return;
+
+          const pool = await getPoolByTokenPair(
+            selectedSellToken.address,
+            selectedBuyToken.address
+          );
           if (isSellInput) {
-            // Update buyAmount based on sellAmount and conversion rate
-            setSellAmount(value);
-            setBuyAmount((parseFloat(value) * conversionRate?.aToBRatio || 0).toFixed(6));  // Adjust precision as necessary
+            if (pool.data.tokenA === selectedSellToken.address) {
+              setSellAmount(value);
+              setBuyAmount(
+                (parseFloat(value) * pool.data.aToBRatio || 0).toFixed(6)
+              ); // Adjust precision as necessary
+            } else {
+              setSellAmount(value);
+              setBuyAmount(
+                (parseFloat(value) * pool.data.bToARatio || 0).toFixed(6)
+              ); // Adjust precision as necessary
+            }
           } else {
-            // Update sellAmount based on buyAmount and conversion rate
-            setBuyAmount(value);
-            setSellAmount((parseFloat(value) / conversionRate?.bToARatio || 0).toFixed(6));  // Adjust precision as necessary
+            if (pool.data.tokenA === selectedBuyToken.address) {
+              setBuyAmount(value);
+              setSellAmount(
+                (parseFloat(value) * pool.data.bToARatio || 0).toFixed(6)
+              ); // Adjust precision as necessary
+            } else {
+              setBuyAmount(value);
+              setSellAmount(
+                (parseFloat(value) * pool.data.aToBRatio || 0).toFixed(6)
+              ); // Adjust precision as necessary
+            }
           }
         } catch (err) {
           console.log(err);
@@ -217,6 +230,27 @@ const SwapPanel: FC = () => {
       }
     };
 
+    // Add swap action handler
+    const handleSwapAction = async () => {
+      if (!selectedSellToken || !selectedBuyToken) return;
+      try {
+        // Replace this with your actual pool address logic if different
+        const method =
+          pool.data.tokenA === selectedSellToken.address
+            ? "tokenAToTokenB"
+            : "tokenBToTokenA";
+
+        const response = await axios.post("/api/swap/swap", {
+          address: pool.address,
+          method: method,
+          amount: (parseFloat(sellAmount) * 10 ** 18).toFixed(0),
+          min_tokens: (parseFloat(buyAmount) * 10 ** 18).toFixed(0),
+        });
+        console.log("Swap response:", response.data);
+      } catch (error) {
+        console.error("Swap error:", error);
+      }
+    };
 
     return (
       <div className="min-h-screen bg-gray-50 px-6 py-8">
@@ -228,7 +262,9 @@ const SwapPanel: FC = () => {
           <div className="flex flex-col gap-2 bg-white rounded-2xl border border-gray-100 overflow-hidden relative">
             <div className="flex flex-col p-4 border-b border-gray-100">
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-xs text-gray-500">Sell</span>
+                <span className="font-semibold text-xs text-gray-500">
+                  Sell
+                </span>
               </div>
               <div className="flex items-center justify-end pt-2 pb-2 min-h-[59px] transform translate-x-0">
                 <div className="flex items-center flex-grow h-9 mr-2 overflow-hidden opacity-100">
@@ -237,7 +273,7 @@ const SwapPanel: FC = () => {
                       type="number"
                       placeholder="0"
                       value={sellAmount}
-                      onChange={(e) => handleInputChange(true,e.target.value)}
+                      onChange={(e) => handleInputChange(true, e.target.value)}
                       className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
                       disabled={!selectedSellToken}
                     />
@@ -261,22 +297,35 @@ const SwapPanel: FC = () => {
                         }}
                         className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
                       >
-                        <TokenIcon symbol={selectedSellToken?._symbol || 'NA'} size="md" />
-                        <span className="font-medium text-base text-gray-900">{selectedSellToken._name}</span>
-                        <svg className="w-6 h-6 text-gray-400 rotate-90" viewBox="0 0 24 24" fill="none">
-                          <path d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z" fill="currentColor" />
+                        <TokenIcon
+                          symbol={selectedSellToken?._symbol || "NA"}
+                          size="md"
+                        />
+                        <span className="font-medium text-base text-gray-900">
+                          {selectedSellToken._name}
+                        </span>
+                        <svg
+                          className="w-6 h-6 text-gray-400 rotate-90"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
+                          <path
+                            d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"
+                            fill="currentColor"
+                          />
                         </svg>
                       </button>
                     )}
                   </div>
                 </div>
-
               </div>
               <div className="flex justify-between items-center pt-2 text-sm text-gray-500">
                 <span>${sellAmount ? sellAmount : 0}</span>
                 <div className="flex items-center gap-2">
                   <span>{selectedToken1Amount}</span>
-                  <button className="bg-gray-100 rounded-xl px-2 py-1 border border-gray-200 cursor-default">Max</button>
+                  <button className="bg-gray-100 rounded-xl px-2 py-1 border border-gray-200 cursor-default">
+                    Max
+                  </button>
                 </div>
               </div>
             </div>
@@ -295,7 +344,8 @@ const SwapPanel: FC = () => {
                 setSellAmount(buyAmount);
                 setBuyAmount(tempAmount);
               }}
-              className="flex flex-col items-center h-0">
+              className="flex flex-col items-center h-0"
+            >
               <div className="absolute -bottom-6 flex flex-col items-center">
                 <div
                   data-testid="switch-currencies-button"
@@ -329,7 +379,9 @@ const SwapPanel: FC = () => {
             <div className="flex flex-col relative box-border min-h-0 min-w-0 flex-shrink-0 cursor-pointer transform scale-100 opacity-100">
               <div className="flex flex-col relative box-border min-h-0 min-w-0 flex-shrink-0 overflow-hidden px-4 py-4">
                 <div className="flex justify-between items-stretch">
-                  <span className="inline-block whitespace-pre-wrap m-0 text-gray-700 font-bold text-sm leading-tight">Buy</span>
+                  <span className="inline-block whitespace-pre-wrap m-0 text-gray-700 font-bold text-sm leading-tight">
+                    Buy
+                  </span>
                 </div>
                 <div className="flex items-center justify-end pt-2 pb-2 min-h-[59px] transform translate-x-0">
                   <div className="flex items-center flex-grow h-9 mr-2 overflow-hidden opacity-100">
@@ -338,7 +390,9 @@ const SwapPanel: FC = () => {
                         type="number"
                         placeholder="0"
                         value={buyAmount}
-                        onChange={(e) => handleInputChange(false,e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange(false, e.target.value)
+                        }
                         className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
                         disabled={!selectedBuyToken}
                       />
@@ -349,7 +403,7 @@ const SwapPanel: FC = () => {
                       {!selectedBuyToken ? (
                         <button
                           onClick={() => {
-                            setShowTokenSelectorBuy(true)
+                            setShowTokenSelectorBuy(true);
                           }}
                           className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
                         >
@@ -358,14 +412,26 @@ const SwapPanel: FC = () => {
                       ) : (
                         <button
                           onClick={() => {
-                            setShowTokenSelectorBuy(true)
+                            setShowTokenSelectorBuy(true);
                           }}
                           className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
                         >
-                          <TokenIcon symbol={selectedBuyToken?._symbol || 'NA'} size="md" />
-                          <span className="font-medium text-base text-gray-900">{selectedBuyToken._name}</span>
-                          <svg className="w-6 h-6 text-gray-400 rotate-90" viewBox="0 0 24 24" fill="none">
-                            <path d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z" fill="currentColor" />
+                          <TokenIcon
+                            symbol={selectedBuyToken?._symbol || "NA"}
+                            size="md"
+                          />
+                          <span className="font-medium text-base text-gray-900">
+                            {selectedBuyToken._name}
+                          </span>
+                          <svg
+                            className="w-6 h-6 text-gray-400 rotate-90"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                          >
+                            <path
+                              d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"
+                              fill="currentColor"
+                            />
                           </svg>
                         </button>
                       )}
@@ -375,7 +441,9 @@ const SwapPanel: FC = () => {
                 <div className="flex items-center gap-2 opacity-0 pointer-events-none">
                   <div className="flex flex-col cursor-pointer transform scale-100 opacity-100">
                     <div className="flex items-center justify-center gap-1">
-                      <span className="inline-block whitespace-nowrap m-0 text-gray-700 font-bold text-sm leading-tight overflow-hidden text-ellipsis">$0</span>
+                      <span className="inline-block whitespace-nowrap m-0 text-gray-700 font-bold text-sm leading-tight overflow-hidden text-ellipsis">
+                        $0
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -385,8 +453,10 @@ const SwapPanel: FC = () => {
 
           <div className="flex flex-col pt-4 pb-4">
             <button
-              className="bg-gray-100 text-gray-500 rounded-xl py-4 text-lg font-medium cursor-pointer">
-              Swap token
+              onClick={handleSwapAction}
+              className="bg-gray-100 text-gray-500 rounded-xl py-4 text-lg font-medium cursor-pointer"
+            >
+              Swap
             </button>
           </div>
 
@@ -417,9 +487,22 @@ const SwapPanel: FC = () => {
               <div className="bg-white rounded-3xl w-full max-w-md p-4">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-medium">Settings</h2>
-                  <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-100 rounded-full">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full"
+                  >
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -431,29 +514,32 @@ const SwapPanel: FC = () => {
                     </label>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setSlippage('0.1')}
-                        className={`px-3 py-2 rounded-lg ${slippage === '0.1'
-                          ? 'bg-blue-100 text-blue-600'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                          }`}
+                        onClick={() => setSlippage("0.1")}
+                        className={`px-3 py-2 rounded-lg ${
+                          slippage === "0.1"
+                            ? "bg-blue-100 text-blue-600"
+                            : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                        }`}
                       >
                         0.1%
                       </button>
                       <button
-                        onClick={() => setSlippage('0.5')}
-                        className={`px-3 py-2 rounded-lg ${slippage === '0.5'
-                          ? 'bg-blue-100 text-blue-600'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                          }`}
+                        onClick={() => setSlippage("0.5")}
+                        className={`px-3 py-2 rounded-lg ${
+                          slippage === "0.5"
+                            ? "bg-blue-100 text-blue-600"
+                            : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                        }`}
                       >
                         0.5%
                       </button>
                       <button
-                        onClick={() => setSlippage('1.0')}
-                        className={`px-3 py-2 rounded-lg ${slippage === '1.0'
-                          ? 'bg-blue-100 text-blue-600'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                          }`}
+                        onClick={() => setSlippage("1.0")}
+                        className={`px-3 py-2 rounded-lg ${
+                          slippage === "1.0"
+                            ? "bg-blue-100 text-blue-600"
+                            : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                        }`}
                       >
                         1.0%
                       </button>
@@ -465,7 +551,9 @@ const SwapPanel: FC = () => {
                           className="w-full bg-gray-50 rounded-lg px-3 py-2 pr-8 focus:outline-none"
                           placeholder="Custom"
                         />
-                        <span className="absolute right-3 top-2 text-gray-500">%</span>
+                        <span className="absolute right-3 top-2 text-gray-500">
+                          %
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -480,7 +568,9 @@ const SwapPanel: FC = () => {
                         defaultValue="30"
                         className="w-full bg-gray-50 rounded-lg px-3 py-2 pr-12 focus:outline-none"
                       />
-                      <span className="absolute right-3 top-2 text-gray-500">minutes</span>
+                      <span className="absolute right-3 top-2 text-gray-500">
+                        minutes
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -510,7 +600,11 @@ const SwapPanel: FC = () => {
             <TabPane tab="Withdraw" key="withdraw" />
           </Tabs>
           <div className="mt-4">
-            {activeTab2 === "deposits" ? <RenderDeposits /> : <RenderWithdraw />}
+            {activeTab2 === "deposits" ? (
+              <RenderDeposits />
+            ) : (
+              <RenderWithdraw />
+            )}
           </div>
         </Card>
       </motion.div>
@@ -518,18 +612,25 @@ const SwapPanel: FC = () => {
   );
 
   const RenderDeposits = () => {
-    const [tokenSearchQueryDeposit1, setTokenSearchQueryDeposit1] = useState("");
-    const [tokenSearchQueryDeposit2, setTokenSearchQueryDeposit2] = useState("");
-    const [showTokenSelectorDeposit, setShowTokenSelectorDeposit] = useState(false);
-    const [selectedTokenDeposit1, setSelectedDepositToken1] = useState<TokenData>();
-    const [selectedTokenDeposit2, setSelectedDepositToken2] = useState<TokenData | null>(null);
-    const [selectingDepositToken, setSelectingDepositToken] = useState<1 | 2 | null>(null);
+    const [tokenSearchQueryDeposit1, setTokenSearchQueryDeposit1] =
+      useState("");
+    const [tokenSearchQueryDeposit2, setTokenSearchQueryDeposit2] =
+      useState("");
+    const [showTokenSelectorDeposit, setShowTokenSelectorDeposit] =
+      useState(false);
+    const [selectedTokenDeposit1, setSelectedDepositToken1] =
+      useState<TokenData>();
+    const [selectedTokenDeposit2, setSelectedDepositToken2] =
+      useState<TokenData | null>(null);
+    const [selectingDepositToken, setSelectingDepositToken] = useState<
+      1 | 2 | null
+    >(null);
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
-        setSelectedDepositToken1(tokens[0])
+        setSelectedDepositToken1(tokens[0]);
       }
-    }, [])
+    }, []);
 
     const handleTokenSelectDeposit = (token: TokenData) => {
       if (selectingDepositToken === 1) {
@@ -548,7 +649,6 @@ const SwapPanel: FC = () => {
             <div className="max-w-6xl mx-auto">
               <div className="relative inline-flex items-center mb-4">
                 <div className="w-full max-w-6xl mx-auto p-4">
-
                   <div className="flex flex-col md:flex-row justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900">
                       Deposits
@@ -563,8 +663,8 @@ const SwapPanel: FC = () => {
                             Select pair
                           </h2>
                           <p className="text-sm text-gray-600">
-                            Choose the tokens you want to provide liquidity for. You
-                            can select tokens on all supported networks.
+                            Choose the tokens you want to provide liquidity for.
+                            You can select tokens on all supported networks.
                           </p>
                           <div className="flex flex-col gap-8 mb-4">
                             <button
@@ -575,7 +675,10 @@ const SwapPanel: FC = () => {
                               className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
                             >
                               <div className="flex items-center gap-2">
-                                <TokenIcon symbol={selectedTokenDeposit1?._symbol || ''} size="md" />
+                                <TokenIcon
+                                  symbol={selectedTokenDeposit1?._symbol || ""}
+                                  size="md"
+                                />
                                 <span className="text-gray-800 font-medium">
                                   {selectedTokenDeposit1?._name ?? "ETH"}
                                 </span>
@@ -641,10 +744,15 @@ const SwapPanel: FC = () => {
 
                                     <div className="flex items-center gap-2 px-2 py-2">
                                       <div className="relative w-7 h-7">
-                                        <TokenIcon symbol={selectedTokenDeposit1?._symbol || ''} size="md" />
+                                        <TokenIcon
+                                          symbol={
+                                            selectedTokenDeposit1?._symbol || ""
+                                          }
+                                          size="md"
+                                        />
                                       </div>
                                       <span className="text-lg font-medium text-gray-800">
-                                        {selectedTokenDeposit1._symbol ?? 'ETH'}
+                                        {selectedTokenDeposit1._symbol ?? "ETH"}
                                       </span>
                                     </div>
                                   </div>
@@ -655,7 +763,11 @@ const SwapPanel: FC = () => {
                                     </span>
 
                                     <div className="flex items-center gap-2 ml-auto">
-                                      <span className="font-bold">0 {selectedTokenDeposit1._symbol ?? 'PAXG'}</span>
+                                      <span className="font-bold">
+                                        0{" "}
+                                        {selectedTokenDeposit1._symbol ??
+                                          "PAXG"}
+                                      </span>
                                       <button
                                         className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
                                         disabled
@@ -682,10 +794,16 @@ const SwapPanel: FC = () => {
 
                                     <div className="flex items-center gap-2 px-2 py-2">
                                       <div className="relative w-7 h-7">
-                                        <TokenIcon symbol={selectedTokenDeposit2?._symbol || ''} size="md" />
+                                        <TokenIcon
+                                          symbol={
+                                            selectedTokenDeposit2?._symbol || ""
+                                          }
+                                          size="md"
+                                        />
                                       </div>
                                       <span className="text-lg font-medium text-gray-800">
-                                        {selectedTokenDeposit2._symbol ?? 'PAXG'}
+                                        {selectedTokenDeposit2._symbol ??
+                                          "PAXG"}
                                       </span>
                                     </div>
                                   </div>
@@ -696,7 +814,11 @@ const SwapPanel: FC = () => {
                                     </span>
 
                                     <div className="flex items-center gap-2 ml-auto">
-                                      <span className="font-bold">0 {selectedTokenDeposit2._symbol ?? 'PAXG'}</span>
+                                      <span className="font-bold">
+                                        0{" "}
+                                        {selectedTokenDeposit2._symbol ??
+                                          "PAXG"}
+                                      </span>
                                       <button
                                         className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
                                         disabled
@@ -714,11 +836,14 @@ const SwapPanel: FC = () => {
 
                       <div className="mt-10">
                         <button
-                          className={`w-full px-6 py-4 font-semibold rounded-xl ${selectedTokenDeposit1 && selectedTokenDeposit2
-                            ? "bg-blue-600 text-white cursor-pointer"
-                            : "bg-gray-100 text-gray-500 cursor-not-allowed"
-                            }`}
-                          disabled={!(selectedTokenDeposit1 && selectedTokenDeposit2)}
+                          className={`w-full px-6 py-4 font-semibold rounded-xl ${
+                            selectedTokenDeposit1 && selectedTokenDeposit2
+                              ? "bg-blue-600 text-white cursor-pointer"
+                              : "bg-gray-100 text-gray-500 cursor-not-allowed"
+                          }`}
+                          disabled={
+                            !(selectedTokenDeposit1 && selectedTokenDeposit2)
+                          }
                         >
                           Continue
                         </button>
@@ -752,14 +877,17 @@ const SwapPanel: FC = () => {
           </div>
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   const RenderWithdraw = () => {
-    const [withdrawAmount, setWithdrawAmount] = useState<number>(0)
-    const [showTokenSelectorWithdraw, setShowTokenSelectorWithdraw] = useState(false);
-    const [selectedWithdrawToken, setSelectedWithdrawToken] = useState<TokenData | null>(null)
-    const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] = useState("")
+    const [withdrawAmount, setWithdrawAmount] = useState<number>(0);
+    const [showTokenSelectorWithdraw, setShowTokenSelectorWithdraw] =
+      useState(false);
+    const [selectedWithdrawToken, setSelectedWithdrawToken] =
+      useState<TokenData | null>(null);
+    const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] =
+      useState("");
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
@@ -768,10 +896,9 @@ const SwapPanel: FC = () => {
     }, []);
 
     const handleTokenSelectWIthdraw = (token: TokenData) => {
-      setSelectedWithdrawToken(token)
-      setShowTokenSelectorWithdraw(false)
-
-    }
+      setSelectedWithdrawToken(token);
+      setShowTokenSelectorWithdraw(false);
+    };
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 px-4 py-12">
         <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 w-full max-w-md">
@@ -786,7 +913,10 @@ const SwapPanel: FC = () => {
                   className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
                 >
                   <div className="flex items-center gap-2">
-                    <TokenIcon symbol={selectedWithdrawToken?._symbol || ''} size="md" />
+                    <TokenIcon
+                      symbol={selectedWithdrawToken?._symbol || ""}
+                      size="md"
+                    />
                     <span className="text-gray-800 font-medium">
                       {selectedWithdrawToken?._name ?? "ETH"}
                     </span>
@@ -814,15 +944,17 @@ const SwapPanel: FC = () => {
           <div className="mt-10">
             <button
               className={`w-full px-6 py-4 font-semibold rounded-xl transition 
-    ${withdrawAmount > 0 && selectedWithdrawToken
-                  ? 'bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white cursor-pointer hover:bg-gray-900'
-                  : 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                }`}
+    ${
+      withdrawAmount > 0 && selectedWithdrawToken
+        ? "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white cursor-pointer hover:bg-gray-900"
+        : "bg-gray-100 text-gray-500 cursor-not-allowed"
+    }`}
               disabled={!(withdrawAmount > 0 && selectedWithdrawToken)}
             >
               Withdraw
             </button>
-          </div>{showTokenSelectorWithdraw && (
+          </div>
+          {showTokenSelectorWithdraw && (
             <TokenDropdown
               show={showTokenSelectorWithdraw}
               onClose={() => setShowTokenSelectorWithdraw(false)}
@@ -834,8 +966,8 @@ const SwapPanel: FC = () => {
           )}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   const [showTable, setShowTable] = useState(true);
 
@@ -867,7 +999,9 @@ const SwapPanel: FC = () => {
       <Card
         title={
           <div className="flex items-center justify-between p-2">
-            <h1 className="text-2xl font-bold text-gray-800">Swap & Liquidity</h1>
+            <h1 className="text-2xl font-bold text-gray-800">
+              Swap & Liquidity
+            </h1>
           </div>
         }
         className="w-full w-[100%] rounded-2xl shadow-lg"
@@ -875,11 +1009,15 @@ const SwapPanel: FC = () => {
         <Tabs
           items={tabItems}
           activeKey={activeTab}
-          onChange={(k) => setActiveTab((k as Tabkey))}
+          onChange={(k) => setActiveTab(k as Tabkey)}
           centered
           className="custom-tabs-vibrant"
         />
-        <div className={`mt-4 mb-20 ${activeTab === "swap" ? "h-[440px]" : "h-auto"}`}>
+        <div
+          className={`mt-4 mb-20 ${
+            activeTab === "swap" ? "h-[440px]" : "h-auto"
+          }`}
+        >
           {activeTab === "swap" ? <RenderSwap /> : <RenderLiquidity />}
         </div>
         <div className="px-2 mb-4 font-medium flex items-center justify-between">

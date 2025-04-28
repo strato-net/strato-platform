@@ -12,24 +12,6 @@ import {
 } from "../services/tokens.service";
 
 class TokensController {
-  static async getBalance(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-
-      const tokens = await getBalance(
-        accessToken,
-        query as Record<string, string | undefined>
-      );
-      res.status(RestStatus.OK).json(tokens);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   static async get(
     req: Request,
     res: Response,
@@ -62,6 +44,24 @@ class TokensController {
         query as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(tokens);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getBalance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+
+      const balances = await getBalance(
+        accessToken,
+        query as Record<string, string | undefined>
+      );
+      res.status(RestStatus.OK).json(balances);
     } catch (error) {
       next(error);
     }
