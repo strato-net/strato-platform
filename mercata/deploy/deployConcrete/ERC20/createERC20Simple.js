@@ -4,41 +4,21 @@ const { rest, util, importer, fsUtil, oauthUtil } = require('blockapps-rest');
 const fs = require('fs');
 const path = require('path');
 const auth = require('../../auth');
+const { createContractArgs, getEnvVar, saveCreateTXDataAsFile } = require('../../util');
 
-async function main() {
+async function createERC20Simple(
+  tokenName,
+  tokenSymbol,
+  tokenDecimals,
+  tokenInitialSupply
+) {
   try {
-    // Destructure and validate required environment variables.
-    const {
-      GLOBAL_ADMIN_NAME,
-      GLOBAL_ADMIN_PASSWORD,
-      TOKEN_NAME,
-      TOKEN_SYMBOL,
-      TOKEN_DECIMALS,
-      TOKEN_INITIAL_SUPPLY
-    } = process.env;
-
-    if (!GLOBAL_ADMIN_NAME || !GLOBAL_ADMIN_PASSWORD) {
+    if (!tokenName || !tokenSymbol || !tokenDecimals || !tokenInitialSupply) {
       throw new Error(
-        'GLOBAL_ADMIN_NAME and GLOBAL_ADMIN_PASSWORD environment variables are required.'
+        'Token name, symbol, decimals, and initial supply are required.'
       );
     }
 
-    if (!TOKEN_NAME || !TOKEN_SYMBOL || !TOKEN_DECIMALS || !TOKEN_INITIAL_SUPPLY) {
-      throw new Error(
-        'TOKEN_NAME, TOKEN_SYMBOL, TOKEN_DECIMALS, and TOKEN_INITIAL_SUPPLY environment variables are required.'
-      );
-    }
-
-    // 1. Obtain the user token via OAuth.
-    const tokenString = await auth.getUserToken(GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD);
-    
-    if (!tokenString) {
-      throw new Error('Failed to acquire token.');
-    }
-    console.log('Token acquired:', tokenString);
-    const token = { token: tokenString };
-
-    // 4. Set up contract details for deployment.
     // Be sure to have updated the SimpleReserve.sol contract with the correct Base Code Collection.
     const contractName = 'ERC20Simple';
     const contractFilename =
@@ -47,10 +27,10 @@ async function main() {
 
     // Build the constructor arguments.
     const constructorArgs = {
-      name: TOKEN_NAME,
-      symbol: TOKEN_SYMBOL,
-      decimals: TOKEN_DECIMALS,
-      initialSupply: TOKEN_INITIAL_SUPPLY
+      name: tokenName,
+      symbol: tokenSymbol,
+      decimals: tokenDecimals,
+      initialSupply: tokenInitialSupply
     };
 
     const contractArgs = {
@@ -59,67 +39,45 @@ async function main() {
       args: util.usc(constructorArgs),
     };
 
-    // Deployment options.
-    const options = {
-      config,
-      history: contractName,
-      cacheNonce: true,
-      isAsync: true,
-    };
-    console.log(
-      'Deploying new ERC20Simple contract via rest.createContract...'
-    );
-    const response = await rest.createContract(token, contractArgs, options);
+    const final = await createContractArgs(contractArgs);
 
-    // Ensure response is an array so that we can safely call .map()
-    const responseArray = Array.isArray(response) ? response : [response];
-
-    // 5. Poll until the new contract appears in the database.
-    const predicate = (results) =>
-      results.filter((r) => r.status === 'Pending').length === 0;
-    const action = async (options) =>
-      rest.getBlocResults(
-        token,
-        responseArray.map((r) => r.hash),
-        options
-      );
-    const finalResults = await util.until(
-      predicate,
-      action,
-      { config, isAsync: true },
-      3600000
-    );
-    const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
-    if (final.status !== 'Success') {
-      throw new Error(`Error: contract deployment failed.`);
-    }
     console.log(`New ERC20Simple contract deployed.`);
+    finalContractAddress = final.txResult.contractsCreated;
     
-    // Store deployment information in a text file
-    const deploymentInfo = {
-      contractName: contractName,
-      deploymentTime: new Date().toISOString(),
-    //   final: final,
-      contractAddress: final.txResult.contractsCreated,
-      transactionHash: final.hash,
-      status: final.status
-    };
-    
-    const deploymentDir = path.join(__dirname, 'deployment-logs');
-    if (!fs.existsSync(deploymentDir)) {
-      fs.mkdirSync(deploymentDir, { recursive: true });
-    }
-    
-    const filename = `${contractName}-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
-    const filePath = path.join(deploymentDir, filename);
-    
-    const content = JSON.stringify(deploymentInfo, null, 2);
-    fs.writeFileSync(filePath, content);
-    
-    console.log(`Deployment information saved to: ${filePath}`);
+    saveCreateTXDataAsFile(contractName, final);
+
+    return finalContractAddress;
   } catch (error) {
     console.error('Fatal error in deployment:', error);
+    throw error;
   }
+}
+
+async function main() {
+    try {
+        const TOKEN_NAME = getEnvVar('TOKEN_NAME');
+        const TOKEN_SYMBOL = getEnvVar('TOKEN_SYMBOL');
+        const TOKEN_DECIMALS = getEnvVar('TOKEN_DECIMALS');
+        const TOKEN_INITIAL_SUPPLY = getEnvVar('TOKEN_INITIAL_SUPPLY');
+
+        if (!TOKEN_NAME || !TOKEN_SYMBOL || !TOKEN_DECIMALS || !TOKEN_INITIAL_SUPPLY) {
+          throw new Error(
+            'TOKEN_NAME, TOKEN_SYMBOL, TOKEN_DECIMALS, and TOKEN_INITIAL_SUPPLY environment variables are required.'
+          );
+        }
+        
+        // Call createERC20Simple with environment variables as parameters
+        const result = await createERC20Simple(
+            TOKEN_NAME,
+            TOKEN_SYMBOL,
+            TOKEN_DECIMALS,
+            TOKEN_INITIAL_SUPPLY
+        );
+        console.log("Deployed contract address:", result);
+    } catch (error) {
+        console.error("Error in main:", error);
+        process.exit(1);
+    }
 }
 
 main();

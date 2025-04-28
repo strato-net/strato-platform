@@ -4,57 +4,55 @@ const axios = require('axios');
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 const config = fsUtil.getYaml(`../../config.yaml`);
 const auth = require('../../auth');
+const { callListAndWait, getEnvVar } = require('../../util');
 
-/**
- * Calls a list of function calls and polls until all transactions have completed.
- *
- * @param {Object} token - The token object.
- * @param {Array} callListArgs - Array of call arguments.
- * @returns {Promise<Array>} - Final transaction results.
- */
-const callListAndWait = async (token, callListArgs) => {
-  const options = { config, cacheNonce: true, isAsync: true };
-  const pendingTxResultList = await rest.callList(token, callListArgs, options);
-  const responseArray = Array.isArray(pendingTxResultList)
-    ? pendingTxResultList
-    : [pendingTxResultList];
+async function registerMetadata(
+  tokenAddress,
+  tokenName,
+  tokenDescription,
+  tokenImages,
+  tokenFiles,
+  tokenFileNames,
+  tokenCreatedDate,
+  metadataAddress
+) {
+  try {
+    if (!tokenAddress || !metadataAddress) {
+      throw new Error('Token address and metadata address are required.');
+    }
 
-  // Poll until there are no pending transactions.
-  const predicate = (results) =>
-    results.filter((r) => r.status === 'Pending').length === 0;
-  const action = async (options) =>
-    await rest.getBlocResults(
-      token,
-      responseArray.map((r) => r.hash),
-      options
+    // Call registerMetadata.
+    console.log('Calling registerMetadata...');
+    // Prepare call arguments for the registerMetadata call.
+    let callListArgs = [
+      {
+        contract: { address: metadataAddress, name: 'SimpleTokenMetadata' },
+        method: 'registerMetadata',
+        args: util.usc({
+          tokenAddress: tokenAddress,
+          name: tokenName,
+          description: tokenDescription,
+          images: tokenImages,
+          files: tokenFiles,
+          fileNames: tokenFileNames,
+          createdDate: tokenCreatedDate,
+        }),
+      },
+    ];
+    const finalResults = await callListAndWait(callListArgs);
+    console.log(
+      'registerMetadata result:',
+      JSON.stringify(finalResults, null, 2)
     );
-  const finalResults = await util.until(
-    predicate,
-    action,
-    { config, isAsync: true },
-    3600000
-  );
-  return finalResults;
-};
-
-/**
- * Obtains an environment variable.
- * Throws an error if the variable is not set.
- * @param {string} name - The environment variable name.
- * @returns {string} - The environment variable value.
- */
-function getEnvVar(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Invalid ${name}`);
+    return finalResults;
+  } catch (error) {
+    console.error('Error in registerMetadata:', error);
+    throw error;
   }
-  return value;
 }
 
 async function main() {
   try {
-    const USERNAME = getEnvVar('USERNAME');
-    const PASSWORD = getEnvVar('PASSWORD');
     const TOKEN_ADDRESS = getEnvVar('TOKEN_ADDRESS');
     const TOKEN_NAME = getEnvVar('TOKEN_NAME');
     const TOKEN_DESCRIPTION = getEnvVar('TOKEN_DESCRIPTION');
@@ -64,36 +62,31 @@ async function main() {
     const TOKEN_CREATED_DATE = getEnvVar('TOKEN_CREATED_DATE');
     const METADATA_ADDRESS = getEnvVar('METADATA_ADDRESS');
 
-    // Obtain the first access token.
-    console.log('Obtaining first access token...');
-    let token = await auth.getUserToken(USERNAME, PASSWORD);
-    console.log('Access token of owner:', token);
+    // Validate environment variables
+    if (!USERNAME || !PASSWORD) {
+      throw new Error('USERNAME and PASSWORD environment variables are required.');
+    }
 
-    // Call registerMetadata.
-    console.log('Calling registerMetadata...');
-    // Prepare call arguments for the registerMetadata call.
-    let callListArgs = [
-      {
-        contract: { address: METADATA_ADDRESS, name: 'SimpleTokenMetadata' },
-        method: 'registerMetadata',
-        args: util.usc({
-          tokenAddress: TOKEN_ADDRESS,
-          name: TOKEN_NAME,
-          description: TOKEN_DESCRIPTION,
-          images: TOKEN_IMAGES,
-          files: TOKEN_FILES,
-          fileNames: TOKEN_FILE_NAMES,
-          createdDate: TOKEN_CREATED_DATE,
-        }),
-      },
-    ];
-    const finalResults = await callListAndWait({ token: token }, callListArgs);
-    console.log(
-      'registerMetadata result:',
-      JSON.stringify(finalResults, null, 2)
+    if (!TOKEN_ADDRESS || !METADATA_ADDRESS) {
+      throw new Error('TOKEN_ADDRESS and METADATA_ADDRESS environment variables are required.');
+    }
+
+    // Call registerMetadata with environment variables as parameters
+    const result = await registerMetadata(
+      TOKEN_ADDRESS,
+      TOKEN_NAME,
+      TOKEN_DESCRIPTION,
+      TOKEN_IMAGES,
+      TOKEN_FILES,
+      TOKEN_FILE_NAMES,
+      TOKEN_CREATED_DATE,
+      METADATA_ADDRESS
     );
+    console.log("Register metadata result:", result);
   } catch (error) {
-}
+    console.error("Error in main:", error);
+    process.exit(1);
+  }
 }
 
 main();
