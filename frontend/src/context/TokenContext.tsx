@@ -19,7 +19,7 @@ export const TokenProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         const fetchTokens = async () => {
             try {
-                const res = await axios.get('http://localhost/api/tokens/');
+                const res = await axios.get('api/tokens/');
                 const rawData = res.data as { _name: string; _symbol: string; address: string }[];
 
                 // FIRST: filter tokens that have non-empty _name and _symbol
