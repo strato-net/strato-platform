@@ -1,4 +1,4 @@
-import { getPools } from "../services/lending.service";
+import { getPools } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 
 export const getInputPrice = (
