@@ -1,4 +1,4 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
@@ -11,74 +11,12 @@ export const getPools = async (
   rawParams: Record<string, string | undefined> = {}
 ) => {
   try {
-    // 1. Clean incoming params and force the pool address
-    const params = Object.fromEntries(
-      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ) as Record<string, string>;
-    params.address = "eq." + constants.lendingPool;
-
-    // 2. Base fetch (no heavy selects)
-    const baseResponse = await cirrus.get(
+    const response = await bloc.get(
       accessToken,
-      `/BlockApps-Mercata-LendingPoolBase`,
-      { params }
+      StratoPaths.state.replace(":contractAddress", constants.lendingPool)
     );
-    if (baseResponse.status !== 200) {
-      throw new Error(`Error fetching lending pools: ${baseResponse.statusText}`);
-    }
-    if (!baseResponse.data || baseResponse.data.length === 0) {
-      throw new Error("Pool data is empty");
-    }
-    const poolData: Record<string, any> = baseResponse.data[0];
 
-    // 3. Define the four relations you need
-    const requiredRelations = [
-      "BlockApps-Mercata-LendingPoolBase-loans(*)",
-      "BlockApps-Mercata-LendingPoolBase-assetInterestRate(*)",
-      "BlockApps-Mercata-LendingPoolBase-assetCollateralRatio(*)",
-      "BlockApps-Mercata-LendingPoolBase-assetLiquidationBonus(*)",
-    ];
-
-    // 4. Fetch each relation separately and attach under its field name
-    for (const rel of requiredRelations) {
-      const relResponse = await cirrus.get(
-        accessToken,
-        `/BlockApps-Mercata-LendingPoolBase`,
-        {
-          params: {
-            address: "eq." + constants.lendingPool,
-            select: rel,
-          },
-        }
-      );
-      if (relResponse.status !== 200) {
-        throw new Error(`Error fetching relation ${rel}: ${relResponse.statusText}`);
-      }
-      if (rel.includes("loans")) {
-        // For loans, data is nested under the relation field
-        const row = relResponse.data[0];
-        const relField = Object.keys(row)[0]; // e.g., "BlockApps-Mercata-LendingPoolBase-loans"
-        const loanItems = (row as any)[relField] as any[];
-        poolData.loans = loanItems.map((item: any) => {
-          let parsed: Record<string, any> = {};
-          if (typeof item.value === "string") {
-            try {
-              parsed = JSON.parse(item.value);
-            } catch (parseError) {
-              console.error(
-                `Failed to parse loan value for key ${item.key}:`,
-                parseError
-              );
-            }
-          }
-          return { loanId: item.key, ...parsed };
-        });
-      } else {
-        Object.assign(poolData, relResponse.data[0]);
-      }
-    }
-
-    return [poolData];
+    return response.data;
 
   } catch (error) {
     console.error("Error fetching lending pools:", error);

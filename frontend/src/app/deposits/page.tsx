@@ -707,10 +707,11 @@ const DepositsPanel: FC = () => {
         const addr = userData.userAddress;
         try {
           const resp = await axios.get("/api/lend");
-          const pool = resp.data[0];
-          const userLoans = (pool.loans || []).filter(
-            (loan: any) => loan.user === addr
-          );
+          const pool = resp.data;
+          const loansObj = pool.loans || {};
+          const userLoans = Object.entries(loansObj)
+            .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
+            .filter((loan: any) => loan.user === addr);
           // Enrich each loan with token symbol, name, and human-readable balance
           const enrichedLoans = await Promise.all(
             userLoans.map(async (loan: any) => {
