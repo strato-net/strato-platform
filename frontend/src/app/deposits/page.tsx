@@ -136,7 +136,7 @@ const DepositsPanel: FC = () => {
         setDepositLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully deposited ${depositAmount}`,
+          description: `Succesfully deposited ${depositAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.log(err);
@@ -279,7 +279,7 @@ const DepositsPanel: FC = () => {
         setWithdrawLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully withdrawed ${withdrawAmount}`,
+          description: `Succesfully withdrawed ${withdrawAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.error(err);
@@ -481,7 +481,9 @@ const DepositsPanel: FC = () => {
         setBorrowLoading(true);
         // Use ethers.js to parse amounts to wei
         const amountInWei = ethers.parseUnits(withdrawAmount, 18).toString();
-        const collateralInWei = ethers.parseUnits(colleteralAmount, 18).toString();
+        const collateralInWei = ethers
+          .parseUnits(colleteralAmount, 18)
+          .toString();
         const response = await axios.post("api/lend/getLoan", {
           asset: selectedWithdrawToken?.address,
           amount: amountInWei,
@@ -492,7 +494,7 @@ const DepositsPanel: FC = () => {
         setBorrowLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully Borrowed`,
+          description: `Succesfully Borrowed ${withdrawAmount} ${selectedWithdrawToken?._symbol}`,
         });
       } catch (error) {
         setBorrowLoading(false);
@@ -700,40 +702,39 @@ const DepositsPanel: FC = () => {
     const [repayLoading, setRepayLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
-    useEffect(() => {
-      // Load user address and fetch their loans with token metadata
-      const fetchLoans = async () => {
-        const userData = JSON.parse(localStorage.getItem("user") || "{}");
-        const addr = userData.userAddress;
-        try {
-          const resp = await axios.get("/api/lend");
-          const pool = resp.data;
-          const loansObj = pool.loans || {};
-          const userLoans = Object.entries(loansObj)
-            .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-            .filter((loan: any) => loan.user === addr);
-          // Enrich each loan with token symbol, name, and human-readable balance
-          const enrichedLoans = await Promise.all(
-            userLoans.map(async (loan: any) => {
-              const tokenResp = await axios.get(`/api/tokens/${loan.asset}`);
-              const { _symbol, _name } = tokenResp.data[0];
-              const balanceHuman = ethers.formatUnits(
-                loan.amount,
-                18
-              );
-              return { ...loan, _symbol, _name, balanceHuman };
-            })
-          );
-          setLoanList(enrichedLoans);
-          if (enrichedLoans.length > 0) {
-            setLoan(enrichedLoans[0]);
-          }
-        } catch (e) {
-          console.error("Error fetching loans:", e);
+    // Load user address and fetch their loans with token metadata
+    const fetchLoans = async () => {
+      const userData = JSON.parse(localStorage.getItem("user") || "{}");
+      const addr = userData.userAddress;
+      try {
+        const resp = await axios.get("/api/lend");
+        const pool = resp.data;
+        const loansObj = pool.loans || {};
+        const userLoans = Object.entries(loansObj)
+          .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
+          .filter((loan: any) => loan.user === addr && loan.active === true);
+        console.log(userLoans, "user loans");
+        // Enrich each loan with token symbol, name, and human-readable balance
+        const enrichedLoans = await Promise.all(
+          userLoans.map(async (loan: any) => {
+            const tokenResp = await axios.get(`/api/tokens/${loan.asset}`);
+            const { _symbol, _name } = tokenResp.data[0];
+            const balanceHuman = ethers.formatUnits(loan.amount, 18);
+            return { ...loan, _symbol, _name, balanceHuman };
+          })
+        );
+        setLoanList(enrichedLoans);
+        if (enrichedLoans.length > 0) {
+          setLoan(enrichedLoans[0]);
         }
-      };
+      } catch (e) {
+        console.error("Error fetching loans:", e);
+      }
+    };
+
+    useEffect(() => {
       fetchLoans();
-    }, []);
+    }, [fetchLoans]);
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -752,10 +753,11 @@ const DepositsPanel: FC = () => {
           asset: loan?.asset,
         });
         console.log(response, "repay loan response");
+        await fetchLoans();
         setRepayLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully Repaid ${amount}`,
+          description: `Succesfully Repaid ${amount} ${loan?._symbol}`,
         });
       } catch (error) {
         api["error"]({
@@ -765,6 +767,7 @@ const DepositsPanel: FC = () => {
         setRepayLoading(false);
         console.error("Error repaying loan:", error);
       } finally {
+        setAmount("");
         setRepayLoading(false);
       }
     };
@@ -775,7 +778,8 @@ const DepositsPanel: FC = () => {
       }
     };
 
-    const isFormValid = !!loan?.loanId && !!selectedToken && parseFloat(amount) > 0;
+    const isFormValid =
+      !!loan?.loanId && !!selectedToken && parseFloat(amount) > 0;
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
@@ -891,10 +895,7 @@ const DepositsPanel: FC = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <Card
-        title=""
-        className="w-full w-[100%] rounded-2xl shadow-lg"
-      >
+      <Card title="" className="w-full w-[100%] rounded-2xl shadow-lg">
         <Tabs
           items={tabItems}
           activeKey={activeTab}
