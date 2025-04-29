@@ -13,12 +13,19 @@ async function deployTokensAndPool() {
         const SILVER_SYMBOL = getEnvVar('SILVER_SYMBOL');
         const SILVER_DECIMALS = getEnvVar('SILVER_DECIMALS');
         const SILVER_INITIAL_SUPPLY = getEnvVar('SILVER_INITIAL_SUPPLY');
-        
+        const SILVER_DESCRIPTION = getEnvVar('SILVER_DESCRIPTION');
+        const SILVER_IMAGES = getEnvVar('SILVER_IMAGES');
+        const SILVER_FILES = getEnvVar('SILVER_FILES');
+        const SILVER_FILE_NAMES = getEnvVar('SILVER_FILE_NAMES');
         // Get environment variables for USDST Token
         const USDST_NAME = getEnvVar('USDST_NAME');
         const USDST_SYMBOL = getEnvVar('USDST_SYMBOL');
         const USDST_DECIMALS = getEnvVar('USDST_DECIMALS');
         const USDST_INITIAL_SUPPLY = getEnvVar('USDST_INITIAL_SUPPLY');
+        const USDST_DESCRIPTION = getEnvVar('USDST_DESCRIPTION');
+        const USDST_IMAGES = getEnvVar('USDST_IMAGES');
+        const USDST_FILES = getEnvVar('USDST_FILES');
+        const USDST_FILE_NAMES = getEnvVar('USDST_FILE_NAMES');
 
         console.log('Creating Silver Token...');
         const silverTokenAddress = await createERC20Simple(
@@ -85,10 +92,10 @@ async function deployTokensAndPool() {
         const usdstMetadataInfo = {
             tokenAddress: usdstTokenAddress,
             tokenName: USDST_NAME,
-            tokenDescription: getEnvVar('USDST_DESCRIPTION'),
-            tokenImages: getEnvVar('USDST_IMAGES'),
-            tokenFiles: getEnvVar('USDST_FILES'),
-            tokenFileNames: getEnvVar('USDST_FILE_NAMES'),
+            tokenDescription: USDST_DESCRIPTION,
+            tokenImages: USDST_IMAGES,
+            tokenFiles: USDST_FILES,
+            tokenFileNames: USDST_FILE_NAMES,
             tokenCreatedDate: new Date().toISOString(),
             metadataAddress: metadataAddress
         };
@@ -120,7 +127,7 @@ async function deployTokensAndPool() {
             poolAddress
         };
     } catch (error) {
-        console.error('Error in deploy2tokensAndPool:', error);
+        console.error('Error in deployTokensAndPool:', error);
         throw error;
     }
 }

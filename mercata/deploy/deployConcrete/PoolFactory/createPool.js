@@ -61,4 +61,12 @@ async function main() {
   }
 }
 
-main();
+// Only run main() if this file is being executed directly, not when imported
+if (require.main === module) {
+  main();
+}
+
+// Add this at the end of the file
+module.exports = {
+  createPool
+};

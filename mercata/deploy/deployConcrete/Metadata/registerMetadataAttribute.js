@@ -1,9 +1,4 @@
-const config = require('../../config');
-
-const axios = require('axios');
-const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
-const config = fsUtil.getYaml(`../../config.yaml`);
-const auth = require('../../auth');
+const { util } = require('blockapps-rest');
 const { callListAndWait, getEnvVar } = require('../../util');
 
 async function registerMetadataAttribute(
@@ -16,11 +11,6 @@ async function registerMetadataAttribute(
     if (!tokenAddress || !tokenAttributes || !metadataAddress) {
       throw new Error('Token address, token attributes, and metadata address are required.');
     }
-
-    // Obtain the first access token.
-    console.log('Obtaining first access token...');
-    let token = await auth.getUserToken(username, password);
-    console.log('Access token of owner:', token);
 
     // Call registerMetadata.
     console.log('Calling registerMetadataAttribute...');
@@ -80,4 +70,12 @@ async function main() {
   }
 }
 
-main();
+// Only run main() if this file is being executed directly, not when imported
+if (require.main === module) {
+  main();
+}
+
+// Add this at the end of the file
+module.exports = {
+  registerMetadataAttribute
+};
