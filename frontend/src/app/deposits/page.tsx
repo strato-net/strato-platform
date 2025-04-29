@@ -279,7 +279,7 @@ const DepositsPanel: FC = () => {
         setWithdrawLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully withdrawed ${withdrawAmount} ${selectedDepositToken?._symbol}`,
+          description: `Succesfully withdrew ${withdrawAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.error(err);
