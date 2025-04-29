@@ -1,19 +1,45 @@
-pragma solidvm 11.5;
+pragma solidvm 12.0;
 
-import "Tokens/Token.sol";
 import "Bridge/MercataEthBridge.sol";
 import "ERC20/ERC20.sol";
+import "ERC20/extensions/ERC20Burnable.sol";
+import "Lending/CollateralVaultBase.sol";
+import "../concrete/Lending/CollateralVault.sol";
+import "Lending/LendingPoolBase.sol";
+import "../concrete/Lending/LendingPool.sol";
+import "Lending/LendingRegistryBase.sol";
+import "../concrete/Lending/LendingRegistry.sol";
+import "Lending/LiquidityPoolBase.sol";
+import "../concrete/Lending/LiquidityPool.sol";
+import "Lending/PoolConfiguratorBase.sol";
+import "../concrete/Lending/PoolConfigurator.sol";
+import "Lending/PriceOracleBase.sol";
+import "../concrete/Lending/PriceOracle.sol";
+import "Lending/RateStrategyBase.sol";
+import "../concrete/Lending/RateStrategy.sol";
 import "Pools/Pool.sol";
 import "Pools/PoolFactory.sol";
-import "ERC20/extensions/ERC20Burnable.sol";
-import "ERC20/access/Ownable.sol";
 import "Redemptions/RedemptionService.sol";
-import "Lending/CollateralVaultBase.sol";
-import "Lending/LendingPoolBase.sol";
-import "Lending/LendingRegistryBase.sol";
-import "Lending/PoolConfiguratorBase.sol";
-import "Lending/PriceOracleBase.sol";
-import "Lending/RateStrategyBase.sol";
-import "Lending/LiquidityPoolBase.sol";
+import "Tokens/Token.sol";
 
-contract Mercata{}
+contract Mercata {
+    RateStrategyBase rateStrategy;
+    PriceOracleBase priceOracle;
+    CollateralVaultBase collateralVault;
+    LiquidityPoolBase liquidityPool;
+    LendingPoolBase lendingPool;
+    PoolConfiguratorBase poolConfigurator;
+    LendingRegistryBase lendingRegistry;
+
+    constructor() public {
+        rateStrategy = RateStrategyBase(new RateStrategy());
+        priceOracle = PriceOracleBase(new PriceOracle());
+        collateralVault = CollateralVaultBase(new CollateralVault());
+        liquidityPool = LiquidityPoolBase(new LiquidityPool());
+        lendingPool = LendingPoolBase(new LendingPool(address(liquidityPool), address(collateralVault), address(rateStrategy), address(priceOracle)));
+        poolConfigurator = PoolConfiguratorBase(new PoolConfigurator(address(lendingPool)));
+        lendingRegistry = LendingRegistryBase(new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy)));
+        collateralVault.setLendingPool(address(lendingPool));
+        liquidityPool.setLendingPool(address(lendingPool));
+    }
+}

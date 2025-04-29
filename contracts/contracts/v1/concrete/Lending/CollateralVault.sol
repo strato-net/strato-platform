@@ -1,8 +1,6 @@
+pragma solidvm 12.0;
 
-pragma es6;
-pragma strict;
-
-import <BASE_CODE_COLLECTION>;
+import "../../abstract/Lending/CollateralVaultBase.sol";
 
 contract CollateralVault is CollateralVaultBase {
     constructor() {
