@@ -9,6 +9,7 @@ import { MdAttachMoney } from "react-icons/md";
 import Image from "next/image";
 import { useTokens } from "@/context/TokenContext";
 import TokenIcon from "../icons/TokenIcon";
+import BigNumber from "bignumber.js";
 
 type Token = {
   id: number;
@@ -96,8 +97,8 @@ export default function Dashboard() {
             id: token.id || Math.random(),
             name: matchingToken?._name || token.name || 'Unknown Token',
             symbol: matchingToken?._symbol || token.symbol || 'UNK',
-            balance: token.value || '0',
-            value: token.value || '0',
+            balance: token.value ? new BigNumber(token.value).dividedBy(10 ** 18).toString() : '0',
+            value: token.value ? new BigNumber(token.value).dividedBy(10 ** 18).toString() : '0',
             change24h: token.change24h || '0%',
             icon: token.icon || '/icons/default-token.svg',
             address: token.address
