@@ -283,7 +283,23 @@ pipeline {
                 allOf {
                   branch "PR-*"
                   environment(name: "CHANGE_TARGET", value: "develop")
-                  changeset "strato/**"
+                  expression {
+                    return sh(
+                      script: '''
+                        echo "Fetching origin/develop to compare..."
+                        git fetch origin develop --quiet
+                        echo "Checking for strato/ changes..."
+                        if git diff --name-only origin/develop...HEAD | grep '^strato/'; then
+                          echo "Detected changes in strato/, proceeding to Test Sync stage."
+                          exit 0
+                        else
+                          echo "No changes in strato/, skipping Test Sync stage."
+                          exit 1
+                        fi
+                      ''',
+                      returnStatus: true
+                    ) == 0
+                  }
                 }
               }
               agent { label "testsync" }
