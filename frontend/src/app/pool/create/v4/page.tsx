@@ -82,7 +82,6 @@ export default function V4PositionCreate() {
           <div className="w-full p-6 border rounded-2xl border-gray-200 flex flex-col gap-8">
             <div className="flex flex-col gap-4">
               <h2 className="text-2xl font-bold text-gray-900">Select pair</h2>
-              <p className="text-sm text-gray-600">Choose the tokens you want to provide liquidity for. You can select tokens on all supported networks.</p>
               <div className="flex flex-col md:flex-row gap-4">
                 <button 
                  onClick={() => {

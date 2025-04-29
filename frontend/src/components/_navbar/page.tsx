@@ -4,13 +4,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import axios from 'axios';
+import { useUser } from '@/context/UserContext';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [showPopover, setShowPopover] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [userAddress, setUserAddress] = useState('');
+  const { userAddress } = useUser();
 
   const isActiveParentRoute = (routes: string[]) =>
     routes.some(route => pathname.startsWith(route));
@@ -25,16 +25,6 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    axios.get('api/users/me')
-      .then(response => {
-        localStorage.setItem("user", JSON.stringify(response.data)); 
-        setUserAddress(response.data.userAddress);
-      })
-      .catch(error => {
-        console.error('Error fetching user data:', error);
-      });
-  }, []);
 
   const handleLogout = () => {
     console.log("Logging out...");
