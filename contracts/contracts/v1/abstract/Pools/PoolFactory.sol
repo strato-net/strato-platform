@@ -21,7 +21,7 @@ abstract contract PoolFactory is Ownable {
     mapping(address => mapping(address => address)) public getPool;
     address[] public allPools;
 
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable() {}
 
     /// @notice Create a new pool for tokenA/tokenB
     function createPool(address tokenA, address tokenB) external returns (address pool) onlyOwner {
