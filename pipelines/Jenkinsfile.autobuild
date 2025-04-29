@@ -284,19 +284,18 @@ pipeline {
                   branch "PR-*"
                   environment(name: "CHANGE_TARGET", value: "develop")
                   expression {
+                    sh(script: '''
+                      echo "[Test Sync check] Checking for strato/ changes..."
+                      git fetch origin develop --quiet
+                      if git diff --name-only origin/develop...HEAD | grep '^strato/'; then
+                        echo "[Test Sync check] Detected changes in strato/"
+                      else
+                        echo "[Test Sync check] No changes in strato/, skipping"
+                      fi
+                    ''', returnStatus: true)
+
                     return sh(
-                      script: '''
-                        echo "Fetching origin/develop to compare..."
-                        git fetch origin develop --quiet
-                        echo "Checking for strato/ changes..."
-                        if git diff --name-only origin/develop...HEAD | grep '^strato/'; then
-                          echo "Detected changes in strato/, proceeding to Test Sync stage."
-                          exit 0
-                        else
-                          echo "No changes in strato/, skipping Test Sync stage."
-                          exit 1
-                        fi
-                      ''',
+                      script: 'git diff --name-only origin/develop...HEAD | grep -q "^strato/"',
                       returnStatus: true
                     ) == 0
                   }
