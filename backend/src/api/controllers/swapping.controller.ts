@@ -263,8 +263,8 @@ class SwappingController {
 
   static validateCreatePoolsArgs(args: any) {
     const schema = Joi.object({
-      token: Joi.string().required(),
-      stablecoin: Joi.string().required(),
+      tokenA: Joi.string().required(),
+      tokenB: Joi.string().required(),
     });
 
     const validation = schema.validate(args);

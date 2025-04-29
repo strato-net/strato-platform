@@ -48,7 +48,7 @@ export const createPool = async (
       contractName: PoolFactory,
       contractAddress: constants.poolFactory,
       method: "createPool",
-      args: usc(body),
+      args: body,
     });
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
