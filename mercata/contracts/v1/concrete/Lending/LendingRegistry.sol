@@ -1,8 +1,6 @@
+pragma solidvm 12.0;
 
-pragma es6;
-pragma strict;
-
-import <BASE_CODE_COLLECTION>;
+import "../../abstract/Lending/LendingRegistryBase.sol";
 
 contract LendingRegistry is LendingRegistryBase {
     // No extra logic needed
