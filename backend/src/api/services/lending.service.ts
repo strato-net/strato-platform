@@ -54,7 +54,28 @@ export const getPools = async (
       if (relResponse.status !== 200) {
         throw new Error(`Error fetching relation ${rel}: ${relResponse.statusText}`);
       }
-      Object.assign(poolData, relResponse.data[0]);
+      if (rel.includes("loans")) {
+        // For loans, data is nested under the relation field
+        const row = relResponse.data[0];
+        const relField = Object.keys(row)[0]; // e.g., "BlockApps-Mercata-LendingPoolBase-loans"
+        const loanItems = (row as any)[relField] as any[];
+        poolData.loans = loanItems.map((item: any) => {
+          let parsed: Record<string, any> = {};
+          if (typeof item.value === "string") {
+            try {
+              parsed = JSON.parse(item.value);
+            } catch (parseError) {
+              console.error(
+                `Failed to parse loan value for key ${item.key}:`,
+                parseError
+              );
+            }
+          }
+          return { loanId: item.key, ...parsed };
+        });
+      } else {
+        Object.assign(poolData, relResponse.data[0]);
+      }
     }
 
     return [poolData];

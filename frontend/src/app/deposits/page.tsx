@@ -2,6 +2,7 @@
 
 import React, { FC, useEffect, useState } from "react";
 import { Card, notification, Spin, Tabs, TabsProps } from "antd";
+import { Select } from "antd";
 import { motion } from "framer-motion";
 import TokenDropdown from "@/components/_dropdown/page";
 import SupplyBorrowDashboard from "../_supplyTables/page";
@@ -9,37 +10,43 @@ import TokenIcon from "../icons/TokenIcon";
 import { TokenData } from "@/interface/token";
 import { useTokens } from "@/context/TokenContext";
 import axios from "axios";
+import { ethers } from "ethers";
 
 type TabKey = "deposits" | "borrow";
-type TabKey2 = "borrow" | "repay"
-type TabKey3 = "deposit" | "withdraw"
+type TabKey2 = "borrow" | "repay";
+type TabKey3 = "deposit" | "withdraw";
 
 const DepositsPanel: FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("deposits");
   const [activeTab2, setActiveTab2] = useState<TabKey2>("borrow");
-  const [activeTab3, setActiveTab3] = useState<TabKey3>(
-    "deposit"
-  );
+  const [activeTab3, setActiveTab3] = useState<TabKey3>("deposit");
   const { tokens } = useTokens();
 
   const [tokenList, setTokenList] = useState<TokenData[]>([]);
 
-  
   useEffect(() => {
     const fetchTokenList = async () => {
       try {
         const userData = await JSON.parse(localStorage.getItem("user") || "{}");
-        const res = await axios.get(`/api/tokens/table/balance?key=eq.${userData.userAddress}`);
-        const responseAddresses = new Set(res.data.map((addr: {address: string}) => addr?.address.toLowerCase()));
-        const filteredTokens = tokens ? tokens.filter(token =>
-          responseAddresses.has(token?.address?.toLowerCase())
-        ) : [];
+        const res = await axios.get(
+          `/api/tokens/table/balance?key=eq.${userData.userAddress}`
+        );
+        const responseAddresses = new Set(
+          res.data.map((addr: { address: string }) =>
+            addr?.address.toLowerCase()
+          )
+        );
+        const filteredTokens = tokens
+          ? tokens.filter((token) =>
+              responseAddresses.has(token?.address?.toLowerCase())
+            )
+          : [];
         setTokenList(filteredTokens);
       } catch (err) {
         console.log(err);
       }
     };
-    if(tokens){
+    if (tokens) {
       fetchTokenList();
     }
   }, [tokens]);
@@ -95,13 +102,14 @@ const DepositsPanel: FC = () => {
       useState(false);
     const [selectedDepositToken, setSelectedDepositToken] =
       useState<TokenData | null>(null);
-    const [depositAmount, setDepositAmount] = useState<string>('');
+    const [depositAmount, setDepositAmount] = useState<string>("");
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
-    const [depositLoading, setDepositLoading] = useState(false)
+    const [depositLoading, setDepositLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
-
-    const handleDepositAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleDepositAmountChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setDepositAmount(value);
@@ -109,31 +117,36 @@ const DepositsPanel: FC = () => {
     };
 
     const handleDeposit = async () => {
-  try {
-    setDepositLoading(true)
-    const res = await axios.post('/api/lend/manageLiquidity', {
-      asset: selectedDepositToken?.address,
-      amount: depositAmount,
-      method: "depositLiquidity",
-    });
-    console.log(res);
-    setDepositLoading(false)
-    api['success']({
-      message: 'Success',
-      description:
-        `Succesfully deposited ${depositAmount}`,
-    });
-  } catch (err) {
-    console.log(err);
-    setDepositLoading(false)
-    api['error']({
-      message: 'Error',
-      description:
-        `Deposit Error - ${err}`,
-    });
-  }
-};
-
+      try {
+        setDepositLoading(true);
+        // Convert depositAmount (a decimal string) to a BigInt in wei
+        const decimals = 18;
+        const [whole, fraction = ""] = depositAmount.split(".");
+        const fractionPadded = (fraction + "0".repeat(decimals)).slice(
+          0,
+          decimals
+        );
+        const amountInWei = BigInt(whole + fractionPadded).toString();
+        const res = await axios.post("/api/lend/manageLiquidity", {
+          asset: selectedDepositToken?.address,
+          amount: amountInWei,
+          method: "depositLiquidity",
+        });
+        console.log(res);
+        setDepositLoading(false);
+        api["success"]({
+          message: "Success",
+          description: `Succesfully deposited ${depositAmount}`,
+        });
+      } catch (err) {
+        console.log(err);
+        setDepositLoading(false);
+        api["error"]({
+          message: "Error",
+          description: `Deposit Error - ${err}`,
+        });
+      }
+    };
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
@@ -205,14 +218,15 @@ const DepositsPanel: FC = () => {
           </div>
           <div className="mt-10 w-1/2 mx-auto">
             <button
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && depositAmount
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
+                selectedDepositToken && depositAmount
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
               disabled={!selectedDepositToken || depositLoading}
               onClick={handleDeposit}
             >
-              {depositLoading && <Spin /> }
+              {depositLoading && <Spin />}
               Deposit
             </button>
           </div>
@@ -237,12 +251,14 @@ const DepositsPanel: FC = () => {
       useState(false);
     const [selectedDepositToken, setSelectedDepositToken] =
       useState<TokenData | null>(null);
-    const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+    const [withdrawAmount, setWithdrawAmount] = useState<string>("");
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
-    const [withdrawLoading, setWithdrawLoading] = useState(false)
+    const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
-    const handleWithdrawAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleWithdrawAmountChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setWithdrawAmount(value);
@@ -251,30 +267,29 @@ const DepositsPanel: FC = () => {
 
     const handleWithdraw = async () => {
       try {
-        setWithdrawLoading(true)
-        const res = await axios.post('/api/lend/manageLiquidity', {
+        setWithdrawLoading(true);
+        // Use ethers.js to parse the decimal string to wei
+        const amountInWei = ethers.parseUnits(withdrawAmount, 18).toString();
+        const res = await axios.post("/api/lend/manageLiquidity", {
           asset: selectedDepositToken?.address,
-          amount: withdrawAmount,
+          amount: amountInWei,
           method: "withdrawLiquidity",
         });
         console.log(res);
-        setWithdrawLoading(false)
-        api['success']({
-          message: 'Success',
-          description:
-            `Succesfully withdrawed ${withdrawAmount}`,
+        setWithdrawLoading(false);
+        api["success"]({
+          message: "Success",
+          description: `Succesfully withdrawed ${withdrawAmount}`,
         });
       } catch (err) {
         console.error(err);
-        setWithdrawLoading(false)
-        api['error']({
-          message: 'Error',
-          description:
-            `Withdraw Error - ${err}`,
+        setWithdrawLoading(false);
+        api["error"]({
+          message: "Error",
+          description: `Withdraw Error - ${err}`,
         });
       }
     };
-    
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
@@ -346,14 +361,15 @@ const DepositsPanel: FC = () => {
           </div>
           <div className="mt-10 w-1/2 mx-auto">
             <button
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && withdrawAmount
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
+                selectedDepositToken && withdrawAmount
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
               disabled={!selectedDepositToken || withdrawLoading}
               onClick={handleWithdraw}
             >
-              {withdrawLoading && <Spin /> }
+              {withdrawLoading && <Spin />}
               Withdraw
             </button>
           </div>
@@ -433,8 +449,8 @@ const DepositsPanel: FC = () => {
     const [selectedColleteralToken, setSelectedColleteralToken] =
       useState<TokenData | null>(null);
     const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
-    const [withdrawAmount, setWithdrawAmount] = useState<string>('');
-    const [colleteralAmount, setColleteralAmount] = useState<string>('');
+    const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+    const [colleteralAmount, setColleteralAmount] = useState<string>("");
     const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] =
       useState("");
     const [tokenSearchQueryColleteral, setTokenSearchQueryColleteral] =
@@ -442,15 +458,18 @@ const DepositsPanel: FC = () => {
     const [borrowLoading, setBorrowLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
-
-    const handleWithdrawAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleWithdrawAmountChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setWithdrawAmount(value);
       }
     };
 
-    const handleColleteralAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleColleteralAmountChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setColleteralAmount(value);
@@ -460,33 +479,34 @@ const DepositsPanel: FC = () => {
     const borrowLoan = async () => {
       try {
         setBorrowLoading(true);
+        // Use ethers.js to parse amounts to wei
+        const amountInWei = ethers.parseUnits(withdrawAmount, 18).toString();
+        const collateralInWei = ethers.parseUnits(colleteralAmount, 18).toString();
         const response = await axios.post("api/lend/getLoan", {
           asset: selectedWithdrawToken?.address,
-          amount: withdrawAmount,
+          amount: amountInWei,
           collateralAsset: selectedColleteralToken?.address,
-          collateralAmount: colleteralAmount,
+          collateralAmount: collateralInWei,
         });
         console.log(response, "<<");
-        setBorrowLoading(false)
-        api['success']({
-          message: 'Success',
-          description:
-            `Succesfully Borrowed`,
+        setBorrowLoading(false);
+        api["success"]({
+          message: "Success",
+          description: `Succesfully Borrowed`,
         });
       } catch (error) {
-        setBorrowLoading(false)
+        setBorrowLoading(false);
         console.error("Error borrowing loan:", error);
-        api['error']({
-          message: 'Error',
-          description:
-            `Borrow Error - ${error}`,
+        api["error"]({
+          message: "Error",
+          description: `Borrow Error - ${error}`,
         });
       } finally {
         setBorrowLoading(false);
       }
     };
 
-    const handleWithdraw = () => {
+    const handleBorrow = () => {
       if (isWithdrawFormValid) {
         borrowLoan();
       }
@@ -577,7 +597,7 @@ const DepositsPanel: FC = () => {
 
           <div className="mb-6 flex flex-col gap-2">
             <label className="block text-sm font-medium text-blue-700 mb-1">
-              Select Colleteral
+              Select Collateral
             </label>
             <button
               onClick={() => {
@@ -632,14 +652,15 @@ const DepositsPanel: FC = () => {
           <div className="mb-2">
             <button
               type="button"
-              onClick={handleWithdraw}
+              onClick={handleBorrow}
               disabled={!isWithdrawFormValid || borrowLoading}
-              className={`flex justify-center gap-3 w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 ${isWithdrawFormValid && !borrowLoading
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 ${
+                isWithdrawFormValid && !borrowLoading
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
             >
-              {borrowLoading && <Spin /> }
+              {borrowLoading && <Spin />}
               {borrowLoading ? "Borrowing..." : "Borrow"}
             </button>
           </div>
@@ -670,13 +691,48 @@ const DepositsPanel: FC = () => {
   };
 
   const RenderRepay = () => {
+    const [loanList, setLoanList] = useState<any[]>([]);
     const [showTokenSelector, setShowTokenSelector] = useState(false);
     const [selectedToken, setSelectedToken] = useState<TokenData | null>(null);
-    const [loanId, setLoanId] = useState("");
-    const [amount, setAmount] = useState<string>('');
+    const [loan, setLoan] = useState<any | null>(null);
+    const [amount, setAmount] = useState<string>("");
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [repayLoading, setRepayLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+
+    useEffect(() => {
+      // Load user address and fetch their loans with token metadata
+      const fetchLoans = async () => {
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
+        const addr = userData.userAddress;
+        try {
+          const resp = await axios.get("/api/lend");
+          const pool = resp.data[0];
+          const userLoans = (pool.loans || []).filter(
+            (loan: any) => loan.user === addr
+          );
+          // Enrich each loan with token symbol, name, and human-readable balance
+          const enrichedLoans = await Promise.all(
+            userLoans.map(async (loan: any) => {
+              const tokenResp = await axios.get(`/api/tokens/${loan.asset}`);
+              const { _symbol, _name } = tokenResp.data[0];
+              const balanceHuman = ethers.formatUnits(
+                loan.amount,
+                18
+              );
+              return { ...loan, _symbol, _name, balanceHuman };
+            })
+          );
+          setLoanList(enrichedLoans);
+          if (enrichedLoans.length > 0) {
+            setLoan(enrichedLoans[0]);
+          }
+        } catch (e) {
+          console.error("Error fetching loans:", e);
+        }
+      };
+      fetchLoans();
+    }, []);
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -688,25 +744,24 @@ const DepositsPanel: FC = () => {
     const repayLoan = async () => {
       try {
         setRepayLoading(true);
+        const amountInWei = ethers.parseUnits(amount, 18).toString();
         const response = await axios.post("api/lend/repayLoan", {
-          loanId,
-          amount: amount,
-          asset: selectedToken?.address,
+          loanId: loan?.loanId,
+          amount: amountInWei,
+          asset: loan?.asset,
         });
         console.log(response, "repay loan response");
-        setRepayLoading(false)
-        api['success']({
-          message: 'Success',
-          description:
-            `Succesfully Repaid ${amount}`,
+        setRepayLoading(false);
+        api["success"]({
+          message: "Success",
+          description: `Succesfully Repaid ${amount}`,
         });
       } catch (error) {
-        api['error']({
-          message: 'Error',
-          description:
-            `Repay Error - ${error}`,
+        api["error"]({
+          message: "Error",
+          description: `Repay Error - ${error}`,
         });
-        setRepayLoading(false)
+        setRepayLoading(false);
         console.error("Error repaying loan:", error);
       } finally {
         setRepayLoading(false);
@@ -719,14 +774,7 @@ const DepositsPanel: FC = () => {
       }
     };
 
-    const handleLoanIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      if (/^\d*$/.test(value)) {
-        setLoanId(value);
-      }
-    };
-
-    const isFormValid = loanId && selectedToken && parseFloat(amount) > 0;
+    const isFormValid = !!loan?.loanId && !!selectedToken && parseFloat(amount) > 0;
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
@@ -748,47 +796,22 @@ const DepositsPanel: FC = () => {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
-              Loan ID
+              Select Loan
             </label>
-            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-white">
-              <input
-                value={loanId}
-                onChange={handleLoanIdChange}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="Enter loan ID"
-                className="flex-1 text-lg focus:outline-none text-gray-800 placeholder-gray-400 bg-transparent"
-              />
-            </div>
-          </div>
-
-          <div className="mb-6 flex flex-col gap-2">
-            <label className="block text-sm font-medium text-blue-700 mb-1">
-              Select Asset
-            </label>
-            <button
-              onClick={() => {
-                setShowTokenSelector(true);
+            <Select
+              value={loan?.loanId}
+              onChange={(value: string) => {
+                const selected = loanList.find((l) => l.loanId === value);
+                setLoan(selected || null);
               }}
-              className="flex items-center justify-between px-4 py-3 border rounded-xl border-blue-200 bg-blue-50 w-full hover:bg-blue-100 transition"
-            >
-              <div className="flex items-center gap-2">
-                <TokenIcon symbol={selectedToken?._symbol || "NA"} size="md" />
-                <span className="text-[#2C3E50] font-medium">
-                  {selectedToken?._name || "ETH"}
-                </span>
-              </div>
-              <svg
-                className="w-5 h-5 rotate-90 text-blue-500"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
-              </svg>
-            </button>
+              options={loanList.map((loan) => ({
+                label: `${loan._symbol} - ${loan.balanceHuman}`,
+                value: loan.loanId,
+              }))}
+              placeholder="Select a loan"
+              className="w-full"
+            />
           </div>
-
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
               Amount
@@ -805,7 +828,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedToken?._symbol ?? "ETH"}
+                  {loan?._symbol ?? "ETH"}
                 </h3>
               </div>
             </div>
@@ -815,12 +838,13 @@ const DepositsPanel: FC = () => {
             <button
               onClick={handleRepay}
               disabled={!isFormValid || repayLoading}
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${isFormValid && !repayLoading
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
+                isFormValid && !repayLoading
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
             >
-              {repayLoading && <Spin /> }
+              {repayLoading && <Spin />}
               {repayLoading ? "Repaying..." : "Repay"}
             </button>
           </div>
@@ -867,7 +891,7 @@ const DepositsPanel: FC = () => {
       animate={{ opacity: 1, y: 0 }}
     >
       <Card
-        title="Swap & Liquidity"
+        title=""
         className="w-full w-[100%] rounded-2xl shadow-lg"
       >
         <Tabs
