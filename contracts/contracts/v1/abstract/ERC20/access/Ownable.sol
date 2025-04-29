@@ -54,7 +54,6 @@ abstract contract Ownable is Context {
      */
     function _checkOwner() internal view virtual {
         if (owner() != _msgSender()) {
-            require(owner() == _msgSender(), string(owner()) + " does not match " + string(_msgSender()));
             revert OwnableUnauthorizedAccount(_msgSender());
         }
     }
