@@ -11,46 +11,54 @@ export const getPools = async (
   rawParams: Record<string, string | undefined> = {}
 ) => {
   try {
-    // Filter out undefined values (cleaning for axios)
+    // 1. Clean incoming params and force the pool address
     const params = Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
     params.address = "eq." + constants.lendingPool;
-    // Ensure all required relations are selected
+
+    // 2. Base fetch (no heavy selects)
+    const baseResponse = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-LendingPoolBase`,
+      { params }
+    );
+    if (baseResponse.status !== 200) {
+      throw new Error(`Error fetching lending pools: ${baseResponse.statusText}`);
+    }
+    if (!baseResponse.data || baseResponse.data.length === 0) {
+      throw new Error("Pool data is empty");
+    }
+    const poolData: Record<string, any> = baseResponse.data[0];
+
+    // 3. Define the four relations you need
     const requiredRelations = [
       "BlockApps-Mercata-LendingPoolBase-loans(*)",
       "BlockApps-Mercata-LendingPoolBase-assetInterestRate(*)",
       "BlockApps-Mercata-LendingPoolBase-assetCollateralRatio(*)",
       "BlockApps-Mercata-LendingPoolBase-assetLiquidationBonus(*)",
     ];
-    // Clean and build select parameter
-    const existingSelect = params.select
-      ? Array.from(new Set(params.select.split(",")))
-      : ["*"];
-    requiredRelations.forEach((rel) => {
-      if (!existingSelect.includes(rel)) {
-        existingSelect.push(rel);
-      }
-    });
-    params.select = existingSelect.join(",");
 
-    const response = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-LendingPoolBase`,
-      {
-        params,
+    // 4. Fetch each relation separately and attach under its field name
+    for (const rel of requiredRelations) {
+      const relResponse = await cirrus.get(
+        accessToken,
+        `/BlockApps-Mercata-LendingPoolBase`,
+        {
+          params: {
+            address: "eq." + constants.lendingPool,
+            select: rel,
+          },
+        }
+      );
+      if (relResponse.status !== 200) {
+        throw new Error(`Error fetching relation ${rel}: ${relResponse.statusText}`);
       }
-    );
-
-    if (response.status !== 200) {
-      throw new Error(`Error fetching lending pools: ${response.statusText}`);
+      Object.assign(poolData, relResponse.data[0]);
     }
 
-    if (!response.data) {
-      throw new Error("Pool data is empty");
-    }
+    return [poolData];
 
-    return response.data;
   } catch (error) {
     console.error("Error fetching lending pools:", error);
     throw error;
