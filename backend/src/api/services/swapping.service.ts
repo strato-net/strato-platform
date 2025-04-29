@@ -70,13 +70,56 @@ export const addLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const pool = await getPools(accessToken, {
+      address: "eq." + body.address,
+      select: "data->>tokenA,data->>tokenB",
+    });
+
+    let tx = buildFunctionTx({
+      contractName: "ERC20",
+      contractAddress: pool[0].tokenA || "",
+      method: "approve",
+      args: {
+        spender: body.address,
+        value: body.max_tokenA_amount,
+      },
+    });
+
+    let { status: approveStatus1, hash: approveHash1 } = await postAndWaitForTx(
+      accessToken,
+      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    if (approveStatus1 !== "Success") {
+      throw new Error(`Error approving asset with hash: ${approveHash1}`);
+    }
+
+    tx = buildFunctionTx({
+      contractName: "ERC20",
+      contractAddress: pool[0].tokenB || "",
+      method: "approve",
+      args: {
+        spender: body.address,
+        value: body.tokenB_amount,
+      },
+    });
+
+    let { status: approveStatus2, hash: approveHash2 } = await postAndWaitForTx(
+      accessToken,
+      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    if (approveStatus2 !== "Success") {
+      throw new Error(`Error approving asset with hash: ${approveHash2}`);
+    }
+
+    tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: body.address || "",
       method: "addLiquidity",
       args: {
-        stable_amount: body.stable_amount,
-        max_tokens: body.max_tokens,
+        tokenB_amount: body.tokenB_amount,
+        max_tokenA_amount: body.max_tokenA_amount,
       },
     });
 
@@ -99,14 +142,28 @@ export const removeLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
+    const pool = await getPools(accessToken, {
+      address: "eq." + body.address,
+    });
+    // calculate tokenA and tokenB amounts
+    const tokenA_amount =
+      (BigInt(pool[0].data.tokenABalance) * BigInt(body.amount || "0")) /
+      BigInt(pool[0]._totalSupply);
+    const tokenB_amount =
+      (BigInt(pool[0].data.tokenBBalance) * BigInt(body.amount || "0")) /
+      BigInt(pool[0]._totalSupply);
+    // Apply 1% slippage tolerance
+    const slippageFactor = BigInt(99); // 99%
+    const min_tokenA_amount = ((tokenA_amount * slippageFactor) / BigInt(100)).toString();
+    const min_tokenB_amount = ((tokenB_amount * slippageFactor) / BigInt(100)).toString();
     const tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: body.address || "",
       method: "removeLiquidity",
       args: {
         amount: body.amount,
-        min_stable: body.min_stable,
-        min_tokens: body.min_tokens,
+        min_tokenB: min_tokenB_amount,
+        min_tokenA_amount: min_tokenA_amount,
       },
     });
 

@@ -30,6 +30,7 @@ router.get("/swapableTokens/", authHandler.authorizeRequest(true), SwappingContr
 router.get("/swapableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
 router.get("/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 router.get("/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
+router.get("/lpToken", authHandler.authorizeRequest(true), SwappingController.getLPTokens);
 
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);

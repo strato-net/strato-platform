@@ -9,7 +9,7 @@ import {
   swap,
   calculateSwap,
 } from "../services/swapping.service";
-import { getTokens } from "../services/tokens.service";
+import { getBalance, getTokens } from "../services/tokens.service";
 
 class SwappingController {
   static async get(
@@ -60,6 +60,37 @@ class SwappingController {
       return next();
     } catch (e) {
       return next(e);
+    }
+  }
+
+  static async getLPTokens(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken,address } = req;
+
+      const userTokens = await getBalance(accessToken, {
+        key: "eq." + address,
+      });
+      const userTokensAddresses = userTokens.map((token: any) => token.address);
+      const pools = await getPools(accessToken, {
+        address: "in.(" + userTokensAddresses.join(",") + ")",
+      });
+
+      const poolsWithUserTokens = pools.map((pool: any) => {
+        const userToken = userTokens.find(
+          (token: any) => token.address === pool.address
+        );
+        return {
+          ...pool,
+          ...userToken,
+        };
+      });
+      res.status(RestStatus.OK).json(poolsWithUserTokens);
+    } catch (error) {
+      next(error);
     }
   }
 
@@ -248,8 +279,8 @@ class SwappingController {
   static validateAddLiquidityArgs(args: any) {
     const schema = Joi.object({
       address: Joi.string().required(),
-      stable_amount: Joi.string().required(),
-      max_tokens: Joi.string().required(),
+      tokenB_amount: Joi.string().required(),
+      max_tokenA_amount: Joi.string().required(),
     });
 
     const validation = schema.validate(args);
@@ -265,8 +296,8 @@ class SwappingController {
     const schema = Joi.object({
       address: Joi.string().required(),
       amount: Joi.string().required(),
-      min_stable: Joi.string().required(),
-      min_tokens: Joi.string().required(),
+      // min_tokenB: Joi.string().required(),
+      // min_tokenA_amount: Joi.string().required(),
     });
 
     const validation = schema.validate(args);
