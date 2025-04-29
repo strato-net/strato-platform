@@ -136,7 +136,7 @@ const DepositsPanel: FC = () => {
         setDepositLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully deposited ${depositAmount}`,
+          description: `Succesfully deposited ${depositAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.log(err);
@@ -279,7 +279,7 @@ const DepositsPanel: FC = () => {
         setWithdrawLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully withdrawed ${withdrawAmount}`,
+          description: `Succesfully withdrawed ${withdrawAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.error(err);
@@ -492,7 +492,7 @@ const DepositsPanel: FC = () => {
         setBorrowLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully Borrowed`,
+          description: `Succesfully Borrowed ${withdrawAmount} ${selectedWithdrawToken?._symbol}`,
         });
       } catch (error) {
         setBorrowLoading(false);
@@ -755,7 +755,7 @@ const DepositsPanel: FC = () => {
         setRepayLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully Repaid ${amount}`,
+          description: `Succesfully Repaid ${amount} ${loan?._symbol}`,
         });
       } catch (error) {
         api["error"]({
