@@ -3,8 +3,8 @@
  */
 const fs = require("fs-extra");
 const path = require("path");
-const { rest, importer } = require("blockapps-rest");
-const { createContract } = rest;
+const { rest, importer, util } = require("blockapps-rest");
+const { createContract, getState } = rest;
 const config = require("./config");
 
 /**
@@ -80,14 +80,18 @@ async function uploadDappContract(token, options) {
     // Deploy the contract
     console.log(`Deploying contract ${contractName}...`);
     const contract = await createContract(token, contractArgs, deployOptions);
-
+    const contractState = await util.until(
+      (r) => r && r.lendingPool,
+      (opts) => getState(token, contract, opts),
+      options
+    );
     // Remove source code from the result (it can be large)
     contract.src = "removed";
 
     console.log(`Contract deployed successfully!`);
     console.log(`Contract address: ${contract.address}`);
 
-    return contract;
+    return { ...contract, managers: contractState };
   } catch (error) {
     console.error("Error deploying contract:", error);
     throw error;
