@@ -1,9 +1,4 @@
-const config = require('../../config');
-
-const axios = require('axios');
-const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
-const config = fsUtil.getYaml(`../../config.yaml`);
-const auth = require('../../auth');
+const { util } = require('blockapps-rest');
 const { callListAndWait, getEnvVar } = require('../../util');
 
 async function registerMetadata(
@@ -89,4 +84,12 @@ async function main() {
   }
 }
 
-main();
+// Only run main() if this file is being executed directly, not when imported
+if (require.main === module) {
+  main();
+}
+
+// Add this at the end of the file
+module.exports = {
+  registerMetadata
+};

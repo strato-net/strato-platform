@@ -2,10 +2,10 @@
 const { util, importer } = require('blockapps-rest');
 const { createContractArgs, saveCreateTXDataAsFile } = require('../../util');
 
-async function createMetadata(username, password) {
+async function createMetadata() {
   try {
     // Be sure to have updated the SimpleTokenMetadata.sol contract with the correct Base Code Collection.
-    const contractName = 'Metadata';
+    const contractName = 'SimpleTokenMetadata';
     const contractFilename =
       '../../../contracts/v1/abstract/Tokens/Metadata/SimpleTokenMetadata.sol';
     const source = await importer.combine(contractFilename);
@@ -23,9 +23,10 @@ async function createMetadata(username, password) {
     const final = await createContractArgs(contractArgs);
 
     console.log(`New Metadata contract deployed.`);
-    finalContractAddress = final.contractAddress || final.address;
+    finalContractAddress = final.txResult.contractsCreated;
     
     saveCreateTXDataAsFile(contractName, final);
+    
     return finalContractAddress;
   } catch (error) {
     console.error('Fatal error in deployment:', error);
@@ -44,4 +45,11 @@ async function main() {
     }
 }
 
-main();
+// Only run main() if this file is being executed directly, not when imported
+if (require.main === module) {
+  main();
+}
+// Add this at the end of the file
+module.exports = {
+  createMetadata
+};
