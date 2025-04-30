@@ -430,7 +430,7 @@ async function main() {
           try {
             await Promise.race([
               submitOraclePricePeriodically(),
-              createTimeoutPromise(seconds=4200, breachMessage="submitOraclePricePeriodically timed out after 4200 seconds")
+              createTimeoutPromise(4200, "submitOraclePricePeriodically timed out after 4200 seconds")
             ]);
             lastOracleRun = currentDate;
           } catch (error) {
@@ -453,7 +453,7 @@ async function main() {
           try {
             await Promise.race([
               updateSalePricePeriodically(),
-              createTimeoutPromise(seconds=3600, breachMessage="updateSalePricePeriodically timed out after 3600 seconds")
+              createTimeoutPromise(3600, "updateSalePricePeriodically timed out after 3600 seconds")
             ]);
           } catch (error) {
             if (error instanceof TimeoutError) {
