@@ -93,7 +93,7 @@ const SwapPanel: React.FC = () => {
   const onRemoveLiquidity = () => {
     if (withdrawPercent <= 0 || withdrawPercent > 100)
       return message.error("Enter a % between 1‑100");
-    message.success(`Withdrew ${withdrawPercent}% of position (mock)`);
+    message.success(`Withdraw ${withdrawPercent}% of position (mock)`);
   };
   const renderSwap = () => (
     <div className="space-y-4">
