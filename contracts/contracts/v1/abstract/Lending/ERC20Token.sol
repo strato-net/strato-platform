@@ -19,7 +19,7 @@ abstract contract ERC20Token is Utils, ERC20, ERC20Burnable, Ownable {
         string _symbol,
         uint256 _initialSupply,
         uint8 _decimals
-     ) ERC20(_name, _symbol) Ownable(msg.sender) {
+     ) ERC20(_name, _symbol) Ownable() {
         ownerCommonName = getCommonName(msg.sender);
         decimals = _decimals;
         mint(_initialSupply);

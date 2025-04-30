@@ -1,5 +1,4 @@
 pragma solidvm 12.0;
-import "./LendingPoolBase.sol";
 
 abstract contract LiquidityPoolBase  {
     event Deposited(address indexed user, address indexed asset, uint256 amount);
