@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
+// Create change in file outside of strato/
 
 const host = process.env.POSTGRES_SERVER_URL || 'postgres';
 const port = process.env.POSTGRES_PORT || '5432';
