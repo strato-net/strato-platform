@@ -41,7 +41,6 @@ contract Mercata {
         lendingRegistry = LendingRegistryBase(new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy)));
         collateralVault.setLendingPool(address(lendingPool));
         liquidityPool.setLendingPool(address(lendingPool));
-        Ownable(collateralVault).transferOwnership(msg.sender);
-        Ownable(liquidityPool).transferOwnership(msg.sender);
+        
     }
 }

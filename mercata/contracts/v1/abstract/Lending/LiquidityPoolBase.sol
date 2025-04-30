@@ -1,7 +1,7 @@
 pragma solidvm 12.0;
 import "./LendingPoolBase.sol";
 
-abstract contract LiquidityPoolBase is Ownable  {
+abstract contract LiquidityPoolBase   {
     event Deposited(address indexed user, address indexed asset, uint256 amount);
     event Withdrawn(address indexed user, address indexed asset, uint256 amount);
     event Borrowed(address indexed user, address indexed asset, uint256 amount);
@@ -22,7 +22,7 @@ abstract contract LiquidityPoolBase is Ownable  {
     mapping(address => uint256) public record totalLiquidity;
     mapping(string => Borrow) public record borrowed;
 
-    constructor() Ownable() {
+    constructor() {
         
     } 
  
@@ -31,7 +31,7 @@ abstract contract LiquidityPoolBase is Ownable  {
         _;
     }
 
-   function setLendingPool(address _lendingPool)  external onlyOwner {
+   function setLendingPool(address _lendingPool)  external  {
         //require(address(lendingPool) == address(0), "LendingPool already set");
         require(_lendingPool != address(0), "Invalid address");
         lendingPool = _lendingPool;
