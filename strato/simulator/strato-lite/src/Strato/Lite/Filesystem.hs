@@ -28,6 +28,7 @@ import Blockchain.Database.MerklePatricia.MPDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
+import Blockchain.GenesisBlocks.Contracts.BitcoinBridge
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
 -- import Blockchain.GenesisBlocks.Contracts.Governance
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
@@ -84,13 +85,15 @@ createFilesystemPeerAndCorePeer ::
   FilesystemDBs ->
   IO (FilesystemPeer, CorePeer)
 createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost bootNodes valBehav sock fsDBs = do
-  let privAndIds = [(privKey, Validator "dnorwood")]
+  let privAndIds = [(privKey, selfId)]
       validatorsPrivKeys = id privAndIds
       vals' = makeValidators validatorsPrivKeys
   certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
   let vals = snd <$> vals'
-      genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract certs defaultGenesisInfo -- Helium.genesisBlock
+      genesisInfo = insertBitcoinBridgeContract
+                  . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
+                  $ insertCertRegistryContract certs defaultGenesisInfo
   -- let genesisInfo = Production.productionGenesisBlock
   -- let genesisInfo = Helium.genesisBlock
   corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
