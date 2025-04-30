@@ -140,92 +140,92 @@ makeLenses ''MemContext
 instance Default MemContext where
   def = MemContext def def
 
-type MemContextM = ReaderT (IORef MemContext) (LoggingT IO) -- I hope we can get rid of the IO dependency someday
+type MemContextM m = ReaderT (IORef MemContext) m
 
-getMemContext :: MemContextM MemContext
+getMemContext :: MonadIO m => MemContextM m MemContext
 getMemContext = ask >>= readIORef
 
-get :: MemContextM ContextState
+get :: MonadIO m => MemContextM m ContextState
 get = _state <$> getMemContext
 {-# INLINE get #-}
 
-gets :: (ContextState -> a) -> MemContextM a
+gets :: MonadIO m => (ContextState -> a) -> MemContextM m a
 gets f = f <$> get
 {-# INLINE gets #-}
 
-put :: ContextState -> MemContextM ()
+put :: MonadIO m => ContextState -> MemContextM m ()
 put c = ask >>= \i -> atomicModifyIORef i $ (,()) . (state .~ c)
 {-# INLINE put #-}
 
-modify :: (ContextState -> ContextState) -> MemContextM ()
+modify :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
 modify f = ask >>= \i -> atomicModifyIORef i $ (,()) . (state %~ f)
 {-# INLINE modify #-}
 
-modify' :: (ContextState -> ContextState) -> MemContextM ()
+modify' :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
 modify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (state %~ f)
 {-# INLINE modify' #-}
 
-dbsGet :: MemContextM MemContextDBs
+dbsGet :: MonadIO m => MemContextM m MemContextDBs
 dbsGet = _dbs <$> getMemContext
 {-# INLINE dbsGet #-}
 
-dbsGets :: (MemContextDBs -> a) -> MemContextM a
+dbsGets :: MonadIO m => (MemContextDBs -> a) -> MemContextM m a
 dbsGets f = f <$> dbsGet
 {-# INLINE dbsGets #-}
 
-dbsPut :: MemContextDBs -> MemContextM ()
+dbsPut :: MonadIO m => MemContextDBs -> MemContextM m ()
 dbsPut c = ask >>= \i -> atomicModifyIORef i $ (,()) . (dbs .~ c)
 {-# INLINE dbsPut #-}
 
-dbsModify :: (MemContextDBs -> MemContextDBs) -> MemContextM ()
+dbsModify :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MemContextM m ()
 dbsModify f = ask >>= \i -> atomicModifyIORef i $ (,()) . (dbs %~ f)
 {-# INLINE dbsModify #-}
 
-dbsModify' :: (MemContextDBs -> MemContextDBs) -> MemContextM ()
+dbsModify' :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MemContextM m ()
 dbsModify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (dbs %~ f)
 {-# INLINE dbsModify' #-}
 
-contextGet :: MemContextM ContextState
+contextGet :: MonadIO m => MemContextM m ContextState
 contextGet = get
 {-# INLINE contextGet #-}
 
-contextGets :: (ContextState -> a) -> MemContextM a
+contextGets :: MonadIO m => (ContextState -> a) -> MemContextM m a
 contextGets = gets
 {-# INLINE contextGets #-}
 
-contextPut :: ContextState -> MemContextM ()
+contextPut :: MonadIO m => ContextState -> MemContextM m ()
 contextPut = put
 {-# INLINE contextPut #-}
 
-contextModify :: (ContextState -> ContextState) -> MemContextM ()
+contextModify :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
 contextModify = modify
 {-# INLINE contextModify #-}
 
-contextModify' :: (ContextState -> ContextState) -> MemContextM ()
+contextModify' :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
 contextModify' = modify'
 {-# INLINE contextModify' #-}
 
 instance Show MemContext where
   show = const "<context>"
 
-instance Mod.Modifiable ContextState MemContextM where
+instance MonadIO m => Mod.Modifiable ContextState (MemContextM m) where
   get _ = get
   put _ = put
 
-instance Mod.Accessible MemContext MemContextM where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemContext (MemContextM m) where
   access _ = ask >>= readIORef
 
-instance Mod.Modifiable (Maybe DebugSettings) MemContextM where
+instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MemContextM m) where
   get _ = gets $ view debugSettings
   put _ ds = modify $ debugSettings .~ ds
 
-instance Mod.Accessible ContextState MemContextM where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (MemContextM m) where
   access _ = get
 
-instance Mod.Accessible MemDBs MemContextM where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (MemContextM m) where
   access _ = gets $ view memDBs
 
-instance Mod.Modifiable MemDBs MemContextM where
+instance MonadIO m => Mod.Modifiable MemDBs (MemContextM m) where
   get _ = gets $ view memDBs
   put _ md = modify $ memDBs .~ md
 
@@ -238,42 +238,42 @@ vmGenesisRootKey = "genesis_root"
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
-instance Mod.Modifiable BlockHashRoot MemContextM where
+instance MonadIO m => Mod.Modifiable BlockHashRoot (MemContextM m) where
   get _ = dbsGets $ view blockHashRoot
   put _ bhr = dbsModify' $ blockHashRoot .~ bhr
 
-instance Mod.Modifiable GenesisRoot MemContextM where
+instance MonadIO m => Mod.Modifiable GenesisRoot (MemContextM m) where
   get _ = dbsGets $ view genesisRoot
   put _ gr = dbsModify' $ genesisRoot .~ gr
 
-instance Mod.Modifiable BestBlockRoot MemContextM where
+instance MonadIO m => Mod.Modifiable BestBlockRoot (MemContextM m) where
   get _ = dbsGets $ view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
-instance Mod.Modifiable CurrentBlockHash MemContextM where
+instance MonadIO m => Mod.Modifiable CurrentBlockHash (MemContextM m) where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
 
-instance HasMemAddressStateDB MemContextM where
+instance MonadIO m => HasMemAddressStateDB (MemContextM m) where
   getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) MemContextM where
+instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MemContextM m) where
   lookup _ sr = dbsGets $ view (stateDB . at sr)
   insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
   delete _ sr = dbsModify' $ stateDB . at sr .~ Nothing
 
-instance (Address `A.Alters` AddressState) MemContextM where
+instance (MonadIO m, MonadLogger m) => (Address `A.Alters` AddressState) (MemContextM m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance {-# OVERLAPPING #-} A.Selectable Address AddressState MemContextM where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Address AddressState (MemContextM m) where
   select _ = getAddressStateMaybe
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) MemContextM where
+instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MemContextM m) where
   lookup _ chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
@@ -296,19 +296,19 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) MemContextM where
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
 
-instance (Keccak256 `A.Alters` DBCode) MemContextM where
+instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MemContextM m) where
   lookup _ k = dbsGets $ view (codeDB . at k)
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k = dbsModify' $ codeDB . at k .~ Nothing
 
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) MemContextM where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509CertificateField) (MemContextM m) where
   select _ (k, t) = do
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
-instance (Address `A.Selectable` X509Certificate) MemContextM where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509Certificate) (MemContextM m) where
   select _ k = do
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
@@ -318,46 +318,48 @@ instance (Address `A.Selectable` X509Certificate) MemContextM where
         Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
 
-instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
+instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MemContextM m) where
   lookup _ n1 = dbsGets $ view (hashDB . at n1)
   insert _ n1 n2 = dbsModify' $ hashDB . at n1 ?~ n2
   delete _ n1 = dbsModify' $ hashDB . at n1 .~ Nothing
 
-instance HasMemRawStorageDB MemContextM where
+instance MonadIO m => HasMemRawStorageDB (MemContextM m) where
   getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
   putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
   getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
-instance (RawStorageKey `A.Alters` RawStorageValue) MemContextM where
+instance (MonadIO m, MonadLogger m) => (RawStorageKey `A.Alters` RawStorageValue) (MemContextM m) where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance (Keccak256 `A.Alters` BlockSummary) MemContextM where
+instance MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MemContextM m) where
   lookup _ k = dbsGets $ view (blockSummaryDB . at k)
   insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
   delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
 
-instance {-# OVERLAPPING #-} Mod.Accessible (Maybe WorldBestBlock) MemContextM where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MemContextM m) where
   access _ = dbsGets $ view worldBestBlock
 
-instance Mod.Modifiable GasCap MemContextM where
+instance MonadIO m => Mod.Modifiable GasCap (MemContextM m) where
   get _ = GasCap . _vmGasCap <$> get
   put _ (GasCap g) = contextModify $ vmGasCap .~ g
 
 runMemContextM ::
+  (MonadIO m, MonadLogger m) =>
   Maybe DebugSettings ->
-  MemContextM a ->
-  LoggingT IO (a, MemContext)
+  MemContextM m a ->
+  m (a, MemContext)
 runMemContextM = runMemContextMWith def
 
 runMemContextMWith ::
+  (MonadIO m, MonadLogger m) =>
   MemContextDBs ->
   Maybe DebugSettings ->
-  MemContextM a ->
-  LoggingT IO (a, MemContext)
+  MemContextM m a ->
+  m (a, MemContext)
 runMemContextMWith cdbs dSettings f = do
   cache <- liftIO $ TRC.new 64
   let cstate =
@@ -374,16 +376,18 @@ runMemContextMWith cdbs dSettings f = do
   return (a, ctx')
 
 evalMemContextM ::
+  (MonadIO m, MonadLogger m) =>
   Maybe DebugSettings ->
-  MemContextM a ->
-  LoggingT IO a
+  MemContextM m a ->
+  m a
 evalMemContextM d f = fst <$> runMemContextM d f
 
 execMemContextM ::
+  (MonadIO m, MonadLogger m) =>
   Maybe DebugSettings ->
-  MemContextM a ->
-  LoggingT IO MemContext
+  MemContextM m a ->
+  m MemContext
 execMemContextM d f = snd <$> runMemContextM d f
 
-compactMemContextM :: MemContextM ()
+compactMemContextM :: MonadIO m => MemContextM m ()
 compactMemContextM = ask >>= flip atomicModifyIORef' (\a -> (force a, ()))

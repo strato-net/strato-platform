@@ -1,10 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module SolidVM.Solidity.Fuzzer.Types where
 
-import Blockchain.MemVMContext
 import Blockchain.Strato.Model.Address
 import Control.Lens
 import Control.Monad.Trans.Reader
@@ -26,7 +26,7 @@ data FuzzerArgs = FuzzerArgs
 
 makeLenses ''FuzzerArgs
 
-type FuzzerM = ReaderT FuzzerArgs MemContextM
+type FuzzerM m = ReaderT FuzzerArgs m
 
 data FuzzerTx = FuzzerTx
   { _fuzzerTxFuncName :: SolidString,
@@ -52,8 +52,10 @@ data FuzzerResultF a
       { _fuzzerFailureDetails :: Maybe FuzzerFailureDetails,
         _fuzzerFailureContext :: a
       }
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Show, Functor, Generic, ToJSON, FromJSON)
 
 makePrisms ''FuzzerResultF
 
 type FuzzerResult = Annotated FuzzerResultF
+
+type FuzzerTestAndResult = FuzzerResultF (SourceAnnotation (Text, Text))

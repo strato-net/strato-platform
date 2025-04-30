@@ -153,37 +153,6 @@ withSrcPos pos str =
         str
       ]
 
--- TODO: I'm putting all of these instances related to debugging here,
---       but they should really go in SM.hs
---       However, the functions needed to run `variableSet` and `runExpr`,
---       which are critical for debugging, are defined in SetGet.hs and
---       SolidVM.hs. I think this suggests a reorganization of the
---       solid-vm package should be done, but I don't want to interfere
---       with it too much just to get the debugger working.
-
-variableSet :: MonadSM m => m VariableSet
-variableSet = do
-  cis <- Mod.get (Mod.Proxy @[CallInfo])
-  let textSet = S.fromList . M.keys
-      varNames = case cis of
-        [] -> S.empty
-        (ci : _) -> textSet $ localVariables ci
-      locals = M.singleton "Local Variables" varNames
-  acct <- getCurrentAddress
-  ~(contract, _, _) <- getCodeAndCollection acct
-  let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
-      globals = M.singleton "State Variables" stateVars
-  pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
-
-instance MonadSM m => Mod.Accessible VariableSet m where
-  access _ = variableSet
-
-instance MonadSM m => Mod.Accessible [SourcePosition] m where
-  access _ = do
-    cis <- Mod.get (Mod.Proxy @[CallInfo])
-    pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
-
-
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do
   -- TODO: allow write access once we figure out how to discard changes

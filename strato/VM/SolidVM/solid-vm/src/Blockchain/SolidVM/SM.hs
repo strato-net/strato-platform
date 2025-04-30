@@ -107,6 +107,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
+import qualified Data.Set as S
 import Data.Source
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -172,7 +173,7 @@ type MonadSM m =
   ( (Address `A.Alters` AddressState) m,
     A.Selectable Address AddressState m,
     HasStateDB m,
-    (Keccak256 `A.Alters` DBCode) m,
+    HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
     HasSelectX509CertDB m,
     HasSelectX509FieldDB m,
@@ -181,6 +182,8 @@ type MonadSM m =
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
     Mod.Accessible Env.Environment m,
+    Mod.Accessible [SourcePosition] m,
+    Mod.Accessible VariableSet m,
     Mod.Modifiable GasInfo m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable Env.Sender m,
@@ -342,6 +345,28 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Event) (SM m) where
 instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) where
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
+
+variableSet :: VMBase m => SM m VariableSet
+variableSet = do
+  cis <- Mod.get (Mod.Proxy @[CallInfo])
+  let textSet = S.fromList . M.keys
+      varNames = case cis of
+        [] -> S.empty
+        (ci : _) -> textSet $ localVariables ci
+      locals = M.singleton "Local Variables" varNames
+  acct <- getCurrentAddress
+  ~(contract, _, _) <- getCodeAndCollection acct
+  let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
+      globals = M.singleton "State Variables" stateVars
+  pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
+
+instance {-# OVERLAPPING #-} VMBase m => Mod.Accessible VariableSet (SM m) where
+  access _ = variableSet
+
+instance {-# OVERLAPPING #-} VMBase m => Mod.Accessible [SourcePosition] (SM m) where
+  access _ = do
+    cis <- Mod.get (Mod.Proxy @[CallInfo])
+    pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
 
 runSM ::
   ( MonadUnliftIO m,

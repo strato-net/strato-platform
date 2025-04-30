@@ -58,7 +58,6 @@ import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
-import SelectAccessible ()
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format

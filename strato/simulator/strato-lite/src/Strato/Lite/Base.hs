@@ -104,7 +104,7 @@ type MonadBaseVM m = ( Mod.Modifiable BlockHashRoot m
                      , Mod.Modifiable GenesisRoot m
                      , Mod.Modifiable BestBlockRoot m
                      , (MP.StateRoot `A.Alters` MP.NodeData) m
-                     , (Keccak256 `A.Alters` DBCode) m
+                     , HasCodeDB m
                      , (N.NibbleString `A.Alters` N.NibbleString) m
                      , (Keccak256 `A.Alters` BlockSummary) m
                      , Mod.Accessible (Maybe WorldBestBlock) m

@@ -34,7 +34,6 @@ import qualified Database.Esqueleto.Experimental       as E
 import qualified Database.Persist.Postgresql           as SQL
 import           Numeric.Natural
 import           Prometheus
-import           SelectAccessible                      ()
 import           UnliftIO
 
 

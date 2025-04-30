@@ -50,7 +50,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
-import SelectAccessible ()
 import Text.Format
 import Text.Printf
 

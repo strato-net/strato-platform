@@ -44,7 +44,6 @@ import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import Network.HTTP.Client (defaultManagerSettings, newManager)
-import SelectAccessible ()
 import Servant.Client
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
@@ -142,6 +141,9 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m
   lookup _ = genericLookupCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   insert _ = genericInsertCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   delete _ = genericDeleteCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
+ 
+instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath String (ReaderT SetupDBs m) where
+  select _ _ = pure Nothing
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where
   select _ = error "SetupDBM select @X509Certificate"

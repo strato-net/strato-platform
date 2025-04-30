@@ -20,7 +20,7 @@ import SolidVM.Solidity.StaticAnalysis
 data SourceTools = SourceTools
   { parser :: SourceMap -> Either [SourceAnnotation Text] CodeCollection,
     analyzer :: SourceMap -> [SourceAnnotation (WithSeverity Text)],
-    fuzzer :: SourceMap -> (IO [FuzzerResult])
+    fuzzer :: SourceMap -> (IO [FuzzerTestAndResult])
   }
   deriving (Generic)
 
@@ -33,7 +33,7 @@ type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
 
 type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation (WithSeverity Text)]
 
-type PostFuzz = "fuzz" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [FuzzerResult]
+type PostFuzz = "fuzz" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [FuzzerTestAndResult]
 
 sourceToolsAPI :: Proxy SourceToolsAPI
 sourceToolsAPI = Proxy
@@ -51,9 +51,9 @@ postAnalyze ::
 postAnalyze analyze = pure . analyze
 
 postFuzz ::
-  (SourceMap -> IO [FuzzerResult]) ->
+  (SourceMap -> IO [FuzzerTestAndResult]) ->
   SourceMap ->
-  Handler [FuzzerResult]
+  Handler [FuzzerTestAndResult]
 postFuzz fuzz args = liftIO (fuzz args)
 
 sourceToolsServer ::
@@ -75,7 +75,7 @@ defaultSourceTools dSettings =
           . M.fromList
           . unSourceMap
       analyze = runDetectors parse compile id
-      fuzz = runFuzzer dSettings compile
+      fuzz = runFuzzer dSettings (pure . compile)
    in SourceTools compile analyze fuzz
 
 initializeSolidVMDebugger :: (Maybe DebugSettings -> SourceTools) -> IO (Maybe (DebugSettings, IO ()))

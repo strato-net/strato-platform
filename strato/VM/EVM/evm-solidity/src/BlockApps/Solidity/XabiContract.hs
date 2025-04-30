@@ -5,7 +5,6 @@ module BlockApps.Solidity.XabiContract
 where
 
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
-import SelectAccessible ()
 import SolidVM.Model.CodeCollection hiding (contractName, events)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType

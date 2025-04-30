@@ -25,6 +25,7 @@ import qualified Blockchain.Network as Net
 import Blockchain.Strato.Model.Options (flags_network)
 import Conduit
 import Control.Monad
+import Control.Monad.Change.Alter ()
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.Composable.SQL
@@ -39,7 +40,6 @@ import qualified Data.Map as M
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
 import qualified Executable.EthDiscoverySetup as EthDiscovery
-import SelectAccessible ()
 import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory

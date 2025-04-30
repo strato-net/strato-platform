@@ -34,7 +34,6 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 -- import Slipstream.Processor
 
-import SelectAccessible ()
 import Text.Printf
 import Text.RawString.QQ
 

@@ -1,14 +1,19 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.SolidVM.ImportResolver
   ( FileUnitF (..),
@@ -132,19 +137,23 @@ instance Monoid (FileUnitsF a) where
   mempty = def
   mappend = (<>)
 
-type ImportMapF a = Map Text (Either (UnresolvedFileUnitsF a) (FileUnitsF a))
+type ImportUnitF a = Either (UnresolvedFileUnitsF a) (FileUnitsF a)
+
+type ImportMapF a = Map Text (ImportUnitF a)
 
 resolveImports ::
   ( A.Selectable Address AddressState m,
+    A.Selectable FilePath String m,
     Show a,
     Ord a,
     Default a
   ) =>
   (Keccak256 -> m (CodeCollectionF a)) ->
+  (T.Text -> T.Text -> Maybe (UnresolvedFileUnitsF a)) ->
   Map Text (UnresolvedFileUnitsF a) ->
   ExceptT Text m (CodeCollectionF a)
-resolveImports getCCFromHash m = do
-  m' <- fmap snd . foldrM (resolveFile getCCFromHash) (S.empty, Left <$> m) . map lit $ M.keys m
+resolveImports getCCFromHash getNamedSUnits m = do
+  m' <- fmap snd . foldrM (resolveFile getCCFromHash getNamedSUnits) (S.empty, Left <$> m) . map lit $ M.keys m
   m'' <- flip M.traverseWithKey m' $ \k v -> case v of
     Left _ -> throwE $ "Failed to resolve imports for file: " <> k
     Right r -> pure r
@@ -152,16 +161,18 @@ resolveImports getCCFromHash m = do
 
 resolveFile ::
   ( A.Selectable Address AddressState m,
+    A.Selectable FilePath String m,
     Show a,
     Ord a,
     Default a
   ) =>
   (Keccak256 -> m (CodeCollectionF a)) ->
+  (T.Text -> T.Text -> Maybe (UnresolvedFileUnitsF a)) ->
   ExpressionF a ->
   EndoM (ExceptT Text m) (S.Set Text, ImportMapF a)
-resolveFile getCCFromHash expr (seen, resolved) =
+resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
-    then throwE . T.concat $ "Circular reference identified: " : S.toList seen
+    then throwE $ "Circular reference identified: " <> T.intercalate ", " (S.toList seen)
     else case expr of
       AccountLiteral _ acct -> do
         lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
@@ -176,10 +187,19 @@ resolveFile getCCFromHash expr (seen, resolved) =
       StringLiteral _ fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of
-              Nothing -> throwE $ "Could not find file by name of " <> fileName
+              Nothing -> A.select (A.Proxy @String) (T.unpack fileName) >>= \case
+                Nothing -> throwE $ "Could not find file by name of " <> fileName
+                Just contents -> case getNamedSUnits fileName (T.pack contents) of
+                  Nothing -> throwE $ "Could not resolve source units of imported file: " <> fileName
+                  Just l ->
+                    let resolved' = M.insert fileName (Left l) resolved
+                        eResolved' = snd <$> foldrM (doResolve getCCFromHash getNamedSUnits fileName) (S.insert fileName seen, resolved') (l ^. ufuImports)
+                     in fmap (seen,) . flip fmap eResolved' . flip M.adjust fileName $ \case
+                          Left u -> Right . FileUnits (u ^. ufuPragmas) $ M.singleton Nothing (u ^. ufuUnits)
+                          Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
               Just (Right _) -> pure (seen, resolved)
               Just (Left l) ->
-                let eResolved' = snd <$> foldrM (doResolve getCCFromHash fileName) (S.insert fileName seen, resolved) (l ^. ufuImports)
+                let eResolved' = snd <$> foldrM (doResolve getCCFromHash getNamedSUnits fileName) (S.insert fileName seen, resolved) (l ^. ufuImports)
                  in fmap (seen,) . flip fmap eResolved' . flip M.adjust fileName $ \case
                       Left u -> Right . FileUnits (u ^. ufuPragmas) $ M.singleton Nothing (u ^. ufuUnits)
                       Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
@@ -209,18 +229,20 @@ fileUnitsToCodeCollection (FileUnits ps us) =
 
 doResolve ::
   ( A.Selectable Address AddressState m,
+    A.Selectable FilePath String m,
     Show a,
     Ord a,
     Default a
   ) =>
   (Keccak256 -> m (CodeCollectionF a)) ->
+  (T.Text -> T.Text -> Maybe (UnresolvedFileUnitsF a)) ->
   Text ->
   FileImportF a ->
   EndoM (ExceptT Text m) (S.Set Text, ImportMapF a)
-doResolve f fileName imp (seen, resolved) = case imp of
-  Simple path _ -> resolvePath fileName path >>= \p -> resolveFile f p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved fileName (tShowExpr p) "" r'
-  Qualified path alias _ -> resolvePath fileName path >>= \p -> resolveFile f p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved fileName (tShowExpr p) alias r'
-  Braced items path _ -> resolvePath fileName path >>= \p -> resolveFile f p (seen, resolved) >>= \(_, r') -> (seen,) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
+doResolve f g fileName imp (seen, resolved) = case imp of
+  Simple path _ -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved fileName (tShowExpr p) "" r'
+  Qualified path alias _ -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved fileName (tShowExpr p) alias r'
+  Braced items path _ -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
 
 resolvePath :: Monad m => Text -> EndoM (ExceptT Text m) (ExpressionF a)
 resolvePath fileName (StringLiteral a path') =

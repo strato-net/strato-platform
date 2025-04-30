@@ -13,11 +13,14 @@ library:
   ghc-options: -Wall -O2
   dependencies:
   - aeson
+  - blockapps-data
   - bytestring
   - common-log
   - containers
   - debugger
+  - exceptions
   - lens
+  - monad-alter
   - QuickCheck
   - servant-server
   - solid-vm
@@ -28,7 +31,28 @@ library:
   - strato-model
   - text
   - transformers
+  - unliftio
   - vm-tools
+
+executables:
+  solid-vm-cli:
+    source-dirs: exec_src
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - containers
+      - exceptions
+      - hflags
+      - monad-alter
+      - solid-vm-compiler
+      - solid-vm-fuzzer
+      - solid-vm-model
+      - source-tools
+      - strato-model
+      - text
+      - unliftio
+      - vm-tools
+    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto 
 
 tests:
   solid-vm-spec:

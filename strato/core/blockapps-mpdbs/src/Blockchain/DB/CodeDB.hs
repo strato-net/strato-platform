@@ -46,6 +46,7 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Default
+import Data.Functor.Identity
 import qualified Data.Map.Strict as M
 import qualified Database.LevelDB as DB
 import Prelude hiding (lookup)
@@ -55,7 +56,7 @@ newtype CodeDB = CodeDB {unCodeDB :: DB.DB}
 instance NFData CodeDB where
   rnf (CodeDB a) = a `seq` ()
 
-type HasCodeDB m = (Keccak256 `A.Alters` DBCode) m
+type HasCodeDB m = ((Keccak256 `A.Alters` DBCode) m, A.Selectable FilePath String m)
 
 type DBCode = (CodeKind, B.ByteString)
 
@@ -105,6 +106,12 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (ReaderT CodeDB m) where
   lookup _ = genericLookupCodeDB ask
   insert _ = genericInsertCodeDB ask
   delete _ = genericDeleteCodeDB ask
+
+instance {-# OVERLAPPING #-} A.Selectable FilePath String Identity where
+  select _ _ = pure Nothing
+
+instance {-# OVERLAPPING #-} A.Selectable FilePath String IO where
+  select _ _ = pure Nothing
 
 toWord8 :: CodeKind -> Word8
 toWord8 = fromIntegral . fromEnum

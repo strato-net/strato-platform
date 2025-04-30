@@ -96,22 +96,22 @@ data IdentityServerData = IdentityServerData
     sendgridAPIKey :: Maybe SendgridAPIKey
   }
 
-instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
   access _ = asks issuer
 
-instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where
   access _ = asks issuerCert
 
-instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
   access _ = asks issuerPrivKey
 
-instance Monad m => Accessible RealmMap (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible RealmMap (ReaderT IdentityServerData m) where
   access _ = asks realmNameToDetails
 
-instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
   access _ = asks sendgridAPIKey
 
-instance MonadIO m => (String `A.Selectable` AccessToken) (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} MonadIO m => (String `A.Selectable` AccessToken) (ReaderT IdentityServerData m) where
   select _ realm = do
     realmMap <- asks realmNameToDetails
     case M.lookup realm realmMap of
@@ -155,13 +155,13 @@ instance MonadIO m => ((String, String) `A.Alters` Address) (ReaderT IdentitySer
       Just RealmDetails {cacheRef = ref} -> void $ atomicModifyIORef' ref (\lru -> LRU.delete k lru)
       Nothing -> return ()
 
-instance Monad m => Accessible VaultData (VaultM m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
 
-instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
   access = lift . access
 
-instance Monad m => Accessible NotificationData (NotificationM m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible NotificationData (NotificationM m) where
   access _ = ask
 
 getPingIdentity :: (MonadIO m) => m Int

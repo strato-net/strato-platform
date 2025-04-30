@@ -105,7 +105,6 @@ import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM2
 import Executable.StratoP2P
-import SelectAccessible ()
 import SolidVM.Model.Storable hiding (toList)
 import Strato.Lite.Base
 import Text.Read (readMaybe)

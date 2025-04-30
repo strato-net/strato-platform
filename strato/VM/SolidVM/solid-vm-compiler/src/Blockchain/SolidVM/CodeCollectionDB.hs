@@ -159,7 +159,7 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap
-  theCC <- withExceptT IEx $ resolveImports (codeCollectionFromHashNoCache False typeCheck) ufuMap
+  theCC <- withExceptT IEx $ resolveImports (codeCollectionFromHashNoCache False typeCheck) (\f -> either (const Nothing) Just . getNamedSUnits f) ufuMap
   pure $ force theCC
 
 --- Don't typecheck in Slipstream!!!

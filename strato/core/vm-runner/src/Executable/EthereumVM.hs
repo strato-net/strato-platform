@@ -52,6 +52,7 @@ import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
 import Control.Monad
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Data.Conduit.List (mapMaybeM)
@@ -128,7 +129,7 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-initializeBestBlock :: (HasContext m, Bagger.MonadBagger m) => m ()
+initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-

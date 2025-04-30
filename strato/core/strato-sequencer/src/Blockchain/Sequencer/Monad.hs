@@ -73,7 +73,6 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import qualified Database.LevelDB as LDB
 import qualified LabeledError
-import SelectAccessible ()
 import Servant.Client
 import qualified Strato.Strato23.API.Types as VC hiding (Address (..))
 import qualified Strato.Strato23.Client as VC

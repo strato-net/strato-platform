@@ -228,7 +228,7 @@ instance (Address `A.Alters` X509CertInfoState) m => (Address `A.Alters` X509Cer
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance (Address `A.Alters` X509CertInfoState) m => (A.Selectable Address X509CertInfoState) (ExceptT e m) where
+instance {-# OVERLAPPING #-} (Address `A.Alters` X509CertInfoState) m => (A.Selectable Address X509CertInfoState) (ExceptT e m) where
   select p = lift . A.lookup p
 
 
