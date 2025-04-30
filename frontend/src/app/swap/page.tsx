@@ -1129,7 +1129,7 @@ const SwapPanel: FC = () => {
       if (!selectedWithdrawPool) return;
       try {
         setWithdrawLoading(true)
-        const calculatedAmount = new BigNumber(withdrawAmount.toString()).multipliedBy(new BigNumber(selectedWithdrawPool?.value).dividedBy(10 ** 18)).dividedBy(100);
+        const calculatedAmount = new BigNumber(withdrawAmount.toString()).multipliedBy(new BigNumber(selectedWithdrawPool?.value || '0').dividedBy(10 ** 18)).dividedBy(100);
         const response = await axios.post("/api/swap/removeLiquidity", {
           address: selectedWithdrawPool.address,
           amount: new BigNumber(calculatedAmount).multipliedBy(10 ** 18).toFixed(0),
@@ -1158,9 +1158,9 @@ const SwapPanel: FC = () => {
         try {
           const res = await axios.get(`/api/lpToken/`);
           const tempPools = res.data
-          const enrichedPools = tempPools.map(pool => {
-            const tokenAInfo = tokens && tokens.find(t => t.address === pool.data.tokenA);
-            const tokenBInfo = tokens && tokens.find(t => t.address === pool.data.tokenB);
+          const enrichedPools = tempPools.map((pool: any) => {
+            const tokenAInfo = tokens && tokens.find(t => t.address === pool?.data?.tokenA);
+            const tokenBInfo = tokens && tokens.find(t => t.address === pool?.data?.tokenB);
 
             return {
               ...pool,

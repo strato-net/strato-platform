@@ -1,4 +1,4 @@
-import { bloc } from "./mercataApiHelper";
+import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
 
 export const until = async (
@@ -52,6 +52,32 @@ export const postAndWaitForTx = async (
 
   const action = async () => {
     const res = await bloc.post(accessToken, StratoPaths.result, [txHash]);
+    return res.data;
+  };
+
+  const finalResult = await until(predicate, action, timeout);
+
+  const statusInfo = finalResult[0];
+
+  return {
+    status: statusInfo.status,
+    hash: statusInfo.hash,
+  };
+};
+
+export const waitOnCirrus = async (
+  accessToken: string,
+  tableName: string,
+  txHash: string,
+  timeout: number = 60000
+): Promise<{ status: string; hash: string }> => {
+  const predicate = (results: any[]) =>
+    results.every((r) => r.status !== "Pending");
+
+  const action = async () => {
+    const res = await cirrus.get(accessToken, tableName, {
+      params: { transaction_hash: txHash },
+    });
     return res.data;
   };
 

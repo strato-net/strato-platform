@@ -21,6 +21,8 @@ export interface TokenMetadata {
   pool?: string;
   usdst?: string;
   token?: string;
+  tokenBBalance?: string;
+  tokenABalance?: string;
   imageURL?: string;
   isActive?: string;
   locked?: string;
