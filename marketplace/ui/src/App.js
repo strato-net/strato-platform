@@ -10,7 +10,7 @@ import FooterComponent from './components/Footer/FooterComponent';
 import TagManager from 'react-gtm-module';
 import { UsersProvider } from './contexts/users';
 import { useMarketplaceState } from './contexts/marketplace';
-import { getCookie, delete_cookie } from './helpers/cookie';
+import { setCookie, getCookie, delete_cookie } from './helpers/cookie';
 import InternalError from './components/500';
 import { CategorysProvider } from './contexts/category';
 import { useEventStream } from './helpers/websocket';
@@ -53,6 +53,16 @@ const App = () => {
     window.location.href = getCookie('returnUrl');
     delete_cookie('returnUrl');
   }
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refValue = urlParams.get('ref');
+
+    if (refValue && !getCookie('mercata_referrer_address')) {
+      // Set the cookie for 7 days (10080 minutes)
+      setCookie('mercata_referrer_address', refValue, 10080);
+    }
+  }, []);
 
   useEffect(() => {
     const referrer = document.referrer;

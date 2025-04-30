@@ -22,7 +22,7 @@ import { useState, useEffect } from 'react';
 import DataTableComponent from '../DataTableComponent';
 import './index.css';
 import TagManager from 'react-gtm-module';
-import { setCookie } from '../../helpers/cookie';
+import { setCookie, getCookie } from '../../helpers/cookie';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
 
@@ -218,6 +218,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
       tax: tax,
       user: user.commonName,
       htmlContents: htmlContents,
+      referral: getCookie('mercata_referrer_address') || null
     };
 
     window.LOQ.push([

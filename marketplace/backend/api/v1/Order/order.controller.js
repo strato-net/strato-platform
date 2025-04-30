@@ -71,6 +71,19 @@ class OrderController {
         orderEvent[0].currency === 'USDST'
       ) {
         await sendEmail(body.user, 'Your Order Confirmation', htmlContents[0]);
+        if (body.referral) {
+        await logReferral({
+          referringAddress: body.referral,
+          orderHash: checkoutHash,
+          orderAddress: orderEvent[0].orderAddress,
+          assetAddress: orderEvent[0].assetAddress,
+          assetName: orderEvent[0].assetName,
+          assetQuantity: orderEvent[0].assetQuantity,
+          assetUnitPrice: orderEvent[0].assetUnitPrice,
+          assetTotalPrice: orderEvent[0].assetTotalPrice,
+          assetTokenId: orderEvent[0].assetTokenId,
+        }) // need order infromation
+      }
         console.log('*Buyer placed order*', orderEvent);
       }
       return next();
