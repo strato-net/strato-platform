@@ -125,7 +125,7 @@ mainNative = do
 main :: IO ()
 main = do
   _ <- $initHFlags "STRATO Lite"
-  createHaskoinMultiSigScript
+  -- createHaskoinMultiSigScript
   let sqlitePath = "strato.sqlite"
   runLoggingT . runResourceT $ do
     (f,c) <- createFilesystemNode
