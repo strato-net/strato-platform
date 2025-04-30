@@ -1,13 +1,13 @@
 "use client";
 
-import React, { FC, useEffect, useState } from "react";
+import React, { FC, useCallback, useEffect, useState } from "react";
 import { Card, notification, Spin, Tabs, TabsProps } from "antd";
 import { Select } from "antd";
 import { motion } from "framer-motion";
 import TokenDropdown from "@/components/_dropdown/page";
 import SupplyBorrowDashboard from "../_supplyTables/page";
 import TokenIcon from "../icons/TokenIcon";
-import { TokenData } from "@/interface/token";
+import { EnrichedLoan, LoanEntry, TokenData } from "@/interface/token";
 import { useTokens } from "@/context/TokenContext";
 import axios from "axios";
 import { ethers } from "ethers";
@@ -38,8 +38,8 @@ const DepositsPanel: FC = () => {
         );
         const filteredTokens = tokens
           ? tokens.filter((token) =>
-              responseAddresses.has(token?.address?.toLowerCase())
-            )
+            responseAddresses.has(token?.address?.toLowerCase())
+          )
           : [];
         setTokenList(filteredTokens);
       } catch (err) {
@@ -136,7 +136,7 @@ const DepositsPanel: FC = () => {
         setDepositLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully deposited ${depositAmount} ${selectedDepositToken?._symbol}`,
+          description: `Successfully deposited ${depositAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.log(err);
@@ -218,11 +218,10 @@ const DepositsPanel: FC = () => {
           </div>
           <div className="mt-10 w-1/2 mx-auto">
             <button
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
-                selectedDepositToken && depositAmount
-                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                  : "cursor-not-allowed bg-gray-300"
-              }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && depositAmount
+                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                : "cursor-not-allowed bg-gray-300"
+                }`}
               disabled={!selectedDepositToken || depositLoading}
               onClick={handleDeposit}
             >
@@ -279,7 +278,7 @@ const DepositsPanel: FC = () => {
         setWithdrawLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully withdrew ${withdrawAmount} ${selectedDepositToken?._symbol}`,
+          description: `Successfully withdrew ${withdrawAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.error(err);
@@ -361,11 +360,10 @@ const DepositsPanel: FC = () => {
           </div>
           <div className="mt-10 w-1/2 mx-auto">
             <button
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
-                selectedDepositToken && withdrawAmount
-                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                  : "cursor-not-allowed bg-gray-300"
-              }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && withdrawAmount
+                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                : "cursor-not-allowed bg-gray-300"
+                }`}
               disabled={!selectedDepositToken || withdrawLoading}
               onClick={handleWithdraw}
             >
@@ -494,7 +492,7 @@ const DepositsPanel: FC = () => {
         setBorrowLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully Borrowed ${withdrawAmount} ${selectedWithdrawToken?._symbol}`,
+          description: `Successfully Borrowed ${withdrawAmount} ${selectedWithdrawToken?._symbol}`,
         });
       } catch (error) {
         setBorrowLoading(false);
@@ -656,11 +654,10 @@ const DepositsPanel: FC = () => {
               type="button"
               onClick={handleBorrow}
               disabled={!isWithdrawFormValid || borrowLoading}
-              className={`flex justify-center gap-3 w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 ${
-                isWithdrawFormValid && !borrowLoading
-                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-                  : "cursor-not-allowed bg-gray-300"
-              }`}
+              className={`flex justify-center gap-3 w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 ${isWithdrawFormValid && !borrowLoading
+                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+                : "cursor-not-allowed bg-gray-300"
+                }`}
             >
               {borrowLoading && <Spin />}
               {borrowLoading ? "Borrowing..." : "Borrow"}
@@ -693,17 +690,17 @@ const DepositsPanel: FC = () => {
   };
 
   const RenderRepay = () => {
-    const [loanList, setLoanList] = useState<any[]>([]);
+    const [loanList, setLoanList] = useState<EnrichedLoan[]>([]);
     const [showTokenSelector, setShowTokenSelector] = useState(false);
     const [selectedToken, setSelectedToken] = useState<TokenData | null>(null);
-    const [loan, setLoan] = useState<any | null>(null);
+    const [loan, setLoan] = useState<LoanEntry | null>(null);
     const [amount, setAmount] = useState<string>("");
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [repayLoading, setRepayLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
     // Load user address and fetch their loans with token metadata
-    const fetchLoans = async () => {
+    const fetchLoans = useCallback(async () => {
       const userData = JSON.parse(localStorage.getItem("user") || "{}");
       const addr = userData.userAddress;
       try {
@@ -711,12 +708,12 @@ const DepositsPanel: FC = () => {
         const pool = resp.data;
         const loansObj = pool.loans || {};
         const userLoans = Object.entries(loansObj)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-          .filter((loan: any) => loan.user === addr && loan.active === true);
+          .filter((loan: LoanEntry) => loan.user === addr && loan.active === true);
         console.log(userLoans, "user loans");
-        // Enrich each loan with token symbol, name, and human-readable balance
         const enrichedLoans = await Promise.all(
-          userLoans.map(async (loan: any) => {
+          userLoans.map(async (loan: LoanEntry) => {
             const tokenResp = await axios.get(`/api/tokens/${loan.asset}`);
             const { _symbol, _name } = tokenResp.data[0];
             const balanceHuman = ethers.formatUnits(loan.amount, 18);
@@ -730,7 +727,7 @@ const DepositsPanel: FC = () => {
       } catch (e) {
         console.error("Error fetching loans:", e);
       }
-    };
+    }, []);
 
     useEffect(() => {
       fetchLoans();
@@ -757,7 +754,7 @@ const DepositsPanel: FC = () => {
         setRepayLoading(false);
         api["success"]({
           message: "Success",
-          description: `Succesfully Repaid ${amount} ${loan?._symbol}`,
+          description: `Successfully Repaid ${amount} ${loan?._symbol}`,
         });
       } catch (error) {
         api["error"]({
@@ -843,11 +840,10 @@ const DepositsPanel: FC = () => {
             <button
               onClick={handleRepay}
               disabled={!isFormValid || repayLoading}
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
-                isFormValid && !repayLoading
-                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                  : "cursor-not-allowed bg-gray-300"
-              }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${isFormValid && !repayLoading
+                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                : "cursor-not-allowed bg-gray-300"
+                }`}
             >
               {repayLoading && <Spin />}
               {repayLoading ? "Repaying..." : "Repay"}

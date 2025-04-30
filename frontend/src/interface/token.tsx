@@ -53,7 +53,8 @@ export interface TokenMetadata {
   incomingRedemptionsRoute?: string;
   outgoingRedemptionsRoute?: string;
   createCustomerAddressRoute?: string;
-
+  tokenABalance?: string;
+  tokenBBalance?: string;
 }
 
 export interface TokenBalance {
@@ -70,6 +71,24 @@ export interface TokenBalance {
   block_timestamp: string;
   transaction_hash: string;
   transaction_sender: string;
+}
+
+export interface LoanEntry {
+  amount: string;
+  asset: string;
+  collateralAmount: string;
+  collateralAsset: string;
+  lastUpdated: string;
+  user: string;
+  active?: boolean;
+  loanId?: string;
+  _symbol: string;
+};
+
+export interface EnrichedLoan extends LoanEntry {
+  _symbol: string;
+  _name: string;
+  balanceHuman: string;
 }
 
 export type Tabkey = "swap" | "liquidity"

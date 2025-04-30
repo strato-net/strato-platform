@@ -200,8 +200,16 @@ const SwapPanel: FC = () => {
           // const pool = await getPoolByTokenPair(
           //   selectedSellToken.address,
           //   selectedBuyToken.address
-          // );         
+          // );
+          const parsedValue = new BigNumber(value || "0");
+
+          // Convert on-chain balance (in wei) to readable form
+          const maxSell = new BigNumber(selectedToken1Amount || "0").dividedBy(1e18);
+
           if (isSellInput) {
+            if (parsedValue.gt(maxSell)) {
+              return;
+            }
             if (pool.data.tokenA === selectedSellToken.address) {
               setSellAmount(value);
               setBuyAmount(
@@ -277,7 +285,7 @@ const SwapPanel: FC = () => {
         api['success']({
           message: 'Success',
           description:
-            `Swapping succesfull from ${selectedSellToken?._name} to ${selectedBuyToken?._name}`,
+            `Swapping Done Successfully from ${selectedSellToken?._name} to ${selectedBuyToken?._name}`,
         });
       } catch (error) {
         console.error("Swap error:", error);
@@ -289,6 +297,11 @@ const SwapPanel: FC = () => {
         });
       }
     };
+
+    const handleMaxClick = () => {
+      setSellAmount(new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
+      handleInputChange(true,new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
+    }
 
     const isSwapValid = selectedSellToken && selectedBuyToken && parseFloat(sellAmount) > 0 && parseFloat(buyAmount) > 0
 
@@ -314,7 +327,7 @@ const SwapPanel: FC = () => {
                       placeholder="0"
                       value={sellAmount}
                       onChange={(e) => handleInputChange(true, e.target.value)}
-                      className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
+                      className="no-spinner w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
                       disabled={!selectedSellToken}
                     />
                   </div>
@@ -362,8 +375,20 @@ const SwapPanel: FC = () => {
               <div className="flex justify-between items-center pt-2 text-sm text-gray-500">
                 <span>{sellAmount ? sellAmount : 0}</span>
                 <div className="flex items-center gap-2">
-                  <span>{balanceLoading ? <Spin /> : new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString()}</span>
-                  <button className="bg-gray-100 rounded-xl px-2 py-1 border border-gray-200 cursor-default">
+                  <span>
+                    {balanceLoading
+                      ? <Spin />
+                      : new BigNumber(selectedToken1Amount).dividedBy(1e18).toString()}
+                  </span>
+
+                  <button
+                    disabled={balanceLoading || selectedToken1Amount == 0}
+                    onClick={handleMaxClick}
+                    className={`bg-gray-200 rounded-xl px-2 py-1 border border-gray-200 ${balanceLoading || selectedToken1Amount == 0
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer opacity-100"
+                      }`}
+                  >
                     Max
                   </button>
                 </div>
@@ -434,7 +459,7 @@ const SwapPanel: FC = () => {
                         onChange={(e) =>
                           handleInputChange(false, e.target.value)
                         }
-                        className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
+                        className="no-spinner w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
                         disabled={!selectedBuyToken}
                       />
                     </div>
@@ -746,6 +771,13 @@ const SwapPanel: FC = () => {
     }, [selectedTokenDeposit1, selectedTokenDeposit2]);
 
     const handleInputChangeDeposit1 = (value: string) => {
+      const parsedValue = new BigNumber(value || "0");
+
+      // Convert on-chain balance (in wei) to readable form
+      const maxValue = new BigNumber(selectedToken1Amount || "0").dividedBy(1e18);
+      if (parsedValue.gt(maxValue)) {
+        return;
+      }
       setDepositAmount1(value);
       if (pool?.data) {
         const ratio =
@@ -763,6 +795,13 @@ const SwapPanel: FC = () => {
     };
 
     const handleInputChangeDeposit2 = (value: string) => {
+      const parsedValue = new BigNumber(value || "0");
+
+      // Convert on-chain balance (in wei) to readable form
+      const maxValue = new BigNumber(selectedToken2Amount || "0").dividedBy(1e18);
+      if (parsedValue.gt(maxValue)) {
+        return;
+      }
       setDepositAmount2(value);
       if (pool?.data) {
         const ratio =
@@ -801,7 +840,7 @@ const SwapPanel: FC = () => {
         api['success']({
           message: 'Success',
           description:
-            `Succesfully added liquidity for ${selectedTokenDeposit1?._name} ${selectedTokenDeposit2?._name}`,
+            `Successfully added liquidity for ${selectedTokenDeposit1?._name} ${selectedTokenDeposit2?._name}`,
         });
       } catch (err) {
         console.error("Add liquidity error:", err);
@@ -854,13 +893,23 @@ const SwapPanel: FC = () => {
       }
     };
 
+    const handleMaxClick = (firstToken: boolean = false) => {
+      if (firstToken) {
+        setDepositAmount1(new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
+        handleInputChangeDeposit1(new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
+      } else {
+        setDepositAmount2(new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toString())
+        handleInputChangeDeposit2(new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toString())
+      }
+    }
+
     return (
       <div className="space-y-4">
         <div className="h-full flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 px-4 py-12">
-          <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 w-full max-w-lg">
-            <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 w-auto">
+            <div className="w-auto mx-auto">
               <div className="relative inline-flex items-center mb-4">
-                <div className="w-full max-w-6xl mx-auto p-4">
+                <div className="w-auto mx-auto p-4">
                   <div className="flex flex-col md:flex-row justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900">
                       Deposits
@@ -946,13 +995,14 @@ const SwapPanel: FC = () => {
                                 </span>
                               </div>
 
-                              <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-6 py-4">
-                                <div className="flex flex-col bg-white rounded-[16px] px-4 py-4 overflow-hidden">
+                              <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-2 py-4">
+                                <div className="flex flex-col bg-white rounded-[16px] px-2 py-4 overflow-hidden">
                                   <div className="flex items-center justify-between min-h-[59px]">
                                     <div className="flex flex-grow items-center overflow-hidden mr-4">
                                       <div className="flex flex-col flex-grow">
                                         <input
-                                          type="text"
+                                          type="number"
+                                          min={0}
                                           placeholder="0"
                                           value={depositAmount1}
                                           onChange={(e) =>
@@ -960,7 +1010,7 @@ const SwapPanel: FC = () => {
                                               e.target.value
                                             )
                                           }
-                                          className="w-full text-[36px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
+                                          className="no-spinner w-full text-[30px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
                                         />
                                       </div>
                                     </div>
@@ -988,12 +1038,17 @@ const SwapPanel: FC = () => {
                                     <div className="flex items-center gap-2 ml-auto">
                                       <span className="font-bold">
                                         {new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toFixed(4)}
+                                        {" "}
                                         {selectedTokenDeposit1._symbol ??
                                           "PAXG"}
                                       </span>
                                       <button
-                                        className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
-                                        disabled
+                                        onClick={() => handleMaxClick(true)}
+                                        className={`bg-gray-200 rounded-xl px-2 py-1 border border-gray-200 ${selectedToken1Amount == "0"
+                                          ? "cursor-not-allowed opacity-50"
+                                          : "cursor-pointer opacity-100"
+                                          }`}
+                                        disabled={selectedToken1Amount == "0"}
                                       >
                                         Max
                                       </button>
@@ -1002,13 +1057,14 @@ const SwapPanel: FC = () => {
                                 </div>
                               </div>
 
-                              <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-6 py-4">
-                                <div className="flex flex-col bg-white rounded-[16px] px-4 py-4 overflow-hidden">
+                              <div className="flex flex-col rounded-2xl bg-surface2 overflow-hidden px-2 py-4">
+                                <div className="flex flex-col bg-white rounded-[16px] px-2 py-4 overflow-hidden">
                                   <div className="flex items-center justify-between min-h-[59px]">
                                     <div className="flex flex-grow items-center overflow-hidden mr-4">
                                       <div className="flex flex-col flex-grow">
                                         <input
-                                          type="text"
+                                          type="number"
+                                          min={0}
                                           placeholder="0"
                                           value={depositAmount2}
                                           onChange={(e) =>
@@ -1016,7 +1072,7 @@ const SwapPanel: FC = () => {
                                               e.target.value
                                             )
                                           }
-                                          className="w-full text-[36px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
+                                          className="no-spinner w-full text-[30px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
                                           disabled={!depositAmount1}
                                         />
                                       </div>
@@ -1046,12 +1102,17 @@ const SwapPanel: FC = () => {
                                     <div className="flex items-center gap-2 ml-auto">
                                       <span className="font-bold">
                                         {new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toFixed(4)}
+                                        {" "}
                                         {selectedTokenDeposit2._symbol ??
                                           "PAXG"}
                                       </span>
                                       <button
-                                        className="flex items-center justify-center bg-gray-100 px-2 py-1 rounded-[12px] border border-gray-200 text-xs font-medium text-gray-600 cursor-not-allowed select-none"
-                                        disabled
+                                        onClick={() => handleMaxClick(false)}
+                                        className={`bg-gray-200 rounded-xl px-2 py-1 border border-gray-200 ${selectedToken2Amount == "0"
+                                          ? "cursor-not-allowed opacity-50"
+                                          : "cursor-pointer opacity-100"
+                                          }`}
+                                        disabled={selectedToken2Amount == "0"}
                                       >
                                         Max
                                       </button>
@@ -1129,7 +1190,7 @@ const SwapPanel: FC = () => {
       if (!selectedWithdrawPool) return;
       try {
         setWithdrawLoading(true)
-        const calculatedAmount = new BigNumber(withdrawAmount.toString()).multipliedBy(new BigNumber(selectedWithdrawPool?.value).dividedBy(10 ** 18)).dividedBy(100);
+        const calculatedAmount = new BigNumber(withdrawAmount.toString()).multipliedBy(new BigNumber(selectedWithdrawPool?.value || "").dividedBy(10 ** 18)).dividedBy(100);
         const response = await axios.post("/api/swap/removeLiquidity", {
           address: selectedWithdrawPool.address,
           amount: new BigNumber(calculatedAmount).multipliedBy(10 ** 18).toFixed(0),
@@ -1138,7 +1199,7 @@ const SwapPanel: FC = () => {
         api['success']({
           message: 'Success',
           description:
-            `Succesfully withdrawed ${selectedWithdrawPool?._name}`,
+            `Successfully withdrawed ${selectedWithdrawPool?._name}`,
         });
         setWithdrawLoading(false)
       } catch (err) {
@@ -1158,7 +1219,7 @@ const SwapPanel: FC = () => {
         try {
           const res = await axios.get(`/api/lpToken/`);
           const tempPools = res.data
-          const enrichedPools = tempPools.map(pool => {
+          const enrichedPools = tempPools.map((pool: { data: { tokenA: string, tokenB: string } }) => {
             const tokenAInfo = tokens && tokens.find(t => t.address === pool.data.tokenA);
             const tokenBInfo = tokens && tokens.find(t => t.address === pool.data.tokenB);
 
@@ -1175,7 +1236,7 @@ const SwapPanel: FC = () => {
         }
       };
       fetchUserPools();
-    }, []);
+    }, [tokens]);
 
     const handleChange = (value: string) => {
       if (value === '' || (Number(value) <= 100 && Number(value) >= 0)) {
@@ -1214,19 +1275,19 @@ const SwapPanel: FC = () => {
                   </svg>
                 </button>
                 <div className="flex justify-center items-center border border-blue-200 rounded-xl">
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={withdrawAmount}
-                  onChange={(e) => handleChange(e.target.value)}
-                  className="no-spinner w-full p-4  focus:outline-none text-gray-800 placeholder-gray-400" // Right padding for the % sign
-                  disabled={!selectedWithdrawPool}
-                  max="100"
-                  min="0"
-                />
-                <span className="text-gray-900 font-bold pointer-events-none mr-4">
-                  %
-                </span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={withdrawAmount}
+                    onChange={(e) => handleChange(e.target.value)}
+                    className="no-spinner w-full p-4  focus:outline-none text-gray-800 placeholder-gray-400" // Right padding for the % sign
+                    disabled={!selectedWithdrawPool}
+                    max="100"
+                    min="0"
+                  />
+                  <span className="text-gray-900 font-bold pointer-events-none mr-4">
+                    %
+                  </span>
                 </div>
                 {selectedWithdrawPool && (
                   <div className="text-sm text-gray-600 mt-1">

@@ -94,7 +94,7 @@ export default function Navbar() {
               <div className="absolute right-0 mt-2 w-52 bg-[#101c2c] text-white rounded-xl shadow-2xl z-50">
                 <div className="p-3 border-b border-white/10">
                   <p className="text-base font-semibold">Connected Wallet</p>
-                  <p className="text-sm text-cyan-300">0x75...c60f</p>
+                  <p className="text-sm text-cyan-300">{userAddress?.slice(0, 4)}...{userAddress?.slice(-4)}</p>
                 </div>
                 <button
                   onClick={handleLogout}

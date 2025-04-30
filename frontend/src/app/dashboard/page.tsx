@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaHandHoldingUsd } from 'react-icons/fa';
 import { IoMdSwap } from "react-icons/io";
@@ -72,7 +72,7 @@ export default function Dashboard() {
   const endIndex = startIndex + itemsPerPage;
   const currentTokens = userTokens.slice(startIndex, endIndex);
 
-  const fetchUserTokens = async () => {
+  const fetchUserTokens = useCallback(async () => {
     setIsLoading(true);
     try {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -115,13 +115,13 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  },[tokens]);
 
   useEffect(() => {
     if (tokens) { 
       fetchUserTokens();
     }
-  }, [tokens]);
+  }, [tokens,fetchUserTokens]);
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
