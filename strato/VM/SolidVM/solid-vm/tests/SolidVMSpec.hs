@@ -35,10 +35,8 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
-import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.SQLDB
 import Blockchain.GenesisBlocks.Builder
-import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
@@ -49,13 +47,10 @@ import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import qualified Blockchain.Stream.Action as Action
-import Blockchain.SyncDB
-import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
-import Blockchain.Wiring (contextGets, gets)
+import Blockchain.Wiring ()
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Exception
@@ -73,7 +68,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char
-import Data.Either.Extra
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
@@ -81,7 +75,6 @@ import qualified Data.Text as T
 import qualified Data.Map.Ordered as OMap
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
-import Data.Traversable (for)
 import Executable.EVMFlags ()
 import qualified LabeledError
 import qualified Numeric (readHex, showHex)
@@ -91,8 +84,6 @@ import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, x
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
-import Text.Read (readMaybe)
-import UnliftIO hiding (race, throwIO, timeout)
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -315,47 +306,6 @@ writeBlockSummary block =
 
 instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
   accessEnv = fmap (view $ dbs . sqldb) accessEnv
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (ReaderT Context m) where
-  access _ = Mod.get (Mod.Proxy @ContextState)
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (ReaderT Context m) where
-  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Context m) where
-  access _ = fmap (view $ dbs . redisPool) accessEnv
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (ReaderT Context m) where
-  access _ = do
-    mRBB <- RBDB.withRedisBlockDB getWorldBestBlockInfo
-    for mRBB $ \(BestBlock sha num) ->
-      return . WorldBestBlock $ BestBlock sha num
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (ReaderT Context m) where
-  access _ = gets $ view memDBs
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TRC.Cache (ReaderT Context m) where
-  access _ = contextGets _txRunResultsCache
-
-instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => A.Selectable Address AddressState (ReaderT Context m) where
-  select _ = getAddressStateMaybe
-
-instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => (Address `A.Selectable` X509Certificate) (ReaderT Context m) where
-  select _ k = do
-    let certKey addr = (addr,) . encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
-        _ -> pure Nothing
-
-instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => ((Address, T.Text) `A.Selectable` X509CertificateField) (ReaderT Context m) where
-  select _ (k, t) = do
-    let certKey addr = (addr,) . encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      maybe Nothing (readMaybe . T.unpack . decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
