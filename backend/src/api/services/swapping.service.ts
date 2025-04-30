@@ -9,7 +9,7 @@ import {getPools as getLendingPool} from "./lending.service";
 const Pool = "ERC20";
 const PoolFactory = "PoolFactory";
 
-export const getPools = async (
+export const getPoolsWithDetails = async (
   accessToken: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
@@ -94,6 +94,37 @@ export const getPools = async (
       pool.data.tokenAPrice = pricesMap[pool.data.tokenA] || "0";
       pool.data.tokenBPrice = pricesMap[pool.data.tokenB] || "0";
     });
+
+    return poolData;
+  } catch (error) {
+    console.error("Error fetching pools:", error);
+    throw error;
+  }
+};
+
+export const getPools = async (
+  accessToken: string,
+  rawParams: Record<string, string | undefined> = {}
+) => {
+  try {
+    // Filter out undefined values from query
+    const params = Object.fromEntries(
+      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+    ) as Record<string, string>;
+
+    params.root = `eq.${constants.poolFactory}`;
+
+    const cirrusResponse = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-ERC20`,
+      { params }
+    );
+
+    if (cirrusResponse.status !== 200 || !Array.isArray(cirrusResponse.data)) {
+      throw new Error("Error fetching pool data from Cirrus");
+    }
+
+    const poolData = cirrusResponse.data;
 
     return poolData;
   } catch (error) {
