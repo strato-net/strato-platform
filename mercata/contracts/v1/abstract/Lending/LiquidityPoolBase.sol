@@ -8,9 +8,9 @@ abstract contract LiquidityPoolBase  {
     event LendingPoolSet(address lendingPool);
 
     LendingPoolBase public lendingPool;
-    mapping(bytes32 => uint256) public record balances;
+    mapping(string => uint256) public record balances;
     mapping(address => uint256) public record totalLiquidity;
-    mapping(bytes32 => uint256) public record borrowed;
+    mapping(string => uint256) public record borrowed;
 
     constructor() {
         
@@ -23,7 +23,7 @@ abstract contract LiquidityPoolBase  {
         emit LendingPoolSet(_lendingPool);
     }
 
-    function _key(address user, address asset)  returns (bytes32) {
+    function _key(address user, address asset)  returns (string) {
         return keccak256(string(user), string(asset));
     }
 
@@ -39,7 +39,7 @@ abstract contract LiquidityPoolBase  {
     function withdraw(address asset, uint256 amount, address to)   {
         require(amount > 0, "Amount must be greater than 0");
         require(to != address(0), "Invalid recipient address");
-        bytes32 key = _key(to, asset);
+        string key = _key(to, asset);
         require(balances[key] >= amount, "Insufficient balance");
         balances[key] -= amount;
         totalLiquidity[asset] -= amount;
@@ -48,7 +48,7 @@ abstract contract LiquidityPoolBase  {
     }
 
     function borrow(address asset, uint256 amount, address borrower)   {
-        bytes32 key = _key(borrower, asset);
+        string key = _key(borrower, asset);
         require(amount > 0, "Amount must be greater than 0");
         require(borrower != address(0), "Invalid borrower address");
         require(totalLiquidity[asset] >= amount, "Insufficient liquidity");
@@ -59,7 +59,7 @@ abstract contract LiquidityPoolBase  {
     }
 
     function repay(address asset, uint256 amount, address borrower)   {
-        bytes32 key = _key(borrower, asset);
+        string key = _key(borrower, asset);
         require(borrowed[key] > 0, "No outstanding debt");
         uint256 repayAmount = amount > borrowed[key] ? borrowed[key] : amount;
         borrowed[key] -= repayAmount;

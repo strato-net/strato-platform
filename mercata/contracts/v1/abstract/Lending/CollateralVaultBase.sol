@@ -5,7 +5,7 @@ abstract contract CollateralVaultBase is IERC20 {
     event CollateralRemoved(address indexed user, address indexed asset, uint256 amount);
 
     address public lendingPool;
-    mapping(bytes32 => uint256) public record collaterals;
+    mapping(string => uint256) public record collaterals;
 
     constructor() {
         // Set lendingPool later
@@ -17,7 +17,7 @@ abstract contract CollateralVaultBase is IERC20 {
         lendingPool = _lendingPool;
     }
 
-    function _key(address user, address asset)  returns (bytes32) {
+    function _key(address user, address asset)  returns (string) {
         return keccak256(string(user), string(asset));
     }
 
@@ -25,14 +25,14 @@ abstract contract CollateralVaultBase is IERC20 {
         require(amount > 0, "Invalid amount");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
 
-        bytes32 key = _key(borrower, asset);
+        string key = _key(borrower, asset);
         collaterals[key] += amount;
 
         emit CollateralAdded(borrower, asset, amount);
     }
 
     function removeCollateral(address borrower, address asset, uint256 amount)  {
-        bytes32 key = _key(borrower, asset);
+        string key = _key(borrower, asset);
         require(collaterals[key] >= amount, "Insufficient collateral");
 
         collaterals[key] -= amount;
