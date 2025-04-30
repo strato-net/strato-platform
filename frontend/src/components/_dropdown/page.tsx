@@ -84,7 +84,7 @@ const TokenDropdown: React.FC<Props> = ({
                   onClick={() => handleTokenSelect(token)}
                   className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg"
                 >
-                  <TokenIcon symbol={token?._symbol || ''} size="md" />
+                  <TokenIcon symbol={token?._symbol || ''} size="lg" />
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{token._name}</span>
                     <div className="flex items-center gap-2">
