@@ -74,10 +74,11 @@ const SwapPanel: FC = () => {
     const [tokenSearchQueryBuy, setTokenSearchQueryBuy] = useState("");
     const [showTokenSelectorSell, setShowTokenSelectorSell] = useState(false);
     const [showTokenSelectorBuy, setShowTokenSelectorBuy] = useState(false);
-    const [selectedSellToken, setSelectedSellToken] =
-      useState<TokenData | null>(null);
+    const [selectedSellToken, setSelectedSellToken] = useState<
+      TokenData | null
+    >(null);
     const [selectedBuyToken, setSelectedBuyToken] = useState<TokenData | null>(
-      null
+      null,
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [pool, setPool] = useState<any>(null);
@@ -91,11 +92,10 @@ const SwapPanel: FC = () => {
     const [tokenList2, setTokenList2] = useState<TokenData[]>([]);
 
     const [selectedToken1Amount, setSelectedToken1Amount] = useState(0);
-    const [swapLoading, setSwapLoading] = useState(false)
-    const [balanceLoading, setBalanceLoading] = useState(false)
+    const [swapLoading, setSwapLoading] = useState(false);
+    const [balanceLoading, setBalanceLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
     const { userAddress } = useUser();
-
 
     useEffect(() => {
       const fetchTokens = async () => {
@@ -159,7 +159,7 @@ const SwapPanel: FC = () => {
     const getPoolByTokenPair = async (tokenA: string, tokenB: string) => {
       try {
         const res = await axios.get(
-          `/api/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
+          `/api/poolByTokenPair?tokenPair=${tokenA},${tokenB}`,
         );
         setPool(res.data[0]);
         return res.data[0];
@@ -179,15 +179,15 @@ const SwapPanel: FC = () => {
 
     const getTokenBalance = async (address: string) => {
       try {
-        setBalanceLoading(true)
+        setBalanceLoading(true);
         const res = await axios.get(
-          `api/tokens/table/balance?key=eq.${userAddress}&address=eq.${address}`
+          `api/tokens/table/balance?key=eq.${userAddress}&address=eq.${address}`,
         );
         setSelectedToken1Amount(res?.data[0]?.value || 0);
-        setBalanceLoading(false)
+        setBalanceLoading(false);
       } catch (err) {
         console.log(err);
-        setBalanceLoading(false)
+        setBalanceLoading(false);
       }
     };
 
@@ -204,7 +204,9 @@ const SwapPanel: FC = () => {
           const parsedValue = new BigNumber(value || "0");
 
           // Convert on-chain balance (in wei) to readable form
-          const maxSell = new BigNumber(selectedToken1Amount || "0").dividedBy(1e18);
+          const maxSell = new BigNumber(selectedToken1Amount || "0").dividedBy(
+            1e18,
+          );
 
           if (isSellInput) {
             if (parsedValue.gt(maxSell)) {
@@ -214,19 +216,19 @@ const SwapPanel: FC = () => {
               setSellAmount(value);
               setBuyAmount(
                 Math.floor(
-                  parseFloat(value) * (pool.data.aToBRatio || 0) * 10000
+                  parseFloat(value) * (pool.data.aToBRatio || 0) * 10000,
                 ) /
                 10000 +
-                ""
+                "",
               ); // Always rounds down with 6 decimal places
             } else {
               setSellAmount(value);
               setBuyAmount(
                 Math.floor(
-                  parseFloat(value) * (pool.data.bToARatio || 0) * 10000
+                  parseFloat(value) * (pool.data.bToARatio || 0) * 10000,
                 ) /
                 10000 +
-                ""
+                "",
               ); // Always rounds down with 6 decimal places
             }
           } else {
@@ -234,19 +236,19 @@ const SwapPanel: FC = () => {
               setBuyAmount(value);
               setSellAmount(
                 Math.floor(
-                  parseFloat(value) * (pool.data.aToBRatio || 0) * 1000000
+                  parseFloat(value) * (pool.data.aToBRatio || 0) * 1000000,
                 ) /
                 1000000 +
-                ""
+                "",
               ); // Always rounds down with 6 decimal places
             } else {
               setBuyAmount(value);
               setSellAmount(
                 Math.floor(
-                  parseFloat(value) * (pool.data.bToARatio || 0) * 1000000
+                  parseFloat(value) * (pool.data.bToARatio || 0) * 1000000,
                 ) /
                 1000000 +
-                ""
+                "",
               ); // Always rounds down with 6 decimal places
             }
           }
@@ -265,45 +267,50 @@ const SwapPanel: FC = () => {
 
     // Add swap action handler
     const handleSwapAction = async () => {
-      setSwapLoading(true)
+      setSwapLoading(true);
       if (!selectedSellToken || !selectedBuyToken) return;
       try {
         // Replace this with your actual pool address logic if different
-        const method =
-          pool.data.tokenA === selectedSellToken.address
-            ? "tokenAToTokenB"
-            : "tokenBToTokenA";
+        const method = pool.data.tokenA === selectedSellToken.address
+          ? "tokenAToTokenB"
+          : "tokenBToTokenA";
 
         const response = await axios.post("/api/swap/swap", {
           address: pool.address,
           method: method,
           amount: new BigNumber(sellAmount).multipliedBy(10 ** 18).toFixed(0),
-          min_tokens: new BigNumber(buyAmount).multipliedBy(10 ** 18).multipliedBy(0.99).toFixed(0),
+          min_tokens: new BigNumber(buyAmount).multipliedBy(10 ** 18)
+            .multipliedBy(0.99).toFixed(0),
         });
         console.log("Swap response:", response.data);
-        setSwapLoading(false)
-        api['success']({
-          message: 'Success',
+        setSwapLoading(false);
+        api["success"]({
+          message: "Success",
           description:
             `Swapping Done Successfully from ${selectedSellToken?._name} to ${selectedBuyToken?._name}`,
         });
       } catch (error) {
         console.error("Swap error:", error);
-        setSwapLoading(false)
-        api['error']({
-          message: 'Error',
-          description:
-            `Swapping Error - ${error}`,
+        setSwapLoading(false);
+        api["error"]({
+          message: "Error",
+          description: `Swapping Error - ${error}`,
         });
       }
     };
 
     const handleMaxClick = () => {
-      setSellAmount(new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
-      handleInputChange(true,new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
-    }
+      setSellAmount(
+        new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString(),
+      );
+      handleInputChange(
+        true,
+        new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString(),
+      );
+    };
 
-    const isSwapValid = selectedSellToken && selectedBuyToken && parseFloat(sellAmount) > 0 && parseFloat(buyAmount) > 0
+    const isSwapValid = selectedSellToken && selectedBuyToken &&
+      parseFloat(sellAmount) > 0 && parseFloat(buyAmount) > 0;
 
     return (
       <div className="min-h-screen bg-gray-50 px-6 py-8">
@@ -334,41 +341,43 @@ const SwapPanel: FC = () => {
                 </div>
                 <div className="flex items-center">
                   <div className="flex flex-col cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full border border-gray-200 shadow-md transform scale-100 opacity-100">
-                    {!selectedSellToken ? (
-                      <button
-                        onClick={() => {
-                          setShowTokenSelectorSell(true);
-                        }}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
-                      >
-                        Select token
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setShowTokenSelectorSell(true);
-                        }}
-                        className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
-                      >
-                        <TokenIcon
-                          symbol={selectedSellToken?._symbol || "NA"}
-                          size="md"
-                        />
-                        <span className="font-medium text-base text-gray-900">
-                          {selectedSellToken._name}
-                        </span>
-                        <svg
-                          className="w-6 h-6 text-gray-400 rotate-90"
-                          viewBox="0 0 24 24"
-                          fill="none"
+                    {!selectedSellToken
+                      ? (
+                        <button
+                          onClick={() => {
+                            setShowTokenSelectorSell(true);
+                          }}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
                         >
-                          <path
-                            d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"
-                            fill="currentColor"
+                          Select token
+                        </button>
+                      )
+                      : (
+                        <button
+                          onClick={() => {
+                            setShowTokenSelectorSell(true);
+                          }}
+                          className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
+                        >
+                          <TokenIcon
+                            symbol={selectedSellToken?._symbol || "NA"}
+                            size="md"
                           />
-                        </svg>
-                      </button>
-                    )}
+                          <span className="font-medium text-base text-gray-900">
+                            {selectedSellToken._name}
+                          </span>
+                          <svg
+                            className="w-6 h-6 text-gray-400 rotate-90"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                          >
+                            <path
+                              d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        </button>
+                      )}
                   </div>
                 </div>
               </div>
@@ -378,7 +387,8 @@ const SwapPanel: FC = () => {
                   <span>
                     {balanceLoading
                       ? <Spin />
-                      : new BigNumber(selectedToken1Amount).dividedBy(1e18).toString()}
+                      : new BigNumber(selectedToken1Amount).dividedBy(1e18)
+                        .toString()}
                   </span>
 
                   <button
@@ -403,7 +413,7 @@ const SwapPanel: FC = () => {
                 const tempToken = selectedSellToken;
                 setSelectedSellToken(selectedBuyToken || null);
                 setSelectedBuyToken(tempToken || null);
-                getTokenBalance(selectedBuyToken?.address || '')
+                getTokenBalance(selectedBuyToken?.address || "");
 
                 // Swap amounts
                 const tempAmount = sellAmount;
@@ -457,8 +467,7 @@ const SwapPanel: FC = () => {
                         placeholder="0"
                         value={buyAmount}
                         onChange={(e) =>
-                          handleInputChange(false, e.target.value)
-                        }
+                          handleInputChange(false, e.target.value)}
                         className="no-spinner w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
                         disabled={!selectedBuyToken}
                       />
@@ -466,41 +475,43 @@ const SwapPanel: FC = () => {
                   </div>
                   <div className="flex items-center">
                     <div className="flex flex-col cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full border border-gray-200 shadow-md transform scale-100 opacity-100">
-                      {!selectedBuyToken ? (
-                        <button
-                          onClick={() => {
-                            setShowTokenSelectorBuy(true);
-                          }}
-                          className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
-                        >
-                          Select token
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setShowTokenSelectorBuy(true);
-                          }}
-                          className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
-                        >
-                          <TokenIcon
-                            symbol={selectedBuyToken?._symbol || "NA"}
-                            size="md"
-                          />
-                          <span className="font-medium text-base text-gray-900">
-                            {selectedBuyToken._name}
-                          </span>
-                          <svg
-                            className="w-6 h-6 text-gray-400 rotate-90"
-                            viewBox="0 0 24 24"
-                            fill="none"
+                      {!selectedBuyToken
+                        ? (
+                          <button
+                            onClick={() => {
+                              setShowTokenSelectorBuy(true);
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white rounded-full text-base font-medium shadow"
                           >
-                            <path
-                              d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"
-                              fill="currentColor"
+                            Select token
+                          </button>
+                        )
+                        : (
+                          <button
+                            onClick={() => {
+                              setShowTokenSelectorBuy(true);
+                            }}
+                            className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm"
+                          >
+                            <TokenIcon
+                              symbol={selectedBuyToken?._symbol || "NA"}
+                              size="md"
                             />
-                          </svg>
-                        </button>
-                      )}
+                            <span className="font-medium text-base text-gray-900">
+                              {selectedBuyToken._name}
+                            </span>
+                            <svg
+                              className="w-6 h-6 text-gray-400 rotate-90"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                            >
+                              <path
+                                d="M15.7 5.3a1 1 0 0 1 0 1.4L10.4 12l5.3 5.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </button>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -691,29 +702,32 @@ const SwapPanel: FC = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab2 === "deposits" ? (
-                <RenderDeposits />
-              ) : (
-                <RenderWithdraw />
-              )}
+              {activeTab2 === "deposits"
+                ? <RenderDeposits />
+                : <RenderWithdraw />}
             </motion.div>
           </Card>
         </motion.div>
       </>
-    )
+    );
   };
 
   const RenderDeposits = () => {
-    const [tokenSearchQueryDeposit1, setTokenSearchQueryDeposit1] =
-      useState("");
-    const [tokenSearchQueryDeposit2, setTokenSearchQueryDeposit2] =
-      useState("");
-    const [showTokenSelectorDeposit, setShowTokenSelectorDeposit] =
-      useState(false);
-    const [selectedTokenDeposit1, setSelectedDepositToken1] =
-      useState<TokenData>();
-    const [selectedTokenDeposit2, setSelectedDepositToken2] =
-      useState<TokenData | null>(null);
+    const [tokenSearchQueryDeposit1, setTokenSearchQueryDeposit1] = useState(
+      "",
+    );
+    const [tokenSearchQueryDeposit2, setTokenSearchQueryDeposit2] = useState(
+      "",
+    );
+    const [showTokenSelectorDeposit, setShowTokenSelectorDeposit] = useState(
+      false,
+    );
+    const [selectedTokenDeposit1, setSelectedDepositToken1] = useState<
+      TokenData
+    >();
+    const [selectedTokenDeposit2, setSelectedDepositToken2] = useState<
+      TokenData | null
+    >(null);
     const [selectingDepositToken, setSelectingDepositToken] = useState<
       1 | 2 | null
     >(null);
@@ -723,7 +737,7 @@ const SwapPanel: FC = () => {
         const fetchPaired = async () => {
           try {
             const res = await axios.get(
-              `/api/swapableTokenPairs/${selectedTokenDeposit1.address}`
+              `/api/swapableTokenPairs/${selectedTokenDeposit1.address}`,
             );
             setTokenList2(res.data);
           } catch (err) {
@@ -734,6 +748,8 @@ const SwapPanel: FC = () => {
       }
     }, [selectedTokenDeposit1]);
 
+    const { tokens } = useTokens()
+
     const [tokenList, setTokenList] = useState<TokenData[]>([]);
 
     const [tokenList2, setTokenList2] = useState<TokenData[]>([]);
@@ -743,16 +759,22 @@ const SwapPanel: FC = () => {
     const [depositAmount2, setDepositAmount2] = useState<string>("");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [pool, setPool] = useState<any>(null);
-    const [liquidityLoading, setLiquidityLoading] = useState(false)
+    const [liquidityLoading, setLiquidityLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
-    const { userAddress } = useUser()
-    const [selectedToken1Amount, setSelectedToken1Amount] = useState("")
-    const [selectedToken2Amount, setSelectedToken2Amount] = useState("")
+    const { userAddress } = useUser();
+    const [selectedToken1Amount, setSelectedToken1Amount] = useState("");
+    const [selectedToken2Amount, setSelectedToken2Amount] = useState("");
+    const [initialPrice, setInitialPrice] = useState("");
+    const [minPrice, setMinPrice] = useState("");
+    const [maxPrice, setMaxPrice] = useState("");
+    const [tokenAmount1, setTokenAmount1] = useState("");
+    const [tokenAmount2, setTokenAmount2] = useState("");
+
 
     const getPoolByTokenPair = async (tokenA: string, tokenB: string) => {
       try {
         const res = await axios.get(
-          `/api/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
+          `/api/poolByTokenPair?tokenPair=${tokenA},${tokenB}`,
         );
         setPool(res.data[0]);
         return res.data[0];
@@ -765,7 +787,7 @@ const SwapPanel: FC = () => {
       if (selectedTokenDeposit1?.address && selectedTokenDeposit2?.address) {
         getPoolByTokenPair(
           selectedTokenDeposit1.address,
-          selectedTokenDeposit2.address
+          selectedTokenDeposit2.address,
         );
       }
     }, [selectedTokenDeposit1, selectedTokenDeposit2]);
@@ -774,16 +796,17 @@ const SwapPanel: FC = () => {
       const parsedValue = new BigNumber(value || "0");
 
       // Convert on-chain balance (in wei) to readable form
-      const maxValue = new BigNumber(selectedToken1Amount || "0").dividedBy(1e18);
+      const maxValue = new BigNumber(selectedToken1Amount || "0").dividedBy(
+        1e18,
+      );
       if (parsedValue.gt(maxValue)) {
         return;
       }
       setDepositAmount1(value);
       if (pool?.data) {
-        const ratio =
-          pool.data.tokenA === selectedTokenDeposit1?.address
-            ? pool.data.aToBRatio
-            : pool.data.bToARatio;
+        const ratio = pool.data.tokenA === selectedTokenDeposit1?.address
+          ? pool.data.aToBRatio
+          : pool.data.bToARatio;
         const calculated = new BigNumber(value)
           .multipliedBy(ratio)
           .multipliedBy(10000)
@@ -798,16 +821,17 @@ const SwapPanel: FC = () => {
       const parsedValue = new BigNumber(value || "0");
 
       // Convert on-chain balance (in wei) to readable form
-      const maxValue = new BigNumber(selectedToken2Amount || "0").dividedBy(1e18);
+      const maxValue = new BigNumber(selectedToken2Amount || "0").dividedBy(
+        1e18,
+      );
       if (parsedValue.gt(maxValue)) {
         return;
       }
       setDepositAmount2(value);
       if (pool?.data) {
-        const ratio =
-          pool.data.tokenA === selectedTokenDeposit1?.address
-            ? pool.data.bToARatio
-            : pool.data.aToBRatio;
+        const ratio = pool.data.tokenA === selectedTokenDeposit1?.address
+          ? pool.data.bToARatio
+          : pool.data.aToBRatio;
         const calculated = new BigNumber(value)
           .multipliedBy(ratio)
           .multipliedBy(10000)
@@ -821,35 +845,34 @@ const SwapPanel: FC = () => {
     const handleAddLiquidity = async () => {
       if (!selectedTokenDeposit1 || !selectedTokenDeposit2) return;
       try {
-        setLiquidityLoading(true)
+        setLiquidityLoading(true);
         const response = await axios.post("/api/swap/addLiquidity", {
           address: pool.address,
           max_tokenA_amount: new BigNumber(
             pool.data.tokenA === selectedTokenDeposit1?.address
               ? depositAmount1
-              : depositAmount2
+              : depositAmount2,
           ).multipliedBy(10 ** 18).multipliedBy(1.01).toFixed(0),
           tokenB_amount: new BigNumber(
             pool.data.tokenA === selectedTokenDeposit1?.address
               ? depositAmount2
-              : depositAmount1
+              : depositAmount1,
           ).multipliedBy(10 ** 18).toFixed(0),
         });
         console.log("Add liquidity response:", response.data);
-        setLiquidityLoading(false)
-        api['success']({
-          message: 'Success',
+        setLiquidityLoading(false);
+        api["success"]({
+          message: "Success",
           description:
             `Successfully added liquidity for ${selectedTokenDeposit1?._name} ${selectedTokenDeposit2?._name}`,
         });
       } catch (err) {
         console.error("Add liquidity error:", err);
-        api['error']({
-          message: 'Error',
-          description:
-            `Liquidity Error - ${err}`,
+        api["error"]({
+          message: "Error",
+          description: `Liquidity Error - ${err}`,
         });
-        setLiquidityLoading(false)
+        setLiquidityLoading(false);
       }
     };
 
@@ -869,24 +892,27 @@ const SwapPanel: FC = () => {
     const handleTokenSelectDeposit = (token: TokenData) => {
       if (selectingDepositToken === 1) {
         setSelectedDepositToken1(token);
-        getTokenBalance(token?.address || '', true)
+        getTokenBalance(token?.address || "", true);
       } else if (selectingDepositToken === 2) {
         setSelectedDepositToken2(token);
-        getTokenBalance(token?.address || '')
+        getTokenBalance(token?.address || "");
       }
       setShowTokenSelectorDeposit(false);
       setSelectingDepositToken(null);
     };
 
-    const getTokenBalance = async (address: string, firstToken: boolean = false) => {
+    const getTokenBalance = async (
+      address: string,
+      firstToken: boolean = false,
+    ) => {
       try {
         const res = await axios.get(
-          `api/tokens/table/balance?key=eq.${userAddress}&address=eq.${address}`
+          `api/tokens/table/balance?key=eq.${userAddress}&address=eq.${address}`,
         );
         if (firstToken) {
-          setSelectedToken1Amount(res?.data[0]?.value || 0)
+          setSelectedToken1Amount(res?.data[0]?.value || 0);
         } else {
-          setSelectedToken2Amount(res?.data[0]?.value || 0)
+          setSelectedToken2Amount(res?.data[0]?.value || 0);
         }
       } catch (err) {
         console.log(err);
@@ -895,13 +921,45 @@ const SwapPanel: FC = () => {
 
     const handleMaxClick = (firstToken: boolean = false) => {
       if (firstToken) {
-        setDepositAmount1(new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
-        handleInputChangeDeposit1(new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString())
+        setDepositAmount1(
+          new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString(),
+        );
+        handleInputChangeDeposit1(
+          new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toString(),
+        );
       } else {
-        setDepositAmount2(new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toString())
-        handleInputChangeDeposit2(new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toString())
+        setDepositAmount2(
+          new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toString(),
+        );
+        handleInputChangeDeposit2(
+          new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toString(),
+        );
       }
-    }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+
+      switch (name) {
+        case "initialPrice":
+          setInitialPrice(value);
+          break;
+        case "minPrice":
+          setMinPrice(value);
+          break;
+        case "maxPrice":
+          setMaxPrice(value);
+          break;
+        case "tokenAmount1":
+          setTokenAmount1(value);
+          break;
+        case "tokenAmount2":
+          setTokenAmount2(value);
+          break;
+        default:
+          break;
+      }
+    };
 
     return (
       <div className="space-y-4">
@@ -936,12 +994,16 @@ const SwapPanel: FC = () => {
                               className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
                             >
                               <div className="flex items-center gap-2">
-                                {selectedTokenDeposit1 && <TokenIcon
-                                  symbol={selectedTokenDeposit1?._symbol || ""}
-                                  size="md"
-                                />}
+                                {selectedTokenDeposit1 && (
+                                  <TokenIcon
+                                    symbol={selectedTokenDeposit1?._symbol ||
+                                      ""}
+                                    size="md"
+                                  />
+                                )}
                                 <span className="text-gray-800 font-medium">
-                                  {selectedTokenDeposit1?._name ?? "Choose token"}
+                                  {selectedTokenDeposit1?._name ??
+                                    "Choose token"}
                                 </span>
                               </div>
                               <svg
@@ -960,12 +1022,16 @@ const SwapPanel: FC = () => {
                               className="flex items-center justify-between p-4 border rounded-xl border-gray-300 bg-gray-900 text-white w-full"
                             >
                               <div className="flex items-center gap-2">
-                                {selectedTokenDeposit2 && <TokenIcon
-                                  symbol={selectedTokenDeposit2?._symbol || ""}
-                                  size="md"
-                                />}
+                                {selectedTokenDeposit2 && (
+                                  <TokenIcon
+                                    symbol={selectedTokenDeposit2?._symbol ||
+                                      ""}
+                                    size="md"
+                                  />
+                                )}
                                 <span className="font-medium">
-                                  {selectedTokenDeposit2?._name ?? "Choose token"}
+                                  {selectedTokenDeposit2?._name ??
+                                    "Choose token"}
                                 </span>
                               </div>
                               <svg
@@ -977,7 +1043,7 @@ const SwapPanel: FC = () => {
                               </svg>
                             </button>
                           </div>
-                          {selectedTokenDeposit1 && selectedTokenDeposit2 && (
+                          {selectedTokenDeposit1 && selectedTokenDeposit2 && tokenList2.length > 0 && (
                             <>
                               <div className="flex items-center">
                                 <span className="text-lg font-bold text-neutral-900 flex-grow">
@@ -1007,9 +1073,8 @@ const SwapPanel: FC = () => {
                                           value={depositAmount1}
                                           onChange={(e) =>
                                             handleInputChangeDeposit1(
-                                              e.target.value
-                                            )
-                                          }
+                                              e.target.value,
+                                            )}
                                           className="no-spinner w-full text-[30px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
                                         />
                                       </div>
@@ -1018,9 +1083,8 @@ const SwapPanel: FC = () => {
                                     <div className="flex items-center gap-2 px-2 py-2">
                                       <div className="relative w-7 h-7">
                                         <TokenIcon
-                                          symbol={
-                                            selectedTokenDeposit1?._symbol || ""
-                                          }
+                                          symbol={selectedTokenDeposit1
+                                            ?._symbol || ""}
                                           size="md"
                                         />
                                       </div>
@@ -1037,8 +1101,8 @@ const SwapPanel: FC = () => {
 
                                     <div className="flex items-center gap-2 ml-auto">
                                       <span className="font-bold">
-                                        {new BigNumber(selectedToken1Amount).dividedBy(10 ** 18).toFixed(4)}
-                                        {" "}
+                                        {new BigNumber(selectedToken1Amount)
+                                          .dividedBy(10 ** 18).toFixed(4)}{" "}
                                         {selectedTokenDeposit1._symbol ??
                                           "PAXG"}
                                       </span>
@@ -1069,9 +1133,8 @@ const SwapPanel: FC = () => {
                                           value={depositAmount2}
                                           onChange={(e) =>
                                             handleInputChangeDeposit2(
-                                              e.target.value
-                                            )
-                                          }
+                                              e.target.value,
+                                            )}
                                           className="no-spinner w-full text-[30px] leading-[43px] text-gray-800 font-bold focus:outline-none bg-transparent placeholder:text-gray-400"
                                           disabled={!depositAmount1}
                                         />
@@ -1081,9 +1144,8 @@ const SwapPanel: FC = () => {
                                     <div className="flex items-center gap-2 px-2 py-2">
                                       <div className="relative w-7 h-7">
                                         <TokenIcon
-                                          symbol={
-                                            selectedTokenDeposit2?._symbol || ""
-                                          }
+                                          symbol={selectedTokenDeposit2
+                                            ?._symbol || ""}
                                           size="md"
                                         />
                                       </div>
@@ -1101,8 +1163,8 @@ const SwapPanel: FC = () => {
 
                                     <div className="flex items-center gap-2 ml-auto">
                                       <span className="font-bold">
-                                        {new BigNumber(selectedToken2Amount).dividedBy(10 ** 18).toFixed(4)}
-                                        {" "}
+                                        {new BigNumber(selectedToken2Amount)
+                                          .dividedBy(10 ** 18).toFixed(4)}{" "}
                                         {selectedTokenDeposit2._symbol ??
                                           "PAXG"}
                                       </span>
@@ -1122,6 +1184,137 @@ const SwapPanel: FC = () => {
                               </div>
                             </>
                           )}
+                          {selectedTokenDeposit1 && selectedTokenDeposit2 && tokenList2.length == 0 && (
+                            <div className="bg-white p-6 rounded-xl shadow-md space-y-8">
+                              {/* Header */}
+                              <div>
+                                <h2 className="text-xl font-semibold text-gray-800">Creating new pool</h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  Your selections will create a new liquidity pool which may result in lower initial liquidity and increased volatility.
+                                </p>
+                              </div>
+
+                              {/* Initial Price */}
+                              <div>
+                                <h3 className="text-base font-semibold text-gray-800 mb-1">Set initial price</h3>
+                                <p className="text-sm text-gray-500 mb-3">
+                                  When creating a new pool, you must set the starting exchange rate for both tokens. This rate will reflect the initial market price.
+                                </p>
+                                <div className="bg-gray-100 p-4 rounded-lg space-y-2">
+                                  <label className="text-sm text-gray-700">Initial price</label>
+                                  <div className="flex justify-between items-center">
+                                    <input
+                                      name="initialPrice"
+                                      type="number"
+                                      placeholder="0"
+                                      value={initialPrice}
+                                      onChange={handleInputChange}
+                                      className="no-spinner focus:outline-none w-1/2 p-2 rounded-md"
+                                    />
+                                    <div className="flex items-center gap-1">
+                                      <TokenIcon symbol={selectedTokenDeposit1?._symbol || ""} size="md" />
+                                      <span className="text-gray-600 font-medium mr-2">{selectedTokenDeposit1?._name || ""}</span>
+                                      <TokenIcon symbol={selectedTokenDeposit2?._symbol || ""} size="md" />
+                                      <span className="text-gray-600 font-medium">{selectedTokenDeposit2?._name || ""}</span>
+                                    </div>
+                                  </div>
+                                  <span className="text-sm text-gray-500">1 UNI = 1 USDG</span>
+                                  <div className="text-xs text-gray-400 mt-2">
+                                    ⚠️ Market price not found. Please do your own research to avoid loss of funds.
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Price Range */}
+                              <div>
+                                <h3 className="text-base font-semibold text-gray-800 mb-2">Set price range</h3>
+                                <div className="flex gap-4 mb-4">
+                                  <button className="px-4 py-1 rounded-full bg-gray-200 text-sm font-medium">Full range</button>
+                                  <button className="px-4 py-1 rounded-full bg-white border text-sm font-medium">Custom range</button>
+                                </div>
+                                <p className="text-sm text-gray-500 mb-4">
+                                  Setting full range liquidity when creating a pool ensures continuous market participation across all possible prices, offering simplicity but with potential for higher impermanent loss.
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm text-gray-700 mb-1">Min price</label>
+                                    <input
+                                      name="minPrice"
+                                      type="number"
+                                      placeholder="0"
+                                      value={minPrice}
+                                      onChange={handleInputChange}
+                                      className="no-spinner focus:outline-none w-full p-2 rounded-md"
+                                    />
+                                    <span className="text-xs text-gray-500">1 UNI = 1 USDG</span>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm text-gray-700 mb-1">Max price</label>
+                                    <input
+                                      name="maxPrice"
+                                      type="number"
+                                      placeholder="∞"
+                                      value={maxPrice}
+                                      onChange={handleInputChange}
+                                      className="no-spinner focus:outline-none w-full p-2 rounded-md"
+                                    />
+                                    <span className="text-xs text-gray-500">1 UNI = 1 USDG</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Deposit Tokens */}
+                              <div>
+                                <h3 className="text-base font-semibold text-gray-800 mb-1">Deposit tokens</h3>
+                                <p className="text-sm text-gray-500 mb-3">Specify the token amounts for your liquidity contribution.</p>
+
+                                {/* Token 1 */}
+                                <div className="bg-gray-100 p-3 rounded-lg flex items-center justify-between mb-3">
+                                  <input
+                                    name="tokenAmount1"
+                                    type="number"
+                                    placeholder="0"
+                                    value={tokenAmount1}
+                                    onChange={handleInputChange}
+                                    className="no-spinner focus:outline-none w-1/2 p-2 rounded-md"
+                                  />
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="w-full flex items-center justify-end gap-2">
+                                      <TokenIcon symbol={selectedTokenDeposit1?._symbol || ""} size="md" />
+                                      <span className="text-gray-600 font-medium mr-2">{selectedTokenDeposit1?._name || ""}</span>
+                                    </div>
+                                    <div>
+                                      <span>{selectedToken1Amount || 0}</span>
+                                      <button className="ml-3 text-xs text-purple-600 font-medium">Max</button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Token 2 */}
+                                <div className="bg-gray-100 p-3 rounded-lg flex items-center justify-between">
+                                  <input
+                                    name="tokenAmount2"
+                                    type="number"
+                                    placeholder="0"
+                                    value={tokenAmount2}
+                                    onChange={handleInputChange}
+                                    className="no-spinner focus:outline-none w-1/2 p-2 rounded-md"
+                                  />
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="w-full flex items-center justify-end gap-2">
+                                      <TokenIcon symbol={selectedTokenDeposit2?._symbol || ""} size="md" />
+                                      <span className="text-gray-600 font-medium mr-2">{selectedTokenDeposit2?._name || ""}</span>
+                                    </div>
+                                    <div className="flex">
+                                      <span>{selectedToken2Amount || 0}</span>
+                                      <button className="ml-3 text-xs text-purple-600 font-medium">Max</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                         </div>
                       </div>
 
@@ -1132,7 +1325,8 @@ const SwapPanel: FC = () => {
                             ? "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white cursor-pointer hover:bg-gray-900"
                             : "bg-gray-100 text-gray-500 cursor-not-allowed"
                             }`}
-                          disabled={!(depositAmount1 && depositAmount2) || liquidityLoading}
+                          disabled={!(depositAmount1 && depositAmount2) ||
+                            liquidityLoading}
                         >
                           {liquidityLoading && <Spin />}
                           Add Liquidity
@@ -1147,7 +1341,7 @@ const SwapPanel: FC = () => {
                       onClose={() => setShowTokenSelectorDeposit(false)}
                       tokenSearchQuery={tokenSearchQueryDeposit1}
                       setTokenSearchQuery={setTokenSearchQueryDeposit1}
-                      popularTokens={tokenList}
+                      popularTokens={tokens}
                       handleTokenSelect={handleTokenSelectDeposit}
                     />
                   )}
@@ -1157,7 +1351,11 @@ const SwapPanel: FC = () => {
                       onClose={() => setShowTokenSelectorDeposit(false)}
                       tokenSearchQuery={tokenSearchQueryDeposit2}
                       setTokenSearchQuery={setTokenSearchQueryDeposit2}
-                      popularTokens={tokenList2}
+                      popularTokens={
+                        tokenList2.length > 0
+                          ? tokenList2
+                          : tokens ? tokens.filter(token => token.address !== selectedTokenDeposit1?.address) : []
+                      }
                       handleTokenSelect={handleTokenSelectDeposit}
                     />
                   )}
@@ -1165,50 +1363,57 @@ const SwapPanel: FC = () => {
               </div>
             </div>
           </div>
-        </div >
+        </div>
         {contextHolder}
-      </div >
+      </div>
     );
   };
 
   const RenderWithdraw = () => {
     // Replace state declarations with new state for LP pools and withdraw info
     const [lpPools, setLpPools] = useState<TokenData[]>([]);
-    const [showTokenSelectorWithdraw, setShowTokenSelectorWithdraw] =
-      useState(false);
-    const [selectedWithdrawPool, setSelectedWithdrawPool] =
-      useState<TokenData | null>(null);
-    const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] =
-      useState("");
+    const [showTokenSelectorWithdraw, setShowTokenSelectorWithdraw] = useState(
+      false,
+    );
+    const [selectedWithdrawPool, setSelectedWithdrawPool] = useState<
+      TokenData | null
+    >(null);
+    const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] = useState(
+      "",
+    );
     const [withdrawAmount, setWithdrawAmount] = useState<string>("");
     const [api, contextHolder] = notification.useNotification();
-    const [withdrawLoading, setWithdrawLoading] = useState(false)
-    const { tokens } = useTokens()
+    const [withdrawLoading, setWithdrawLoading] = useState(false);
+    const { tokens } = useTokens();
 
     // Withdraw handler
     const handleWithdraw = async () => {
       if (!selectedWithdrawPool) return;
       try {
-        setWithdrawLoading(true)
-        const calculatedAmount = new BigNumber(withdrawAmount.toString()).multipliedBy(new BigNumber(selectedWithdrawPool?.value || "").dividedBy(10 ** 18)).dividedBy(100);
+        setWithdrawLoading(true);
+        const calculatedAmount = new BigNumber(withdrawAmount.toString())
+          .multipliedBy(
+            new BigNumber(selectedWithdrawPool?.value || "").dividedBy(
+              10 ** 18,
+            ),
+          ).dividedBy(100);
         const response = await axios.post("/api/swap/removeLiquidity", {
           address: selectedWithdrawPool.address,
-          amount: new BigNumber(calculatedAmount).multipliedBy(10 ** 18).toFixed(0),
+          amount: new BigNumber(calculatedAmount).multipliedBy(10 ** 18)
+            .toFixed(0),
         });
         console.log("Withdraw response:", response.data);
-        api['success']({
-          message: 'Success',
-          description:
-            `Successfully withdrawed ${selectedWithdrawPool?._name}`,
+        api["success"]({
+          message: "Success",
+          description: `Successfully withdrawed ${selectedWithdrawPool?._name}`,
         });
-        setWithdrawLoading(false)
+        setWithdrawLoading(false);
       } catch (err) {
         console.error("Withdraw error:", err);
-        setWithdrawLoading(false)
-        api['error']({
-          message: 'Error',
-          description:
-            `Withdraw Error - ${err}`,
+        setWithdrawLoading(false);
+        api["error"]({
+          message: "Error",
+          description: `Withdraw Error - ${err}`,
         });
       }
     };
@@ -1218,17 +1423,22 @@ const SwapPanel: FC = () => {
       const fetchUserPools = async () => {
         try {
           const res = await axios.get(`/api/lpToken/`);
-          const tempPools = res.data
-          const enrichedPools = tempPools.map((pool: { data: { tokenA: string, tokenB: string } }) => {
-            const tokenAInfo = tokens && tokens.find(t => t.address === pool.data.tokenA);
-            const tokenBInfo = tokens && tokens.find(t => t.address === pool.data.tokenB);
+          const tempPools = res.data;
+          const enrichedPools = tempPools.map(
+            (pool: { data: { tokenA: string; tokenB: string } }) => {
+              const tokenAInfo = tokens && tokens.find((t) =>
+                t.address === pool.data.tokenA
+              );
+              const tokenBInfo = tokens &&
+                tokens.find((t) => t.address === pool.data.tokenB);
 
-            return {
-              ...pool,
-              _name: `${tokenAInfo?._name}/${tokenBInfo?._name}`,
-              _symbol: `${tokenAInfo?._symbol}/${tokenBInfo?._symbol}`,
-            };
-          });
+              return {
+                ...pool,
+                _name: `${tokenAInfo?._name}/${tokenBInfo?._name}`,
+                _symbol: `${tokenAInfo?._symbol}/${tokenBInfo?._symbol}`,
+              };
+            },
+          );
           console.log(enrichedPools, "pools");
           setLpPools(enrichedPools);
         } catch (err) {
@@ -1239,7 +1449,7 @@ const SwapPanel: FC = () => {
     }, [tokens]);
 
     const handleChange = (value: string) => {
-      if (value === '' || (Number(value) <= 100 && Number(value) >= 0)) {
+      if (value === "" || (Number(value) <= 100 && Number(value) >= 0)) {
         setWithdrawAmount(value);
       }
     };
@@ -1292,37 +1502,56 @@ const SwapPanel: FC = () => {
                 {selectedWithdrawPool && (
                   <div className="text-sm text-gray-600 mt-1">
                     Max available LP tokens:{" "}
-                    {Number(selectedWithdrawPool.value) / 1e18}{" "}
+                    {Number(selectedWithdrawPool.value) / 1e18}
+                    {" "}
                   </div>
                 )}
                 {selectedWithdrawPool &&
-                  <div className="w-full flex justify-between px-2">
-                    <span>
-                      {selectedWithdrawPool?._name?.split('/')[0]} position
-                    </span>
-                    <span>
-                      {new BigNumber(selectedWithdrawPool?.value || 0)
-                        .dividedBy(new BigNumber(selectedWithdrawPool?._totalSupply || 1))
-                        .multipliedBy(new BigNumber(selectedWithdrawPool?.data?.tokenABalance || 0))
-                        .dividedBy(1e18) // multiply by 10^18
-                        .toFixed(0)}
-                    </span>
-                  </div>
-                }
+                  (
+                    <div className="w-full flex justify-between px-2">
+                      <span>
+                        {selectedWithdrawPool?._name?.split("/")[0]} position
+                      </span>
+                      <span>
+                        {new BigNumber(selectedWithdrawPool?.value || 0)
+                          .dividedBy(
+                            new BigNumber(
+                              selectedWithdrawPool?._totalSupply || 1,
+                            ),
+                          )
+                          .multipliedBy(
+                            new BigNumber(
+                              selectedWithdrawPool?.data?.tokenABalance || 0,
+                            ),
+                          )
+                          .dividedBy(1e18) // multiply by 10^18
+                          .toFixed(0)}
+                      </span>
+                    </div>
+                  )}
                 {selectedWithdrawPool &&
-                  <div className="w-full flex justify-between px-2">
-                    <span>
-                      {selectedWithdrawPool?._name?.split('/')[1]} position
-                    </span>
-                    <span>
-                      {new BigNumber(selectedWithdrawPool?.value || 0)
-                        .dividedBy(new BigNumber(selectedWithdrawPool?._totalSupply || 1))
-                        .multipliedBy(new BigNumber(selectedWithdrawPool?.data?.tokenBBalance || 0))
-                        .dividedBy(1e18) // multiply by 10^18
-                        .toFixed(0)}
-                    </span>
-                  </div>
-                }
+                  (
+                    <div className="w-full flex justify-between px-2">
+                      <span>
+                        {selectedWithdrawPool?._name?.split("/")[1]} position
+                      </span>
+                      <span>
+                        {new BigNumber(selectedWithdrawPool?.value || 0)
+                          .dividedBy(
+                            new BigNumber(
+                              selectedWithdrawPool?._totalSupply || 1,
+                            ),
+                          )
+                          .multipliedBy(
+                            new BigNumber(
+                              selectedWithdrawPool?.data?.tokenBBalance || 0,
+                            ),
+                          )
+                          .dividedBy(1e18) // multiply by 10^18
+                          .toFixed(0)}
+                      </span>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -1335,11 +1564,10 @@ const SwapPanel: FC = () => {
                   ? "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white cursor-pointer hover:bg-gray-900"
                   : "bg-gray-100 text-gray-500 cursor-not-allowed"
                 }`}
-              disabled={
-                !(parseFloat(withdrawAmount) > 0 && selectedWithdrawPool) || withdrawLoading
-              }
+              disabled={!(parseFloat(withdrawAmount) > 0 &&
+                selectedWithdrawPool) || withdrawLoading}
             >
-              {withdrawLoading && <Spin />}  Withdraw
+              {withdrawLoading && <Spin />} Withdraw
             </button>
           </div>
           {showTokenSelectorWithdraw && (
