@@ -14,6 +14,8 @@ abstract contract LendingPoolBase {
     event Liquidated(address indexed borrower, address indexed asset, uint256 repaidAmount, address indexed collateralAsset, uint256 collateralSeized);
 
     struct LoanInfo {
+        address user;
+        address asset;
         uint256 amount;
         uint256 lastUpdated;
         bool active;
@@ -40,7 +42,7 @@ abstract contract LendingPoolBase {
         assetInterestRate[address(0)] = 5; // default example rate
     }
 
-    function _loanKey(address user, address asset)  returns (bytes32) {
+    function _loanKey(address user, address asset)  returns (string) {
         return keccak256(string(user), string(asset), string(block.timestamp));
    }
 
@@ -55,8 +57,8 @@ abstract contract LendingPoolBase {
     }
 
     function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount)   {
-        bytes32 loanId = _loanKey(msg.sender, asset);
-         uint256 assetPrice = oracle.getAssetPrice(asset);
+        string loanId = _loanKey(msg.sender, asset);
+        uint256 assetPrice = oracle.getAssetPrice(asset);
         require(assetPrice > 0, "Asset price not set");
         uint256 collateralPrice = oracle.getAssetPrice(collateralAsset);
         require(collateralPrice > 0, "Collateral price not set");
@@ -72,6 +74,8 @@ abstract contract LendingPoolBase {
         liquidityPool.borrow(asset, amount, msg.sender);
 
         loans[loanId] = LoanInfo(
+            msg.sender,
+            asset,
             amount,
             block.timestamp,
             true,
@@ -88,13 +92,13 @@ abstract contract LendingPoolBase {
 
         uint256 interest = rateStrategy.calculateInterest(
             loan.amount,
-            assetInterestRate[loan.collateralAsset],
+            assetInterestRate[loan.asset],
             loan.lastUpdated
         );
         uint256 totalOwed = loan.amount + interest;
         require(amount > 0 && amount <= totalOwed, "Invalid repayment");
 
-        liquidityPool.repay(loan.collateralAsset, amount, msg.sender);
+        liquidityPool.repay(loan.asset, amount, msg.sender);
 
         if (amount >= totalOwed) {
             collateralVault.removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
@@ -104,7 +108,7 @@ abstract contract LendingPoolBase {
             loan.lastUpdated = block.timestamp;
         }
 
-        emit Repaid(msg.sender, loan.collateralAsset, amount);
+        emit Repaid(msg.sender, loan.asset, amount);
     }
 
     function liquidate(string loanId, address borrower) public {
