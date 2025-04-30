@@ -11,7 +11,7 @@ abstract contract CollateralVaultBase is IERC20, Ownable {
     address public lendingPool;
     mapping(string => Collateral) public record collaterals;
 
-    constructor() {
+    constructor() Ownable(){
         // Set lendingPool later
     }
     

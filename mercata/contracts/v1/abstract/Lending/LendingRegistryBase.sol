@@ -17,7 +17,7 @@ abstract contract LendingRegistryBase is Ownable {
         address _liquidityPool,
         address _collateralVault,
         address _rateStrategy
-    ) {
+    ) Ownable() {
         lendingPool = _lendingPool;
         liquidityPool = _liquidityPool;
         collateralVault = _collateralVault;
