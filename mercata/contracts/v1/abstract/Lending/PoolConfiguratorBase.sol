@@ -2,7 +2,7 @@
 pragma solidvm 12.0;
 import "./LendingPoolBase.sol";
 
-abstract contract PoolConfiguratorBase {
+abstract contract PoolConfiguratorBase is Ownable {
    
     event LendingPoolUpdated(address indexed newAddress);
     event InterestRateUpdated(address indexed asset, uint256 newRate);
@@ -16,22 +16,22 @@ abstract contract PoolConfiguratorBase {
         lendingPool = LendingPoolBase(_lendingPool);
     }
 
-    function updateLendingPool(address newAddress)  {
+    function updateLendingPool(address newAddress) public onlyOwner {
         lendingPool = LendingPoolBase(newAddress);
         emit LendingPoolUpdated(newAddress);
     }
 
-    function setInterestRate(address asset, uint256 newRate)  {
+    function setInterestRate(address asset, uint256 newRate) public onlyOwner {
         lendingPool.setInterestRate(asset, newRate);
         emit InterestRateUpdated(asset, newRate);
     }
 
-    function setCollateralRatio(address asset, uint256 newRatio)  {
+    function setCollateralRatio(address asset, uint256 newRatio) public onlyOwner {
         lendingPool.setCollateralRatio(asset, newRatio);
         emit CollateralRatioUpdated(asset, newRatio);
     }
 
-    function setLiquidationBonus(address asset, uint256 newBonus)  {
+    function setLiquidationBonus(address asset, uint256 newBonus) public onlyOwner {
         lendingPool.setLiquidationBonus(asset, newBonus);
         emit LiquidationBonusUpdated(asset,newBonus);
     }
