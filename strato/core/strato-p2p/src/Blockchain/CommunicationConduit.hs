@@ -157,7 +157,7 @@ handleMsgServerConduit myPubkey peer = do
   when (numActivePeers > flags_maxConn) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
-
+-- random comment inside strato/
   awaitMsg >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
