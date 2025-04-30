@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import "../Utils/Utils.sol";
+import "../../Utils/Utils.sol";
 
 abstract contract TokenMetadata is Utils {
     address owner;

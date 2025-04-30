@@ -1,0 +1,9 @@
+{
+  "contractName": "SimplePoolFactory",
+  "deploymentTime": "2025-04-25T21:18:15.824Z",
+  "contractAddress": [
+    "b84fcfea929da83fda9b854784cef4119b495c11"
+  ],
+  "transactionHash": "2f30f3b085d90fd628bcb7e08d5bf2918ace1d581be639f0a4c85db6fdbd7a73",
+  "status": "Success"
+}

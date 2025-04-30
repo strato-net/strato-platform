@@ -1,0 +1,9 @@
+{
+  "contractName": "ERC20Simple",
+  "deploymentTime": "2025-04-25T21:01:37.242Z",
+  "contractAddress": [
+    "a24067e36eb380064ed19a0d76644e5840448f5e"
+  ],
+  "transactionHash": "bfd9abf399516196710e2d859d68e4a94567fde31f94343cdf15723252945ee9",
+  "status": "Success"
+}
