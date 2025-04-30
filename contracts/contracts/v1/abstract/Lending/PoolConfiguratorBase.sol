@@ -11,7 +11,7 @@ abstract contract PoolConfiguratorBase is Ownable {
 
     LendingPoolBase public lendingPool;
 
-    constructor(address _lendingPool) {
+    constructor(address _lendingPool) Ownable() {
         require(_lendingPool != address(0), "Invalid LendingPool address");
         lendingPool = LendingPoolBase(_lendingPool);
     }
