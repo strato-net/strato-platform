@@ -1,7 +1,7 @@
 
 pragma solidvm 12.0;
 
-abstract contract LendingRegistryBase is Ownable {
+abstract contract LendingRegistryBase  {
     event LendingPoolUpdated(address indexed newAddress);
     event LiquidityPoolUpdated(address indexed newAddress);
     event CollateralVaultUpdated(address indexed newAddress);
@@ -17,7 +17,7 @@ abstract contract LendingRegistryBase is Ownable {
         address _liquidityPool,
         address _collateralVault,
         address _rateStrategy
-    ) Ownable() {
+    ) {
         lendingPool = _lendingPool;
         liquidityPool = _liquidityPool;
         collateralVault = _collateralVault;
@@ -29,22 +29,22 @@ abstract contract LendingRegistryBase is Ownable {
         emit RateStrategyUpdated(_rateStrategy);
     }
 
-    function updateLendingPool(address _lendingPool) public onlyOwner  {
+    function updateLendingPool(address _lendingPool) public   {
         lendingPool = _lendingPool;
         emit LendingPoolUpdated(_lendingPool);
     }
 
-    function updateLiquidityPool(address _liquidityPool) public onlyOwner {
+    function updateLiquidityPool(address _liquidityPool) public  {
         liquidityPool = _liquidityPool;
         emit LiquidityPoolUpdated(_liquidityPool);
     }
 
-    function updateCollateralVault(address _collateralVault) public onlyOwner {
+    function updateCollateralVault(address _collateralVault) public  {
         collateralVault = _collateralVault;
         emit CollateralVaultUpdated(_collateralVault);
     }
 
-    function updateRateStrategy(address _rateStrategy) public onlyOwner {
+    function updateRateStrategy(address _rateStrategy) public  {
         rateStrategy = _rateStrategy;
         emit RateStrategyUpdated(_rateStrategy);
     }

@@ -1,6 +1,6 @@
 pragma solidvm 12.0;
 
-abstract contract CollateralVaultBase is IERC20, Ownable {
+abstract contract CollateralVaultBase is IERC20 {
     event CollateralAdded(address indexed user, address indexed asset, uint256 amount);
     event CollateralRemoved(address indexed user, address indexed asset, uint256 amount);
     struct Collateral {   
@@ -11,7 +11,7 @@ abstract contract CollateralVaultBase is IERC20, Ownable {
     address public lendingPool;
     mapping(string => Collateral) public record collaterals;
 
-    constructor() Ownable(){
+    constructor() {
         // Set lendingPool later
     }
     
@@ -20,7 +20,7 @@ abstract contract CollateralVaultBase is IERC20, Ownable {
         _;
     }
     
-    function setLendingPool(address _lendingPool) external onlyOwner {
+    function setLendingPool(address _lendingPool) external  {
         //require(lendingPool == address(0), "LendingPool already set");
         require(_lendingPool != address(0), "Invalid address");
         lendingPool = _lendingPool;
