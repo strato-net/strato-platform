@@ -76,3 +76,7 @@ export interface TokenBalance {
 
 export type Tabkey = "swap" | "liquidity"
 export type TabKey2 = "deposits" | "withdraw"
+
+export interface FaucetData {
+  address?: string;
+}

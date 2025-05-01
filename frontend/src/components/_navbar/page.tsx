@@ -1,16 +1,22 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
+import axios from "axios";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
+import { useTokens } from "@/context/TokenContext";
 import { useUser } from '@/context/UserContext';
+import { notification, Spin } from "antd";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { faucets, loading, reload } = useTokens();
   const [showPopover, setShowPopover] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const { userAddress } = useUser();
+  const [faucetLoading, setFaucetLoading] = useState(false)
+  const [api, contextHolder] = notification.useNotification();
 
   const isActiveParentRoute = (routes: string[]) =>
     routes.some(route => pathname.startsWith(route));
@@ -25,6 +31,28 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleGetTokens = async () => {
+    try {
+      setShowPopover(false);
+      setFaucetLoading(true)
+      console.log(`faucets: ${JSON.stringify(faucets)}`)
+      await axios.post("/api/tokens/faucet", {
+        address: (faucets && faucets[0] && faucets[0].address) || ''
+      });
+      setFaucetLoading(false)
+      reload();
+      api["success"]({
+        message: "Success",
+        description: `Succesfully fauceted tokens`,
+      });
+    } catch (err) {
+      console.log(err);
+      api["error"]({
+        message: "Error",
+        description: `Faucet Error - ${err}`,
+      });
+    }
+  };
 
   const handleLogout = () => {
     console.log("Logging out...");
@@ -35,6 +63,7 @@ export default function Navbar() {
 
   return (
     <nav className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white shadow-lg">
+      {contextHolder}
       <div className="w-full px-4 md:px-6 py-3 flex items-center justify-between">
         {/* Left Side */}
         <div className="flex items-center gap-20">
@@ -80,6 +109,18 @@ export default function Navbar() {
           <span className="bg-white/10 text-cyan-200 px-4 py-1.5 rounded-full text-sm font-semibold">
             {userAddress}
           </span>
+          {(loading || !faucets || faucets.length === 0) ? (<></>) :
+          (<div className="relative">
+            <button
+              disabled={loading || faucetLoading || !faucets || faucets.length === 0}
+              onClick={() => handleGetTokens()}
+              className="bg-white/10 text-cyan-200 px-4 py-1.5 rounded-full text-sm font-semibold"
+              title="Get Tokens"
+            >
+              Get Tokens {faucetLoading && <Spin />}
+            </button>
+          </div>)
+          }
           <div className="relative" ref={popoverRef}>
             <button
               onClick={() => setShowPopover(!showPopover)}

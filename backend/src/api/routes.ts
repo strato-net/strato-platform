@@ -17,11 +17,13 @@ router.get("/authentication/logout", authHandler.authorizeRequest(), Authenticat
 
 router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
 
+router.get("/tokens/faucets", authHandler.authorizeRequest(), TokensController.getFaucets);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.get("/tokens/state/:address", authHandler.authorizeRequest(true), TokensController.getState);
 router.get("/tokens/table/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
+router.post("/tokens/faucet", authHandler.authorizeRequest(), TokensController.faucet);
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
