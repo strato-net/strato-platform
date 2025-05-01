@@ -8,6 +8,7 @@ import {
   removeLiquidity,
   swap,
   calculateSwap,
+  getPoolsWithDetails,
 } from "../services/swapping.service";
 import { getBalance, getTokens } from "../services/tokens.service";
 
@@ -39,7 +40,7 @@ class SwappingController {
     try {
       const { accessToken, query } = req;
 
-      const tokens = await getPools(
+      const tokens = await getPoolsWithDetails(
         accessToken,
         query as Record<string, string | undefined>
       );

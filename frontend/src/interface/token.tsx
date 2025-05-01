@@ -21,8 +21,6 @@ export interface TokenMetadata {
   pool?: string;
   usdst?: string;
   token?: string;
-  tokenBBalance?: string;
-  tokenABalance?: string;
   imageURL?: string;
   isActive?: string;
   locked?: string;
@@ -55,7 +53,8 @@ export interface TokenMetadata {
   incomingRedemptionsRoute?: string;
   outgoingRedemptionsRoute?: string;
   createCustomerAddressRoute?: string;
-
+  tokenABalance?: string;
+  tokenBBalance?: string;
 }
 
 export interface TokenBalance {
@@ -74,8 +73,28 @@ export interface TokenBalance {
   transaction_sender: string;
 }
 
-export type Tabkey = "swap" | "liquidity"
-export type TabKey2 = "deposits" | "withdraw"
+export interface LoanEntry {
+  amount: string;
+  asset: string;
+  collateralAmount: string;
+  collateralAsset: string;
+  lastUpdated: string;
+  user: string;
+  active?: boolean;
+  loanId?: string;
+  _symbol: string;
+  balanceHuman: string;
+  interest: string;
+}
+
+export interface EnrichedLoan extends LoanEntry {
+  _symbol: string;
+  _name: string;
+  balanceHuman: string;
+}
+
+export type Tabkey = "swap" | "liquidity";
+export type TabKey2 = "deposit" | "withdraw";
 
 export interface FaucetData {
   address?: string;

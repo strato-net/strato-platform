@@ -70,7 +70,7 @@ const TransferPanel = () => {
       api['success']({
         message: 'Success',
         description:
-          `Transfered ${amount} succesfully.`,
+          `Transferred $${amount} successfully.`,
       });
     } catch (error) {
       setTransferLoading(false)

@@ -238,12 +238,18 @@ export const getDepositableTokens = async (
   );
   return depositable.map((token) => {
     const userToken = userTokens.find((t: any) => t.address === token)!;
+    const collateralRatio = assetCollateralRatio[token];
+    const interestRate = pool.assetInterestRate[token] || "0";
+    const price = prices[token];
     const meta = userToken["BlockApps-Mercata-ERC20"];
     return {
       address: token,
       _name: meta._name,
       _symbol: meta._symbol,
       value: userToken.value,
+      collateralRatio,
+      interestRate,
+      price,
     };
   });
 };
@@ -326,7 +332,7 @@ export const getLoans = async (
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const divisor = BigInt(365 * 100);
+  const divisor = BigInt(365 * 24 * 60 * 100);
 
   // Fetch metadata for all assets and collateral assets in the user's loans
   const assetAddresses = Object.values(userLoansMap).map((l: any) => l.asset);
@@ -350,11 +356,12 @@ export const getLoans = async (
       const collateralMeta = metadataMap[loan.collateralAsset] || {};
       const lastUpdated = Number(loan.lastUpdated);
       const rawDuration = now > lastUpdated ? now - lastUpdated : 0;
-      // convert duration to days, minimum 1 day
-      const days = BigInt(Math.floor(rawDuration / 86400) || 0);
+      // convert duration to minutes, minimum 1 minute
+      const baseMinutes = BigInt(Math.floor(rawDuration / 60) || 0);
+      const minutes = baseMinutes + BigInt(5);
       const rate = Number(pool.assetInterestRate[loan.asset] || "0");
       const principal = BigInt(loan.amount);
-      const interest = (principal * BigInt(rate) * days) / divisor;
+      const interest = (principal * BigInt(rate) * minutes) / divisor;
       const interestStr = interest.toString();
       return [
         key,
