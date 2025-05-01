@@ -11,12 +11,12 @@ const BorrowingSection = () => {
     <Card className="border border-gray-100 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle className="text-xl font-bold">Borrowing</CardTitle>
+          <CardTitle className="text-xl font-bold">Your Loans</CardTitle>
           <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
         </div>
         <div>
           <Button className="flex items-center gap-2">
-            Start Borrowing <ArrowUpRight size={16} />
+            <ArrowUpRight size={16} /> Start Borrowing
           </Button>
         </div>
       </CardHeader>
@@ -34,8 +34,20 @@ const BorrowingSection = () => {
               <span className="font-semibold">{riskPercentage}%</span>
             </div>
             
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4 relative">
               <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
+              
+              {/* Portfolio Value indicator (100%) */}
+              <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
+                <div className="h-4 w-0.5 bg-blue-500"></div>
+                <div className="mt-1 text-xs text-blue-600 whitespace-nowrap">Portfolio Value</div>
+              </div>
+              
+              {/* Liquidation indicator (80%) */}
+              <div className="absolute top-0 flex flex-col items-center" style={{ left: '80%', transform: 'translateX(-50%)' }}>
+                <div className="h-4 w-0.5 bg-red-500"></div>
+                <div className="mt-1 text-xs text-red-600 whitespace-nowrap">Liquidation</div>
+              </div>
             </div>
             
             <div className="flex flex-col gap-1">
