@@ -1,4 +1,6 @@
+
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
@@ -209,30 +211,32 @@ const Assets = () => {
                     />
                   </button>
                   
-                  <div className="h-48 bg-gray-100 flex items-center justify-center relative">
-                    <div 
-                      className="w-24 h-24 rounded-full bg-white border-4 flex items-center justify-center overflow-hidden"
-                      style={{ borderColor: asset.color }}
-                    >
-                      <img 
-                        src={asset.image} 
-                        alt={asset.name} 
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <div 
-                      className="absolute top-2 right-2 w-12 h-12 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: asset.color }}
-                    >
-                      {asset.logoText}
-                    </div>
-                    
-                    {asset.soldOut && (
-                      <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">
-                        Sold Out
+                  <Link to={`/dashboard/assets/${asset.id}`} className="block">
+                    <div className="h-48 bg-gray-100 flex items-center justify-center relative">
+                      <div 
+                        className="w-24 h-24 rounded-full bg-white border-4 flex items-center justify-center overflow-hidden"
+                        style={{ borderColor: asset.color }}
+                      >
+                        <img 
+                          src={asset.image} 
+                          alt={asset.name} 
+                          className="w-full h-full object-contain"
+                        />
                       </div>
-                    )}
-                  </div>
+                      <div 
+                        className="absolute top-2 right-2 w-12 h-12 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                        style={{ backgroundColor: asset.color }}
+                      >
+                        {asset.logoText}
+                      </div>
+                      
+                      {asset.soldOut && (
+                        <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">
+                          Sold Out
+                        </div>
+                      )}
+                    </div>
+                  </Link>
                 </div>
                 
                 <CardHeader className="pb-2">
