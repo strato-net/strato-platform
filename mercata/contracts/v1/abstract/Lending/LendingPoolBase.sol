@@ -89,6 +89,7 @@ abstract contract LendingPoolBase {
     function repayLoan(string loanId, uint256 amount) public {
         LoanInfo storage loan = loans[loanId];
         require(loan.active, "No active loan");
+        require(amount > 0, "Invalid repayment");
 
         uint256 interest = rateStrategy.calculateInterest(
             loan.amount,
@@ -96,9 +97,8 @@ abstract contract LendingPoolBase {
             loan.lastUpdated
         );
         uint256 totalOwed = loan.amount + interest;
-        require(amount > 0 && amount <= totalOwed, "Invalid repayment");
-
-        liquidityPool.repay(loan.asset, amount, msg.sender);
+     
+        liquidityPool.repay(loan.asset, amount, totalOwed, msg.sender);
 
         if (amount >= totalOwed) {
             collateralVault.removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
@@ -132,7 +132,7 @@ abstract contract LendingPoolBase {
         uint256 ratio = assetCollateralRatio[loan.collateralAsset];
         require(ratio > 0 && collateralValue * 100 < loanValue * ratio, "Healthy loan");
 
-        liquidityPool.repay(loan.collateralAsset, totalOwed, msg.sender);
+        liquidityPool.repay(loan.collateralAsset, totalOwed, totalOwed, msg.sender);
         uint256 bonus = assetLiquidationBonus[loan.collateralAsset];
         uint256 seizeAmount = (totalOwed * bonus * 1e18) / (collateralPrice * 100);
 
