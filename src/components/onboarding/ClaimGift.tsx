@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Confetti } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import Lottie from 'react-lottie-player';
 import confettiAnimation from '../../assets/confetti-animation.json';
 
@@ -51,7 +51,7 @@ const ClaimGift: React.FC<ClaimGiftProps> = ({ onClaim, isMobile }) => {
       }`}>
         <CardHeader className="bg-gradient-to-r from-strato-blue to-strato-purple text-white text-center pb-6">
           <div className="mx-auto mb-2">
-            <Confetti size={40} className="text-yellow-200" />
+            <Sparkles size={40} className="text-yellow-200" />
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Gift!</CardTitle>
         </CardHeader>

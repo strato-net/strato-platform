@@ -7,7 +7,7 @@ import BorrowUSDST from '../components/onboarding/BorrowUSDST';
 import OnboardingComplete from '../components/onboarding/OnboardingComplete';
 import OnboardingProgress from '../components/onboarding/OnboardingProgress';
 import { useToast } from '@/hooks/use-toast';
-import { useMediaQuery } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Onboarding steps
 const STEPS = {

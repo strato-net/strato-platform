@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Confetti } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import Lottie from 'react-lottie-player';
 import confettiAnimation from '../../assets/confetti-animation.json';
 
@@ -54,7 +54,7 @@ const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
             <div className="w-20 h-20 rounded-full bg-gradient-to-r from-strato-blue to-strato-purple flex items-center justify-center">
-              <Confetti size={40} className="text-white" />
+              <Sparkles size={40} className="text-white" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Trial Complete!</CardTitle>
@@ -67,12 +67,12 @@ const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
           
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-white p-4 rounded-lg border">
-              <div className="text-sm text-gray-500">USDST Balance</div>
+              <div className="text-sm text-gray-500 mb-1">USDST Balance</div>
               <div className="font-bold text-lg">${assets.usdst.toFixed(2)}</div>
             </div>
             
             <div className="bg-white p-4 rounded-lg border">
-              <div className="text-sm text-gray-500">GOLDST</div>
+              <div className="text-sm text-gray-500 mb-1">GOLDST</div>
               <div className="font-bold text-lg">{assets.goldst.toFixed(3)}</div>
             </div>
           </div>
