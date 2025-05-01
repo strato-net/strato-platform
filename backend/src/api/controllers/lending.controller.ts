@@ -6,6 +6,9 @@ import {
   manageLiquidity,
   getLoan,
   repayLoan,
+  getDepositableTokens,
+  getWithdrawableTokens,
+  getLoans
 } from "../services/lending.service";
 
 class LendingController {
@@ -74,6 +77,48 @@ class LendingController {
       return next();
     } catch (error) {
       return next(error);
+    }
+  }
+
+  static async getDepositableTokens(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address } = req;
+      const result = await getDepositableTokens(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getWithdrawableTokens(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address } = req;
+      const result = await getWithdrawableTokens(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getLoans(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address } = req;
+      const result = await getLoans(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
     }
   }
 
