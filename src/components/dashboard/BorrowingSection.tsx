@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, Shield } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const BorrowingSection = () => {
@@ -11,13 +11,10 @@ const BorrowingSection = () => {
           <CardTitle className="text-xl font-bold">Borrowing</CardTitle>
           <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
         </div>
-        <div className="flex items-center gap-4">
+        <div>
           <Button className="flex items-center gap-2">
             Start Borrowing <ArrowUpRight size={16} />
           </Button>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500">
-            <Shield className="text-white" size={18} />
-          </div>
         </div>
       </CardHeader>
       <CardContent>
