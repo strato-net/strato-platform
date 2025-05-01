@@ -74,7 +74,7 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
           </div>
         </div>
         <h1 className="text-2xl font-bold mb-2">
-          {isRegister ? 'Create your account' : 'Welcome back'}
+          {isRegister ? 'Create Your STRATO Mercata Wallet' : 'Welcome back'}
         </h1>
         <p className="text-gray-600">
           {isRegister 
