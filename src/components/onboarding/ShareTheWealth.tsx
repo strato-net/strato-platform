@@ -122,7 +122,7 @@ const ShareTheWealth: React.FC<ShareTheWealthProps> = ({ onShare, assets, isMobi
         <CardContent className="pt-6 space-y-4">
           <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
             <p className="text-purple-800 text-sm">
-              Invite friends to STRATO Mercata and earn <span className="font-bold">0.05 CATA</span> for each friend who signs up!
+              Invite friends to STRATO Mercata and earn <span className="font-bold">1 CATA</span> for each friend who signs up!
             </p>
           </div>
           
@@ -208,7 +208,7 @@ const ShareTheWealth: React.FC<ShareTheWealthProps> = ({ onShare, assets, isMobi
           <div className="bg-green-50 rounded-lg p-3 border border-green-100">
             <div className="flex items-center text-sm text-green-700 gap-1">
               <span>Potential earnings:</span>
-              <span className="font-medium">{(emails.length * 0.05).toFixed(2)} CATA</span>
+              <span className="font-medium">{emails.length} CATA</span>
             </div>
           </div>
         </CardContent>

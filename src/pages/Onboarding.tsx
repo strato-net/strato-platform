@@ -83,8 +83,8 @@ const Onboarding = () => {
   };
   
   const handleShareWealth = (emailsSent: number) => {
-    // Add CATA rewards for referrals (0.05 per email)
-    const referralBonus = emailsSent * 0.05;
+    // Add CATA rewards for referrals (1 per email)
+    const referralBonus = emailsSent * 1.0; // Changed from 0.05 to 1.0
     setAssets(prev => ({
       ...prev,
       cata: prev.cata + referralBonus
@@ -93,7 +93,7 @@ const Onboarding = () => {
     if (emailsSent > 0) {
       toast({
         title: "Referrals sent!",
-        description: `You earned ${referralBonus.toFixed(2)} CATA from your referrals.`
+        description: `You earned ${referralBonus.toFixed(0)} CATA from your referrals.`
       });
     }
     
