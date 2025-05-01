@@ -4,17 +4,8 @@ import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
-interface BorrowingSectionProps {
-  borrowed: number;
-}
-
-const BorrowingSection = ({ borrowed = 0 }: BorrowingSectionProps) => {
-  // Calculate risk percentage based on borrowed amount (0% if nothing borrowed, 36% for $1 as in onboarding)
-  const riskPercentage = borrowed > 0 ? 36 : 0;
-  
-  // Risk level text based on percentage
-  const riskLevel = riskPercentage === 0 ? "None" : "Moderate";
-  const riskLevelClass = riskPercentage === 0 ? "bg-green-50 text-green-600" : "bg-yellow-50 text-yellow-600";
+const BorrowingSection = () => {
+  const riskPercentage = 36;
   
   return (
     <Card className="border border-gray-100 shadow-sm">
@@ -36,7 +27,7 @@ const BorrowingSection = ({ borrowed = 0 }: BorrowingSectionProps) => {
             <div className="mb-2">
               {/* Reduced width bar graph that now appears above risk level text */}
               <div className="w-4/5 mx-auto bg-gray-200 rounded-full h-2 relative mb-3">
-                <div className={`${riskPercentage > 0 ? 'bg-yellow-500' : 'bg-green-500'} h-2 rounded-full`} style={{ width: `${riskPercentage}%` }}></div>
+                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
                 
                 {/* Portfolio Value indicator with improved positioning */}
                 <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
@@ -55,8 +46,8 @@ const BorrowingSection = ({ borrowed = 0 }: BorrowingSectionProps) => {
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center">
                   <span className="text-gray-600 mr-2">Risk Level:</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${riskLevelClass}`}>
-                    {riskLevel}
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-600">
+                    Moderate
                   </span>
                 </div>
                 <span className="font-semibold">{riskPercentage}%</span>
@@ -71,7 +62,7 @@ const BorrowingSection = ({ borrowed = 0 }: BorrowingSectionProps) => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Current Borrowed</span>
-                <span className="font-semibold">${borrowed.toFixed(2)}</span>
+                <span className="font-semibold">$1,250.00</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Average Interest Rate</span>
