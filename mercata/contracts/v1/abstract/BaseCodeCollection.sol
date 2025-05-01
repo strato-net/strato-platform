@@ -21,6 +21,7 @@ import "Pools/Pool.sol";
 import "Pools/PoolFactory.sol";
 import "Redemptions/RedemptionService.sol";
 import "Tokens/Token.sol";
+import "Tokens/TokenFaucet.sol";
 
 contract Mercata {
     RateStrategyBase public rateStrategy;
