@@ -83,6 +83,8 @@ export interface LoanEntry {
   active?: boolean;
   loanId?: string;
   _symbol: string;
+  balanceHuman: string;
+  interest: string;
 }
 
 export interface EnrichedLoan extends LoanEntry {
@@ -93,3 +95,7 @@ export interface EnrichedLoan extends LoanEntry {
 
 export type Tabkey = "swap" | "liquidity";
 export type TabKey2 = "deposit" | "withdraw";
+
+export interface FaucetData {
+  address?: string;
+}

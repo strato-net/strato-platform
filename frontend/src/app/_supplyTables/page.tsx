@@ -1,6 +1,37 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { ethers } from "ethers";
 
 const SupplyBorrowDashboard = () => {
+  const [loans, setLoans] = useState<any[]>([]);
+  const [withdrawables, setWithdrawables] = useState<any[]>([]);
+  const fetchLoans = async () => {
+    try {
+      const res = await fetch("/api/loans");
+      if (!res.ok) throw new Error("Network response was not ok");
+      const data = await res.json();
+      setLoans(data.loans ? Object.values(data.loans) : []);
+    } catch (err) {
+      console.error("Failed to fetch loans:", err);
+    }
+  };
+  const fetchWithdrawables = async () => {
+    try {
+      const res = await fetch("/api/withdrawableTokens");
+      if (!res.ok) throw new Error("Network response was not ok");
+      const data = await res.json();
+      setWithdrawables(data);
+    } catch (err) {
+      console.error("Failed to fetch withdrawable tokens:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLoans();
+    fetchWithdrawables();
+  }, []);
+
+  const activeLoans = loans.filter((loan) => loan.active);
+
   return (
     <div className="w-full bg-[#f3f4f6] px-6 py-10">
       <div className="max-w-screen-2xl mx-auto w-full space-y-8">
@@ -8,19 +39,71 @@ const SupplyBorrowDashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Supplies */}
           <div className="bg-white rounded-2xl shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Your supplies</h2>
-            <p className="text-gray-500">Nothing supplied yet</p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Your deposits
+            </h2>
+            {withdrawables.length === 0 ? (
+              <p className="text-gray-500">Nothing supplied yet</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-gray-500 border-b">
+                    <tr>
+                      <th className="py-2">Asset</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-700">
+                    {withdrawables.map((token, idx) => (
+                      <tr key={idx} className="border-b">
+                        <td className="py-3">
+                          {token._symbol || token.address}
+                        </td>
+                        <td>{ethers.formatEther(token.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Borrows */}
           <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Your borrows</h2>
-              <span className="text-xs text-gray-400">
-                E-Mode <span className="ml-1 px-2 py-0.5 border border-gray-300 rounded text-gray-600">DISABLED</span>
-              </span>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Your loans
+              </h2>
             </div>
-            <p className="text-gray-500">Nothing borrowed yet</p>
+            {activeLoans.length === 0 ? (
+              <p className="text-gray-500">Nothing borrowed yet</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-gray-500 border-b">
+                    <tr>
+                      <th className="py-2">Asset</th>
+                      <th>Amount</th>
+                      <th>Collateral</th>
+                      <th>Accrued Interest</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-700">
+                    {activeLoans.map((loan, idx) => (
+                      <tr key={idx} className="border-b">
+                        <td className="py-3">{loan.assetName || loan.asset}</td>
+                        <td>{ethers.formatEther(loan.amount)}</td>
+                        <td>
+                          {loan.collateralName || loan.collateralAsset}{" "}
+                          {ethers.formatEther(loan.collateralAmount)}
+                        </td>
+                        <td>{ethers.formatEther(loan.interest)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
@@ -29,14 +112,18 @@ const SupplyBorrowDashboard = () => {
           {/* Assets to Supply */}
           <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Assets to supply</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Assets to supply
+              </h2>
               <button className="text-sm text-gray-500">Hide —</button>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
               <input type="checkbox" />
               <label>Show assets with 0 balance</label>
-              <a href="#" className="ml-auto text-blue-500 text-xs">ETHEREUM SEPOLIA FAUCET</a>
+              <a href="#" className="ml-auto text-blue-500 text-xs">
+                ETHEREUM SEPOLIA FAUCET
+              </a>
             </div>
 
             <div className="overflow-x-auto">
@@ -52,22 +139,54 @@ const SupplyBorrowDashboard = () => {
                 </thead>
                 <tbody className="text-gray-700">
                   {[
-                    { icon: "₿", name: "WBTC", balance: "2.00", apy: "< 0.01%", collateral: true },
-                    { icon: "🟢", name: "USDT", balance: "30,000.00", apy: "77.28%", collateral: "Isolated" },
-                    { icon: "🔵", name: "USDC", balance: "20,000.00", apy: "0.30%", collateral: true },
-                    { icon: "⬛", name: "ETH", balance: "0.2949031", apy: "0%", collateral: true }
+                    {
+                      icon: "₿",
+                      name: "WBTC",
+                      balance: "2.00",
+                      apy: "< 0.01%",
+                      collateral: true,
+                    },
+                    {
+                      icon: "🟢",
+                      name: "USDT",
+                      balance: "30,000.00",
+                      apy: "77.28%",
+                      collateral: "Isolated",
+                    },
+                    {
+                      icon: "🔵",
+                      name: "USDC",
+                      balance: "20,000.00",
+                      apy: "0.30%",
+                      collateral: true,
+                    },
+                    {
+                      icon: "⬛",
+                      name: "ETH",
+                      balance: "0.2949031",
+                      apy: "0%",
+                      collateral: true,
+                    },
                   ].map((item, idx) => (
                     <tr key={idx} className="border-b">
-                      <td className="py-3 flex items-center gap-2">{item.icon} {item.name}</td>
+                      <td className="py-3 flex items-center gap-2">
+                        {item.icon} {item.name}
+                      </td>
                       <td>{item.balance}</td>
                       <td>{item.apy}</td>
                       <td>
-                        {item.collateral === true ? "✔️" : (
-                          <span className="bg-orange-100 text-orange-500 px-2 py-0.5 rounded text-xs">Isolated</span>
-                        )}
+                        {item.collateral === true ? (
+                          "✔️"
+                        ) : (
+                          <span className="bg-orange-100 text-orange-500 px-2 py-0.5 rounded text-xs">
+                            Isolated
+                          </span>
+                        )}3
                       </td>
                       <td>
-                        <button className="bg-gray-800 text-white px-3 py-1 rounded">Supply</button>
+                        <button className="bg-gray-800 text-white px-3 py-1 rounded">
+                          Supply
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -79,7 +198,9 @@ const SupplyBorrowDashboard = () => {
           {/* Assets to Borrow */}
           <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Assets to borrow</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Assets to borrow
+              </h2>
               <button className="text-sm text-gray-500">Hide —</button>
             </div>
 
@@ -99,7 +220,12 @@ const SupplyBorrowDashboard = () => {
                 </thead>
                 <tbody className="text-gray-700">
                   {[
-                    { icon: "🟣", name: "GHO", available: "0", apy: "1.41 - 2.02%" },
+                    {
+                      icon: "🟣",
+                      name: "GHO",
+                      available: "0",
+                      apy: "1.41 - 2.02%",
+                    },
                     { icon: "₿", name: "WBTC", available: "0", apy: "0.05%" },
                     { icon: "🟢", name: "USDT", available: "0", apy: "89.02%" },
                     { icon: "🔵", name: "USDC", available: "0", apy: "1.22%" },
@@ -107,12 +233,21 @@ const SupplyBorrowDashboard = () => {
                     { icon: "🔷", name: "LINK", available: "0", apy: "40.18%" },
                   ].map((item, idx) => (
                     <tr key={idx} className="border-b">
-                      <td className="py-3 flex items-center gap-2">{item.icon} {item.name}</td>
+                      <td className="py-3 flex items-center gap-2">
+                        {item.icon} {item.name}
+                      </td>
                       <td>{item.available}</td>
                       <td>{item.apy}</td>
                       <td className="flex gap-2">
-                        <button className="bg-gray-200 text-gray-500 px-3 py-1 rounded cursor-not-allowed" disabled>Borrow</button>
-                        <button className="bg-gray-100 text-gray-800 px-3 py-1 rounded border border-gray-300">Details</button>
+                        <button
+                          className="bg-gray-200 text-gray-500 px-3 py-1 rounded cursor-not-allowed"
+                          disabled
+                        >
+                          Borrow
+                        </button>
+                        <button className="bg-gray-100 text-gray-800 px-3 py-1 rounded border border-gray-300">
+                          Details
+                        </button>
                       </td>
                     </tr>
                   ))}

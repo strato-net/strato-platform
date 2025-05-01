@@ -141,7 +141,7 @@ const DepositsPanel: FC = () => {
     );
   };
 
-  const RenderDeposit: React.FC<RenderProps> = ({ tokens }) => {
+  const RenderDeposit: React.FC<RenderProps> = ({}) => {
     const [showDepositTokenSelector, setShowDepositTokenSelector] =
       useState(false);
     const [selectedDepositToken, setSelectedDepositToken] =
@@ -150,6 +150,7 @@ const DepositsPanel: FC = () => {
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [depositLoading, setDepositLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+    const [depositTokenList, setDepositTokenList] = useState<TokenData[]>([]);
 
     const handleDepositAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
@@ -193,10 +194,18 @@ const DepositsPanel: FC = () => {
     };
 
     useEffect(() => {
-      if (tokens && tokens.length > 0) {
-        setSelectedDepositToken(tokens[0]);
-      }
-    }, [tokens]);
+      const fetchTokenList = async () => {
+        try {
+          const res = await axios.get(`/api/depositableTokens`);
+          setDepositTokenList(res.data);
+          setSelectedDepositToken(res.data[0] || null);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+
+      fetchTokenList();
+    }, []);
 
     const handleTokenSelect = (token: TokenData) => {
       setSelectedDepositToken(token);
@@ -226,7 +235,7 @@ const DepositsPanel: FC = () => {
                   size="md"
                 />
                 <span className="text-[#2C3E50] font-medium">
-                  {selectedDepositToken?._name ?? "ETH"}
+                  {selectedDepositToken?._name ?? "None"}
                 </span>
               </div>
               <svg
@@ -255,7 +264,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedDepositToken?._symbol ?? "ETH"}
+                  {selectedDepositToken?._symbol ?? ""}
                 </h3>
               </div>
             </div>
@@ -280,7 +289,7 @@ const DepositsPanel: FC = () => {
             onClose={() => setShowDepositTokenSelector(false)}
             tokenSearchQuery={tokenSearchQuery}
             setTokenSearchQuery={setTokenSearchQuery}
-            popularTokens={tokens}
+            popularTokens={depositTokenList}
             handleTokenSelect={handleTokenSelect}
           />
         )}
@@ -298,6 +307,9 @@ const DepositsPanel: FC = () => {
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+    const [withdrawableTokens, setWithdrawableTokens] = useState<TokenData[]>(
+      []
+    );
     const [tokenAPosition, setTokenAPosition] = useState<string>("0.00");
     const [tokenBPosition, setTokenBPosition] = useState<string>("0.00");
 
@@ -350,10 +362,18 @@ const DepositsPanel: FC = () => {
     };
 
     useEffect(() => {
-      if (tokens && tokens.length > 0) {
-        setSelectedDepositToken(tokens[0]);
-      }
-    }, [tokens]);
+      const fetchTokenList = async () => {
+        try {
+          const res = await axios.get(`/api/withdrawableTokens`);
+          setWithdrawableTokens(res.data);
+          setSelectedDepositToken(res.data[0] || null);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+
+      fetchTokenList();
+    }, []);
 
     const handleTokenSelect = (token: TokenData) => {
       setSelectedDepositToken(token);
@@ -383,7 +403,7 @@ const DepositsPanel: FC = () => {
                   size="md"
                 />
                 <span className="text-[#2C3E50] font-medium">
-                  {selectedDepositToken?._name ?? "ETH"}
+                  {selectedDepositToken?._name ?? "NA"}
                 </span>
               </div>
               <svg
@@ -412,7 +432,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedDepositToken?._symbol ?? "ETH"}
+                  {selectedDepositToken?._symbol ?? ""}
                 </h3>
               </div>
             </div>
@@ -438,7 +458,7 @@ const DepositsPanel: FC = () => {
             onClose={() => setShowDepositTokenSelector(false)}
             tokenSearchQuery={tokenSearchQuery}
             setTokenSearchQuery={setTokenSearchQuery}
-            popularTokens={tokens}
+            popularTokens={withdrawableTokens}
             handleTokenSelect={handleTokenSelect}
           />
         )}
@@ -497,7 +517,7 @@ const DepositsPanel: FC = () => {
     tokens: ExtendedTokenData[] | null;
   }
 
-  const RenderBorrow: React.FC<RenderProps> = ({ tokens }) => {
+  const RenderBorrow: React.FC<RenderProps> = ({}) => {
     const [showWithdrawTokenSelector, setShowWithdrawTokenSelector] =
       useState(false);
     const [showColleteralTokenSelector, setShowColleteralTokenSelector] =
@@ -515,6 +535,7 @@ const DepositsPanel: FC = () => {
       useState("");
     const [borrowLoading, setBorrowLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+    const [tokens, setTokens] = useState<TokenData[]>([]);
 
     const handleWithdrawAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
@@ -584,6 +605,20 @@ const DepositsPanel: FC = () => {
         setSelectedColleteralToken(tokens[0]);
       }
     }, [tokens]);
+    useEffect(() => {
+      const fetchTokenList = async () => {
+        try {
+          const res = await axios.get(`/api/depositableTokens`);
+          setTokens(res.data);
+          setSelectedWithdrawToken(res.data[0] || null);
+          setSelectedColleteralToken(res.data[1] || null);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+
+      fetchTokenList();
+    }, []);
 
     const handleTokenSelect = (token: TokenData) => {
       if (selectingToken === 1) {
@@ -649,7 +684,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedWithdrawToken?._symbol ?? "ETH"}
+                  {selectedWithdrawToken?._symbol ?? "NA"}
                 </h3>
               </div>
             </div>
@@ -674,7 +709,7 @@ const DepositsPanel: FC = () => {
                 <span className="text-gray-800 font-medium">
                   {selectedColleteralToken
                     ? selectedColleteralToken._name
-                    : "ETH"}
+                    : "NA"}
                 </span>
               </div>
               <svg
@@ -721,7 +756,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedColleteralToken?._symbol ?? "ETH"}
+                  {selectedColleteralToken?._symbol ?? "NA"}
                 </h3>
               </div>
             </div>
@@ -758,7 +793,11 @@ const DepositsPanel: FC = () => {
             onClose={() => setShowColleteralTokenSelector(false)}
             tokenSearchQuery={tokenSearchQueryColleteral}
             setTokenSearchQuery={setTokenSearchQueryColleteral}
-            popularTokens={tokens}
+            popularTokens={tokens.filter(
+              (token) =>
+                selectedWithdrawToken &&
+                token.address !== selectedWithdrawToken.address
+            )}
             handleTokenSelect={handleTokenSelect}
           />
         )}
@@ -782,25 +821,32 @@ const DepositsPanel: FC = () => {
       const userData = JSON.parse(localStorage.getItem("user") || "{}");
       const addr = userData.userAddress;
       try {
-        const resp = await axios.get("/api/lend");
+        const resp = await axios.get("/api/loans");
         const pool = resp.data;
         const loansObj = pool.loans || {};
         const userLoans = Object.entries(loansObj)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-          .filter((loan: LoanEntry) => loan.user === addr && loan.active === true);
-        console.log(userLoans, "user loans");
+          .filter((loan: any) => loan.user === addr && loan.active === true);
+        // Enrich each loan with token symbol, name, and human-readable balance
         const enrichedLoans = await Promise.all(
-          userLoans.map(async (loan: LoanEntry) => {
-            const tokenResp = await axios.get(`/api/tokens/${loan.asset}`);
-            const { _symbol, _name } = tokenResp.data[0];
-            const balanceHuman = ethers.formatUnits(loan.amount, 18);
-            return { ...loan, _symbol, _name, balanceHuman };
+          userLoans.map(async (loan: any) => {
+            const balanceHuman = ethers.formatUnits(
+              BigInt(loan.amount) + BigInt(loan.interest),
+              18
+            );
+            return {
+              ...loan,
+              _name: loan.assetName,
+              _symbol: loan.assetSymbol,
+              balanceHuman,
+            };
           })
         );
         setLoanList(enrichedLoans);
         if (enrichedLoans.length > 0) {
           setLoan(enrichedLoans[0]);
+          setAmount(enrichedLoans[0].balanceHuman);
         }
       } catch (e) {
         console.error("Error fetching loans:", e);
@@ -809,7 +855,7 @@ const DepositsPanel: FC = () => {
 
     useEffect(() => {
       fetchLoans();
-    }, [fetchLoans]);
+    }, []);
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -883,6 +929,7 @@ const DepositsPanel: FC = () => {
               onChange={(value: string) => {
                 const selected = loanList.find((l) => l.loanId === value);
                 setLoan(selected || null);
+                setAmount(selected?.balanceHuman || "");
               }}
               options={loanList.map((loan) => ({
                 label: `${loan._symbol} - ${loan.balanceHuman}`,
@@ -891,6 +938,19 @@ const DepositsPanel: FC = () => {
               placeholder="Select a loan"
               className="w-full"
             />
+            {loan && (
+              <div className="mt-2 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800 mb-1">
+                  <span className="font-medium">Principal:</span> {ethers.formatUnits(loan.amount, 18)} {loan._symbol}
+                </p>
+                <p className="text-sm text-blue-800 mb-1">
+                  <span className="font-medium">Interest:</span> {ethers.formatUnits(loan.interest, 18)} {loan._symbol}
+                </p>
+                <p className="text-sm font-medium text-blue-900">
+                  Total outstanding: {loan.balanceHuman} {loan._symbol}
+                </p>
+              </div>
+            )}
           </div>
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
