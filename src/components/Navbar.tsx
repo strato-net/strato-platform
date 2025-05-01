@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ const Navbar = () => {
               <img 
                 src="/lovable-uploads/de952550-4201-4e43-99f4-72cdcf272c55.png" 
                 alt="STRATO mercata" 
-                className="h-8" 
+                className="h-10" 
               />
             </Link>
             <div className="hidden md:block">
