@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Circle, LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book } from 'lucide-react';
+import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book } from 'lucide-react';
 
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -22,13 +22,19 @@ const DashboardSidebar = () => {
     >
       <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
         <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
-          <div className="w-8 h-8 relative flex-shrink-0">
-            <div className="absolute inset-0 bg-gradient-to-r from-strato-blue to-strato-purple rounded-md"></div>
-            <div className="absolute inset-[2px] bg-sidebar-background rounded-md flex items-center justify-center">
-              <Circle className="h-4 w-4 text-strato-blue" />
-            </div>
-          </div>
-          {!collapsed && <span className="ml-2 text-lg font-bold">STRATO<span className="text-strato-blue">mercata</span></span>}
+          {collapsed ? (
+            <img 
+              src="/lovable-uploads/de952550-4201-4e43-99f4-72cdcf272c55.png" 
+              alt="STRATO mercata" 
+              className="h-6" 
+            />
+          ) : (
+            <img 
+              src="/lovable-uploads/de952550-4201-4e43-99f4-72cdcf272c55.png" 
+              alt="STRATO mercata" 
+              className="h-8" 
+            />
+          )}
         </div>
         <button
           onClick={() => setCollapsed(!collapsed)}

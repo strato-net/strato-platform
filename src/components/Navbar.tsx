@@ -1,8 +1,7 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Circle, Wallet } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,15 +12,11 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0">
-              <div className="flex items-center">
-                <div className="w-10 h-10 relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-strato-blue to-strato-purple rounded-md"></div>
-                  <div className="absolute inset-[2px] bg-white rounded-md flex items-center justify-center">
-                    <Circle className="h-6 w-6 text-strato-blue" />
-                  </div>
-                </div>
-                <span className="ml-2 text-xl font-bold text-strato-dark">STRATO<span className="text-strato-blue">mercata</span></span>
-              </div>
+              <img 
+                src="/lovable-uploads/de952550-4201-4e43-99f4-72cdcf272c55.png" 
+                alt="STRATO mercata" 
+                className="h-8" 
+              />
             </Link>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
