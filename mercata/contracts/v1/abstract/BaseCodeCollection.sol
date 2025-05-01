@@ -23,13 +23,13 @@ import "Redemptions/RedemptionService.sol";
 import "Tokens/Token.sol";
 
 contract Mercata {
-    RateStrategyBase rateStrategy;
-    PriceOracleBase priceOracle;
-    CollateralVaultBase collateralVault;
-    LiquidityPoolBase liquidityPool;
-    LendingPoolBase lendingPool;
-    PoolConfiguratorBase poolConfigurator;
-    LendingRegistryBase lendingRegistry;
+    RateStrategyBase public rateStrategy;
+    PriceOracleBase public priceOracle;
+    CollateralVaultBase public collateralVault;
+    LiquidityPoolBase public liquidityPool;
+    LendingPoolBase public lendingPool;
+    PoolConfiguratorBase public poolConfigurator;
+    LendingRegistryBase public lendingRegistry;
 
     constructor() public {
         rateStrategy = RateStrategyBase(new RateStrategy());
@@ -41,5 +41,6 @@ contract Mercata {
         lendingRegistry = LendingRegistryBase(new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy)));
         collateralVault.setLendingPool(address(lendingPool));
         liquidityPool.setLendingPool(address(lendingPool));
+        
     }
 }

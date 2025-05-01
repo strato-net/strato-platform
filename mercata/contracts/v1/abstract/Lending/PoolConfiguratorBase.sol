@@ -16,22 +16,22 @@ abstract contract PoolConfiguratorBase {
         lendingPool = LendingPoolBase(_lendingPool);
     }
 
-    function updateLendingPool(address newAddress)  {
+    function updateLendingPool(address newAddress) public  {
         lendingPool = LendingPoolBase(newAddress);
         emit LendingPoolUpdated(newAddress);
     }
 
-    function setInterestRate(address asset, uint256 newRate)  {
+    function setInterestRate(address asset, uint256 newRate) public  {
         lendingPool.setInterestRate(asset, newRate);
         emit InterestRateUpdated(asset, newRate);
     }
 
-    function setCollateralRatio(address asset, uint256 newRatio)  {
+    function setCollateralRatio(address asset, uint256 newRatio) public  {
         lendingPool.setCollateralRatio(asset, newRatio);
         emit CollateralRatioUpdated(asset, newRatio);
     }
 
-    function setLiquidationBonus(address asset, uint256 newBonus)  {
+    function setLiquidationBonus(address asset, uint256 newBonus) public  {
         lendingPool.setLiquidationBonus(asset, newBonus);
         emit LiquidationBonusUpdated(asset,newBonus);
     }

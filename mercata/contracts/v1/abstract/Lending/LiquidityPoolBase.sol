@@ -1,68 +1,89 @@
 pragma solidvm 12.0;
+import "./LendingPoolBase.sol";
 
-abstract contract LiquidityPoolBase  {
+abstract contract LiquidityPoolBase   {
     event Deposited(address indexed user, address indexed asset, uint256 amount);
     event Withdrawn(address indexed user, address indexed asset, uint256 amount);
     event Borrowed(address indexed user, address indexed asset, uint256 amount);
     event Repaid(address indexed user, address indexed asset, uint256 amount);
     event LendingPoolSet(address lendingPool);
-
-    LendingPoolBase public lendingPool;
-    mapping(string => uint256) public record balances;
+    struct Deposit {   
+        address user;
+        address asset;
+        uint256 amount;
+    }
+    struct Borrow {   
+        address user;
+        address asset;
+        uint256 amount;
+    }
+    address public lendingPool;
+    mapping(string => Deposit) public record deposited;
     mapping(address => uint256) public record totalLiquidity;
-    mapping(string => uint256) public record borrowed;
+    mapping(string => Borrow) public record borrowed;
 
     constructor() {
         
     } 
  
-    function setLendingPool(address _lendingPool)  {
-        //require(address(lendingPool) == address(0), "LendingPool already set");
-        require(_lendingPool != address(0), "Invalid address");
-        lendingPool = LendingPoolBase(_lendingPool);
-        emit LendingPoolSet(_lendingPool);
+    modifier onlyLendingPool() {
+        require(msg.sender == lendingPool, "Caller is not LendingPool");
+        _;
     }
 
-    function _key(address user, address asset)  returns (string) {
+   function setLendingPool(address _lendingPool)  external  {
+        //require(address(lendingPool) == address(0), "LendingPool already set");
+        require(_lendingPool != address(0), "Invalid address");
+        lendingPool = _lendingPool;
+        emit LendingPoolSet(_lendingPool);
+     }
+
+    function _key(address user, address asset) pure returns (string) {
         return keccak256(string(user), string(asset));
     }
 
-    function deposit(address asset, uint256 amount, address onBehalfOf)   {
+    function deposit(address asset, uint256 amount, address onBehalfOf) public   {
+        string key = _key(onBehalfOf, asset);
         require(amount > 0, "Amount must be greater than 0");
         require(onBehalfOf != address(0), "Invalid user address");
         require(IERC20(asset).transferFrom(onBehalfOf, address(this), amount), "Transfer failed");
-        balances[_key(onBehalfOf, asset)] += amount;
+        deposited[key].amount += amount;
+        deposited[key].user = onBehalfOf;
+        deposited[key].asset = asset;
+
         totalLiquidity[asset] += amount;
         emit Deposited(onBehalfOf, asset, amount);
     }
 
-    function withdraw(address asset, uint256 amount, address to)   {
+    function withdraw(address asset, uint256 amount, address to) public  {
         require(amount > 0, "Amount must be greater than 0");
         require(to != address(0), "Invalid recipient address");
         string key = _key(to, asset);
-        require(balances[key] >= amount, "Insufficient balance");
-        balances[key] -= amount;
+        require(deposited[key].amount >= amount, "Insufficient balance");
+        deposited[key].amount -= amount;
         totalLiquidity[asset] -= amount;
         require(IERC20(asset).transfer(to, amount), "Withdraw failed");
         emit Withdrawn(to, asset, amount);
     }
 
-    function borrow(address asset, uint256 amount, address borrower)   {
+    function borrow(address asset, uint256 amount, address borrower) public  onlyLendingPool  {
         string key = _key(borrower, asset);
         require(amount > 0, "Amount must be greater than 0");
         require(borrower != address(0), "Invalid borrower address");
         require(totalLiquidity[asset] >= amount, "Insufficient liquidity");
         totalLiquidity[asset] -= amount;
-        borrowed[key] += amount;
+        borrowed[key].amount += amount;
+        borrowed[key].user = borrower;
+        borrowed[key].asset = asset;
         require(IERC20(asset).transfer(borrower, amount), "Borrow transfer failed");
         emit Borrowed(borrower, asset, amount);
     }
 
-    function repay(address asset, uint256 amount, address borrower)   {
+    function repay(address asset, uint256 amount, address borrower) public  onlyLendingPool  {
         string key = _key(borrower, asset);
-        require(borrowed[key] > 0, "No outstanding debt");
-        uint256 repayAmount = amount > borrowed[key] ? borrowed[key] : amount;
-        borrowed[key] -= repayAmount;
+        require(borrowed[key].amount > 0, "No outstanding debt");
+        uint256 repayAmount = amount > borrowed[key].amount ? borrowed[key].amount : amount;
+        borrowed[key].amount -= repayAmount;
         require(amount > 0, "Amount must be greater than 0");
         require(borrower != address(0), "Invalid borrower address");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Repay failed");
@@ -70,7 +91,7 @@ abstract contract LiquidityPoolBase  {
         emit Repaid(borrower, asset, repayAmount);
     }
 
-    function getUserBalance(address user, address asset)  view  returns (uint256) {
-        return balances[_key(user, asset)];
+    function getUserBalance(address user, address asset)  view  returns (uint256) public view {
+        return deposited[_key(user, asset)].amount;
     }
 }

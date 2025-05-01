@@ -15,7 +15,7 @@ abstract contract PriceOracleBase {
         emit PriceUpdated(asset, price);
     }
 
-    function getAssetPrice(address asset) view  returns (uint256) {
+    function getAssetPrice(address asset) view returns (uint256) {
         uint256 price = prices[asset];
         require(price > 0, "Price not set");
         return price;
