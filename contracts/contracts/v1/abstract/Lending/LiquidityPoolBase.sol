@@ -79,13 +79,15 @@ abstract contract LiquidityPoolBase   {
         emit Borrowed(borrower, asset, amount);
     }
 
-    function repay(address asset, uint256 amount, address borrower) public  onlyLendingPool  {
-        string key = _key(borrower, asset);
-        require(borrowed[key].amount > 0, "No outstanding debt");
-        uint256 repayAmount = amount > borrowed[key].amount ? borrowed[key].amount : amount;
-        borrowed[key].amount -= repayAmount;
+    function repay(address asset, uint256 amount, uint256 totalOwed, address borrower) public  onlyLendingPool  {
         require(amount > 0, "Amount must be greater than 0");
         require(borrower != address(0), "Invalid borrower address");
+        string key = _key(borrower, asset);
+        //set to latest owed amount that includes interest
+        borrowed[key].amount = totalOwed;
+        require(borrowed[key].amount > 0, "No outstanding debt");
+        uint256 repayAmount = amount > totalOwed ? totalOwed : amount;
+        borrowed[key].amount -= repayAmount;
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Repay failed");
         totalLiquidity[asset] += repayAmount;
         emit Repaid(borrower, asset, repayAmount);
