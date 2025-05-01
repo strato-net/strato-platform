@@ -97,7 +97,7 @@ const DepositsPanel: FC = () => {
     );
   };
 
-  const RenderDeposit: React.FC<RenderProps> = ({ tokens }) => {
+  const RenderDeposit: React.FC<RenderProps> = ({ }) => {
     const [showDepositTokenSelector, setShowDepositTokenSelector] =
       useState(false);
     const [selectedDepositToken, setSelectedDepositToken] =
@@ -106,6 +106,7 @@ const DepositsPanel: FC = () => {
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [depositLoading, setDepositLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+    const [depositTokenList, setDepositTokenList] = useState<TokenData[]>([]);
 
     const handleDepositAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
@@ -149,10 +150,20 @@ const DepositsPanel: FC = () => {
     };
 
     useEffect(() => {
-      if (tokens && tokens.length > 0) {
-        setSelectedDepositToken(tokens[0]);
-      }
-    }, [tokens]);
+      const fetchTokenList = async () => {
+        try {
+          const res = await axios.get(
+            `/api/depositableTokens`
+          );
+          setDepositTokenList(res.data);
+          setSelectedDepositToken(res.data[0] || null);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+
+      fetchTokenList();
+    }, []);
 
     const handleTokenSelect = (token: TokenData) => {
       setSelectedDepositToken(token);
@@ -182,7 +193,7 @@ const DepositsPanel: FC = () => {
                   size="md"
                 />
                 <span className="text-[#2C3E50] font-medium">
-                  {selectedDepositToken?._name ?? "ETH"}
+                  {selectedDepositToken?._name ?? "None"}
                 </span>
               </div>
               <svg
@@ -211,7 +222,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedDepositToken?._symbol ?? "ETH"}
+                  {selectedDepositToken?._symbol ?? ""}
                 </h3>
               </div>
             </div>
@@ -237,7 +248,7 @@ const DepositsPanel: FC = () => {
             onClose={() => setShowDepositTokenSelector(false)}
             tokenSearchQuery={tokenSearchQuery}
             setTokenSearchQuery={setTokenSearchQuery}
-            popularTokens={tokens}
+            popularTokens={depositTokenList}
             handleTokenSelect={handleTokenSelect}
           />
         )}
@@ -255,6 +266,7 @@ const DepositsPanel: FC = () => {
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+    const [withdrawableTokens, setWithdrawableTokens] = useState<TokenData[]>([]);
 
     const handleWithdrawAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
@@ -292,10 +304,20 @@ const DepositsPanel: FC = () => {
     };
 
     useEffect(() => {
-      if (tokens && tokens.length > 0) {
-        setSelectedDepositToken(tokens[0]);
-      }
-    }, [tokens]);
+      const fetchTokenList = async () => {
+        try {
+          const res = await axios.get(
+            `/api/withdrawableTokens`
+          );
+          setWithdrawableTokens(res.data);
+          setSelectedDepositToken(res.data[0] || null);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+
+      fetchTokenList();
+    }, []);
 
     const handleTokenSelect = (token: TokenData) => {
       setSelectedDepositToken(token);
@@ -325,7 +347,7 @@ const DepositsPanel: FC = () => {
                   size="md"
                 />
                 <span className="text-[#2C3E50] font-medium">
-                  {selectedDepositToken?._name ?? "ETH"}
+                  {selectedDepositToken?._name ?? "NA"}
                 </span>
               </div>
               <svg
@@ -354,7 +376,7 @@ const DepositsPanel: FC = () => {
               />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
-                  {selectedDepositToken?._symbol ?? "ETH"}
+                  {selectedDepositToken?._symbol ?? ""}
                 </h3>
               </div>
             </div>
@@ -380,7 +402,7 @@ const DepositsPanel: FC = () => {
             onClose={() => setShowDepositTokenSelector(false)}
             tokenSearchQuery={tokenSearchQuery}
             setTokenSearchQuery={setTokenSearchQuery}
-            popularTokens={tokens}
+            popularTokens={withdrawableTokens}
             handleTokenSelect={handleTokenSelect}
           />
         )}

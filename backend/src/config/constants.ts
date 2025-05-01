@@ -7,7 +7,7 @@ export enum StratoPaths {
 }
 
 export const constants = {
-  poolFactory: "1ca2d535a8bcb2b88d681ef56589e70223e8885f",
-  lendingPool: "0da8f2beb3ec371dc023d2b7ad8a63a5a810e3eb",
+  poolFactory: "7f48b17043776a8999bfae2bead474ae148f5ec9",
+  lendingPool: "94788d10f794355501beff2638aaa36e3cd6059a",
   DECIMALS: 10n ** 18n,
 };
