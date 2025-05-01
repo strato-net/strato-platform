@@ -17,7 +17,11 @@ interface WalletData {
 const WalletCreated = () => {
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [copiedKeys, setCopiedKeys] = useState<{[key: string]: boolean}>({});
+  const [copiedKeys, setCopiedKeys] = useState<{[key: string]: boolean}>({
+    username: false,
+    blockchainAccount: false,
+    privateKey: false
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -53,12 +57,13 @@ const WalletCreated = () => {
   };
   
   const handleContinue = () => {
-    // Show confirmation dialog if user hasn't copied all credentials
-    if (!copiedKeys.privateKey) {
+    // Show confirmation dialog if user hasn't copied private key
+    if (!copiedKeys.privateKey && !confirmDialogOpen) {
       setConfirmDialogOpen(true);
-    } else {
-      navigate('/onboarding', { state: { walletData } });
+      return;
     }
+    
+    navigate('/onboarding', { state: { walletData } });
   };
 
   if (!walletData) return null;
