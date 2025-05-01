@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import AssetSummary from '@/components/dashboard/AssetSummary';
 import AssetsGrid from '@/components/dashboard/AssetsGrid';
+import { Coins, ChartBar } from 'lucide-react';
 
 interface Asset {
   id: string;
@@ -121,7 +122,13 @@ const Assets = () => {
         <main className="p-6">
           {/* Asset Summary */}
           <div className="mb-8">
-            <AssetSummary />
+            <AssetSummary 
+              title="Total Assets" 
+              value="$386,787.71"
+              change={4.2}
+              icon={<Coins className="text-white" size={18} />}
+              color="bg-purple-500"
+            />
           </div>
           
           {/* Assets List */}
