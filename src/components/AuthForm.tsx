@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
-import { Shield, User, Lock, ArrowRight, Mail, Telegram } from 'lucide-react';
+import { Shield, User, Lock, ArrowRight, Mail, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthFormProps {
@@ -184,7 +184,7 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
                     <FormLabel>Telegram (optional)</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Telegram className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                        <MessageSquare className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                         <Input className="pl-10" placeholder="@username" {...field} />
                       </div>
                     </FormControl>
