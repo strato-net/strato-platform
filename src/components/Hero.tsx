@@ -24,10 +24,10 @@ const Hero = () => {
         <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-20">
           <div className="w-full lg:w-1/2 text-center lg:text-left">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="gradient-text">Live On-chain</span>
+              <span className="gradient-text">Where Stability Meets Opportunity</span>
             </h1>
             <p className="text-xl md:text-2xl mb-8 text-gray-700">
-              The easiest way to trade, and stake vaulted real-world assets
+              Easily earn on vaulted gold, silver & crypto. Get instant credit. Built by ETH veterans.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link to="/register" className="cta-button flex items-center justify-center">
