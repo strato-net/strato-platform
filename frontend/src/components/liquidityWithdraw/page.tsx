@@ -43,7 +43,7 @@ export const RenderWithdraw = () => {
         console.log("Withdraw response:", response.data);
         api["success"]({
           message: "Success",
-          description: `Successfully withdrawed ${selectedWithdrawPool?._name}`,
+          description: `Successfully withdrew ${selectedWithdrawPool?._name}`,
         });
         setWithdrawLoading(false);
       } catch (err) {

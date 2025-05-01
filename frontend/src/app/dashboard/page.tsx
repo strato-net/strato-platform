@@ -234,7 +234,7 @@ export default function Dashboard() {
                     <tr>
                       <th className="py-3 px-4">Token</th>
                       <th className="py-3 px-4">Balance</th>
-                      <th className="py-3 px-4">Value</th>
+                      {/* <th className="py-3 px-4">Value</th> */}
                       {/* <th className="py-3 px-4">24h Change</th>
                       <th className="py-3 px-4">Actions</th> */}
                     </tr>
@@ -252,7 +252,7 @@ export default function Dashboard() {
                           </div>
                         </td>
                         <td className="py-3 px-4">{token.balance}</td>
-                        <td className="py-3 px-4">{token.value}</td>
+                        {/* <td className="py-3 px-4">{token.value}</td> */}
                         {/* <td className={`py-3 px-4 ${token.change24h.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
                           {token.change24h}
                         </td> */}
@@ -334,7 +334,7 @@ export default function Dashboard() {
         </section> */}
 
         {/* Token Details Modal */}
-        {selectedToken && (
+        {/* {selectedToken && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className="bg-white rounded shadow-lg p-6 w-96 space-y-4">
               <div className="flex items-center gap-3 mb-4">
@@ -385,7 +385,7 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

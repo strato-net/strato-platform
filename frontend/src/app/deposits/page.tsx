@@ -57,7 +57,7 @@ const DepositsPanel: FC = () => {
         key: "deposit",
         label: (
           <span className="text-base font-semibold text-gray-700 transition-colors">
-            Deposits
+            Deposit
           </span>
         ),
       },
@@ -254,6 +254,20 @@ const DepositsPanel: FC = () => {
     const [tokenSearchQuery, setTokenSearchQuery] = useState("");
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
+    const [tokenAPosition, setTokenAPosition] = useState<string>("0.00");
+    const [tokenBPosition, setTokenBPosition] = useState<string>("0.00");
+
+    const calculatePositions = (amount: string) => {
+      if (!amount || isNaN(parseFloat(amount))) {
+        setTokenAPosition("0.00");
+        setTokenBPosition("0.00");
+        return;
+      }
+      // Assuming 50-50 split for tokenA and tokenB
+      const position = (parseFloat(amount) / 2).toFixed(2);
+      setTokenAPosition(position);
+      setTokenBPosition(position);
+    };
 
     const handleWithdrawAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
@@ -261,6 +275,7 @@ const DepositsPanel: FC = () => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setWithdrawAmount(value);
+        calculatePositions(value);
       }
     };
 
@@ -278,7 +293,7 @@ const DepositsPanel: FC = () => {
         setWithdrawLoading(false);
         api["success"]({
           message: "Success",
-          description: `Successfully withdraw ${withdrawAmount} ${selectedDepositToken?._symbol}`,
+          description: `Successfully withdrew ${withdrawAmount} ${selectedDepositToken?._symbol}`,
         });
       } catch (err) {
         console.error(err);
@@ -358,6 +373,7 @@ const DepositsPanel: FC = () => {
               </div>
             </div>
           </div>
+
           <div className="mt-10 w-1/2 mx-auto">
             <button
               className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && withdrawAmount
@@ -456,21 +472,22 @@ const DepositsPanel: FC = () => {
     const [borrowLoading, setBorrowLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
+    const COLLATERALIZATION_RATIO = 1.5; // 150%
+    const INTEREST_RATE = 0.05; // 5%
+
+    const calculateCollateralAmount = (amount: string) => {
+      if (!amount || isNaN(parseFloat(amount))) return "";
+      const collateral = parseFloat(amount) * COLLATERALIZATION_RATIO;
+      return collateral.toFixed(2);
+    };
+
     const handleWithdrawAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
     ) => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setWithdrawAmount(value);
-      }
-    };
-
-    const handleColleteralAmountChange = (
-      e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-      const value = e.target.value;
-      if (/^\d*\.?\d*$/.test(value)) {
-        setColleteralAmount(value);
+        setColleteralAmount(calculateCollateralAmount(value));
       }
     };
 
@@ -540,7 +557,7 @@ const DepositsPanel: FC = () => {
       <div className="h-full flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 px-4 py-10">
         <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 w-full max-w-md">
           <h2 className="text-3xl font-bold text-center text-[#1f1f5f] mb-8">
-            Borrow Loan{" "}
+            Borrow Loan
           </h2>
 
           <div className="mb-6 flex flex-col gap-2">
@@ -627,20 +644,35 @@ const DepositsPanel: FC = () => {
             </button>
           </div>
 
+      
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-blue-700 mb-1">
+              Interest Rate
+            </label>
+            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
+              <span className="text-lg text-gray-800">{INTEREST_RATE * 100}%</span>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-blue-700 mb-1">
+              Collateralization Ratio
+            </label>
+            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
+              <span className="text-lg text-gray-800">{COLLATERALIZATION_RATIO * 100}%</span>
+            </div>
+          </div>
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
               Collateral Amount
             </label>
-            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-white">
-              <input
-                value={colleteralAmount}
-                onChange={handleColleteralAmountChange}
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]*\.?[0-9]*"
-                placeholder="0.00"
-                className="flex-1 text-lg focus:outline-none text-gray-800 placeholder-gray-400 bg-transparent"
-              />
+
+            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
+              <span className="text-lg text-gray-800">
+                {colleteralAmount || "0.00"}
+              </span>
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
                   {selectedColleteralToken?._symbol ?? "ETH"}

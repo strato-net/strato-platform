@@ -668,7 +668,7 @@ const SwapPanel: FC = () => {
         key: "deposits",
         label: (
           <span className="text-base font-semibold text-gray-700 transition-colors">
-            Deposits
+            Deposit
           </span>
         ),
       },
@@ -905,7 +905,7 @@ const SwapPanel: FC = () => {
                 <div className="w-full max-w-6xl mx-auto p-4">
                   <div className="flex flex-col md:flex-row justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900">
-                      Deposits
+                      Deposit
                     </h1>
                   </div>
 
@@ -1297,12 +1297,6 @@ const SwapPanel: FC = () => {
                   </span>
                 </div>
                 {selectedWithdrawPool && (
-                  <div className="text-sm text-gray-600 mt-1">
-                    Max available LP tokens:{" "}
-                    {Number(selectedWithdrawPool.value) / 1e18}{" "}
-                  </div>
-                )}
-                {selectedWithdrawPool && (
                   <div className="w-full flex justify-between px-2">
                     <span>
                       {selectedWithdrawPool?._name?.split("/")[0]} position
@@ -1338,6 +1332,48 @@ const SwapPanel: FC = () => {
                           )
                         )
                         .dividedBy(1e18) // multiply by 10^18
+                        .toFixed(0)}
+                    </span>
+                  </div>
+                )}
+                {selectedWithdrawPool && withdrawAmount && (
+                  <div className="w-full flex justify-between px-2">
+                    <span>
+                      New {selectedWithdrawPool?._name?.split("/")[0]} position
+                    </span>
+                    <span>
+                      {new BigNumber(selectedWithdrawPool?.value || 0)
+                        .dividedBy(
+                          new BigNumber(selectedWithdrawPool?._totalSupply || 1)
+                        )
+                        .multipliedBy(
+                          new BigNumber(
+                            selectedWithdrawPool?.data?.tokenABalance || 0
+                          )
+                        )
+                        .multipliedBy(new BigNumber(100).minus(withdrawAmount).dividedBy(100))
+                        .dividedBy(1e18)
+                        .toFixed(0)}
+                    </span>
+                  </div>
+                )}
+                {selectedWithdrawPool && withdrawAmount && (
+                  <div className="w-full flex justify-between px-2">
+                    <span>
+                      New {selectedWithdrawPool?._name?.split("/")[1]} position
+                    </span>
+                    <span>
+                      {new BigNumber(selectedWithdrawPool?.value || 0)
+                        .dividedBy(
+                          new BigNumber(selectedWithdrawPool?._totalSupply || 1)
+                        )
+                        .multipliedBy(
+                          new BigNumber(
+                            selectedWithdrawPool?.data?.tokenBBalance || 0
+                          )
+                        )
+                        .multipliedBy(new BigNumber(100).minus(withdrawAmount).dividedBy(100))
+                        .dividedBy(1e18)
                         .toFixed(0)}
                     </span>
                   </div>

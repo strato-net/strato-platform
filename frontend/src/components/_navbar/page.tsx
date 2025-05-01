@@ -5,12 +5,20 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useUser } from '@/context/UserContext';
+import { CopyOutlined } from '@ant-design/icons';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [showPopover, setShowPopover] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const { userAddress } = useUser();
+  const [showCopied, setShowCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(userAddress || '');
+    setShowCopied(true);
+    setTimeout(() => setShowCopied(false), 2000);
+  };
 
   const isActiveParentRoute = (routes: string[]) =>
     routes.some(route => pathname.startsWith(route));
@@ -101,7 +109,21 @@ export default function Navbar() {
               <div className="absolute right-0 mt-2 w-52 bg-[#101c2c] text-white rounded-xl shadow-2xl z-50">
                 <div className="p-3 border-b border-white/10">
                   <p className="text-base font-semibold">Connected Wallet</p>
-                  <p className="text-sm text-cyan-300">{userAddress?.slice(0, 4)}...{userAddress?.slice(-4)}</p>
+                  <p className="text-sm text-cyan-300 flex items-center gap-2">
+                    {userAddress?.slice(0, 4)}...{userAddress?.slice(-4)}
+                    <button
+                      onClick={handleCopy}
+                      className="text-cyan-300 hover:text-cyan-200 transition-colors cursor-pointer"
+                      title="Copy address"
+                    >
+                      <CopyOutlined className="text-base" />
+                    </button>
+                    {showCopied && (
+                      <span className="text-xs text-green-400 animate-fade-in">
+                        Copied!
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <button
                   onClick={handleLogout}
