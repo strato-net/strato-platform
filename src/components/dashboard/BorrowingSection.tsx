@@ -42,7 +42,7 @@ const BorrowingSection = () => {
                 </div>
               </div>
               
-              {/* Risk level text now appears below the bar graph */}
+              {/* Risk level text now appears below the bar graph - removed percentage */}
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center">
                   <span className="text-gray-600 mr-2">Risk Level:</span>
@@ -50,7 +50,7 @@ const BorrowingSection = () => {
                     Moderate
                   </span>
                 </div>
-                <span className="font-semibold">{riskPercentage}%</span>
+                {/* Removed the percentage display that was here */}
               </div>
             </div>
             
