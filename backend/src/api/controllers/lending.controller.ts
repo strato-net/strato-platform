@@ -8,6 +8,7 @@ import {
   repayLoan,
   getDepositableTokens,
   getWithdrawableTokens,
+  getLoans
 } from "../services/lending.service";
 
 class LendingController {
@@ -101,6 +102,20 @@ class LendingController {
     try {
       const { accessToken, address } = req;
       const result = await getWithdrawableTokens(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getLoans(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address } = req;
+      const result = await getLoans(accessToken, address as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

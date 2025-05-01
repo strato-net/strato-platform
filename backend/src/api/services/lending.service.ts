@@ -295,3 +295,84 @@ export const getWithdrawableTokens = async (
     value: d.amount,
   }));
 };
+
+export const getLoans = async (
+  accessToken: string,
+  address: string
+): Promise<any> => {
+  // Fetch pool data
+  const { data: pool } = await bloc.get(
+    accessToken,
+    StratoPaths.state.replace(":contractAddress", constants.lendingPool)
+  );
+  if (!pool) {
+    throw new Error("Lending pool data is empty");
+  }
+
+  // Filter only loans for this user
+  const loansMap = pool.loans || {};
+  const userLoansMap = Object.fromEntries(
+    Object.entries(loansMap).filter(
+      ([_, loan]: [string, any]) => loan.user === address
+    )
+  );
+
+  // If no loans for this user, still return pool with empty loans object
+  if (!Object.keys(userLoansMap).length) {
+    return {
+      ...pool,
+      loans: {},
+    };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const divisor = BigInt(365 * 100);
+
+  // Fetch metadata for all assets and collateral assets in the user's loans
+  const assetAddresses = Object.values(userLoansMap).map((l: any) => l.asset);
+  const collateralAddresses = Object.values(userLoansMap).map(
+    (l: any) => l.collateralAsset
+  );
+  const allAddresses = Array.from(
+    new Set([...assetAddresses, ...collateralAddresses])
+  );
+  const tokenMetadata = await getTokens(accessToken, {
+    address: "in.(" + allAddresses.join(",") + ")",
+  });
+  const metadataMap = Object.fromEntries(
+    tokenMetadata.map((t: any) => [t.address, t])
+  );
+
+  // Enrich each loan entry with asset and collateral metadata
+  const enrichedLoans = Object.fromEntries(
+    Object.entries(userLoansMap).map(([key, loan]: [string, any]) => {
+      const assetMeta = metadataMap[loan.asset] || {};
+      const collateralMeta = metadataMap[loan.collateralAsset] || {};
+      const lastUpdated = Number(loan.lastUpdated);
+      const rawDuration = now > lastUpdated ? now - lastUpdated : 0;
+      // convert duration to days, minimum 1 day
+      const days = BigInt(Math.floor(rawDuration / 86400) || 0);
+      const rate = Number(pool.assetInterestRate[loan.asset] || "0");
+      const principal = BigInt(loan.amount);
+      const interest = (principal * BigInt(rate) * days) / divisor;
+      const interestStr = interest.toString();
+      return [
+        key,
+        {
+          ...loan,
+          assetName: assetMeta._name,
+          assetSymbol: assetMeta._symbol,
+          collateralName: collateralMeta._name,
+          collateralSymbol: collateralMeta._symbol,
+          interest: interestStr,
+        },
+      ];
+    })
+  );
+
+  // Return the full pool object with only the user's enriched loans
+  return {
+    ...pool,
+    loans: enrichedLoans,
+  };
+};
