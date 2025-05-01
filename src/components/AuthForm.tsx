@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
-import { Shield, User, Lock, ArrowRight } from 'lucide-react';
+import { Shield, User, Lock, ArrowRight, Mail, Telegram } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthFormProps {
@@ -13,10 +13,11 @@ interface AuthFormProps {
 }
 
 interface FormValues {
-  name?: string;
-  email: string;
+  username?: string;
   password: string;
   confirmPassword?: string;
+  email?: string;
+  telegram?: string;
 }
 
 const AuthForm = ({ isRegister = false }: AuthFormProps) => {
@@ -26,10 +27,11 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
   
   const form = useForm<FormValues>({
     defaultValues: {
-      name: '',
-      email: '',
+      username: '',
       password: '',
       confirmPassword: '',
+      email: '',
+      telegram: '',
     },
   });
   
@@ -86,14 +88,14 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
           {isRegister && (
             <FormField
               control={form.control}
-              name="name"
+              name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel>Username</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                      <Input className="pl-10" placeholder="John Doe" {...field} />
+                      <Input className="pl-10" placeholder="johndoe" {...field} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -101,23 +103,6 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
               )}
             />
           )}
-          
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <Input className="pl-10" placeholder="your@email.com" {...field} />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
           
           <FormField
             control={form.control}
@@ -153,6 +138,61 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
                 </FormItem>
               )}
             />
+          )}
+          
+          {!isRegister ? (
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <Input className="pl-10" placeholder="your@email.com" {...field} />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : (
+            <>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email (optional)</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                        <Input className="pl-10" placeholder="your@email.com" {...field} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="telegram"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telegram (optional)</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Telegram className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                        <Input className="pl-10" placeholder="@username" {...field} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
           )}
           
           <Button 
