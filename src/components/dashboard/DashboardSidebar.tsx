@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Circle, LayoutDashboard, Wallet, Coins, ChartBar, Settings, LogOut, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Circle, LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book } from 'lucide-react';
 
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -10,9 +10,8 @@ const DashboardSidebar = () => {
   const navItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
     { icon: <Wallet size={20} />, label: 'Assets', path: '/dashboard/assets' },
-    { icon: <Coins size={20} />, label: 'Earn', path: '/dashboard/earn' },
-    { icon: <ChartBar size={20} />, label: 'Portfolio', path: '/dashboard/portfolio' },
-    { icon: <Settings size={20} />, label: 'Settings', path: '/dashboard/settings' },
+    { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
+    { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
   ];
 
   return (

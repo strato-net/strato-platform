@@ -1,5 +1,6 @@
 
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Plus } from 'lucide-react';
+import { Button } from "../ui/button";
 
 interface Asset {
   name: string;
@@ -56,9 +57,15 @@ const AssetsList = () => {
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">Your Assets</h2>
-          <a href="#" className="text-sm text-blue-500 hover:text-blue-600 flex items-center">
-            View All <ArrowUpRight size={14} className="ml-1" />
-          </a>
+          <div className="flex items-center gap-3">
+            <Button size="sm" className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1">
+              <Plus size={16} />
+              Add Deposits
+            </Button>
+            <a href="#" className="text-sm text-blue-500 hover:text-blue-600 flex items-center">
+              View All <ArrowUpRight size={14} className="ml-1" />
+            </a>
+          </div>
         </div>
       </div>
       

@@ -1,5 +1,6 @@
 
-import { Bell, User } from 'lucide-react';
+import { Bell, User, Wallet } from 'lucide-react';
+import { Button } from "../ui/button";
 
 interface DashboardHeaderProps {
   title: string;
@@ -11,6 +12,12 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
       <h1 className="text-xl font-bold">{title}</h1>
       
       <div className="flex items-center space-x-4">
+        <Button variant="outline" className="flex items-center gap-2 border-strato-blue text-strato-blue hover:bg-strato-blue/10">
+          <Wallet size={16} />
+          <span className="hidden md:inline">Connect Ethereum Wallet</span>
+          <span className="inline md:hidden">Connect</span>
+        </Button>
+        
         <div className="relative">
           <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
             <Bell size={20} />

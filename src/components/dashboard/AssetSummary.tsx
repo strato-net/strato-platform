@@ -17,16 +17,29 @@ const AssetSummary = ({ title, value, change, icon, color }: AssetSummaryProps) 
           <p className="text-gray-500 text-sm">{title}</p>
           <h3 className="text-2xl font-bold mt-1">{value}</h3>
           
-          <div className={`flex items-center mt-2 ${
-            change >= 0 ? 'text-green-500' : 'text-red-500'
-          }`}>
-            {change >= 0 ? (
-              <TrendingUp size={16} className="mr-1" />
-            ) : (
-              <TrendingDown size={16} className="mr-1" />
-            )}
-            <span className="text-sm font-medium">{Math.abs(change)}%</span>
-          </div>
+          {title !== "Borrowing" && (
+            <div className={`flex items-center mt-2 ${
+              change >= 0 ? 'text-green-500' : 'text-red-500'
+            }`}>
+              {change >= 0 ? (
+                <TrendingUp size={16} className="mr-1" />
+              ) : (
+                <TrendingDown size={16} className="mr-1" />
+              )}
+              <span className="text-sm font-medium">{Math.abs(change)}%</span>
+            </div>
+          )}
+          
+          {title === "Borrowing" && (
+            <div className="mt-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                value === "$0.00" ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
+              }`}>
+                {value === "$0.00" ? 'None' : 'Moderate'}
+              </span>
+              <p className="text-xs text-gray-500 mt-1">Risk Level</p>
+            </div>
+          )}
         </div>
         
         <div 

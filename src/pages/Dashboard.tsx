@@ -4,6 +4,7 @@ import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import AssetSummary from '../components/dashboard/AssetSummary';
 import AssetsList from '../components/dashboard/AssetsList';
+import DashboardFAQ from '../components/dashboard/DashboardFAQ';
 import { Wallet, Coins, ChartBar, Shield } from 'lucide-react';
 
 const Dashboard = () => {
@@ -45,8 +46,8 @@ const Dashboard = () => {
             />
             
             <AssetSummary 
-              title="Risk Level" 
-              value="Low"
+              title="Borrowing" 
+              value="$1,250.00"
               change={0}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
@@ -57,8 +58,7 @@ const Dashboard = () => {
             <AssetsList />
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Additional dashboard widgets would go here */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm col-span-2">
               <h2 className="font-bold text-lg mb-4">Recent Activity</h2>
               <p className="text-gray-500 text-sm">You have no recent activity.</p>
@@ -68,6 +68,10 @@ const Dashboard = () => {
               <h2 className="font-bold text-lg mb-4">Market Updates</h2>
               <p className="text-gray-500 text-sm">Stay tuned for market updates.</p>
             </div>
+          </div>
+
+          <div className="mb-8">
+            <DashboardFAQ />
           </div>
         </main>
       </div>
