@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Wallet } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -40,7 +40,7 @@ const Navbar = () => {
               </Link>
               <Link to="/register">
                 <Button className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                  <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
+                  <ArrowRight className="mr-2 h-4 w-4" /> Launch App
                 </Button>
               </Link>
             </div>
@@ -85,7 +85,7 @@ const Navbar = () => {
               </Link>
               <Link to="/register" className="block w-full">
                 <Button className="w-full bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                  <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
+                  <ArrowRight className="mr-2 h-4 w-4" /> Launch App
                 </Button>
               </Link>
             </div>
