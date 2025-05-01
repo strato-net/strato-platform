@@ -16,7 +16,7 @@ const AssetsList = () => {
   const assets: Asset[] = [
     {
       name: 'Gold',
-      symbol: 'GOLD',
+      symbol: 'GOLDST',
       price: '$1,958.30',
       change: 0.34,
       amount: '0.5 oz',
@@ -25,7 +25,7 @@ const AssetsList = () => {
     },
     {
       name: 'Silver',
-      symbol: 'SILVER',
+      symbol: 'SILVST',
       price: '$24.75',
       change: -0.78,
       amount: '10 oz',
@@ -33,8 +33,8 @@ const AssetsList = () => {
       iconUrl: 'https://placekitten.com/100/101' // Placeholder for demo
     },
     {
-      name: 'Ethereum',
-      symbol: 'ETH',
+      name: 'Bridged Ethereum',
+      symbol: 'ETHST',
       price: '$2,207.65',
       change: 3.45,
       amount: '0.75 ETH',
@@ -57,15 +57,10 @@ const AssetsList = () => {
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">Your Assets</h2>
-          <div className="flex items-center gap-3">
-            <Button size="sm" className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1">
-              <Plus size={16} />
-              Add Deposits
-            </Button>
-            <a href="#" className="text-sm text-blue-500 hover:text-blue-600 flex items-center">
-              View All <ArrowUpRight size={14} className="ml-1" />
-            </a>
-          </div>
+          <Button size="sm" className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1">
+            <Plus size={16} />
+            Add Deposits
+          </Button>
         </div>
       </div>
       
@@ -120,6 +115,12 @@ const AssetsList = () => {
             ))}
           </tbody>
         </table>
+      </div>
+      
+      <div className="p-4 text-right border-t border-gray-100">
+        <a href="#" className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end">
+          View All <ArrowUpRight size={14} className="ml-1" />
+        </a>
       </div>
     </div>
   );

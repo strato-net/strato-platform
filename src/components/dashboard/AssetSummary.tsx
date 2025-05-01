@@ -31,13 +31,13 @@ const AssetSummary = ({ title, value, change, icon, color }: AssetSummaryProps) 
           )}
           
           {title === "Borrowing" && (
-            <div className="mt-2">
+            <div className="mt-2 flex items-center">
+              <span className="text-xs text-gray-500 mr-2">Risk Level:</span>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                 value === "$0.00" ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
               }`}>
                 {value === "$0.00" ? 'None' : 'Moderate'}
               </span>
-              <p className="text-xs text-gray-500 mt-1">Risk Level</p>
             </div>
           )}
         </div>
