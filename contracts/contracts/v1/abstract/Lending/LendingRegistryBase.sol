@@ -29,22 +29,22 @@ abstract contract LendingRegistryBase  {
         emit RateStrategyUpdated(_rateStrategy);
     }
 
-    function updateLendingPool(address _lendingPool)  {
+    function updateLendingPool(address _lendingPool) public   {
         lendingPool = _lendingPool;
         emit LendingPoolUpdated(_lendingPool);
     }
 
-    function updateLiquidityPool(address _liquidityPool)  {
+    function updateLiquidityPool(address _liquidityPool) public  {
         liquidityPool = _liquidityPool;
         emit LiquidityPoolUpdated(_liquidityPool);
     }
 
-    function updateCollateralVault(address _collateralVault)  {
+    function updateCollateralVault(address _collateralVault) public  {
         collateralVault = _collateralVault;
         emit CollateralVaultUpdated(_collateralVault);
     }
 
-    function updateRateStrategy(address _rateStrategy)  {
+    function updateRateStrategy(address _rateStrategy) public  {
         rateStrategy = _rateStrategy;
         emit RateStrategyUpdated(_rateStrategy);
     }
