@@ -57,13 +57,13 @@ const WalletCreated = () => {
   };
   
   const handleContinue = () => {
-    // Show confirmation dialog if user hasn't copied private key
-    if (!copiedKeys.privateKey && !confirmDialogOpen) {
+    // Only show confirmation dialog if user hasn't copied private key
+    if (!copiedKeys.privateKey) {
       setConfirmDialogOpen(true);
-      return;
+    } else {
+      // If they've copied the private key, navigate directly
+      navigate('/onboarding', { state: { walletData } });
     }
-    
-    navigate('/onboarding', { state: { walletData } });
   };
 
   if (!walletData) return null;
