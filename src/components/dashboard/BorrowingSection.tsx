@@ -22,35 +22,38 @@ const BorrowingSection = () => {
       </CardHeader>
       <CardContent>
         <div className="py-4">
-          <div className="space-y-4">
-            {/* Risk level bar moved to the top */}
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center">
-                <span className="text-gray-600 mr-2">Risk Level:</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-600">
-                  Moderate
-                </span>
-              </div>
-              <span className="font-semibold">{riskPercentage}%</span>
-            </div>
-            
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4 relative">
-              <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
-              
-              {/* Portfolio Value indicator (100%) */}
-              <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
-                <div className="h-4 w-0.5 bg-blue-500"></div>
-                <div className="mt-1 text-xs text-blue-600 whitespace-nowrap">Portfolio Value</div>
+          <div className="space-y-6">
+            {/* Risk level bar with improved spacing */}
+            <div className="mb-2">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center">
+                  <span className="text-gray-600 mr-2">Risk Level:</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-600">
+                    Moderate
+                  </span>
+                </div>
+                <span className="font-semibold">{riskPercentage}%</span>
               </div>
               
-              {/* Liquidation indicator (80%) */}
-              <div className="absolute top-0 flex flex-col items-center" style={{ left: '80%', transform: 'translateX(-50%)' }}>
-                <div className="h-4 w-0.5 bg-red-500"></div>
-                <div className="mt-1 text-xs text-red-600 whitespace-nowrap">Liquidation</div>
+              <div className="w-full bg-gray-200 rounded-full h-2 relative">
+                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
+                
+                {/* Portfolio Value indicator with improved positioning */}
+                <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
+                  <div className="h-4 w-0.5 bg-blue-500"></div>
+                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap">Portfolio Value</div>
+                </div>
+                
+                {/* Liquidation indicator with improved positioning */}
+                <div className="absolute top-0 flex flex-col items-center" style={{ left: '80%', transform: 'translateX(-50%)' }}>
+                  <div className="h-4 w-0.5 bg-red-500"></div>
+                  <div className="mt-1 text-xs text-red-600 whitespace-nowrap">Liquidation</div>
+                </div>
               </div>
             </div>
             
-            <div className="flex flex-col gap-1">
+            {/* Added extra spacing with mt-8 to separate indicators from data */}
+            <div className="flex flex-col gap-1 mt-8">
               <div className="flex justify-between">
                 <span className="text-gray-600">Available Borrowing Power</span>
                 <span className="font-semibold">$3,462.91</span>
