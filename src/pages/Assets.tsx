@@ -1,10 +1,8 @@
-
 import { useState } from 'react';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Heart, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -260,17 +258,6 @@ const Assets = () => {
                     </div>
                     
                     <div className="text-sm text-gray-600">{asset.description}</div>
-                    
-                    <div className="flex items-center">
-                      <div className="w-full">
-                        <Input 
-                          type="number" 
-                          placeholder="0.01"
-                          className="text-right" 
-                          disabled={!asset.available || !isWalletConnected}
-                        />
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
                 
