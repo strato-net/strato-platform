@@ -2,9 +2,9 @@ import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
+import { approveAsset } from "../helpers/tokens.helper";
 
 const Pool = "LendingPoolBase";
-const ERC20 = "ERC20";
 
 export const getPools = async (
   accessToken: string,
@@ -17,7 +17,6 @@ export const getPools = async (
     );
 
     return response.data;
-
   } catch (error) {
     console.error("Error fetching lending pools:", error);
     throw error;
@@ -29,7 +28,6 @@ export const manageLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    let tx: any = null;
     if (body.method === "depositLiquidity") {
       const response = await cirrus.get(
         accessToken,
@@ -52,27 +50,15 @@ export const manageLiquidity = async (
       }
       const liquidityPool = response.data[0].liquidityPool;
 
-      tx = buildFunctionTx({
-        contractName: ERC20,
-        contractAddress: body.asset || "",
-        method: "approve",
-        args: {
-          spender: liquidityPool,
-          value: body.amount,
-        },
-      });
-
-      let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+      await approveAsset(
         accessToken,
-        () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+        body.asset || "",
+        liquidityPool,
+        body.amount || ""
       );
-
-      if (approveStatus !== "Success") {
-        throw new Error(`Error approving asset with hash: ${approveHash}`);
-      }
     }
 
-    tx = buildFunctionTx({
+    const tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: constants.lendingPool,
       method: body.method || "",
@@ -122,26 +108,14 @@ export const getLoan = async (
     }
     const collateralVault = response.data[0].collateralVault;
 
-    let tx = buildFunctionTx({
-      contractName: ERC20,
-      contractAddress: body.collateralAsset || "",
-      method: "approve",
-      args: {
-        spender: collateralVault,
-        value: body.collateralAmount,
-      },
-    });
-
-    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+    await approveAsset(
       accessToken,
-      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      body.collateralAsset || "",
+      collateralVault,
+      body.collateralAmount || ""
     );
 
-    if (approveStatus !== "Success") {
-      throw new Error(`Error approving asset with hash: ${approveHash}`);
-    }
-
-    tx = buildFunctionTx({
+    const tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: constants.lendingPool,
       method: "getLoan",
@@ -193,26 +167,14 @@ export const repayLoan = async (
     }
     const liquidityPool = response.data[0].liquidityPool;
 
-    let tx = buildFunctionTx({
-      contractName: ERC20,
-      contractAddress: body.asset || "",
-      method: "approve",
-      args: {
-        spender: liquidityPool,
-        value: body.amount,
-      },
-    });
-
-    let { status: approveStatus, hash: approveHash } = await postAndWaitForTx(
+    await approveAsset(
       accessToken,
-      () => strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      body.asset || "",
+      liquidityPool,
+      body.amount || ""
     );
 
-    if (approveStatus !== "Success") {
-      throw new Error(`Error approving asset with hash: ${approveHash}`);
-    }
-
-    tx = buildFunctionTx({
+    const tx = buildFunctionTx({
       contractName: Pool,
       contractAddress: constants.lendingPool,
       method: "repayLoan",
