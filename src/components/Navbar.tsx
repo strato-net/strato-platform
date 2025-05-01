@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Circle, Wallet } from 'lucide-react';
 
@@ -11,7 +12,7 @@ const Navbar = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <a href="/" className="flex-shrink-0">
+            <Link to="/" className="flex-shrink-0">
               <div className="flex items-center">
                 <div className="w-10 h-10 relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-strato-blue to-strato-purple rounded-md"></div>
@@ -21,7 +22,7 @@ const Navbar = () => {
                 </div>
                 <span className="ml-2 text-xl font-bold text-strato-dark">STRATO<span className="text-strato-blue">mercata</span></span>
               </div>
-            </a>
+            </Link>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
                 <a href="#marketplace" className="text-gray-700 hover:text-strato-blue px-3 py-2 rounded-md text-sm font-medium">
@@ -38,12 +39,14 @@ const Navbar = () => {
           </div>
           <div className="hidden md:block">
             <div className="ml-4 flex items-center md:ml-6">
-              <a href="/login" className="text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5 px-4 py-2 rounded-full mr-3 text-sm font-medium">
+              <Link to="/login" className="text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5 px-4 py-2 rounded-full mr-3 text-sm font-medium">
                 Login
-              </a>
-              <Button className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
-              </Button>
+              </Link>
+              <Link to="/register">
+                <Button className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
+                  <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
+                </Button>
+              </Link>
             </div>
           </div>
           <div className="flex md:hidden">
@@ -81,12 +84,14 @@ const Navbar = () => {
               About
             </a>
             <div className="pt-4 pb-2 border-t border-gray-200">
-              <a href="/login" className="block text-center w-full text-strato-blue border border-strato-blue hover:bg-strato-blue/5 px-4 py-2 rounded-full mb-2">
+              <Link to="/login" className="block text-center w-full text-strato-blue border border-strato-blue hover:bg-strato-blue/5 px-4 py-2 rounded-full mb-2">
                 Login
-              </a>
-              <Button className="w-full bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
-              </Button>
+              </Link>
+              <Link to="/register" className="block w-full">
+                <Button className="w-full bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
+                  <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

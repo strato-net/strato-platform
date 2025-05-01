@@ -1,5 +1,6 @@
 
 import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Hero = () => {
   return (
@@ -29,9 +30,9 @@ const Hero = () => {
               The easiest way to trade, and stake vaulted real-world assets
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <a href="#marketplace" className="cta-button flex items-center justify-center">
-                Launch Marketplace
-              </a>
+              <Link to="/register" className="cta-button flex items-center justify-center">
+                Launch App
+              </Link>
               <a href="#how-it-works" className="secondary-button flex items-center justify-center">
                 How It Works <ArrowRight className="ml-2 h-4 w-4" />
               </a>

@@ -1,0 +1,78 @@
+
+import { useEffect } from 'react';
+import DashboardSidebar from '../components/dashboard/DashboardSidebar';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+import AssetSummary from '../components/dashboard/AssetSummary';
+import AssetsList from '../components/dashboard/AssetsList';
+import { Wallet, Coins, ChartBar, Shield } from 'lucide-react';
+
+const Dashboard = () => {
+  useEffect(() => {
+    document.title = "Dashboard | STRATO Mercata";
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      <DashboardSidebar />
+      
+      <div className="flex-1 ml-64">
+        <DashboardHeader title="Overview" />
+        
+        <main className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <AssetSummary 
+              title="Total Balance" 
+              value="$4,327.39"
+              change={2.5}
+              icon={<Wallet className="text-white" size={18} />}
+              color="bg-blue-500"
+            />
+            
+            <AssetSummary 
+              title="CATA Rewards" 
+              value="287.53 CATA"
+              change={12.3}
+              icon={<Coins className="text-white" size={18} />}
+              color="bg-purple-500"
+            />
+            
+            <AssetSummary 
+              title="Portfolio Growth" 
+              value="8.4%"
+              change={3.7}
+              icon={<ChartBar className="text-white" size={18} />}
+              color="bg-green-500"
+            />
+            
+            <AssetSummary 
+              title="Risk Level" 
+              value="Low"
+              change={0}
+              icon={<Shield className="text-white" size={18} />}
+              color="bg-orange-500"
+            />
+          </div>
+
+          <div className="mb-8">
+            <AssetsList />
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Additional dashboard widgets would go here */}
+            <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm col-span-2">
+              <h2 className="font-bold text-lg mb-4">Recent Activity</h2>
+              <p className="text-gray-500 text-sm">You have no recent activity.</p>
+            </div>
+            
+            <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+              <h2 className="font-bold text-lg mb-4">Market Updates</h2>
+              <p className="text-gray-500 text-sm">Stay tuned for market updates.</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;

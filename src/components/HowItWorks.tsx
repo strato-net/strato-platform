@@ -26,8 +26,8 @@ const HowItWorks = () => {
     },
     {
       id: 4,
-      title: 'Govern',
-      description: 'Vote on proposals with your earned CATA tokens',
+      title: 'Diversify',
+      description: 'Expand your portfolio with a variety of assets',
       icon: <ChartBar className="h-6 w-6" />,
       color: 'bg-orange-500'
     }
