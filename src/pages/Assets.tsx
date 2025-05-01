@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
@@ -135,9 +134,6 @@ const Assets = () => {
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Available Assets</CardTitle>
-              <CardDescription>
-                View and manage all your assets in one place.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <AssetsGrid assets={assets} />
