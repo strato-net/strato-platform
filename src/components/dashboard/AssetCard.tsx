@@ -42,7 +42,7 @@ const AssetCard = ({ id, name, symbol, price, deposit, image, color, logoText }:
             <span className="font-medium">{price}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sm text-gray-500">Your Deposit</span>
+            <span className="text-sm text-gray-500">Asset Deposits</span>
             <span className="font-medium">{deposit}</span>
           </div>
         </div>

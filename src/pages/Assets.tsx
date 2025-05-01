@@ -134,7 +134,7 @@ const Assets = () => {
           {/* Assets List */}
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Your Assets</CardTitle>
+              <CardTitle>Available Assets</CardTitle>
               <CardDescription>
                 View and manage all your assets in one place.
               </CardDescription>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
@@ -317,7 +316,7 @@ const AssetDetail = () => {
                     </div>
                     
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Asset Deposit:</span>
+                      <span className="text-gray-500">Asset Deposits:</span>
                       <span className="font-medium">{asset.deposit}</span>
                     </div>
                     
