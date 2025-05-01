@@ -5,6 +5,7 @@ import DashboardHeader from '../components/dashboard/DashboardHeader';
 import AssetSummary from '../components/dashboard/AssetSummary';
 import AssetsList from '../components/dashboard/AssetsList';
 import DashboardFAQ from '../components/dashboard/DashboardFAQ';
+import BorrowingSection from '../components/dashboard/BorrowingSection';
 import { Wallet, Coins, ChartBar, Shield } from 'lucide-react';
 
 const Dashboard = () => {
@@ -58,16 +59,8 @@ const Dashboard = () => {
             <AssetsList />
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm col-span-2">
-              <h2 className="font-bold text-lg mb-4">Recent Activity</h2>
-              <p className="text-gray-500 text-sm">You have no recent activity.</p>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-              <h2 className="font-bold text-lg mb-4">Market Updates</h2>
-              <p className="text-gray-500 text-sm">Stay tuned for market updates.</p>
-            </div>
+          <div className="mb-8">
+            <BorrowingSection />
           </div>
 
           <div className="mb-8">
