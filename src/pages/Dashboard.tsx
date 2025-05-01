@@ -7,7 +7,7 @@ import AssetSummary from '../components/dashboard/AssetSummary';
 import AssetsList from '../components/dashboard/AssetsList';
 import DashboardFAQ from '../components/dashboard/DashboardFAQ';
 import BorrowingSection from '../components/dashboard/BorrowingSection';
-import { Wallet, Coins, ChartBar, Shield } from 'lucide-react';
+import { Wallet, Coins, ChartBar, Shield, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Dashboard = () => {
@@ -61,8 +61,8 @@ const Dashboard = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Your Assets</h2>
               <Link to="/dashboard/assets">
-                <Button variant="outline" className="flex gap-2">
-                  Add Deposit
+                <Button variant="default" className="flex items-center gap-2">
+                  <Plus size={16} /> Deposit
                 </Button>
               </Link>
             </div>
