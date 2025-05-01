@@ -11,8 +11,13 @@ const BorrowingSection = () => {
           <CardTitle className="text-xl font-bold">Borrowing</CardTitle>
           <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
         </div>
-        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500">
-          <Shield className="text-white" size={18} />
+        <div className="flex items-center gap-4">
+          <Button className="flex items-center gap-2">
+            Start Borrowing <ArrowUpRight size={16} />
+          </Button>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500">
+            <Shield className="text-white" size={18} />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -44,12 +49,6 @@ const BorrowingSection = () => {
 
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '36%' }}></div>
-            </div>
-
-            <div className="flex justify-center pt-4">
-              <Button className="w-full sm:w-auto flex items-center gap-2">
-                Start Borrowing <ArrowUpRight size={16} />
-              </Button>
             </div>
           </div>
         </div>
