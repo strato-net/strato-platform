@@ -72,7 +72,14 @@ export default function Navbar() {
               Transfer
             </Link>
 
-            <span className="text-white/60 cursor-not-allowed">Markets</span>
+            <Link
+              href="/markets"
+              className={`transition ${
+                isActiveParentRoute(['/markets']) ? 'text-cyan-300 underline' : 'text-white/90 hover:text-cyan-300'
+              }`}
+            >
+              Markets
+            </Link>
           </div>
         </div>
         {/* Right Side */}
