@@ -30,6 +30,8 @@ const SupplyBorrowDashboard = () => {
     fetchWithdrawables();
   }, []);
 
+  const activeLoans = loans.filter((loan) => loan.active);
+
   return (
     <div className="w-full bg-[#f3f4f6] px-6 py-10">
       <div className="max-w-screen-2xl mx-auto w-full space-y-8">
@@ -38,7 +40,7 @@ const SupplyBorrowDashboard = () => {
           {/* Supplies */}
           <div className="bg-white rounded-2xl shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Your supplies
+              Your deposits
             </h2>
             {withdrawables.length === 0 ? (
               <p className="text-gray-500">Nothing supplied yet</p>
@@ -70,10 +72,10 @@ const SupplyBorrowDashboard = () => {
           <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-900">
-                Your borrows
+                Your loans
               </h2>
             </div>
-            {loans.length === 0 ? (
+            {activeLoans.length === 0 ? (
               <p className="text-gray-500">Nothing borrowed yet</p>
             ) : (
               <div className="overflow-x-auto">
@@ -87,7 +89,7 @@ const SupplyBorrowDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="text-gray-700">
-                    {loans.map((loan, idx) => (
+                    {activeLoans.map((loan, idx) => (
                       <tr key={idx} className="border-b">
                         <td className="py-3">{loan.assetName || loan.asset}</td>
                         <td>{ethers.formatEther(loan.amount)}</td>
