@@ -23,20 +23,10 @@ const BorrowingSection = () => {
       <CardContent>
         <div className="py-4">
           <div className="space-y-6">
-            {/* Risk level bar with improved spacing and reduced width */}
+            {/* Bar graph now appears first */}
             <div className="mb-2">
-              <div className="flex justify-between items-center mb-3">
-                <div className="flex items-center">
-                  <span className="text-gray-600 mr-2">Risk Level:</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-600">
-                    Moderate
-                  </span>
-                </div>
-                <span className="font-semibold">{riskPercentage}%</span>
-              </div>
-              
-              {/* Reduced width to 80% and centered with mx-auto */}
-              <div className="w-4/5 mx-auto bg-gray-200 rounded-full h-2 relative">
+              {/* Reduced width bar graph that now appears above risk level text */}
+              <div className="w-4/5 mx-auto bg-gray-200 rounded-full h-2 relative mb-3">
                 <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
                 
                 {/* Portfolio Value indicator with improved positioning */}
@@ -50,6 +40,17 @@ const BorrowingSection = () => {
                   <div className="h-4 w-0.5 bg-red-500"></div>
                   <div className="mt-1 text-xs text-red-600 whitespace-nowrap">Liquidation</div>
                 </div>
+              </div>
+              
+              {/* Risk level text now appears below the bar graph */}
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center">
+                  <span className="text-gray-600 mr-2">Risk Level:</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-600">
+                    Moderate
+                  </span>
+                </div>
+                <span className="font-semibold">{riskPercentage}%</span>
               </div>
             </div>
             
