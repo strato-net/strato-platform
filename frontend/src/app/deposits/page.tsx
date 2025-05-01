@@ -523,9 +523,9 @@ const DepositsPanel: FC = () => {
     const [showColleteralTokenSelector, setShowColleteralTokenSelector] =
       useState(false);
     const [selectedWithdrawToken, setSelectedWithdrawToken] =
-      useState<ExtendedTokenData | null>(null);
+      useState<any | null>(null);
     const [selectedColleteralToken, setSelectedColleteralToken] =
-      useState<ExtendedTokenData | null>(null);
+      useState<any | null>(null);
     const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
     const [withdrawAmount, setWithdrawAmount] = useState<string>("");
     const [collateralAmount, setCollateralAmount] = useState<string>("");
@@ -536,6 +536,28 @@ const DepositsPanel: FC = () => {
     const [borrowLoading, setBorrowLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
     const [tokens, setTokens] = useState<TokenData[]>([]);
+    const [minCollateral, setMinCollateral] = useState<string>("0");
+
+    useEffect(() => {
+      if (!selectedWithdrawToken || !selectedColleteralToken || !withdrawAmount) {
+        setMinCollateral("0");
+        return;
+      }
+      try {
+        // parse borrow amount to wei
+        const amountWei = ethers.parseUnits(withdrawAmount, 18);
+        // extract prices and ratio
+        const assetPrice = BigInt(selectedWithdrawToken.price);
+        const collateralPrice = BigInt(selectedColleteralToken.price);
+        const ratio = BigInt(Number(selectedColleteralToken.collateralRatio));
+        // calculate min collateral: (amountWei * assetPrice * ratio) / (collateralPrice * 100)
+        const minWei = (amountWei * assetPrice * ratio) / (collateralPrice * BigInt(100));
+        setMinCollateral(ethers.formatUnits(minWei, 18));
+        setCollateralAmount(ethers.formatUnits(minWei, 18));
+      } catch {
+        setMinCollateral("0");
+      }
+    }, [withdrawAmount, selectedWithdrawToken, selectedColleteralToken]);
 
     const handleWithdrawAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
@@ -597,14 +619,8 @@ const DepositsPanel: FC = () => {
       selectedWithdrawToken &&
       selectedColleteralToken &&
       parseFloat(withdrawAmount) > 0 &&
-      parseFloat(collateralAmount) > 0;
+      parseFloat(collateralAmount) >= parseFloat(minCollateral);
 
-    useEffect(() => {
-      if (tokens && tokens.length > 0) {
-        setSelectedWithdrawToken(tokens[0]);
-        setSelectedColleteralToken(tokens[0]);
-      }
-    }, [tokens]);
     useEffect(() => {
       const fetchTokenList = async () => {
         try {
@@ -724,7 +740,7 @@ const DepositsPanel: FC = () => {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
-              Interest Rate
+              Interest on Loan
             </label>
             <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
               <span className="text-lg text-gray-800">{selectedWithdrawToken?.interestRate ?? 0}%</span>
@@ -733,10 +749,10 @@ const DepositsPanel: FC = () => {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
-              Collateralization Ratio
+              Collateralization
             </label>
             <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
-              <span className="text-lg text-gray-800">{selectedWithdrawToken?.collateralRatio ?? 0}%</span>
+              <span className="text-lg text-gray-800">{selectedColleteralToken?.collateralRatio ?? 0}%</span>
             </div>
           </div>
 
@@ -760,6 +776,15 @@ const DepositsPanel: FC = () => {
                 </h3>
               </div>
             </div>
+            <p className="mt-2 text-sm text-gray-500">
+              Minimum collateral: {minCollateral} {selectedColleteralToken?._symbol || selectedColleteralToken?.address} 
+              (calculated as (borrow amount × price × collateral ratio) ÷ collateral price)
+            </p>
+            {collateralAmount && parseFloat(collateralAmount) < parseFloat(minCollateral) && (
+              <p className="mt-1 text-sm text-red-500">
+                Collateral must be at least {minCollateral} {selectedColleteralToken?._symbol}
+              </p>
+            )}
           </div>
 
           <div className="mb-2">
