@@ -4,7 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getInputPrice } from "../helpers/swapping.helper";
 import { approveAsset } from "../helpers/tokens.helper";
-import {getPools as getLendingPool} from "./lending.service";
+import { getPools as getLendingPool } from "./lending.service";
 
 const Pool = "ERC20";
 const PoolFactory = "PoolFactory";
@@ -125,6 +125,81 @@ export const getPools = async (
     }
 
     const poolData = cirrusResponse.data;
+
+    // Fetch metadata for all unique token addresses in pools, defaulting missing to empty string
+    const tokenAddresses = Array.from(
+      new Set(
+        poolData.flatMap((pool) =>
+          pool.data ? [pool.data.tokenA ?? "", pool.data.tokenB ?? ""] : []
+        )
+      )
+    ).filter((addr) => addr);
+
+    const tokenMetaResponse = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-ERC20`,
+      {
+        params: {
+          address: `in.(${tokenAddresses.join(",")})`,
+          select: "address,_name,_symbol",
+        },
+      }
+    );
+
+    if (
+      tokenMetaResponse.status !== 200 ||
+      !Array.isArray(tokenMetaResponse.data)
+    ) {
+      throw new Error("Error fetching token metadata from Cirrus");
+    }
+
+    const tokenMetaMap = tokenMetaResponse.data.reduce((map, token) => {
+      map[token.address] = {
+        name: token._name ?? "",
+        symbol: token._symbol ?? "",
+      };
+      return map;
+    }, {} as Record<string, { name: string; symbol: string }>);
+
+    // Attach name and symbol to each pool object
+    poolData.forEach((pool) => {
+      if (!pool.data) return;
+      const tokenA = pool.data.tokenA ?? "";
+      const tokenB = pool.data.tokenB ?? "";
+      const metaA = tokenMetaMap[tokenA] || { name: "", symbol: "" };
+      const metaB = tokenMetaMap[tokenB] || { name: "", symbol: "" };
+      pool.data.tokenAName = metaA.name;
+      pool.data.tokenASymbol = metaA.symbol;
+      pool.data.tokenBName = metaB.name;
+      pool.data.tokenBSymbol = metaB.symbol;
+    });
+
+    // Fetch lending pool info to get oracle address
+    const lendingInfo = await getLendingPool(accessToken);
+    const oracleAddress = lendingInfo.oracle;
+
+    // Fetch latest prices from oracle contract
+    const priceResponse = await bloc.get(
+      accessToken,
+      StratoPaths.state.replace(":contractAddress", oracleAddress)
+    );
+    if (
+      priceResponse.status !== 200 ||
+      !priceResponse.data ||
+      !priceResponse.data?.prices
+    ) {
+      throw new Error("Error fetching prices from PriceOracle");
+    }
+    const pricesMap: Record<string, string> = priceResponse.data.prices;
+
+    // Attach price to each pool object
+    poolData.forEach((pool) => {
+      if (!pool.data) return;
+      const tokenA = pool.data.tokenA ?? "";
+      const tokenB = pool.data.tokenB ?? "";
+      pool.data.tokenAPrice = pricesMap[tokenA] || "0";
+      pool.data.tokenBPrice = pricesMap[tokenB] || "0";
+    });
 
     return poolData;
   } catch (error) {

@@ -21,8 +21,6 @@ export interface TokenMetadata {
   pool?: string;
   usdst?: string;
   token?: string;
-  tokenBBalance?: string;
-  tokenABalance?: string;
   imageURL?: string;
   isActive?: string;
   locked?: string;
@@ -85,7 +83,7 @@ export interface LoanEntry {
   active?: boolean;
   loanId?: string;
   _symbol: string;
-};
+}
 
 export interface EnrichedLoan extends LoanEntry {
   _symbol: string;
@@ -93,5 +91,5 @@ export interface EnrichedLoan extends LoanEntry {
   balanceHuman: string;
 }
 
-export type Tabkey = "swap" | "liquidity"
-export type TabKey2 = "deposits" | "withdraw"
+export type Tabkey = "swap" | "liquidity";
+export type TabKey2 = "deposit" | "withdraw";

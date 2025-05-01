@@ -8,7 +8,7 @@ import {
   removeLiquidity,
   swap,
   calculateSwap,
-  getPoolsWithDetails
+  getPoolsWithDetails,
 } from "../services/swapping.service";
 import { getBalance, getTokens } from "../services/tokens.service";
 
@@ -70,7 +70,7 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken,address } = req;
+      const { accessToken, address } = req;
 
       const userTokens = await getBalance(accessToken, {
         key: "eq." + address,
