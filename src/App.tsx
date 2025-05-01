@@ -10,6 +10,7 @@ import Register from "./pages/Register";
 import WalletCreated from "./pages/WalletCreated";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
+import SwapAsset from "./pages/SwapAsset";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/wallet-created" element={<WalletCreated />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard/swap" element={<SwapAsset />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
