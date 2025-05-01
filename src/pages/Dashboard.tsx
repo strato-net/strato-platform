@@ -1,14 +1,12 @@
 
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import AssetSummary from '../components/dashboard/AssetSummary';
 import AssetsList from '../components/dashboard/AssetsList';
 import DashboardFAQ from '../components/dashboard/DashboardFAQ';
 import BorrowingSection from '../components/dashboard/BorrowingSection';
-import { Wallet, Coins, ChartBar, Shield, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Wallet, Coins, ChartBar, Shield } from 'lucide-react';
 
 const Dashboard = () => {
   useEffect(() => {
@@ -58,14 +56,6 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Your Assets</h2>
-              <Link to="/dashboard/assets">
-                <Button variant="default" className="flex items-center gap-2">
-                  <Plus size={16} /> Add Deposits
-                </Button>
-              </Link>
-            </div>
             <AssetsList />
           </div>
           
