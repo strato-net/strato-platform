@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FC, useCallback, useEffect, useState } from "react";
+import React, { FC, useCallback, useEffect, useState, useMemo } from "react";
 import { Card, notification, Spin, Tabs, TabsProps } from "antd";
 import { Select } from "antd";
 import { motion } from "framer-motion";
@@ -16,13 +16,35 @@ type TabKey = "deposits" | "borrow";
 type TabKey2 = "borrow" | "repay";
 type TabKey3 = "deposit" | "withdraw";
 
+// Extend TokenData interface
+interface ExtendedTokenData extends TokenData {
+  collateralRatio?: string;
+  interestRate?: string;
+}
+
 const DepositsPanel: FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("deposits");
   const [activeTab2, setActiveTab2] = useState<TabKey2>("borrow");
   const [activeTab3, setActiveTab3] = useState<TabKey3>("deposit");
   const { tokens } = useTokens();
 
-  const [tokenList, setTokenList] = useState<TokenData[]>([]);
+  const [tokenList, setTokenList] = useState<ExtendedTokenData[]>([]);
+  const [lendingData, setLendingData] = useState<any>(null);
+
+  const fetchLendingData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/lend/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch lending data');
+      }
+      const data = await response.json();
+      setLendingData(data);
+    } catch (error) {
+      console.error('Error fetching lending data:', error);
+    }
+  }, []);
+
+  console.log(lendingData);
 
   useEffect(() => {
     const fetchTokenList = async () => {
@@ -50,6 +72,28 @@ const DepositsPanel: FC = () => {
       fetchTokenList();
     }
   }, [tokens]);
+
+  useEffect(() => {
+    fetchLendingData();
+  }, [fetchLendingData]);
+
+  // Format tokens with lending data
+  const formattedTokens = useMemo(() => {
+    if (!tokens || !lendingData) return tokens;
+    
+    return tokens.map((token: TokenData): ExtendedTokenData => {
+      const collateralRatio = token.address && lendingData?.assetCollateralRatio ? 
+        lendingData.assetCollateralRatio[token.address] || '0' : '0';
+      const interestRate = token.address && lendingData?.assetInterestRate ? 
+        lendingData.assetInterestRate[token.address] || '0' : '0';
+      
+      return {
+        ...token,
+        collateralRatio,
+        interestRate
+      };
+    });
+  }, [tokens, lendingData]);
 
   const RenderDeposits: React.FC<RenderProps> = () => {
     const tabItems: TabsProps["items"] = [
@@ -450,7 +494,7 @@ const DepositsPanel: FC = () => {
   };
 
   interface RenderProps {
-    tokens: TokenData[] | null;
+    tokens: ExtendedTokenData[] | null;
   }
 
   const RenderBorrow: React.FC<RenderProps> = ({ tokens }) => {
@@ -459,12 +503,12 @@ const DepositsPanel: FC = () => {
     const [showColleteralTokenSelector, setShowColleteralTokenSelector] =
       useState(false);
     const [selectedWithdrawToken, setSelectedWithdrawToken] =
-      useState<TokenData | null>(null);
+      useState<ExtendedTokenData | null>(null);
     const [selectedColleteralToken, setSelectedColleteralToken] =
-      useState<TokenData | null>(null);
+      useState<ExtendedTokenData | null>(null);
     const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
     const [withdrawAmount, setWithdrawAmount] = useState<string>("");
-    const [colleteralAmount, setColleteralAmount] = useState<string>("");
+    const [collateralAmount, setCollateralAmount] = useState<string>("");
     const [tokenSearchQueryWithdraw, setTokenSearchQueryWithdraw] =
       useState("");
     const [tokenSearchQueryColleteral, setTokenSearchQueryColleteral] =
@@ -472,22 +516,21 @@ const DepositsPanel: FC = () => {
     const [borrowLoading, setBorrowLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
 
-    const COLLATERALIZATION_RATIO = 1.5; // 150%
-    const INTEREST_RATE = 0.05; // 5%
-
-    const calculateCollateralAmount = (amount: string) => {
-      if (!amount || isNaN(parseFloat(amount))) return "";
-      const collateral = parseFloat(amount) * COLLATERALIZATION_RATIO;
-      return collateral.toFixed(2);
-    };
-
     const handleWithdrawAmountChange = (
       e: React.ChangeEvent<HTMLInputElement>
     ) => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setWithdrawAmount(value);
-        setColleteralAmount(calculateCollateralAmount(value));
+      }
+    };
+
+    const handleCollateralAmountChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+      const value = e.target.value;
+      if (/^\d*\.?\d*$/.test(value)) {
+        setCollateralAmount(value);
       }
     };
 
@@ -497,7 +540,7 @@ const DepositsPanel: FC = () => {
         // Use ethers.js to parse amounts to wei
         const amountInWei = ethers.parseUnits(withdrawAmount, 18).toString();
         const collateralInWei = ethers
-          .parseUnits(colleteralAmount, 18)
+          .parseUnits(collateralAmount, 18)
           .toString();
         const response = await axios.post("api/lend/getLoan", {
           asset: selectedWithdrawToken?.address,
@@ -533,7 +576,7 @@ const DepositsPanel: FC = () => {
       selectedWithdrawToken &&
       selectedColleteralToken &&
       parseFloat(withdrawAmount) > 0 &&
-      parseFloat(colleteralAmount) > 0;
+      parseFloat(collateralAmount) > 0;
 
     useEffect(() => {
       if (tokens && tokens.length > 0) {
@@ -544,10 +587,10 @@ const DepositsPanel: FC = () => {
 
     const handleTokenSelect = (token: TokenData) => {
       if (selectingToken === 1) {
-        setSelectedWithdrawToken(token);
+        setSelectedWithdrawToken(token as ExtendedTokenData);
         setShowWithdrawTokenSelector(false);
       } else if (selectingToken === 2) {
-        setSelectedColleteralToken(token);
+        setSelectedColleteralToken(token as ExtendedTokenData);
         setShowColleteralTokenSelector(false);
       }
       setSelectingToken(null);
@@ -644,14 +687,12 @@ const DepositsPanel: FC = () => {
             </button>
           </div>
 
-      
-
           <div className="mb-6">
             <label className="block text-sm font-medium text-blue-700 mb-1">
               Interest Rate
             </label>
             <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
-              <span className="text-lg text-gray-800">{INTEREST_RATE * 100}%</span>
+              <span className="text-lg text-gray-800">{selectedWithdrawToken?.interestRate ?? 0}%</span>
             </div>
           </div>
 
@@ -660,7 +701,7 @@ const DepositsPanel: FC = () => {
               Collateralization Ratio
             </label>
             <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
-              <span className="text-lg text-gray-800">{COLLATERALIZATION_RATIO * 100}%</span>
+              <span className="text-lg text-gray-800">{selectedWithdrawToken?.collateralRatio ?? 0}%</span>
             </div>
           </div>
 
@@ -668,11 +709,16 @@ const DepositsPanel: FC = () => {
             <label className="block text-sm font-medium text-blue-700 mb-1">
               Collateral Amount
             </label>
-
-            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
-              <span className="text-lg text-gray-800">
-                {colleteralAmount || "0.00"}
-              </span>
+            <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-white">
+              <input
+                value={collateralAmount}
+                onChange={handleCollateralAmountChange}
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
+                placeholder="0.00"
+                className="flex-1 text-lg focus:outline-none text-gray-800 placeholder-gray-400 bg-transparent"
+              />
               <div className="flex items-center gap-2 ml-3">
                 <h3 className="text-base font-semibold text-gray-700">
                   {selectedColleteralToken?._symbol ?? "ETH"}
@@ -935,7 +981,7 @@ const DepositsPanel: FC = () => {
           {activeTab === "deposits" ? (
             <RenderDeposits tokens={tokenList} />
           ) : (
-            <RenderBorrowRepay tokens={tokens} />
+            <RenderBorrowRepay tokens={formattedTokens} />
           )}
         </div>
         <div className="h-auto mx-8 p-[4px] bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] rounded-xl flex justify-center">
@@ -949,3 +995,4 @@ const DepositsPanel: FC = () => {
 };
 
 export default DepositsPanel;
+
