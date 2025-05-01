@@ -1205,7 +1205,7 @@ const SwapPanel: FC = () => {
         console.log("Withdraw response:", response.data);
         api["success"]({
           message: "Success",
-          description: `Succesfully withdrawed ${selectedWithdrawPool?._name}`,
+          description: `Succesfully withdrew ${selectedWithdrawPool?._name}`,
         });
         setWithdrawLoading(false);
       } catch (err) {
