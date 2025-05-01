@@ -29,7 +29,7 @@ const Onboarding = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const isMobile = useMediaQuery("(max-width: 640px)");
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     document.title = "Onboarding | STRATO Mercata";
