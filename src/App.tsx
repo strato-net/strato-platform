@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
+import Borrow from "./pages/Borrow";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/dashboard/swap" element={<SwapAsset />} />
           <Route path="/dashboard/assets" element={<Assets />} />
           <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
+          <Route path="/dashboard/borrow" element={<Borrow />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
