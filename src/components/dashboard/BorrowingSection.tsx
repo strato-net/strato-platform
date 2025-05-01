@@ -23,7 +23,7 @@ const BorrowingSection = () => {
       <CardContent>
         <div className="py-4">
           <div className="space-y-6">
-            {/* Risk level bar with improved spacing */}
+            {/* Risk level bar with improved spacing and reduced width */}
             <div className="mb-2">
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center">
@@ -35,7 +35,8 @@ const BorrowingSection = () => {
                 <span className="font-semibold">{riskPercentage}%</span>
               </div>
               
-              <div className="w-full bg-gray-200 rounded-full h-2 relative">
+              {/* Reduced width to 80% and centered with mx-auto */}
+              <div className="w-4/5 mx-auto bg-gray-200 rounded-full h-2 relative">
                 <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
                 
                 {/* Portfolio Value indicator with improved positioning */}
