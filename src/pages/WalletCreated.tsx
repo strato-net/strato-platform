@@ -57,7 +57,7 @@ const WalletCreated = () => {
     if (!copiedKeys.privateKey) {
       setConfirmDialogOpen(true);
     } else {
-      navigate('/dashboard');
+      navigate('/onboarding', { state: { walletData } });
     }
   };
 
@@ -146,7 +146,7 @@ const WalletCreated = () => {
                 className="w-full bg-strato-blue hover:bg-strato-blue/90 text-white"
                 onClick={handleContinue}
               >
-                Continue to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                Start Onboarding <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardFooter>
           </Card>
@@ -169,7 +169,7 @@ const WalletCreated = () => {
               variant="destructive" 
               onClick={() => {
                 setConfirmDialogOpen(false);
-                navigate('/dashboard');
+                navigate('/onboarding', { state: { walletData } });
               }}
             >
               Continue Anyway
