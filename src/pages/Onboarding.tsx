@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import ClaimGift from '../components/onboarding/ClaimGift';
 import BuyGoldST from '../components/onboarding/BuyGoldST';
 import BorrowUSDST from '../components/onboarding/BorrowUSDST';
+import ShareTheWealth from '../components/onboarding/ShareTheWealth';
 import OnboardingComplete from '../components/onboarding/OnboardingComplete';
 import OnboardingProgress from '../components/onboarding/OnboardingProgress';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +15,8 @@ const STEPS = {
   CLAIM_GIFT: 0,
   BUY_GOLDST: 1,
   BORROW_USDST: 2,
-  COMPLETE: 3
+  SHARE_WEALTH: 3,
+  COMPLETE: 4
 };
 
 const Onboarding = () => {
@@ -77,6 +79,24 @@ const Onboarding = () => {
       title: "Borrow successful!",
       description: "You've borrowed $1 USDST against your GOLDST"
     });
+    setCurrentStep(STEPS.SHARE_WEALTH);
+  };
+  
+  const handleShareWealth = (emailsSent: number) => {
+    // Add CATA rewards for referrals (0.05 per email)
+    const referralBonus = emailsSent * 0.05;
+    setAssets(prev => ({
+      ...prev,
+      cata: prev.cata + referralBonus
+    }));
+    
+    if (emailsSent > 0) {
+      toast({
+        title: "Referrals sent!",
+        description: `You earned ${referralBonus.toFixed(2)} CATA from your referrals.`
+      });
+    }
+    
     setCurrentStep(STEPS.COMPLETE);
   };
   
@@ -98,6 +118,8 @@ const Onboarding = () => {
         return <BuyGoldST onBuy={handleBuyGoldST} assets={assets} isMobile={isMobile} />;
       case STEPS.BORROW_USDST:
         return <BorrowUSDST onBorrow={handleBorrowUSDST} assets={assets} isMobile={isMobile} />;
+      case STEPS.SHARE_WEALTH:
+        return <ShareTheWealth onShare={handleShareWealth} assets={assets} isMobile={isMobile} />;
       case STEPS.COMPLETE:
         return <OnboardingComplete onComplete={handleComplete} assets={assets} isMobile={isMobile} />;
       default:
@@ -109,7 +131,7 @@ const Onboarding = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="container mx-auto px-4 py-8 flex-1 flex flex-col">
         <div className="mb-6">
-          <OnboardingProgress currentStep={currentStep} totalSteps={3} />
+          <OnboardingProgress currentStep={currentStep} totalSteps={4} />
         </div>
         
         <div className="flex-1 flex items-center justify-center">
