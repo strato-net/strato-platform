@@ -35,6 +35,8 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.SQL
+import Data.Aeson
+import qualified Data.Aeson.KeyMap as KM
 import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -176,7 +178,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
     Just _ -> pure []
   -- let storage = translateStorageMap storage'
 
-  ret <- case (storage', mName) of
+  case (storage', mName) of
     (StorageAddress {kind = SolidVM} : _, Nothing) -> do
       $logInfoS "getContractsState/SolidVM" $
         Text.unlines
@@ -184,19 +186,12 @@ getContractsState _ address chainId mName mCount mOffset _ = do
             Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (kind s, key s, value s)) $ storage',
             "End of storage"
           ]
-      return $ decodeSolidVMValues $ map (key &&& value) storage'
+      return $ decodeSolidVMValuesToJSON $ map (key &&& value) storage'
     (StorageAddress {kind = SolidVM} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
-    ([], Nothing) -> return []
+    ([], Nothing) -> return $ Object KM.empty
     _ ->
       error $ "EVM contract state indexing no longer supported"
-  $logDebugS "getContractsState/storage" $
-    Text.unlines
-      [ "Storage:",
-        Text.pack $ unlines $ map (\s -> ("  " ++) $ show (kind s, key s, value s)) $ storage',
-        "End of storage"
-      ]
-  return $ Map.fromList ret
 
 -- where
 --   getStorageRange :: (MonadIO m, MonadLogger m) =>

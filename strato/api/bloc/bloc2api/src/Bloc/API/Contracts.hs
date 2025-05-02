@@ -187,7 +187,7 @@ instance ToParam (QueryFlag "length") where
   toParam _ =
     DocQueryParam "length" ["0", "1", ""] "flag for resolving a transaction result" Flag
 
-type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
+type GetContractsStateResponses = Value -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
@@ -286,6 +286,11 @@ instance ToSchema FunctionName where
       & mapped . name ?~ "Function Name"
       & mapped . schema . example ?~ toJSON (FunctionName "fireMissiles")
 
+instance ToSchema Value where
+  declareNamedSchema _ =
+    return $
+      NamedSchema (Just "JSON Value") mempty
+
 --------------------------------------------------------------------------------
 
 -- GET /contracts/:contractName/:contractAddress/symbols
@@ -377,7 +382,7 @@ instance {-# OVERLAPPING #-} ToSchema GetContractsStateMappingResponse where
           & example ?~ toJSON ex
     where
       ex :: GetContractsStateResponses
-      ex = Map.fromList [("willRain", SolidityBool False)]
+      ex = toJSON $ Map.fromList [("willRain" :: String, SolidityBool False)]
 
 --------------------------------------------------------------------------------
 -- GET /contracts/:contractName/all/states/
