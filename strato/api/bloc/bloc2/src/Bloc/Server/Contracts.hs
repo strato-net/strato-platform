@@ -19,11 +19,7 @@ import Bloc.XabiHelper
 import BlockApps.Logging
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.Parse.Parser (parseXabi)
-import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi hiding (Func, Public, External)
-import BlockApps.Solidity.Xabi.Type (indexedTypeType)
-import BlockApps.Solidity.XabiContract
-import BlockApps.SolidityVarReader
 import BlockApps.Storage as S
 import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
@@ -36,11 +32,9 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Control.Arrow ((&&&), (***))
-import Control.Monad ((<=<))
+import Control.Arrow ((&&&))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.SQL
-import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -53,7 +47,6 @@ import Handlers.Storage
 import qualified MaybeNamed
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
-import SolidVM.Model.CodeCollection.Function
 import UnliftIO
 
 hexStorageToWord256 :: HexStorage -> Word256
@@ -154,10 +147,9 @@ translateStorageMap storage' =
    in storage
 
 getContractsState ::
-  ( MonadLogger m,
-    A.Selectable Address AddressState m,
-    HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasSQL m
   ) =>
   ContractName ->
@@ -169,7 +161,8 @@ getContractsState ::
   Bool ->
   m GetContractsStateResponses -- state-translation
 getContractsState _ address chainId mName mCount mOffset _ = do
-  contract' <- getContractsDetails' address chainId
+  $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
+  -- contract' <- getContractsDetails' address chainId
 
   storage' <- case mName of
     Nothing ->
@@ -183,16 +176,6 @@ getContractsState _ address chainId mName mCount mOffset _ = do
     Just _ -> pure []
   -- let storage = translateStorageMap storage'
 
-  let contractFuncs Contract {..} = catMaybes . map (traverse getFunction) $ Map.toList _functions
-      convertType = (either (const Nothing) Just . xabiTypeToType . indexedTypeType) <=< indexedTypeToEvmIndexedType
-      getFunction Func {..} =
-        if isNothing _funcVisibility || _funcVisibility == Just Public || _funcVisibility == Just External
-          then
-            let args = catMaybes $ sequence . (maybe "" Text.pack *** convertType) <$> _funcArgs
-                ret = catMaybes $ sequence . (fmap Text.pack *** convertType) <$> _funcVals
-             in Just . valueToSolidityValue $ ValueFunction "dead" args ret
-          else Nothing
-
   ret <- case (storage', mName) of
     (StorageAddress {kind = SolidVM} : _, Nothing) -> do
       $logInfoS "getContractsState/SolidVM" $
@@ -201,12 +184,10 @@ getContractsState _ address chainId mName mCount mOffset _ = do
             Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (kind s, key s, value s)) $ storage',
             "End of storage"
           ]
-      return $
-        (first Text.pack <$> contractFuncs contract')
-          ++ (decodeSolidVMValues $ map (key &&& value) storage')
+      return $ decodeSolidVMValues $ map (key &&& value) storage'
     (StorageAddress {kind = SolidVM} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
-    ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
+    ([], Nothing) -> return []
     _ ->
       error $ "EVM contract state indexing no longer supported"
   $logDebugS "getContractsState/storage" $
@@ -228,10 +209,9 @@ getContractsState _ address chainId mName mCount mOffset _ = do
 --                          }
 
 postContractsBatchStates ::
-  ( MonadLogger m,
-    A.Selectable Address AddressState m,
-    HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasSQL m
   ) =>
   [PostContractsBatchStatesRequest] ->
