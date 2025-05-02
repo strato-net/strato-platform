@@ -182,8 +182,8 @@ const HeaderComponent = ({
           onClick: () =>
             navigate(
               `${routes.MarketplaceUserProfile.url.replace(
-                ':commonName',
-                user.commonName
+                ':address',
+                user.address
               )}`
             ),
         },
@@ -191,7 +191,7 @@ const HeaderComponent = ({
           key: '2',
           label: (
             <div>
-              <p>{user == null ? '' : user.commonName}</p>
+		<p>{user ? `${user.preferred_username} (0x${user.address})` : ''}</p>
             </div>
           ),
         },
