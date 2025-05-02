@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { ethers } from "ethers";
 
-const SupplyBorrowDashboard = () => {
+export interface DashboardHandle {
+  refresh: () => void;
+}
+
+const SupplyBorrowDashboard = forwardRef<DashboardHandle>((props, ref) => {
   const [loans, setLoans] = useState<any[]>([]);
   const [withdrawables, setWithdrawables] = useState<any[]>([]);
   const fetchLoans = async () => {
@@ -29,6 +33,13 @@ const SupplyBorrowDashboard = () => {
     fetchLoans();
     fetchWithdrawables();
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    refresh: async () => {
+      fetchLoans();
+      fetchWithdrawables();
+    },
+  }));
 
   const activeLoans = loans.filter((loan) => loan.active);
 
@@ -110,7 +121,7 @@ const SupplyBorrowDashboard = () => {
         {/* Assets Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Assets to Supply */}
-          <div className="bg-white rounded-2xl shadow p-6">
+          {/* <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-900">
                 Assets to supply
@@ -181,7 +192,8 @@ const SupplyBorrowDashboard = () => {
                           <span className="bg-orange-100 text-orange-500 px-2 py-0.5 rounded text-xs">
                             Isolated
                           </span>
-                        )}3
+                        )}
+                        3
                       </td>
                       <td>
                         <button className="bg-gray-800 text-white px-3 py-1 rounded">
@@ -193,10 +205,10 @@ const SupplyBorrowDashboard = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div> */}
 
           {/* Assets to Borrow */}
-          <div className="bg-white rounded-2xl shadow p-6">
+          {/* <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-900">
                 Assets to borrow
@@ -254,11 +266,11 @@ const SupplyBorrowDashboard = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
   );
-};
+});
 
 export default SupplyBorrowDashboard;

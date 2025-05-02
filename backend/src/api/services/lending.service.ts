@@ -211,14 +211,18 @@ export const getDepositableTokens = async (
   if (!pool) {
     throw new Error("Lending pool data is empty");
   }
-  const { assetCollateralRatio = {}, oracle: oracleAddress } = pool;
+  const { assetCollateralRatio = {}, oracle: oracleAddress, liquidityPool: liquidityPoolAddress } = pool;
   const ratioTokens = Object.keys(assetCollateralRatio);
 
   // Concurrently fetch oracle data and user balances
-  const [oracleResponse, userTokens] = await Promise.all([
+  const [oracleResponse, liquidityPoolResponse, userTokens] = await Promise.all([
     bloc.get(
       accessToken,
       StratoPaths.state.replace(":contractAddress", oracleAddress)
+    ),
+    bloc.get(
+      accessToken,
+      StratoPaths.state.replace(":contractAddress", liquidityPoolAddress)
     ),
     getBalance(accessToken, { key: "eq." + address }),
   ]);
@@ -228,6 +232,11 @@ export const getDepositableTokens = async (
     throw new Error("Oracle data is empty");
   }
   const prices = oracle.prices || {};
+  const { data: liquidityPool } = liquidityPoolResponse;
+  if (!liquidityPool) {
+    throw new Error("Liquidity pool data is empty");
+  }
+  const { totalLiquidity } = liquidityPool;
 
   // Create a set for faster lookups
   const userAddressSet = new Set(userTokens.map((t: any) => t.address));
@@ -250,6 +259,7 @@ export const getDepositableTokens = async (
       collateralRatio,
       interestRate,
       price,
+      liquidity: totalLiquidity[token] || "0",
     };
   });
 };
@@ -319,7 +329,7 @@ export const getLoans = async (
   const loansMap = pool.loans || {};
   const userLoansMap = Object.fromEntries(
     Object.entries(loansMap).filter(
-      ([_, loan]: [string, any]) => loan.user === address
+      ([_, loan]: [string, any]) => loan.user === address && loan?.active
     )
   );
 
@@ -356,9 +366,7 @@ export const getLoans = async (
       const collateralMeta = metadataMap[loan.collateralAsset] || {};
       const lastUpdated = Number(loan.lastUpdated);
       const rawDuration = now > lastUpdated ? now - lastUpdated : 0;
-      // convert duration to minutes, minimum 1 minute
-      const baseMinutes = BigInt(Math.floor(rawDuration / 60) || 0);
-      const minutes = baseMinutes + BigInt(5);
+      const minutes = BigInt(rawDuration) + BigInt(5 * 60);
       const rate = Number(pool.assetInterestRate[loan.asset] || "0");
       const principal = BigInt(loan.amount);
       const interest = (principal * BigInt(rate) * minutes) / divisor;
