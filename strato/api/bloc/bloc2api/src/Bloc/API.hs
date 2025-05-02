@@ -35,6 +35,7 @@ type BlocAPI =
     :<|> GetContractsData
     :<|> GetContractsContract
     :<|> GetContractsState
+    :<|> GetContractsState2
     :<|> GetContractsDetails
     :<|> GetContractsFunctions
     :<|> GetContractsSymbols

@@ -48,6 +48,7 @@ bloc =
     :<|> getContractsData
     :<|> getContractsContract
     :<|> getContractsState
+    :<|> getContractsState2
     :<|> getContractsDetails
     :<|> getContractsFunctions
     :<|> getContractsSymbols

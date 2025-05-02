@@ -185,6 +185,50 @@ getContractsState _ address chainId mName mCount mOffset _ = do
             Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (kind s, key s, value s)) $ storage',
             "End of storage"
           ]
+      return . Map.fromList $ decodeSolidVMValues $ map (key &&& value) storage'
+    (StorageAddress {kind = SolidVM} : _, Just name) ->
+      error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
+    ([], Nothing) -> return Map.empty
+    _ ->
+      error $ "EVM contract state indexing no longer supported"
+
+getContractsState2 ::
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  ContractName ->
+  Address ->
+  Maybe ChainId ->
+  Maybe Text ->
+  Maybe Integer ->
+  Maybe Integer ->
+  Bool ->
+  m GetContractsStateResponses2 -- state-translation
+getContractsState2 _ address chainId mName mCount mOffset _ = do
+  $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
+  -- contract' <- getContractsDetails' address chainId
+
+  storage' <- case mName of
+    Nothing ->
+      getStorage'
+        storageFilterParams
+          { qsAddress = Just address,
+            qsChainId = MaybeNamed.Unnamed <$> chainId,
+            qsOffset = fromInteger <$> mOffset,
+            qsLimit = fromInteger <$> mCount
+          }
+    Just _ -> pure []
+  -- let storage = translateStorageMap storage'
+
+  case (storage', mName) of
+    (StorageAddress {kind = SolidVM} : _, Nothing) -> do
+      $logInfoS "getContractsState/SolidVM" $
+        Text.unlines
+          [ "Storage:",
+            Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (kind s, key s, value s)) $ storage',
+            "End of storage"
+          ]
       return $ decodeSolidVMValuesToJSON $ map (key &&& value) storage'
     (StorageAddress {kind = SolidVM} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name

@@ -174,6 +174,18 @@ type GetContractsState =
     :> QueryFlag "length"
     :> Get '[JSON] GetContractsStateResponses -- change to HTML
 
+type GetContractsState2 =
+  "contracts"
+    :> Capture "contractName" ContractName
+    :> Capture "contractAddress" Address
+    :> "state2"
+    :> QueryParam "chainid" ChainId
+    :> QueryParam "name" Text
+    :> QueryParam "count" Integer
+    :> QueryParam "offset" Integer
+    :> QueryFlag "length"
+    :> Get '[JSON] GetContractsStateResponses2 -- change to HTML
+
 instance ToParam (QueryParam "name" Text) where
   toParam _ = DocQueryParam "name" [] "Names of contract variables" Normal
 
@@ -187,9 +199,13 @@ instance ToParam (QueryFlag "length") where
   toParam _ =
     DocQueryParam "length" ["0", "1", ""] "flag for resolving a transaction result" Flag
 
-type GetContractsStateResponses = Value -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
+type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
+
+type GetContractsStateResponses2 = Value -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
+
+instance ToSample GetContractsStateResponses2 where toSamples _ = noSamples
 
 data PostContractsBatchStatesRequest = PostContractsBatchStatesRequest
   { postcontractsbatchstatesrequestContractName :: ContractName,
@@ -382,7 +398,7 @@ instance {-# OVERLAPPING #-} ToSchema GetContractsStateMappingResponse where
           & example ?~ toJSON ex
     where
       ex :: GetContractsStateResponses
-      ex = toJSON $ Map.fromList [("willRain" :: String, SolidityBool False)]
+      ex = Map.fromList [("willRain", SolidityBool False)]
 
 --------------------------------------------------------------------------------
 -- GET /contracts/:contractName/all/states/
