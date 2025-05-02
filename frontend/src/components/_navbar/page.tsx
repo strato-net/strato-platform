@@ -129,7 +129,7 @@ export default function Navbar() {
             <button
               disabled={loading || faucetLoading || !faucets || faucets.length === 0}
               onClick={() => handleGetTokens()}
-              className="bg-white/10 text-cyan-200 px-4 py-1.5 rounded-full text-sm font-semibold"
+              className="bg-white/10 hover:bg-white/20 text-cyan-200 px-4 py-1.5 rounded-full text-sm font-semibold cursor-pointer"
               title="Get Tokens"
             >
               Get Tokens {faucetLoading && <Spin />}
@@ -139,7 +139,7 @@ export default function Navbar() {
           <div className="relative" ref={popoverRef}>
             <button
               onClick={() => setShowPopover(!showPopover)}
-              className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition"
+              className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition cursor-pointer"
               title="User Menu"
             >
               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
