@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -151,8 +152,7 @@ translateStorageMap storage' =
 getContractsState ::
   ( MonadIO m,
     MonadLogger m,
-    A.Selectable StorageFilterParams [StorageAddress] m,
-    HasSQL m
+    A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   ContractName ->
   Address ->
@@ -204,9 +204,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
 --                          }
 
 postContractsBatchStates ::
-  ( MonadIO m,
-    MonadLogger m,
-    A.Selectable StorageFilterParams [StorageAddress] m,
+  ( MonadLogger m,
     HasSQL m
   ) =>
   [PostContractsBatchStatesRequest] ->
