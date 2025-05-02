@@ -996,6 +996,7 @@ const DepositsPanel: FC = () => {
           description: `Successfully Repaid ${amount} ${loan?._symbol}`,
         });
         dashboardRef.current?.refresh();
+        setLoan(null);
       } catch (error) {
         api["error"]({
           message: "Error",

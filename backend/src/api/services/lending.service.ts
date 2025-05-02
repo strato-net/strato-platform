@@ -329,7 +329,7 @@ export const getLoans = async (
   const loansMap = pool.loans || {};
   const userLoansMap = Object.fromEntries(
     Object.entries(loansMap).filter(
-      ([_, loan]: [string, any]) => loan.user === address
+      ([_, loan]: [string, any]) => loan.user === address && loan?.active
     )
   );
 
@@ -366,9 +366,7 @@ export const getLoans = async (
       const collateralMeta = metadataMap[loan.collateralAsset] || {};
       const lastUpdated = Number(loan.lastUpdated);
       const rawDuration = now > lastUpdated ? now - lastUpdated : 0;
-      // convert duration to minutes, minimum 1 minute
-      const baseMinutes = BigInt(Math.floor(rawDuration / 60) || 0);
-      const minutes = baseMinutes + BigInt(5);
+      const minutes = BigInt(rawDuration) + BigInt(5 * 60);
       const rate = Number(pool.assetInterestRate[loan.asset] || "0");
       const principal = BigInt(loan.amount);
       const interest = (principal * BigInt(rate) * minutes) / divisor;
