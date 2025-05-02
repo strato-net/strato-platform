@@ -5,7 +5,8 @@
 {-# LANGUAGE TupleSections #-}
 
 module BlockApps.SolidVMStorageDecoder
-  ( decodeSolidVMValues,
+  ( decodeSolidVMValuesToJSON,
+    decodeSolidVMValues,
     decodeCacheValues,
     decodeCacheValuesForCollections,
     replayDeltas, -- Testing only
@@ -20,11 +21,15 @@ import BlockApps.Solidity.Value as V
 import Blockchain.SolidVM.Model
 import Control.DeepSeq
 import Control.Monad.Extra
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Key as K
+import qualified Data.Aeson.KeyMap as KM
 import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
+import Data.Foldable (foldrM)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
@@ -35,6 +40,40 @@ import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 import Text.Printf
+
+bsToJSON :: B.ByteString -> Either String T.Text
+bsToJSON bs = do
+  fieldText <- either (Left . show) pure $ decodeUtf8' bs
+  maybe (Left "empty field") (pure . snd) $ T.uncons fieldText
+
+decodeSolidVMValuesToJSON :: [(HexStorage, HexStorage)] -> A.Value
+decodeSolidVMValuesToJSON = either (error . printf "decodeSolidVMValues: %s" . show) id . foldrM (\(k, v) obj -> do
+  (StoragePath path, value) <- bimapM hexStorageToPath (fmap A.toJSON . hexStorageToBasic) (k, v)
+  let foldPath :: [StoragePathPiece] -> A.Value -> Either String A.Value
+      foldPath (Field bs : rest) (A.Object o) = do
+        fieldName <- bsToJSON bs
+        val' <- case KM.lookup (K.fromText fieldName) o of
+          Just o'' -> foldPath rest o''
+          _ -> foldPath rest (A.Object KM.empty)
+        pure . A.Object $ KM.insert (K.fromText fieldName) val' o
+      foldPath (MapIndex it : rest) (A.Object o) = do
+        fieldName <- case it of
+          INum i -> pure . T.pack $ show i
+          IText bs -> bsToJSON bs
+          IBool b -> pure . T.pack $ show b
+          IAccount na -> pure . T.pack $ show na
+        val' <- case KM.lookup (K.fromText fieldName) o of
+          Just o'' -> foldPath rest o''
+          _ -> foldPath rest (A.Object KM.empty)
+        pure . A.Object $ KM.insert (K.fromText fieldName) val' o
+      foldPath (ArrayIndex i : rest) (A.Object o) = do
+        fieldName <- pure . T.pack $ show i
+        val' <- case KM.lookup (K.fromText fieldName) o of
+          Just o'' -> foldPath rest o''
+          _ -> foldPath rest (A.Object KM.empty)
+        pure . A.Object $ KM.insert (K.fromText fieldName) val' o
+      foldPath _ _ = pure value
+  foldPath path obj) (A.Object KM.empty)
 
 decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]
 decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do

@@ -44,7 +44,6 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Core.API
-import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
@@ -272,10 +271,5 @@ addPathsTo404 baseApp req respond' =
 
 instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a) where
   toSwagger _ = toSwagger (Proxy :: Proxy a)
-
-instance ToSchema Value where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "JSON Value") mempty
 
 -----------
