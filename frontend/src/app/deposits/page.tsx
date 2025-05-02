@@ -1,11 +1,18 @@
 "use client";
 
-import React, { FC, useCallback, useEffect, useState, useMemo } from "react";
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+} from "react";
 import { Card, notification, Spin, Tabs, TabsProps } from "antd";
 import { Select } from "antd";
 import { motion } from "framer-motion";
 import TokenDropdown from "@/components/_dropdown/page";
-import SupplyBorrowDashboard from "../_supplyTables/page";
+import SupplyBorrowDashboard, { DashboardHandle } from "../_supplyTables/page";
 import TokenIcon from "../icons/TokenIcon";
 import { EnrichedLoan, LoanEntry, TokenData } from "@/interface/token";
 import { useTokens } from "@/context/TokenContext";
@@ -23,6 +30,7 @@ interface ExtendedTokenData extends TokenData {
 }
 
 const DepositsPanel: FC = () => {
+  const dashboardRef = useRef<DashboardHandle>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("deposits");
   const [activeTab2, setActiveTab2] = useState<TabKey2>("borrow");
   const [activeTab3, setActiveTab3] = useState<TabKey3>("deposit");
@@ -33,14 +41,14 @@ const DepositsPanel: FC = () => {
 
   const fetchLendingData = useCallback(async () => {
     try {
-      const response = await fetch('/api/lend/');
+      const response = await fetch("/api/lend/");
       if (!response.ok) {
-        throw new Error('Failed to fetch lending data');
+        throw new Error("Failed to fetch lending data");
       }
       const data = await response.json();
       setLendingData(data);
     } catch (error) {
-      console.error('Error fetching lending data:', error);
+      console.error("Error fetching lending data:", error);
     }
   }, []);
 
@@ -60,8 +68,8 @@ const DepositsPanel: FC = () => {
         );
         const filteredTokens = tokens
           ? tokens.filter((token) =>
-            responseAddresses.has(token?.address?.toLowerCase())
-          )
+              responseAddresses.has(token?.address?.toLowerCase())
+            )
           : [];
         setTokenList(filteredTokens);
       } catch (err) {
@@ -80,17 +88,21 @@ const DepositsPanel: FC = () => {
   // Format tokens with lending data
   const formattedTokens = useMemo(() => {
     if (!tokens || !lendingData) return tokens;
-    
+
     return tokens.map((token: TokenData): ExtendedTokenData => {
-      const collateralRatio = token.address && lendingData?.assetCollateralRatio ? 
-        lendingData.assetCollateralRatio[token.address] || '0' : '0';
-      const interestRate = token.address && lendingData?.assetInterestRate ? 
-        lendingData.assetInterestRate[token.address] || '0' : '0';
-      
+      const collateralRatio =
+        token.address && lendingData?.assetCollateralRatio
+          ? lendingData.assetCollateralRatio[token.address] || "0"
+          : "0";
+      const interestRate =
+        token.address && lendingData?.assetInterestRate
+          ? lendingData.assetInterestRate[token.address] || "0"
+          : "0";
+
       return {
         ...token,
         collateralRatio,
-        interestRate
+        interestRate,
       };
     });
   }, [tokens, lendingData]);
@@ -183,6 +195,7 @@ const DepositsPanel: FC = () => {
           message: "Success",
           description: `Successfully deposited ${depositAmount} ${selectedDepositToken?._symbol}`,
         });
+        dashboardRef.current?.refresh();
       } catch (err) {
         console.log(err);
         setDepositLoading(false);
@@ -271,10 +284,11 @@ const DepositsPanel: FC = () => {
           </div>
           <div className="mt-10 w-1/2 mx-auto">
             <button
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && depositAmount
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
+                selectedDepositToken && depositAmount
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
               disabled={!selectedDepositToken || depositLoading}
               onClick={handleDeposit}
             >
@@ -351,6 +365,7 @@ const DepositsPanel: FC = () => {
           message: "Success",
           description: `Successfully withdrew ${withdrawAmount} ${selectedDepositToken?._symbol}`,
         });
+        dashboardRef.current?.refresh();
       } catch (err) {
         console.error(err);
         setWithdrawLoading(false);
@@ -440,10 +455,11 @@ const DepositsPanel: FC = () => {
 
           <div className="mt-10 w-1/2 mx-auto">
             <button
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${selectedDepositToken && withdrawAmount
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
+                selectedDepositToken && withdrawAmount
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
               disabled={!selectedDepositToken || withdrawLoading}
               onClick={handleWithdraw}
             >
@@ -522,10 +538,12 @@ const DepositsPanel: FC = () => {
       useState(false);
     const [showColleteralTokenSelector, setShowColleteralTokenSelector] =
       useState(false);
-    const [selectedWithdrawToken, setSelectedWithdrawToken] =
-      useState<any | null>(null);
-    const [selectedColleteralToken, setSelectedColleteralToken] =
-      useState<any | null>(null);
+    const [selectedWithdrawToken, setSelectedWithdrawToken] = useState<
+      any | null
+    >(null);
+    const [selectedColleteralToken, setSelectedColleteralToken] = useState<
+      any | null
+    >(null);
     const [selectingToken, setSelectingToken] = useState<1 | 2 | null>(null);
     const [withdrawAmount, setWithdrawAmount] = useState<string>("");
     const [collateralAmount, setCollateralAmount] = useState<string>("");
@@ -534,12 +552,17 @@ const DepositsPanel: FC = () => {
     const [tokenSearchQueryColleteral, setTokenSearchQueryColleteral] =
       useState("");
     const [borrowLoading, setBorrowLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string>("");
     const [api, contextHolder] = notification.useNotification();
     const [tokens, setTokens] = useState<TokenData[]>([]);
     const [minCollateral, setMinCollateral] = useState<string>("0");
 
     useEffect(() => {
-      if (!selectedWithdrawToken || !selectedColleteralToken || !withdrawAmount) {
+      if (
+        !selectedWithdrawToken ||
+        !selectedColleteralToken ||
+        !withdrawAmount
+      ) {
         setMinCollateral("0");
         return;
       }
@@ -551,7 +574,8 @@ const DepositsPanel: FC = () => {
         const collateralPrice = BigInt(selectedColleteralToken.price);
         const ratio = BigInt(Number(selectedColleteralToken.collateralRatio));
         // calculate min collateral: (amountWei * assetPrice * ratio) / (collateralPrice * 100)
-        const minWei = (amountWei * assetPrice * ratio) / (collateralPrice * BigInt(100));
+        const minWei =
+          (amountWei * assetPrice * ratio) / (collateralPrice * BigInt(100));
         setMinCollateral(ethers.formatUnits(minWei, 18));
         setCollateralAmount(ethers.formatUnits(minWei, 18));
       } catch {
@@ -565,6 +589,15 @@ const DepositsPanel: FC = () => {
       const value = e.target.value;
       if (/^\d*\.?\d*$/.test(value)) {
         setWithdrawAmount(value);
+        if (
+          selectedWithdrawToken &&
+          parseFloat(value) >
+            parseFloat(ethers.formatUnits(selectedWithdrawToken.liquidity, 18))
+        ) {
+          setErrorMessage("Amount exceeds maximum borrowable amount.");
+        } else {
+          setErrorMessage("");
+        }
       }
     };
 
@@ -597,6 +630,7 @@ const DepositsPanel: FC = () => {
           message: "Success",
           description: `Successfully Borrowed ${withdrawAmount} ${selectedWithdrawToken?._symbol}`,
         });
+        dashboardRef.current?.refresh();
       } catch (error) {
         setBorrowLoading(false);
         console.error("Error borrowing loan:", error);
@@ -619,7 +653,11 @@ const DepositsPanel: FC = () => {
       selectedWithdrawToken &&
       selectedColleteralToken &&
       parseFloat(withdrawAmount) > 0 &&
-      parseFloat(collateralAmount) >= parseFloat(minCollateral);
+      parseFloat(withdrawAmount) <=
+        parseFloat(ethers.formatUnits(selectedWithdrawToken.liquidity, 18)) &&
+      parseFloat(collateralAmount) >= parseFloat(minCollateral) &&
+      parseFloat(collateralAmount) <=
+        parseFloat(ethers.formatUnits(selectedColleteralToken.value, 18));
 
     useEffect(() => {
       const fetchTokenList = async () => {
@@ -705,6 +743,20 @@ const DepositsPanel: FC = () => {
               </div>
             </div>
           </div>
+          {selectedWithdrawToken && (
+            <p className="mt-2 text-sm text-gray-500">
+              {parseFloat(
+                ethers.formatUnits(selectedWithdrawToken.liquidity, 18)
+              ).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedWithdrawToken._symbol} available in pool
+            </p>
+          )}
+          {errorMessage && (
+            <p className="mt-1 text-sm text-red-500">{errorMessage}</p>
+          )}
 
           <div className="mb-6 flex flex-col gap-2">
             <label className="block text-sm font-medium text-blue-700 mb-1">
@@ -743,7 +795,9 @@ const DepositsPanel: FC = () => {
               Interest on Loan
             </label>
             <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
-              <span className="text-lg text-gray-800">{selectedWithdrawToken?.interestRate ?? 0}%</span>
+              <span className="text-lg text-gray-800">
+                {selectedWithdrawToken?.interestRate ?? 0}%
+              </span>
             </div>
           </div>
 
@@ -752,7 +806,9 @@ const DepositsPanel: FC = () => {
               Collateralization
             </label>
             <div className="flex items-center border border-blue-200 rounded-xl px-4 py-3 bg-gray-50">
-              <span className="text-lg text-gray-800">{selectedColleteralToken?.collateralRatio ?? 0}%</span>
+              <span className="text-lg text-gray-800">
+                {selectedColleteralToken?.collateralRatio ?? 0}%
+              </span>
             </div>
           </div>
 
@@ -777,14 +833,47 @@ const DepositsPanel: FC = () => {
               </div>
             </div>
             <p className="mt-2 text-sm text-gray-500">
-              Minimum collateral: {minCollateral} {selectedColleteralToken?._symbol || selectedColleteralToken?.address} 
-              (calculated as (borrow amount × price × collateral ratio) ÷ collateral price)
+              Minimum collateral: {minCollateral}{" "}
+              {selectedColleteralToken?._symbol ||
+                selectedColleteralToken?.address}
+              (calculated as (borrow amount × price × collateral ratio) ÷
+              collateral price)
             </p>
-            {collateralAmount && parseFloat(collateralAmount) < parseFloat(minCollateral) && (
-              <p className="mt-1 text-sm text-red-500">
-                Collateral must be at least {minCollateral} {selectedColleteralToken?._symbol}
-              </p>
-            )}
+            {collateralAmount &&
+              parseFloat(collateralAmount) < parseFloat(minCollateral) && (
+                <p className="mt-1 text-sm text-red-500">
+                  Collateral must be at least {minCollateral}{" "}
+                  {selectedColleteralToken?._symbol}
+                </p>
+              )}
+            <p className="mt-2 text-sm text-gray-500">
+              Available user balance:{" "}
+              {parseFloat(
+                ethers.formatUnits(selectedColleteralToken?.value || 0, 18)
+              ).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedColleteralToken?._symbol || "NA"}
+            </p>
+
+            {/* If they type more than they have, show an error */}
+            {collateralAmount &&
+              parseFloat(collateralAmount) >
+                parseFloat(
+                  ethers.formatUnits(selectedColleteralToken?.value || 0, 18)
+                ) && (
+                <p className="mt-1 text-sm text-red-500">
+                  Collateral cannot exceed{" "}
+                  {parseFloat(
+                    ethers.formatUnits(selectedColleteralToken?.value || 0, 18)
+                  ).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  {selectedColleteralToken?._symbol || "NA"}
+                </p>
+              )}
           </div>
 
           <div className="mb-2">
@@ -792,10 +881,11 @@ const DepositsPanel: FC = () => {
               type="button"
               onClick={handleBorrow}
               disabled={!isWithdrawFormValid || borrowLoading}
-              className={`flex justify-center gap-3 w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 ${isWithdrawFormValid && !borrowLoading
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 ${
+                isWithdrawFormValid && !borrowLoading
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
             >
               {borrowLoading && <Spin />}
               {borrowLoading ? "Borrowing..." : "Borrow"}
@@ -905,6 +995,7 @@ const DepositsPanel: FC = () => {
           message: "Success",
           description: `Successfully Repaid ${amount} ${loan?._symbol}`,
         });
+        dashboardRef.current?.refresh();
       } catch (error) {
         api["error"]({
           message: "Error",
@@ -966,10 +1057,12 @@ const DepositsPanel: FC = () => {
             {loan && (
               <div className="mt-2 p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800 mb-1">
-                  <span className="font-medium">Principal:</span> {ethers.formatUnits(loan.amount, 18)} {loan._symbol}
+                  <span className="font-medium">Principal:</span>{" "}
+                  {ethers.formatUnits(loan.amount, 18)} {loan._symbol}
                 </p>
                 <p className="text-sm text-blue-800 mb-1">
-                  <span className="font-medium">Interest:</span> {ethers.formatUnits(loan.interest, 18)} {loan._symbol}
+                  <span className="font-medium">Interest:</span>{" "}
+                  {ethers.formatUnits(loan.interest, 18)} {loan._symbol}
                 </p>
                 <p className="text-sm font-medium text-blue-900">
                   Total outstanding: {loan.balanceHuman} {loan._symbol}
@@ -1003,10 +1096,11 @@ const DepositsPanel: FC = () => {
             <button
               onClick={handleRepay}
               disabled={!isFormValid || repayLoading}
-              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${isFormValid && !repayLoading
-                ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
-                : "cursor-not-allowed bg-gray-300"
-                }`}
+              className={`flex justify-center gap-3 w-full px-6 py-4 font-semibold rounded-xl transition ${
+                isFormValid && !repayLoading
+                  ? "cursor-pointer bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white"
+                  : "cursor-not-allowed bg-gray-300"
+              }`}
             >
               {repayLoading && <Spin />}
               {repayLoading ? "Repaying..." : "Repay"}
@@ -1071,7 +1165,7 @@ const DepositsPanel: FC = () => {
         </div>
         <div className="h-auto mx-8 p-[4px] bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] rounded-xl flex justify-center">
           <div className="h-full w-full m-4 bg-white rounded-xl flex justify-between items-center">
-            <SupplyBorrowDashboard />
+            <SupplyBorrowDashboard ref={dashboardRef} />
           </div>
         </div>
       </Card>
@@ -1080,4 +1174,3 @@ const DepositsPanel: FC = () => {
 };
 
 export default DepositsPanel;
-

@@ -211,14 +211,18 @@ export const getDepositableTokens = async (
   if (!pool) {
     throw new Error("Lending pool data is empty");
   }
-  const { assetCollateralRatio = {}, oracle: oracleAddress } = pool;
+  const { assetCollateralRatio = {}, oracle: oracleAddress, liquidityPool: liquidityPoolAddress } = pool;
   const ratioTokens = Object.keys(assetCollateralRatio);
 
   // Concurrently fetch oracle data and user balances
-  const [oracleResponse, userTokens] = await Promise.all([
+  const [oracleResponse, liquidityPoolResponse, userTokens] = await Promise.all([
     bloc.get(
       accessToken,
       StratoPaths.state.replace(":contractAddress", oracleAddress)
+    ),
+    bloc.get(
+      accessToken,
+      StratoPaths.state.replace(":contractAddress", liquidityPoolAddress)
     ),
     getBalance(accessToken, { key: "eq." + address }),
   ]);
@@ -228,6 +232,11 @@ export const getDepositableTokens = async (
     throw new Error("Oracle data is empty");
   }
   const prices = oracle.prices || {};
+  const { data: liquidityPool } = liquidityPoolResponse;
+  if (!liquidityPool) {
+    throw new Error("Liquidity pool data is empty");
+  }
+  const { totalLiquidity } = liquidityPool;
 
   // Create a set for faster lookups
   const userAddressSet = new Set(userTokens.map((t: any) => t.address));
@@ -250,6 +259,7 @@ export const getDepositableTokens = async (
       collateralRatio,
       interestRate,
       price,
+      liquidity: totalLiquidity[token] || "0",
     };
   });
 };
