@@ -55,12 +55,20 @@ const App = () => {
   }
 
   useEffect(() => {
+    // Set the cookie expiration time to 7 days (10080 minutes)
+    const SLIDING_EXPIRATION_MINUTES = 10080; // 7 days
+
     const urlParams = new URLSearchParams(window.location.search);
     const refValue = urlParams.get('ref');
-
-    if (refValue && !getCookie('mercata_referrer_address')) {
-      // Set the cookie for 7 days (10080 minutes)
-      setCookie('mercata_referrer_address', refValue, 10080);
+    
+    if (refValue) {
+      const existingRef = getCookie('mercata_referrer_address');
+    
+      if (existingRef === refValue) {
+        setCookie('mercata_referrer_address', refValue, SLIDING_EXPIRATION_MINUTES);
+      } else if (!existingRef) {
+        setCookie('mercata_referrer_address', refValue, SLIDING_EXPIRATION_MINUTES);
+      }
     }
   }, []);
 
