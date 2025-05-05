@@ -2,12 +2,12 @@ import { notification, Spin } from "antd";
 import TokenDropdown from "../_dropdown/page";
 import TokenIcon from "@/app/icons/TokenIcon";
 import axios from "axios";
-import { TokenData } from "@/interface/token";
+import { RefetchPoolProps, TokenData } from "@/interface/token";
 import { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { BigNumber } from "bignumber.js"
 
- export const RenderSwap = () => {
+ export const RenderSwap = ({ refetchPools }: RefetchPoolProps) => {
     const [tokenSearchQuerySell, setTokenSearchQuerySell] = useState("");
     const [tokenSearchQueryBuy, setTokenSearchQueryBuy] = useState("");
     const [showTokenSelectorSell, setShowTokenSelectorSell] = useState(false);
@@ -34,6 +34,8 @@ import { BigNumber } from "bignumber.js"
     const [balanceLoading, setBalanceLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
     const { userAddress } = useUser();
+    const [wrongAmount, setWrongAmount] = useState(false)
+
 
     useEffect(() => {
       const fetchTokens = async () => {
@@ -148,8 +150,11 @@ import { BigNumber } from "bignumber.js"
 
           if (isSellInput) {
             if (parsedValue.gt(maxSell)) {
-              return;
+              setWrongAmount(true)
+            } else {
+              setWrongAmount(false)
             }
+
             if (pool.data.tokenA === selectedSellToken.address) {
               setSellAmount(value);
               setBuyAmount(
@@ -216,17 +221,18 @@ import { BigNumber } from "bignumber.js"
         const response = await axios.post("/api/swap/swap", {
           address: pool.address,
           method: method,
-          amount: new BigNumber(sellAmount).multipliedBy(10 ** 18).toFixed(0),
+          amount: new BigNumber(sellAmount).multipliedBy(10 ** 18),
           min_tokens: new BigNumber(buyAmount).multipliedBy(10 ** 18)
-            .multipliedBy(0.99).toFixed(0),
+            .multipliedBy(0.99),
         });
         console.log("Swap response:", response.data);
         setSwapLoading(false);
         api["success"]({
           message: "Success",
           description:
-            `Swapping Done Successfully from ${selectedSellToken?._name} to ${selectedBuyToken?._name}`,
+            `Swapping successful from ${selectedSellToken?._name} to ${selectedBuyToken?._name}`,
         });
+        await refetchPools()
       } catch (error) {
         console.error("Swap error:", error);
         setSwapLoading(false);
@@ -251,7 +257,7 @@ import { BigNumber } from "bignumber.js"
       parseFloat(sellAmount) > 0 && parseFloat(buyAmount) > 0;
 
     return (
-      <div className="min-h-screen bg-gray-50 px-6 py-8">
+      <div className="min-h-auto bg-gray-50 px-6 py-8">
         <div className="max-w-3xl mx-auto">
           <header className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-semibold text-gray-800">Swap</h1>
@@ -272,7 +278,7 @@ import { BigNumber } from "bignumber.js"
                       placeholder="0"
                       value={sellAmount}
                       onChange={(e) => handleInputChange(true, e.target.value)}
-                      className="no-spinner w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300"
+                      className={`no-spinner w-full text-3xl font-bold border-none outline-none placeholder-gray-300 ${wrongAmount ? "text-red-500" : "text-gray-900"}`}
                       disabled={!selectedSellToken}
                     />
                   </div>
@@ -319,6 +325,7 @@ import { BigNumber } from "bignumber.js"
                   </div>
                 </div>
               </div>
+                {wrongAmount && <span className="text-red-500">Entered amount is greater than your current balance.</span>}
               <div className="flex justify-between items-center pt-2 text-sm text-gray-500">
                 <span>{sellAmount ? sellAmount : 0}</span>
                 <div className="flex items-center gap-2">
@@ -332,9 +339,9 @@ import { BigNumber } from "bignumber.js"
                   <button
                     disabled={balanceLoading || selectedToken1Amount == 0}
                     onClick={handleMaxClick}
-                    className={`bg-gray-200 rounded-xl px-2 py-1 border border-gray-200 ${balanceLoading || selectedToken1Amount == 0
-                      ? "cursor-not-allowed opacity-50"
-                      : "cursor-pointer opacity-100"
+                    className={`rounded-xl px-2 py-1 ${balanceLoading || selectedToken1Amount == 0
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                      : "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 cursor-pointer"
                       }`}
                   >
                     Max
@@ -469,11 +476,11 @@ import { BigNumber } from "bignumber.js"
           <div className="flex flex-col pt-4 pb-4">
             <button
               onClick={handleSwapAction}
-              className={`rounded-xl py-4 text-lg font-medium flex justify-center gap-4 ${isSwapValid
+              className={`rounded-xl py-4 text-lg font-medium flex justify-center gap-4 ${isSwapValid && !wrongAmount
                 ? "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 cursor-pointer"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 } ${swapLoading ? "cursor-not-allowed" : ""}`}
-              disabled={!isSwapValid || swapLoading}
+              disabled={!isSwapValid || swapLoading || wrongAmount}
             >
               {swapLoading && <Spin />}
               Swap

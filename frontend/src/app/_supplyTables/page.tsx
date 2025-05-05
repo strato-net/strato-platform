@@ -1,13 +1,14 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { ethers } from "ethers";
+import { EnrichedLoan, LoanEntry } from "@/interface/token";
 
 export interface DashboardHandle {
   refresh: () => void;
 }
 
 const SupplyBorrowDashboard = forwardRef<DashboardHandle>((props, ref) => {
-  const [loans, setLoans] = useState<any[]>([]);
-  const [withdrawables, setWithdrawables] = useState<any[]>([]);
+  const [loans, setLoans] = useState<LoanEntry[]>([]);
+  const [withdrawables, setWithdrawables] = useState<EnrichedLoan[]>([]);
   const fetchLoans = async () => {
     try {
       const res = await fetch("/api/loans");
@@ -70,7 +71,7 @@ const SupplyBorrowDashboard = forwardRef<DashboardHandle>((props, ref) => {
                         <td className="py-3">
                           {token._symbol || token.address}
                         </td>
-                        <td>{ethers.formatEther(token.value)}</td>
+                        <td>{token.value && ethers.formatEther(token.value)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -103,12 +104,12 @@ const SupplyBorrowDashboard = forwardRef<DashboardHandle>((props, ref) => {
                     {activeLoans.map((loan, idx) => (
                       <tr key={idx} className="border-b">
                         <td className="py-3">{loan.assetName || loan.asset}</td>
-                        <td>{ethers.formatEther(loan.amount)}</td>
+                        <td>{ethers.formatEther(loan?.amount || 0)}</td>
                         <td>
                           {loan.collateralName || loan.collateralAsset}{" "}
-                          {ethers.formatEther(loan.collateralAmount)}
+                          {ethers.formatEther(loan?.collateralAmount || 0)}
                         </td>
-                        <td>{ethers.formatEther(loan.interest)}</td>
+                        <td>{ethers.formatEther(loan?.interest || 0)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -272,5 +273,7 @@ const SupplyBorrowDashboard = forwardRef<DashboardHandle>((props, ref) => {
     </div>
   );
 });
+
+SupplyBorrowDashboard.displayName = "SupplyBorrowDashboard"; // 👈 Add this line
 
 export default SupplyBorrowDashboard;

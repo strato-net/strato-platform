@@ -1,3 +1,5 @@
+import { RefObject } from "react";
+
 export interface TokenData {
   address?: string;
   block_hash?: string;
@@ -13,6 +15,10 @@ export interface TokenData {
   _symbol?: string;
   _totalSupply?: number;
   value?: string;
+  price?: string;
+  liquidity?: string;
+  interestRate?: string;
+  collateralRatio?: string;
   "BlockApps-Mercata-ERC20-_balances"?: TokenBalance[];
 }
 
@@ -55,6 +61,10 @@ export interface TokenMetadata {
   createCustomerAddressRoute?: string;
   tokenABalance?: string;
   tokenBBalance?: string;
+  tokenASymbol?: string;
+  tokenBSymbol?: string;
+  tokenAPrice?: string;
+  tokenBPrice?: string;
 }
 
 export interface TokenBalance {
@@ -74,23 +84,28 @@ export interface TokenBalance {
 }
 
 export interface LoanEntry {
-  amount: string;
-  asset: string;
-  collateralAmount: string;
-  collateralAsset: string;
-  lastUpdated: string;
-  user: string;
+  amount?: string;
+  asset?: string;
+  collateralAmount?: string;
+  collateralAsset?: string;
+  lastUpdated?: string;
+  user?: string;
   active?: boolean;
   loanId?: string;
-  _symbol: string;
-  balanceHuman: string;
-  interest: string;
+  _symbol?: string;
+  balanceHuman?: string;
+  interest?: string;
+  assetName?: string;
+  collateralName?: string;
+  assetSymbol?: string;
 }
 
 export interface EnrichedLoan extends LoanEntry {
   _symbol: string;
-  _name: string;
+  _name: string | undefined;
   balanceHuman: string;
+  address?: string;
+  value?: string;
 }
 
 export type Tabkey = "swap" | "liquidity";
@@ -98,4 +113,15 @@ export type TabKey2 = "deposit" | "withdraw";
 
 export interface FaucetData {
   address?: string;
+}
+export interface RefetchPoolProps {
+  refetchPools: () => Promise<void>;
+}
+
+export interface DashboardHandle {
+  refresh: () => void;
+}
+
+export interface ChildComponentProps {
+  dashboardRef: RefObject<DashboardHandle | null>;
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { FC, useEffect, useState } from "react";
-import { Card, Tabs, TabsProps } from "antd";
+import { Card, Spin, Tabs, TabsProps } from "antd";
 import { motion } from "framer-motion";
-import { Tabkey } from "@/interface/token";
+import { Tabkey, TokenData } from "@/interface/token";
 import { RenderSwap } from "@/components/swapComp/page";
 import { RenderLiquidity } from "@/components/liquidity/page";
 import axios from "axios";
@@ -12,22 +12,26 @@ import { ethers } from "ethers";
 const SwapPanel: FC = () => {
   const [activeTab, setActiveTab] = useState<Tabkey>("swap");
   const [showTable, setShowTable] = useState(true);
-  const [pools, setPools] = useState<any[]>([]);
-  const [lpPools, setLpPools] = useState<any[]>([]);
+  const [pools, setPools] = useState<TokenData[]>([]);
+  const [lpPools, setLpPools] = useState<TokenData[]>([]);
+  const [positionLoading, setPositionLoading] = useState(false)
+
+  const fetchPools = async () => {
+    try {
+      setPositionLoading(true)
+      const res = await axios.get("api/swap");
+      const lpres = await axios.get(`/api/lpToken/`);
+      setPools(res.data);
+      setLpPools(lpres.data);
+      setPositionLoading(false)
+    } catch (err) {
+      console.log(err);
+      setPositionLoading(false)
+    }
+  };
 
   // Get pools
   useEffect(() => {
-    const fetchPools = async () => {
-      try {
-        const res = await axios.get("api/swap");
-        const lpres = await axios.get(`/api/lpToken/`);
-        setPools(res.data);
-        setLpPools(lpres.data);
-      } catch (err) {
-        console.log(err);
-      }
-    };
-
     fetchPools();
   }, []);
 
@@ -64,7 +68,7 @@ const SwapPanel: FC = () => {
             </h1>
           </div>
         }
-        className="w-full rounded-2xl shadow-lg"
+        className="w-full h-full bg-red-200 rounded-2xl shadow-lg"
       >
         <Tabs
           items={tabItems}
@@ -74,10 +78,10 @@ const SwapPanel: FC = () => {
           className="custom-tabs-vibrant"
         />
         <div
-          className={`mt-4 mb-20 ${activeTab === "swap" ? "h-[440px]" : "h-auto"
+          className={`mt-4 mb-28 ${activeTab === "swap" ? "h-[440px]" : "h-auto"
             }`}
         >
-          {activeTab === "swap" ? <RenderSwap /> : <RenderLiquidity />}
+          {activeTab === "swap" ? <RenderSwap refetchPools={fetchPools} /> : <RenderLiquidity refetchPools={fetchPools} />}
         </div>
         <div className="px-2 mb-4 font-medium flex items-center justify-between">
           <span>My positions</span>
@@ -89,61 +93,67 @@ const SwapPanel: FC = () => {
           </button>
         </div>
         {showTable && (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-4">#</th>
-                  <th className="p-4">Pool</th>
-                  <th className="p-4">TVL</th>
-                  <th className="p-4">My Position</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pools.map((pool, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-t border-gray-200 hover:bg-gray-50"
-                  >
-                    <td className="p-4">{idx + 1}</td>
-                    <td className="p-4 font-medium">
-                      {pool.data.tokenASymbol}/{pool.data.tokenBSymbol}
-                    </td>
-                    <td className="p-4">
-                      ${(() => {
-                        const priceA = BigInt(pool.data.tokenAPrice);
-                        const balA = BigInt(pool.data.tokenABalance);
-                        const priceB = BigInt(pool.data.tokenBPrice);
-                        const balB = BigInt(pool.data.tokenBBalance);
-                        const ONE = BigInt(10) ** BigInt(18);
-                        const valueAW = (priceA * balA) / ONE;
-                        const valueBW = (priceB * balB) / ONE;
-                        const totalValueWei = valueAW + valueBW;
-                        return parseFloat(ethers.formatUnits(totalValueWei, 18)).toFixed(2);
-                      })()}
-                    </td>
-                    <td className="p-4">
-                      ${(() => {
-                        const priceA = BigInt(pool.data.tokenAPrice);
-                        const balA = BigInt(pool.data.tokenABalance);
-                        const priceB = BigInt(pool.data.tokenBPrice);
-                        const balB = BigInt(pool.data.tokenBBalance);
-                        const ONE = BigInt(10) ** BigInt(18);
-                        const valueAW = (priceA * balA) / ONE;
-                        const valueBW = (priceB * balB) / ONE;
-                        const totalValueWei = valueAW + valueBW;
-                        const lpEntry = lpPools.find(lp => lp.address === pool.address);
-                        const lpValue = lpEntry ? BigInt(lpEntry.value) : BigInt(0);
-                        const userShareWei =
-                          (totalValueWei * lpValue) / BigInt(pool._totalSupply);
-                        return parseFloat(ethers.formatUnits(userShareWei, 18)).toFixed(2);
-                      })()}
-                    </td>
+          positionLoading ?
+            <div className="h-40 w-full flex justify-between items-center">
+              <Spin className="w-full" />
+            </div>
+            :
+            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm mb-4">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-4">#</th>
+                    <th className="p-4">Pool</th>
+                    <th className="p-4">Overall TVL</th>
+                    <th className="p-4">My Position</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {pools.map((pool, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-t border-gray-200 hover:bg-gray-50"
+                    >
+                      <td className="p-4">{idx + 1}</td>
+                      <td className="p-4 font-medium">
+                        {pool?.data?.tokenASymbol || ""}/{pool?.data?.tokenBSymbol || ""}
+                      </td>
+                      <td className="p-4">
+                        ${(() => {
+                          const priceA = BigInt(pool?.data?.tokenAPrice || 0);
+                          const balA = BigInt(pool?.data?.tokenABalance || 0);
+                          const priceB = BigInt(pool?.data?.tokenBPrice || 0);
+                          const balB = BigInt(pool?.data?.tokenBBalance || 0);
+                          const ONE = BigInt(10) ** BigInt(18);
+                          const valueAW = (priceA * balA) / ONE;
+                          const valueBW = (priceB * balB) / ONE;
+                          const totalValueWei = valueAW + valueBW;
+                          return parseFloat(ethers.formatUnits(totalValueWei, 18)).toFixed(2);
+                        })()}
+                      </td>
+                      <td className="p-4">
+                        ${(() => {
+                          const priceA = BigInt(pool?.data?.tokenAPrice || 0);
+                          const balA = BigInt(pool?.data?.tokenABalance || 0);
+                          const priceB = BigInt(pool?.data?.tokenBPrice || 0);
+                          const balB = BigInt(pool?.data?.tokenBBalance || 0);
+                          const ONE = BigInt(10) ** BigInt(18);
+                          const valueAW = (priceA * balA) / ONE;
+                          const valueBW = (priceB * balB) / ONE;
+                          const totalValueWei = valueAW + valueBW;
+                          const lpEntry = lpPools.find(lp => lp.address === pool.address);
+                          const lpValue = lpEntry ? BigInt(lpEntry?.value || 0) : BigInt(0);
+                          const userShareWei =
+                            (totalValueWei * lpValue) / BigInt(pool?._totalSupply || 0);
+                          return parseFloat(ethers.formatUnits(userShareWei, 18)).toFixed(2);
+                        })()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
         )}
       </Card>
     </motion.div>

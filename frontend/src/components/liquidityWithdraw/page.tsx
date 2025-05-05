@@ -1,13 +1,13 @@
 import TokenIcon from "@/app/icons/TokenIcon";
 import { useTokens } from "@/context/TokenContext";
-import { TokenData } from "@/interface/token";
+import { RefetchPoolProps, TokenData } from "@/interface/token";
 import { notification, Spin } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import TokenDropdown from "../_dropdown/page";
 import { BigNumber } from "bignumber.js";
 
-export const RenderWithdraw = () => {
+export const RenderWithdraw = ({ refetchPools }: RefetchPoolProps) => {
   // Replace state declarations with new state for LP pools and withdraw info
   const [lpPools, setLpPools] = useState<TokenData[]>([]);
   const [showTokenSelectorWithdraw, setShowTokenSelectorWithdraw] =
@@ -33,8 +33,7 @@ export const RenderWithdraw = () => {
       const response = await axios.post("/api/swap/removeLiquidity", {
         address: selectedWithdrawPool.address,
         amount: new BigNumber(calculatedAmount)
-          .multipliedBy(10 ** 18)
-          .toFixed(0),
+          .multipliedBy(10 ** 18),
       });
       console.log("Withdraw response:", response.data);
       api["success"]({
@@ -42,6 +41,7 @@ export const RenderWithdraw = () => {
         description: `Successfully withdrew ${selectedWithdrawPool?._name}`,
       });
       setWithdrawLoading(false);
+      await refetchPools()
     } catch (err) {
       console.error("Withdraw error:", err);
       setWithdrawLoading(false);
@@ -148,7 +148,7 @@ export const RenderWithdraw = () => {
                         )
                       )
                       .dividedBy(1e18) // multiply by 10^18
-                      .toFixed(0)}
+                      .toString()}
                   </span>
                 </div>
               )}
@@ -168,7 +168,7 @@ export const RenderWithdraw = () => {
                         )
                       )
                       .dividedBy(1e18) // multiply by 10^18
-                      .toFixed(0)}
+                      .toString()}
                   </span>
                 </div>
               )}
@@ -191,7 +191,7 @@ export const RenderWithdraw = () => {
                         new BigNumber(100).minus(withdrawAmount).dividedBy(100)
                       )
                       .dividedBy(1e18)
-                      .toFixed(0)}
+                      .toString()}
                   </span>
                 </div>
               )}
@@ -213,8 +213,7 @@ export const RenderWithdraw = () => {
                       .multipliedBy(
                         new BigNumber(100).minus(withdrawAmount).dividedBy(100)
                       )
-                      .dividedBy(1e18)
-                      .toFixed(0)}
+                      .dividedBy(1e18).toString()}
                   </span>
                 </div>
               )}

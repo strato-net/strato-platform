@@ -3,8 +3,9 @@ import { useState } from "react";
 import { RenderDeposits } from "../liquidityDeposit/page";
 import { RenderWithdraw } from "../liquidityWithdraw/page";
 import { motion } from "framer-motion";
+import { RefetchPoolProps } from "@/interface/token";
 
-export const RenderLiquidity = () => {
+export const RenderLiquidity = ({ refetchPools }: RefetchPoolProps) => {
     type TabKey2 = "deposit" | "withdraw"
     const [activeTab2, setActiveTab2] = useState<TabKey2>("deposit");
     const tabItems: TabsProps["items"] = [
@@ -47,8 +48,8 @@ export const RenderLiquidity = () => {
               transition={{ duration: 0.2 }}
             >
               {activeTab2 === "deposit"
-                ? <RenderDeposits />
-                : <RenderWithdraw />}
+                ? <RenderDeposits refetchPools={refetchPools} />
+                : <RenderWithdraw refetchPools={refetchPools} />}
             </motion.div>
           </Card>
         </motion.div>

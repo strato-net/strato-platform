@@ -6,7 +6,7 @@ import { FaHandHoldingUsd } from 'react-icons/fa';
 import { IoMdSwap } from "react-icons/io";
 import { FaMoneyBillTransfer } from "react-icons/fa6";
 import { MdAttachMoney } from "react-icons/md";
-import Image from "next/image";
+import { CopyOutlined } from '@ant-design/icons';
 import { useTokens } from "@/context/TokenContext";
 import TokenIcon from "../icons/TokenIcon";
 import BigNumber from "bignumber.js";
@@ -57,15 +57,12 @@ type Token = {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const { tokens} = useTokens();
   const [isLoading, setIsLoading] = useState(true);
   const [userTokens, setUserTokens] = useState<Token[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   // const openTokenDetails = (token: Token) => setSelectedToken(token);
-  const closeModal = () => setSelectedToken(null);
-
   // Calculate pagination values
   const totalPages = Math.ceil(userTokens.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -202,11 +199,10 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-20"></div>
-                        <div className="h-3 bg-gray-200 rounded w-16"></div>
+                        <div className="h-4 bg-gray-200 rounded w-48"></div>
+                        <div className="h-4 bg-gray-200 rounded w-8"></div>
                       </div>
-                      <div className="h-4 bg-gray-200 rounded w-16"></div>
-                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
                     </div>
                   </div>
                 ))}
@@ -220,12 +216,6 @@ export default function Dashboard() {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Tokens Found</h3>
                 <p className="text-gray-500 text-center mb-4">{"You don't have any tokens in your portfolio yet."}</p>
-                <button
-                  onClick={() => router.push("/swap")}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                >
-                  Start Trading
-                </button>
               </div>
             ) : (
               <>
@@ -233,6 +223,7 @@ export default function Dashboard() {
                   <thead className="bg-gray-100 text-gray-600 text-sm">
                     <tr>
                       <th className="py-3 px-4">Token</th>
+                      <th className="py-3 px-4">Token Address</th>
                       <th className="py-3 px-4">Balance</th>
                       {/* <th className="py-3 px-4">Value</th> */}
                       {/* <th className="py-3 px-4">24h Change</th>
@@ -244,10 +235,36 @@ export default function Dashboard() {
                       <tr key={token.id} className="border-t border-gray-200">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <TokenIcon symbol={token.symbol} size="sm" />
+                            <TokenIcon symbol={token.symbol} size="md" />
                             <div>
                               <p className="font-medium">{token.name}</p>
                               <p className="text-sm text-gray-500">{token.symbol}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span>{token.address}</span>
+                            <div className="relative group">
+                              <CopyOutlined 
+                                className="cursor-pointer hover:text-blue-500 transition-colors" 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(token.address || '');
+                                  const tooltip = document.getElementById(`tooltip-${token.id}`);
+                                  if (tooltip) {
+                                    tooltip.textContent = 'Copied!';
+                                    setTimeout(() => {
+                                      tooltip.textContent = 'Click to copy';
+                                    }, 2000);
+                                  }
+                                }}
+                              />
+                              <span 
+                                id={`tooltip-${token.id}`}
+                                className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                              >
+                                Click to copy
+                              </span>
                             </div>
                           </div>
                         </td>

@@ -1,14 +1,14 @@
 import TokenIcon from "@/app/icons/TokenIcon";
 import { useTokens } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
-import { TokenData } from "@/interface/token";
+import { RefetchPoolProps, TokenData } from "@/interface/token";
 import { notification, Spin } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import TokenDropdown from "../_dropdown/page";
 import { BigNumber } from "bignumber.js"
 
-export const RenderDeposits = () => {
+export const RenderDeposits = ({ refetchPools }: RefetchPoolProps) => {
     const [tokenSearchQueryDeposit1, setTokenSearchQueryDeposit1] = useState(
       "",
     );
@@ -146,12 +146,12 @@ export const RenderDeposits = () => {
             pool.data.tokenA === selectedTokenDeposit1?.address
               ? depositAmount1
               : depositAmount2,
-          ).multipliedBy(10 ** 18).multipliedBy(1.01).toFixed(0),
+          ).multipliedBy(10 ** 18).multipliedBy(1.01),
           tokenB_amount: new BigNumber(
             pool.data.tokenA === selectedTokenDeposit1?.address
               ? depositAmount2
               : depositAmount1,
-          ).multipliedBy(10 ** 18).toFixed(0),
+          ).multipliedBy(10 ** 18),
         });
         console.log("Add liquidity response:", response.data);
         setLiquidityLoading(false);
@@ -160,6 +160,7 @@ export const RenderDeposits = () => {
           description:
             `Successfully added liquidity for ${selectedTokenDeposit1?._name} ${selectedTokenDeposit2?._name}`,
         });
+        await refetchPools()
       } catch (err) {
         console.error("Add liquidity error:", err);
         api["error"]({

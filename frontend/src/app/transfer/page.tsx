@@ -64,7 +64,7 @@ const TransferPanel = () => {
       await axios.post("api/tokens/transfer", {
         address: selectedToken?.address,
         to,
-        value: (numericAmount * 1e18).toFixed(0),
+        value: (numericAmount * 1e18),
       });
       setTransferLoading(false)
       api['success']({
@@ -98,7 +98,7 @@ const TransferPanel = () => {
             </label>
             <input
               type="text"
-              placeholder="0xYourAddress"
+              placeholder="YourAddress"
               disabled={true}
               value={from}
               className="bg-gray w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -111,7 +111,7 @@ const TransferPanel = () => {
             </label>
             <input
               type="text"
-              placeholder="0xRecipientAddress"
+              placeholder="RecipientAddress"
               value={to}
               onChange={(e) => setTo(e.target.value)}
               className="w-full px-4 py-3 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800 placeholder-gray-400"
@@ -126,21 +126,28 @@ const TransferPanel = () => {
               className="flex items-center justify-between px-4 py-3 border rounded-xl border-gray-300 bg-gray-100 w-full"
             >
               <div className="flex items-center gap-2">
-                <TokenIcon symbol={selectedToken?._symbol || "NA"} size="md" />
+                {selectedToken && <TokenIcon symbol={selectedToken?._symbol || "NA"} size="md" />}
                 <span className="text-gray-800 font-medium">
-                  {selectedToken ? selectedToken._name : "ETH"}
-                  {" ("}
-                  {selectedToken ? Number(selectedToken?.value) / 1e18 : 0}
-                  {")"}
+                  {selectedToken ? (
+                    <>
+                      {selectedToken._name} (
+                      {Number(selectedToken.value) / 1e18})
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-3">Fetching Tokens </span>  <Spin />
+                    </>
+                  )}
                 </span>
               </div>
-              <svg
-                className="w-5 h-5 rotate-90"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
-              </svg>
+              {selectedToken &&
+                <svg
+                  className="w-5 h-5 rotate-90"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M15.707 5.293a1 1 0 0 1 0 1.414L10.414 12l5.293 5.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0z" />
+                </svg>}
             </button>
           </div>
 

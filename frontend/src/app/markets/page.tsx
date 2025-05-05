@@ -1,93 +1,114 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Card, Tabs, TabsProps } from 'antd';
+import { Spin } from 'antd';
 import { motion } from 'framer-motion';
+import axios from 'axios';
+import { ethers } from 'ethers';
+import { TokenData } from '@/interface/token';
 
-const poolData = [
-  {
-    pool: "WBTC/USDC",
-    protocol: "v3",
-    fee: "0.30%",
-    tvl: "$127.6M",
-    tvlNum: 127600000,
-    apr: "13.564%",
-    rewards: "+10.2%",
-    vol1d: "$52.5M",
-    vol30d: "$866.3M",
-    ratio: "0.43",
-  },
-  {
-    pool: "USDC/USDT",
-    protocol: "v4",
-    fee: "0.01%",
-    tvl: "$116.4M",
-    tvlNum: 116400000,
-    apr: "1.799%",
-    rewards: "+10.0%",
-    vol1d: "$115.1M",
-    vol30d: "$314.5M",
-    ratio: "1.12",
-  },
-  {
-    pool: "USDC/ETH",
-    protocol: "v3",
-    fee: "0.05%",
-    tvl: "$110.1M",
-    tvlNum: 110100000,
-    apr: "16.273%",
-    rewards: "+8.5%",
-    vol1d: "$285.4M",
-    vol30d: "$5.6B",
-    ratio: "2.62",
-  },
-  {
-    pool: "WISE/ETH",
-    protocol: "v2",
-    fee: "0.30%",
-    tvl: "$107.0M",
-    tvlNum: 107000000,
-    apr: "0.003%",
-    rewards: "-",
-    vol1d: "$1.6K",
-    vol30d: "$117.8K",
-    ratio: "<0.01",
-  },
-  {
-    pool: "ETH/wstETH",
-    protocol: "v4",
-    fee: "0.01%",
-    tvl: "$90.4M",
-    tvlNum: 90400000,
-    apr: "0.187%",
-    rewards: "-",
-    vol1d: "-",
-    vol30d: "-",
-    ratio: "-",
-  },
-  {
-    pool: "WBTC/ETH",
-    protocol: "v3",
-    fee: "0.30%",
-    tvl: "$60.7M",
-    tvlNum: 60700000,
-    apr: "7.388%",
-    rewards: "+7.0%",
-    vol1d: "$10.2M",
-    vol30d: "$200.1M",
-    ratio: "0.05",
-  },
-];
+// const poolData = [
+//   {
+//     pool: "WBTC/USDC",
+//     protocol: "v3",
+//     fee: "0.30%",
+//     tvl: "$127.6M",
+//     tvlNum: 127600000,
+//     apr: "13.564%",
+//     rewards: "+10.2%",
+//     vol1d: "$52.5M",
+//     vol30d: "$866.3M",
+//     ratio: "0.43",
+//   },
+//   {
+//     pool: "USDC/USDT",
+//     protocol: "v4",
+//     fee: "0.01%",
+//     tvl: "$116.4M",
+//     tvlNum: 116400000,
+//     apr: "1.799%",
+//     rewards: "+10.0%",
+//     vol1d: "$115.1M",
+//     vol30d: "$314.5M",
+//     ratio: "1.12",
+//   },
+//   {
+//     pool: "USDC/ETH",
+//     protocol: "v3",
+//     fee: "0.05%",
+//     tvl: "$110.1M",
+//     tvlNum: 110100000,
+//     apr: "16.273%",
+//     rewards: "+8.5%",
+//     vol1d: "$285.4M",
+//     vol30d: "$5.6B",
+//     ratio: "2.62",
+//   },
+//   {
+//     pool: "WISE/ETH",
+//     protocol: "v2",
+//     fee: "0.30%",
+//     tvl: "$107.0M",
+//     tvlNum: 107000000,
+//     apr: "0.003%",
+//     rewards: "-",
+//     vol1d: "$1.6K",
+//     vol30d: "$117.8K",
+//     ratio: "<0.01",
+//   },
+//   {
+//     pool: "ETH/wstETH",
+//     protocol: "v4",
+//     fee: "0.01%",
+//     tvl: "$90.4M",
+//     tvlNum: 90400000,
+//     apr: "0.187%",
+//     rewards: "-",
+//     vol1d: "-",
+//     vol30d: "-",
+//     ratio: "-",
+//   },
+//   {
+//     pool: "WBTC/ETH",
+//     protocol: "v3",
+//     fee: "0.30%",
+//     tvl: "$60.7M",
+//     tvlNum: 60700000,
+//     apr: "7.388%",
+//     rewards: "+7.0%",
+//     vol1d: "$10.2M",
+//     vol30d: "$200.1M",
+//     ratio: "0.05",
+//   },
+// ];
 
 export default function MarketsPage() {
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const [tvlSort, setTvlSort] = useState<'asc' | 'desc'>('desc');
+  // const [tvlSort, setTvlSort] = useState<'asc' | 'desc'>('desc');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tooltip, setTooltip] = useState<{ text: string; left: number } | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [pools, setPools] = useState<TokenData[]>([]);
+  // const [lpPools, setLpPools] = useState<any[]>([]);
+  const [positionLoading, setPositionLoading] = useState(false);
 
-  const sortedData = [...poolData].sort((a, b) =>
-    tvlSort === 'asc' ? a.tvlNum - b.tvlNum : b.tvlNum - a.tvlNum
-  );
+  const fetchPools = async () => {
+    try {
+      setPositionLoading(true);
+      const res = await axios.get("api/swap");
+      // const lpres = await axios.get(`/api/lpToken/`);
+      setPools(res.data);
+      // setLpPools(lpres.data);
+      setPositionLoading(false);
+    } catch (err) {
+      console.log(err);
+      setPositionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPools();
+  }, []);
+
 
   // useEffect(() => {
   //   async function fetchLpTokenData() {
@@ -101,6 +122,10 @@ export default function MarketsPage() {
   //   }
   //   fetchLpTokenData();
   // }, []);
+
+  // const sortedData = [...poolData].sort((a, b) =>
+  //   tvlSort === 'asc' ? a.tvlNum - b.tvlNum : b.tvlNum - a.tvlNum
+  // );
 
   return (
     <motion.div
@@ -118,7 +143,73 @@ export default function MarketsPage() {
 
           <h2 className="text-2xl font-bold text-black mb-4 mt-8">Top pools by TVL</h2>
 
-          <div ref={tableContainerRef} className="relative max-w-[900px] overflow-x-auto rounded-xl bg-white border border-gray-200" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="px-2 mb-4 font-medium flex items-center justify-between">
+            <span>My positions</span>
+          </div>
+
+          {positionLoading ? (
+            <div className="h-40 w-full flex justify-between items-center">
+              <Spin className="w-full" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm mb-4">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-4">#</th>
+                    <th className="p-4">Pool</th>
+                    <th className="p-4">Overall TVL</th>
+                    {/* <th className="p-4">My Position</th> */}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pools.map((pool, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-t border-gray-200 hover:bg-gray-50"
+                    >
+                      <td className="p-4">{idx + 1}</td>
+                      <td className="p-4 font-medium">
+                        {pool?.data?.tokenASymbol}/{pool?.data?.tokenBSymbol}
+                      </td>
+                      <td className="p-4">
+                        ${(() => {
+                          const priceA = BigInt(pool?.data?.tokenAPrice || 0);
+                          const balA = BigInt(pool?.data?.tokenABalance || 0);
+                          const priceB = BigInt(pool?.data?.tokenBPrice || 0);
+                          const balB = BigInt(pool?.data?.tokenBBalance || 0);
+                          const ONE = BigInt(10) ** BigInt(18);
+                          const valueAW = (priceA * balA) / ONE;
+                          const valueBW = (priceB * balB) / ONE;
+                          const totalValueWei = valueAW + valueBW;
+                          return parseFloat(ethers.formatUnits(totalValueWei, 18)).toFixed(2);
+                        })()}
+                      </td>
+                      {/* <td className="p-4">
+                        ${(() => {
+                          const priceA = BigInt(pool.data.tokenAPrice);
+                          const balA = BigInt(pool.data.tokenABalance);
+                          const priceB = BigInt(pool.data.tokenBPrice);
+                          const balB = BigInt(pool.data.tokenBBalance);
+                          const ONE = BigInt(10) ** BigInt(18);
+                          const valueAW = (priceA * balA) / ONE;
+                          const valueBW = (priceB * balB) / ONE;
+                          const totalValueWei = valueAW + valueBW;
+                          const lpEntry = lpPools.find(lp => lp.address === pool.address);
+                          const lpValue = lpEntry ? BigInt(lpEntry.value) : BigInt(0);
+                          const userShareWei =
+                            (totalValueWei * lpValue) / BigInt(pool._totalSupply);
+                          return parseFloat(ethers.formatUnits(userShareWei, 18)).toFixed(2);
+                        })()}
+                      </td> */}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div ref={tableContainerRef} className="relative max-w-[900px] overflow-x-auto rounded-xl bg-white " style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {/* Tooltip outside table */}
             {tooltip && (
               <div
@@ -136,6 +227,8 @@ export default function MarketsPage() {
                 {tooltip.text}
               </div>
             )}
+
+{/*             
             <style>{`
               .hide-scrollbar::-webkit-scrollbar { display: none; }
             `}</style>
@@ -232,7 +325,7 @@ export default function MarketsPage() {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

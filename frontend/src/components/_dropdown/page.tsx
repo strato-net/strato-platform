@@ -28,7 +28,7 @@ const TokenDropdown: React.FC<Props> = ({
   useEffect(() => {
     setTimeout(() => {
       setLoading(false)
-    }, 1000);
+    }, 500);
   }, [])
   
   const debouncedQuery = useDebouncedValue(tokenSearchQuery, 300);
