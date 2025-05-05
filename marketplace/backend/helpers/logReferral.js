@@ -1,4 +1,7 @@
-const Airtable = require("airtable");
+import Airtable from 'airtable';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '../../../.env' });
 
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_TABLE_NAME = process.env.AIRTABLE_TABLE_NAME;
@@ -15,7 +18,6 @@ async function logReferral(data) {
     ]);
 
     return createdRecords;
-
   } catch (error) {
     throw error;
   }

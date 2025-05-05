@@ -49,6 +49,7 @@
     "@babel/register": "^7.18.9",
     "@hapi/joi": "^17.1.1",
     "@sendgrid/mail": "^7.7.0",
+    "airtable": "^0.12.2",
     "axios": "^1.6.8",
     "babel-plugin-module-resolver": "^4.1.0",
     "bignumber.js": "^9.1.2",

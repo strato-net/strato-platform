@@ -4,6 +4,7 @@ import RestStatus from 'http-status-codes';
 import config from '../../../load.config';
 import sendEmail from '../../../helpers/email';
 import constants from '../../../helpers/constants';
+import logReferral from '../../../helpers/logReferral';
 const options = { config, cacheNonce: true };
 
 class OrderController {
@@ -72,17 +73,19 @@ class OrderController {
       ) {
         await sendEmail(body.user, 'Your Order Confirmation', htmlContents[0]);
         if (body.referral) {
-        await logReferral({
-          referringAddress: body.referral,
+        const res = await logReferral({
+          referralAddress: body.referral,
+          blockTime: orderEvent[0].block_timestamp,
+          purchaserAddress: orderEvent[0].purchaser,
+          purchaserCommonName: orderEvent[0].purchasersCommonName,
+          quantity: orderEvent[0].quantities[0],
+          amount: orderEvent[0].amount,
+          currency: orderEvent[0].currency,
+          saleAddress: orderEvent[0].saleAddresses[0],
+          sellerAddress: orderEvent[0].sellerAddress,
+          sellersCommonName: orderEvent[0].sellersCommonName,
           orderHash: checkoutHash,
-          orderAddress: orderEvent[0].orderAddress,
-          assetAddress: orderEvent[0].assetAddress,
-          assetName: orderEvent[0].assetName,
-          assetQuantity: orderEvent[0].assetQuantity,
-          assetUnitPrice: orderEvent[0].assetUnitPrice,
-          assetTotalPrice: orderEvent[0].assetTotalPrice,
-          assetTokenId: orderEvent[0].assetTokenId,
-        }) // need order infromation
+        })
       }
         console.log('*Buyer placed order*', orderEvent);
       }
@@ -252,6 +255,7 @@ class OrderController {
       orderTotal: Joi.number().required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
+      referral: Joi.string().optional(),
     }).required();
 
     const validation = paymentSchema.validate(args);
