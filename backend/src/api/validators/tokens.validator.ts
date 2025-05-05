@@ -1,0 +1,79 @@
+import Joi from "@hapi/joi";
+
+// Schema definitions
+const addressSchema = Joi.object({
+  address: Joi.string().required(),
+});
+
+const createTokensSchema = Joi.object({
+  name: Joi.string().required(),
+  symbol: Joi.string().required(),
+  initialSupply: Joi.number().integer().min(0).required(),
+  decimals: Joi.number().integer().min(0).max(18).required(),
+});
+
+const transferItemSchema = Joi.object({
+  address: Joi.string().required(),
+  to: Joi.string().required(),
+  value: Joi.string().pattern(/^\d+$/).required(),
+});
+
+
+const approveArgsSchema = Joi.object({
+  address: Joi.string().required(),
+  spender: Joi.string().required(),
+  value: Joi.string().pattern(/^\d+$/).required(),
+});
+
+const transferFromArgsSchema = Joi.object({
+  address: Joi.string().required(),
+  from: Joi.string().required(),
+  to: Joi.string().required(),
+  value: Joi.string().pattern(/^\d+$/).required(),
+});
+
+const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
+
+// Validator functions
+export function validateAddressArgs(args: any) {
+  const { error } = addressSchema.validate(args);
+  if (error) {
+    throw new Error("Address Argument Validation Error");
+  }
+}
+
+export function validateCreateTokensArgs(args: any) {
+  const { error } = createTokensSchema.validate(args);
+  if (error) {
+    throw new Error(
+      "Create Inventory Argument Validation Error: " + error.message
+    );
+  }
+}
+
+export function validateTransferItemArgs(args: any) {
+  const { error } = transferItemSchema.validate(args);
+  if (error) {
+    throw new Error("Transfer Item Argument Validation Error");
+  }
+}
+
+export function validateQueryParams(query: any) {
+  const { error } = queryParamsSchema.validate(query);
+  if (error) {
+    throw new Error("Query Parameter Validation Error: " + error.message);
+  }
+}
+
+export function validateApproveArgs(args: any) {
+  const { error } = approveArgsSchema.validate(args);
+  if (error) {
+    throw new Error("Approve Argument Validation Error: " + error.message);
+  }
+}
+export function validateTransferFromArgs(args: any) {
+  const { error } = transferFromArgsSchema.validate(args);
+  if (error) {
+    throw new Error("TransferFrom Argument Validation Error: " + error.message);
+  }
+}

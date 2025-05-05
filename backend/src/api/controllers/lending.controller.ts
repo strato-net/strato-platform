@@ -1,4 +1,3 @@
-import Joi from "@hapi/joi";
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
@@ -8,8 +7,13 @@ import {
   repayLoan,
   getDepositableTokens,
   getWithdrawableTokens,
-  getLoans
+  getLoans,
 } from "../services/lending.service";
+import {
+  validateManageLiquidityArgs,
+  validateGetLoanArgs,
+  validateRepayLoanArgs,
+} from "../validators/lending.validator";
 
 class LendingController {
   static async get(
@@ -36,7 +40,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      LendingController.validateManageLiquidityArgs(body);
+      validateManageLiquidityArgs(body);
 
       const result = await manageLiquidity(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -53,7 +57,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      LendingController.validateGetLoanArgs(body);
+      validateGetLoanArgs(body);
 
       const result = await getLoan(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -70,7 +74,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      LendingController.validateRepayLoanArgs(body);
+      validateRepayLoanArgs(body);
 
       const result = await repayLoan(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -101,7 +105,10 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address } = req;
-      const result = await getWithdrawableTokens(accessToken, address as string);
+      const result = await getWithdrawableTokens(
+        accessToken,
+        address as string
+      );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -119,83 +126,6 @@ class LendingController {
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
-    }
-  }
-
-  // ----------------------- ARG VALIDATION ------------------------
-  static validateGetArgs(args: any) {
-    const schema = Joi.object({
-      address: Joi.string().required(),
-    });
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error("Address Argument Validation Error: " + error.message);
-    }
-  }
-
-  static validateQueryArgs(args: any) {
-    const schema = Joi.object({
-      address: Joi.string().optional(),
-      owner: Joi.string().optional(),
-      creator: Joi.string().optional(),
-      order: Joi.string().optional(),
-      limit: Joi.string().optional(),
-      offset: Joi.string().optional(),
-    });
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error("Query Argument Validation Error: " + error.message);
-    }
-  }
-
-  static validateCreateArgs(args: any) {
-    const schema = Joi.object().pattern(Joi.string(), Joi.string().required());
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error(
-        "Create Pool Argument Validation Error: " + error.message
-      );
-    }
-  }
-
-  static validateManageLiquidityArgs(args: any) {
-    const schema = Joi.object({
-      method: Joi.string()
-        .valid("depositLiquidity", "withdrawLiquidity")
-        .required(),
-      asset: Joi.string().required(),
-      amount: Joi.string().required(),
-    });
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error(
-        "Manage Liquidity Argument Validation Error: " + error.message
-      );
-    }
-  }
-
-  static validateGetLoanArgs(args: any) {
-    const schema = Joi.object({
-      asset: Joi.string().required(),
-      amount: Joi.string().required(),
-      collateralAsset: Joi.string().required(),
-      collateralAmount: Joi.string().required(),
-    });
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error("Get Loan Argument Validation Error: " + error.message);
-    }
-  }
-
-  static validateRepayLoanArgs(args: any) {
-    const schema = Joi.object({
-      loanId: Joi.string().required(),
-      asset: Joi.string().required(),
-      amount: Joi.string().required(),
-    });
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error("Repay Loan Argument Validation Error: " + error.message);
     }
   }
 }

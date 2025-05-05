@@ -243,6 +243,9 @@ export const addLiquidity = async (
       address: "eq." + body.address,
       select: "data->>tokenA,data->>tokenB",
     });
+    if (!pool || pool.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
 
     await approveAsset(
       accessToken,

@@ -1,15 +1,14 @@
-import { Request, Router, Response, NextFunction } from 'express';
+import { Request, Router, Response, NextFunction } from "express";
 
 import packageJson from "../../package.json";
 
 import authHandler from "./middleware/authHandler";
 
 import TokensController from "./controllers/tokens.controller";
-import SwappingController from './controllers/swapping.controller';
-import LendingController from './controllers/lending.controller';
+import SwappingController from "./controllers/swapping.controller";
+import LendingController from "./controllers/lending.controller";
 import AuthenticationController from "./controllers/authentication.controller";
 import UsersController from "./controllers/users.controller";
-
 
 const router = Router();
 
@@ -56,7 +55,7 @@ router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
     version: packageJson.version,
     timestamp: new Date().toISOString(),
   });
-  return next()
+  return next();
 });
 
 export default router;

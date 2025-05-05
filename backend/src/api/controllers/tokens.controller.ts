@@ -1,4 +1,3 @@
-import Joi from "@hapi/joi";
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
@@ -12,6 +11,14 @@ import {
   approveToken,
   transferFromToken,
 } from "../services/tokens.service";
+import {
+  validateAddressArgs,
+  validateCreateTokensArgs,
+  validateTransferItemArgs,
+  validateApproveArgs,
+  validateTransferFromArgs,
+  validateQueryParams
+} from "../validators/tokens.validator";
 
 class TokensController {
   static async get(
@@ -21,8 +28,7 @@ class TokensController {
   ): Promise<void> {
     try {
       const { accessToken, params } = req;
-
-      TokensController.validateAddressArgs(params);
+      validateAddressArgs(params);
 
       const token = await getTokens(accessToken, {
         address: "eq." + params.address,
@@ -40,6 +46,7 @@ class TokensController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
+      validateQueryParams(query);
 
       const tokens = await getTokens(
         accessToken,
@@ -57,12 +64,9 @@ class TokensController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query } = req;
+      const { accessToken } = req;
 
-      const faucets = await getFaucetAddresses(
-        accessToken,
-        query as Record<string, string | undefined>
-      );
+      const faucets = await getFaucetAddresses(accessToken);
       res.status(RestStatus.OK).json(faucets);
     } catch (error) {
       next(error);
@@ -76,6 +80,7 @@ class TokensController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
+      validateQueryParams(query);
 
       const balances = await getBalance(
         accessToken,
@@ -94,10 +99,9 @@ class TokensController {
   ): Promise<void> {
     try {
       const { accessToken, params } = req;
-      const allowances = await getState(
-        accessToken,
-        params.address as string,
-      );
+      validateAddressArgs(params);
+
+      const allowances = await getState(accessToken, params.address as string);
       res.status(RestStatus.OK).json(allowances);
     } catch (error) {
       next(error);
@@ -107,8 +111,7 @@ class TokensController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-
-      TokensController.validateCreateTokensArgs(body);
+      validateCreateTokensArgs(body);
 
       const result = await createToken(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -121,8 +124,7 @@ class TokensController {
   static async faucet(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-
-      TokensController.validateFaucetArgs(body);
+      validateAddressArgs(body);
 
       const result = await faucetTokens(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -135,8 +137,7 @@ class TokensController {
   static async transfer(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-
-      TokensController.validateTransferItemArgs(body);
+      validateTransferItemArgs(body);
 
       const result = await transferToken(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -149,6 +150,8 @@ class TokensController {
   static async approve(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
+      validateApproveArgs(body);
+
       const result = await approveToken(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
@@ -160,69 +163,13 @@ class TokensController {
   static async transferFrom(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
+      validateTransferFromArgs(body);
 
       const result = await transferFromToken(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
       return next(e);
-    }
-  }
-
-  // ----------------------- ARG VALIDATION ------------------------
-  static validateAddressArgs(args: any) {
-    const addressSchema = Joi.object({
-      address: Joi.string().required(),
-    });
-
-    const validation = addressSchema.validate(args);
-
-    if (validation.error) {
-      throw new Error("Address Argument Validation Error");
-    }
-  }
-
-  static validateCreateTokensArgs(args: any) {
-    const createTokensSchema = Joi.object({
-      name: Joi.string().required(),
-      symbol: Joi.string().required(),
-      initialSupply: Joi.number().integer().min(0).required(),
-      decimals: Joi.number().integer().min(0).max(18).required(),
-    });
-
-    const validation = createTokensSchema.validate(args);
-
-    if (validation.error) {
-      throw new Error(
-        "Create Inventory Argument Validation Error: " +
-          validation.error.message
-      );
-    }
-  }
-
-  static validateFaucetArgs(args: any) {
-    const faucetSchema = Joi.object({
-      address: Joi.string().required(),
-    });
-
-    const validation = faucetSchema.validate(args);
-
-    if (validation.error) {
-      throw new Error("Faucet Argument Validation Error");
-    }
-  }
-
-  static validateTransferItemArgs(args: any) {
-    const transferItemSchema = Joi.object({
-      address: Joi.string().required(),
-      to: Joi.string().required(),
-      value: Joi.string().pattern(/^\d+$/).required(),
-    });
-
-    const validation = transferItemSchema.validate(args);
-
-    if (validation.error) {
-      throw new Error("Transfer Item Argument Validation Error");
     }
   }
 }

@@ -1,4 +1,3 @@
-import Joi from "@hapi/joi";
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
@@ -11,6 +10,14 @@ import {
   getPoolsWithDetails,
 } from "../services/swapping.service";
 import { getBalance, getTokens } from "../services/tokens.service";
+import {
+  validateAddressArgs,
+  validateCreatePoolsArgs,
+  validateAddLiquidityArgs,
+  validateRemoveLiquidityArgs,
+  validateSwapArgs,
+  validateQueryParams,
+} from "../validators/swapping.validator";
 
 class SwappingController {
   static async get(
@@ -20,8 +27,7 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, params } = req;
-
-      SwappingController.validateAddressArgs(params);
+      validateAddressArgs(params);
 
       const token = await getPools(accessToken, {
         address: "eq." + params.address,
@@ -39,6 +45,7 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
+      validateQueryParams(query);
 
       const tokens = await getPoolsWithDetails(
         accessToken,
@@ -53,8 +60,7 @@ class SwappingController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-
-      SwappingController.validateCreatePoolsArgs(body);
+      validateCreatePoolsArgs(body);
 
       const result = await createPool(accessToken, body);
       res.status(200).json(result);
@@ -98,8 +104,7 @@ class SwappingController {
   static async addLiquidity(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-
-      SwappingController.validateAddLiquidityArgs(body);
+      validateAddLiquidityArgs(body);
 
       const result = await addLiquidity(accessToken, body);
       res.status(200).json(result);
@@ -116,8 +121,7 @@ class SwappingController {
   ) {
     try {
       const { accessToken, body } = req;
-
-      SwappingController.validateRemoveLiquidityArgs(body);
+      validateRemoveLiquidityArgs(body);
 
       const result = await removeLiquidity(accessToken, body);
       res.status(200).json(result);
@@ -130,8 +134,7 @@ class SwappingController {
   static async swap(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-
-      SwappingController.validateSwapArgs(body);
+      validateSwapArgs(body);
 
       const result = await swap(accessToken, body);
       res.status(200).json(result);
@@ -148,6 +151,7 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
+      validateQueryParams(query);
 
       const price = await calculateSwap(
         accessToken,
@@ -198,8 +202,7 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, params } = req;
-
-      SwappingController.validateAddressArgs({ address: params.address });
+      validateAddressArgs(params);
 
       const poolA = await getPools(accessToken, {
         "data->>tokenA": "eq." + params.address,
@@ -238,6 +241,7 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
+      validateQueryParams(query);
 
       const pools = await getPools(accessToken, {
         "data->>tokenA": "in.(" + query.tokenPair + ")",
@@ -246,97 +250,6 @@ class SwappingController {
       res.status(RestStatus.OK).json(pools);
     } catch (error) {
       next(error);
-    }
-  }
-
-  // ----------------------- ARG VALIDATION ------------------------
-  static validateAddressArgs(args: any) {
-    const schema = Joi.object({
-      address: Joi.string().required(),
-    });
-
-    const validation = schema.validate(args);
-
-    if (validation.error) {
-      throw new Error("Address Argument Validation Error");
-    }
-  }
-
-  static validateCreatePoolsArgs(args: any) {
-    const schema = Joi.object({
-      tokenA: Joi.string().required(),
-      tokenB: Joi.string().required(),
-    });
-
-    const validation = schema.validate(args);
-
-    if (validation.error) {
-      throw new Error(
-        "Create Pool Argument Validation Error: " + validation.error.message
-      );
-    }
-  }
-
-  static validateAddLiquidityArgs(args: any) {
-    const schema = Joi.object({
-      address: Joi.string().required(),
-      tokenB_amount: Joi.string().required(),
-      max_tokenA_amount: Joi.string().required(),
-    });
-
-    const validation = schema.validate(args);
-
-    if (validation.error) {
-      throw new Error(
-        "Add Liduitity Argument Validation Error: " + validation.error.message
-      );
-    }
-  }
-
-  static validateRemoveLiquidityArgs(args: any) {
-    const schema = Joi.object({
-      address: Joi.string().required(),
-      amount: Joi.string().required(),
-      // min_tokenB: Joi.string().required(),
-      // min_tokenA_amount: Joi.string().required(),
-    });
-
-    const validation = schema.validate(args);
-
-    if (validation.error) {
-      throw new Error(
-        "Remove Liduitity Argument Validation Error: " +
-          validation.error.message
-      );
-    }
-  }
-
-  static validateSwapArgs(args: any) {
-    const schema = Joi.object({
-      address: Joi.string().required(),
-      method: Joi.string().valid("tokenAToTokenB", "tokenBToTokenA").required(),
-      amount: Joi.string().required(),
-      min_tokens: Joi.string().required(),
-    });
-
-    const validation = schema.validate(args);
-
-    if (validation.error) {
-      throw new Error(
-        "Swap Argument Validation Error: " + validation.error.message
-      );
-    }
-  }
-
-  static validatePriceQueryArgs(args: any, field: string) {
-    const schema = Joi.object({
-      [field]: Joi.string()
-        .pattern(/^[0-9]+$/)
-        .required(),
-    });
-    const { error } = schema.validate(args);
-    if (error) {
-      throw new Error(`Invalid query parameter: ${field}`);
     }
   }
 }

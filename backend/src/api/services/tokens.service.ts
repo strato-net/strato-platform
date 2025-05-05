@@ -52,17 +52,18 @@ export const getTokens = async (
 };
 
 // Get all faucet contract addresses
-export const getFaucetAddresses = async (
-  accessToken: string,
-  rawParams: Record<string, string | undefined> = {}
-) => {
+export const getFaucetAddresses = async (accessToken: string) => {
   try {
-    const response = await cirrus.get(accessToken, `/BlockApps-Mercata-${TokenFaucet}`, {
-      params: {
-        isActive: 'eq.true',
-        select: 'address'
+    const response = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-${TokenFaucet}`,
+      {
+        params: {
+          isActive: "eq.true",
+          select: "address",
+        },
       }
-    });
+    );
 
     if (response.status !== 200) {
       throw new Error(`Error fetching faucets: ${response.statusText}`);
