@@ -72,8 +72,8 @@ class OrderController {
         orderEvent[0].currency === 'USDST'
       ) {
         await sendEmail(body.user, 'Your Order Confirmation', htmlContents[0]);
-        if (body.referral) {
-        const res = await logReferral({
+        if (body.referral && (process.env.networkID === constants.prodNetworkId)) {
+        await logReferral({
           referralAddress: body.referral,
           blockTime: orderEvent[0].block_timestamp,
           purchaserAddress: orderEvent[0].purchaser,
