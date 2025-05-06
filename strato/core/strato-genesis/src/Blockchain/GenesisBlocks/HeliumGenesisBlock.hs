@@ -16,6 +16,7 @@ import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
 import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
 import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
@@ -25,7 +26,7 @@ import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
 import qualified Data.Map.Strict                                 as M
-import           Data.Maybe                                      (catMaybes)
+import           Data.Maybe                                      (mapMaybe)
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
@@ -51,27 +52,36 @@ genesisBlock  =
               , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
               , (".:originAddress", BAccount $ unspecifiedChain 0x1000)
               ]
-            ] ++ concatMap assetToAccountInfos GA.assets 
+            ] ++ mapMaybe assetToAccountInfos GA.assets
               ++ concatMap escrowToAccountInfos GE.escrows 
               ++ concatMap reserveToAccountInfos GR.reserves,
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
 
-assetToAccountInfos :: GA.Asset -> [AccountInfo]
-assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{..} -> SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 $ T.unpack assetType) $
-  [ (".:creator", BString $ encodeUtf8 "BlockApps")
-  , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
-  , (".:originAddress", BAccount $ unspecifiedChain root)
-  , (".originAddress", BAccount $ unspecifiedChain root)
-  , (".name", BString $ encodeUtf8 name)
-  , (".description", BString $ encodeUtf8 description)
-  , (".owner", BAccount $ unspecifiedChain owner)
-  , (".ownerCommonName", BString $ encodeUtf8 ownerCommonName)
-  , (".quantity", BInteger quantity)
-  ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
-    ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
-    ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
-    ++ catMaybes (map (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData))
+assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
+assetToAccountInfos GA.Asset{..} =
+  let times10ToThe a b = foldr (*) a $ replicate b 10
+      bigQ q = if decimals < 0 || decimals >= 18 || name == "CATA" || name == "ETHST"
+                 then q
+                 else if name == "STRAT"
+                        then q `times10ToThe` 14
+                        else q `times10ToThe` (fromIntegral $ 18 - decimals)
+      allBalances = mapMaybe (\(GA.Balance _ o _ q) -> if q > 0 then Just ("._balances<a:" <> encodeUtf8 (T.pack $ formatAddressWithoutColor o) <> ">", BInteger $ bigQ q) else Nothing) $ M.elems balances
+   in case allBalances of
+        [] -> Nothing
+        _ -> Just . SolidVMContractWithStorage root 0 (CodeAtAccount 0x1000 "ERC20Asset") $
+          [ (".:creator", BString $ encodeUtf8 "BlockApps")
+          , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+          , (".:originAddress", BAccount $ unspecifiedChain root)
+          , (".originAddress", BAccount $ unspecifiedChain root)
+          , (".name", BString $ encodeUtf8 name)
+          , (".description", BString $ encodeUtf8 description)
+          , (".owner", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+          ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
+            ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
+            ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
+            ++ mapMaybe (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData)
+            ++ allBalances
   where maybeDefault BDefault = Nothing
         maybeDefault v        = Just v
 
