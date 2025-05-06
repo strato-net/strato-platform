@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 
-module Main.App where
+module Strato.App where
 
 import Reflex.Dom
 import Common.Route

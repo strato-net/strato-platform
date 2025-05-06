@@ -40,6 +40,7 @@ library:
   - containers
   - crypto-pubkey-types
   - extra
+  - filepath
   - hflags
   - monad-alter
   - servant-server

@@ -77,7 +77,7 @@ import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
-import Control.Monad (forever, join)
+import Control.Monad (forever, join, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Identity
@@ -107,6 +107,7 @@ import Executable.EthereumVM2
 import Executable.StratoP2P
 import SolidVM.Model.Storable hiding (toList)
 import Strato.Lite.Base
+import Text.Format
 import Text.Read (readMaybe)
 import UnliftIO
 import Prelude hiding (round, sequence)
@@ -153,6 +154,7 @@ data CorePeer = CorePeer
   , _corePeerApiIndexSource :: TQueue [IndexEvent]
   , _corePeerP2pIndexSource :: TQueue [IndexEvent]
   , _corePeerSlipstreamSource :: TQueue [VMEvent]
+  , _corePeerNodeDataReqs :: TVar (Map MP.StateRoot (TMChan MP.NodeData))
   , _corePeerContext :: CoreContext
   }
 
@@ -509,8 +511,45 @@ instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable BestBlockRoot (CoreT 
   put p = lift . Mod.put p
 
 instance {-# OVERLAPPING #-} MonadBase m => (MP.StateRoot `A.Alters` MP.NodeData) (CoreT m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
+  lookupWithDefault p k = lift $ A.lookupWithDefault p k
+  lookup p k = lift (A.lookup p k) >>= \case
+    Just v -> pure $ Just v
+    Nothing -> do
+      $logWarnS "A.lookup NodeData" . T.pack $ "Couldn't find " ++ format k ++ " locally. Fetching from network"
+      ndReqsVar <- asks _corePeerNodeDataReqs
+      ndReqs <- atomically $ readTVar ndReqsVar
+      case M.lookup k ndReqs of
+        Just chan -> do
+          $logWarnS "A.lookup NodeData" . T.pack $ "Channel already exists for " ++ format k ++ ". Duplicating and waiting for response"
+          mValue <- atomically (dupTMChan chan) >>= atomically . readTMChan
+          $logWarnS "A.lookup NodeData" . T.pack $ "Got value for " ++ format k ++ ": " ++ maybe "Nothing" format mValue
+          pure mValue
+        Nothing -> do
+          $logWarnS "A.lookup NodeData" . T.pack $ "No channel found for " ++ format k ++ ". Creating a new one"
+          seqP2pSrc <- asks _corePeerSeqP2pSource
+          chan <- atomically $ do
+            bChan <- newBroadcastTMChan
+            modifyTVar ndReqsVar $ M.insert k bChan
+            writeTMChan seqP2pSrc $ P2pGetMPNodes [k]
+            dupTMChan bChan
+          $logWarnS "A.lookup NodeData" . T.pack $ "Created a channel for " ++ format k ++ " and dispatched a GetMPNodes request"
+          mmResp <- timeout 2000000 . atomically $ readTMChan chan
+          atomically $ closeTMChan chan
+          $logWarnS "A.lookup NodeData" . T.pack $ "Got value for " ++ format k ++ ": " ++ maybe "Nothing" format mmResp
+          pure $ join mmResp
+  insert p k v = do
+    ndReqsVar <- asks _corePeerNodeDataReqs
+    wrote <- atomically $ do
+      ndReqs <- readTVar ndReqsVar
+      case M.lookup k ndReqs of
+        Just chan -> do
+          writeTMChan chan v
+          modifyTVar ndReqsVar $ M.delete k
+          pure True
+        Nothing -> pure False
+    when wrote $ do
+      $logWarnS "A.insert NodeData" . T.pack $ "Found channel for " ++ format k ++ ". Writing value " ++ format v ++ " to channel"
+    lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
 
 instance {-# OVERLAPPING #-} MonadBase m => (Keccak256 `A.Alters` DBCode) (CoreT m) where
@@ -735,10 +774,9 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
   apiIndexerSource <- newTQueueIO
   p2pIndexerSource <- newTQueueIO
   slipstreamSource <- newTQueueIO
-  timerChan <- atomically newTMChan
+  timerChan <- newTMChanIO
+  nodeDataReqs <- newTVarIO M.empty
   let validators' = readValidatorsFromGenesisInfo genesisInfo
-  --     extraCerts = readCertsFromGenesisInfo genesisInfo
-  --     certMap = M.fromList $ (userAddress &&& id) . x509CertToCertInfoState <$> extraCerts
   seqCtx <- newSequencerContext $ newBlockstanbulContext network' selfValidator validators' valBehav
   cache <- TRC.new 64
   let cstate = def & txRunResultsCache .~ cache
@@ -757,6 +795,7 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
       apiIndexerSource
       p2pIndexerSource
       slipstreamSource
+      nodeDataReqs
       coreContext
 
 corePeerUnseqSink :: MonadBase m => [IngestEvent] -> CoreT m ()
@@ -774,6 +813,7 @@ corePeerSeqTimerSource = do
 
 corePeerSetup :: MonadBase m => CoreT m ()
 corePeerSetup = do
+  MP.initializeBlank
   genesisInfo <- asks _corePeerGenesisInfo
   (srcInfo, gb) <- genesisInfoToGenesisBlock genesisInfo
   let genHash = rlpHash $ blockBlockData gb
@@ -815,7 +855,6 @@ corePeerSetup = do
       A.insert (A.Proxy @(API OutputBlock)) genHash $ API genesisOutputBlock
       A.replace (A.Proxy @(Canonical BlockHeader)) (0 :: Integer) (Canonical $ blockBlockData gb)
       DBDB.bootstrapGenesisBlock genHash
-      MP.initializeBlank
       withCurrentBlockHash genHash $ setStateDBStateRoot Nothing $ stateRoot genHeader
       writeBlockSummary genesisOutputBlock
       -- for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v

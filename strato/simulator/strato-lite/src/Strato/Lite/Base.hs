@@ -36,6 +36,7 @@ import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
 import Data.Text (Text)
+import Numeric.Natural
 import Prelude hiding (round)
 import Prometheus
 
@@ -64,7 +65,7 @@ type MonadBase m = ( MonadFail m
                    , A.Selectable Host PPeer m
                    , A.Replaceable Host PPeer m
                    , (Host `A.Alters` PPeer) m
-                   , A.Selectable Point ClosestPeers m
+                   , A.Selectable (Point, Natural) ClosestPeers m
                    -- , A.Selectable Keccak256 [DataDefs.TransactionResult] m
                    , Mod.Accessible TCPPort m
                    , Mod.Accessible UDPPort m

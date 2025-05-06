@@ -1,0 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
+
+module Strato.Options where
+
+import HFlags
+
+defineFlag "directory" ("~/.strato" :: String) "Directory where blockchain data should be stored"
+defineFlag "private_key" ("strato.pem" :: String) "Path to private key file"
+defineFlag "username" ("strato_user" :: String) "Username"
+defineFlag "backend_port" (3031 :: Int) "Username"
+defineFlag "frontend_port" (3030 :: Int) "Username"

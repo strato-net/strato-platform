@@ -93,6 +93,7 @@ library:
     - strato-lite
     - text
     - time
+    - unix
     - wai
     - wai-middleware-static
     - wai-cors
@@ -102,7 +103,8 @@ library:
 
 executables:
   smd-ui-hs-browser:
-    main: Main.hs
+    main: BrowserMain.hs
+    other-modules: []
     source-dirs: app
     ghc-options:
       - -threaded
@@ -113,7 +115,8 @@ executables:
       - jsaddle-dom
 
   smd-ui-hs-native:
-    main: Main.hs
+    main: NativeMain.hs
+    other-modules: []
     source-dirs: app
     ghc-options:
       - -threaded

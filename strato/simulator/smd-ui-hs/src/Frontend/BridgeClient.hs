@@ -17,16 +17,17 @@ import qualified Data.Text.Encoding as T
 import Frontend.Client
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
+import Strato.Options (flags_backend_port)
 import Text.Read (readMaybe)
 -- import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 -- This must match your server base URL
 backendBaseUrl :: BaseUrl
-backendBaseUrl = BaseUrl Http "localhost" 8889 ""
+backendBaseUrl = BaseUrl Http "localhost" flags_backend_port ""
 
 -- This must match your server base URL
 blocBaseUrl :: BaseUrl
-blocBaseUrl = BaseUrl Http "localhost" 8889 "/bloc/v2.2"
+blocBaseUrl = BaseUrl Http "localhost" flags_backend_port "/bloc/v2.2"
 
 fetchBlockSummaries :: IO [BitcoinBlockSummary]
 fetchBlockSummaries = do

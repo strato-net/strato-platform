@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Main where
+module Strato.Run where
 
 import Backend.Handlers
 import Bitcoin.TxBuilder
@@ -13,7 +13,8 @@ import Blockchain.Blockstanbul.Options ()
 import Blockchain.Options (flags_address, flags_listen)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
-import Blockchain.Strato.Model.Options ()
+import Blockchain.Strato.Model.Options (flags_network)
+import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Common.API
 import Control.Monad.Trans.Resource
@@ -21,29 +22,29 @@ import Crypto.Random.Entropy
 import qualified Data.Binary as Binary
 import qualified Data.Cache as Cache
 import Data.FileEmbed
+import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Executable.EVMFlags ()
 import Handlers.Metadata (UrlMap)
-import Language.Javascript.JSaddle.Warp (run)
-import Language.Javascript.JSaddle.WKWebView (run)
+import Language.Javascript.JSaddle.Monad (JSM)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Haskoin.Address
 import Haskoin.Crypto
 import Haskoin.Script
 import Haskoin.Util
-import HFlags
-import qualified Main.App as App
 import Network.Wai
 import Network.Wai.Handler.Warp as Wai
 import Reflex.Dom.Core
 import Servant as Servant
+import qualified Strato.App as App
 import Strato.Lite.Base.Filesystem
 import Strato.Lite.Core
 import Strato.Lite.Filesystem
 import Strato.Lite.Rest.Server
+import Strato.Options
 import System.Clock
 import UnliftIO
 
@@ -109,36 +110,22 @@ header = do
   el "style" $ text $ decodeUtf8 appCss
   el "style" $ text $ decodeUtf8 css
 
--- Main function for browser-based interface
-mainBrowser :: IO ()
-mainBrowser = do
-  putStrLn "Starting browser-based interface..."
-  Language.Javascript.JSaddle.Warp.run 3000 $ mainWidgetWithHead header App.mainWidget
-
--- Main function for native window interface
-mainNative :: IO ()
-mainNative = do
-  putStrLn "Starting native window interface..."
-  Language.Javascript.JSaddle.WKWebView.run $ mainWidgetWithHead header App.mainWidget
-
 -- Default main function (can be changed to mainBrowser or mainNative)
-main :: IO ()
-main = do
-  _ <- $initHFlags "STRATO Lite"
+runStrato :: (JSM () -> IO ()) -> IO ()
+runStrato runUI = do
   -- createHaskoinMultiSigScript
   let sqlitePath = "strato.sqlite"
   runLoggingT . runResourceT $ do
     (f,c) <- createFilesystemNode
-               "/Users/dustinnorwood/blockchain/strato"
+               flags_directory
                sqlitePath
-               "mercata-francium"
-               "/Users/dustinnorwood/.ssh/strato.pem"
-               "dnorwood"
-               "Dustin's local node"
+               flags_network
+               flags_private_key
+               (Validator $ T.pack flags_username)
+               "node"
                (TCPPort flags_listen)
                (UDPPort flags_listen)
                (Host $ T.pack flags_address)
-               [Host "44.209.149.47"] --  "3.84.124.109"]
                True
 
     let stateFetchLimit' = 100
@@ -157,6 +144,10 @@ main = do
               userRegistryCodeHash = Nothing,
               useWalletsByDefault = False
             }
-    a <- runFilesystemNode f c
-    b <- liftIO . async $ Wai.run 8889 $ app sqlitePath f c env M.empty
-    finally (liftIO mainNative) (traverse cancel a >> cancel b)
+    as <- runFilesystemNode f c
+    a <- liftIO . async $ Wai.run flags_backend_port $ app sqlitePath f c env M.empty
+    let finalize = do
+          putStrLn "Cancelling threads..."
+          traverse_ cancel $ a:as
+          putStrLn "Done cancelling threads"
+    finally (liftIO . runUI $ mainWidgetWithHead header App.mainWidget) $ liftIO finalize

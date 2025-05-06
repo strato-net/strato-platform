@@ -30,10 +30,9 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.GenesisBlocks.Contracts.BitcoinBridge
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
--- import Blockchain.GenesisBlocks.Contracts.Governance
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
--- import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
--- import qualified Blockchain.GenesisBlocks.ProductionGenesisBlock as Production
+import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
+import qualified Blockchain.GenesisBlocks.ProductionGenesisBlock as Production
 import Blockchain.Sequencer.DB.DependentBlockDB (DependentBlockDB(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
@@ -47,6 +46,7 @@ import Control.Lens ((.~))
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.List (isPrefixOf)
 import Data.Pool (withResource)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -59,8 +59,23 @@ import Strato.Lite.Base
 import Strato.Lite.Base.Filesystem
 import Strato.Lite.Core
 import System.Directory
+import System.FilePath
 import UnliftIO
 import Prelude hiding (round)
+
+expandHome :: MonadIO m => FilePath -> m FilePath
+expandHome path
+  | "~/" `isPrefixOf` path = do
+      home <- liftIO getHomeDirectory
+      pure $ home </> drop 2 path
+  | otherwise = pure path
+
+resolvePath :: MonadIO m => FilePath -> m FilePath
+resolvePath path = do
+  expanded <- expandHome path
+  if isAbsolute expanded
+    then pure expanded
+    else liftIO $ makeAbsolute expanded
 
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (\(a,b) -> (fromPrivateKey a, b))
@@ -79,23 +94,26 @@ createFilesystemPeerAndCorePeer ::
   TCPPort ->
   UDPPort ->
   Host ->
-  [Host] ->
   Bool ->
   Socket ->
   FilesystemDBs ->
   IO (FilesystemPeer, CorePeer)
-createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost bootNodes valBehav sock fsDBs = do
-  let privAndIds = [(privKey, selfId)]
-      validatorsPrivKeys = id privAndIds
-      vals' = makeValidators validatorsPrivKeys
-  certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
+createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav sock fsDBs = do
+  (genesisInfo, bootNodes) <- case network' of
+    "mercata" -> pure (Production.productionGenesisBlock, ["44.209.149.47","54.84.33.40","52.1.78.10","44.198.14.117","3.84.124.109"]) -- nodes 1-4 and dustin-node
+    "mercata-hydrogen" -> pure (Production.productionGenesisBlock, ["52.4.166.179","3.94.32.63","44.216.113.122","52.7.26.21"])
+    "mercata-helium" -> pure (Helium.genesisBlock, [])
+    _ -> do
+      let privAndIds = [(privKey, selfId)]
+          validatorsPrivKeys = id privAndIds
+          vals' = makeValidators validatorsPrivKeys
+      certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
+      let vals = snd <$> vals'
+          gi = insertBitcoinBridgeContract
+             . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
+             $ insertCertRegistryContract certs defaultGenesisInfo
+      pure (gi, [])
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
-  let vals = snd <$> vals'
-      genesisInfo = insertBitcoinBridgeContract
-                  . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
-                  $ insertCertRegistryContract certs defaultGenesisInfo
-  -- let genesisInfo = Production.productionGenesisBlock
-  -- let genesisInfo = Helium.genesisBlock
   corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
   pure (fsPeer, corePeer)
 
@@ -106,7 +124,7 @@ runFilesystemNode :: FilesystemPeer -> CorePeer -> BaseM [Async ()]
 runFilesystemNode p c = runNode (hoistFilesystem p) (\f ->
   bracket
     (connectMe $ _filesystemPeerUDPPort p)
-    (liftIO . S.close)
+    (\s -> liftIO $ S.close s >> putStrLn "Closed UDP socket")
     (\s -> local (filesystemPeerUDPSocket .~ s) f)) c
 
 createFilesystemNode ::
@@ -120,14 +138,16 @@ createFilesystemNode ::
   TCPPort ->
   UDPPort ->
   Host ->
-  [Host] ->
   Bool ->
   m (FilesystemPeer, CorePeer)
-createFilesystemNode dir dbPath network' privKeyFile selfId name tcpPort udpPort myHost bootNodes valBehav = do
+createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
+  dir' <- resolvePath dir''
+  let dir = dir' </> network'
   privKey <- liftIO $ do
     createDirectoryIfMissing True dir
     setCurrentDirectory dir
-    privBS <- B.readFile privKeyFile
+    privKeyFilePath <- resolvePath privKeyFile
+    privBS <- B.readFile privKeyFilePath
     case bsToPriv privBS of
       Left e -> error $ e ++ ": " ++ BC.unpack privBS
       Right p -> pure p
@@ -166,4 +186,4 @@ createFilesystemNode dir dbPath network' privKeyFile selfId name tcpPort udpPort
         , _kvDB = kvdb
         , _sqlPool = conn
         }
-  liftIO $ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost bootNodes valBehav (error "socket not initialized") fsDBs
+  liftIO $ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs

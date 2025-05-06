@@ -23,6 +23,7 @@ import qualified Data.Map                              as M
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Time.Clock                       (getCurrentTime)
+import           Numeric.Natural
 import           UnliftIO
 
 data MemPeerDBEnv = MemPeerDBEnv {
@@ -74,6 +75,11 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable (Host, Point) PeerBondin
   replace _ (h, _) (PeerBondingState s) = do
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ (,()) . M.adjust (\p -> p{pPeerBondState = s}) h
+
+instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable PPeer PeerLastBestBlockHash (MemPeerDBM m) where
+  replace _ p (PeerLastBestBlockHash h) = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    atomicModifyIORef' peerMap $ (,()) . M.adjust (\p' -> p'{pPeerLastBestBlockHash = h}) (pPeerHost p)
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible AvailablePeers (MemPeerDBM m) where
   access _ = do
@@ -136,17 +142,10 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible UnbondedPeersForUDP (Me
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return $ UnbondedPeersForUDP $ filter f $ M.elems peerMap
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Host ClosestPeers (MemPeerDBM m) where
-  select _ t = do
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Point, Natural) ClosestPeers (MemPeerDBM m) where
+  select _ (point, lim) = do
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
-    return $ Just $ ClosestPeers $ filter f $ M.elems peerMap
-    where
-      f p = pPeerHost p /= t && isJust (pPeerPubkey p)
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Point ClosestPeers (MemPeerDBM m) where
-  select _ point = do
-    peerMap <- readIORef . stringPPeerMap =<< accessEnv
-    pure . Just . ClosestPeers . filter f . M.elems $ pointPeerMap peerMap
+    pure . Just . ClosestPeers . take (fromIntegral lim) . filter f . M.elems $ pointPeerMap peerMap
     where
       f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
       pointPeerMap = M.fromList . catMaybes . map (\p -> (,p) <$> pPeerPubkey p) . M.elems
