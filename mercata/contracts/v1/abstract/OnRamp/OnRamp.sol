@@ -22,7 +22,7 @@ abstract contract OnRamp {
     }
 
     PriceOracleBase public priceOracle;
-    uint256 public nextOrderId;
+    uint256 public nextOrderId = 1;
     address public owner;
     address public approver;
 
