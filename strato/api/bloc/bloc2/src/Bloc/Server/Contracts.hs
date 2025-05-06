@@ -84,7 +84,7 @@ getContracts mName mOffset mLimit chainId = do
       accountsFilterParams
         { _qaChainId = maybeToList chainId,
           _qaExternal = Just False,
-          _qaContractName = mName,
+          _qaSearch = mName,
           _qaOffset = fromIntegral <$> mOffset,
           _qaLimit = fromIntegral <$> mLimit
         }
