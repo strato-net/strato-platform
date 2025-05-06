@@ -206,7 +206,7 @@ abstract contract OnRamp {
         uint256 totalFiat = calculatePrice(order.token, reservedAmount, order.marginBps);
         emit OrderFulfilled(orderId, msg.sender, reservedAmount, totalFiat);
 
-        delete reservations[orderId][msg.sender];
+        reservations[orderId][msg.sender] = Reservation(0, 0);
         _removeActiveReservation(orderId, msg.sender);
     }
 
@@ -221,13 +221,14 @@ abstract contract OnRamp {
         uint256 idx = reservationIndex[orderId][buyer];
         require(idx > 0, "No active reservation");
         uint256 lastIdx = activeReservations.length;
-        ReservationKey last = activeReservations[lastIdx - 1];
-        activeReservations[idx - 1] = last;
-        reservationIndex[last.orderId][last.buyer] = idx;
+        uint256 orderId = activeReservations[lastIdx - 1].orderId;
+        address buyer = activeReservations[lastIdx - 1].buyer;
+        activeReservations[idx - 1] = ReservationKey(orderId, buyer);
+        reservationIndex[orderId][buyer] = idx;
         uint len = activeReservations.length;
         activeReservations[len - 1] = ReservationKey(0, address(0));
         activeReservations.length = len - 1;
-        delete reservationIndex[orderId][buyer];
+        reservationIndex[orderId][buyer] = 0;
         reservationCounts[orderId]--;
     }
 
@@ -235,14 +236,15 @@ abstract contract OnRamp {
         uint256 processed = 0;
         while (processed < MAX_RESERVATIONS_PER_ORDER && activeReservations.length > 0) {
             uint256 idx = activeReservations.length - 1;
-            ReservationKey key = activeReservations[idx];
-            Reservation r = reservations[key.orderId][key.buyer];
+            uint256 orderId = activeReservations[idx].orderId;
+            address buyer = activeReservations[idx].buyer;
+            Reservation r = reservations[orderId][buyer];
             // Only expire if past expiry
             if (r.amount > 0 && block.timestamp > r.timestamp + RESERVATION_EXPIRY) {
-                SellOrder order = sellOrders[key.orderId];
+                SellOrder order = sellOrders[orderId];
                 order.amount += r.amount;
-                reservations[key.orderId][key.buyer] = Reservation(0, 0);
-                _removeActiveReservation(key.orderId, key.buyer);
+                reservations[orderId][buyer] = Reservation(0, 0);
+                _removeActiveReservation(orderId, buyer);
                 processed++;
             } else {
                 break;

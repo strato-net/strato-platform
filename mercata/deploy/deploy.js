@@ -54,6 +54,7 @@ async function main() {
     console.log(`Lending Pool: ${deployedContract.managers.lendingPool}`);
     console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
     console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
+    console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
