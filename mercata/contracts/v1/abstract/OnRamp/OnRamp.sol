@@ -193,21 +193,21 @@ abstract contract OnRamp {
         order.amount -= amount;
     }
 
-    function fulfillPartialOrder(uint256 orderId) external onlyApprover {
-        Reservation r = reservations[orderId][msg.sender];
+    function fulfillPartialOrder(uint256 orderId, address buyer) external onlyApprover {
+        Reservation r = reservations[orderId][buyer];
         require(r.amount > 0, "No reservation to fulfill");
         uint256 reservedAmount = r.amount;
         SellOrder order = sellOrders[orderId];
 
         require(!order.cancelled, "Cancelled");
 
-        IERC20(order.token).transfer(msg.sender, reservedAmount);
+        IERC20(order.token).transfer(buyer, reservedAmount);
 
         uint256 totalFiat = calculatePrice(order.token, reservedAmount, order.marginBps);
-        emit OrderFulfilled(orderId, msg.sender, reservedAmount, totalFiat);
+        emit OrderFulfilled(orderId, buyer, reservedAmount, totalFiat);
 
-        reservations[orderId][msg.sender] = Reservation(0, 0);
-        _removeActiveReservation(orderId, msg.sender);
+        reservations[orderId][buyer] = Reservation(0, 0);
+        _removeActiveReservation(orderId, buyer);
     }
 
     // Reservation management helpers
