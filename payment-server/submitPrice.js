@@ -387,7 +387,9 @@ async function main() {
     const respJson = JSON.stringify({
       lastLoopTimestamp: new Date(lastLoopTimestamp).toISOString(),
       health: healthy,
-      message: !isLoopRecent ? "check the daemon" : (errorFlagRaised ? "check errors" : "ok"),
+      message: !isLoopRecent && errorFlagRaised ? "check the daemon and errors" : 
+               !isLoopRecent ? "check the daemon" : 
+               errorFlagRaised ? "check errors" : "ok",
     })
     res.writeHead(healthy ? 200 : 500, { "Content-Type": "application/json" });
     res.end(respJson);
