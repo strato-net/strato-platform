@@ -76,6 +76,10 @@ abstract contract OnRamp {
         _;
     }
 
+    function setOwner(address newOwner) external onlyOwner {
+        owner = newOwner;
+    }
+
     function setSellableToken(address token, bool whitelist) external onlyOwner {
         if (whitelist) {
             require(!tokenMeta[token], "Already whitelisted");

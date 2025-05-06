@@ -46,5 +46,6 @@ contract Mercata {
         collateralVault.setLendingPool(address(lendingPool));
         liquidityPool.setLendingPool(address(lendingPool));
         onRamp = OnRamp(new SimpleOnRamp(address(priceOracle), msg.sender));
+        onRamp.setOwner(msg.sender);
     }
 }
