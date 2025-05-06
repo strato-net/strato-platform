@@ -241,7 +241,7 @@ abstract contract OnRamp {
             if (r.amount > 0 && block.timestamp > r.timestamp + RESERVATION_EXPIRY) {
                 SellOrder order = sellOrders[key.orderId];
                 order.amount += r.amount;
-                delete reservations[key.orderId][key.buyer];
+                reservations[key.orderId][key.buyer] = Reservation(0, 0);
                 _removeActiveReservation(key.orderId, key.buyer);
                 processed++;
             } else {
