@@ -376,21 +376,23 @@ async function main() {
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   let lastOracleRun = 0;
+  let lastLoopTimestamp = 0; // Initialize with 0
 
   const heartbeatServer = http.createServer(async (_, res) => {
     const errorFlagRaised = await flagFile.isErrorFlagRaised();
-    if (!errorFlagRaised) {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, message: "pong" }));
-    } else {
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          success: false,
-          message: "server error, check errors",
-        })
-      );
-    }
+    const currentTime = Date.now();
+    const timeSinceLastLoop = currentTime - lastLoopTimestamp;
+    const isLoopRecent = timeSinceLastLoop < 15 * 60 * 1000; // Check if the last loop was started within 15 minutes
+    const healthy = isLoopRecent && !errorFlagRaised;
+    const respJson = JSON.stringify({
+      health: healthy,
+      message: !isLoopRecent && errorFlagRaised ? "check the daemon and errors" : 
+               !isLoopRecent ? "check the daemon" : 
+               errorFlagRaised ? "check errors" : "ok",
+      lastLoopTimestamp: new Date(lastLoopTimestamp).toISOString(),
+    })
+    res.writeHead(healthy ? 200 : 500, { "Content-Type": "application/json" });
+    res.end(respJson);
   });
   const port = process.env.PORT || 8018;
   heartbeatServer.listen(port, () => {
@@ -417,6 +419,8 @@ async function main() {
   const runTasks = async () => {
     while (true) {
       try {
+        lastLoopTimestamp = Date.now(); // Update the timestamp at the start of each loop
+        
         const now = new Date();
         const currentDate = now.toISOString().split("T")[0]; // e.g., "2025-02-24"
 
