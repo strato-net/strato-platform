@@ -108,10 +108,9 @@ export const Art = {
 export const Tokens = {
   prefix: '/tokens',
   create: '/',
-  getETHSTAddress: '/address',
-  getWBTCSTAddress: '/wbtcstAddress',
   addHash: '/addHash',
   bridgeOut: '/bridgeOut',
+  getBridgeableTokens: '/bridgeableTokens',
 };
 
 export const CarbonOffset = {

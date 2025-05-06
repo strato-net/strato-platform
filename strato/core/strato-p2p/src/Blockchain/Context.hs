@@ -472,6 +472,7 @@ type MonadP2P m =
       '[ '(PPeer, TcpEnableTime),
          '(PPeer, UdpEnableTime),
          '(PPeer, PeerDisable),
+         '(PPeer, PeerLastBestBlockHash),
          '(PPeer, T.Text),
          '((Host, Point), PeerBondingState)
        ]

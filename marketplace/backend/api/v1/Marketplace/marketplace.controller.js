@@ -94,28 +94,39 @@ class MarketplaceController {
 
   movingGoldToFirst(inventoryData) {
     const inventoryDataCopy = JSON.parse(JSON.stringify(inventoryData));
-
-    // Move item with name 'gold' (case-insensitive) to the front
-    const indexOfGoldSt = inventoryDataCopy.findIndex(
-      x => x.name?.toLowerCase() === 'gold' || x.name?.toLowerCase() === 'goldst'
-    );
-    if (indexOfGoldSt > -1) {
-      const dataToMove = inventoryDataCopy.splice(indexOfGoldSt, 1)[0];
-      inventoryDataCopy.unshift(dataToMove);
-    }
-
-    // Move items with 'sale' as undefined, null, or falsy to the end
-    const itemsWithSale = inventoryDataCopy.filter(x => x.sale);
-    const itemsWithoutSale = inventoryDataCopy.filter(x => !x.sale);
-    return [...itemsWithSale, ...itemsWithoutSale];
+    // Create a set of token names from constants.tokensArray
+    const tokensNamesSet = new Set(constants.tokensArray.map(token => token.name.toLowerCase()));
+    
+    // Partition items into four buckets:
+    // Bucket 1: Items with name 'gold' or 'goldst'
+    // Bucket 2: Items with a truthy 'sale' property
+    // Bucket 3: Items whose name exists in tokensNamesSet
+    // Bucket 4: All other items
+    const bucketGold = [];
+    const bucketSale = [];
+    const bucketTokenNames = [];
+    const bucketRest = [];
+    
+    inventoryDataCopy.forEach(item => {
+      const name = item.name?.toLowerCase();
+      if (name === 'gold' || name === 'goldst') {
+        bucketGold.push(item);
+      } else if (item.sale) {
+        bucketSale.push(item);
+      } else if (tokensNamesSet.has(name)) {
+        bucketTokenNames.push(item);
+      } else {
+        bucketRest.push(item);
+      }
+    });
+    
+    return [...bucketGold, ...bucketSale, ...bucketTokenNames, ...bucketRest];
   }
 
   static async getStakeableProducts(req, res, next) {
     try {
-      const { dapp, query } = req;
-      const inventories = await dapp.getStakeableProducts({
-        ...query,
-      });
+      const { dapp } = req;
+      const inventories = await dapp.getStakeableProducts();
       const updatedInventory = new MarketplaceController().movingGoldToFirst(inventories);
       rest.response.status200(res, updatedInventory);
 

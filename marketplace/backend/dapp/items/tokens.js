@@ -164,6 +164,33 @@ async function addHash(user, args, options) {
   return rest.call(user, callArgs, options);
 }
 
+
+async function getBridge(user, args, options) {
+  const CREATOR = 'in.(BlockApps,mercata_usdst)';
+  const IS_ACTIVE = 'eq.true';
+  // const contractName = 'MercataETHBridge';
+  const mercataETHBridgeSearchOptions = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      isActive: IS_ACTIVE,
+      ['data->>isMint']: 'eq.True',
+    },
+  };
+
+  const ethBridge = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-MercataETHBridge' },
+    mercataETHBridgeSearchOptions
+  );
+
+  if (!ethBridge || ethBridge.length === 0) {
+    throw new Error('No active ethBridge found for the given address');
+  }
+
+  return ethBridge;
+}
+
 async function burnETHST(user, args, options) {
   const { ethstAddresses, quantity, baseAddress, tokenAssetRootAddress } = args;
   const contractName = 'MercataETHBridge';
@@ -200,24 +227,20 @@ function getCataAddress() {
   }
 }
 
-function getETHSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodETHSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetETHSTAddress;
-  } else {
-    return constants.prodETHSTAddress;
-  }
-}
-
-function getWBTCSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodWBTCSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetWBTCSTAddress;
-  } else {
-    return constants.prodWBTCSTAddress;
-  }
+function getBridgeableTokensAddress(cirrusData) {
+  const addressMapping = cirrusData.reduce((acc, item) => {
+    acc[item.data.name] = item.address;
+    return acc;
+  }, {});
+  
+  // Update tokensArray with addresses
+  const {tokensArray} = constants;
+  tokensArray.forEach(token => {
+    if (addressMapping[token.name]) {
+      token.address = addressMapping[token.name];
+    }
+  });
+  return tokensArray;
 }
 
 function getStratsAddress() {
@@ -238,10 +261,10 @@ export default {
   marshalIn,
   marshalOut,
   addHash,
+  getBridge,
   burnETHST,
   getUSDSTAddress,
   getCataAddress,
-  getETHSTAddress,
   getStratsAddress,
-  getWBTCSTAddress,
+  getBridgeableTokensAddress
 };

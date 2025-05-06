@@ -908,7 +908,7 @@ const ProductDetails = ({ user, users }) => {
             balance: ethBalance,
             decimals: 18,
           }}
-          tokenName="ETH"
+          tokenName="ETHST"
         />
       )}
       {borrowModalOpen && (

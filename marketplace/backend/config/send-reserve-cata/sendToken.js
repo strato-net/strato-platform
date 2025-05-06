@@ -94,7 +94,7 @@ async function main() {
         args: util.usc({
           newOwner: RESERVE_ADDRESS,
           price: 0.1,
-          quantity: Number(CATA_QUANTITY),
+          quantity: `${CATA_QUANTITY}`,
           transferNumber: util.iuid(),
         }),
       },

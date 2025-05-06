@@ -283,7 +283,22 @@ pipeline {
                 allOf {
                   branch "PR-*"
                   environment(name: "CHANGE_TARGET", value: "develop")
-                  changeset "strato/**"
+                  expression {
+                    sh(script: '''
+                      echo "[Test Sync check] Checking for strato/ changes..."
+                      git fetch origin develop --quiet
+                      if git diff --name-only origin/develop...HEAD | grep '^strato/'; then
+                        echo "[Test Sync check] Detected changes in strato/"
+                      else
+                        echo "[Test Sync check] No changes in strato/, skipping"
+                      fi
+                    ''', returnStatus: true)
+
+                    return sh(
+                      script: 'git diff --name-only origin/develop...HEAD | grep -q "^strato/"',
+                      returnStatus: true
+                    ) == 0
+                  }
                 }
               }
               agent { label "testsync" }
@@ -454,7 +469,7 @@ pipeline {
           steps{
             dir ('tests') {
               sh 'rm -rf node_modules'
-              sh 'npm install'
+              sh 'npm ci'
               sh 'npm run test'
             }
           }

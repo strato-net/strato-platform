@@ -1,13 +1,13 @@
 import React from 'react';
 import { useAuthenticateState } from '../../contexts/authentication';
 
-const WbtcstSteps = () => {
+const StakeSteps = ({name}) => {
   const { loginUrl } = useAuthenticateState();
 
   return (
     <div className="bg-[#f3f4f6] p-4 rounded-md mx-16">
       <h2 className="text-center text-xl font-semibold mb-6">
-        How to stake WBTCST in 4 simple steps
+        How to stake {name} in 4 simple steps
       </h2>
       <div className="relative flex flex-col md:flex-row items-center md:justify-between">
         {/* Green Line Connecting Circles */}
@@ -73,8 +73,8 @@ const WbtcstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Connect to your Ethereum wallet and bridge your WBTC to Mercata’s
-              equivalent token WBTCST to begin staking!
+              Connect to your Ethereum wallet and bridge your {name.replace(/st/gi, '')} to Mercata’s
+              equivalent token {name} to begin staking!
             </p>
           </div>
         </div>
@@ -98,7 +98,7 @@ const WbtcstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Stake your WBTCST tokens and begin earning daily rewards in the
+              Stake your {name} tokens and begin earning daily rewards in the
               form of CATA, our governance token.
             </p>
           </div>
@@ -121,7 +121,7 @@ const WbtcstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Borrow (interest-free for a limited time!) USDST against your staked WBTCST.
+              Borrow (interest-free for a limited time!) USDST against your staked {name}.
             </p>
           </div>
         </div>
@@ -130,4 +130,4 @@ const WbtcstSteps = () => {
   );
 };
 
-export default WbtcstSteps;
+export default StakeSteps;

@@ -22,12 +22,7 @@ const StakeableProductCards = () => {
 
   useEffect(() => {
     if (reserves) {
-      actions.fetchStakeableProducts(
-        marketplaceDispatch,
-        reserves
-          .filter((reserve) => !reserve.name.toLowerCase().includes('temp'))
-          .map((reserve) => reserve.assetRootAddress)
-      );
+      actions.fetchStakeableProducts(marketplaceDispatch);
     }
   }, [marketplaceDispatch, reserves]);
 
@@ -92,7 +87,7 @@ const StakeableProductCards = () => {
               {stakeableProducts.map((topSellingProduct) => {
                 const matchingReserve = reserves?.find(
                   (reserve) =>
-                    reserve.assetRootAddress === topSellingProduct.address
+                    reserve.assetRootAddress === topSellingProduct.root
                 );
                 return (
                   <NewTrendingCard

@@ -34,10 +34,11 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
 import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
 import BridgeWallet from '../ETHST/BridgeWallet';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const USDSTIcon = (
   <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -53,7 +54,6 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
-  bridgeableTokens,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -70,8 +70,20 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const { bridgeableTokens } = useEthState();
+
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokens = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokens();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
+
   const [bridgeOutModalOpen, setBridgeOutModalOpen] = useState(false);
-  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -93,12 +105,14 @@ const InventoryCard = ({
       ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
       : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
     : undefined;
-  const saleQuantity =
-    inventory.saleQuantity !== undefined
-      ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-        new BigNumber(10).pow(decimals)
-      )
-      : undefined;
+  
+  const saleQuantity = (
+    stratsAddress === inventory.originAddress
+      ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+      : new BigNumber(inventory.saleQuantity || 0).dividedBy(
+          new BigNumber(10).pow(decimals || 0)
+        )
+  )
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
       new BigNumber(10).pow(decimals)
@@ -196,12 +210,8 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    if (inventory.originAddress === ethstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (inventory.originAddress === wbtcstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+    if (bridgeableAddresses?.includes(inventory.originAddress)) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address).replace(':bridgeableAsset', inventory.name)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {
@@ -283,8 +293,8 @@ const InventoryCard = ({
 
   const isBridgeableToken = (inventoryRoot) => {
     return (
-      Array.isArray(bridgeableTokens) &&
-      bridgeableTokens.find((address) => address === inventoryRoot)
+      Array.isArray(bridgeableAddresses) &&
+      bridgeableAddresses.find((address) => address === inventoryRoot)
     );
   };
 
@@ -570,9 +580,34 @@ const InventoryCard = ({
 
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Price</p>
+            <p className="text-[#202020] font-semibold">
+              {price ? (
+                <p className="flex">
+                  <span>${price.toString()}</span>
+                  <p className="flex text-xs items-center">
+                    &nbsp;(
+                    {price.toString()} {USDSTIcon})
+                  </p>
+                </p>
+              ) : (
+                'N/A'
+              )}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
               {quantity.toNumber().toLocaleString('en-US', {
+                maximumFractionDigits: 6,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
+            <p className="text-[#202020] font-semibold">
+              {saleQuantity.toNumber().toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
@@ -602,28 +637,6 @@ const InventoryCard = ({
                       maximumFractionDigits: 6,
                       minimumFractionDigits: 0,
                     }) || 'N/A'}
-                </p>
-              </div>
-              <div className="flex justify-between  ">
-                <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-                <p className="text-[#202020] font-semibold">
-                  {saleQuantity ? saleQuantity.toString() : 'N/A'}
-                </p>
-              </div>
-              <div className="flex justify-between  ">
-                <p className="text-[#6A6A6A]">Price</p>
-                <p className="text-[#202020] font-semibold">
-                  {price ? (
-                    <p className="flex">
-                      <span>${price.toString()}</span>
-                      <p className="flex text-xs items-center">
-                        &nbsp;(
-                        {price.toString()} {USDSTIcon})
-                      </p>
-                    </p>
-                  ) : (
-                    'N/A'
-                  )}
                 </p>
               </div>
             </>

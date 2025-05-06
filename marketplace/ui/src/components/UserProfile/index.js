@@ -81,8 +81,6 @@ const UserProfile = ({ user }) => {
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
-      await ethActions.fetchETHSTAddress(ethDispatch);
-      await ethActions.fetchWBTCSTAddress(ethDispatch);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 

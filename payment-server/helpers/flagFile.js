@@ -5,7 +5,7 @@ const error_flag_file_path = `${process.env.CONFIG_DIR_PATH || '.'}/errors_list`
 
 async function appendToErrorFile(error_message) {
   try {
-    await fs.appendFile(error_flag_file_path, error_message+'\n');
+    await fs.appendFile(error_flag_file_path, `${new Date().toISOString()} :: ${error_message}\n`);
     console.log('Added the error message to the error file.');
   } catch (err) {
     console.error('!!! An error occurred while appending to the file:', err);
@@ -21,7 +21,7 @@ async function isErrorFlagRaised() {
       return false
     } else {
       console.error('An error occurred:', err);
-      await appendToErrorFile(`An error occurred while checking the error file: ${err}`);
+      await appendToErrorFile(`${new Date().toISOString()} :: An error occurred while checking the error file: ${err.message}`);
       return true;
     }
   }

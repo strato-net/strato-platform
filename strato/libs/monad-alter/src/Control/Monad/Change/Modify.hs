@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -14,7 +15,8 @@ module Control.Monad.Change.Modify
     inputs,
     Outputs (..),
     genericOutputsStringIO,
-    Awaits (..),
+    Awaitable (..),
+    Awaits,
     Yields (..),
     module Data.Proxy,
   )
@@ -161,14 +163,14 @@ class Outputs f a where
 genericOutputsStringIO :: MonadIO m => String -> m ()
 genericOutputsStringIO = liftIO . putStrLn
 
-{- The Awaits Typeclass
-  (f `Awaits` a) is a typeclass used to generalize the `await` function from streaming
+{- The Awaitable Typeclass
+  Awaitable a f is a typeclass used to generalize the `await` function from streaming
   libraries like Pipes and Conduit to any monad f.
   The class has two type parameters:
-    f - the underlying monad, such as `ConduitT i o m r`
     a - the value type being awaited, like the `i` in `ConduitT i o m r`
+    f - the underlying monad, such as `ConduitT i o m r`
 -}
-class Awaits f a where
+class Awaitable a f where
   await :: f (Maybe a)
   {-# MINIMAL await #-}
 
@@ -177,6 +179,8 @@ class Awaits f a where
     await >>= \case
       Nothing -> return ()
       Just a -> f a >> awaitForever f
+
+type Awaits f a = Awaitable a f
 
 {- The Yields Typeclass
   (f `Yields` a) is a typeclass used to generalize the `yield` function from streaming

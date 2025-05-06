@@ -20,26 +20,6 @@ class TokensController {
     }
   }
 
-  static async getETHSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getETHSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getWBTCSTAddress(_, res, next) {
-    try {
-      const address = await tokensJs.getWBTCSTAddress();
-
-      return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
   static async addHash(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -65,6 +45,17 @@ class TokensController {
       rest.response.status200(res, result);
 
       return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getBridgeableTokens(req, res, next) {
+    try {
+      const { dapp } = req;
+      const result = await dapp.getBridgeableAddresses({});
+      const tokensArray =  await tokensJs.getBridgeableTokensAddress(result);
+      return rest.response.status200(res, tokensArray);
     } catch (e) {
       return next(e);
     }

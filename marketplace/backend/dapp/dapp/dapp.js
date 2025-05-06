@@ -960,13 +960,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions);
   };
 
-  contract.getStakeableProducts = async function (
-    args = {},
-    options = optionsNoChainIds
-  ) {
+  contract.getStakeableProducts = async function (options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-
-    return inventoryJs.getAll(rawAdmin, args, getOptions);
+    return await inventoryJs.getStakeableProducts(rawAdmin, getOptions);
   };
 
   contract.getPriceHistory = async function (args, options = defaultOptions) {
@@ -1165,6 +1161,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.addHash = async function (args, options = defaultOptions) {
     return tokensJs.addHash(rawAdmin, args, options);
+  };
+
+  contract.getBridgeableAddresses = async function (args, options = defaultOptions) {
+    return tokensJs.getBridge(rawAdmin, args, options);
   };
 
   contract.bridgeOut = async function (args, options = defaultOptions) {

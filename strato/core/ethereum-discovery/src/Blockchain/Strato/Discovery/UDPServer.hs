@@ -40,6 +40,7 @@ import           Data.Maybe                              (fromJust)
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
+import           Numeric.Natural
 import           System.Entropy
 import           System.Random
 import qualified Text.Colors                             as CL
@@ -125,10 +126,9 @@ udpHandshakeServer minPeers = do
   _ <- addPeersIfNeeded minPeers
   _ <- attemptBond
   -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
-  maybePacketData <- A.select (A.Proxy @(B.ByteString, SockAddr)) ()
-  _ <- case maybePacketData of
+  Mod.await @UDPPacket >>= \case
     Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
-    Just (msg, addr) -> do
+    Just (UDPPacket (msg, addr)) -> do
       _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ show (B.length msg)
       catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> T.pack (show e)
   udpHandshakeServer minPeers
@@ -195,7 +195,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       Just peer -> do
         A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
           Just (PeerBondingState b) | b > 1 -> do
-            peers <- getPeersClosestTo targetPubkey otherPubKey
+            peers <- getPeersClosestTo (20 :: Natural) targetPubkey otherPubKey
             let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
             sendPacket peer $ Neighbors theNeighbors nextTime
           _ -> do
