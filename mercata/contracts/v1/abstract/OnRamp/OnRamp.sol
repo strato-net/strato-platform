@@ -106,6 +106,10 @@ abstract contract OnRamp {
         approver = newApprover;
     }
 
+    function setPriceOracle(address newOracle) external onlyOwner {
+        priceOracle = PriceOracleBase(newOracle);
+    }
+
     function createSellOrder(address token, uint256 amount, uint256 marginBps)
         external onlyApprovedSeller onlyWhitelistedToken(token)
     {
