@@ -31,6 +31,7 @@ import Control.Arrow ((***))
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Data.Aeson
+import Data.Foldable (for_)
 import Data.Maybe
 import Data.Swagger hiding (name)
 import qualified Database.Esqueleto.Legacy as E
@@ -150,7 +151,9 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
           E.where_ (foldl1 (E.&&.) criteria2)
 
           E.offset . fromIntegral $ fromMaybe 0 qsOffset
-          E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qsLimit
+          case qsAddress of
+            Nothing -> E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qsLimit
+            Just _ -> for_ qsLimit $ E.limit . fromIntegral
 
           E.orderBy [E.asc (storage E.^. StorageKey)]
 
