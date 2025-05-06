@@ -385,11 +385,11 @@ async function main() {
     const isLoopRecent = timeSinceLastLoop < 15 * 60 * 1000; // Check if the last loop was started within 15 minutes
     const healthy = isLoopRecent && !errorFlagRaised;
     const respJson = JSON.stringify({
-      lastLoopTimestamp: new Date(lastLoopTimestamp).toISOString(),
       health: healthy,
       message: !isLoopRecent && errorFlagRaised ? "check the daemon and errors" : 
                !isLoopRecent ? "check the daemon" : 
                errorFlagRaised ? "check errors" : "ok",
+      lastLoopTimestamp: new Date(lastLoopTimestamp).toISOString(),
     })
     res.writeHead(healthy ? 200 : 500, { "Content-Type": "application/json" });
     res.end(respJson);
