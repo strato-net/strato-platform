@@ -1,0 +1,49 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    image: mercata-backend
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - NODE_URL=${NODE_URL}
+      - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  frontend:
+    build: ./frontend
+    image: mercata-frontend
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - ssl=${ssl:-false}
+    build:
+      context: ./nginx
+      # Uncomment if having issues pulling the openresty module from a repo at build time
+      #extra_hosts:
+      #  - "openresty.org=3.125.51.27"
+    image: mercata-nginx
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
