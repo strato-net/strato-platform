@@ -12,7 +12,7 @@ const USDSTIcon = (
 );
 
 // Make sure you have any necessary variables or functions defined/imported
-// You may need to pass user, limit, offset, reserves, USDSTAddress, assetsWithEighteenDecimalPlaces as params,
+// You may need to pass user, limit, offset, reserves, USDSTAddress as params,
 // or handle them in the file where you call these columns.
 
 export const aggregateStakeColumns = (
@@ -20,8 +20,7 @@ export const aggregateStakeColumns = (
   limit,
   offset,
   reserves,
-  USDSTAddress,
-  assetsWithEighteenDecimalPlaces
+  USDSTAddress
 ) => {
   return [
     {
@@ -125,9 +124,7 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -235,7 +232,6 @@ export const aggregateStakeColumns = (
             debouncedSearchTerm={''}
             user={user}
             reserves={reserves}
-            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -282,7 +278,6 @@ export const stakeColumns = (
   offset,
   reserves,
   bridgeableTokens,
-  assetsWithEighteenDecimalPlaces,
   navigate
 ) => {
   return [
@@ -335,9 +330,7 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         const displayedQuantity = record.quantity / Math.pow(10, decimals)
         return <div>{displayedQuantity || 0}</div>;
       },
@@ -357,9 +350,7 @@ export const stakeColumns = (
             return true;
           }
         };
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         // Parse quantity safely
         const parsedQuantity = parseFloat(record.quantity) || 0;
         const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
@@ -396,9 +387,7 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         return (
           <div>
             { matchingQuantity / Math.pow(10, decimals) }
@@ -459,7 +448,6 @@ export const stakeColumns = (
           user={user}
           reserves={reserves}
           bridgeableTokens={bridgeableTokens}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       ),
     },

@@ -52,7 +52,6 @@ const ResponsiveCart = ({
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const [tax, setTax] = useState(new BigNumber(0));
   const [subTotal, setSubTotal] = useState(new BigNumber(0));
   const [total, setTotal] = useState(new BigNumber(0));
@@ -157,9 +156,7 @@ const ResponsiveCart = ({
     let orderList = [];
 
     cartData.forEach((item) => {
-      const decimals = assetsWithEighteenDecimalPlaces.includes(item.key)
-        ? 18
-        : item.decimals || 0;
+      const decimals = 18;
 
       const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);

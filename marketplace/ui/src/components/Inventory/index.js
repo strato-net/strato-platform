@@ -84,8 +84,6 @@ const Inventory = ({ user }) => {
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -477,15 +475,8 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
-          record.originAddress
-        );
         const price = record.price
-          ? stratsAddress === record.originAddress
-            ? parseFloat(record.price * 100).toFixed(2)
-            : is18DecimalPlaces
-              ? parseFloat(record.price * 10 ** 18).toFixed(2)
-              : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
+          ? parseFloat(record.price * 10 ** 18).toFixed(2)
           : 'N/A';
         return (
           <div>
@@ -508,19 +499,10 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
-          record.originAddress
-        );
         const quantity = (
-          stratsAddress === record.originAddress
-            ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
-            : is18DecimalPlaces
-              ? new BigNumber(record.quantity).dividedBy(
-                new BigNumber(10).pow(18)
-              )
-              : new BigNumber(record.quantity).dividedBy(
-                new BigNumber(10).pow(record.decimals || 0)
-              )
+          new BigNumber(record.quantity).dividedBy(
+            new BigNumber(10).pow(18)
+          )
         )
           .toNumber()
           .toLocaleString('en-US', {
@@ -534,19 +516,10 @@ const Inventory = ({ user }) => {
       title: 'Listed for Sale',
       align: 'center',
       render: (_, record) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
-          record.originAddress
-        );
         const saleQuantity = (
-          stratsAddress === record.originAddress
-            ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
-            : is18DecimalPlaces
-              ? new BigNumber(record.saleQuantity || 0).dividedBy(
-                new BigNumber(10).pow(18)
-              )
-              : new BigNumber(record.saleQuantity || 0).dividedBy(
-                new BigNumber(10).pow(record.decimals || 0)
-              )
+          new BigNumber(record.saleQuantity || 0).dividedBy(
+            new BigNumber(10).pow(18)
+          )
         ).toString();
 
         return <div className="w-24">{saleQuantity}</div>;
@@ -568,7 +541,6 @@ const Inventory = ({ user }) => {
             bridgeableTokens={bridgeableAddresses}
             supportedTokens={supportedTokens}
             reserves={reserves}
-            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -831,9 +803,6 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        assetsWithEighteenDecimalPlaces={
-                          assetsWithEighteenDecimalPlaces
-                        }
                       />
                     ))
                   ) : (
@@ -855,9 +824,6 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        assetsWithEighteenDecimalPlaces={
-                          assetsWithEighteenDecimalPlaces
-                        }
                       />
                     ))
                   ) : (

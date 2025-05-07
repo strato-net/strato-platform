@@ -41,7 +41,6 @@ const { Title } = Typography;
 const GlobalTransaction = ({
   user,
   USDSTAddress,
-  assetsWithEighteenDecimalPlaces,
   bridgeableAddresses,
   stratsAddress,
 }) => {
@@ -101,11 +100,7 @@ const GlobalTransaction = ({
   }, [globalTransactions]);
 
   const Content = ({ data }) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      data.assetOriginAddress
-    )
-      ? 18
-      : data.decimals || 0;
+    const decimals = 18;
     const price = (data?.assetPrice || data?.price) * Math.pow(10, decimals);
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -236,12 +231,7 @@ const GlobalTransaction = ({
           formattedQuantity = quantity;
         } else {
           if (quantity) {
-            const value =
-              assetOriginAddress === stratsAddress
-                ? (quantity / 100).toFixed(2)
-                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                ? quantity / Math.pow(10, 18)
-                : quantity / Math.pow(10, decimals || 0);
+            const value = quantity / Math.pow(10, 18)
 
             formattedQuantity = value.toLocaleString('en-US', {
               maximumFractionDigits: 6,
@@ -263,29 +253,13 @@ const GlobalTransaction = ({
         <>
           <p className="text-base flex justify-end items-center">
             {price
-              ? formattedNum(
-                  assetOriginAddress === stratsAddress
-                    ? (price * 100).toFixed(2)
-                    : assetsWithEighteenDecimalPlaces.includes(
-                        assetOriginAddress
-                      )
-                    ? (price * Math.pow(10, 18)).toFixed(2)
-                    : (price * Math.pow(10, decimals || 0)).toFixed(2)
-                )
+              ? formattedNum((price * Math.pow(10, 18)).toFixed(2))
               : '--'}
             <span>{price && USDSTIcon}</span>
           </p>
           <p className="text-xs">
             {price
-              ? `$ ${formattedNum(
-                  assetOriginAddress === stratsAddress
-                    ? (price * 100).toFixed(2)
-                    : assetsWithEighteenDecimalPlaces.includes(
-                        assetOriginAddress
-                      )
-                    ? (price * Math.pow(10, 18)).toFixed(2)
-                    : (price * Math.pow(10, decimals || 0)).toFixed(2)
-                )}`
+              ? `$ ${formattedNum((price * Math.pow(10, 18)).toFixed(2))}`
               : '--'}
           </p>
         </>
@@ -460,7 +434,6 @@ const GlobalTransaction = ({
               data={list}
               user={user}
               isTransactionLoading={isTransactionLoading}
-              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               bridgeableAddresses={bridgeableAddresses}
               stratsAddress={stratsAddress}
             />

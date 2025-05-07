@@ -17,7 +17,6 @@ const Invoice = () => {
   const dispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { orderDetails, isorderDetailsLoading } = useOrderState();
-  const { assetsWithEighteenDecimalPlaces, isFetchingAssetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const [decimals, setDecimals] = useState(false);
 
   const routeMatch = useMatch({
@@ -32,24 +31,19 @@ const Invoice = () => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchOrderDetails(dispatch, Id);
-      marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-        marketplaceDispatch
-      );
     }
   }, [Id, dispatch]);
 
   useEffect(() => {
-    if (orderDetails && assetsWithEighteenDecimalPlaces) {
-      const decimals = assetsWithEighteenDecimalPlaces.includes(
-        orderDetails.assets[0].root
-      ) ? 18 : orderDetails.assets[0].decimals || 0;
+    if (orderDetails) {
+      const decimals = 18;
       setDecimals(decimals);
     }
-  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
+  }, [orderDetails]);
 
   return (
     <div className="h-screen">
-      {orderDetails === null || isorderDetailsLoading || isFetchingAssetsWithEighteenDecimalPlaces ? (
+      {orderDetails === null || isorderDetailsLoading ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isorderDetailsLoading} size="large" />
         </div>

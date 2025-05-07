@@ -37,18 +37,13 @@ const ListForSaleModal = ({
   debouncedSearchTerm,
   category,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const { stratsAddress } = useMarketplaceState();
   const isStrat = inventory.originAddress === stratsAddress;
   const [data, setData] = useState([inventory]);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const decimals = isStrat
-    ? 2
-    : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-    ? 18
-    : inventory.decimals || 0;
+  const decimals = 18;
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = new BigNumber(
       inventory.saleAddress ? inventory.saleQuantity : inventory.quantity

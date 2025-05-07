@@ -179,7 +179,6 @@ const BorrowModal = ({
   limit,
   offset,
   productDetailPage,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const { isReservesLoading, reserves, isBorrowing } = useInventoryState();
   const inventoryDispatch = useInventoryDispatch();

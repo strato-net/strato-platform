@@ -1,12 +1,7 @@
 pragma es6;
 pragma strict;
 
-contract ERC20Asset is ERC20{
-    address public owner;
-    string public description;
-    string[] public images;
-    string[] public files;
-    string[] public fileNames;
+contract ERC20Asset is Asset {
 
     constructor(
         string _name,
@@ -16,12 +11,18 @@ contract ERC20Asset is ERC20{
         string[] _files,
         string[] _fileNames,
         uint256 _initialSupply
-    ) ERC20(_name, _symbol){
-        owner = msg.sender;
-        description = _description;
-        images = _images;
-        files = _files; 
-        fileNames = _fileNames;
+    ) Asset(
+        _name,
+        _symbol,
+        _description,
+        _images,
+        _files,
+        _fileNames,
+        block.timestamp,
+        _initialSupply,
+        18,
+        AssetStatus.ACTIVE
+    ) {
         _mint(msg.sender, _initialSupply);
     }
 

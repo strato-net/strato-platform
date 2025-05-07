@@ -5,7 +5,7 @@ import <509>;
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 
-abstract contract Asset is Utils {
+abstract contract Asset is Utils, ERC20 {
     enum AssetStatus {
         NULL,
         ACTIVE,
@@ -58,6 +58,7 @@ abstract contract Asset is Utils {
 
     constructor(
         string _name,
+        string _symbol,
         string _description,
         string[] _images,
         string[] _files,
@@ -66,7 +67,7 @@ abstract contract Asset is Utils {
         uint _quantity,
         uint _decimals,
         AssetStatus _status
-    ) {
+    ) ERC20(_name, _symbol) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
         require(_quantity >= 0, "Quantity must be greater than or equal to 0");
         owner  = msg.sender;

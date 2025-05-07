@@ -240,17 +240,12 @@ const StakeModal = ({
   offset,
   type,
   productDetailPage,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const { isStaking, isUnstaking, isReservesLoading, reserves } =
     useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
   const isLoader = isStaking || isUnstaking || isReservesLoading;
-  const decimalFactor = new BigNumber(10).pow(
-    assetsWithEighteenDecimalPlaces?.includes(inventory.root)
-      ? 18
-      : inventory.decimals || 0
-  );
+  const decimalFactor = 18;
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);

@@ -980,11 +980,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         { originAddress: originAddress },
         options
       );
-      const decimals = assetsOfOriginAsset[0].decimals
-        ? assetsOfOriginAsset[0].decimals
-        : constants.AssetsWithEighteenDecimalPlaces.includes(originAddress)
-        ? 18
-        : 0;
+      const decimals = 18;
       const assetsAddressArr = assetsOfOriginAsset.map((item) => item.address);
       // Aggregate sales for all associated assets
 
@@ -1225,12 +1221,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       rawAdmin,
       {
 	  owner: userAddress,
-        originAddress: USDSTOriginAddress,
-        queryOptions: { select: 'quantity.sum()' },
+        address: USDSTOriginAddress,
       },
       options
     );
-    return balance[0].sum || 0;
+    return balance[0].quantity || 0;
   };
 
   contract.getCataBalance = async function (_, options = defaultOptions) {
@@ -1239,12 +1234,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       rawAdmin,
       {
         owner: sessionUser.address,
-        originAddress: CataOriginAddress,
-        queryOptions: { select: 'quantity.sum()' },
+        address: CataOriginAddress,
       },
       options
     );
-    return balance[0].sum || 0;
+    return balance[0].quantity || 0;
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------

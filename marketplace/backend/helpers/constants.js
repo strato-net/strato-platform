@@ -61,16 +61,7 @@ export default {
     'blockapps_art',
     'blockapps_spirits',
   ],
-  AssetsWithEighteenDecimalPlaces: [
-    '2680dc6693021cd3fefb84351570874fbef8332a', //prodCataAddress
-    '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
-    '93fb7295859b2d70199e0a4883b7c320cf874e6c', //prodETHSTAddress
-    'fa4e951fdb86f10394a23efc89ddeef83a0b1c17', //testnetETHSTAddress
-    '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
-    '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
-    'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
-    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
-  ],
+  AssetsWithEighteenDecimalPlaces: [],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
   testTokenServerUrl: 'https://campaigns-test.blockapps.net',
