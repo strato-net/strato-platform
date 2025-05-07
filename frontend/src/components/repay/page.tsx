@@ -170,11 +170,12 @@ export const RenderRepay = ({ dashboardRef }: ChildComponentProps) => {
                             placeholder="0.00"
                             className="flex-1 text-lg focus:outline-none text-gray-800 placeholder-gray-400 bg-transparent"
                         />
-                        <div className="flex items-center gap-2 ml-3">
-                            <h3 className="text-base font-semibold text-gray-700">
-                                {loan?._symbol ?? "ETH"}
-                            </h3>
-                        </div>
+                        {loan &&
+                            <div className="flex items-center gap-2 ml-3">
+                                <h3 className="text-base font-semibold text-gray-700">
+                                    {loan?._symbol ?? "ETH"}
+                                </h3>
+                            </div>}
                     </div>
                 </div>
 

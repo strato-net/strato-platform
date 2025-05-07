@@ -80,7 +80,14 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden sm:flex items-center gap-8 text-[15px] font-semibold">
-            <span className="text-white/60 cursor-not-allowed">Buy/Bridge</span>
+            <Link 
+               href="/buy"
+               className={`transition ${
+                 isActiveParentRoute(['/buy']) ? 'text-cyan-300 underline' : 'text-white/90 hover:text-cyan-300'
+               }`}
+            >
+              Buy/Bridge
+            </Link>
 
             <Link
               href="/swap"

@@ -211,11 +211,11 @@ export const RenderBorrow = ({ dashboardRef }: ChildComponentProps) => {
               placeholder="0.00"
               className="flex-1 text-lg focus:outline-none text-gray-800 placeholder-gray-400 bg-transparent"
             />
-            <div className="flex items-center gap-2 ml-3">
+            {selectedWithdrawToken && <div className="flex items-center gap-2 ml-3">
               <h3 className="text-base font-semibold text-gray-700">
                 {selectedWithdrawToken?._symbol ?? "NA"}
               </h3>
-            </div>
+            </div>}
           </div>
         </div>
         {selectedWithdrawToken && (
@@ -296,11 +296,12 @@ export const RenderBorrow = ({ dashboardRef }: ChildComponentProps) => {
               placeholder="0.00"
               className="flex-1 text-lg focus:outline-none text-gray-800 placeholder-gray-400 bg-transparent"
             />
-            <div className="flex items-center gap-2 ml-3">
-              <h3 className="text-base font-semibold text-gray-700">
-                {selectedColleteralToken?._symbol ?? "NA"}
-              </h3>
-            </div>
+            {selectedColleteralToken &&
+              <div className="flex items-center gap-2 ml-3">
+                <h3 className="text-base font-semibold text-gray-700">
+                  {selectedColleteralToken?._symbol ?? "NA"}
+                </h3>
+              </div>}
           </div>
           <p className="mt-2 text-sm text-gray-500">
             Minimum collateral: {minCollateral} {selectedColleteralToken?._symbol || selectedColleteralToken?.address}

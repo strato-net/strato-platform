@@ -510,7 +510,10 @@ export const RenderDeposits = ({ refetchPools }: RefetchPoolProps) => {
                                       <span className="text-gray-600 font-medium">{selectedTokenDeposit2?._name || ""}</span>
                                     </div>
                                   </div>
-                                  <span className="text-sm text-gray-500">1 UNI = 1 USDG</span>
+                                  <span className="text-sm text-gray-500">
+                                    {/* 1 UNI = 1 USDG */}
+                                    {"1" + selectedTokenDeposit1?._symbol + " = " + "1" + selectedTokenDeposit2?._symbol}
+                                  </span>
                                   <div className="text-xs text-gray-400 mt-2">
                                     ⚠️ Market price not found. Please do your own research to avoid loss of funds.
                                   </div>

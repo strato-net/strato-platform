@@ -13,7 +13,7 @@ export default function Lend() {
     <div className="h-screen">
       {supplyOpen && <SupplyModal onClose={() => setSupplyOpen(false)} />}
       {withdrawOpen && <WithdrawModal onClose={() => setWithdrawOpen(false)} />}
-      <div className="max-w-6xl mx-auto mt-10 p-6 bg-white rounded mt-4 bg-white text-[#303549] shadow-[0_2px_1px_rgba(0,0,0,0.05),0_0_1px_rgba(0,0,0,0.25)] transition-shadow duration-300 ease-in-out rounded border border-[#eaebef]">
+      <div className="max-w-6xl mx-auto p-6 mt-4 bg-white text-[#303549] shadow-[0_2px_1px_rgba(0,0,0,0.05),0_0_1px_rgba(0,0,0,0.25)] transition-shadow duration-300 ease-in-out rounded border border-[#eaebef]">
         <div className="p-4">
           <div className="mb-2">
             <h3 className="text-xl font-semibold">Your supplies</h3>

@@ -125,3 +125,16 @@ export interface DashboardHandle {
 export interface ChildComponentProps {
   dashboardRef: RefObject<DashboardHandle | null>;
 }
+
+export interface TokenForm {
+    name: string;
+    symbol: string;
+    address: string;
+    decimals: number;
+    logo: string;
+    network: string;
+    isBuyable: boolean;
+    minAmount: string;
+    maxAmount: string;
+    price: string;
+}
