@@ -13,7 +13,7 @@ abstract contract OnRamp {
         address seller;
         uint256 amount;
         uint256 marginBps; // e.g. 500 = +5%
-        bool cancelled;
+        bool closed;
     }
 
     struct Reservation {
@@ -121,7 +121,7 @@ abstract contract OnRamp {
         require(marginBps >= 0, "Margin less than 0");
 
         uint256 existing = activeOrderFor[token];
-        require(existing == 0 || sellOrders[existing].cancelled, "Active order exists");
+        require(existing == 0 || sellOrders[existing].closed, "Active order exists");
 
         IERC20(token).transferFrom(msg.sender, address(this), amount);
 
@@ -142,7 +142,7 @@ abstract contract OnRamp {
     function updateSellOrder(uint256 orderId, uint256 newAmount, uint256 newMargin) external {
         SellOrder order = sellOrders[orderId];
         require(msg.sender == order.seller, "Not seller");
-        require(!order.cancelled, "Cancelled");
+        require(!order.closed, "Closed");
         require(newAmount > 0, "Zero amount");
         require(newMargin >= 0, "Margin less than 0");
 
@@ -164,10 +164,12 @@ abstract contract OnRamp {
     function cancelOrder(uint256 orderId) external {
         SellOrder order = sellOrders[orderId];
         require(msg.sender == order.seller, "Not seller");
-        require(!order.cancelled, "Already cancelled");
+        require(!order.closed, "Already closed");
 
         uint256 remaining = order.amount;
-        order.cancelled = true;
+        order.closed = true;
+        activeOrderFor[order.token] = 0;
+        order.amount = 0;
 
         IERC20(order.token).transfer(msg.sender, remaining);
 
@@ -178,7 +180,7 @@ abstract contract OnRamp {
         sweepExpired();
         require(reservationCounts[orderId] < MAX_RESERVATIONS_PER_ORDER, "Too many reservations");
         SellOrder order = sellOrders[orderId];
-        require(!order.cancelled, "Cancelled");
+        require(!order.closed, "Closed");
         require(amount > 0 && amount <= order.amount, "Invalid amount");
         require(order.amount >= amount, "Not enough available tokens");
 
@@ -199,12 +201,17 @@ abstract contract OnRamp {
         uint256 reservedAmount = r.amount;
         SellOrder order = sellOrders[orderId];
 
-        require(!order.cancelled, "Cancelled");
+        require(!order.closed, "Closed");
 
         IERC20(order.token).transfer(buyer, reservedAmount);
 
         uint256 totalFiat = calculatePrice(order.token, reservedAmount, order.marginBps);
         emit OrderFulfilled(orderId, buyer, reservedAmount, totalFiat);
+
+        if (order.amount == 0) {
+            order.closed = true;
+            activeOrderFor[order.token] = 0;
+        }
 
         reservations[orderId][buyer] = Reservation(0, 0);
         _removeActiveReservation(orderId, buyer);
