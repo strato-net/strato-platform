@@ -24,7 +24,7 @@ export const getServiceToken = async (): Promise<string> => {
     }
 
     const tokenResponse = await axios.post(
-      openIdTokenEndpoint ?? "",
+      openIdTokenEndpoint,
       new URLSearchParams({
         grant_type: "client_credentials",
       }),
@@ -33,7 +33,7 @@ export const getServiceToken = async (): Promise<string> => {
           "Content-Type": "application/x-www-form-urlencoded",
           Authorization:
             "Basic " +
-            Buffer.from(`${clientId ?? ""}:${clientSecret ?? ""}`).toString(
+            Buffer.from(`${clientId}:${clientSecret}`).toString(
               "base64"
             ),
         },
@@ -113,4 +113,27 @@ export async function createOrGetKey(token: string): Promise<string> {
   }
 
   return address;
+}
+
+/**
+ * Fetches the token endpoint from the OpenID Connect discovery document
+ */
+export async function fetchOpenIdTokenEndpoint(openIdDiscoveryUrl: string | undefined): Promise<string> {
+  try {
+    if (!openIdDiscoveryUrl) {
+      throw new Error("OpenID Discovery URL is not defined");
+    }
+    
+    const response = await axios.get(openIdDiscoveryUrl);
+    const { token_endpoint } = response.data;
+    
+    if (!token_endpoint) {
+      throw new Error("Token endpoint not found in OpenID discovery document");
+    }
+    console.debug("Successfully fetched the token endpoint from OpenID Discovery");
+    return token_endpoint;
+  } catch (error) {
+    console.error("Failed to fetch OpenID discovery data:", error);
+    throw new Error("Failed to fetch OpenID discovery data");
+  }
 }

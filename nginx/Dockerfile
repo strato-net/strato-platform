@@ -1,5 +1,4 @@
 FROM openresty/openresty:1.19.3.1-7-buster
-MAINTAINER BlockApps Inc.
 
 ENV DEBIAN_FRONTEND=noninteractive
 

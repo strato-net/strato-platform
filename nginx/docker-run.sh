@@ -6,6 +6,7 @@ OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 HOST_IP=${HOST_IP:-host.docker.internal}
+DOCKERIZED_APP=${DOCKERIZED_APP:-true}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -29,7 +30,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
-  sed -i "s|__HOST_IP__|$HOST_IP|g" /tmp/nginx.conf
+
+  if [ "$DOCKERIZED_APP" = true ]; then
+    sed -i "s|__BACKEND_HOST__|backend|g" /tmp/nginx.conf
+    sed -i "s|__FRONTEND_HOST__|frontend|g" /tmp/nginx.conf
+  else
+    sed -i "s|__BACKEND_HOST__|$HOST_IP|g" /tmp/nginx.conf
+    sed -i "s|__FRONTEND_HOST__|$HOST_IP|g" /tmp/nginx.conf
+  fi
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
