@@ -24,7 +24,6 @@ abstract contract OnRamp {
         address seller;
         uint256 amount;
         uint256 marginBps; // e.g. 500 = +5%
-        bool closed;
     }
 
     struct Lock {
@@ -177,7 +176,7 @@ abstract contract OnRamp {
         require(providerAddresses.length > 0, "No providers specified");
 
         uint256 existing = activeListingFor[token];
-        require(existing == 0 || listings[existing].closed, "Active listing exists");
+        require(existing == 0 || listings[existing].id != 0, "Active listing exists");
 
         IERC20(token).transferFrom(msg.sender, address(this), amount);
 
@@ -186,8 +185,7 @@ abstract contract OnRamp {
             token,
             msg.sender,
             amount,
-            marginBps,
-            false
+            marginBps
         );
 
         activeListingFor[token] = nextListingId;
@@ -205,7 +203,7 @@ abstract contract OnRamp {
     function updateListing(uint256 listingId, uint256 amount, uint256 marginBps, address[] providerAddresses) external {
         Listing listing = listings[listingId];
         require(msg.sender == listing.seller, "Not seller");
-        require(!listing.closed, "Closed");
+        require(listing.id != 0, "Closed");
         // Clear all providers via global list
         for (uint i = 0; i < paymentProviders.length; i++) {
             listingProviders[listingId][paymentProviders[i].providerAddress] = false;
@@ -237,14 +235,17 @@ abstract contract OnRamp {
     function cancelListing(uint256 listingId) external {
         Listing listing = listings[listingId];
         require(msg.sender == listing.seller, "Not seller");
-        require(!listing.closed, "Already closed");
+        require(listing.id != 0, "Already closed");
         // Clear all providers via global list
         for (uint i = 0; i < paymentProviders.length; i++) {
             listingProviders[listingId][paymentProviders[i].providerAddress] = false;
         }
 
         uint256 remaining = listing.amount;
-        listing.closed = true;
+        listing.id = 0;
+        listing.marginBps = 0;
+        listing.seller = address(0);
+        listing.token = address(0);
         activeListingFor[listing.token] = 0;
         listing.amount = 0;
 
@@ -257,7 +258,7 @@ abstract contract OnRamp {
         sweepExpired();
         require(lockCounts[listingId] < MAX_LOCKS_PER_LISTING, "Too many locks");
         Listing listing = listings[listingId];
-        require(!listing.closed, "Closed");
+        require(listing.id != 0, "Closed");
         require(amount > 0 && amount <= listing.amount, "Invalid amount");
         require(listing.amount >= amount, "Not enough available tokens");
 
@@ -276,7 +277,7 @@ abstract contract OnRamp {
         require(listingProviders[listingId][msg.sender], "Not allowed provider for this listing");
         uint256 lockedAmount = locks[listingId][buyer].amount;
         require(lockedAmount > 0, "No lock to fulfill");
-        require(!listings[listingId].closed, "Closed");
+        require(listings[listingId].id != 0, "Closed");
 
         IERC20(listings[listingId].token).transfer(buyer, lockedAmount);
 
@@ -284,8 +285,11 @@ abstract contract OnRamp {
         emit ListingFulfilled(listingId, buyer, lockedAmount, totalFiat);
 
         if (listings[listingId].amount == 0) {
-            listings[listingId].closed = true;
             activeListingFor[listings[listingId].token] = 0;
+            listings[listingId].id = 0;
+            listings[listingId].marginBps = 0;
+            listings[listingId].seller = address(0);
+            listings[listingId].token = address(0);
             for (uint i = 0; i < paymentProviders.length; i++) {
                 listingProviders[listingId][paymentProviders[i].providerAddress] = false;
             }
