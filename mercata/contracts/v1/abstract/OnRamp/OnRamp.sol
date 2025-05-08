@@ -129,7 +129,8 @@ abstract contract OnRamp {
             paymentProviderIndex[last.providerAddress] = actualIndex + 1;
         }
 
-        delete paymentProviders[lastIndex];
+        paymentProviders[lastIndex].name = "";
+        paymentProviders[lastIndex].providerAddress = address(0);
         paymentProviders.length = lastIndex;
         delete paymentProviderIndex[provider];
 
