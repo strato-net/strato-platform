@@ -6,10 +6,10 @@ contract SimpleOnRamp is OnRamp {
  
     constructor(
         address _oracle,
-        address _approver
+        address _admin
     ) OnRamp (
         _oracle,
-        _approver
+        _admin
     ) {
     }
 }
