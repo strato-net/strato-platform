@@ -286,6 +286,9 @@ abstract contract OnRamp {
         if (listings[listingId].amount == 0) {
             listings[listingId].closed = true;
             activeListingFor[listings[listingId].token] = 0;
+            for (uint i = 0; i < paymentProviders.length; i++) {
+                listingProviders[listingId][paymentProviders[i].providerAddress] = false;
+            }
         }
 
         locks[listingId][buyer] = Lock(0, 0);
