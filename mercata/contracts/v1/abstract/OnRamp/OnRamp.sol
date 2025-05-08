@@ -48,6 +48,7 @@ abstract contract OnRamp {
     mapping(address => bool) public approvedSellers;
     mapping(address => bool) public approvedTokens;
     PaymentProviderInfo[] public paymentProviders;
+    mapping(address => uint) public paymentProviderIndex;
 
     // Price oracle
     PriceOracleBase public priceOracle;
@@ -89,11 +90,8 @@ abstract contract OnRamp {
         require(approvedTokens[token], "Token not allowed");
         _;
     }
-    function isPaymentProvider(address p) public view returns (bool) {
-        for (uint i = 0; i < paymentProviders.length; i++) {
-            if (paymentProviders[i].providerAddress == p) return true;
-        }
-        return false;
+    function isPaymentProvider(address provider) public view returns (bool) {
+        return paymentProviderIndex[provider] != 0;
     }
 
     // Setter functions
@@ -112,27 +110,33 @@ abstract contract OnRamp {
         }
     }
 
-    function addPaymentProvider(address provider, string name) external onlyAdmin {
-        require(!isPaymentProvider(provider), "Already payment provider");
+    function addPaymentProvider(address provider, string memory name) external onlyAdmin {
+        require(paymentProviderIndex[provider] == 0, "Already payment provider");
         paymentProviders.push(PaymentProviderInfo(provider, name));
+        paymentProviderIndex[provider] = paymentProviders.length; // 1-based indexing
         emit PaymentProviderAdded(provider);
     }
 
     function removePaymentProvider(address provider) external onlyAdmin {
-        require(isPaymentProvider(provider), "Not payment provider");
-        for (uint i = 0; i < paymentProviders.length; i++) {
-            if (paymentProviders[i].providerAddress == provider) {
-                string name = paymentProviders[i].name;
-                address lastProvider = paymentProviders[paymentProviders.length - 1].providerAddress;
-                paymentProviders[i] = PaymentProviderInfo(lastProvider, name);
-                paymentProviders.length--;
-                break;
-            }
+        uint index = paymentProviderIndex[provider];
+        require(index != 0, "Not payment provider");
+        uint actualIndex = index - 1;
+        uint lastIndex = paymentProviders.length - 1;
+
+        if (actualIndex != lastIndex) {
+            PaymentProviderInfo last = paymentProviders[lastIndex];
+            paymentProviders[actualIndex] = last;
+            paymentProviderIndex[last.providerAddress] = actualIndex + 1;
         }
+
+        delete paymentProviders[lastIndex];
+        paymentProviders.length = lastIndex;
+        delete paymentProviderIndex[provider];
+
         emit PaymentProviderRemoved(provider);
     }
 
-    function setSellableToken(address token, bool whitelist) external onlyAdmin {
+    function setApprovedToken(address token, bool whitelist) external onlyAdmin {
         if (whitelist) {
             require(!approvedTokens[token], "Already whitelisted");
 
@@ -145,7 +149,7 @@ abstract contract OnRamp {
         }
     }
 
-    function setSellerApproved(address seller, bool approved) external onlyAdmin {
+    function setApprovedSeller(address seller, bool approved) external onlyAdmin {
         approvedSellers[seller] = approved;
         emit SellerApproved(seller, approved);
     }
