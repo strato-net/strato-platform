@@ -110,7 +110,7 @@ abstract contract OnRamp {
         }
     }
 
-    function addPaymentProvider(address provider, string memory name) external onlyAdmin {
+    function addPaymentProvider(address provider, string name) external onlyAdmin {
         require(paymentProviderIndex[provider] == 0, "Already payment provider");
         paymentProviders.push(PaymentProviderInfo(provider, name));
         paymentProviderIndex[provider] = paymentProviders.length; // 1-based indexing
