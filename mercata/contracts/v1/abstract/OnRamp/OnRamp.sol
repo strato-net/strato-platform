@@ -125,7 +125,8 @@ abstract contract OnRamp {
 
         if (actualIndex != lastIndex) {
             PaymentProviderInfo last = paymentProviders[lastIndex];
-            paymentProviders[actualIndex] = last;
+            paymentProviders[actualIndex].name = last.name;
+            paymentProviders[actualIndex].providerAddress = last.providerAddress;
             paymentProviderIndex[last.providerAddress] = actualIndex + 1;
         }
 
