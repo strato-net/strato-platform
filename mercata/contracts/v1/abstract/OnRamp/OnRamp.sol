@@ -122,7 +122,9 @@ abstract contract OnRamp {
         require(isPaymentProvider(provider), "Not payment provider");
         for (uint i = 0; i < paymentProviders.length; i++) {
             if (paymentProviders[i].providerAddress == provider) {
-                paymentProviders[i] = paymentProviders[paymentProviders.length - 1];
+                string name = paymentProviders[i].name;
+                address lastProvider = paymentProviders[paymentProviders.length - 1].providerAddress;
+                paymentProviders[i] = PaymentProviderInfo(lastProvider, name);
                 paymentProviders.length--;
                 break;
             }
