@@ -232,7 +232,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
           appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
           (abstrs, maps, arrs, cc) <- case cp of
             SolidVMCode contractName' codeHash' -> do
-              cc <- codeCollectionFromHash False codeHash'
+              cc <- codeCollectionFromHash True codeHash' -- Maybe the typechecking should be done elsewhere, but this will allow us to prevent faulty code collections from going into the genesis block
               case cc ^. CC.contracts . at contractName' of
                 Nothing -> do
                   $logWarnS "populateStorageDBs/toAction" . T.pack $ "Couldn't find a contract named " ++ contractName' ++ " in code collection " ++ format codeHash'

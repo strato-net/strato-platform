@@ -5,7 +5,7 @@ import <509>;
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 
-abstract contract Asset is Utils, ERC20 {
+abstract contract Asset is ERC20, Ownable {
     enum AssetStatus {
         NULL,
         ACTIVE,
@@ -61,58 +61,25 @@ abstract contract Asset is Utils, ERC20 {
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint _quantity,
         AssetStatus _status
-    ) ERC20(_name, _symbol) {
+    ) ERC20(_name, _symbol) Ownable() {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
-        name = _name;
         description = _description;
         images = _images;
         files = _files; 
         fileNames = _fileNames;
         createdDate = _createdDate;
-        quantity = _quantity;
+        quantity = 0;
         status = _status;
-        try {
-            assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
-            originAddress = Asset(msg.sender).originAddress();
-            itemNumber = Asset(msg.sender).itemNumber();
-        } catch {
-            originAddress = address(this);
-            itemNumber = 1;
-            emit OwnershipTransfer(
-                originAddress,
-                address(0),
-                "",
-                owner,
-                ownerCommonName,
-                itemNumber,
-                itemNumber + _quantity - 1
-            );
-        }
-    }
-
-    modifier requireOwner(string action) {
-        string err = "Only the owner of the asset can "
-                   + action
-                   + ".";
-        require(getCommonName(msg.sender) == ownerCommonName, err);
-        _;
-    }
-
-    modifier requireOwnerOrigin(string action) {
-        string err = "Only the owner of the asset can "
-                   + action
-                   + ".";
-        require(getCommonName(tx.origin) == ownerCommonName, err);
-        _;
+        originAddress = address(this);
+        itemNumber = 1;
     }
 
     function updateAsset(
         string[] _images,
         string[] _files,
         string[] _fileNames
-    ) public requireOwner("update asset") returns (uint) {
+    ) public returns (uint) {
         images = _images;
         files = _files;
         fileNames = _fileNames;
@@ -120,14 +87,6 @@ abstract contract Asset is Utils, ERC20 {
     }
 
     function updateStatus(AssetStatus _status) public returns (uint) {
-        if (status == AssetStatus.ACTIVE) {
-            require(getCommonName(msg.sender) == ownerCommonName, "Only the owner can update the asset's status");
-        } else if (status == AssetStatus.PENDING_REDEMPTION) {
-            string cn = getCommonName(msg.sender);
-            require(cn == ownerCommonName || cn == this.creator, "Only the owner or issuer can update the asset's status");
-        } else {
-            require(false, "The asset's status can no longer be updated");
-        }
         status = _status;
         return RestStatus.OK;
     }
