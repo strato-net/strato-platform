@@ -9,8 +9,10 @@
 
 module Data.Source.Annotation
   ( SourceAnnotation (..),
+    NoShow(..),
     Positioned,
     Annotated,
+    showTextAnnotation,
     parseErrorToAnnotation,
     withAnnotation,
     withPosition,
@@ -118,6 +120,14 @@ instance Show a => Show (SourceAnnotation a) where
       startPosColumn = (_sourcePositionColumn startPos)
       endPosLine = (_sourcePositionLine endPos)
       endPosColumn = (_sourcePositionColumn endPos)
+
+data NoShow = NoShow deriving (Eq, Ord)
+
+instance Show NoShow where
+  show _ = ""
+
+showTextAnnotation :: SourceAnnotation Text -> Text
+showTextAnnotation sa = T.pack (show $ NoShow <$ sa) <> _sourceAnnotationAnnotation sa
 
 type Positioned f = f (SourceAnnotation ())
 

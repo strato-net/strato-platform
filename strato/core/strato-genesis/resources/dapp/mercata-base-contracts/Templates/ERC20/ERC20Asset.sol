@@ -19,20 +19,18 @@ contract ERC20Asset is Asset {
         _files,
         _fileNames,
         block.timestamp,
-        _initialSupply,
-        18,
         AssetStatus.ACTIVE
     ) {
         _mint(msg.sender, _initialSupply);
     }
 
     function mint(uint256 amount) public{
-        require(msg.sender == owner, "Only the owner can mint");
+        require(msg.sender == owner(), "Only the owner can mint");
         _mint(msg.sender, amount);
     }
 
     function burn(uint256 amount)public {
-        require(msg.sender == owner, "Only the owner can burn");
+        require(msg.sender == owner(), "Only the owner can burn");
         _burn(msg.sender, amount);
     }
 }

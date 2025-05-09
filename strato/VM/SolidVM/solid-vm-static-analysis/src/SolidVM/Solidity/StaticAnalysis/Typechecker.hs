@@ -840,13 +840,13 @@ typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
         Bottom _ -> do
           f <- typecheckMember (Static (SVMType.Contract c) x) n
           case f of
-            Bottom _ ->
+            Bottom (f' NE.:| _) ->
               pure . bottom $
                 ( T.concat
-                    [ "Missing label: ",
+                    [ "Missing label ",
                       labelToText c,
-                      (T.pack (show f)),
-                      " is not a known enum, struct, or contract."
+                      " ",
+                      showTextAnnotation f'
                     ]
                 )
                   <$ x

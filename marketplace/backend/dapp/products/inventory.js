@@ -144,6 +144,7 @@ function marshalOut(_args) {
   const args = {
     ..._args,
     name: _args.name || _args._name,
+    owner: _args.owner || _args._owner,
   };
   return args;
 }

@@ -7,7 +7,7 @@ import <509>;
 //import "../Utils/Utils.sol";
 //import "../Structs/Structs.sol";
 
-abstract contract Sale is Utils, Structs { 
+abstract contract Sale is Ownable, Structs { 
 
     Asset public assetToBeSold;
     decimal public price;
@@ -21,8 +21,7 @@ abstract contract Sale is Utils, Structs {
     constructor(
         address _assetToBeSold,
         decimal _price,
-        uint _quantity,
-        PaymentServiceInfo[] _paymentServices
+        uint _quantity
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         require(_quantity > 0, "Quantity must be greater than 0");
@@ -31,33 +30,16 @@ abstract contract Sale is Utils, Structs {
         quantity = _quantity;
         totalLockedQuantity = 0;
         isOpen = true;
-        _addPaymentServices(_paymentServices);
-        assetToBeSold.attachSale();
     }
 
     modifier requireSeller(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
+        address sellersCommonName = Ownable(assetToBeSold).owner();
         string err = "Only "
-                   + sellersCommonName
+                   + string(sellersCommonName)
                    + " can perform "
                    + action
                    + ".";
-        string commonName = getCommonName(msg.sender);
-        require(commonName == sellersCommonName, err);
-    }
-
-    modifier requirePaymentService(string action) {
-        require(isPaymentService(msg.sender), "Only whitelisted payment services can perform " + action + ".");
-        _;
-    }
-
-    modifier requireSellerOrPaymentService(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
-        string commonName = getCommonName(msg.sender);
-        bool isAuthorized = commonName == sellersCommonName
-                         || isPaymentService(msg.sender);
-        require(isAuthorized, "Only the seller, or payment service can perform " + action + ".");
-        _;
+        require(msg.sender == sellersCommonName, err);
     }
 
     function getLock (
@@ -71,29 +53,7 @@ abstract contract Sale is Utils, Structs {
         );
     }
 
-    function _addPaymentServices(PaymentServiceInfo[] _paymentServices) internal {
-        for (uint i = 0; i < _paymentServices.length; i++) {
-            PaymentServiceInfo p = _paymentServices[i];
-            paymentServices.push(p);
-            paymentServicesMap[p.serviceName][p.creator] = paymentServices.length;
-        }
-    }
-
-    function _clearPaymentServices() internal {
-        for(uint i = 0; i < paymentServices.length; i++) {
-            paymentServicesMap[paymentServices[i].serviceName][paymentServices[i].creator] = 0;
-            paymentServices[i].creator = "";
-            paymentServices[i].serviceName = "";
-        }
-        paymentServices = [];
-    }
-
-    function isPaymentService(address _paymentService) public returns (bool) {
-        string _serviceName = _paymentService.call("serviceName");
-        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
-    }
-
-    function completeSale( string orderHash, address purchaser ) public virtual requirePaymentService("complete sale") returns (uint);
+    function completeSale( string orderHash, address purchaser ) public virtual returns (uint);
 
     function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public virtual returns (uint);
 
@@ -113,18 +73,13 @@ abstract contract Sale is Utils, Structs {
     }
 
     function close() internal {
-        try {
-            assetToBeSold.closeSale();
-        } catch {
-
-        }
     }
 
     function lockQuantity(
         uint quantityToLock,
         string orderHash,
         address purchaser
-    ) requirePaymentService("lock quantity") public {
+    ) public {
         require(quantityToLock <= quantity, "Not enough quantity to lock");
         string lock = getLock(orderHash, purchaser);
         require(lockedQuantity[lock] == 0, "Order has already locked quantity in this asset.");
@@ -150,7 +105,7 @@ abstract contract Sale is Utils, Structs {
     function unlockQuantity(
         string orderHash,
         address purchaser
-    ) requireSellerOrPaymentService("unlock quantity") public {
+    ) requireSeller("unlock quantity") public {
         uint quantityToReturn = takeLockedQuantity(orderHash, purchaser);
         quantity += quantityToReturn;
     }
@@ -166,7 +121,6 @@ abstract contract Sale is Utils, Structs {
     function _update(
         uint _quantity,
         decimal _price,
-        PaymentServiceInfo[] _paymentServices,
         uint _scheme
     ) internal returns (uint) {
 
@@ -182,8 +136,6 @@ abstract contract Sale is Utils, Structs {
         price = _price;
       }
       if ((_scheme & (1 << 2)) == (1 << 2)) {
-        _clearPaymentServices();
-        _addPaymentServices(_paymentServices);
       }
       return RestStatus.OK;
     }

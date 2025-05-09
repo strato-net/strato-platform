@@ -869,7 +869,7 @@ const ProductDetails = ({ user, users }) => {
                     </div>
                   )}
                 <div>
-                  {priceHistory?.originRecords?.length !== 0 && (
+                  {priceHistory?.originRecords?.length && priceHistory?.originRecords?.length !== 0 && (
                     <>
                       <h2 className="w-full text-center font-bold text-2xl">
                         12-Month Historical Data
