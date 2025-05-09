@@ -2,6 +2,7 @@ export const Images = {
   USDST: require('./resources/USDST.png'),
   cata: require('./resources/cata.png'),
   logo: require('./resources/logo.png'),
+  logo_big: require('./resources/logo_big.png'),
   noProductSymbol: require('./resources/noProductSymbol.png'),
   noEventPageSymbol: require('./resources/no_event.png'),
   art: require('./resources/categories/art.png'),

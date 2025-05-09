@@ -351,14 +351,14 @@ export const BANNER = [
             Built by ETH veterans.
           </h1>
         </div>
-        {/* <div>
+        <div>
           <img
-            src={Images.cata}
-            alt={'Cata...'}
-            title={'Cata'}
+            src={Images.logo_big}
+            alt={'Logo...'}
+            title={'Logo'}
             className="md:w-[160px] md:h-[160px] w-[90px] h-[90px] z-[11] relative md:mr-80 mr-32"
           />
-        </div> */}
+        </div>
       </div>
     ),
     desktopText: 'Stake now',
