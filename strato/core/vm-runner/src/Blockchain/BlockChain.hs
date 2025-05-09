@@ -107,7 +107,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
-import SolidVM.Model.CodeCollection (invalidPragmasUsed)
+import SolidVM.Model.CodeCollection (FunctionCallType(..), invalidPragmasUsed)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -516,10 +516,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
 
           let eCall =
                 case codeHash of
-                  ExternallyOwned _ -> Right (\a bro c d e f g h i j _ l m n o p q r -> EVM.call a bro c d e f g h i j l m n o p q r)
+                  ExternallyOwned _ -> Right (\a bro c d e f g h i j _ l m n o p q r _ -> EVM.call a bro c d e f g h i j l m n o p q r)
                   SolidVMCode _ _ -> Right SolidVM.call
                   CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (ExternallyOwned _) -> Right (\a bro c d e f g h i j _ l m n o p q r -> EVM.call a bro c d e f g h i j l m n o p q r)
+                    Just (ExternallyOwned _) -> Right (\a bro c d e f g h i j _ l m n o p q r _ -> EVM.call a bro c d e f g h i j l m n o p q r)
                     Just (SolidVMCode _ _) -> Right SolidVM.call
                     Just (CodeAtAccount acct' name') -> Left (acct', name')
                     Nothing -> Left (acct, name)
@@ -552,7 +552,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
                       (fromIntegral availableGas) --availableGas
                       tAddr -- origin
                       (txHash ut) -- txHash
-                      (fmap (M.insert "funcName" "decide") $ txMetadata ut)
+                      (fmap (M.insert "funcName" "decide" . M.insert "args" "()") $ txMetadata ut)
+                      (Just DelegateCall)
 
                   unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
                   unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
@@ -581,6 +582,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
                   tAddr -- origin
                   (txHash ut) -- txHash
                   (txMetadata ut) -- metadata
+                  Nothing
 
 ----------------
 

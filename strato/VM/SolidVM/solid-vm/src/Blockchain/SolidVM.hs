@@ -414,10 +414,11 @@ call ::
   Address ->
   Keccak256 ->
   Maybe (M.Map T.Text T.Text) ->
+  Maybe CC.FunctionCallType ->
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' metadata mFuncCallType = do
   recordCall
 
   isRunningTests <- checkIfRunningTests
@@ -453,7 +454,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGa
 
     ((creator, appName), returnVal) <-
       traverse (fmap Just . maybe (return "()") encodeForReturn)
-        =<< call' sender' codeAddress CC.DefaultCall Nothing funcName isRCC args
+        =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) Nothing funcName isRCC args
 
     solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
@@ -578,7 +579,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         mCallInfo <- getCurrentCallInfoIfExists
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when ((from /= to) && isForbidden) $
-          unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
+          unknownFunction "logFunctionCall" (functionName, "asdf2" :: String) -- contract) -- ^. CC.contractName)
         let ro = case mCallInfo of
               Nothing -> False
               Just ci -> readOnly ci
@@ -630,7 +631,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                 _ -> Nothing
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when ((from /= to) && isForbidden) $
-          unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
+          unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
         case mtheFunction' of
           Just theFunction' -> do
             args' <- argsToVals contract' theFunction' $ case valList' of [] -> CC.OrderedArgs []; _ -> argExps
@@ -650,7 +651,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                         Just ci -> readOnly ci
                       f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                   return (f', args')
-                _ -> unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
+                _ -> unknownFunction "logFunctionCall" (functionName, "asdf3" :: String) -- contract ^. CC.contractName)
             )
       -- Maybe the function is actually a getter
       _ -> do
@@ -669,7 +670,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                        _ -> pure []
             let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
             when ((from /= to) && isForbidden) $
-              unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
+              unknownFunction "logFunctionCall" (functionName, "asdf4" :: String) -- contract ^. CC.contractName)
             -- TODO: this should only exist if the storage variable is declared "public",
             -- right now I just ignore this and allow anything to be called as a getter
             case null args' of
@@ -691,7 +692,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                         Just ci -> readOnly ci
                       f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                   return (f', args')
-                _ -> unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
+                _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
             )
 
   when

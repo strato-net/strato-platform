@@ -678,6 +678,7 @@ runCall funcName callArgs bs = do
       origin
       txHash
       callMetadata
+      Nothing
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
   return $ erReturnVal er2
@@ -761,6 +762,7 @@ runCall' funcName callArgs bs = do
       origin
       txHash
       callMetadata
+      Nothing
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
   return $ erReturnVal er2
@@ -823,6 +825,7 @@ call2 funcName callArgs contractAddress = do
       origin
       txHash
       callMetadata
+      Nothing
   rethrowEx er
   return $ erReturnVal er
 

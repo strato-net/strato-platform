@@ -30,16 +30,17 @@ insertDecideContract gi =
 dec1deContract :: Text
 dec1deContract =
   [r|
+import <937efa7e3a77e20bbdbd7c0d32b6514f368c1010>;
 contract Decider {
     constructor() {
     }
 
     function decide() returns (bool) {
-      int oneDollar = 1e18;
+      uint oneDollar = 1e18;
       address USDST = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
       address validatorPool = address(0x1234);
 
-      USDST.call("transfer", validatorPool, 0.10 * oneDollar); //Each transaction costs 10¢
+      ERC20(USDST).transfer(validatorPool, oneDollar / 10); //Each transaction costs 10¢
 
       require(1==1, "forbidden!");
       
