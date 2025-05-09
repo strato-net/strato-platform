@@ -31,14 +31,10 @@ abstract contract OnRamp {
         uint256 timestamp;
     }
 
-    struct LockKey {
-        uint256 listingId;
-        address buyer;
-    }
-
     struct PaymentProviderInfo {
         address providerAddress;
         string  name;
+        string  endpoint;
     }
 
     // Approval management
@@ -60,11 +56,8 @@ abstract contract OnRamp {
 
     // Lock management
     uint256 public LOCK_EXPIRY = 1800; // 30 minutes in seconds
-    uint256 public MAX_LOCKS_PER_LISTING = 100;
-    LockKey[] public activeLocks;
-    mapping(uint256 => uint256) public lockCounts;
     mapping(uint256 => mapping(address => Lock)) public locks; // listingId => buyer => lock
-    mapping(uint256 => mapping(address => uint256)) public lockIndex;
+    mapping(uint256 => uint256) public lockedAmounts; // listingId => total locked amount
 
     // Constructor
     constructor(address _oracle, address _admin) {
@@ -109,9 +102,9 @@ abstract contract OnRamp {
         }
     }
 
-    function addPaymentProvider(address provider, string name) external onlyAdmin {
+    function addPaymentProvider(address provider, string name, string endpoint) external onlyAdmin {
         require(paymentProviderIndex[provider] == 0, "Already payment provider");
-        paymentProviders.push(PaymentProviderInfo(provider, name));
+        paymentProviders.push(PaymentProviderInfo(provider, name, endpoint));
         paymentProviderIndex[provider] = paymentProviders.length; // 1-based indexing
         emit PaymentProviderAdded(provider);
     }
@@ -124,6 +117,7 @@ abstract contract OnRamp {
 
         if (actualIndex != lastIndex) {
             PaymentProviderInfo last = paymentProviders[lastIndex];
+            paymentProviders[actualIndex].endpoint = last.endpoint;
             paymentProviders[actualIndex].name = last.name;
             paymentProviders[actualIndex].providerAddress = last.providerAddress;
             paymentProviderIndex[last.providerAddress] = actualIndex + 1;
@@ -131,6 +125,7 @@ abstract contract OnRamp {
 
         paymentProviders[lastIndex].name = "";
         paymentProviders[lastIndex].providerAddress = address(0);
+        paymentProviders[lastIndex].endpoint = "";
         paymentProviders.length = lastIndex;
         delete paymentProviderIndex[provider];
 
@@ -157,10 +152,6 @@ abstract contract OnRamp {
 
     function setLockExpiry(uint256 newExpiry) external onlyAdmin {
         LOCK_EXPIRY = newExpiry;
-    }
-
-    function setMaxLocksPerListing(uint256 newMax) external onlyAdmin {
-        MAX_LOCKS_PER_LISTING = newMax;
     }
 
     function setPriceOracle(address newOracle) external onlyAdmin {
@@ -236,6 +227,7 @@ abstract contract OnRamp {
         Listing listing = listings[listingId];
         require(msg.sender == listing.seller, "Not seller");
         require(listing.id != 0, "Already closed");
+        require(lockedAmounts[listingId] == 0, "Active locks exist");
         // Clear all providers via global list
         for (uint i = 0; i < paymentProviders.length; i++) {
             listingProviders[listingId][paymentProviders[i].providerAddress] = false;
@@ -255,8 +247,6 @@ abstract contract OnRamp {
     }
 
     function lockTokens(uint256 listingId, uint256 amount) external {
-        sweepExpired();
-        require(lockCounts[listingId] < MAX_LOCKS_PER_LISTING, "Too many locks");
         Listing listing = listings[listingId];
         require(listing.id != 0, "Closed");
         require(amount > 0 && amount <= listing.amount, "Invalid amount");
@@ -269,8 +259,36 @@ abstract contract OnRamp {
             amount,
             block.timestamp
         );
-        _addActiveLock(listingId, msg.sender);
+        lockedAmounts[listingId] += amount;
         listing.amount -= amount;
+    }
+
+    function unlockTokens(uint256 listingId) external {
+        Lock userLock = locks[listingId][msg.sender];
+        require(userLock.amount > 0, "No lock to unlock");
+        
+        listings[listingId].amount += userLock.amount;
+        lockedAmounts[listingId] -= userLock.amount;
+        locks[listingId][msg.sender] = Lock(0, 0);
+    }
+
+    function expireLock(uint256 listingId, address buyer) external {
+        require(msg.sender == listings[listingId].seller, "Not seller");
+        require(block.timestamp > locks[listingId][buyer].timestamp + LOCK_EXPIRY, "Not expired");
+        
+        listings[listingId].amount += locks[listingId][buyer].amount;
+        lockedAmounts[listingId] -= locks[listingId][buyer].amount;
+        locks[listingId][buyer] = Lock(0, 0);
+    }
+
+    function providerUnlockTokens(uint256 listingId, address buyer) external {
+        require(listingProviders[listingId][msg.sender], "Not allowed provider for this listing");
+        Lock buyerLock = locks[listingId][buyer];
+        require(buyerLock.amount > 0, "No lock to unlock");
+        
+        listings[listingId].amount += buyerLock.amount;
+        lockedAmounts[listingId] -= buyerLock.amount;
+        locks[listingId][buyer] = Lock(0, 0);
     }
 
     function fulfillListing(uint256 listingId, address buyer) external {
@@ -295,50 +313,8 @@ abstract contract OnRamp {
             }
         }
 
+        lockedAmounts[listingId] -= lockedAmount;
         locks[listingId][buyer] = Lock(0, 0);
-        _removeActiveLock(listingId, buyer);
-    }
-
-    // Lock management helpers
-    function _addActiveLock(uint256 listingId, address buyer) internal {
-        activeLocks.push(LockKey(listingId, buyer));
-        lockIndex[listingId][buyer] = activeLocks.length; // 1-based index
-        lockCounts[listingId]++;
-    }
-
-    function _removeActiveLock(uint256 listingId, address buyer) internal {
-        uint256 idx = lockIndex[listingId][buyer];
-        require(idx > 0, "No active lock");
-        uint256 lastIdx = activeLocks.length;
-        uint256 lastListingId = activeLocks[lastIdx - 1].listingId;
-        address lastBuyer = activeLocks[lastIdx - 1].buyer;
-        activeLocks[idx - 1] = LockKey(lastListingId, lastBuyer);
-        lockIndex[lastListingId][lastBuyer] = idx;
-        uint len = activeLocks.length;
-        activeLocks[len - 1] = LockKey(0, address(0));
-        activeLocks.length = len - 1;
-        lockIndex[listingId][buyer] = 0;
-        lockCounts[listingId]--;
-    }
-
-    function sweepExpired() public {
-        uint256 processed = 0;
-        while (processed < MAX_LOCKS_PER_LISTING && activeLocks.length > 0) {
-            uint256 idx = activeLocks.length - 1;
-            uint256 listingId = activeLocks[idx].listingId;
-            address buyer = activeLocks[idx].buyer;
-            Lock l = locks[listingId][buyer];
-            // Only expire if past expiry
-            if (l.amount > 0 && block.timestamp > l.timestamp + LOCK_EXPIRY) {
-                Listing listing = listings[listingId];
-                listing.amount += l.amount;
-                locks[listingId][buyer] = Lock(0, 0);
-                _removeActiveLock(listingId, buyer);
-                processed++;
-            } else {
-                break;
-            }
-        }
     }
 
     function calculatePrice(address token, uint256 amount, uint256 marginBps) public view returns (uint256) {
