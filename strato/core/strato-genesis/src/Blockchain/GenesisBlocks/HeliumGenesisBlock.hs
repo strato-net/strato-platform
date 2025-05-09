@@ -10,6 +10,7 @@ module Blockchain.GenesisBlocks.HeliumGenesisBlock (
 
 import           BlockApps.X509
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.GenesisBlocks.Contracts.Decide
 import           Blockchain.GenesisBlocks.Contracts.CertRegistry
 import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import           Blockchain.GenesisBlocks.Contracts.Mercata
@@ -37,6 +38,7 @@ import           Text.RawString.QQ
 genesisBlock :: GenesisInfo
 genesisBlock  =
   insertMercataGovernanceContract validators admins
+  . insertDecideContract
   . insertCertRegistryContract extraCerts
   $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
