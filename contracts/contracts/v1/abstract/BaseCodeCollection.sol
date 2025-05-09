@@ -31,6 +31,7 @@ contract Mercata {
     LendingPoolBase public lendingPool;
     PoolConfiguratorBase public poolConfigurator;
     LendingRegistryBase public lendingRegistry;
+    MercataEthBridge public mercataEthBridge;
 
     constructor() public {
         rateStrategy = RateStrategyBase(new RateStrategy());
@@ -42,6 +43,6 @@ contract Mercata {
         lendingRegistry = LendingRegistryBase(new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy)));
         collateralVault.setLendingPool(address(lendingPool));
         liquidityPool.setLendingPool(address(lendingPool));
-        
+        mercataEthBridge = MercataEthBridge(new MercataEthBridge(address(msg.sender)));
     }
 }
