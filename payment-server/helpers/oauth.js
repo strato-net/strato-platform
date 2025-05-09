@@ -31,8 +31,10 @@ class Admin {
     }
   }
 
+  // Legacy function, still used
   async getUser() {
-    return { token: await oauthHelper.getServiceToken(), address: this.address };
+    const { token } = await oauthHelper.getServiceToken();
+    return { token, address: this.address };
   }
 }
 
