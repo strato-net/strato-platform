@@ -12,9 +12,8 @@ abstract contract MercataETHBridge is Utils {
     }
 
     address public owner;
-    uint public decimals;
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
-    bool public isActive = true;
+    bool public isActive;
 
     address public ethSt;
 
@@ -33,9 +32,8 @@ abstract contract MercataETHBridge is Utils {
         require(isActive, "MercataETHBridge is not active");
         _;
     }
-    constructor(uint _decimals) {
+    constructor() {
         owner = msg.sender;
-        decimals = _decimals;
     }
 
     function deactivate() public onlyOwner requireActive {

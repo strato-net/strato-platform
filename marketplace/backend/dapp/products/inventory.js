@@ -143,6 +143,7 @@ async function getHistory(user, chainId, address, options) {
 function marshalOut(_args) {
   const args = {
     ..._args,
+    name: _args.name || _args._name,
   };
   return args;
 }

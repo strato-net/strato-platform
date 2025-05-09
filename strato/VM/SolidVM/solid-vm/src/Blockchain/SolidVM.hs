@@ -1496,7 +1496,7 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> Maybe SVMType.Type -> m Variable
 expToVar x t = do
-  --liftIO $ print $ T.pack $ "expToVar: " ++ show x
+  -- liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
   v <- expToVar' x t
   decrementGas 1
   return v

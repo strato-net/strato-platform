@@ -833,11 +833,11 @@ getXabiType acct field = do
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
-  let field = MS.getField path
-  mType <- getXabiType loc field
-  case mType of
-    Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
+  case MS.getField path of
+    Left e -> typeError "getXabiValueType/invalid storage path" e
+    Right field -> getXabiType loc field >>= \case
+      Nothing -> todo "getXabiValueType/unknown storage reference" field
+      Just v -> return $!! loop ccs' (tail $ MS.toList path) v
   where
     loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
     loop _ [] = id

@@ -5,7 +5,7 @@ import <509>;
 //import "../Utils/Utils.sol";
 
 abstract contract MinterAuthorization is Utils {
-    string public name;
+    string public minterName;
     address public owner;
     bool public isActive;
 
@@ -16,10 +16,10 @@ abstract contract MinterAuthorization is Utils {
     event MintedToken(address indexed user, uint amount);
     event BurnedToken(address indexed user, uint amount);
     
-    constructor(string _name) {
+    constructor(string _minterName) {
         owner = msg.sender;
         isActive = true;
-        name = _name;
+        minterName = _minterName;
     }
 
     modifier onlyOwner() {

@@ -161,9 +161,9 @@ empty = StoragePath []
 singleton :: B.ByteString -> StoragePath
 singleton bs = StoragePath [Field bs]
 
-getField :: StoragePath -> B.ByteString
-getField (StoragePath (Field f : _)) = f
-getField path = error "StoragePath must begin with field" path
+getField :: StoragePath -> Either String B.ByteString
+getField (StoragePath (Field f : _)) = Right f
+getField path = Left $ "StoragePath must begin with field: " ++ show path
 
 snoc :: StoragePath -> StoragePathPiece -> StoragePath
 snoc (StoragePath p) piece = StoragePath $ p ++ [piece]

@@ -15,17 +15,14 @@ abstract contract Asset is Utils, ERC20 {
     }
 
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
-    address public owner;
     string public ownerCommonName;
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
-    string public name;
     string public description;
     string[] public images;
     string[] public files;
     string[] public fileNames;
     uint public createdDate;
     uint public quantity;
-    uint public decimals;
     uint public itemNumber;
     AssetStatus public status;
 
@@ -65,13 +62,9 @@ abstract contract Asset is Utils, ERC20 {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
-        uint _decimals,
         AssetStatus _status
     ) ERC20(_name, _symbol) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
-        require(_quantity >= 0, "Quantity must be greater than or equal to 0");
-        owner  = msg.sender;
-        ownerCommonName = getCommonName(msg.sender);
         name = _name;
         description = _description;
         images = _images;
@@ -79,7 +72,6 @@ abstract contract Asset is Utils, ERC20 {
         fileNames = _fileNames;
         createdDate = _createdDate;
         quantity = _quantity;
-        decimals = _decimals;
         status = _status;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
@@ -88,7 +80,6 @@ abstract contract Asset is Utils, ERC20 {
         } catch {
             originAddress = address(this);
             itemNumber = 1;
-            quantity = quantity * (10**_decimals);
             emit OwnershipTransfer(
                 originAddress,
                 address(0),
@@ -115,97 +106,6 @@ abstract contract Asset is Utils, ERC20 {
                    + ".";
         require(getCommonName(tx.origin) == ownerCommonName, err);
         _;
-    }
-
-    modifier fromSale(string action) {
-        if (sale == address(0)) {
-            string err = "Only the owner can "
-                       + action
-                       + ".";
-            require(getCommonName(msg.sender) == ownerCommonName, err);
-        } else {
-            string err = "Only the current Sale contract can "
-                       + action
-                       + ".";
-            require(msg.sender == sale, err);
-        }
-        _;
-    }
-
-    // Updated function to add a sale to the whitelist
-    function attachSale() public requireOwnerOrigin("attach sale") {
-        require(sale == address(0), "Sale is already assigned for this asset");
-        sale = msg.sender;
-    }
-
-    // Updated function to remove a sale from the whitelist
-    function closeSale() public fromSale("close sale") {
-        close();
-    }
-
-    function close() internal {
-        sale = address(0);
-    }
-
-    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-        require(_quantity > 0, "Quantity must be greater than 0");
-        string newOwnerCommonName = getCommonName(_newOwner);
-
-        if(_isUserTransfer && _transferNumber>0){
-
-            emit ItemTransfers(
-                originAddress,
-                owner,
-                ownerCommonName,
-                _newOwner,
-                newOwnerCommonName,
-                name,
-                itemNumber,
-                itemNumber + _quantity - 1,
-                _quantity,
-                _transferNumber,
-                block.timestamp,
-                _price
-                );
-
-            }
-
-        emit OwnershipTransfer(
-            originAddress,
-            owner,
-            ownerCommonName,
-            _newOwner,
-            newOwnerCommonName,
-            itemNumber,
-            itemNumber + _quantity - 1
-        );
-        owner = _newOwner;
-        ownerCommonName = newOwnerCommonName;
-        close();
-    }
-    
-    function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) public fromSale("transfer ownership") {
-        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
-        // regular transfer - isUserTransfer: false, transferNumber: 0
-        // transfer feature - isUserTransfer: true, transferNumber: >0
-        _transfer(_newOwner, _quantity, _isUserTransfer, _transferNumber, _price);
-    }
-
-    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-        require(_quantity > 0, "Quantity must be greater than 0");
-        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
-        if (sale == address(0)) {
-            // transfer feature - isUserTransfer: true, transferNumber: >0
-            _transfer(_newOwner, _quantity, true, _transferNumber, _price);
-            return RestStatus.OK;
-        } else {
-            // transfer feature - isUserTransfer: true, transferNumber: >0
-            return Sale(sale).automaticTransfer(_newOwner, _price, _quantity, _transferNumber);
-        }
     }
 
     function updateAsset(

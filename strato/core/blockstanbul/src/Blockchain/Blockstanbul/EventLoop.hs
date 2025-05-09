@@ -308,6 +308,12 @@ eventLoop ctx = execStateC ctx $
           -- this is for sending out a new block,
           -- may be a good candidtate for sending newCerts
           let blk = scrubConsensus blk'
+          when False $ do
+            vs <- use validators
+            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            pseal <- proposerSeal blockWithVs
+            commitBlock $ addProposerSeal pseal blockWithVs
+            yieldR MakeBlockCommand
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
