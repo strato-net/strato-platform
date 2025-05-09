@@ -108,6 +108,8 @@ function marshalIn(_args) {
   const args = {
     ...defaultArgs,
     ..._args,
+    _name: _args._name || _args.name,
+    _owner: _args._owner || _args.owner,
   };
   return args;
 }
@@ -559,7 +561,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         options,
         admin
       );
-      inventories = rawInventories.map((i) => ({ ...i, owner, quantity: (balancesMap[i.address].value || '0') }));
+      inventories = rawInventories.map((i) => ({ ...i, owner: undefined, _owner: owner, quantity: (balancesMap[i.address].value || '0') }));
     } else if (assetAddresses) {
       const rawInventories = await searchAllWithQueryArgs(
         contractName,
@@ -573,7 +575,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         options,
         admin
       );
-      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: b.key, quantity: b.value })))]), []);
+      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: undefined, _owner: b.key, quantity: b.value })))]), []);
     } else {
       const rawInventories = await searchAllWithQueryArgs(
         contractName,
@@ -586,7 +588,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         options,
         admin
       );
-      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: b.key, quantity: b.value })))]), []);
+      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: undefined, _owner: b.key, quantity: b.value })))]), []);
     }
 
     // Currently can't filter on second table, so filtering sales fields here.
