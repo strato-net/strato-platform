@@ -526,27 +526,61 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
           
           case eCall of
             Left (acct, name) -> throwE $ TFCodeCollectionNotFound acct name t
-            Right call ->
+            Right call -> do
+              decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
+              case decideCodeHash of
+                SolidVMCode _ _ -> do
+                  -- BEGIN: Custom Validation Check
+                  -- Call validation contract at 0xDEC1DE. Require it returns True.
+                  result <-
+                    lift $
+                    SolidVM.call
+                      isRunningTests'
+                      isHomestead
+                      False
+                      False  -- isRCC
+                      S.empty
+                      b  -- blockData
+                      0
+                      owner
+                      (Address 0xDEC1DE)  --codeAddress
+                      tAddr -- sender
+                      proposer  --proposer
+                      0
+                      (fromInteger $ transactionGasPrice ut)
+                      (transactionData ut)
+                      (fromIntegral availableGas) --availableGas
+                      tAddr -- origin
+                      (txHash ut) -- txHash
+                      (fmap (M.insert "funcName" "decide") $ txMetadata ut)
+
+                  unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
+                  unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
+
+                _ -> return ()
+
+              $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
+
               lift $
                 call
                   isRunningTests'
                   isHomestead
                   False
-                  False
+                  False  --isRCC
                   S.empty
-                  b
+                  b -- blockData
                   0
                   owner
-                  owner
-                  tAddr
-                  proposer
+                  owner -- codeAddress
+                  tAddr -- sender
+                  proposer -- proposer
                   (fromInteger $ transactionValue ut)
                   (fromInteger $ transactionGasPrice ut)
                   (transactionData ut)
-                  (fromIntegral availableGas)
-                  tAddr
-                  (txHash ut)
-                  (txMetadata ut)
+                  (fromIntegral availableGas) -- availableGas
+                  tAddr -- origin
+                  (txHash ut) -- txHash
+                  (txMetadata ut) -- metadata
 
 ----------------
 
