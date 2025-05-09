@@ -273,7 +273,6 @@ abstract contract OnRamp {
     }
 
     function expireLock(uint256 listingId, address buyer) external {
-        require(msg.sender == listings[listingId].seller, "Not seller");
         require(block.timestamp > locks[listingId][buyer].timestamp + LOCK_EXPIRY, "Not expired");
         
         listings[listingId].amount += locks[listingId][buyer].amount;
