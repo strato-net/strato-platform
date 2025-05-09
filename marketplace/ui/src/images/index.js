@@ -70,6 +70,11 @@ export const Images = {
   StakingX1440: require('./resources/Banner/StakingX1440.png'),
   StakingX1600: require('./resources/Banner/StakingX1600.png'),
 
+  MercataX394: require('./resources/Banner/MercataX394.png'),
+  MercataX768: require('./resources/Banner/MercataX768.png'),
+  MercataX1440: require('./resources/Banner/MercataX1440.png'),
+  MercataX1600: require('./resources/Banner/MercataX1600.png'),
+
   BatmanX394: require('./resources/Banner/BatmanX394.png'),
   BatmanX768: require('./resources/Banner/BatmanX768.png'),
   BatmanX1440: require('./resources/Banner/BatmanX1440.png'),
