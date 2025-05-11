@@ -379,9 +379,6 @@ rethrowEx _ = return ()
 runArgsWithSenderBeef :: Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
   let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -400,9 +397,6 @@ runArgsWithSenderBeef acc args bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
@@ -410,16 +404,10 @@ runArgsWithSenderBeef acc args bs = do
   newAddress <- getNewAddress acc
   er <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
@@ -432,9 +420,6 @@ runArgsWithSenderBeef acc args bs = do
 runArgsWithSender :: Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -453,9 +438,6 @@ runArgsWithSender acc args bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
@@ -465,16 +447,10 @@ runArgsWithSender acc args bs = do
   newAddress <- getNewAddress acc
   er <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
@@ -486,9 +462,6 @@ runArgsWithSender acc args bs = do
 runArgsWithOrigin :: Address -> Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
   let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -507,9 +480,6 @@ runArgsWithOrigin orig acc args bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
@@ -517,16 +487,10 @@ runArgsWithOrigin orig acc args bs = do
   newAddress <- getNewAddress acc
   er <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       orig
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
@@ -604,10 +568,7 @@ runArgsBeef = runArgsWithSenderBeef sender
 runCall :: T.Text -> T.Text -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
       isRCC = False
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -626,30 +587,18 @@ runCall funcName callArgs bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
       createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
-      noValueTransfer = error "TODO: noValueTransfer"
-      receiveAddress = error "TODO: receiveAddress"
-      theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
   $logErrorS "runCall" "Beginning create"
   er1 <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
@@ -660,20 +609,11 @@ runCall funcName callArgs bs = do
   $logErrorS "runCall" "Beginning call"
   er2 <-
     SVM.call
-      isTest
-      isHomestead
-      noValueTransfer
       isRCC
-      suicides
       blockData
-      callDepth
-      receiveAddress
       newAddress
       sender
       proposer
-      value
-      gasPrice
-      theData
       availableGas
       origin
       txHash
@@ -688,10 +628,7 @@ runCall funcName callArgs bs = do
 runCall' :: T.Text -> T.Text -> String -> ContextM (Maybe String)
 runCall' funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
       isRCC = False
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -710,30 +647,18 @@ runCall' funcName callArgs bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
       createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
-      noValueTransfer = error "TODO: noValueTransfer"
-      receiveAddress = error "TODO: receiveAddress"
-      theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
   $logErrorS "runCall" "Beginning create"
   er1 <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
@@ -744,20 +669,11 @@ runCall' funcName callArgs bs = do
   $logErrorS "runCall" "Beginning call"
   er2 <-
     SVM.call
-      isTest
-      isHomestead
-      noValueTransfer
       isRCC
-      suicides
       blockData
-      callDepth
-      receiveAddress
       newAddress
       sender
       proposer
-      value
-      gasPrice
-      theData
       availableGas
       origin
       txHash
@@ -774,10 +690,7 @@ lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
 call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
-  let isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      isRCC = False
-      suicides = error "TODO: suicides"
+  let isRCC = False
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -796,31 +709,16 @@ call2 funcName callArgs contractAddress = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
-      noValueTransfer = error "TODO: noValueTransfer"
-      receiveAddress = error "TODO: receiveAddress"
-      theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   er <-
     SVM.call
-      isTest
-      isHomestead
-      noValueTransfer
       isRCC
-      suicides
       blockData
-      callDepth
-      receiveAddress
       contractAddress
       sender
       proposer
-      value
-      gasPrice
-      theData
       availableGas
       origin
       txHash

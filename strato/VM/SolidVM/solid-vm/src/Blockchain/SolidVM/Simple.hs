@@ -138,38 +138,16 @@ data SolidVMTx
 
 makePrisms ''SolidVMTx
 
-err :: String -> String -> a
-err func arg =
-  error $
-    concat
-      [ "Blockchain.SolidVM.Simple.",
-        func,
-        ": ",
-        arg
-      ]
-
-createErr :: String -> a
-createErr = err "create"
-
-callErr :: String -> a
-callErr = err "call"
-
 create ::
   (SolidVM.SolidVMBase m) =>
   SolidVMCreateArgs ->
   m ExecResults
 create s =
   SolidVM.create
-    (createErr "isRunningTests'")
-    (createErr "isHomestead")
-    (createErr "preExistingSuicideList")
     (s ^. createArgs . argsBlockData)
-    (createErr "callDepth")
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
     (s ^. createArgs . argsProposer)
-    (createErr "value")
-    (createErr "gasPrice")
     (Gas 100000000)
     (s ^. createNewAddress)
     (s ^. createCode)
@@ -182,20 +160,11 @@ call ::
   m ExecResults
 call s =
   SolidVM.call
-    (callErr "isRunningTests'")
-    (callErr "isHomestead")
-    (callErr "noValueTransfer")
     False
-    (callErr "preExistingSuicideList")
     (s ^. callArgs . argsBlockData)
-    (callErr "callDepth")
-    (callErr "receiveAddress")
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
     (s ^. callArgs . argsProposer)
-    (callErr "value")
-    (callErr "gasPrice")
-    (callErr "theData")
     (Gas 100000000)
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)

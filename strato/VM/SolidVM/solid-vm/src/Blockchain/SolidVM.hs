@@ -218,16 +218,10 @@ requireOriginCert address = unless (not flags_requireCerts || address == fromPub
 
 create ::
   SolidVMBase m =>
-  Bool ->
-  Bool ->
-  S.Set Address ->
   BlockHeader ->
-  Int ->
   Address ->
   Address ->
   Address ->
-  Integer ->
-  Integer ->
   Gas ->
   Address ->
   Code ->
@@ -236,7 +230,7 @@ create ::
   m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress code txHash' metadata = do
+create blockData sender' origin' proposer' availableGas newAddress code txHash' metadata = do
   isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
@@ -397,19 +391,10 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 call ::
   SolidVMBase m =>
   Bool ->
-  Bool ->
-  Bool ->
-  Bool ->
-  S.Set Address ->
   BlockHeader ->
-  Int ->
   Address ->
   Address ->
   Address ->
-  Address ->
-  Word256 ->
-  Word256 ->
-  B.ByteString ->
   Gas ->
   Address ->
   Keccak256 ->
@@ -418,7 +403,7 @@ call ::
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' metadata mFuncCallType = do
+call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' metadata mFuncCallType = do
   recordCall
 
   isRunningTests <- checkIfRunningTests

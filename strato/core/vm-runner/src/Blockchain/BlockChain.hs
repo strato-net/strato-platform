@@ -75,12 +75,9 @@ import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
-import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
-import qualified Blockchain.EVM as EVM
--- import qualified Blockchain.EVM.Code as EVC
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
@@ -337,7 +334,7 @@ addTransactions blockData txs proposer =
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = txChainId =<< otPrivatePayload t
-      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t proposer
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId blockData blockGas t proposer
 
       afterMap <- getAddressStateTxDBMap
 
@@ -362,7 +359,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
 
   let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
   beforeMap <- getAddressStateTxDBMap
-  (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx mSelfAddress
+  (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing header remGas tx mSelfAddress
   afterMap <- getAddressStateTxDBMap
   P.setGauge vmTxMining (realToFrac time')
   printTransactionMessage tx result time' (txChainId bt)
@@ -395,13 +392,12 @@ blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
 addTransaction ::
   (VMBase m, MonadMonitor m) =>
   Maybe Word256 ->
-  Bool ->
   BlockHeader ->
   Integer ->
   OutputTx ->
   Address -> 
   ExceptT TransactionFailureCause m ExecResults
-addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
+addTransaction chainId b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
 
   let isHomestead = blockIsHomestead $ number b
@@ -444,7 +440,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
   when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAddr t proposer
+  execResults <- runCodeForTransaction b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAddr t proposer
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of
@@ -461,46 +457,28 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
 
 runCodeForTransaction ::
   (VMBase m) =>
-  Bool ->
-  Bool -> -- add address here
   BlockHeader ->
   Gas ->
   Address ->
   OutputTx ->
   Address ->
   ExceptT TransactionFailureCause m ExecResults
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t proposer =
+runCodeForTransaction b availableGas tAddr t proposer =
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
    in if isContractCreationTX ut
         then do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
-
-          let create =
-                case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-                  Just "EVM" -> (\a bro c d e f g _ i j k l m n o -> EVM.create a bro c d e f g i j k l m n o)
-                  Just "SolidVM" -> SolidVM.create
-                  Nothing -> (\a bro c d e f g _ i j k l m n o -> EVM.create a bro c d e f g i j k l m n o)
-                  Just vmName ->
-                    -- Return a dummy VM that just complains that the requested VM doesn't exist
-                    \_ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->
-                      return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
           nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
           let newAddress = getNewAddress_unsafe (tAddr) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
           lift $
-            create
-              isRunningTests'
-              isHomestead
-              S.empty
+            SolidVM.create
               b
-              0
               tAddr
               tAddr
               proposer
-              (transactionValue ut)
-              (fromInteger $ transactionGasPrice ut)
               availableGas
               newAddress
               (transactionInit ut)
@@ -514,41 +492,29 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
           codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
           resolvedCodeHash <- lift $ resolveCodePtr codeHash
 
-          let eCall =
-                case codeHash of
-                  ExternallyOwned _ -> Right (\a bro c d e f g h i j _ l m n o p q r _ -> EVM.call a bro c d e f g h i j l m n o p q r)
-                  SolidVMCode _ _ -> Right SolidVM.call
-                  CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (ExternallyOwned _) -> Right (\a bro c d e f g h i j _ l m n o p q r _ -> EVM.call a bro c d e f g h i j l m n o p q r)
-                    Just (SolidVMCode _ _) -> Right SolidVM.call
-                    Just (CodeAtAccount acct' name') -> Left (acct', name')
-                    Nothing -> Left (acct, name)
+          case codeHash of
+            ExternallyOwned _ -> error "EVM not supported"
+            SolidVMCode _ _ -> return ()
+            CodeAtAccount acct name -> case resolvedCodeHash of
+              Just (ExternallyOwned _) -> error "EVM not supported"
+              Just (SolidVMCode _ _) -> return ()
+              Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
+              Nothing -> throwE $ TFCodeCollectionNotFound acct name t
           
-          case eCall of
-            Left (acct, name) -> throwE $ TFCodeCollectionNotFound acct name t
-            Right call -> do
-              decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
-              case decideCodeHash of
-                SolidVMCode _ _ -> do
+          decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
+
+          case decideCodeHash of
+            SolidVMCode _ _ -> do
                   -- BEGIN: Custom Validation Check
                   -- Call validation contract at 0xDEC1DE. Require it returns True.
                   result <-
                     lift $
                     SolidVM.call
-                      isRunningTests'
-                      isHomestead
-                      False
                       False  -- isRCC
-                      S.empty
                       b  -- blockData
-                      0
-                      owner
                       (Address 0xDEC1DE)  --codeAddress
                       tAddr -- sender
                       proposer  --proposer
-                      0
-                      (fromInteger $ transactionGasPrice ut)
-                      (transactionData ut)
                       (fromIntegral availableGas) --availableGas
                       tAddr -- origin
                       (txHash ut) -- txHash
@@ -558,26 +524,17 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
                   unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
                   unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
 
-                _ -> return ()
+            _ -> return ()
 
-              $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
+          $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
 
-              lift $
-                call
-                  isRunningTests'
-                  isHomestead
-                  False
+          lift $
+            SolidVM.call
                   False  --isRCC
-                  S.empty
                   b -- blockData
-                  0
-                  owner
                   owner -- codeAddress
                   tAddr -- sender
                   proposer -- proposer
-                  (fromInteger $ transactionValue ut)
-                  (fromInteger $ transactionGasPrice ut)
-                  (transactionData ut)
                   (fromIntegral availableGas) -- availableGas
                   tAddr -- origin
                   (txHash ut) -- txHash
