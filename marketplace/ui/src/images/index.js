@@ -2,6 +2,7 @@ export const Images = {
   USDST: require('./resources/USDST.png'),
   cata: require('./resources/cata.png'),
   logo: require('./resources/logo.png'),
+  logo_big: require('./resources/logo_big.png'),
   noProductSymbol: require('./resources/noProductSymbol.png'),
   noEventPageSymbol: require('./resources/no_event.png'),
   art: require('./resources/categories/art.png'),
@@ -69,6 +70,11 @@ export const Images = {
   StakingX768: require('./resources/Banner/StakingX768.png'),
   StakingX1440: require('./resources/Banner/StakingX1440.png'),
   StakingX1600: require('./resources/Banner/StakingX1600.png'),
+
+  MercataX394: require('./resources/Banner/MercataX394.png'),
+  MercataX768: require('./resources/Banner/MercataX768.png'),
+  MercataX1440: require('./resources/Banner/MercataX1440.png'),
+  MercataX1600: require('./resources/Banner/MercataX1600.png'),
 
   BatmanX394: require('./resources/Banner/BatmanX394.png'),
   BatmanX768: require('./resources/Banner/BatmanX768.png'),
