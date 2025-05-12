@@ -234,14 +234,14 @@ abstract contract OnRamp {
         }
 
         uint256 remaining = listing.amount;
+        IERC20(listing.token).transfer(msg.sender, remaining);
+
         listing.id = 0;
         listing.marginBps = 0;
         listing.seller = address(0);
         listing.token = address(0);
         activeListingFor[listing.token] = 0;
         listing.amount = 0;
-
-        IERC20(listing.token).transfer(msg.sender, remaining);
 
         emit ListingCancelled(listingId);
     }
