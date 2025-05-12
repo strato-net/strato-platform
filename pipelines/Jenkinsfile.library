@@ -77,7 +77,6 @@ def deployStrato(nodeData) {
         networkID="${nodeData.NETWORK_ID}" \\
         BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
         validators="${nodeData.VALIDATORS}" \\
-        requireCerts=false \\
         ./strato --blockstanbul"""
       } else {
         runCommand = """#!/bin/bash
@@ -93,7 +92,6 @@ def deployStrato(nodeData) {
         NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
         HTTPS_PORT="${nodeData.PORT}" \\
         network="blockappsnet" \\
-        requireCerts=false \\
         ./strato --blockstanbul"""
       }
       writeFile file:"run.sh", text: """${runCommand}"""
@@ -195,7 +193,6 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
           OAUTH_CLIENT_SECRET=${clientSecret} \\
           VAULT_URL=https://${nodeData.BOOT_HOST}:8093  \\
           VAULT_PROXY_DEBUG=true \\
-          requireCerts=false \\
           ./strato
       """
       sh 'chmod +x run.sh'
@@ -314,7 +311,6 @@ export AWS_ACCESS_KEY_ID='${AWS_BEANSTALK_INTERNAL_TEST_USER_KEY}'
 export AWS_SECRET_ACCESS_KEY='${AWS_BEANSTALK_INTERNAL_TEST_USER_PASSWORD}'
 export AWS_REGION='us-east-1'
 export AWS_SQS_URL='https://sqs.us-east-1.amazonaws.com/406773134706/beanstalk-internal-sqs'
-export requireCerts=false
 
 #POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL
 #CUSTOM_NPM_SCRIPT__OPTIONAL
@@ -347,7 +343,6 @@ export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://keycloak.blockapps.net/aut
 export INT_SERVER_OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}'
 export INT_SERVER_OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
 export INT_SERVER_OAUTH_SCOPE='openid email'
-export requireCerts=false
 
   docker compose up -d --build
           """
@@ -440,7 +435,6 @@ export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://login.microsoftonline.com/
 export INT_SERVER_OAUTH_CLIENT_ID='${AZUREAD_INTSERVER_CLIENT_ID}'
 export INT_SERVER_OAUTH_CLIENT_SECRET='${AZUREAD_INTSERVER_CLIENT_SECRET}'
 export INT_SERVER_OAUTH_SCOPE='openid email ${AZUREAD_INTSERVER_CLIENT_ID}/.default'
-export requireCerts=false
 
 #POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL
 #CUSTOM_NPM_SCRIPT__OPTIONAL

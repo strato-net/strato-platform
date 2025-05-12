@@ -10,7 +10,6 @@ module Blockchain.VMOptions
     flags_queryBlocks,
     flags_transactionRootVerification,
     flags_startingBlock,
-    flags_requireCerts,
     flags_accountNonceLimit,
     flags_txSizeLimit,
     flags_gasLimit,
@@ -40,7 +39,6 @@ defineFlag "transactionRootVerification" False "Flag to turn transaction root ve
 defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
-defineFlag "requireCerts" (True :: Bool) "Flag to enable the requirement of a cert to send transactions"
 defineFlag "creatorForkBlockNumber" (-1 :: Integer) "The block number at which to use commonName for the creator value instead of organization"
 defineFlag "strictGas" (True :: Bool) "Whether to restrict transactions to approximately 2 second gas timeout"
 defineFlag "strictGasLimit" (400000 :: Integer) "The maximum amount of gas that can be used for a transaction in strict mode"

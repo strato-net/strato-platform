@@ -178,7 +178,6 @@ services:
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
-    - requireCerts=${requireCerts:-true}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
@@ -194,6 +193,7 @@ services:
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
+    - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul} \
     - txSizeLimit=${txSizeLimit}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}

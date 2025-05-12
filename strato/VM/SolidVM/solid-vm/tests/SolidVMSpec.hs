@@ -5960,7 +5960,6 @@ contract qq {
     ( runTest $ do
         ( runBS
             [r|
-pragma solidvm 11.4;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -8120,7 +8119,6 @@ contract qq {
   it "can use create and create2 built-in function calls" . runTest $ do
     runBS
       [r|
-pragma builtinCreates;
 
 contract qq {
   account a;
@@ -8749,7 +8747,6 @@ contract qq {
 
   it "respects the number of decimal places during arithmetic operations" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 contract qq {
   decimal a;
   decimal b;
@@ -8790,7 +8787,6 @@ contract qq {
 
   it "can use built-in truncate functions on decimals" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 contract qq {
   decimal a = 5.2825;
   decimal b = 5.2825;
@@ -8823,7 +8819,6 @@ contract qq {
         getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
-pragma safeExternalCalls;
 contract qq {
     bool public myVal;
 
@@ -8849,9 +8844,8 @@ contract qq {
     }
 }|]) `shouldThrow` anyTypeError
 
-  it "can use es6 imports with solidvm 11.4 pragma" $ runTest ( do
+  it "can use es6 imports" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 import { someFunc } from <123>;
 
 contract qq {
@@ -8863,9 +8857,8 @@ contract qq {
 }
 |]) `shouldThrow` specificTypeError "\"Could not find file <0000000000000000000000000000000000000123>\""
 
-  it "can use strict modifiers with solidvm 11.4 pragma" $ runTest ( do
+  it "can use strict modifiers" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 
 contract A {
   int y = 5;
@@ -8883,12 +8876,11 @@ contract qq is A {
     x = a.getY();
   }
 }
-|]) `shouldThrow` specificTypeError "\" (line 17, column 9) - (line 17, column 10): \\\"Missing label: ABottom ( (line 17, column 9) - (line 17, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
+|]) `shouldThrow` specificTypeError "\" (line 16, column 9) - (line 16, column 10): \\\"Missing label: ABottom ( (line 16, column 9) - (line 16, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
 
-  it "can use create and create2 built-in function calls with solidvm 11.4 pragma" . runTest $ do
+  it "can use create and create2 built-in function calls" . runTest $ do
     runBS
       [r|
-pragma solidvm 11.4;
 
 contract qq {
   account a;
@@ -8907,12 +8899,11 @@ contract qq {
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
     getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
-  it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
         getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
-pragma solidvm 11.4;
 contract qq {
     bool public myVal;
 

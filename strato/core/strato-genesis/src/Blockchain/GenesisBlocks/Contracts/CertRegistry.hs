@@ -103,12 +103,12 @@ insertCertRegistryContract certs gi =
 certificateRegistryContract :: Text
 certificateRegistryContract =
   [r|
-contract Certificate {
+contract record Certificate {
     address owner;  // The CertificateRegistry Contract
 
     address public userAddress;
     address public parent;
-    address[] public children;
+    address[] public record children;
 
     
     // Store all the fields of a certificate in a Cirrus record
@@ -159,11 +159,11 @@ contract Certificate {
     }
 }
 
-contract CertificateRegistry {
+contract record CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
-    mapping(address => address) addressToCertMap;
+    mapping(address => address) public record addressToCertMap;
     address public owner;
 
     event CertificateRegistered(string certificate);

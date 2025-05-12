@@ -1,8 +1,5 @@
 import <509>;
 
-pragma es6;
-pragma strict;
-
 contract RestStatus {
   uint constant OK = 200;
   uint constant CREATED = 201;

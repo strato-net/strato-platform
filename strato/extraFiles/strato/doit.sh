@@ -170,6 +170,7 @@ function newnode {
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
     --validatorBehavior=${validatorBehavior:-true} \
+    --test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     "${networkFlag}" "${iFlag}" "${sBFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
@@ -239,7 +240,6 @@ function newnode {
     --sqlDiff=${sqlDiff:-true} \
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
-    --requireCerts=${requireCerts:-true} \
     ${networkFlag} \
     "${aclFlag}" \
     "${txsFlag}" \

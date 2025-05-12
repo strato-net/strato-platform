@@ -7,8 +7,6 @@
 -- Maintainer: Dustin Norwood <dustin@blockapps.net>
 module SolidVM.Solidity.Parse.Imports (solidityImport) where
 
-import Data.List (find)
-import Data.Maybe (isJust)
 import Data.Source
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Import
@@ -20,22 +18,14 @@ import Text.Parsec
 
 solidityImport :: SolidityParser SourceUnit
 solidityImport = do
-  es6 <- isJust . find ((== "es6") . fst) . pragmas <$> getState
   ~(a, imp) <- withPosition $ do
     reserved "import"
-    fileImport es6
+    fileImport
   semi
   pure $ Import a imp
 
-fileImport :: Bool -> SolidityParser FileImport
-fileImport es6 = do
-  i <- bracedImport <|> try qualifiedImport <|> simpleImport
-  if es6
-    then pure i
-    else case i of
-      Simple {} -> pure i
-      Qualified {} -> fail "Please add `pragma es6;` to the top of the file to enable support for qualified imports."
-      Braced {} -> fail "Please add `pragma es6;` to the top of the file to enable support for braced imports."
+fileImport :: SolidityParser FileImport
+fileImport = bracedImport <|> try qualifiedImport <|> simpleImport
 
 simpleImport :: SolidityParser FileImport
 simpleImport = do

@@ -158,6 +158,7 @@ instance ToSample Contract where
           _usings = Map.empty,
           _contractType = ContractType,
           _importedFrom = Nothing,
+          _isContractRecord = False,
           _contractContext = SourceAnnotation (SourcePosition "SimpleStorage.sol" 1 1) (SourcePosition "SimpleStorage.sol" 1 2) ()
         }
 

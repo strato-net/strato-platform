@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 /// @title A representation of Token assets
 abstract contract LendingToken is Mintable, MinterAuthorization {
     constructor(

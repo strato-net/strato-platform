@@ -254,9 +254,10 @@ getArrayNamesFromContract :: ContractF () -> Map.Map T.Text SVMType.Type
 getArrayNamesFromContract c =
   let storageDefs' = c ^. storageDefs
       storageDefsList = Map.toList storageDefs'
+      listOfArraysWithRecords = filter (\(_, vd) -> _isRecord vd) storageDefsList
       listOfArraysWithTypename = map (\(name, vd) -> case (_varType vd) of
                                                        SVMType.Array entry _ -> Just (T.pack name, entry)
-                                                       _ -> Nothing) storageDefsList
+                                                       _ -> Nothing) listOfArraysWithRecords
    in Map.fromList $ catMaybes listOfArraysWithTypename
 
 getContractsFromPC :: E.ProcessedContract -> [Text]
@@ -299,7 +300,7 @@ processTheMessages env conn messages = do
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
-          forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
+          forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these collections and add a foreign key to the main table
 

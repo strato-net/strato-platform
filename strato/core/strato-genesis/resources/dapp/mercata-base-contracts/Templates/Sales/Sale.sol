@@ -1,18 +1,15 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 //import "../Assets/Asset.sol";
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 //import "../Structs/Structs.sol";
 
-abstract contract Sale is Ownable, Structs { 
+abstract contract record Sale is Ownable, Structs { 
 
     Asset public assetToBeSold;
     decimal public price;
     uint public quantity;
-    PaymentServiceInfo[] public paymentServices;
+    PaymentServiceInfo[] public record paymentServices;
     mapping (string => mapping (string => uint)) paymentServicesMap;
     mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;

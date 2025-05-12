@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 contract Mercata{}
 
 abstract contract Asset is Utils {

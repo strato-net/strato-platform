@@ -211,11 +211,6 @@ solidVMBreakpoint ann = do
 
 -- end debugger-related code
 
-requireOriginCert :: MonadSM m => Address -> m ()
-requireOriginCert address = unless (not flags_requireCerts || address == fromPublicKey rootPubKey) $ do
-  originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) address)
-  unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" address
-
 create ::
   SolidVMBase m =>
   BlockHeader ->
@@ -257,7 +252,6 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
-    requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -427,7 +421,6 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
           }
 
   fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
-    requireOriginCert origin'
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeSrcLength = M.lookup "srcLength" =<< metadata
@@ -1997,14 +1990,9 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
-            (SDecimal v, "truncate") -> do
-              (_, parentCC) <- getCurrentCodeCollection
-              contract <- getCurrentContract
-              let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
-              case (pragmaCheck, convertedFirstArg) of
-                (True, SInteger n) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
-                (False, _) -> unknownFunction "truncate" (contract ^. CC.contractName)
-                _ -> invalidArguments ("truncate() called with non-integer value as argument") convertedFirstArg
+            (SDecimal v, "truncate") -> case convertedFirstArg of
+              SInteger n -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
+              _ -> invalidArguments ("truncate() called with non-integer value as argument") convertedFirstArg
             _ -> regularFunctionCall Nothing
         _ -> regularFunctionCall Nothing
       where
@@ -2374,8 +2362,6 @@ expToVarArith :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 expToVarArith intOp decOp expr1 expr2 valType = do
-  (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
@@ -2385,15 +2371,15 @@ expToVarArith intOp decOp expr1 expr2 valType = do
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "expToVarArith" (i1, i2)
   
 expToVarDivide :: MonadSM m => 
@@ -2404,27 +2390,25 @@ expToVarDivide :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 expToVarDivide intOp decOp expr1 expr2 valType = do
-  (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
   case (i1, i2, valType') of
     (SInteger a, SInteger b, (SVMType.Int _ _)) -> return . Constant . SInteger $ a `intOp` b
     (SInteger a, SInteger b, SVMType.Decimal) -> 
-      return $ bool (Constant $ SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)) (Constant $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "expToVarArith" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
@@ -2441,8 +2425,6 @@ binopAssign' :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 binopAssign' intOp decOp lhs rhs valType = do
-  (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   let readVal e = getVar =<< expToVar e Nothing
   delta <- readVal rhs
   curValue <- readVal lhs
@@ -2454,15 +2436,15 @@ binopAssign' intOp decOp lhs rhs valType = do
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      pure $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      pure $ SDecimal $ roundTo maxDecimalPlaces result
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ SDecimal $ roundTo maxDecimalPlaces result
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "binopAssign'" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2475,8 +2457,6 @@ binopDivide :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 binopDivide intOp decOp lhs rhs valType = do
-  (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   let readVal e = getVar =<< expToVar e Nothing
   delta <- readVal rhs
   curValue <- readVal lhs
@@ -2485,19 +2465,19 @@ binopDivide intOp decOp lhs rhs valType = do
   next <- case (curValue, delta, valType') of
     (SInteger c, SInteger d, (SVMType.Int _ _)) -> pure . SInteger $ c `intOp` d
     (SInteger a, SInteger b, SVMType.Decimal) -> 
-      return $ bool (SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)) (SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))) pragmaCheck
+      return $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ SDecimal $ roundTo maxDecimalPlaces result
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ SDecimal $ roundTo maxDecimalPlaces result
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
+      return $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "binopAssign'" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2782,7 +2762,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
 
   creator <- getCurrentAddress
   currentContract <- getCurrentContract
-  (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
   -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
@@ -2790,7 +2769,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "builtinCreates"
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
@@ -2803,7 +2781,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
-  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
   case erNewContractAddress execResults of
     Just nca -> do
       when (not isRunningTests) $ 
@@ -2828,7 +2806,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
 
   creator <- getCurrentAddress
   currentContract <- getCurrentContract
-  (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
   -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
@@ -2836,7 +2813,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "builtinCreates"
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
         Right parsedArgs -> parsedArgs
@@ -2849,7 +2825,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
   case erNewContractAddress execResults of
     Just nca -> do
       when (not isRunningTests) $ 
@@ -2996,22 +2972,14 @@ runTheConstructors from to hsh cc contractName' argExps = do
           for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
     -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
-    let isStrict = CC.resolvePragmaFeature (CC._pragmas cc) "strict"
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
-      if isStrict
-        then for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
-          args' <- traverse (getVar <=< flip expToVar Nothing) args''
-          let argExprs = map (valueToExpression $ contract' ^. CC.contractContext) args'
-              mArgs = sequence $ uncurry (<|>) <$> zip argExprs (Just <$> args'')
-          case mArgs of
-            Just args -> runTheConstructors from to hsh cc parent $ CC.OrderedArgs args
-            Nothing -> typeError "Could not determine values for constructor arguments" args'
-        else do
-          let args =
-                CC.OrderedArgs
-                  . fromMaybe []
-                  $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
-          runTheConstructors from to hsh cc parent args
+      for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
+        args' <- traverse (getVar <=< flip expToVar Nothing) args''
+        let argExprs = map (valueToExpression $ contract' ^. CC.contractContext) args'
+            mArgs = sequence $ uncurry (<|>) <$> zip argExprs (Just <$> args'')
+        case mArgs of
+          Just args -> runTheConstructors from to hsh cc parent $ CC.OrderedArgs args
+          Nothing -> typeError "Could not determine values for constructor arguments" args'
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
@@ -3082,15 +3050,11 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  -- 'pragma safeExternalCalls' is used for contracts that may receive external calls
-  -- and want to enforce a typecheck on arguments given by other contracts
-  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas cc) "safeExternalCalls"
-  when pragmaCheck $ do
-   unlessM (validateFunctionArguments theFunction argVals) $
-    typeError
-      "the argument values do not match up with the function signature" 
-      (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
-       in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
+  unlessM (validateFunctionArguments theFunction argVals) $
+   typeError
+     "the argument values do not match up with the function signature" 
+     (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
+      in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args = case argVals of
         OrderedVals vs ->

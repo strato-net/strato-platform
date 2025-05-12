@@ -16,5 +16,5 @@ predicate _ = False
 
 main :: IO ()
 main = do
-  _ <- $initHFlagsDependentDefaults "P2P unit tests" (const $ const $ const $ [("requireCerts", "False")])
+  _ <- $initHFlags "P2P unit tests"
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec

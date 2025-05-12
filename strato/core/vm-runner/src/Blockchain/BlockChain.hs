@@ -424,6 +424,12 @@ addTransaction chainId b remainingBlockGas t@OutputTx {otSigner = tAddr} propose
   when (txSize >= toInteger flags_txSizeLimit)
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
+  
+  let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
+      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
+      availableGas = fromInteger adjustedTxGasLimit - intrinsicGas'
+
+  payFees b availableGas tAddr t proposer
 
   lift $ incrementNonce tAddr
 
@@ -436,11 +442,9 @@ addTransaction chainId b remainingBlockGas t@OutputTx {otSigner = tAddr} propose
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
   lift $ P.incCounter txTypeCounter
-  let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
-      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
   when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-  execResults <- runCodeForTransaction b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAddr t proposer
+  execResults <- runCodeForTransaction b availableGas tAddr t proposer
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of
@@ -501,33 +505,6 @@ runCodeForTransaction b availableGas tAddr t proposer =
               Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
               Nothing -> throwE $ TFCodeCollectionNotFound acct name t
           
-          decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
-
-          case decideCodeHash of
-            SolidVMCode _ _ -> do
-                  -- BEGIN: Custom Validation Check
-                  -- Call validation contract at 0xDEC1DE. Require it returns True.
-                  result <-
-                    lift $
-                    SolidVM.call
-                      False  -- isRCC
-                      b  -- blockData
-                      (Address 0xDEC1DE)  --codeAddress
-                      tAddr -- sender
-                      proposer  --proposer
-                      (fromIntegral availableGas) --availableGas
-                      tAddr -- origin
-                      (txHash ut) -- txHash
-                      (fmap (M.insert "funcName" "decide" . M.insert "args" "()") $ txMetadata ut)
-                      (Just DelegateCall)
-
-                  unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
-                  unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
-
-            _ -> return ()
-
-          $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
-
           lift $
             SolidVM.call
                   False  --isRCC
@@ -540,6 +517,41 @@ runCodeForTransaction b availableGas tAddr t proposer =
                   (txHash ut) -- txHash
                   (txMetadata ut) -- metadata
                   Nothing
+
+payFees ::
+  VMBase m =>
+  BlockHeader ->
+  Gas ->
+  Address ->
+  OutputTx ->
+  Address ->
+  ExceptT TransactionFailureCause m ()
+payFees b availableGas tAddr t proposer = do
+  let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
+  case decideCodeHash of
+    SolidVMCode _ _ -> do
+          -- BEGIN: Custom Validation Check
+          -- Call validation contract at 0xDEC1DE. Require it returns True.
+          result <-
+            lift $
+            SolidVM.call
+              False  -- isRCC
+              b  -- blockData
+              (Address 0xDEC1DE)  --codeAddress
+              tAddr -- sender
+              proposer  --proposer
+              (fromIntegral availableGas) --availableGas
+              tAddr -- origin
+              (txHash ut) -- txHash
+              (fmap (M.insert "funcName" "decide" . M.insert "args" "()") $ txMetadata ut)
+              (Just DelegateCall)
+
+          unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
+          unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
+
+    _ -> return ()
+  $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
 
 ----------------
 

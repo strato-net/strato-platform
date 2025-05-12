@@ -1,11 +1,8 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 
-abstract contract Asset is ERC20, Ownable {
+abstract contract record Asset is ERC20, Ownable {
     enum AssetStatus {
         NULL,
         ACTIVE,
@@ -18,9 +15,9 @@ abstract contract Asset is ERC20, Ownable {
     string public ownerCommonName;
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public description;
-    string[] public images;
-    string[] public files;
-    string[] public fileNames;
+    string[] public record images;
+    string[] public record files;
+    string[] public record fileNames;
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;

@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 contract ERC20Asset is Asset {
 
     constructor(

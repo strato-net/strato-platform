@@ -102,6 +102,7 @@ createDummyContract v =
       _usings=undefined,
       _contractType=undefined,
       _importedFrom=undefined,
+      _isContractRecord=undefined,
       _contractContext=undefined
     }
 

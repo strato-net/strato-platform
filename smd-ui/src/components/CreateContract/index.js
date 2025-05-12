@@ -301,18 +301,6 @@ class CreateContract extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-
         <AnchorButton onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal();
@@ -322,9 +310,8 @@ class CreateContract extends Component {
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
           text={"Create Contract"}
-          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract)}
         />
-        </Popover>
         <form>
           <Dialog
             iconName="inbox"

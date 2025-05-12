@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 //import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Collectible assets

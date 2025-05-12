@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)
-pragma solidvm 12.0;
 
 /**
  * @dev Provides information about the current execution context, including the

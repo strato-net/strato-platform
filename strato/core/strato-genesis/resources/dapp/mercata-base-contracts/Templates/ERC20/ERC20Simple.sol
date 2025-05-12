@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 contract ERC20Simple is ERC20{
     address public owner;
     constructor(string name_, string symbol_, uint256 initialSupply_) ERC20(name_, symbol_){

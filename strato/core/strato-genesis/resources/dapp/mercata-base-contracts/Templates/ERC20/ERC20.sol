@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.2.0) (token/ERC20/ERC20.sol)
-pragma solidvm 12.0;
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -20,7 +19,7 @@ pragma solidvm 12.0;
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
  */
-abstract contract ERC20 is IERC20, IERC20Metadata{ //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
+abstract contract record ERC20 is IERC20, IERC20Metadata{ //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
     mapping(address => uint256) public record _balances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream
 
     mapping(address => mapping(address => uint256)) public record _allowances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream. Also, I realize now that nested mappings don't work in slipstream so we need to use a different approach to query the allowances for now.

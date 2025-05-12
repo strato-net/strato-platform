@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 //import "../Assets/Asset.sol";
 //import "../Enums/RestStatus.sol";
