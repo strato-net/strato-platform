@@ -497,10 +497,10 @@ runCodeForTransaction b availableGas tAddr t proposer =
           resolvedCodeHash <- lift $ resolveCodePtr codeHash
 
           case codeHash of
-            ExternallyOwned _ -> error "EVM not supported"
+            ExternallyOwned _ -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
             SolidVMCode _ _ -> return ()
             CodeAtAccount acct name -> case resolvedCodeHash of
-              Just (ExternallyOwned _) -> error "EVM not supported"
+              Just (ExternallyOwned _) -> throwE $ TFCodeCollectionNotFound acct "EVM not supported" t
               Just (SolidVMCode _ _) -> return ()
               Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
               Nothing -> throwE $ TFCodeCollectionNotFound acct name t
