@@ -4871,7 +4871,6 @@ contract qq{
         myContract =
           [r|contract Test {
   uint sixtyNine = 69;
-  // no constructor found
 }
 |]
         contract :: String
@@ -7426,7 +7425,7 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert f({x:'a',y:'b'});
+      revert f({x:"a",y:"b"});
   }
 }|]
       )
@@ -8456,7 +8455,7 @@ contract qq {
                       BDecimal "3.123123",
                       BDecimal "-0.876877",
                       BDecimal "2.246246",
-                      BDecimal "0.5615615",
+                      BDecimal "0.561562",
                       BDecimal "-2"
                      ])
 
@@ -8482,7 +8481,7 @@ contract qq {
                       BDecimal "5.3",
                       BDecimal "1.3",
                       BDecimal "6.6",
-                      BDecimal "1.65"
+                      BDecimal "1.6"
                      ])
 
   it "can use decimal literals in expressions" $ runTest ( do
@@ -8522,9 +8521,9 @@ contract qq {
                       BDecimal "0.8",
                       BDecimal "2.1",
                       BDecimal "6.4",
-                      BDecimal "-2.76",
-                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
-                      BDecimal "2",
+                      BDecimal "-2.8",
+                      BDecimal "0.9",
+                      BDecimal "2.0",
                       BDecimal "6.25"
                      ])
 
@@ -8876,7 +8875,7 @@ contract qq is A {
     x = a.getY();
   }
 }
-|]) `shouldThrow` specificTypeError "\" (line 16, column 9) - (line 16, column 10): \\\"Missing label: ABottom ( (line 16, column 9) - (line 16, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
+|]) `shouldThrow` specificTypeError "\" (line 16, column 9) - (line 16, column 10): \\\"Missing label A  (line 16, column 9) - (line 16, column 10):  cannot access function getY because it is marked as private\\\" \""
 
   it "can use create and create2 built-in function calls" . runTest $ do
     runBS

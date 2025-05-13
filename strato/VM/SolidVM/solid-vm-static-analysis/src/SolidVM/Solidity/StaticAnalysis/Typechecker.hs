@@ -1560,11 +1560,11 @@ getVarTypeByName' name ctx = do
               :| [ Function fArgs (Static s ctx') ctx' [] [] False
                  ]
         Just (e@(SVMType.Error _ err), ctx') -> do
-          args <- fmap snd <$> lookupError err
-          let eArgs = flip Product ctx $ flip Static ctx <$> args
+          args <- lookupError err
+          let eArgs = flip Product ctx $ flip Static ctx . snd <$> args
           pure . Sum $
             (Static e ctx')
-              :| [ Function eArgs (Static e ctx') ctx' [] [] False
+              :| [ Function eArgs (Static e ctx') ctx' [] (Just . fst <$> args) False
                  ]
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing ->
