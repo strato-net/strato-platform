@@ -123,8 +123,8 @@ pipeline {
               counter=0
               until curl --silent --fail --location $(</host)/health | jq .health | grep true
               do
-                if [[ "$counter" -gt 120 ]]; then
-                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
+                if [[ "$counter" -gt 300 ]]; then
+                  echo "STRATO node took longer than 5 minutes to initialize! aborting."
                   exit 73
                 fi
                 echo "waiting for STRATO health endpoint to be available through nginx"
