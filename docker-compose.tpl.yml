@@ -193,7 +193,7 @@ services:
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
-    - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul} \
+    - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     - txSizeLimit=${txSizeLimit}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
