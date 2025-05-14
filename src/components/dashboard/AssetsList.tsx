@@ -1,6 +1,9 @@
-
+import { useState } from 'react';
 import { ArrowUpRight, Plus } from 'lucide-react';
 import { Button } from "../ui/button";
+import DepositModal from './DepositModal';
+import BridgeModal from './BridgeModal';
+import DepositOptionsModal from './DepositOptionsModal';
 
 interface Asset {
   name: string;
@@ -13,6 +16,19 @@ interface Asset {
 }
 
 const AssetsList = () => {
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
+
+  const handleOptionSelect = (option: 'credit-card' | 'bridge') => {
+    setIsOptionsModalOpen(false);
+    if (option === 'credit-card') {
+      setIsDepositModalOpen(true);
+    } else {
+      setIsBridgeModalOpen(true);
+    }
+  };
+
   const assets: Asset[] = [
     {
       name: 'Gold',
@@ -57,7 +73,11 @@ const AssetsList = () => {
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">Your Assets</h2>
-          <Button size="sm" className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1">
+          <Button 
+            size="sm" 
+            className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
+            onClick={() => setIsOptionsModalOpen(true)}
+          >
             <Plus size={16} />
             Add Deposits
           </Button>
@@ -122,6 +142,22 @@ const AssetsList = () => {
           View All <ArrowUpRight size={14} className="ml-1" />
         </a>
       </div>
+
+      <DepositOptionsModal 
+        isOpen={isOptionsModalOpen}
+        onClose={() => setIsOptionsModalOpen(false)}
+        onSelectOption={handleOptionSelect}
+      />
+
+      <DepositModal 
+        isOpen={isDepositModalOpen}
+        onClose={() => setIsDepositModalOpen(false)}
+      />
+
+      <BridgeModal
+        isOpen={isBridgeModalOpen}
+        onClose={() => setIsBridgeModalOpen(false)}
+      />
     </div>
   );
 };
