@@ -171,8 +171,8 @@ contract record KeywordEventTest {
 
 
   it("Will expand Cirrus tables when contract versions with new fields are created", async () => {
-    const version1 = "contract ExpansionTest { uint x; constructor() { x = 0; } }";
-    const version2 = "contract ExpansionTest { uint x; uint y; constructor() { x = 2; y = 10; } }";
+    const version1 = "contract record ExpansionTest { uint x; constructor() { x = 0; } }";
+    const version2 = "contract record ExpansionTest { uint x; uint y; constructor() { x = 2; y = 10; } }";
 
     const [user, contract] = await upload("ExpansionTest", version1, options);
     const v1SearchList = await rest.searchUntil(user, {...contract, name: toTableName("ExpansionTest")}, (r) => r.length > 0, {...options, query: {address: `eq.${contract.address}`}});
