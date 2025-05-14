@@ -431,12 +431,13 @@ addTransaction chainId b remainingBlockGas t@OutputTx {otSigner = tAddr} propose
 
   payFees b availableGas tAddr t proposer
 
-  let owner = transactionTo $ otBaseTx t
-  lift (A.lookupWithDefault (Proxy @AddressState) owner >>= resolveCodePtr . addressStateCodeHash) >>= \case
-    Just (ExternallyOwned _) -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
-    Just (SolidVMCode _ _) -> return ()
-    Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
-    Nothing -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
+  unless (isContractCreationTX bt) $ do
+    let owner = transactionTo bt
+    lift (A.lookupWithDefault (Proxy @AddressState) owner >>= resolveCodePtr . addressStateCodeHash) >>= \case
+      Just (ExternallyOwned _) -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
+      Just (SolidVMCode _ _) -> return ()
+      Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
+      Nothing -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
 
   lift $ incrementNonce tAddr
 
