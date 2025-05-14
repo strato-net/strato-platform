@@ -1,4 +1,4 @@
-contract FieldsTest {
+contract record FieldsTest {
   uint ACCEPTED = 202;
   uint BAD_GATEWAY = 502;
   uint BAD_REQUEST = 400;
