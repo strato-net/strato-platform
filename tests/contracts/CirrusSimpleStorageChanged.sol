@@ -1,4 +1,4 @@
-contract SimpleStorage {
+contract record SimpleStorage {
     string storedData;
 
     function SimpleStorage(string _storedData) {

@@ -20,7 +20,7 @@ let options:Options = {config};
 let user:BlockChainUser;
 
 const counter = `
-contract Counter {
+contract record Counter {
     uint count;
 
     function incr() public {
@@ -33,7 +33,7 @@ contract Counter {
 `;
 
 const partialModify = `
-contract PartialModify {
+contract record PartialModify {
   uint x = 83;
   uint y = 72;
 
@@ -46,7 +46,7 @@ contract PartialModify {
 const deployAndModify = `
 ${partialModify}
 
-contract Deployer {
+contract record Deployer {
   PartialModify pm;
 
   constructor() public {
@@ -56,13 +56,13 @@ contract Deployer {
 }
 `;
 
-const enumContract = `contract EnumContract {
+const enumContract = `contract record EnumContract {
   enum E {A, B, C, D}
   E e = E.C;
 }
 `;
 
-const stringsContract = `contract StringReturns {
+const stringsContract = `contract record StringReturns {
 
   function single() returns (string) {
     return "how are you?";

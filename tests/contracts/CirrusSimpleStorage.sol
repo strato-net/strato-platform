@@ -1,4 +1,4 @@
-contract SimpleStorage {
+contract record SimpleStorage {
     uint storedData;
 
     function SimpleStorage(uint _storedData) {

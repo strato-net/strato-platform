@@ -1,4 +1,4 @@
-contract RejectionType {
+contract record RejectionType {
 
   enum RejectionType {
     NULL,

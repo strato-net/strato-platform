@@ -1,6 +1,6 @@
 import './Mortal.sol'
 
-contract Greeter is Mortal {
+contract record Greeter is Mortal {
   string greeting;
 
   function greeter(string _greeting) public {

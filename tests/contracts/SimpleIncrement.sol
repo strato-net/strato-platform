@@ -1,6 +1,6 @@
 pragma solidity ^0.4.8;
 
-contract SimpleIncrement { 
+contract record SimpleIncrement { 
   
   uint x; 
 

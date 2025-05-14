@@ -3,7 +3,7 @@
 /**
  * Vehicle root
  */
-contract Vehicle_Packed {
+contract record Vehicle_Packed {
   uint public timestamp;
 
   // vehcile info

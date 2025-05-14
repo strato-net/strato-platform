@@ -4,7 +4,7 @@ import "./EventLogType.sol";
 /**
 * Permission Manager for all
 */
-contract PermissionManager is RestStatus, EventLogType {
+contract record PermissionManager is RestStatus, EventLogType {
   // master account
   address master;
   // owner account

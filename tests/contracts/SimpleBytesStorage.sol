@@ -1,4 +1,4 @@
-contract SimpleBytesStorage {
+contract record SimpleBytesStorage {
     bytes32 storedData;
 
     bytes32[] storedDatum;

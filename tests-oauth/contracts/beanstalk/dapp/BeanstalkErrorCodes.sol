@@ -1,4 +1,4 @@
-contract BeanstalkErrorCodes {
+contract record BeanstalkErrorCodes {
 
   enum BeanstalkErrorCodes {
     NULL,

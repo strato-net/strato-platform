@@ -1,4 +1,4 @@
-contract DataTypeString {
+contract record DataTypeString {
     string storedData;
 
     string[] storedDatum;

@@ -1,7 +1,7 @@
 import "./EchoRole.sol";
 import "./EchoPermission.sol";
 
-contract EchoRolePermissions  is EchoRole, EchoPermission {
+contract record EchoRolePermissions  is EchoRole, EchoPermission {
   uint[] rolePermissions;
   constructor() {
     rolePermissions.length = uint(EchoRole.OFFICER)+1;

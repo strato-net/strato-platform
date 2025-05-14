@@ -25,7 +25,7 @@ import "../dapp/Notification.sol";
  * #return none
  */
 
-contract Membership is RestStatus, MembershipState, BeanstalkRole, BeanstalkErrorCodes {
+contract record Membership is RestStatus, MembershipState, BeanstalkRole, BeanstalkErrorCodes {
   BeanstalkPermissionManager permissionManager;
   address public dappAddress;
   address public owner;

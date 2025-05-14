@@ -1,7 +1,7 @@
 import "./FSM.sol";
 import "./GasDealState.sol";
 import "./GasDealEvent.sol";
-contract GasDealFSM is FSM, GasDealState, GasDealEvent {
+contract record GasDealFSM is FSM, GasDealState, GasDealEvent {
     constructor() {
         // WAIT_COUNTER_PRICE
         addTransition(GasDealState.WAIT_COUNTER_PRICE, GasDealEvent.COUNTER_PARTY_PRICE, GasDealState.WAIT_MATCH);

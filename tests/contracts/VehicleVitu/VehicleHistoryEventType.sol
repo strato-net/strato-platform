@@ -3,7 +3,7 @@
 /**
  * Contract contains constant values for History Snapshot events
  */
-contract VehicleHistoryEventType {
+contract record VehicleHistoryEventType {
 
   enum VehicleHistoryEventType {
     CONSTRUCTOR,

@@ -18,7 +18,7 @@ import "../dapp/BeanstalkErrorCodes.sol";
 * #return none
 */
 
-contract AgreementManager is RestStatus, BeanstalkErrorCodes {
+contract record AgreementManager is RestStatus, BeanstalkErrorCodes {
   address public dappAddress;
   BeanstalkPermissionManager permissionManager;
   BeanstalkUserManager userManager;

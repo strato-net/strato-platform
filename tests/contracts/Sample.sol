@@ -1,4 +1,4 @@
-contract Sample {
+contract record Sample {
 
   uint buid;
   string wellName;
@@ -32,7 +32,7 @@ contract Sample {
   }
 }
 
-contract SampleManager {
+contract record SampleManager {
   Sample[] data;
   uint nextBuid;
   mapping (uint => uint) buidToIndex;

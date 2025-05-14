@@ -3,7 +3,7 @@
 /**
  * Title form
  */
-contract StackDepth {
+contract record StackDepth {
   // NOTE: members must be public to be indexed for search
   string public s0 = 's0_abcdefghijklmnop';
   string public s1 = 's1_abcdefghijklmnop';

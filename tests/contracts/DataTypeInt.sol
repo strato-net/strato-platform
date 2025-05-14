@@ -1,4 +1,4 @@
-contract DataTypeInt {
+contract record DataTypeInt {
     int storedData;
 
     int[] storedDatum;

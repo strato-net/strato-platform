@@ -28,7 +28,7 @@ let options:Options={config, cacheNonce: true}
 
 //config.apiDebug=true;
 const nonceOrder = `
-contract NonceOrder {
+contract record NonceOrder {
     uint a = 0;
     uint b = 0;
 

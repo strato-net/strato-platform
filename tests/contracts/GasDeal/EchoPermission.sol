@@ -1,6 +1,6 @@
 /* pragma solidity ^0.4.8; */
 
-contract EchoPermission {
+contract record EchoPermission {
 
   enum EchoPermission {
     GAS_CREATE_DEAL,

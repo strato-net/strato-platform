@@ -3,7 +3,7 @@ pragma solidity ^0.4.8;
 /**
  * Title wrapper
  */
-contract TitleHeavy {
+contract record TitleHeavy {
   // NOTE: members must be public to be indexed for search
   string public s0;
   string public s1;

@@ -1,4 +1,4 @@
-contract DealCategory {
+contract record DealCategory {
   enum DealCategory {
     NULL,
     PENDING,

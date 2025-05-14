@@ -15,7 +15,7 @@ import "./EventDef.sol";
 * #return none
 */
 
-contract EventDefManager is RestStatus, BeanstalkErrorCodes, PrivateChainType  {
+contract record EventDefManager is RestStatus, BeanstalkErrorCodes, PrivateChainType  {
   address public dappAddress;
   BeanstalkPermissionManager permissionManager;
   ProgramManager programManager;

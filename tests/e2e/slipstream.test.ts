@@ -48,11 +48,11 @@ describe('Slipstream', function () {
   this.timeout(config.timeout);
   
   const newContract = `
-contract X {
+contract record X {
   uint public z = 7624;
 }
 
-contract Y {
+contract record Y {
   X x;
   constructor() public {
     x = new X();
@@ -71,7 +71,7 @@ contract Y {
 
 
   const Counter = `
-contract Z {
+contract record Z {
   uint public count = 0;
   function incr() public {
     count++;
@@ -98,7 +98,7 @@ contract Z {
 
 
 const eventsContract = `
-contract EventTest {
+contract record EventTest {
   event SlipstreamTest ( uint magic );
   function emitTest ( uint magic ) {
     emit SlipstreamTest ( magic );
@@ -146,7 +146,7 @@ contract EventTest {
   });
 
 const keywordEventsContract = `
-contract KeywordEventTest {
+contract record KeywordEventTest {
   event Keywords (uint from, uint to);
   function emitKeyword (uint from, uint to) {
     emit Keywords(from, to);

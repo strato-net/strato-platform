@@ -9,7 +9,7 @@
 * #return none
 */
 
-contract MembershipEvent {
+contract record MembershipEvent {
   enum MembershipEvent {
     NULL,
     APPROVE,
