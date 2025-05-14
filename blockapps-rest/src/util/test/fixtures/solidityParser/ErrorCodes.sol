@@ -1,4 +1,4 @@
-contract record ErrorCodes {
+contract ErrorCodes {
   enum ErrorCodes {
     NULL,
     SUCCESS,
