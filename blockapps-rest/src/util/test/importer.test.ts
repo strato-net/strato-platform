@@ -26,21 +26,21 @@ describe("imports", function() {
     for (let i = 0; i < source.length; i++) {
       src += source[i][1];
     }
-    assert.isAbove(src.indexOf("contract Main"), 0);
-    assert.isAbove(src.indexOf("contract A"), 0);
-    assert.isAbove(src.indexOf("contract B"), 0);
-    assert.isAbove(src.indexOf("contract C"), 0);
-    assert.isAbove(src.indexOf("contract D"), 0);
+    assert.isAbove(src.indexOf("contract record Main"), 0);
+    assert.isAbove(src.indexOf("contract record A"), 0);
+    assert.isAbove(src.indexOf("contract record B"), 0);
+    assert.isAbove(src.indexOf("contract record C"), 0);
+    assert.isAbove(src.indexOf("contract record D"), 0);
   });
 
   it("combines to object", async () => {
     const filename = `${fixtures}/importer/Main.sol`;
     const source = await importer.combine(filename, true);
-    assert.isAbove(source['Main.sol'].indexOf("contract Main"), 0);
-    assert.isAbove(source['A.sol'].indexOf("contract A"), 0);
-    assert.isAbove(source['B.sol'].indexOf("contract B"), 0);
-    assert.isAbove(source['C.sol'].indexOf("contract C"), 0);
-    assert.isAbove(source['D.sol'].indexOf("contract D"), 0);
+    assert.isAbove(source['Main.sol'].indexOf("contract record Main"), 0);
+    assert.isAbove(source['A.sol'].indexOf("contract record A"), 0);
+    assert.isAbove(source['B.sol'].indexOf("contract record B"), 0);
+    assert.isAbove(source['C.sol'].indexOf("contract record C"), 0);
+    assert.isAbove(source['D.sol'].indexOf("contract record D"), 0);
   });
 
   it("combines to array and uploads", async () => {
