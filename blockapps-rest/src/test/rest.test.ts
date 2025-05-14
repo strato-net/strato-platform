@@ -329,6 +329,7 @@ describe("rest_7", function () {
     });
     */
   });
+});
 
 async function createSearchContract(
   admin,
