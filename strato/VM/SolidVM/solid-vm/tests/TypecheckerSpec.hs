@@ -183,8 +183,6 @@ contract B {
     length anns `shouldBe` 0
   it "cannot call private contract functions" $ do
     anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract A {
   function realFunction() private {
   }
@@ -200,8 +198,6 @@ contract B {
     length anns `shouldBe` 1
   it "cannot call internal contract functions" $ do
     anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract A {
   function realFunction() internal {
   }
@@ -1869,8 +1865,6 @@ contract qq {
 
     it "can't call own external function" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract qq {
   uint x = 7;
   function myExternalFunc() external {
@@ -1933,8 +1927,6 @@ contract qq {
 
     it "can't call an inherited private function" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myPrivateFunc() private {
@@ -1956,8 +1948,6 @@ contract qq is Parent {
 
     it "can't call an inherited external function" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myExternalFunc() external {
@@ -2029,8 +2019,6 @@ contract qq is Parent {
 
     it "can't call a private function in another contract" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myPrivateFunc() private {
@@ -2071,8 +2059,6 @@ contract qq {
 
     it "can't call an internal function from another contract" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myInternalFunc() internal {

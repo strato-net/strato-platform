@@ -2,7 +2,7 @@ import <509>;
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 
-abstract contract OracleService is Utils {
+abstract contract record OracleService is Utils {
     decimal public consensusPrice;
     uint public consensusPriceTimestamp;
 

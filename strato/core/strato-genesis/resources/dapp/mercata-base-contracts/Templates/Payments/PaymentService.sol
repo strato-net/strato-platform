@@ -3,7 +3,7 @@ import <509>;
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 
-abstract contract PaymentService is Utils {
+abstract contract record PaymentService is Utils {
     address public owner;
     string public ownerCommonName;
 

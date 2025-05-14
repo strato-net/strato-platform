@@ -1,6 +1,6 @@
 //import "../Utils/Utils.sol";
 
-abstract contract MercataETHBridge is Utils {
+abstract contract record MercataETHBridge is Utils {
     enum AssetStatus {
         NULL,
         ACTIVE,

@@ -1,18 +1,15 @@
-pragma es6;
-pragma strict;
-
 contract Mercata{}
 
-abstract contract Asset is Utils {
+abstract contract record Asset is Utils {
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
-    string[] public images;
-    string[] public files;
-    string[] public fileNames;
+    string[] public record images;
+    string[] public record files;
+    string[] public record fileNames;
     uint public createdDate;
     uint public quantity;
     uint public decimals;
@@ -414,7 +411,7 @@ contract RestStatus {
   uint constant GATEWAY_TIMEOUT = 504;
 }
 
-abstract contract Order is Utils {
+abstract contract record Order is Utils {
     enum OrderStatus {
         NULL,
         AWAITING_FULFILLMENT,
@@ -426,9 +423,9 @@ abstract contract Order is Utils {
     }
 
     uint public orderId;
-    address[] public saleAddresses;
-    uint[] public quantities;
-    bool[] public completedSales;
+    address[] public record saleAddresses;
+    uint[] public record quantities;
+    bool[] public record completedSales;
     uint outstandingSales;
     address public purchasersAddress;
     string public purchasersCommonName;
@@ -552,7 +549,7 @@ abstract contract Order is Utils {
     }
 }
 
-abstract contract BasePaymentProvider is Utils {
+abstract contract record BasePaymentProvider is Utils {
     address public owner;
     string public ownerCommonName;
 
@@ -623,11 +620,11 @@ abstract contract BasePaymentProvider is Utils {
     }
 }
 
-abstract contract Sale is Utils { 
+abstract contract record Sale is Utils { 
     Asset public assetToBeSold;
     uint public price;
     uint public quantity;
-    address[] public paymentProviders;
+    address[] public record paymentProviders;
     mapping (address => uint) paymentProvidersMap;
     mapping (address => uint) lockedQuantity;
     uint totalLockedQuantity;

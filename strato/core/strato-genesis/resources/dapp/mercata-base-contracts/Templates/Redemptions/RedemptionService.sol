@@ -4,7 +4,7 @@ import <509>;
 //import "../Utils/Utils.sol";
 
 /// @title A representation of PaymentProvider_1 assets
-abstract contract RedemptionService is Utils {
+abstract contract record RedemptionService is Utils {
     address public owner;
     string public ownerCommonName;
 
