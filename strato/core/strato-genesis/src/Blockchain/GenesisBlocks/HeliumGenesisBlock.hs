@@ -442,8 +442,12 @@ extraCerts = map (\s -> either (error $ "can't parse cert: " ++ show s) id $ byt
 
 validators :: [Validator]
 validators = [
+    "NodeOne",
+    "NodeTwo",
+    "NodeThree",
+    "NodeFour"
 --  "bluecabinet"
-  "marketplace.mercata-beta.blockapps.net"
+--  "marketplace.mercata-beta.blockapps.net"
 --  "blockchainhaberdasher.com"
   ]
 
