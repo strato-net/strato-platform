@@ -431,6 +431,13 @@ addTransaction chainId b remainingBlockGas t@OutputTx {otSigner = tAddr} propose
 
   payFees b availableGas tAddr t proposer
 
+  let owner = transactionTo $ otBaseTx t
+  lift (A.lookupWithDefault (Proxy @AddressState) owner) >>= resolveCodePtr . addressStateCodeHash >>= \case
+    Just (ExternallyOwned _) -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
+    Just (SolidVMCode _ _) -> return ()
+    Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
+    Nothing -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
+
   lift $ incrementNonce tAddr
 
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
@@ -491,25 +498,11 @@ runCodeForTransaction b availableGas tAddr t proposer =
         else do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
 
-          let owner = transactionTo ut
-
-          codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
-          resolvedCodeHash <- lift $ resolveCodePtr codeHash
-
-          case codeHash of
-            ExternallyOwned _ -> throwE $ TFCodeCollectionNotFound owner "EVM not supported" t
-            SolidVMCode _ _ -> return ()
-            CodeAtAccount acct name -> case resolvedCodeHash of
-              Just (ExternallyOwned _) -> throwE $ TFCodeCollectionNotFound acct "EVM not supported" t
-              Just (SolidVMCode _ _) -> return ()
-              Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
-              Nothing -> throwE $ TFCodeCollectionNotFound acct name t
-          
           lift $
             SolidVM.call
                   False  --isRCC
                   b -- blockData
-                  owner -- codeAddress
+                  (transactionTo ut) -- codeAddress
                   tAddr -- sender
                   proposer -- proposer
                   (fromIntegral availableGas) -- availableGas
