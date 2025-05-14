@@ -1,7 +1,7 @@
 # Mercata
 
-The app consists of 3 parts:
-- backend (Express.js-based API server)
+The app consists of 4 parts:
+- backend (ExpressJS-based API server)
 - frontend (NextJS-based web UI)
 - nginx
   - The purpose of the Nginx in the app:
@@ -9,6 +9,10 @@ The app consists of 3 parts:
       - In the future: can be moved to the backend - handle client-credentials, authorization-code flows, keep user sessions to avoid having access token in cookie, etc.
     - Serve backend and frontend on a single domain and port
       - In the future: can be done the other way if we want to simplify the deployment without nginx, or do serverless
+- services
+  - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
+  - Currently there is only the Stripe service for token on ramping.
+  - Look at the individual services read me for further details.
 
 ---
 
@@ -31,7 +35,7 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.
 
 ### Run Frontend:
 ```
-cd ../frontend/
+cd ../../frontend/
 npm i
 npm run dev
 ```
@@ -87,10 +91,11 @@ npm i
 npm run build
 cd dist
 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=client-id-here \
-  OAUTH_CLIENT_SECRET=client-secret-here \
+  OAUTH_CLIENT_ID=<client-id-here> \
+  OAUTH_CLIENT_SECRET=<client-secret-here> \
   NODE_URL=https://marketplace.mercata.blockapps.net \
-  BASE_CODE_COLLECTION=skipped_for_now \
+  BASE_URL=<host_url> \
+  BASE_CODE_COLLECTION=<skipped_for_now> \
   pm2 start app.js --name backend
 ```
 

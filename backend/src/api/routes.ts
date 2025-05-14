@@ -9,6 +9,7 @@ import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
 import AuthenticationController from "./controllers/authentication.controller";
 import UsersController from "./controllers/users.controller";
+import OnRampController from "./controllers/onramp.controller";
 
 const router = Router();
 
@@ -48,6 +49,12 @@ router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
 router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.getLoan);
 router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
+
+router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
+router.post("/onramp/sell", authHandler.authorizeRequest(true), OnRampController.onRampSell);
+router.post("/onramp/lock", authHandler.authorizeRequest(true), OnRampController.onRampLock);
+router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampController.unlockTokens);
+
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({

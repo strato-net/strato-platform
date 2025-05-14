@@ -34,3 +34,4 @@ export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseCodeCollection = process.env.BASE_CODE_COLLECTION;
+export const baseUrl = process.env.BASE_URL || "http://localhost";
