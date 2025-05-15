@@ -70,6 +70,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
+import Blockchain.Stream.Action hiding (blockHash)
 import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
@@ -80,6 +81,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
+import Control.Lens ((%~))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -96,6 +98,7 @@ import Data.Either.Extra
 import Data.Foldable (traverse_)
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Map.Ordered as O
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
@@ -421,7 +424,8 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  payFees b availableGas tAddr t proposer
+  feeResult <- payFees b availableGas tAddr t proposer
+  let attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const (<>)) $ _actionData a)) <$> erAction er}) $ erAction feeResult
 
   lift $ incrementNonce tAddr
 
@@ -450,7 +454,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         lift $ purgeStorageMap address'
         lift $ A.delete (Proxy @AddressState) address'
       lift $ P.incCounter vmTxsSuccessful
-  return execResults
+  return $ attachFeeResult execResults
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -484,51 +488,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               (txArgs ut)
         else do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
-
-          let owner = transactionTo ut
-
-          codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
-          resolvedCodeHash <- lift $ resolveCodePtr codeHash
-
-          case codeHash of
-            ExternallyOwned _ -> error "EVM not supported"
-            SolidVMCode _ _ -> return ()
-            CodeAtAccount acct name -> case resolvedCodeHash of
-              Just (ExternallyOwned _) -> error "EVM not supported"
-              Just (SolidVMCode _ _) -> return ()
-              Just (CodeAtAccount acct' name') -> throwE $ TFCodeCollectionNotFound acct' name' t
-              Nothing -> throwE $ TFCodeCollectionNotFound acct name t
           
-          decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
-
-          case decideCodeHash of
-            SolidVMCode _ _ -> do
-                  -- BEGIN: Custom Validation Check
-                  -- Call validation contract at 0xDEC1DE. Require it returns True.
-                  result <-
-                    lift $
-                    SolidVM.call
-                      False  -- isRCC
-                      b  -- blockData
-                      (Address 0xDEC1DE)  --codeAddress
-                      tAddr -- sender
-                      proposer  --proposer
-                      (fromIntegral availableGas) --availableGas
-                      tAddr -- origin
-                      (txHash ut) -- txHash
-                      "decide"
-                      []
-                      (Just DelegateCall)
-
-                  unless (erException result == Nothing) $ do
-                    throwE $ TFKnownFailedTX t
-                  unless (erReturnVal result == Just "(true)") $ do
-                    throwE $ TFKnownFailedTX t
-
-            _ -> return ()
-
-          $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
-
           lift $
             SolidVM.call
                   False  --isRCC
@@ -550,34 +510,32 @@ payFees ::
   Address ->
   OutputTx ->
   Address ->
-  ExceptT TransactionFailureCause m ()
+  ExceptT TransactionFailureCause m ExecResults
 payFees b availableGas tAddr t proposer = do
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
-  decideCodeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Address 0xDEC1DE)
-  case decideCodeHash of
-    SolidVMCode _ _ -> do
-          -- BEGIN: Custom Validation Check
-          -- Call validation contract at 0xDEC1DE. Require it returns True.
-          result <-
-            lift $
-            SolidVM.call
-              False  -- isRCC
-              b  -- blockData
-              (Address 0xDEC1DE)  --codeAddress
-              tAddr -- sender
-              proposer  --proposer
-              (fromIntegral availableGas) --availableGas
-              tAddr -- origin
-              (txHash ut) -- txHash
-              "decide"
-              []
-              (Just DelegateCall)
+  -- BEGIN: Custom Validation Check
+  -- Call validation contract at 0xDEC1DE. Require it returns True.
+  result <-
+    lift $
+    SolidVM.call
+      False  -- isRCC
+      b  -- blockData
+      (Address 0xDEC1DE)  --codeAddress
+      tAddr -- sender
+      proposer  --proposer
+      (fromIntegral availableGas) --availableGas
+      tAddr -- origin
+      (txHash ut) -- txHash
+      "decide"
+      []
+      (Just DelegateCall)
 
-          unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
-          unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
+  unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
+  unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
 
-    _ -> return ()
   $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
+
+  pure result
 
 ----------------
 {-

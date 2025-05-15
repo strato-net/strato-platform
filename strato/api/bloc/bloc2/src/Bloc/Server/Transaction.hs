@@ -884,7 +884,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         Nothing
         fromAddr
         Nothing
-        (Just $ Text.pack $ show _contractName)
+        (Just $ Text.pack _contractName)
         argsAsSource
         "mercata"
         params

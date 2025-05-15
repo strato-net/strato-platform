@@ -208,5 +208,6 @@ partialRLPEncode ContractCreationTX {..} =
       rlpEncode transactionGasLimit,
       rlpEncode transactionContractName,
       rlpEncode transactionArgs,
-      rlpEncode transactionNetwork
+      rlpEncode transactionNetwork,
+      rlpEncode transactionCode
     ]
