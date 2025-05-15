@@ -11,9 +11,7 @@ import Blockchain.Data.TransactionResultStatus
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
@@ -48,7 +46,6 @@ data TransactionFailureCause
   = TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
   | TFBlockGasLimitExceeded Integer Integer OutputTx -- neededGas, actualGas
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
-  | TFChainIdMismatch (Maybe Word256) (Maybe Word256) OutputTx -- expectedChainId, actualChainId
   | TFCodeCollectionNotFound Address String OutputTx
   | TFInvalidPragma [(String, String)] OutputTx
   | TFNonceLimitExceeded Integer Integer OutputTx -- accountNonceLimit, actualNonce
@@ -76,8 +73,7 @@ data RunAttemptError
 data BaggerTxQueue = Incoming | Pending | Queued deriving (Eq, Read, Show)
 
 data TxRejection
-  = WrongChainId BaggerStage BaggerTxQueue OutputTx -- only public transactions are run by the bagger
-  | NonceTooLow BaggerStage BaggerTxQueue Integer OutputTx -- integers: needed nonce
+  = NonceTooLow BaggerStage BaggerTxQueue Integer OutputTx -- integers: needed nonce
   | BalanceTooLow BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
   | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
   | LessLucrative BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
@@ -90,7 +86,6 @@ data TxRejection
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
-rejectedTx (WrongChainId _ _ t) = t
 rejectedTx (NonceTooLow _ _ _ t) = t
 rejectedTx (BalanceTooLow _ _ _ _ t) = t
 rejectedTx (GasLimitTooLow _ _ _ t) = t
@@ -105,14 +100,6 @@ rejectedTx (KnownFailedTX _ _ t) = t
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
 instance Format TxRejection where
-  format (WrongChainId stage queue o@OutputTx {otHash = hash, otBaseTx = bt}) =
-    "WrongChainId at stage " ++ show stage ++ " in queue " ++ show queue
-      ++ "\n\tactual chain ID "
-      ++ TD.formatChainId (txChainId bt)
-      ++ "\n\ttx hash "
-      ++ format hash
-      ++ "\n"
-      ++ format o
   format (NonceTooLow stage queue actual o@OutputTx {otHash = hash}) =
     "NonceTooLow at stage " ++ show stage ++ " in queue " ++ show queue
       ++ "\n\tactual nonce "
@@ -197,8 +184,6 @@ instance Format TxRejection where
       ++ format o
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
-txRejectionToAPIFailureCause (WrongChainId stage queue tx) =
-  Failure (show stage) (Just $ show queue) IncorrectChainId Nothing (fmap toInteger . txChainId $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
   Failure (show stage) (Just $ show queue) IncorrectNonce (Just needed) (Just . TD.transactionNonce $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (BalanceTooLow stage queue needed actual _) =
@@ -224,7 +209,6 @@ tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = GasLimitTooLow Execution Queued ig tx
 tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
-tfToBaggerTxRejection (TFChainIdMismatch _ _ tx) = WrongChainId Validation Queued tx
 tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
 tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
 tfToBaggerTxRejection (TFNonceLimitExceeded limit actual tx) = NonceLimitExceeded Execution Queued actual limit tx
@@ -236,12 +220,11 @@ instance Format TransactionFailureCause where
   format (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
   format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
-  format (TFChainIdMismatch expected actual _) = "Chain ID mismatch: expecting " ++ TD.formatChainId expected ++ ", actual " ++ TD.formatChainId actual
   format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name
   format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
   format (TFNonceLimitExceeded limit actual _) = "Nonce limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
-  format (TFKnownFailedTX t) = "Known failed tx: " ++ show (otHash t)
+  format (TFKnownFailedTX t) = "Known failed tx: " ++ format (otHash t)
   format (TFTransactionGasExceeded limit actual _) = "Transaction gas limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
 
 getDeltasFromResults :: [TxRunResult] -> (ValidatorDelta, CertDelta)

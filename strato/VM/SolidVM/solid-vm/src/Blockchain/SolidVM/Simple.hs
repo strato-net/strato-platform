@@ -152,7 +152,8 @@ create s =
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
-    (s ^. createArgs . argsMetadata)
+    ""
+    []
 
 call ::
   (SolidVM.SolidVMBase m) =>
@@ -168,5 +169,6 @@ call s =
     (Gas 100000000)
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
-    (s ^. callArgs . argsMetadata)
+    ""
+    []
     Nothing

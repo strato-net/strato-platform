@@ -95,6 +95,7 @@ import Data.Maybe
 import qualified Data.Sequence as Q
 import qualified Data.Set as S
 import Data.Source
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
 import Data.Time.Clock.POSIX
@@ -221,11 +222,12 @@ create ::
   Address ->
   Code ->
   Keccak256 ->
-  Maybe (M.Map T.Text T.Text) ->
+  Text ->
+  [Text] ->
   m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create blockData sender' origin' proposer' availableGas newAddress code txHash' metadata = do
+create blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
   isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
@@ -234,7 +236,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.metadata = metadata,
+            Env.metadata = Nothing,
             Env.runningTests = isRunningTests
           }
   let gasInfo' =
@@ -252,17 +254,13 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
-    let maybeContractName = M.lookup "name" =<< metadata
-        !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
-
-    let maybeArgString = M.lookup "args" =<< metadata
-        argString = maybe "()" T.unpack maybeArgString
+    let argString = T.unpack $ "(" <> T.intercalate "," argsStrings <> ")"
         maybeArgs = runParser parseArgs initialParserState "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
-    create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc contractName' args False
+    create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) args False
 
 getParentName :: MonadSM m => Address -> m String
 getParentName address = fromMaybeM (return "") $
@@ -392,14 +390,14 @@ call ::
   Gas ->
   Address ->
   Keccak256 ->
-  Maybe (M.Map T.Text T.Text) ->
+  Text ->
+  [Text] ->
   Maybe CC.FunctionCallType ->
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' metadata mFuncCallType = do
+call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType = do
   recordCall
-
   isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
@@ -408,7 +406,7 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
             Env.origin = origin',
             Env.proposer = proposer',
             Env.txHash = txHash',
-            Env.metadata = metadata,
+            Env.metadata = Nothing,
             Env.runningTests = isRunningTests
           }
 
@@ -421,18 +419,17 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
           }
 
   fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
-    let maybeFuncName = M.lookup "funcName" =<< metadata
-        !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
-        maybeSrcLength = M.lookup "srcLength" =<< metadata
-        !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
-        maybeArgString = M.lookup "args" =<< metadata
-        !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
+    --requireOriginCert origin'
+    let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
+        -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
+        srcLength = 0
+        !argString = T.unpack $ "(" <> T.intercalate "," argsStrings <> ")"
         maybeArgs = runParser parseArgs (initialParserStateWithLength srcLength)  "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     ((creator, appName), returnVal) <-
       traverse (fmap Just . maybe (return "()") encodeForReturn)
-        =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) Nothing funcName isRCC args
+        =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) Nothing (textToLabel funcName) isRCC args
 
     solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)

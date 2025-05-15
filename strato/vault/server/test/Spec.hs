@@ -4,12 +4,14 @@
 
 module Main where
 
-import qualified Blockchain.Data.AlternateTransaction as E
+import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Secp256k1
 import Clockwork
 import Crypto.Random.Entropy
 import qualified Crypto.Secp256k1 as SEC
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Maybe
@@ -32,12 +34,19 @@ main = do
   hspec secp256k1_haskell_spec
   timingTests
 
+rlpHash :: RLPSerializable x => x -> ByteString
+rlpHash =
+  keccak256ToByteString
+    . hash
+    . rlpSerialize
+    . rlpEncode
+
 -- TODO: maybe this should be somewhere else, like in strato-model
 secp256k1_haskell_spec :: Spec
 secp256k1_haskell_spec =
   describe "secp256k1-haskell can do crypto operations just like haskoin" $ do
     it "verify signatures" $ do
-      let mesg = E.rlpHash ("STRATO is a permissioned blockchain" :: String)
+      let mesg = rlpHash ("STRATO is a permissioned blockchain" :: String)
           newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
           newSig = SEC.signRecMsg newPriv newMsg
 
@@ -72,7 +81,7 @@ timingTests = do
     return addr
 
   -- message hashes for signatures
-  let mesg = E.rlpHash ("A monad is like a burrito, or so the Glaswegians would have us believe" :: String)
+  let mesg = rlpHash ("A monad is like a burrito, or so the Glaswegians would have us believe" :: String)
       sMesg = fromMaybe (error "couldnt get secp256k1 message hash") (SEC.msg mesg)
 
   putStrLn "\nECDSA Signatures:"

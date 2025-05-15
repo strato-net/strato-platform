@@ -356,7 +356,7 @@ runTestWithTimeout timeout f = do
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (readFile fp)
 
-runFileArgs :: T.Text -> FilePath -> ContextM ()
+runFileArgs :: [T.Text] -> FilePath -> ContextM ()
 runFileArgs args fp = void $ runArgs args =<< liftIO (readFile fp)
 
 runBS :: String -> ContextM ()
@@ -366,17 +366,17 @@ runBSBeef :: String -> ContextM ()
 runBSBeef = void . runBSBeef'
 
 runBS' :: String -> ContextM ExecResults
-runBS' = runArgs "()"
+runBS' = runArgs []
 
 runBSBeef' :: String -> ContextM ExecResults
-runBSBeef' = runArgs "()"
+runBSBeef' = runArgs []
 
 rethrowEx :: ExecResults -> ContextM ()
 rethrowEx ExecResults {erException = Just ex} = either (liftIO . throwIO . HE) (void . return) ex
 rethrowEx _ = return ()
 
 --Adds a contract to the 0xfeedbeef chain
-runArgsWithSenderBeef :: Address -> T.Text -> String -> ContextM ExecResults
+runArgsWithSenderBeef :: Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
   let code = Code $ UTF8.fromString bs
       blockData =
@@ -399,7 +399,6 @@ runArgsWithSenderBeef acc args bs = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
   er <-
@@ -412,12 +411,13 @@ runArgsWithSenderBeef acc args bs = do
       newAddress
       code
       txHash
-      metadata
+      "qq"
+      args
   rethrowEx er
   return er
 
 --Adds contract to the "main chain"
-runArgsWithSender :: Address -> T.Text -> String -> ContextM ExecResults
+runArgsWithSender :: Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
       blockData =
@@ -440,7 +440,6 @@ runArgsWithSender acc args bs = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
   insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
 
@@ -455,11 +454,12 @@ runArgsWithSender acc args bs = do
       newAddress
       code
       txHash
-      metadata
+      "qq"
+      args
   rethrowEx er
   return er
 
-runArgsWithOrigin :: Address -> Address -> T.Text -> String -> ContextM ExecResults
+runArgsWithOrigin :: Address -> Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
   let code = Code $ UTF8.fromString bs
       blockData =
@@ -482,7 +482,6 @@ runArgsWithOrigin orig acc args bs = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
   er <-
@@ -495,13 +494,14 @@ runArgsWithOrigin orig acc args bs = do
       newAddress
       code
       txHash
-      metadata
+      "qq"
+      args
   rethrowEx er
   return er
 
 runArgsWithCertificateRegistry :: String -> ContextM ExecResults
 runArgsWithCertificateRegistry rawString =
-  runArgsWithOrigin rootAcc sender "()" $
+  runArgsWithOrigin rootAcc sender [] $
     [r|
 
 contract CertificateRegistry {
@@ -559,13 +559,13 @@ contract CertificateRegistry {
 }|]
       ++ rawString
 
-runArgs :: T.Text -> String -> ContextM ExecResults
+runArgs :: [T.Text] -> String -> ContextM ExecResults
 runArgs = runArgsWithSender sender
 
-runArgsBeef :: T.Text -> String -> ContextM ExecResults
+runArgsBeef :: [T.Text] -> String -> ContextM ExecResults
 runArgsBeef = runArgsWithSenderBeef sender
 
-runCall :: T.Text -> T.Text -> String -> ContextM (Maybe String)
+runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
       isRCC = False
@@ -589,8 +589,6 @@ runCall funcName callArgs bs = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
-      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
   $logErrorS "runCall" "Beginning create"
   er1 <-
@@ -603,7 +601,8 @@ runCall funcName callArgs bs = do
       newAddress
       code
       txHash
-      createMetadata
+      "qq"
+      []
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
   $logErrorS "runCall" "Beginning call"
@@ -617,7 +616,8 @@ runCall funcName callArgs bs = do
       availableGas
       origin
       txHash
-      callMetadata
+      funcName
+      callArgs
       Nothing
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
@@ -625,7 +625,7 @@ runCall funcName callArgs bs = do
 
 -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the function runCall
 -- compare the returned value (but got) with expected value (expected) in the test case
-runCall' :: T.Text -> T.Text -> String -> ContextM (Maybe String)
+runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
 runCall' funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
       isRCC = False
@@ -649,8 +649,6 @@ runCall' funcName callArgs bs = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
-      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
   $logErrorS "runCall" "Beginning create"
   er1 <-
@@ -663,7 +661,8 @@ runCall' funcName callArgs bs = do
       newAddress
       code
       txHash
-      createMetadata
+      "qq"
+      []
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
   $logErrorS "runCall" "Beginning call"
@@ -677,7 +676,8 @@ runCall' funcName callArgs bs = do
       availableGas
       origin
       txHash
-      callMetadata
+      funcName
+      callArgs
       Nothing
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
@@ -688,7 +688,7 @@ runCall' funcName callArgs bs = do
 lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
-call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe String)
+call2 :: T.Text -> [T.Text] -> Address -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
   let isRCC = False
       blockData =
@@ -711,7 +711,6 @@ call2 funcName callArgs contractAddress = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
-      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   er <-
     SVM.call
       isRCC
@@ -722,7 +721,8 @@ call2 funcName callArgs contractAddress = do
       availableGas
       origin
       txHash
-      callMetadata
+      funcName
+      callArgs
       Nothing
   rethrowEx er
   return $ erReturnVal er
@@ -767,7 +767,7 @@ spec :: Spec
 spec = do
   xdescribe "Ballot" $ do
     it "can be created" . runTest $ do
-      runFileArgs [r|(["a","b","c"])|] "testdata/Ballot.sol"
+      runFileArgs ["\"a\"","\"b\"","\"c\""] "testdata/Ballot.sol"
 
   xdescribe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
@@ -1624,7 +1624,7 @@ contract qq is Parent {
   it "will pass arguments to constructors" . runTest $ do
     void $
       runArgs
-        "(0x6662346)"
+        ["0x6662346"]
         [r|
 contract qq {
   address target;
@@ -1872,7 +1872,7 @@ contract qq is Parent {
   it "can call functions" . runTest $ do
     runCall'
       "inc"
-      "()"
+      []
       [r|
 contract qq {
   uint x = 99;
@@ -2035,7 +2035,7 @@ contract qq {
   it "can accept remote arrays" . runTest $ do
     runCall'
       "addHead"
-      "([10, 17])"
+      ["[10, 17]"]
       [r|
 contract qq {
   uint x;
@@ -2049,7 +2049,7 @@ contract qq {
   it "can push to memory arrays" . runTest $ do
     runCall'
       "pushMem"
-      "([3, 5])"
+      ["[3, 5]"]
       [r|
 contract qq {
   uint x;
@@ -2177,8 +2177,8 @@ contract qq {
     x = _x;
   }
 }|]
-    void $ runArgs "(1234)" qq
-    void $ runArgs "(887324)" qq
+    void $ runArgs ["1234"] qq
+    void $ runArgs ["887324"] qq
     getFields ["x"] `shouldReturn` [BInteger 1234]
     getFields2 ["x"] `shouldReturn` [BInteger 887324]
 
@@ -2199,13 +2199,13 @@ contract qq {
     return num + 1;
   }
 }|]
-    void $ runArgs "(0x0,99)" qq
+    void $ runArgs ["0x0","99"] qq
     getFields ["x", "num"] `shouldReturn` [bContract "qq" 0x0, BInteger 99]
 
-    void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
+    void $ runArgs [T.pack $ printf "0x%s" $ show uploadAddress, "400"] qq
     getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 400]
 
-    call2 "a" "()" secondAddress `shouldReturn` Just "()"
+    call2 "a" [] secondAddress `shouldReturn` Just "()"
     getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
@@ -2246,7 +2246,7 @@ contract qq {
   it "can externally return locals" . runTest $ do
     runCall'
       "f"
-      "()"
+      []
       [r|
 contract qq {
   function f() returns (uint) {
@@ -2260,7 +2260,7 @@ contract qq {
     er <-
       runCall'
         "f"
-        "()"
+        []
         [r|
 contract qq {
   function f() returns (uint, uint) {
@@ -2385,15 +2385,15 @@ contract qq is BaseContainer {
   }
 }|]
     -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the decprecated function runCall
-    runCall' "contains" "(10)" ctract
+    runCall' "contains" ["10"] ctract
       `shouldReturn` Just "(false)"
-    runCall' "contains" "(4)" ctract
+    runCall' "contains" ["4"] ctract
       `shouldReturn` Just "(true)"
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall'
       "value"
-      "()"
+      []
       [r|
 contract A {
     function value() public virtual returns (uint) {
@@ -2415,7 +2415,7 @@ contract qq is A, B {
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall'
       "value"
-      "()"
+      []
       [r|
 contract A {
   function value() public virtual returns (uint) {
@@ -2490,7 +2490,7 @@ contract qq {
       ( do
           runCall'
             "func"
-            "()"
+            []
             [r|
 contract qq {
   string x;
@@ -2647,7 +2647,7 @@ contract qq {
         want = replicate (40 - length want') '0' ++ want' --etherum address has 40 bytes followed by 0x, short byte string has 32 bytes
     runCall'
       "a"
-      "()"
+      []
       [r|
 contract qq {
   function a() public returns (address) {
@@ -2659,7 +2659,7 @@ contract qq {
   it "can return an enum" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 contract qq {
   enum Letter { a, b, c }
@@ -2728,7 +2728,7 @@ contract qq {
         want = replicate (40 - length want') '0' ++ want'
     runCall'
       "self"
-      "()"
+      []
       [r|
 contract qq {
   function self() public returns (qq) {
@@ -2790,7 +2790,7 @@ contract qq {
   it "can cast ints to enums" . runTest $ do
     runCall'
       "f"
-      "(1)"
+      ["1"]
       [r|
 contract qq {
   enum E {A, B, C, D}
@@ -2805,7 +2805,7 @@ contract qq {
   it "can compare ints to enums" . runTest $ do
     runCall'
       "f"
-      "(1)"
+      ["1"]
       [r|
 contract qq {
   enum E {A, B, C, D}
@@ -2827,7 +2827,7 @@ contract qq {
   it "can return single strings" . runTest $ do
     runCall'
       "txt"
-      "()"
+      []
       [r|
 contract qq {
   function txt() public returns (string) {
@@ -2840,7 +2840,7 @@ contract qq {
   it "can return tuples of strings" . runTest $ do
     runCall'
       "txt"
-      "()"
+      []
       [r|
 contract qq {
   function txt() public returns (string, string, string) {
@@ -2852,7 +2852,7 @@ contract qq {
   it "can return tuples of mixed simple types and strings" . runTest $ do
     runCall'
       "txt"
-      "()"
+      []
       [r|
 contract qq {
   function txt() public returns (string, uint, string, uint) {
@@ -2864,7 +2864,7 @@ contract qq {
   xit "can return numeric bytes32" . runTest $ do
     runCall'
       "num"
-      "()"
+      []
       [r|
 contract qq {
   function num() public returns (bytes32) {
@@ -2877,7 +2877,7 @@ contract qq {
   it "can return state variables" . runTest $ do
     runCall'
       "getS"
-      "()"
+      []
       [r|
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
@@ -2890,7 +2890,7 @@ contract qq {
   it "can return state variables in tuples" . runTest $ do
     runCall'
       "getSAndB"
-      "()"
+      []
       [r|
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
@@ -2903,7 +2903,7 @@ contract qq {
   it "can accept string arguments" . runTest $ do
     runCall
       "set"
-      "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")"
+      ["\"deadbeef00000000000000000000000000000000000000000000000000000000\""]
       [r|
 contract qq {
   string st;
@@ -2917,7 +2917,7 @@ contract qq {
   it "can accept Unicode string arguments" . runTest $ do
     runCall
       "set"
-      "(\"4.11 g CO₂ / t · nm\")"
+      ["\"4.11 g CO₂ / t · nm\""]
       [r|
 contract qq {
   string st;
@@ -2939,7 +2939,7 @@ contract qq {
   it "can accept bytes32 arguments" . runTest $ do
     runCall
       "set"
-      "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")"
+      ["\"deadbeef00000000000000000000000000000000000000000000000000000000\""]
       [r|
 contract qq {
   bytes32 bs;
@@ -2955,7 +2955,7 @@ contract qq {
       ( do
           runCall
             "set"
-            "(3 + block.timestamp)"
+            ["3 + block.timestamp"]
             [r|
 contract qq {
   uint n;
@@ -2969,7 +2969,7 @@ contract qq {
   it "can call boolean arguments" . runTest $ do
     runCall
       "set"
-      "(true,false)"
+      ["true","false"]
       [r|
 contract qq {
   bool a;
@@ -3109,7 +3109,7 @@ contract qq {
     ( runTest $ do
         runCall
           "f"
-          "("
+          ["1q"]
           [r|
 contract qq {
   function f() public {}
@@ -3152,7 +3152,7 @@ contract A {
       `shouldThrow` anyMissingTypeError
 
   it "catches missing function errors" $
-    (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
+    (runTest $ runCall "f" [] [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
 
   it "can cast to int" . runTest $ do
     runBS
@@ -3419,7 +3419,7 @@ contract qq {
   xit "can resolve variables for named arguments" . runTest $ do
     void $
       runArgs
-        "(\"stref\")"
+        ["\"stref\""]
         [r|
 contract qq {
   struct X {
@@ -3949,7 +3949,7 @@ contract qq {
   it "can concatenate strings" . runTest $ do
     runCall'
       "concat"
-      "(\"Hello\",\" World!\")"
+      ["\"Hello\"","\" World!\""]
       [r|
 contract qq {
   string c;
@@ -3963,7 +3963,7 @@ contract qq {
   it "can append to a string" . runTest $ do
     runCall'
       "append"
-      "(\" World!\")"
+      ["\" World!\""]
       [r|
 contract qq {
   string a = "Hello";
@@ -4115,7 +4115,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
+    void $ call2 "myTransfer" [] (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
@@ -4142,7 +4142,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 7})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BInteger 7]
 
   it "will allow for sending to self" . runTest $ do
@@ -4169,7 +4169,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BBool True, BInteger 13]
 
   it "will not send when there is not anything to send between account" . runTest $ do
@@ -4196,7 +4196,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 0})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BDefault]
 
   it "cannot send to a non account payable type" $
@@ -4223,7 +4223,7 @@ contract qq{
           -- Set the balance
           adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "mySend" "()" (a^.namedAccountAddress))
+          (void $ call2 "mySend" [] (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4251,7 +4251,7 @@ contract qq{
           -- Set the balance
           adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
+          (void $ call2 "myTransfer" [] (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4296,7 +4296,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
+    void $ call2 "myTransfer" [] (a^.namedAccountAddress)
     getFields ["bala", "balb", "balc"]
       `shouldReturn` [ BInteger 1,
                        BInteger 26,
@@ -4345,7 +4345,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [BBool True, BInteger 1, BInteger 26, BInteger 13]
 
   it "cannot over transfer from an account." $
@@ -4391,7 +4391,7 @@ contract qq{
           adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
           adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
+          (void $ call2 "myTransfer" [] (a^.namedAccountAddress))
       )
       `shouldThrow` anyPaymentError
 
@@ -4437,7 +4437,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"]
       `shouldReturn` [ BDefault,
                        BInteger 14,
@@ -4464,7 +4464,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
+    void $ call2 "myBalance" [] (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
   it "can get the codehash from an address" . runTest $ do
     let contract =
@@ -5136,7 +5136,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 0})
 
     -- Check return of balance
-    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
+    void $ call2 "myBalance" [] (a^.namedAccountAddress)
     getFields ["bala", "balb"] `shouldReturn` [BInteger 1, BInteger 13]
 
   it "can't assign a value to an unallocated index in an array" $
@@ -5847,7 +5847,7 @@ contract qq{
   it "can set values in a mapping that's a member of a struct" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5865,7 +5865,7 @@ contract qq {
   it "can set values in a mapping that's a local variable" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5880,7 +5880,7 @@ contract qq {
   it "can set values in a mapping that's a contract variable" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5895,7 +5895,7 @@ contract qq {
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5913,7 +5913,7 @@ contract qq {
   it "can use the builtin keccak256 function with any amount of string arguments" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5926,7 +5926,7 @@ contract qq {
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 //
 contract qq {
@@ -5978,7 +5978,7 @@ contract qq {
   it "can use a modifier as part of a function" . runTest $ do
     runCall'
       "decrement"
-      "(1)"
+      ["1"]
       [r|
 
 contract qq {
@@ -6080,7 +6080,7 @@ contract qq {
   it "can use a modifier that takes arguments as part of a function" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -6244,7 +6244,7 @@ contract qq {
     adjust_ (Proxy @AddressState) (contract'^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
     adjust_ (Proxy @AddressState) (owner^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 10})
     -- Check return of balance
-    void $ call2 "selfDestructThis" "()" (contract'^.namedAccountAddress)
+    void $ call2 "selfDestructThis" [] (contract'^.namedAccountAddress)
     getFields ["contract'", "contractPay", "owner", "ownerPay"]
       `shouldReturn` [ BDefault,
                        BDefault,
@@ -6589,7 +6589,7 @@ contract qq {
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect) in a function" . runTest $ do
     runCall'
       "tryTheDivide"
-      "()"
+      []
       [r|
 
 contract Divisor {
@@ -6805,7 +6805,7 @@ contract qq{
       ( do
           runCall'
             "changeHost"
-            "(0)"
+            ["0"]
             [r|
 
 contract qq {
@@ -7065,7 +7065,7 @@ contract qq{
   it "can declare enums at the file level" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 enum Color { red, green, blue }
@@ -7093,7 +7093,7 @@ contract qq {
   it "can declare structs at the file level" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 
@@ -8640,7 +8640,7 @@ contract qq {
   it "can externally return decimals" . runTest $ do
     runCall'
       "f"
-      "()"
+      []
       [r|
 contract qq {
   function f() returns (decimal) {
@@ -8828,7 +8828,7 @@ contract qq {
 
     case getAddressFromResult res of
       Nothing -> error "No address returned"
-      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+      Just address -> runCall' "changeMyValOfTest" (map T.pack ["0x"++ formatAddressWithoutColor address, "3"] ) [r|
 contract Test {
     int public myVal;
 
@@ -8913,7 +8913,7 @@ contract qq {
 
     case getAddressFromResult res of
       Nothing -> error "No address returned"
-      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+      Just address -> runCall' "changeMyValOfTest" (map T.pack ["0x"++ formatAddressWithoutColor address, "3"] ) [r|
 contract Test {
     int public myVal;
 
