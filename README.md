@@ -1,8 +1,9 @@
 # Mercata
 
-The app consists of 4 parts:
+The app consists of multiple parts:
 - backend (ExpressJS-based API server)
-- frontend (NextJS-based web UI)
+- ui (Vite/React-based UI) 
+  - with legacy next.js-based UI in `frontend/` dir
 - nginx
   - The purpose of the Nginx in the app:
     - Handle OAuth2 authentication and authorization
@@ -13,6 +14,16 @@ The app consists of 4 parts:
   - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
   - Currently there is only the Stripe service for token on ramping.
   - Look at the individual services read me for further details.
+
+## Global Project Prerequisites
+- Git submodules
+  - Fetch the git submodules code:
+    ```shell
+    git submodule update --init --recursive
+    ```
+    - `ui/` is a git submodule from https://github.com/blockapps/mercata-vault-finance repo
+    - To work with ui/ codebase, please learn how git submodules work.
+
 
 ---
 
@@ -30,12 +41,13 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.
   OAUTH_CLIENT_SECRET=client-secret-here \
   NODE_URL=https://marketplace.mercata-testnet2.blockapps.net \
   BASE_CODE_COLLECTION=skipped_for_now \
+  BASE_URL=http://localhost \
   npm run dev
 ```
 
-### Run Frontend:
+### Run UI:
 ```
-cd ../../frontend/
+cd ../../ui/
 npm i
 npm run dev
 ```
@@ -73,67 +85,6 @@ sudo \
   OAUTH_CLIENT_SECRET=client-secret-here \
   NODE_URL=https://marketplace.mercata-testnet2.blockapps.net \
   ssl=true \
+  BASE_URL=host-url-here \
   docker compose up -d --build
 ```
-
----
-
-## (LEGACY) PROD MODE - NON-DOCKERIZED
-
-### Prerequisites
-- Node.js v22 (with nvm and npm) — see https://nodejs.org/en/download
-- Install 'pm2' and 'serve': `npm i -g pm2 serve`
-
-### Run Backend:
-```
-cd backend
-npm i
-npm run build
-cd dist
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=<client-id-here> \
-  OAUTH_CLIENT_SECRET=<client-secret-here> \
-  NODE_URL=https://marketplace.mercata.blockapps.net \
-  BASE_URL=<host_url> \
-  BASE_CODE_COLLECTION=<skipped_for_now> \
-  pm2 start app.js --name backend
-```
-
-#### To stop and delete the backend service (e.g., for starting a new backend version):
-```
-pm2 delete backend
-```
-
-### Run Frontend:
-```
-cd ../../frontend
-npm i
-```
-- To run the compiled/optimized version (prod mode):
-    ```
-    npm run build
-    cd dist
-    pm2 start serve --name frontend -- -s build -l 3000
-    ```
-- To run the uncompiled version (dev mode):
-    ```
-    pm2 start npm --name frontend-devmode -- run dev
-    ```
-
-#### To stop and delete the frontend service (e.g., for starting a new frontend version):
-```
-pm2 delete frontend ; pm2 delete frontend-devmode
-```
-
-### Run Nginx Standalone:
-```
-cd ../nginx
-sudo \ 
-  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=client-id-here \
-  OAUTH_CLIENT_SECRET=client-secret-here \
-  ssl=true \
-  HOST_IP=your-host-ip \
-  docker compose -f docker-compose.nginx-standalone.yml up -d --build
-```
-- On Linux, use `HOST_IP=172.17.0.1 \` (the default Docker host IP), or use any static local IP of your host machine.

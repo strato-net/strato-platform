@@ -16,9 +16,9 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  frontend:
-    build: ./frontend
-    image: mercata-frontend
+  ui:
+    build: ./ui
+    image: mercata-ui
     restart: unless-stopped
     logging:
       driver: "json-file"
