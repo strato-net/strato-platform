@@ -8,11 +8,12 @@ import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, ChartBar, Shield } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
-import { useSearchParams } from "next/navigation";
-import { useToast } from "@/hooks/use-toast"; // if you use a toast hook
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { toast } = useToast(); // optional
   const [unlockStatus, setUnlockStatus] = useState<
     "idle" | "success" | "error"
@@ -39,6 +40,7 @@ const Dashboard = () => {
         title: "Purchase Successful",
         description: "Your purchase was completed successfully.",
       });
+      navigate("/dashboard", { replace: true });
       return;
     }
 
@@ -58,6 +60,7 @@ const Dashboard = () => {
               title: "Payment Cancelled",
               description: "Lock released successfully.",
             });
+            navigate("/dashboard", { replace: true });
           } else {
             throw new Error("Unlock failed");
           }

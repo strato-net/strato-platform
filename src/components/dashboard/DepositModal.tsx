@@ -22,7 +22,7 @@ interface DepositModalProps {
 }
 
 const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState("1");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
