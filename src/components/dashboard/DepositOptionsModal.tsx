@@ -26,9 +26,9 @@ const DepositOptionsModal = ({ isOpen, onClose, onSelectOption }: DepositOptions
               <CreditCard className="h-6 w-6 text-blue-600" />
             </div>
             <div className="text-center">
-              <h3 className="font-medium">Buy USDST with Credit Card</h3>
+              <h3 className="font-medium">Buy USDST</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Purchase USDST directly using your credit card
+                Purchase USDST directly using fiat currency
               </p>
             </div>
           </Button>
