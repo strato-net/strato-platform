@@ -7,13 +7,5 @@ export enum StratoPaths {
 }
 
 export const constants = {
-  poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",
-  lendingPool: "96b7b8a3868699971abe853daef3c2ede04f6c2b",
   onRamp: "5f0f4f4bdde0ed657c189351685cfbd5b0d62a50",
-  DECIMALS: 10n ** 18n,
-};
-
-export const stripeConfig = {
-  confirmUrl: `/api/onRamp/buy`,
-  cancelUrl: `/api/onRamp/cancel`,
 };

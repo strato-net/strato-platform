@@ -6,6 +6,7 @@ import { initOpenIdConfig } from "./config/config";
 const PORT = process.env.PORT || 3001;
 
 const app = express();
+
 app.use(cors(), express.json(), express.urlencoded({ extended: true }));
 
 app.use("/api", routes);

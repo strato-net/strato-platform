@@ -20,6 +20,15 @@ export interface TokenData {
   interestRate?: string;
   collateralRatio?: string;
   "BlockApps-Mercata-ERC20-_balances"?: TokenBalance[];
+  amount?: string;
+  id?: string
+  marginBps?: string
+  seller?: string
+  token?: string;
+  tokenName?:string; 
+  tokenSymbol?:string; 
+  tokenOracleValue?:string;
+  paymentProviders?: string[];
 }
 
 export interface TokenMetadata {
