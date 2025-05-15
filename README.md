@@ -21,7 +21,7 @@ The app consists of multiple parts:
     ```shell
     git submodule update --init --recursive
     ```
-    - `ui/` is a git submodule from https://github.com/blockapps/mercata-vault-finance repo
+    - `ui/` is a git submodule from https://github.com/blockapps/mercata-ui repo
     - To work with ui/ codebase, please learn how git submodules work.
 
 
