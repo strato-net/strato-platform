@@ -342,17 +342,20 @@ export const BANNER = [
     text: (
       <div className="staking_banner_text banner-text flex justify-between">
         <div className="banner-text">
-          <h1 className="title text-base md:text-4xl"> RWA + DeFi = Unbanked, On-Chain Living </h1>
+          <h1 className="title text-base md:text-4xl">
+            {' '}
+            Where Stability Meets Opportunity{' '}
+          </h1>
           <h1 className="w-3/4 mt-1 lg:text-2xl md:text-xl font-normal sm:text-2xl text-sm">
-            Stake Silver, Gold, ETH, Wrapped Bitcoin, and many more stakeable
-            assets to earn CATA, our Governance token!
+            Easily earn on vaulted gold, silver & crypto. Get instant credit.
+            Built by ETH veterans.
           </h1>
         </div>
         <div>
           <img
-            src={Images.cata}
-            alt={'Cata...'}
-            title={'Cata'}
+            src={Images.logo_big}
+            alt={'Logo...'}
+            title={'Logo'}
             className="md:w-[160px] md:h-[160px] w-[90px] h-[90px] z-[11] relative md:mr-80 mr-32"
           />
         </div>
@@ -362,10 +365,10 @@ export const BANNER = [
     mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
-    desktopImg: Images.StakingX1600,
-    laptopImg: Images.StakingX1440,
-    tabletImg: Images.StakingX768,
-    mobileImg: Images.StakingX394,
+    desktopImg: Images.MercataX1600,
+    laptopImg: Images.MercataX1440,
+    tabletImg: Images.MercataX768,
+    mobileImg: Images.MercataX394,
   },
   // {
   //   label: 'Batman',
@@ -633,4 +636,3 @@ export const DOWNLOAD_OPTIONS = [
     label: 'CSV',
   },
 ];
-
