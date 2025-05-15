@@ -44,8 +44,6 @@ contract record Decider {
       address validatorPool = address(0x1234);
 
       ERC20_Template(USDST).transfer(validatorPool, oneDollar / 10); //Each transaction costs 10¢
-
-      require(1==1, "forbidden!");
       
       return true;
     }

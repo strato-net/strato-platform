@@ -427,34 +427,39 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   feeResult <- payFees b availableGas tAddr t proposer
   let attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const (<>)) $ _actionData a)) <$> erAction er}) $ erAction feeResult
 
-  lift $ incrementNonce tAddr
+  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
+    then do
+      $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
 
-  when (otHash t `S.member` knownFailedTxs) $ do
-    throwE $ TFKnownFailedTX t
+      lift $ incrementNonce tAddr
 
-  $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
-  faucetSuccess <- lift $ addToBalance tAddr 10000000 -- txCost
-  unless faucetSuccess $ error "failed to give balance to a gasOff account"
+      when (otHash t `S.member` knownFailedTxs) $ do
+        throwE $ TFKnownFailedTX t
 
-  when flags_debug $ $logDebugS "addTx" "running code"
-  let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-  lift $ P.incCounter txTypeCounter
-  when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
+      $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
+      faucetSuccess <- lift $ addToBalance tAddr 10000000 -- txCost
+      unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
-  execResults <- runCodeForTransaction b availableGas tAddr t proposer
-  lift $ P.incCounter vmTxsProcessed
+      when flags_debug $ $logDebugS "addTx" "running code"
+      let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
+      lift $ P.incCounter txTypeCounter
+      when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-  case erException execResults of
-    Just e -> do
-      when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-      lift $ P.incCounter vmTxsUnsuccessful
-    Nothing -> do
-      when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
-      forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
-        lift $ purgeStorageMap address'
-        lift $ A.delete (Proxy @AddressState) address'
-      lift $ P.incCounter vmTxsSuccessful
-  return $ attachFeeResult execResults
+      execResults <- runCodeForTransaction b availableGas tAddr t proposer
+      lift $ P.incCounter vmTxsProcessed
+
+      case erException execResults of
+        Just e -> do
+          when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
+          lift $ P.incCounter vmTxsUnsuccessful
+        Nothing -> do
+          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
+          forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
+            lift $ purgeStorageMap address'
+            lift $ A.delete (Proxy @AddressState) address'
+          lift $ P.incCounter vmTxsSuccessful
+      return $ attachFeeResult execResults
+    else return feeResult
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -515,8 +520,8 @@ payFees b availableGas tAddr t proposer = do
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
   -- BEGIN: Custom Validation Check
   -- Call validation contract at 0xDEC1DE. Require it returns True.
-  result <-
-    lift $
+
+  lift $
     SolidVM.call
       False  -- isRCC
       b  -- blockData
@@ -529,13 +534,6 @@ payFees b availableGas tAddr t proposer = do
       "decide"
       []
       (Just DelegateCall)
-
-  unless (erException result == Nothing) $ throwE $ TFKnownFailedTX t
-  unless (erReturnVal result == Just "(true)") $ throwE $ TFKnownFailedTX t
-
-  $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
-
-  pure result
 
 ----------------
 {-
