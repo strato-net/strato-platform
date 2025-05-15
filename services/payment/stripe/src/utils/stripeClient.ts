@@ -42,8 +42,8 @@ export async function createCheckoutSession({
       buyerAddress,
       amount: amount.toString(),
     },
-    success_url: baseUrl,
-    cancel_url: `${baseUrl}/onramp/cancel?listingId=${listingId}`,
+    success_url: `${baseUrl}/dashboard?listingId=${listingId}&success=true`,
+    cancel_url: `${baseUrl}/dashboard?listingId=${listingId}&success=false`,
     expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 minutes
   });
 
