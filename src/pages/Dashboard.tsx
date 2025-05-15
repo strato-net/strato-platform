@@ -7,11 +7,18 @@ import AssetsList from '../components/dashboard/AssetsList';
 import DashboardFAQ from '../components/dashboard/DashboardFAQ';
 import BorrowingSection from '../components/dashboard/BorrowingSection';
 import { Wallet, Coins, ChartBar, Shield } from 'lucide-react';
+import { useUserTokens } from '@/context/UserTokensContext';
+import { useUser } from '@/context/UserContext';
 
 const Dashboard = () => {
+    const { userAddress } = useUser()
+   const { tokens, loading, error, fetchTokens } = useUserTokens();
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
-  }, []);
+    setTimeout(() => {
+      fetchTokens(userAddress || "")
+    }, 500);
+  }, [userAddress]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -56,7 +63,7 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <AssetsList />
+            <AssetsList tokens={tokens} />
           </div>
           
           <div className="mb-8">
