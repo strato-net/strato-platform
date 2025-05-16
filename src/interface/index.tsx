@@ -32,3 +32,14 @@ export interface Token {
     transaction_sender: string;
   };
 };
+
+export interface SwappableToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  balance?: string;
+  "BlockApps-Mercata-ERC20-_balances": {
+    key: string;
+    value: string;
+  }[];
+};
