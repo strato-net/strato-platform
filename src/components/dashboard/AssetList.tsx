@@ -66,7 +66,7 @@ const AssetsList = () => {
     }
   ];
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm ml-64">
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">Your Assets</h2>

@@ -282,15 +282,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
       }
 
-      // Debug log to check token values
-      console.log('Token Validation:', {
-        fromToken,
-        toToken,
-        fromChain,
-        toChain,
-        amount,
-        tokenBalance
-      });
+
 
       // More specific token validation
       if (!fromToken || !fromToken.symbol || !fromToken.name) {
@@ -361,47 +353,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         recipient
       };
 
-      // Log detailed transaction information
-      console.log('Bridge Transaction Details:', {
-        transaction: {
-          type: 'BRIDGE_TRANSACTION',
-          timestamp: new Date().toISOString(),
-          status: 'PENDING',
-          hash: transactionHash || 'Not yet generated'
-        },
-        from: {
-          network: fromChain,
-          token: {
-            symbol: fromToken.symbol,
-            name: fromToken.name,
-            address: tokenAddress,
-            amount: amount,
-            decimals: 18 // Using standard 18 decimals for ERC20
-          },
-          userAddress: address,
-          balance: tokenBalance
-        },
-        to: {
-          network: toChain,
-          token: {
-            symbol: toToken.symbol,
-            name: toToken.name,
-            address: TOKEN_ADDRESSES[toChain]?.[toToken.symbol] || 'N/A'
-          },
-          recipientAddress: recipient
-        },
-        network: {
-          fromChainId: chainId,
-          toChainId: NETWORK_CONFIGS[toChain]?.chainId,
-          isNativeToken: tokenAddress === NATIVE_TOKEN_ADDRESS
-        },
-        user: {
-          walletAddress: address,
-          isConnected: isConnected,
-          currentNetwork: chain?.name
-        }
-      });
-
       toast({
         title: "Preparing transaction...",
         description: "Please wait while we prepare your transaction",
@@ -436,32 +387,11 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           const receipt = await client.waitForTransactionReceipt({ hash });
 
           if (receipt.status === 'success') {
-            console.log('Transaction Success:', {
-              hash,
-              timestamp: new Date().toISOString(),
-              status: 'SUCCESS',
-              from: {
-                network: fromChain,
-                token: fromToken.symbol,
-                amount: amount
-              },
-              to: {
-                network: toChain,
-                token: toToken.symbol
-              }
-            });
-
             // Refresh balance after successful transfer
             if (fromToken.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
-              console.log('Fetching native token balance...');
               const balance = await client.getBalance({ address: address as `0x${string}` });
               const formattedBalance = formatBalance(balance, 18);
-              console.log('New native token balance:', {
-                address: address,
-                balance: formattedBalance,
-                symbol: fromToken.symbol
-              });
-              
+       
               // Force state update and UI refresh
               setTokenBalance("0"); // Reset first to trigger change
               setTimeout(() => {
@@ -473,7 +403,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                 });
               }, 100);
             } else {
-              console.log('Fetching ERC20 token balance...');
               // For ERC20 tokens, we need to read the contract
               const balance = await client.readContract({
                 address: tokenAddress as `0x${string}`,
@@ -490,12 +419,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                 args: [address as `0x${string}`],
               });
               const formattedBalance = formatBalance(balance, 18);
-              console.log('New ERC20 token balance:', {
-                address: address,
-                tokenAddress: tokenAddress,
-                balance: formattedBalance,
-                symbol: fromToken.symbol
-              });
               
               // Force state update and UI refresh
               setTokenBalance("0"); // Reset first to trigger change
@@ -543,22 +466,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           const receipt = await client.waitForTransactionReceipt({ hash });
 
           if (receipt.status === 'success') {
-            console.log('Transaction Success:', {
-              hash,
-              timestamp: new Date().toISOString(),
-              status: 'SUCCESS',
-              from: {
-                network: fromChain,
-                token: fromToken.symbol,
-                amount: amount
-              },
-              to: {
-                network: toChain,
-                token: toToken.symbol
-              }
-            });
-
-            console.log('Fetching ERC20 token balance...');
             // Refresh balance after successful transfer
             const balance = await client.readContract({
               address: tokenAddress as `0x${string}`,
@@ -575,12 +482,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
               args: [address as `0x${string}`],
             });
             const formattedBalance = formatBalance(balance, 18);
-            console.log('New ERC20 token balance:', {
-              address: address,
-              tokenAddress: tokenAddress,
-              balance: formattedBalance,
-              symbol: fromToken.symbol
-            });
+           
             
             // Force state update and UI refresh
             setTokenBalance("0"); // Reset first to trigger change
@@ -595,13 +497,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           }
         }
 
-        // Log successful transaction
-        console.log('Transaction Submitted:', {
-          hash,
-          timestamp: new Date().toISOString(),
-          status: 'SUBMITTED',
-          details: transactionData
-        });
+ 
 
         toast({
           title: "Success",
@@ -676,8 +572,8 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sticky top-0  z-10 pb-2">
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ArrowLeftRight className="h-5 w-5" />
@@ -686,7 +582,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 mr-3 "
                 onClick={() => setShowTransactions(true)}
               >
                 <History className="h-4 w-4" />
@@ -694,14 +590,14 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
               </Button>
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
+          <div className="grid gap-3 py-2">
             <div className="flex items-center">
               {isConnected ? (
                 <div 
                   onClick={handleDisconnect}
                   className="relative group cursor-pointer"
                 >
-                  <div className="px-4 py-3 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity">
+                  <div className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity">
                     Wallet Connected
                   </div>
                   <div className="absolute inset-0 bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -709,14 +605,14 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                   </div>
                 </div>
               ) : (
-                <div className=" [&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-3 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
+                <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
                   <ConnectButton label={isNetworkChanged ? "Switch Network" : "Connect Wallet"} />
                 </div>
               )}
             </div>
             
-            <div className="space-y-4">
-              <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
                 <Label htmlFor="asset">Select Asset</Label>
                 <Select
                   value={fromToken?.symbol || ''}
@@ -724,7 +620,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                     const token = availableTokens.find(t => t.symbol === value);
                     if (token) {
                       setFromToken(token);
-                      setToToken(token); // Explicitly set toToken
+                      setToToken(token);
                     }
                   }}
                 >
@@ -743,7 +639,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="amount">Amount</Label>
                 <Input
                   id="amount"
@@ -765,44 +661,46 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="from">From Network</Label>
-                <Select 
-                  value={fromChain} 
-                  onValueChange={handleChainChange}
-                >
-                  <SelectTrigger id="from-chain">
-                    <SelectValue placeholder="Select network">
-                      {fromChain || 'Select network'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableNetworks.map((network) => (
-                      <SelectItem key={network} value={network}>
-                        {network}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="from">From Network</Label>
+                  <Select 
+                    value={fromChain} 
+                    onValueChange={handleChainChange}
+                  >
+                    <SelectTrigger id="from-chain">
+                      <SelectValue placeholder="Select network">
+                        {fromChain || 'Select network'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableNetworks.map((network) => (
+                        <SelectItem key={network} value={network}>
+                          {network}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="to">To Network</Label>
-                <Select 
-                  value={toChain} 
-                  onValueChange={(value) => {
-                    setToChain(value);
-                  }}
-                >
-                  <SelectTrigger id="to-chain">
-                    <SelectValue placeholder="Select network">
-                      {toChain || 'Select network'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="STRATO">STRATO</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-1.5">
+                  <Label htmlFor="to">To Network</Label>
+                  <Select 
+                    value={toChain} 
+                    onValueChange={(value) => {
+                      setToChain(value);
+                    }}
+                  >
+                    <SelectTrigger id="to-chain">
+                      <SelectValue placeholder="Select network">
+                        {toChain || 'Select network'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="STRATO">STRATO</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex justify-center">
@@ -817,7 +715,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
               </div>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-md space-y-2">
+            <div className="bg-gray-50 p-3 rounded-md space-y-1.5">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Bridge Fee:</span>
                 <span>0.1%</span>
@@ -828,7 +726,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
               </div>
             </div>
 
-            <div className="text-sm text-gray-500">
+            <div className="text-xs text-gray-500 space-y-1">
               <p>• Bridge assets between Ethereum and STRATO networks</p>
               <p>• Small bridge fee applies</p>
               <p>• Transaction time varies by network congestion</p>
@@ -836,7 +734,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 bg-white pt-2 border-t">
             <Button variant="outline" onClick={onClose} className="mr-2">
               Cancel
             </Button>
