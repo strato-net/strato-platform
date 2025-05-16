@@ -40,7 +40,7 @@ import { BigNumber } from "bignumber.js"
     useEffect(() => {
       const fetchTokens = async () => {
         try {
-          const res = await axios.get("api/swapableTokens");
+          const res = await axios.get("api/swappableTokens");
           setTokenList(res.data);
         } catch (err) {
           console.log(err);
@@ -110,7 +110,7 @@ import { BigNumber } from "bignumber.js"
 
     const getPairedSwapableTokens = async (address: string) => {
       try {
-        const res = await axios.get(`/api/swapableTokenPairs/${address}`);
+        const res = await axios.get(`/api/swappableTokenPairs/${address}`);
         setTokenList2(res.data);
       } catch (err) {
         console.log(err);

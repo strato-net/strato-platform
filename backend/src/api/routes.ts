@@ -28,8 +28,8 @@ router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
 
-router.get("/swapableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
-router.get("/swapableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
+router.get("/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
+router.get("/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
 router.get("/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 router.get("/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
 router.get("/lpToken", authHandler.authorizeRequest(true), SwappingController.getLPTokens);

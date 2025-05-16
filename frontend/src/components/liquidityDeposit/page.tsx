@@ -33,7 +33,7 @@ export const RenderDeposits = ({ refetchPools }: RefetchPoolProps) => {
         const fetchPaired = async () => {
           try {
             const res = await axios.get(
-              `/api/swapableTokenPairs/${selectedTokenDeposit1.address}`,
+              `/api/swappableTokenPairs/${selectedTokenDeposit1.address}`,
             );
             setTokenList2(res.data);
           } catch (err) {
@@ -174,7 +174,7 @@ export const RenderDeposits = ({ refetchPools }: RefetchPoolProps) => {
     useEffect(() => {
       const fetchTokens = async () => {
         try {
-          const res = await axios.get("api/swapableTokens");
+          const res = await axios.get("api/swappableTokens");
           setTokenList(res.data);
         } catch (err) {
           console.log(err);
