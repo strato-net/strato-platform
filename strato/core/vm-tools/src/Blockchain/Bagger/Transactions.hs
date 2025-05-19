@@ -43,7 +43,8 @@ rewriteBlockHash hsh (TxRunResult otx res t before after new) =
 instance NFData TxRunResult
 
 data TransactionFailureCause
-  = TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
+  = TFInsufficientFunds Integer Integer OutputTx -- txCost, accountBalance
+  | TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
   | TFBlockGasLimitExceeded Integer Integer OutputTx -- neededGas, actualGas
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
   | TFCodeCollectionNotFound Address String OutputTx
@@ -206,6 +207,7 @@ txRejectionToAPIFailureCause (KnownFailedTX stage queue t) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.KnownFailedTXError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " is known to fail")
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
+tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
 tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = GasLimitTooLow Execution Queued ig tx
 tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
@@ -217,6 +219,7 @@ tfToBaggerTxRejection (TFKnownFailedTX tx) = KnownFailedTX Execution Queued tx
 tfToBaggerTxRejection (TFTransactionGasExceeded limit actual tx) = GasLimitExceeded Execution Queued actual limit tx
 
 instance Format TransactionFailureCause where
+  format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
   format (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
   format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual

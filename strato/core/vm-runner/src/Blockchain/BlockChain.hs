@@ -459,7 +459,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
             lift $ A.delete (Proxy @AddressState) address'
           lift $ P.incCounter vmTxsSuccessful
       return $ attachFeeResult execResults
-    else return feeResult
+    else throwE $ TFInsufficientFunds 100000000000000000 0 t -- TODO: Get the actual tx cost and user's USDST balance
 
 runCodeForTransaction ::
   (VMBase m) =>

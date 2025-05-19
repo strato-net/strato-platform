@@ -104,6 +104,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
   return $ case res of -- currently only get GasLimit errors out of mineTransactions'
     Nothing -> Right (newStateRoot, ranTxs, newGas)
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
+    Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
     Just f@TFCodeCollectionNotFound {} -> recoverable f
