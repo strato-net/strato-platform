@@ -1,46 +1,59 @@
-
-import { useEffect, useState } from 'react';
-import DashboardSidebar from '../components/dashboard/DashboardSidebar';
-import DashboardHeader from '../components/dashboard/DashboardHeader';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useMemo, useState } from "react";
+import DashboardSidebar from "../components/dashboard/DashboardSidebar";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowDownUp, Check, ChevronDown } from 'lucide-react';
-
-type AssetType = {
-  name: string;
-  symbol: string;
-  balance: string;
-  icon: string;
-}
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
+import { SwappableToken } from "@/interface";
+import api from "@/lib/axios";
+import { useUser } from "@/context/UserContext";
+import { formatUnits, parseUnits } from "ethers";
+import { useToast } from '@/hooks/use-toast';
+import { useSwapContext } from "@/context/SwapContext";
 
 const SwapAsset = () => {
+  // const { tokens: swappableTokens } = useSwapableTokens();
+  // const { pairableTokens, fetchForToken } = usePairableSwapTokens();
+  const { swappableTokens, pairableTokens, fetchPairableTokens } = useSwapContext();
+
+  const { userAddress } = useUser();
+  const { toast } = useToast();
   useEffect(() => {
     document.title = "Swap Assets | STRATO Mercata";
   }, []);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [fromAsset, setFromAsset] = useState<AssetType>({
-    name: 'Bitcoin',
-    symbol: 'BTC',
-    balance: '0.0023',
-    icon: '₿'
-  });
-  const [toAsset, setToAsset] = useState<AssetType>({
-    name: 'Ethereum',
-    symbol: 'ETH',
-    balance: '0.125',
-    icon: 'Ξ'
-  });
-  const [fromAmount, setFromAmount] = useState('');
-  const [toAmount, setToAmount] = useState('');
+  const [fromAsset, setFromAsset] = useState<SwappableToken>();
+  const [toAsset, setToAsset] = useState<SwappableToken>();
+  const [fromAmount, setFromAmount] = useState("");
+  const [toAmount, setToAmount] = useState("");
+  const [wrongAmount, setWrongAmount] = useState(false);
+  const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
+  const [toPopoverOpen, setToPopoverOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslit/no-explicit-any
+  const [pool, setPool] = useState<any>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
+  const [fromBalanceLoading, setFromBalanceLoading] = useState<boolean>(false);
+  const [toBalanceLoading, setToBalanceLoading] = useState<boolean>(false);
+  const [swapLoading, setSwapLoading] = useState<boolean>(false);
 
-  const assets: AssetType[] = [
-    { name: 'Bitcoin', symbol: 'BTC', balance: '0.0023', icon: '₿' },
-    { name: 'Ethereum', symbol: 'ETH', balance: '0.125', icon: 'Ξ' },
-    { name: 'CATA', symbol: 'CATA', balance: '287.53', icon: 'C' },
-    { name: 'USD Stable Token', symbol: 'USDT', balance: '156.23', icon: '$' }
-  ];
+  useEffect(() => {
+    if (fromAsset?.address) {
+      fetchPairableTokens(fromAsset.address);
+    }
+  }, [fromAsset?.address, fetchPairableTokens]);
 
   const handleSwapAssets = () => {
     const temp = fromAsset;
@@ -50,152 +63,357 @@ const SwapAsset = () => {
     setToAmount(fromAmount);
   };
 
-  const handleFromAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFromAmount(e.target.value);
-    // Simple mock exchange rate calculation
-    const rate = 15.3; // Mock rate for demo
-    setToAmount(e.target.value ? (parseFloat(e.target.value) * rate).toFixed(6) : '');
+  const handleAmountChange = (isFromInput: boolean, value: string) => {
+    if (
+      !fromAsset ||
+      !toAsset ||
+      !fromAsset.address ||
+      !toAsset.address ||
+      !pool?.data
+    ) {
+      if (isFromInput) setFromAmount(value);
+      else setToAmount(value);
+      return;
+    }
+
+    try {
+      const decimals = 18; // adjust if your tokens use different decimals
+      const inputValue = value === "" ? "0" : value;
+
+      const parsedValue = parseUnits(inputValue, decimals);
+      const fromBalance = parseUnits(fromAsset.balance || "0", decimals);
+
+      if (isFromInput) {
+        setFromAmount(value);
+
+        setWrongAmount(parsedValue > fromBalance);
+
+        const ratio =
+          pool.data.tokenA === fromAsset.address
+            ? pool.data.aToBRatio
+            : pool.data.bToARatio;
+
+        const result =
+          (parsedValue * BigInt(Math.floor((ratio || 0) * 1e6))) / BigInt(1e6);
+        const formatted = parseFloat(formatUnits(result, decimals)).toFixed(6);
+
+        setToAmount(formatted);
+      } else {
+        setToAmount(value);
+
+        const ratio =
+          pool.data.tokenA === toAsset.address
+            ? pool.data.aToBRatio
+            : pool.data.bToARatio;
+
+        const result =
+          (parsedValue * BigInt(Math.floor((ratio || 0) * 1e6))) / BigInt(1e6);
+        const formatted = parseFloat(formatUnits(result, decimals)).toFixed(6);
+
+        setFromAmount(formatted);
+      }
+    } catch (err) {
+      console.error("Conversion error:", err);
+    }
   };
 
-  const handleSwap = () => {
-    setIsDialogOpen(false);
-    // Here you would normally handle the actual swap transaction
-    // and then show a success message
-    alert(`Swap successful: ${fromAmount} ${fromAsset.symbol} to ${toAmount} ${toAsset.symbol}`);
+  const handleSwap = async () => {
+    if (!fromAsset || !toAsset) return;
+    try {
+      setSwapLoading(true);
+      // Replace this with your actual pool address logic if different
+      const method =
+        pool.data.tokenA === fromAsset.address
+          ? "tokenAToTokenB"
+          : "tokenBToTokenA";
+
+      const response = await api.post("/swap/swap", {
+        address: pool.address,
+        method: method,
+        amount: parseUnits(fromAmount || "0", 18).toString(),
+        min_tokens: parseUnits(
+          (parseFloat(toAmount || "0") * 0.99).toString(),
+          18
+        ).toString(),
+      });
+      toast({
+        title: "Success",
+        description: `Swap successful: ${fromAmount} ${fromAsset?._symbol || ""} to ${toAmount} ${toAsset?._symbol || ""}`,
+        variant: "default",
+      });
+      setIsDialogOpen(false);
+      setSwapLoading(false);
+      setFromAmount('');
+      setToAmount('');
+      getTokenBalance(fromAsset, true)
+      getTokenBalance(toAsset)
+    } catch (error) {
+      console.error("Swap error:", error);
+       toast({
+        title: "Error",
+        description: "Swap failed. Please try again.",
+        variant: "destructive",
+      });
+      setIsDialogOpen(false);
+      setSwapLoading(false);
+    }
   };
+
+  const getTokenBalance = async (asset: SwappableToken, from = false) => {
+    try {
+      const setAsset = from ? setFromAsset : setToAsset;
+      const setLoading = from ? setFromBalanceLoading : setToBalanceLoading;
+      setLoading(true);
+      setAsset(asset);
+
+      // Fetch balance
+      const res = await api.get(
+        `/tokens/table/balance?key=eq.${userAddress}&address=eq.${asset?.address}`
+      );
+
+      const balance = res?.data?.[0]?.value || "0";
+
+      // Update asset with balance
+      setAsset((prev) => ({ ...prev, ...asset, balance }));
+      setLoading(false);
+    } catch (err) {
+      console.log(err);
+      from ? setFromBalanceLoading(false) : setToBalanceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (fromAsset && fromAsset.address && toAsset && toAsset.address) {
+      getPoolByTokenPair(fromAsset.address, toAsset.address);
+    }
+  }, [fromAsset, toAsset]);
+
+  const getPoolByTokenPair = async (tokenA: string, tokenB: string) => {
+    try {
+      const res = await api.get(
+        `/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
+      );
+      setPool(res.data[0]);
+      return res.data[0];
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!pool || !fromAsset || !toAsset) return;
+
+    const rate =
+      pool?.data?.tokenA === fromAsset?.address
+        ? pool?.data?.aToBRatio
+        : pool?.data?.bToARatio;
+    setExchangeRate(Number(rate) || 0);
+  }, [pool, fromAsset, toAsset]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <DashboardSidebar />
-      
+
       <div className="flex-1 ml-64">
         <DashboardHeader title="Swap Assets" />
-        
+
         <main className="p-6">
           <div className="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
-            
+            <h2 className="text-xl font-semibold mb-6">
+              Exchange your digital assets
+            </h2>
+
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex justify-between mb-2">
                   <label className="text-sm text-gray-600">From</label>
                   <span className="text-sm text-gray-600">
-                    Balance: {fromAsset.balance} {fromAsset.symbol}
+                    Balance:{" "}
+                    {fromBalanceLoading ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                    ) : (
+                      `${Number(
+                        formatUnits(fromAsset?.balance || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 4,
+                      })} ${fromAsset?._symbol || ""}`
+                    )}
                   </span>
                 </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    value={fromAmount}
-                    onChange={handleFromAmountChange}
-                    placeholder="0.00"
-                    className="bg-transparent border-none text-lg font-medium focus:outline-none flex-1"
-                  />
-                  
-                  <Popover>
+
+                <div className="flex items-center justify-between flex-1">
+                  <div className="flex flex-col">
+                    <input
+                      type="number"
+                      value={fromAmount}
+                      onChange={(e) => handleAmountChange(true, e.target.value)}
+                      placeholder="0.00"
+                      className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none
+      ${wrongAmount ? "border border-red-500 rounded-md" : ""}`}
+                    />
+                    {wrongAmount && (
+                      <p className="text-red-600 text-sm mt-1">
+                        Insufficient balance
+                      </p>
+                    )}
+                  </div>
+
+                  <Popover
+                    open={fromPopoverOpen}
+                    onOpenChange={setFromPopoverOpen}
+                  >
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2">
-                        <span className="font-mono">{fromAsset.icon}</span>
-                        <span>{fromAsset.symbol}</span>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        {/* <span className="font-mono">{fromAsset.icon}</span> */}
+                        <span>{fromAsset?._symbol || "Select Token"}</span>
                         <ChevronDown className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-0">
                       <div className="flex flex-col">
-                        {assets.map((asset) => (
-                          <Button
-                            key={asset.symbol}
-                            variant="ghost"
-                            className="justify-start gap-2"
-                            onClick={() => setFromAsset(asset)}
-                          >
-                            <span className="font-mono">{asset.icon}</span>
-                            <span>{asset.symbol}</span>
-                            {asset.symbol === fromAsset.symbol && (
-                              <Check className="h-4 w-4 ml-auto" />
-                            )}
-                          </Button>
-                        ))}
+                        {swappableTokens.length > 0 ? (
+                          swappableTokens.map((asset) => (
+                            <Button
+                              key={asset?._symbol || ""}
+                              variant="ghost"
+                              className="justify-start gap-2"
+                              onClick={() => {
+                                setFromPopoverOpen(false);
+                                getTokenBalance(asset, true);
+                              }}
+                            >
+                              {/* <span className="font-mono">{asset.icon}</span> */}
+                              <span>{asset?._symbol || ""}</span>
+                              {asset?._symbol === fromAsset?._symbol && (
+                                <Check className="h-4 w-4 ml-auto" />
+                              )}
+                            </Button>
+                          ))
+                        ) : (
+                          <span className="p-2">No data to show</span>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
-              
+
               <div className="flex justify-center">
-                <Button 
-                  onClick={handleSwapAssets} 
-                  variant="outline" 
+                <Button
+                  onClick={handleSwapAssets}
+                  variant="outline"
                   size="icon"
                   className="rounded-full bg-gray-100"
                 >
                   <ArrowDownUp className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex justify-between mb-2">
                   <label className="text-sm text-gray-600">To</label>
                   <span className="text-sm text-gray-600">
-                    Balance: {toAsset.balance} {toAsset.symbol}
+                    Balance:{" "}
+                    {toBalanceLoading ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                    ) : (
+                      `${Number(
+                        formatUnits(toAsset?.balance || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 4,
+                      })} ${toAsset?._symbol || ""}`
+                    )}
                   </span>
                 </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="text"
-                    value={toAmount}
-                    readOnly
-                    placeholder="0.00"
-                    className="bg-transparent border-none text-lg font-medium focus:outline-none flex-1 text-gray-700"
-                  />
-                  
-                  <Popover>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <input
+                      type="number"
+                      value={toAmount}
+                      onChange={(e) =>
+                        handleAmountChange(false, e.target.value)
+                      }
+                      placeholder="0.00"
+                      className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none flex-1
+      ${wrongAmount ? "border border-red-500 rounded-md" : ""}`}
+                    />
+                    {wrongAmount && (
+                      <p className="text-red-600 text-sm mt-1">
+                        Insufficient balance
+                      </p>
+                    )}
+                  </div>
+
+                  <Popover open={toPopoverOpen} onOpenChange={setToPopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2">
-                        <span className="font-mono">{toAsset.icon}</span>
-                        <span>{toAsset.symbol}</span>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        {/* <span className="font-mono">{toAsset.icon}</span> */}
+                        <span>{toAsset?._symbol || "Select Token"}</span>
                         <ChevronDown className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-0">
                       <div className="flex flex-col">
-                        {assets.map((asset) => (
-                          <Button
-                            key={asset.symbol}
-                            variant="ghost"
-                            className="justify-start gap-2"
-                            onClick={() => setToAsset(asset)}
-                          >
-                            <span className="font-mono">{asset.icon}</span>
-                            <span>{asset.symbol}</span>
-                            {asset.symbol === toAsset.symbol && (
-                              <Check className="h-4 w-4 ml-auto" />
-                            )}
-                          </Button>
-                        ))}
+                        {pairableTokens.length > 0 ? (
+                          pairableTokens.map((asset) => (
+                            <Button
+                              key={asset?._symbol || ""}
+                              variant="ghost"
+                              className="justify-start gap-2"
+                              onClick={() => {
+                                setToPopoverOpen(false);
+                                getTokenBalance(asset);
+                              }}
+                            >
+                              {/* <span className="font-mono">{asset.icon}</span> */}
+                              <span>{asset?._symbol || ""}</span>
+                              {asset?._symbol === toAsset?._symbol && (
+                                <Check className="h-4 w-4 ml-auto" />
+                              )}
+                            </Button>
+                          ))
+                        ) : (
+                          <span className="p-2">No data to show</span>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
-              
+
               <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Exchange Rate</span>
-                  <span className="font-medium">1 {fromAsset.symbol} ≈ 15.3 {toAsset.symbol}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Network Fee</span>
-                  <span className="font-medium">0.0001 {fromAsset.symbol}</span>
+                  <span className="font-medium">
+                    1 {fromAsset?._symbol || ""} ≈{" "}
+                    {exchangeRate.toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 4,
+                    })}{" "}
+                    {toAsset?._symbol || ""}
+                  </span>
                 </div>
               </div>
-              
-              <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700" 
+
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700"
                 onClick={() => setIsDialogOpen(true)}
-                disabled={!fromAmount}
+                disabled={
+                  !fromAmount ||
+                  !toAmount ||
+                  !fromAsset ||
+                  !toAsset ||
+                  wrongAmount
+                }
               >
                 Swap Assets
               </Button>
@@ -203,7 +421,7 @@ const SwapAsset = () => {
           </div>
         </main>
       </div>
-      
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -212,29 +430,39 @@ const SwapAsset = () => {
               Please review your transaction details before confirming.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4 space-y-4">
             <div className="flex justify-between">
               <span className="text-gray-600">You pay:</span>
-              <span className="font-semibold">{fromAmount} {fromAsset.symbol}</span>
+              <span className="font-semibold">
+                {fromAmount} {fromAsset?._symbol || ""}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">You receive:</span>
-              <span className="font-semibold">{toAmount} {toAsset.symbol}</span>
+              <span className="font-semibold">
+                {toAmount} {toAsset?._symbol || ""}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Exchange rate:</span>
-              <span>1 {fromAsset.symbol} ≈ 15.3 {toAsset.symbol}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Network fee:</span>
-              <span>0.0001 {fromAsset.symbol}</span>
+              <span>
+                1 {fromAsset?._symbol || ""} ≈ {exchangeRate}{" "}
+                {toAsset?._symbol || ""}
+              </span>
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSwap}>Confirm Swap</Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={swapLoading} onClick={handleSwap}>
+              {swapLoading && (
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
+              )}{" "}
+              Confirm Swap
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

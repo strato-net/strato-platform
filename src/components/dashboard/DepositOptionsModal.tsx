@@ -1,5 +1,5 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { CreditCard, ArrowLeftRight } from 'lucide-react';
 
 interface DepositOptionsModalProps {
@@ -15,22 +15,38 @@ const DepositOptionsModal = ({ isOpen, onClose, onSelectOption }: DepositOptions
         <DialogHeader>
           <DialogTitle>Choose Deposit Method</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-4 py-4">
+        
+        <div className="grid grid-cols-1 gap-4 py-4">
           <Button
             variant="outline"
-            className="flex flex-col items-center justify-center p-6 h-32"
+            className="h-auto p-6 flex flex-col items-center gap-3 hover:bg-gray-50"
             onClick={() => onSelectOption('credit-card')}
           >
-            <CreditCard className="h-8 w-8 mb-2" />
-            <span>Credit Card</span>
+            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
+              <CreditCard className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="font-medium">Buy USDST</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Purchase USDST directly using fiat currency
+              </p>
+            </div>
           </Button>
+
           <Button
             variant="outline"
-            className="flex flex-col items-center justify-center p-6 h-32"
+            className="h-auto p-6 flex flex-col items-center gap-3 hover:bg-gray-50"
             onClick={() => onSelectOption('bridge')}
           >
-            <ArrowLeftRight className="h-8 w-8 mb-2" />
-            <span>Bridge</span>
+            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
+              <ArrowLeftRight className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="font-medium">Bridge Assets</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Bridge assets between Ethereum and STRATO
+              </p>
+            </div>
           </Button>
         </div>
       </DialogContent>
