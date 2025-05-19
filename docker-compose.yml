@@ -17,13 +17,8 @@ services:
         max-size: "100m"
         max-file: "3"
   ui:
-    build:
-      context: ./ui
-      args:
-        VITE_API_URL: ${VITE_API_URL}
+    build: ./ui
     image: mercata-ui
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
     restart: unless-stopped
     logging:
       driver: "json-file"
