@@ -49,6 +49,16 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [transactionHash, setTransactionHash] = useState<`0x${string}` | undefined>();
   const { toast } = useToast();
+
+  // Create debounced update function using useMemo
+  const debouncedUpdateBalance = React.useMemo(() => {
+    let timeout: NodeJS.Timeout;
+    return (callback: () => void) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(callback, 1000);
+    };
+  }, []);
+
   const {
     fromChain,
     toChain,
@@ -88,6 +98,12 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     const selectedNetworkChainId = NETWORK_CONFIGS[fromChain]?.chainId;
     const isMatching = chainId === selectedNetworkChainId;
     
+    console.log('Chain matching check:', {
+      chainId,
+      selectedNetworkChainId,
+      isMatching
+    });
+    
     return isMatching;
   };
 
@@ -113,49 +129,114 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
   };
 
-  // Update balance fetching hooks
-  const { data: nativeBalance } = useBalance({
+  // Update balance fetching hooks with proper configuration
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
     address,
     chainId: NETWORK_CONFIGS[fromChain]?.chainId,
-    ...(isConnected && !!address && !!fromChain && fromToken?.symbol === (showTestnet ? 'SepoliaETH' : 'ETH') && isChainMatching() ? {} : { enabled: false })
+    query: {
+      enabled: isConnected && !!address && !!fromChain && fromToken?.symbol === (showTestnet ? 'SepoliaETH' : 'ETH') && isChainMatching(),
+      refetchInterval: false
+    }
   });
 
-  const { data: tokenBalanceData } = useBalance({
+  const { data: tokenBalanceData, refetch: refetchTokenBalance } = useBalance({
     address,
     token: fromToken ? (TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol] as `0x${string}`) : undefined,
     chainId: NETWORK_CONFIGS[fromChain]?.chainId,
-    ...(isConnected && !!address && !!fromChain && !!fromToken && fromToken.symbol !== (showTestnet ? 'SepoliaETH' : 'ETH') && isChainMatching() ? {} : { enabled: false })
+    query: {
+      enabled: isConnected && !!address && !!fromChain && !!fromToken && fromToken.symbol !== (showTestnet ? 'SepoliaETH' : 'ETH') && isChainMatching(),
+      refetchInterval: false
+    }
   });
+
+  // Add effect to refetch balance when wallet connects
+  useEffect(() => {
+    if (isConnected && address) {
+      console.log('Wallet connected, fetching balance...');
+      if (fromToken?.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
+        refetchNativeBalance();
+      } else {
+        refetchTokenBalance();
+      }
+    }
+  }, [isConnected, address, fromToken, refetchNativeBalance, refetchTokenBalance]);
 
   // Update balance effect
   useEffect(() => {
-    if (!isConnected || !address || !fromToken || !fromChain) {
-      setTokenBalance("0");
-      return;
-    }
+    let mounted = true;
 
-    // Only fetch balance if we're on the correct network
-    if (!isChainMatching()) {
-      setTokenBalance("0");
-      return;
-    }
-
-    // Reset balance when token changes
-    setTokenBalance("0");
-
-    // Fetch balance based on token type
-    if (fromToken.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
-      if (nativeBalance) {
-        const formattedBalance = formatBalance(nativeBalance.value, nativeBalance.decimals);
-        setTokenBalance(formattedBalance);
+    const updateBalance = async () => {
+      if (!mounted) return;
+      
+      if (!isConnected || !address || !fromToken || !fromChain) {
+        setTokenBalance("0");
+        return;
       }
-    } else {
-      if (tokenBalanceData) {
-        const formattedBalance = formatBalance(tokenBalanceData.value, tokenBalanceData.decimals);
-        setTokenBalance(formattedBalance);
+
+      // Only fetch balance if we're on the correct network
+      if (!isChainMatching()) {
+        setTokenBalance("0");
+        return;
       }
+
+      try {
+        console.log('Updating balance...', {
+          isConnected,
+          address,
+          fromToken,
+          fromChain,
+          nativeBalance,
+          tokenBalanceData
+        });
+
+        // Fetch balance based on token type
+        if (fromToken.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
+          if (nativeBalance) {
+            const formattedBalance = formatBalance(nativeBalance.value, nativeBalance.decimals);
+            if (mounted) {
+              console.log('Setting native balance:', formattedBalance);
+              setTokenBalance(formattedBalance);
+            }
+          }
+        } else {
+          if (tokenBalanceData) {
+            const formattedBalance = formatBalance(tokenBalanceData.value, tokenBalanceData.decimals);
+            if (mounted) {
+              console.log('Setting token balance:', formattedBalance);
+              setTokenBalance(formattedBalance);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+        if (mounted) setTokenBalance("0");
+      }
+    };
+
+    debouncedUpdateBalance(updateBalance);
+
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
+  }, [isConnected, address, fromToken, fromChain, nativeBalance, tokenBalanceData, chainId, isChainMatching, debouncedUpdateBalance]);
+
+  // Add effect to handle network changes
+  useEffect(() => {
+    if (isConnected && chain) {
+      console.log('Chain changed:', chain);
+      // Reset balance when chain changes
+      setTokenBalance("0");
+      // Refetch balance after a short delay
+      setTimeout(() => {
+        if (fromToken?.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
+          refetchNativeBalance();
+        } else {
+          refetchTokenBalance();
+        }
+      }, 1000);
     }
-  }, [isConnected, address, fromToken, fromChain, nativeBalance, tokenBalanceData, chainId, isChainMatching]);
+  }, [chain, isConnected, fromToken, refetchNativeBalance, refetchTokenBalance]);
 
   // Add amount validation
   const [amountError, setAmountError] = useState<string>("");
@@ -281,8 +362,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           return;
         }
       }
-
-
 
       // More specific token validation
       if (!fromToken || !fromToken.symbol || !fromToken.name) {
@@ -497,8 +576,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           }
         }
 
- 
-
         toast({
           title: "Success",
           description: "Transaction completed successfully",
@@ -556,6 +633,20 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
 
     try {
+      // Call checkUserTransaction API with access_token in header
+      const accessToken = "test_access_token_123"; // This should be replaced with actual token
+      const response = await fetch('http://localhost:3002/api/checkUserTransaction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check user transaction');
+      }
+
       await handleBridge();
       onClose();
       setShowTransactions(true);
