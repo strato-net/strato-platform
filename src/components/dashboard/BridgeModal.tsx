@@ -43,6 +43,8 @@ const formatBalance = (value: bigint, decimals: number): string => {
   return formattedBalance.toFixed(decimals);
 };
 
+const access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiJlZjdlMjY5ZS03OTI5LTQ5NzctYmMzZC01NTU3Y2Y4MmZkMzgiLCJleHAiOjE3NDc2NjE0MzIsIm5iZiI6MCwiaWF0IjoxNzQ3NjYwNTMyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJkMTdkYzQ2NS0yNThhLTQ1MGYtYmFjZS01ZTgzMDk0YWY3Y2YiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJkb2NzLnN0cmF0b21lcmNhdGEuY29tIiwiYXV0aF90aW1lIjoxNzQ3NjYwNTIwLCJzZXNzaW9uX3N0YXRlIjoiMmI0MDE0ZGMtYzJjYS00ZWI1LTliMGYtODBlZGNiMmIzYzlhIiwiYWNyIjoiMCIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJCbG9ja0FwcHMgQmxvY2tBcHBzIiwiY29tcGFueSI6IkJsb2NrQXBwcyIsInByZWZlcnJlZF91c2VybmFtZSI6ImJsb2NrYXBwcyIsImdpdmVuX25hbWUiOiJCbG9ja0FwcHMiLCJmYW1pbHlfbmFtZSI6IkJsb2NrQXBwcyIsImVtYWlsIjoiZHVzdGluK2Jsb2NrYXBwc0BibG9ja2FwcHMubmV0In0.mriO_vXMZ3gajZqyBscsdiSK3EHkzt7pb0UMdZugP5CY3Do_skou2h8w_PHMHwhzALU8QDiip4HSjJ5PN9wVnnLOssRXLb2vo0SdCLhVNuk6qAcGr8rdm5D7Kx0p0pYGWHBQX2D6L_i1CDOtmq1WBWNqSCJwUBLNVEIr5K1ae0YyouFUewnEiZIMAZpY4UrS1DwmQno9tmENa7fmiKTHhJq1UB1upzBh4uCfD4iM3g1l4U7geZRl6cOTffUeOKSRcnro1NaiT4-Sgwn_bDSj6HZQNPK5ps5loCxoOIz9H9-VhKMwE7rifAqn-o_NhUCJewJBayEDE5bKycrIE2zEYg';
+
 const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalProps) => {
   const [showTransactions, setShowTransactions] = useState(false);
   const [isNetworkChanged, setIsNetworkChanged] = useState(false);
@@ -634,7 +636,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
 
     try {
       // Call checkUserTransaction API with access_token in header
-      const accessToken = "test_access_token_123"; // This should be replaced with actual token
+      const accessToken = access_token; // This should be replaced with actual token
       const response = await fetch('http://localhost:3002/api/checkUserTransaction', {
         method: 'POST',
         headers: {
