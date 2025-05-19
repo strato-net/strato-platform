@@ -3,7 +3,8 @@ import axios from "axios";
 import { toast } from "@/components/ui/sonner";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost/api", // Adjust accordingly
+  const base = import.meta.env.BASE_URL || "http://localhost"; //Adjust accordingly
+  const baseURL = `${base}/api`;
   withCredentials: true, // if using cookies for auth
 });
 
