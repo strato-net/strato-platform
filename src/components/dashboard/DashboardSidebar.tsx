@@ -1,19 +1,7 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Database, 
-  LogOut, 
-  ArrowLeft, 
-  ArrowRight, 
-  Book, 
-  ArrowRightLeft,
-  List,
-  History,
-  CreditCard,
-  PlusCircle
-} from 'lucide-react';
+import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, List } from 'lucide-react';
 
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -26,10 +14,6 @@ const DashboardSidebar = () => {
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
-    // { icon: <ArrowRightLeft size={20} />, label: 'Bridge', path: '/dashboard/bridge' },
-    // { icon: <History size={20} />, label: 'Bridge Transactions', path: '/dashboard/bridge-transactions' },
-    // { icon: <CreditCard size={20} />, label: 'Deposit', path: '/dashboard/deposit' },
-    // { icon: <PlusCircle size={20} />, label: 'Deposit Options', path: '/dashboard/deposit-options' },
   ];
 
   return (

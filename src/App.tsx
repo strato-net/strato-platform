@@ -8,6 +8,9 @@ import { mainnet, polygon, sepolia } from 'wagmi/chains';
 import { getDefaultWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { createConfig, http } from 'wagmi';
 import '@rainbow-me/rainbowkit/styles.css';
+import { UserProvider } from "@/context/UserContext";
+import { UserTokensProvider } from "@/context/UserTokensContext";
+import { SwapProvider } from "@/context/SwapContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -51,34 +54,39 @@ const App = () => (
       <RainbowKitProvider>
         <TooltipProvider>
           <BridgeProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/wallet-created" element={<WalletCreated />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                
-                {/* Dashboard Routes */}
-                <Route element={<DashboardLayout />}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/dashboard/swap" element={<SwapAsset />} />
-                  <Route path="/dashboard/assets" element={<Assets />} />
-                  <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
-                  <Route path="/dashboard/borrow" element={<Borrow />} />
-                  <Route path="/dashboard/assets-list" element={<AssetsList />} />
-                  <Route path="/dashboard/bridge" element={<BridgePage />} />
-                  <Route path="/dashboard/bridge-transactions" element={<BridgeTransactionsPage />} />
-                  <Route path="/dashboard/deposit" element={<DepositPage />} />
-                  <Route path="/dashboard/deposit-options" element={<DepositOptionsPage />} />
-                </Route>
-                
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+            <UserProvider>
+              <UserTokensProvider>
+                <SwapProvider>
+                  <Toaster />
+                  <BrowserRouter>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/register" element={<Register />} />
+                      <Route path="/wallet-created" element={<WalletCreated />} />
+                      <Route path="/onboarding" element={<Onboarding />} />
+                      
+                      {/* Dashboard Routes */}
+                      <Route element={<DashboardLayout />}>
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/dashboard/swap" element={<SwapAsset />} />
+                        <Route path="/dashboard/assets" element={<Assets />} />
+                        <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
+                        <Route path="/dashboard/borrow" element={<Borrow />} />
+                        <Route path="/dashboard/assets-list" element={<AssetsList />} />
+                        <Route path="/dashboard/bridge" element={<BridgePage />} />
+                        <Route path="/dashboard/bridge-transactions" element={<BridgeTransactionsPage />} />
+                        <Route path="/dashboard/deposit" element={<DepositPage />} />
+                        <Route path="/dashboard/deposit-options" element={<DepositOptionsPage />} />
+                      </Route>
+                      
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </SwapProvider>
+              </UserTokensProvider>
+            </UserProvider>
           </BridgeProvider>
         </TooltipProvider>
       </RainbowKitProvider>
