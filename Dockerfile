@@ -9,8 +9,6 @@ RUN npm ci
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
@@ -28,4 +26,4 @@ COPY --from=builder /app/package.json ./
 
 EXPOSE 8080
 
-CMD ["serve", "-s", "dist", "-l", "8080"] 
+CMD ["serve", "-s", "dist", "-l", "8080"]
