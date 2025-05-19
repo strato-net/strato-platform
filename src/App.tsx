@@ -10,6 +10,7 @@ import WalletCreated from "./pages/WalletCreated";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
+import Transfer from "./pages/Transfer";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import Borrow from "./pages/Borrow";
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/dashboard/assets" element={<Assets />} />
                 <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
                 <Route path="/dashboard/borrow" element={<Borrow />} />
+                <Route path="/dashboard/transfer" element={<Transfer />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
