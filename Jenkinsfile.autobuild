@@ -1,0 +1,146 @@
+pipeline {
+  agent {
+    label "test"
+  }
+
+  environment {
+    AWS_REGION = 'us-east-1'
+    AWS_ACCOUNT_ID = '406773134706'
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        wrap([$class: 'BuildUser']) {
+          script {
+            def buildUser
+            try {
+              buildUser = "${BUILD_USER_FIRST_NAME}"
+            } catch (Exception e) {
+              buildUser = "github"
+            }
+            def nodeUsed = env.NODE_NAME ?: 'unknown'
+            currentBuild.description = "${nodeUsed} // ${buildUser}"
+            env.NODE_USED = nodeUsed
+            env.GIT_SHA = env.GIT_COMMIT.take(7)
+          }
+        }
+
+        sh '''
+          docker ps -aq | xargs --no-run-if-empty docker rm -f || true
+          docker system prune -f || true
+          docker volume prune -f || true
+        '''
+      }
+    }
+
+    stage('Build and Push Docker Images') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'aws-ecr-write-access-account', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
+          usernamePassword(credentialsId: 'blockapps-cd-github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')
+        ]) {
+          script {
+            def GIT_SHA = env.GIT_SHA
+            def baseBranch = env.CHANGE_TARGET ?: 'develop'
+            def headBranch = env.CHANGE_BRANCH ?: 'HEAD'
+
+            // Set GitHub remote and fetch both base and head
+            sh """
+              git remote set-url origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/mercata.git
+              git fetch origin ${baseBranch} --quiet
+              ${env.CHANGE_BRANCH ? "git fetch origin ${env.CHANGE_BRANCH} --quiet" : ""}
+            """
+
+            // Login to ECR
+            sh """
+              AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+              AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+              AWS_DEFAULT_REGION=${AWS_REGION} \
+              aws ecr get-login-password --region ${AWS_REGION} | \
+              docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+            """
+
+            // --- main app (backend, ui, nginx) ---
+            def composeChanged = sh(
+              script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- backend ui nginx || echo changed",
+              returnStdout: true
+            ).trim()
+
+            if (composeChanged == "changed") {
+              echo "Changes detected in backend/ui/nginx — rebuilding with docker-compose..."
+              sh "docker compose build"
+
+            def composeImages = [
+                backend: "mercata-backend",
+                ui: "mercata-ui",
+                nginx: "mercata-nginx"
+            ]
+
+            for (service in composeImages.keySet()) {
+                def localImage = composeImages[service]
+                def repo = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}"
+                def tag = "${repo}:${GIT_SHA}"
+
+                sh "docker tag ${localImage} ${tag}"
+                sh "docker push ${tag}"
+            }
+
+            } else {
+              echo "No changes in backend/ui/nginx — skipping build."
+            }
+
+            // --- External services: Stripe ---
+            def stripeChanged = sh(
+              script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- services/payment/stripe || echo changed",
+              returnStdout: true
+            ).trim()
+
+            if (stripeChanged == "changed") {
+              def stripeRepo = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/stripe"
+              def stripeTag = "${stripeRepo}:${GIT_SHA}"
+
+              echo "Changes detected in stripe. Building and pushing image ${stripeTag}..."
+              sh """
+                docker build -t ${stripeTag} services/payment/stripe
+                docker push ${stripeTag}
+              """
+            } else {
+              echo "No changes in stripe — skipping build."
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker system prune -fa || true'
+    }
+
+    success {
+      slackSend (
+        color: 'good',
+        message: "Mercata build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' on *${env.NODE_USED ?: 'unknown'}* → ${env.BUILD_URL}"
+      )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "Mercata build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' on *${env.NODE_USED ?: 'unknown'}* → ${env.BUILD_URL}"
+      )
+
+      script {
+        if (env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'main') {
+          slackSend (
+            channel: '#engineering',
+            color: 'danger',
+            message: "*High Priority*: Build failed on *${env.BRANCH_NAME}*!\nJob: '${env.JOB_NAME} [${env.BUILD_NUMBER}]'\nNode: ${env.NODE_USED ?: 'unknown'}\nURL: ${env.BUILD_URL}"
+          )
+        }
+      }
+    }
+  }
+}
