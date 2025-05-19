@@ -9,11 +9,6 @@ RUN npm ci
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
-ARG BASE_URL
-ENV BASE_URL=$BASE_URL
-
-# Auto-generate a Vite-compatible env file
-RUN echo "VITE_BASE_URL=$BASE_URL" > .env.production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
