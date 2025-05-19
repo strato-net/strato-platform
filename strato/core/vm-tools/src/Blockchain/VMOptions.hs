@@ -10,7 +10,6 @@ module Blockchain.VMOptions
     flags_queryBlocks,
     flags_transactionRootVerification,
     flags_startingBlock,
-    flags_accountNonceLimit,
     flags_txSizeLimit,
     flags_gasLimit,
     flags_creatorForkBlockNumber,

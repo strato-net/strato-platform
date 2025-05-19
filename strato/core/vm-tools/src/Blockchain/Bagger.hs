@@ -109,7 +109,6 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
     Just f@TFCodeCollectionNotFound {} -> recoverable f
     Just f@TFInvalidPragma {} -> recoverable f
-    Just f@TFNonceLimitExceeded {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFKnownFailedTX {} -> recoverable f
     Just f@TFTransactionGasExceeded {} -> recoverable f
@@ -198,8 +197,6 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
   InvalidPragma s q erPragmas OutputTx {otHash = hsh} ->
     (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
-  NonceLimitExceeded s q e l OutputTx {otHash = hsh} ->
-    (p s q ++ "account nonce limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
   TXSizeLimitExceeded s q e l OutputTx {otHash = hsh} ->
     (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
   GasLimitExceeded s q e l OutputTx {otHash = hsh} ->
@@ -505,9 +502,6 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressNonce > txn)
     . throwE
     $ NonceTooLow Validation Incoming addressNonce t
-  when (addressNonce >= flags_accountNonceLimit)
-    . throwE
-    $ NonceLimitExceeded Validation Incoming addressNonce flags_accountNonceLimit t
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t

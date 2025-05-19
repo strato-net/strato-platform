@@ -537,8 +537,6 @@ spec:
           - containerPort: 30303
             protocol: UDP
         env:
-        - name: accountNonceLimit
-          value: ""
         - name: addBootnodes
           value: ""
         - name: appFetchLimit

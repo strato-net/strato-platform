@@ -49,7 +49,6 @@ data TransactionFailureCause
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
   | TFCodeCollectionNotFound Address String OutputTx
   | TFInvalidPragma [(String, String)] OutputTx
-  | TFNonceLimitExceeded Integer Integer OutputTx -- accountNonceLimit, actualNonce
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
   | TFKnownFailedTX OutputTx
   | TFTransactionGasExceeded Integer Integer OutputTx
@@ -80,7 +79,6 @@ data TxRejection
   | LessLucrative BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
   | CodeNotFound BaggerStage BaggerTxQueue Address String OutputTx
   | InvalidPragma BaggerStage BaggerTxQueue [(String, String)] OutputTx
-  | NonceLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | TXSizeLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | GasLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | KnownFailedTX BaggerStage BaggerTxQueue OutputTx
@@ -93,7 +91,6 @@ rejectedTx (GasLimitTooLow _ _ _ t) = t
 rejectedTx (LessLucrative _ _ _ t) = t
 rejectedTx (CodeNotFound _ _ _ _ t) = t
 rejectedTx (InvalidPragma _ _ _ t) = t
-rejectedTx (NonceLimitExceeded _ _ _ _ t) = t
 rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
 rejectedTx (GasLimitExceeded _ _ _ _ t) = t
 rejectedTx (KnownFailedTX _ _ t) = t
@@ -147,16 +144,6 @@ instance Format TxRejection where
       ++ format hash
       ++ "\n"
       ++ format o
-  format (NonceLimitExceeded stage queue actual limit o@OutputTx {otHash = hash}) =
-    "NonceLimitExceeded at stage " ++ show stage ++ " in queue " ++ show queue
-      ++ "\n\tactual nonce "
-      ++ show actual
-      ++ "\n\tnonce limit"
-      ++ show limit
-      ++ "\n\ttx hash "
-      ++ format hash
-      ++ "\n"
-      ++ format o
   format (TXSizeLimitExceeded stage queue actual limit o@OutputTx {otHash = hash}) =
     "TXSizeLimitExceeded at stage " ++ show stage ++ " in queue " ++ show queue
       ++ "\n\tactual txSize "
@@ -197,8 +184,6 @@ txRejectionToAPIFailureCause (CodeNotFound stage queue address name _) =
   Failure (show stage) (Just $ show queue) MissingCode Nothing Nothing (Just $ "code not found at address " ++ format address ++ " with name " ++ name)
 txRejectionToAPIFailureCause (InvalidPragma stage queue erPragmas' tx) =
   Failure (show stage) (Just $ show queue) InvalidPragmaType Nothing Nothing (Just $ "invalid pragma " ++ show erPragmas' ++ " in tx " ++ format (otBaseTx tx))
-txRejectionToAPIFailureCause (NonceLimitExceeded stage queue actual limit _) =
-  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.NonceLimitError (Just limit) (Just actual) (Just $ "Current nonce is " ++ show actual ++ " but the limit is " ++ show limit)
 txRejectionToAPIFailureCause (TXSizeLimitExceeded stage queue actual limit _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.TXSizeLimitError (Just limit) (Just actual) (Just $ "The TX size is " ++ show actual ++ " but the limit is " ++ show limit)
 txRejectionToAPIFailureCause (GasLimitExceeded stage queue actual limit _) =
@@ -213,7 +198,6 @@ tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (c
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
 tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
 tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
-tfToBaggerTxRejection (TFNonceLimitExceeded limit actual tx) = NonceLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFKnownFailedTX tx) = KnownFailedTX Execution Queued tx
 tfToBaggerTxRejection (TFTransactionGasExceeded limit actual tx) = GasLimitExceeded Execution Queued actual limit tx
@@ -225,7 +209,6 @@ instance Format TransactionFailureCause where
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
   format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name
   format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
-  format (TFNonceLimitExceeded limit actual _) = "Nonce limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFKnownFailedTX t) = "Known failed tx: " ++ format (otHash t)
   format (TFTransactionGasExceeded limit actual _) = "Transaction gas limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual

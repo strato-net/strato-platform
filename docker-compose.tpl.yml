@@ -127,7 +127,6 @@ services:
     - postgres
     - redis
     environment:
-    - accountNonceLimit=${accountNonceLimit}
     - addBootnodes=${addBootnodes}
     - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}

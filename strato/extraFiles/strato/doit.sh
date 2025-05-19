@@ -183,9 +183,6 @@ function newnode {
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
   fi
-  if [ -n "${accountNonceLimit}" ]; then
-      aclFlag="--accountNonceLimit=${accountNonceLimit}"
-  fi
   if [ -n "${txSizeLimit}" ]; then
       txsFlag="--txSizeLimit=${txSizeLimit}"
   fi
@@ -241,7 +238,6 @@ function newnode {
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
     ${networkFlag} \
-    "${aclFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
     "${creatorFlag}" \
@@ -258,7 +254,6 @@ function newnode {
     --vaultUrl=${VAULT_URL} \
     --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
     "${networkFlag}" \
-    "${aclFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
     "${idServer}" \
