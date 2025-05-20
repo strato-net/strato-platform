@@ -136,11 +136,9 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
 
       userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
       getNameAndUnit ss = \case
-        NamedXabi name (xabi, parents') -> do
-          ctrct <-
-            first SVMEx $
-              xabiToContract (textToLabel name) (map textToLabel parents') (userDefinedFromFile ss) xabi
-          pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUContract ctrct
+        FLContract c -> do
+          let ctrct = c & userDefined .~ userDefinedFromFile ss
+          pure . Just $ def & ufuUnits . at (_contractName c) ?~ FUContract ctrct
         FLFunc name fdec ->
           pure . Just $ def & ufuUnits . at name ?~ FUFunction fdec
         FLConstant name cnst ->

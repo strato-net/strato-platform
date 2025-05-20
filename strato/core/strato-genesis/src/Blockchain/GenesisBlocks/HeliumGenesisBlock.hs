@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -9,6 +10,7 @@ module Blockchain.GenesisBlocks.HeliumGenesisBlock (
 
 import           BlockApps.X509
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.GenesisBlocks.Contracts.Decide
 import           Blockchain.GenesisBlocks.Contracts.CertRegistry
 import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import           Blockchain.GenesisBlocks.Contracts.Mercata
@@ -16,6 +18,7 @@ import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
 import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
 import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
@@ -25,7 +28,7 @@ import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
 import qualified Data.Map.Strict                                 as M
-import           Data.Maybe                                      (catMaybes)
+import           Data.Maybe                                      (listToMaybe, mapMaybe, maybeToList)
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
@@ -35,6 +38,7 @@ import           Text.RawString.QQ
 genesisBlock :: GenesisInfo
 genesisBlock  =
   insertMercataGovernanceContract validators admins
+  . insertDecideContract
   . insertCertRegistryContract extraCerts
   $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
@@ -51,27 +55,41 @@ genesisBlock  =
               , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
               , (".:originAddress", BAccount $ unspecifiedChain 0x1000)
               ]
-            ] ++ concatMap assetToAccountInfos GA.assets 
+            ] ++ mapMaybe assetToAccountInfos GA.assets
               ++ concatMap escrowToAccountInfos GE.escrows 
               ++ concatMap reserveToAccountInfos GR.reserves,
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
 
-assetToAccountInfos :: GA.Asset -> [AccountInfo]
-assetToAccountInfos GA.Asset{..} = M.elems . flip M.map balances $ \GA.Balance{..} -> SolidVMContractWithStorage address 0 (CodeAtAccount 0x1000 $ T.unpack assetType) $
-  [ (".:creator", BString $ encodeUtf8 "BlockApps")
-  , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
-  , (".:originAddress", BAccount $ unspecifiedChain root)
-  , (".originAddress", BAccount $ unspecifiedChain root)
-  , (".name", BString $ encodeUtf8 name)
-  , (".description", BString $ encodeUtf8 description)
-  , (".owner", BAccount $ unspecifiedChain owner)
-  , (".ownerCommonName", BString $ encodeUtf8 ownerCommonName)
-  , (".quantity", BInteger quantity)
-  ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
-    ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
-    ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
-    ++ catMaybes (map (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData))
+assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
+assetToAccountInfos GA.Asset{..} =
+  let times10ToThe a b = foldr (*) a $ replicate b 10
+      bigQ q = if decimals < 0 || decimals >= 18 || name == "CATA" || name == "ETHST"
+                 then q
+                 else if name == "STRAT"
+                        then q `times10ToThe` 14
+                        else q `times10ToThe` (fromIntegral $ 18 - decimals)
+      allBalances = mapMaybe (\(GA.Balance _ o _ q) -> if q > 0 then Just ("._balances<a:" <> encodeUtf8 (T.pack $ formatAddressWithoutColor o) <> ">", BInteger $ bigQ q) else Nothing) $ M.elems balances
+      takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
+   in case allBalances of
+        [] -> Nothing
+        _ -> Just . SolidVMContractWithStorage root 0 (CodeAtAccount 0x1000 "ERC20Asset") $
+          [ (".:creator", BString $ encodeUtf8 "BlockApps")
+          , (".:creatorAddress", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+          , (".:originAddress", BAccount $ unspecifiedChain root)
+          , (".originAddress", BAccount $ unspecifiedChain root)
+          , (".name", BString $ encodeUtf8 name)
+          , ("._name", BString $ encodeUtf8 name)
+          , ("._symbol", BString $ encodeUtf8 $ takeCaps name)
+          , (".description", BString $ encodeUtf8 description)
+          , (".owner", BAccount $ unspecifiedChain 0x0dbb9131d99c8317aa69a70909e124f2e02446e8)
+          , (".quantity", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
+          ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
+            ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
+            ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
+            ++ mapMaybe (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData)
+            ++ allBalances
+            ++ maybeToList ((\(_,v) -> (".icon", BString $ encodeUtf8 v)) <$> (listToMaybe $ M.toList images))
   where maybeDefault BDefault = Nothing
         maybeDefault v        = Just v
 
@@ -131,100 +149,120 @@ reserveToAccountInfos GR.Reserve{..} =
 certStrings :: [String]
 certStrings =
   [
--- CN = NodeOne, O = BlockApps, OU = Mercata, C = USA
+-- CN = Admin, O = BlockApps, OU = '', C = US
     [r|-----BEGIN CERTIFICATE-----
-MIIBjDCCATCgAwIBAgIRAI52ezCbmgohZ+tZH9+y4iIwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIzMDIxMDIxMjQzOVoXDTI0MDIx
-MDIxMjQzOVowRjEQMA4GA1UEAwwHTm9kZU9uZTESMBAGA1UECgwJQmxvY2tBcHBz
-MRAwDgYDVQQLDAdNZXJjYXRhMQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUr
-gQQACgNCAASxFFREq3J1hCDp3sncIbWqsLhO1fcJZ3uem/5He43/zY6aiDOHafbR
-qVjDBjYgWT1QT2tODFb3Kmypj6586S63MAwGCCqGSM49BAMCBQADSAAwRQIhAP1w
-MFMuQmizH7ijmZZ2CNtGUbJwY4SLEJ9cf7hXsru9AiAjw5MfA+ctFRRV0wBdqtOr
-/QnFi7IXykn9Ie+//h59Zg==
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
--- CN = NodeTwo, O = BlockApps, OU = Mercata, C = USA
+-- CN = NodeOne, O = BlockApps, OU = '', C = USA
     [r|-----BEGIN CERTIFICATE-----
-MIIBijCCAS+gAwIBAgIQaHFD5KfvdVe135kgfzmevjAMBggqhkjOPQQDAgUAMEgx
-DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
-Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjMwMjEwMjEyNDM5WhcNMjQwMjEw
-MjEyNDM5WjBGMRAwDgYDVQQDDAdOb2RlVHdvMRIwEAYDVQQKDAlCbG9ja0FwcHMx
-EDAOBgNVBAsMB01lcmNhdGExDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB
-BAAKA0IABMdIOBZnx7tlOygp92l8yFKO1ZutgE4ewVOmPrK/tg0o09Qb4eb96mpQ
-WVld6E7/jAruGV+1VOe6A7yiM8LQR5YwDAYIKoZIzj0EAwIFAANHADBEAiAiKQFe
-bluDLPC3piHrJhayXkpUzGu4QOQCc1NvcXRS7QIgaMfzceY/fq0eeelO2kohndi3
-cScH5vDuTM1KTKJNdj8=
+MIIBYjCCAQegAwIBAgIRAMXR0KcRXjeBHoaxxoLgGJYwDAYIKoZIzj0EAwIFADAx
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMQswCQYDVQQGDAJV
+UzAeFw0yNTA1MTUxNDI3MTRaFw0yNjA1MTUxNDI3MTRaMDQxEDAOBgNVBAMMB05v
+ZGVPbmUxEjAQBgNVBAoMCUJsb2NrQXBwczEMMAoGA1UEBgwDVVNBMFYwEAYHKoZI
+zj0CAQYFK4EEAAoDQgAEPfHnJy73CK8RFh1AUM7d6sflX3Qth+AqYY2MLXFNl/oi
+LOyF1KoZLoO9Xd24oXN3ixj7U0BvqFjpVB7FNW7JqjAMBggqhkjOPQQDAgUAA0cA
+MEQCIBrthbt2+spomR2ksFyqdHB35Sz9Ya9ExuCWsKiY5g1BAiAwPf5d42eYl6vC
+tKj+TnAgQ+h5coRX9SSbO0FBx7QF4w==
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
--- CN = NodeThree, O = BlockApps, OU = Mercata, C = USA
+-- CN = NodeTwo, O = BlockApps, OU = '', C = USA
     [r|-----BEGIN CERTIFICATE-----
-MIIBjDCCATGgAwIBAgIQH3mR/RXtVAXFLEyzBqZuKDAMBggqhkjOPQQDAgUAMEgx
-DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
-Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjMwMjEwMjEyNDQwWhcNMjQwMjEw
-MjEyNDQwWjBIMRIwEAYDVQQDDAlOb2RlVGhyZWUxEjAQBgNVBAoMCUJsb2NrQXBw
-czEQMA4GA1UECwwHTWVyY2F0YTEMMAoGA1UEBgwDVVNBMFYwEAYHKoZIzj0CAQYF
-K4EEAAoDQgAEiC5GkH7LUQ1t3SyGltRoVsftcxKS/swq/vfmSp6prNCJdh2z3xVK
-Iww+RyuO0vuDwX9aVaaj/SWCCE2zAah3DzAMBggqhkjOPQQDAgUAA0cAMEQCIB0/
-p0+6sPvf6JRJmA/0OBADPp/oEPZClDJDC3YlefS4AiAXsdZZy1tZay013UEIeS77
-gexIR+gxweapdrHjU6X1sw==
+MIIBYjCCAQagAwIBAgIQQWK9sY3jZKZRssceCy6BezAMBggqhkjOPQQDAgUAMDEx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxCzAJBgNVBAYMAlVT
+MB4XDTI1MDUxNTE0Mjk1MloXDTI2MDUxNTE0Mjk1MlowNDEQMA4GA1UEAwwHTm9k
+ZVR3bzESMBAGA1UECgwJQmxvY2tBcHBzMQwwCgYDVQQGDANVU0EwVjAQBgcqhkjO
+PQIBBgUrgQQACgNCAASobiZDnC7/IdKUhfQD4K1jVDoupIect8ef7YZfouO+M983
+SlkBocgAeyeJK/Vy3sIfHTLQJ/VGf7iRO7IQMNmtMAwGCCqGSM49BAMCBQADSAAw
+RQIhAPB8MojJY+jog/NR4WW9v1N84+U9RJNGchT7k5hYwHPTAiBPlBPRzIk6bgJC
+oQgzpu+NG15D2ufaK7FT2d1W+GxHAA==
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
--- CN = NodeFour, O = BlockApps, OU = Mercata, C = USA
+-- CN = NodeThree, O = BlockApps, OU = '', C = USA
     [r|-----BEGIN CERTIFICATE-----
-MIIBjTCCATGgAwIBAgIRANY68yBodj4lMstRjyTB+OgwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIzMDIxMDIxMjQ0MFoXDTI0MDIx
-MDIxMjQ0MFowRzERMA8GA1UEAwwITm9kZUZvdXIxEjAQBgNVBAoMCUJsb2NrQXBw
-czEQMA4GA1UECwwHTWVyY2F0YTEMMAoGA1UEBgwDVVNBMFYwEAYHKoZIzj0CAQYF
-K4EEAAoDQgAES1+vpxI4NN1pCV9PeT3RndqqlvH0LH4BqceVN+4lbxe0PvmJM5Dx
-ahQzaMYQMHckpWd4SOgsJZ3UqW4cUyamDTAMBggqhkjOPQQDAgUAA0gAMEUCIQDl
-rzr+5SGj+BCBldJPAscnp7w8TA1LExoHfAf6Zlxc2QIgA3Il5RXTLuRDFh/IsPYs
-5FNHog9sg9Ae2b0vG0FgISc=
+MIIBYzCCAQigAwIBAgIQNRQNWAuhdo3fZjocjU1kEDAMBggqhkjOPQQDAgUAMDEx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxCzAJBgNVBAYMAlVT
+MB4XDTI1MDUxNTE0MzAwMVoXDTI2MDUxNTE0MzAwMVowNjESMBAGA1UEAwwJTm9k
+ZVRocmVlMRIwEAYDVQQKDAlCbG9ja0FwcHMxDDAKBgNVBAYMA1VTQTBWMBAGByqG
+SM49AgEGBSuBBAAKA0IABAiiPSINWtkR88fE12J9Uio2PGtMpgOOBHb9OemmWiM4
+M6Q6uJGdCUJzYd4s73aKTpTrDDfmyTka8ena3pql1fwwDAYIKoZIzj0EAwIFAANH
+ADBEAiB7EDnkDt43t4ooXX3eDR8VpeROvK23K5wpRyvu5a3wswIgByWDLnse+vjR
+LDOfa6IqkNqXlsKPf48L7EeV2flRVzs=
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
+-----END CERTIFICATE-----|],
+
+-- CN = NodeFour, O = BlockApps, OU = '', C = USA
+    [r|
+-----BEGIN CERTIFICATE-----
+MIIBYzCCAQigAwIBAgIRALSRHPs/LhpdHY59Zgtp7W8wDAYIKoZIzj0EAwIFADAx
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMQswCQYDVQQGDAJV
+UzAeFw0yNTA1MTUxNDMwMDdaFw0yNjA1MTUxNDMwMDdaMDUxETAPBgNVBAMMCE5v
+ZGVGb3VyMRIwEAYDVQQKDAlCbG9ja0FwcHMxDDAKBgNVBAYMA1VTQTBWMBAGByqG
+SM49AgEGBSuBBAAKA0IABLwIcqxa1nB+W3gJ+Y7ajiK8tXFSp+frERHxIXbEWF5g
+qu01rIsy3eBwpyBkoLO/uNgYeJSOALc3G2XyNWT97PEwDAYIKoZIzj0EAwIFAANH
+ADBEAiBx7+CeXKcdDpVuyR3HrNxkUhMg1qlRQrUcdR/JrzaasgIgTTYspF2KrcFe
+/xizVFvu46tyqPqKC3LreOAKlm7XbDY=
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
 -- CN = BlockApps Support, O = BlockApps, OU = Mercata, C = USA
@@ -369,8 +407,54 @@ BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
 9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
 R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
 N8txKc8G9R27ZYAUuz15zF0=
------END CERTIFICATE-----|]
+-----END CERTIFICATE-----|],
 
+-- CN = dnorwood-personal, O = Mercata Account d1ce262af, OU = '', C = ''
+    [r|-----BEGIN CERTIFICATE-----
+MIIBhTCCASmgAwIBAgIQJAvYwPpzGED65EyJ5Cg42jAMBggqhkjOPQQDAgUAMEgx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
+Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjQwMzI2MTk0MTMzWhcNMjUwMzI2
+MTk0MTMzWjBAMRowGAYDVQQDDBFkbm9yd29vZC1wZXJzb25hbDEiMCAGA1UECgwZ
+TWVyY2F0YSBBY2NvdW50IGQxY2UyNjJhZjBWMBAGByqGSM49AgEGBSuBBAAKA0IA
+BKVNGLs80o4HLkJawrDC/Bf10mtxGoPT04BPTVCOQZapfLvuDSPTZpPGr7yFgzuF
+mMYI3mqvkhhwQJL9DxKBrtcwDAYIKoZIzj0EAwIFAANIADBFAiEAwZg2LRxnvXT0
+i8vNXdiMuAG+y8U9itaUXRM1iUG2olYCIHt+KODJIBTRy2e0LsIIPJI8dX3p8gVs
+99HonTEOziXy
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
+MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
+MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
+9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
+R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
+N8txKc8G9R27ZYAUuz15zF0=
+-----END CERTIFICATE-----|],
+
+-- CN = gotan, O = BlockApps, OU = '', C = ''
+    [r|-----BEGIN CERTIFICATE-----
+MIIBajCCAQ6gAwIBAgIRAOxcR4q96wNTjpqVNYSI8rIwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTI0MDgxNTE5NTE0NFoXDTI1MDgx
+NTE5NTE0NFowJDEOMAwGA1UEAwwFZ290YW4xEjAQBgNVBAoMCUJsb2NrQXBwczBW
+MBAGByqGSM49AgEGBSuBBAAKA0IABDQUTuESFIQQEPZa38l/ShY1MO+eaFK7sXv/
+phDUCMQWK2XTl7p8qBtQZO7gtEBmxNXG3KIWg6s4CYt7s3FOxVwwDAYIKoZIzj0E
+AwIFAANIADBFAiEAxrawRiWvN+F6cSNc4TG26O9CHVUIbyC/k3WcDxaK7t4CIGi2
+S/u4WZO1JqHQdIysBA2MlBUZbssxWKcjBqKqBTLJ
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
+MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
+MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
+9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
+R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
+N8txKc8G9R27ZYAUuz15zF0=
+-----END CERTIFICATE-----|]
   ]
 
 extraCerts :: [X509Certificate]
@@ -378,8 +462,12 @@ extraCerts = map (\s -> either (error $ "can't parse cert: " ++ show s) id $ byt
 
 validators :: [Validator]
 validators = [
+    "NodeOne",
+    "NodeTwo",
+    "NodeThree",
+    "NodeFour"
 --  "bluecabinet"
-  "marketplace.mercata-beta.blockapps.net"
+--  "marketplace.mercata-beta.blockapps.net"
 --  "blockchainhaberdasher.com"
   ]
 

@@ -1,13 +1,10 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 //import "../Assets/Asset.sol";
 //import "../Enums/RestStatus.sol";
 //import "../Utils/Utils.sol";
 
 /// @title A representation of PaymentProvider_1 assets
-abstract contract RedemptionService is Utils {
+abstract contract record RedemptionService is Utils {
     address public owner;
     string public ownerCommonName;
 

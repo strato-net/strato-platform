@@ -31,7 +31,6 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const ethDispatch = useEthDispatch();
 
   useEffect(() => {
@@ -51,11 +50,7 @@ const NewTrendingCard = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    topSellingProduct.originAddress
-  )
-    ? 18
-    : topSellingProduct.decimals || 0;
+  const decimals = 18;
 
   const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
   const [step, setStep] = useState(1);

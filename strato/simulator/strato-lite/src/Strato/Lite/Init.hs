@@ -42,7 +42,6 @@ runStratoLite nodes' = do
   let env =
         BlocEnv
           { txSizeLimit = 150000,
-            accountNonceLimit = 1000000,
             gasLimit = 10000000,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,

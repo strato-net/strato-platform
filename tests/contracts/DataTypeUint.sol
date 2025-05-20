@@ -1,4 +1,4 @@
-contract DataTypeUint {
+contract record DataTypeUint {
     uint storedData;
 
     uint[] storedDatum;

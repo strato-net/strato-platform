@@ -384,7 +384,7 @@ instance {-# OVERLAPPING #-} MonadIO m => GetLastBlocks (MonadSimulator m) where
     pure . catMaybes $ fmap outputBlockToBlock . flip M.lookup bhr <$> lastBlockHashes
 
 instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (MonadSimulator m) where
-  getLastTransactions _ n = do
+  getLastTransactions n = do
     lastBlockHashes <- map (unCanonical . snd) . sortOn (Down . fst) . M.toList <$> use simulatorContextCanonicalBlockHashMap
     ctx <- asks _simulatorPeerContext
     bhr <- _simulatorContextBlockRegistry <$> atomically (readTVar ctx)
@@ -395,7 +395,7 @@ instance {-# OVERLAPPING #-} MonadIO m => GetLastTransactions (MonadSimulator m)
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable TxsFilterParams [DataDefs.RawTransaction] (MonadSimulator m) where
   select _ tfp = case qtHash tfp of
-    Nothing -> Just <$> getLastTransactions Nothing 1000
+    Nothing -> Just <$> getLastTransactions 1000
     Just h -> do
       time <- liftIO getCurrentTime
       let toRawTx OutputTx{..} = txAndTime2RawTX otOrigin otBaseTx (-1) time

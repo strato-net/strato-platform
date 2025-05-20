@@ -18,13 +18,11 @@ module Strato.Lite.Rest.Api
     ThreadResultMap,
     NodeResultMap,
     AddNodeParams (..),
-    PostTxParams (..),
     StratoLiteRestAPI,
     stratoLiteRestAPI,
   )
 where
 
-import Blockchain.Data.AlternateTransaction
 import Data.Aeson
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -50,7 +48,6 @@ type StratoLiteRestAPI =
     :<|> PostAddNode
     :<|> PostRemoveNode
     :<|> PostTimeout
-    :<|> PostTx
 
 type GetNodes = "nodes" :> Get '[JSON] NodeResultMap
 
@@ -75,14 +72,6 @@ data AddNodeParams = AddNodeParams
     _bootNodes :: [T.Text]
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
-data PostTxParams = PostTxParams
-  { _tx :: UnsignedTransaction,
-    _metadata :: M.Map T.Text T.Text
-  }
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
-type PostTx = "node" :> Capture "nodeLabel" T.Text :> "tx" :> ReqBody '[JSON] PostTxParams :> Post '[JSON] ()
 
 -- type PutPause = "pause" :> Put '[JSON] DebuggerStatus
 -- type PutResume = "resume" :> Put '[JSON] DebuggerStatus

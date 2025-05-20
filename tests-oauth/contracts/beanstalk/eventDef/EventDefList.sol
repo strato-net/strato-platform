@@ -12,7 +12,7 @@
  * #return none
  */
 
-contract EventDefList {
+contract record EventDefList {
 
   string public programId;
   string[] public eventIds;

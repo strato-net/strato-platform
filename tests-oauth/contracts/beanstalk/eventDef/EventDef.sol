@@ -13,7 +13,7 @@ import "../eventDef/PayloadDefinition.sol";
  * #return none
  */
 
-contract EventDef is PrivateChainType {
+contract record EventDef is PrivateChainType {
 
   address public dappAddress;
   address public owner;

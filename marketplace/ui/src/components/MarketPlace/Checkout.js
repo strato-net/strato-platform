@@ -50,29 +50,15 @@ const Checkout = () => {
   const { reserves, isReservesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList } = useMarketplaceState();
   const { bridgeableTokens } = useEthState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
   const [inputErrors, setInputErrors] = useState({});
 
-  const calculateDecimals = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    )
-      ? 18
-      : item.product.decimals || 0;
-
-    return decimals;
-  };
-
   const calculateTax = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    )
-      ? 18
-      : item.product.decimals || 0;
+    const decimals = 18;
     let price = new BigNumber(item.product.price).multipliedBy(
       new BigNumber(10).pow(decimals)
     );
@@ -83,11 +69,7 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    )
-      ? 18
-      : item.product.decimals || 0;
+    const decimals = 18;
     let price = new BigNumber(item.product.price).multipliedBy(
       new BigNumber(10).pow(decimals)
     );
@@ -127,11 +109,7 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          item.product.originAddress
-        )
-          ? 18
-          : item.product.decimals || 0;
+        const decimals = 18;
         const saleQuantity = new BigNumber(item.product.saleQuantity).dividedBy(
           new BigNumber(10).pow(decimals)
         );

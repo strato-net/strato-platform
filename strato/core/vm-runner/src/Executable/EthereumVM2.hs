@@ -93,7 +93,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
             bHash = blockHeaderHash bHeader
             -- bro if there are any maybes in this list thaz BAD
             -- private txs don't affect stateroot we compute
-            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block, txType t /= PrivateHash]
+            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block]
         mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
         case mSumm of 
           Nothing -> pure Nothing
@@ -230,7 +230,7 @@ getNumPoolable ::
   m Int
 getNumPoolable txPairs = do
   $logDebugS "evm/getNumPoolable" $ T.pack $ "allTxs :: " ++ show txPairs
-  let allNewTxs = filter (isNothing . txChainId . otBaseTx . snd) txPairs -- PrivateHashTXs have chainId = Nothing
+  let allNewTxs = txPairs -- PrivateHashTXs have chainId = Nothing
   !currentMicrotime <- liftIO getCurrentMicrotime
   $logInfoS "evm/getNumPoolable" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 

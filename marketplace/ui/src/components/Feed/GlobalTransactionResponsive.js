@@ -16,7 +16,6 @@ const GlobalTransactionResponsive = ({
   user,
   isTransactionLoading,
   fetchData,
-  assetsWithEighteenDecimalPlaces,
   bridgeableAddresses,
   stratsAddress,
 }) => {
@@ -112,8 +111,6 @@ const GlobalTransactionResponsive = ({
                   type,
                 },
               ];
-              const is18DecimalPlaces =
-                assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
                 let route;
@@ -226,19 +223,9 @@ const GlobalTransactionResponsive = ({
                     {price ? (
                       <p className={`text-right flex justify-end items-center`}>
                         $
-                        {formattedNum(
-                          assetOriginAddress === stratsAddress
-                            ? (price * 100).toFixed(2)
-                            : is18DecimalPlaces
-                            ? (price * Math.pow(10, 18)).toFixed(2)
-                            : (price * Math.pow(10, decimals || 0)).toFixed(2)
-                        )}{' '}
+                        {formattedNum((price * Math.pow(10, 18)).toFixed(2))}{' '}
                         (
-                        {formattedNum(
-                          is18DecimalPlaces
-                            ? (price * Math.pow(10, 18)).toFixed(2)
-                            : (price * Math.pow(10, decimals || 0)).toFixed(2)
-                        )}{' '}
+                        {formattedNum((price * Math.pow(10, 18)).toFixed(2))}{' '}
                         {USDSTIcon})
                       </p>
                     ) : (
@@ -248,14 +235,7 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {(assetOriginAddress === stratsAddress
-                        ? (quantity / 100).toFixed(2)
-                        : redemption_id
-                        ? quantity
-                        : is18DecimalPlaces
-                        ? quantity / Math.pow(10, 18)
-                        : quantity / Math.pow(10, decimals || 0)
-                      ).toLocaleString('en-US', {
+                      {(quantity / Math.pow(10, 18)).toLocaleString('en-US', {
                         maximumFractionDigits: 6,
                         minimumFractionDigits: 0,
                       })}

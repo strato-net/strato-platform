@@ -109,7 +109,7 @@ putBlocks blockList makeHashOne = do
           let (toInsert, vs, va, vr, ca, cr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
           forM_ (blockReceiptTransactions b) $ \tx -> do
-            txID <- updateBlockNumber b (transactionHash tx) (txChainId tx)
+            txID <- updateBlockNumber b (transactionHash tx)
             SQL.insert $ BlockTransaction blkDataRefId txID
           forM_ vs $ \(Validator v) -> SQL.insert $ BlockValidatorRef blkDataRefId v
           forM_ va $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
@@ -136,8 +136,8 @@ putBlocks blockList makeHashOne = do
         [bd] -> return $ SQL.entityKey bd
         _ -> error "DB has multiple blocks with the same hash"
   where
-    updateBlockNumber b txHash' cid = do
-      ret <- SQL.getBy (UniqueTXHash txHash' $ fromMaybe 0 cid)
+    updateBlockNumber b txHash' = do
+      ret <- SQL.getBy (UniqueTXHash txHash')
       key <-
         case ret of
           Just x -> return $ entityKey x

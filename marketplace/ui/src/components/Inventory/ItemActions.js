@@ -41,14 +41,9 @@ const ItemActions = ({
   bridgeableTokens,
   supportedTokens,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const itemData = inventory.data;
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    inventory.originAddress
-  )
-    ? 18
-    : inventory.decimals || 0;
+  const decimals = 18;
   const quantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );
@@ -511,7 +506,6 @@ const ItemActions = ({
           category={category}
           user={user}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -538,7 +532,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -551,7 +544,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -565,7 +557,6 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -578,7 +569,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -591,7 +581,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

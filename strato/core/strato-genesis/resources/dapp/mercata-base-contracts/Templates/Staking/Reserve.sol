@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 
 //import "../Assets/Asset.sol";
@@ -11,14 +8,13 @@ import <509>;
 //import "../Utils/Utils.sol";
 //import "MinterAuthorization.sol";
 
-abstract contract Reserve is Utils, Structs {
-    OracleService public oracle; // Asset Oracle service for fetching price data
+abstract contract record Reserve is Ownable {
+    address public oracle; // Asset Oracle service for fetching price data
     address public usdstToken;
     Asset public cataToken;
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
 
-    address public owner; // Owner (BlockApps) as source of USDST tokens
     string public name;
     bool public isActive = true;
     address public assetRootAddress;
@@ -43,17 +39,15 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) {
-        oracle = OracleService(_assetOracle);
-        owner = msg.sender;
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) Ownable() {
         name = _name;
         assetRootAddress = _assetRootAddress;
         unitConversionRate = _unitConversionRate;
         usdstToken = _usdstToken;
-        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+        (decimal oraclePrice, uint oracleTimestamp) = (1 * unitConversionRate, block.timestamp);
         oraclePrice = oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = oraclePrice;
-        MinterAuthorization(usdstToken).addReserveAsMinter();
+        // MinterAuthorization(usdstToken).addReserveAsMinter();
         usdstPrice = _usdstPrice; //1000000000000000000.0000
         stratstoUSDSTFactor = _stratstoUSDSTFactor; //100000000000000.0000
     }
@@ -64,22 +58,22 @@ abstract contract Reserve is Utils, Structs {
     }
 
     modifier requireOwner(string action) {
-        require(getCommonName(msg.sender) == getCommonName(owner), "Only owner can " + action + ".");
+        require(msg.sender == owner(), "Only owner can " + action + ".");
         _;
     }
 
     function mintUSDST(address _userAddress, uint _amount) internal requireActive() {
-        MinterAuthorization(usdstToken).mintToken(_userAddress, _amount);
+        // MinterAuthorization(usdstToken).mintToken(_userAddress, _amount);
     }
 
     function burnUSDST(address[] _usdstAssetAddresses, uint _quantity, string _ownerCommonName) internal requireActive() returns (uint) {
-        uint tokenAmountRepaid = MinterAuthorization(usdstToken).burnToken(_usdstAssetAddresses, _quantity, _ownerCommonName);
-        return tokenAmountRepaid;
+        // uint tokenAmountRepaid = MinterAuthorization(usdstToken).burnToken(_usdstAssetAddresses, _quantity, _ownerCommonName);
+        return 0; // tokenAmountRepaid;
     }
 
     function distributeRewards(address[] _escrowAddresses) external {
         // Update the price of the collateral in the escrow
-        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+        (decimal oraclePrice, uint oracleTimestamp) = (lastUpdatedOraclePrice * unitConversionRate, block.timestamp);
         oraclePrice = oraclePrice / unitConversionRate;
         for (uint i = 0; i < _escrowAddresses.length; i++) {
             Escrow escrow = Escrow(_escrowAddresses[i]);
@@ -105,12 +99,9 @@ abstract contract Reserve is Utils, Structs {
                 uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
 
                 // Transfer Cata from reserve to borrower
-                cataToken.transferOwnership(
+                ERC20(cataToken).transfer(
                     escrow.borrower(),
-                    cataReward,
-                    true,
-                    transferNumber,
-                    0.1000000000000000000 / 10**18
+                    cataReward
                     );
                 emit CataTransferred(address(this), escrow.borrower(), cataReward);
             }
@@ -122,10 +113,10 @@ abstract contract Reserve is Utils, Structs {
     function stakeAsset(address _escrowAddress, address[] _assets, uint _collateralQuantity) public requireActive() returns (address) {
         // Calculate required values
         Asset _assetToBeSold = Asset(_assets[0]);
-        require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the assets can stake the assets");
+        require(Ownable(_assetToBeSold).owner() == msg.sender, "Only the owner of the assets can stake the assets");
         require(_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
         
-        (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        (decimal _oraclePrice, uint _priceTimestamp) = (lastUpdatedOraclePrice * unitConversionRate, block.timestamp);
         _oraclePrice = _oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = _oraclePrice;
 
@@ -209,31 +200,30 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function transferCATAbacktoOwner(uint _amount) public requireOwner("transfer CATA back") {
-        cataToken.transferOwnership(owner, _amount, false, 0, 0);
-        emit CataTransferred(address(this), owner, _amount);
+        ERC20(cataToken).transfer(owner(), _amount);
+        emit CataTransferred(address(this), owner(), _amount);
     }
 
     function transferCATAtoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer CATA to another reserve") {
-        cataToken.transferOwnership(_newOwner, _amount, false, 0, 0);
+        ERC20(cataToken).transfer(_newOwner, _amount);
         emit CataTransferred(address(this), _newOwner, _amount);
     }
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
-        MinterAuthorization(usdstToken).removeReserveAsMinter();
+        // MinterAuthorization(usdstToken).removeReserveAsMinter();
         isActive = false;
 
     }
 
     function activate() public requireOwner("activate reserve") {
-        MinterAuthorization(usdstToken).addReserveAsMinter();
+        // MinterAuthorization(usdstToken).addReserveAsMinter();
         isActive = true;
 
     }
 
     function setOracle(address _newOracle) public requireOwner("update oracle") {
         require(_newOracle != address(0), "Invalid oracle address");
-        oracle = OracleService(_newOracle);
-        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+        (decimal oraclePrice, uint oracleTimestamp) = (lastUpdatedOraclePrice * unitConversionRate, block.timestamp);
         oraclePrice = oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = oraclePrice;
     }
@@ -285,7 +275,7 @@ abstract contract Reserve is Utils, Structs {
         require(escrow.borrower() == msg.sender, "Only the borrower can unstake");
         // require(escrow.borrowedAmount() == 0, "Must repay borrowed USDST before unstaking"); // The escrow function unstakeAssets() performs a check on the rebalanced collateralization ratio
 
-        (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        (decimal _oraclePrice, uint _priceTimestamp) = (lastUpdatedOraclePrice * unitConversionRate, block.timestamp);
         _oraclePrice = _oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = _oraclePrice;
 
@@ -335,7 +325,7 @@ abstract contract Reserve is Utils, Structs {
                 string version = escrow.version();
             }
             catch{
-                (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
+                (decimal _oraclePrice, uint _priceTimestamp) = (lastUpdatedOraclePrice * unitConversionRate, block.timestamp);
                 _oraclePrice = _oraclePrice / unitConversionRate;
                 escrow.updateOnPriceChange((_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);    
             }

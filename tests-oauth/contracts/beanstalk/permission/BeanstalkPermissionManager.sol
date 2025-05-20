@@ -18,7 +18,7 @@ import "./BeanstalkRole.sol";
 * #return none
 */
 
-contract BeanstalkPermissionManager is RestStatus, PermissionManager, BeanstalkPermission, BeanstalkRolePermissions {
+contract record BeanstalkPermissionManager is RestStatus, PermissionManager, BeanstalkPermission, BeanstalkRolePermissions {
   BeanstalkUserManager userManager;
   /**
   * Constructor

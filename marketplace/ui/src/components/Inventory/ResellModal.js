@@ -18,9 +18,8 @@ const ResellModal = ({
   limit,
   offset,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
-  const decimals = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress) ? 18 : inventory.decimals || 0;
+  const decimals = 18;
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
   const [canResell, setCanResell] = useState(true);

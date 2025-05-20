@@ -47,7 +47,6 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
 import Control.Concurrent
@@ -238,16 +237,12 @@ rawTx2PostTx RawTransaction {..} =
     { Deprecated.posttransactionHash = rawTransactionTxHash,
       Deprecated.posttransactionGasLimit = fromInteger rawTransactionGasLimit,
       Deprecated.posttransactionCodeOrData = "", -- this is only for send txs anyway
-      Deprecated.posttransactionGasPrice = fromInteger rawTransactionGasPrice,
       Deprecated.posttransactionTo = rawTransactionToAddress,
       Deprecated.posttransactionFrom = rawTransactionFromAddress,
-      Deprecated.posttransactionValue = Strung $ fromInteger rawTransactionValue,
       Deprecated.posttransactionR = Hex $ fromInteger rawTransactionR,
       Deprecated.posttransactionS = Hex $ fromInteger rawTransactionS,
       Deprecated.posttransactionV = Hex rawTransactionV,
-      Deprecated.posttransactionNonce = fromInteger rawTransactionNonce,
-      Deprecated.posttransactionChainId = ChainId <$> toMaybe 0 rawTransactionChainId,
-      Deprecated.posttransactionMetadata = Map.fromList <$> rawTransactionMetadata
+      Deprecated.posttransactionNonce = fromInteger rawTransactionNonce
     }
 
 evalAndReturn ::
@@ -261,15 +256,15 @@ evalAndReturn ::
   [TRD] ->
   m [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
-  \(TRD status txHash i mtxr) -> case status of
+  \(TRD status txHash _ mtxr) -> case status of
     Pending -> return $ BlocTransactionResult Pending txHash Nothing Nothing
     Failure -> return $ BlocTransactionResult Failure txHash (snd <$> mtxr) Nothing
     Success -> case mtxr of
       Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
-      Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
-        (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
-        (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
-        (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) addr
+      Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCode) of
+        (Nothing, _) -> contractResult txHash txr (fromJust rawTransactionContractName)
+        (_, Just _) -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
+        (Just addr, _) -> functionResult txHash txr (fromJust rawTransactionFuncName) addr
 
 nth :: Integer -> Text
 nth n
@@ -282,17 +277,11 @@ contractResult ::
   ( MonadIO m
   , A.Selectable AccountsFilterParams [AddressStateRef] m
   ) =>
-  Integer ->
   Keccak256 ->
   TransactionResult ->
-  Maybe (Map Text Text) ->
+  Text ->
   StateT BatchState m BlocTransactionResult
-contractResult i txHash txResult@TransactionResult {..} mmd = do
-  name <- case mmd of
-    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-    Just md -> case Map.lookup "name" md of
-      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just n -> pure n
+contractResult txHash txResult@TransactionResult {..} name = do
   let accountMaybe = listToMaybe transactionResultContractsCreated
   case accountMaybe of
     Nothing -> case transactionResultMessage of
@@ -307,7 +296,7 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
       details <- lift $ go acct name (0 :: Integer)
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
   where
-    go address name num = do
+    go address name' num = do
       if num >= 100 
         then throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, num=" ++ show num
         else do
@@ -316,7 +305,7 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
             getAccount' 
               accountsFilterParams
                 { _qaAddress = Just address,
-                  _qaContractName = Just name,
+                  _qaContractName = Just name',
                   _qaIgnoreChain = Just True
                 }
           case addressRefs of
@@ -331,13 +320,12 @@ functionResult ::
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m
   ) =>
-  Integer ->
   Keccak256 ->
   TransactionResult ->
-  Maybe (Map Text Text) ->
+  Text ->
   Address ->
   StateT BatchState m BlocTransactionResult
-functionResult i txHash txResult@TransactionResult {..} mmd toAddress = do
+functionResult txHash txResult@TransactionResult {..} funcName toAddress = do
   case transactionResultKind of
     -- Check if it is a solidVm first
     -- If it is, we can reduce calls to get Contract
@@ -351,11 +339,6 @@ functionResult i txHash txResult@TransactionResult {..} mmd toAddress = do
     -- Note the below can be removed if one day
     -- EVM is decided to be taken out
     _ -> do
-      funcName <- case mmd of
-        Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-        Just md -> case Map.lookup "funcName" md of
-          Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-          Just funcName -> pure funcName
       mxabi <- use $ functionXabiMap . at (toAddress, funcName)
       contract <- case mxabi of
         Just contract' -> return contract'

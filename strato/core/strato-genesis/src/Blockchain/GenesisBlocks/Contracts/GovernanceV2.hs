@@ -105,7 +105,7 @@ insertMercataGovernanceContract validators admins gi =
 mercataGovernanceContract :: Text
 mercataGovernanceContract =
   [r|
-contract MercataValidator {
+contract record MercataValidator {
     address public owner;
 
     string public commonName;
@@ -129,7 +129,7 @@ contract MercataValidator {
     }
 }
 
-contract MercataAdmin {
+contract record MercataAdmin {
     address public owner;
 
     string public commonName;
@@ -153,7 +153,7 @@ contract MercataAdmin {
     }
 }
 
-contract MercataValidatorVote {
+contract record MercataValidatorVote {
 
     address public owner;
 
@@ -202,7 +202,7 @@ contract MercataValidatorVote {
     }
 }
 
-contract MercataAdminVote {
+contract record MercataAdminVote {
 
     address public owner;
 
@@ -245,20 +245,20 @@ contract MercataAdminVote {
     }
 }
 
-contract MercataGovernance {
-    mapping (string => MercataValidator) validatorMap;
+contract record MercataGovernance {
+    mapping (string => MercataValidator) public record validatorMap;
     uint validatorCount;
 
-    mapping (string => MercataAdmin) adminMap;
+    mapping (string => MercataAdmin) public record adminMap;
     uint adminCount;
 
-    mapping (string => mapping (string => uint)) validatorVoteMap;
-    mapping (string => MercataValidatorVote[]) validatorVotes;
-    mapping (string => uint) validatorVoteCountMap;
+    mapping (string => mapping (string => uint)) public record validatorVoteMap;
+    mapping (string => MercataValidatorVote[]) public record validatorVotes;
+    mapping (string => uint) public record validatorVoteCountMap;
 
-    mapping (string => mapping (string => uint)) adminVoteMap;
-    mapping (string => MercataAdminVote[]) adminVotes;
-    mapping (string => uint) adminVoteCountMap;
+    mapping (string => mapping (string => uint)) public record adminVoteMap;
+    mapping (string => MercataAdminVote[]) public record adminVotes;
+    mapping (string => uint) public record adminVoteCountMap;
 
     address public owner;
 

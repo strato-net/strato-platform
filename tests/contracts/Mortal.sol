@@ -1,4 +1,4 @@
-contract mortal {
+contract record mortal {
   address owner;
 
   function mortal() {

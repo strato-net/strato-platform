@@ -1,4 +1,4 @@
-contract TestContract {
+contract record TestContract {
 
   uint var1;
 

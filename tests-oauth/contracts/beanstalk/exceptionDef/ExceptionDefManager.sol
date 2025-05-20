@@ -16,7 +16,7 @@ import "../dapp/BeanstalkErrorCodes.sol";
 * #see ExceptionDef
 */
 
-contract ExceptionDefManager is RestStatus, BeanstalkErrorCodes, ExceptionType, PrivateChainType {
+contract record ExceptionDefManager is RestStatus, BeanstalkErrorCodes, ExceptionType, PrivateChainType {
   address public dappAddress;
   BeanstalkPermissionManager permissionManager;
   EventDefManager eventDefManager;

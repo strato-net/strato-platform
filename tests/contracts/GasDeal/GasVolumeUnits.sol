@@ -1,4 +1,4 @@
-contract GasVolumeUnits {
+contract record GasVolumeUnits {
     enum GasVolumeUnits {
         NULL,
         MMBTU, 

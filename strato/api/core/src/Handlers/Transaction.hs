@@ -144,26 +144,10 @@ server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
 
 ---------------------------
 
-data NamedChainId
-  = UnnamedChainIds [ChainId]
-  | MainChain
-  | AllChains
-
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawTransaction] (SQLM m) where
   select _ t@TxsFilterParams {..}
     | t == txsFilterParams = throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
     | otherwise = do
-      chainids <-
-        case (qtChainId, qtChainIds) of
-          (Nothing, []) -> pure MainChain
-          (Nothing, cids) -> pure $ UnnamedChainIds cids
-          (Just c, []) -> case c of
-            Unnamed cid -> pure $ UnnamedChainIds [cid]
-            Named "main" -> pure MainChain
-            Named "all" -> pure AllChains
-            Named name -> throwIO . NamedChainError $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'."
-          _ -> throwIO $ AmbiguousChainError "You can not use both the chainid and chainids parameters togther."
-
       txs <- fmap (map E.entityVal) . sqlQuery $
         E.select $
           E.from $ \(rawTx) -> do
@@ -173,29 +157,15 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
                       fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v) qtFrom,
                       fmap (\v -> rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtTo,
                       fmap (\v -> rawTx E.^. RawTransactionTxHash E.==. E.val v) qtHash,
-                      fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) (fromIntegral <$> qtGasPrice),
-                      fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) (fromIntegral <$> qtMinGasPrice),
-                      fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) (fromIntegral <$> qtMaxGasPrice),
                       fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> qtGasLimit),
                       fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> qtMinGasLimit),
                       fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> qtMaxGasLimit),
-                      fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> qtValue),
-                      fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (maybe (Just 0) (Just . fromIntegral) qtMinValue),
-                      fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> qtMaxValue),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber)
                     ]
 
             E.where_ ((foldl1 (E.&&.) criteria)) -- map (getTransFilter rawTx) $ getParameters ))
-            let matchChainId (ChainId cid) = ((rawTx E.^. RawTransactionChainId) E.==. (E.val cid))
-                chainCriteria = case chainids of
-                  MainChain -> [rawTx E.^. RawTransactionChainId E.==. E.val 0]
-                  UnnamedChainIds cids -> matchChainId <$> cids
-                  AllChains -> []
-                allCriteria = case chainCriteria of
-                  [] -> [criteria]
-                  _ -> map (\cc -> cc : criteria) chainCriteria
             -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
-            E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
+            E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) [criteria]))
 
             -- E.offset $ (limit * offset)
             E.limit $ appFetchLimit

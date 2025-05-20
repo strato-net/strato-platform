@@ -1,6 +1,6 @@
 import "ErrorCodes.sol";
 
-contract DataTypeEnum is ErrorCodes {
+contract record DataTypeEnum is ErrorCodes {
     ErrorCodes storedData;
 
     ErrorCodes[] storedDatum;

@@ -7,7 +7,7 @@ import "./RejectionType.sol";
 /**
  * Deal data container
  */
-contract BaseDeal is Searchable, RestStatus, DealType, PriceType, RejectionType {
+contract record BaseDeal is Searchable, RestStatus, DealType, PriceType, RejectionType {
   // internal
   string public uid;
   uint public timestamp;

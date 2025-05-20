@@ -1,9 +1,6 @@
-pragma es6;
-pragma strict;
-
 contract Mercata{}
 
-abstract contract Asset is Utils {
+abstract contract record Asset is Utils {
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
@@ -414,7 +411,7 @@ contract RestStatus {
   uint constant GATEWAY_TIMEOUT = 504;
 }
 
-abstract contract Order is Utils {
+abstract contract record Order is Utils {
     enum OrderStatus {
         NULL,
         AWAITING_FULFILLMENT,
@@ -552,7 +549,7 @@ abstract contract Order is Utils {
     }
 }
 
-abstract contract BasePaymentProvider is Utils {
+abstract contract record BasePaymentProvider is Utils {
     address public owner;
     string public ownerCommonName;
 
@@ -623,7 +620,7 @@ abstract contract BasePaymentProvider is Utils {
     }
 }
 
-abstract contract Sale is Utils { 
+abstract contract record Sale is Utils { 
     Asset public assetToBeSold;
     uint public price;
     uint public quantity;

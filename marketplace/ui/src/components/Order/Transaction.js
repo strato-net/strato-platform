@@ -22,21 +22,14 @@ const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [stratAddress, setStratAddress] = useState('');
-  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
-    useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
       const stratAddress = await marketplaceActions.fetchStratsAddress(
         marketplaceDispatch
       );
-      const assetsWithEighteenDecimalPlaces =
-        await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-          marketplaceDispatch
-        );
   
       setStratAddress(stratAddress);
-      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
     fetchAddresses();
@@ -91,9 +84,7 @@ const Transaction = ({ user }) => {
           transaction.assetContractName
         );
         let isStrat = transaction.assetOriginAddress === stratAddress;
-        let decimals = assetsWithEighteenDecimalPlaces.includes(
-          transaction.assetOriginAddress
-        ) ? 18 : transaction.decimals || 0;
+        let decimals = 18;
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
@@ -239,7 +230,6 @@ const Transaction = ({ user }) => {
         user={user}
         download={download}
         stratAddress={stratAddress}
-        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
       />
     </div>
   );

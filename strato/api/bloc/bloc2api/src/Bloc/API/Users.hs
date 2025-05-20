@@ -140,8 +140,8 @@ instance ToSchema UploadContractDetails where
             contractAddress = Just $ Address 0xdeadbeef
           }
 
-instance Arbitrary BlocTransactionData where
-  arbitrary = GR.genericArbitrary GR.uniform
+--instance Arbitrary BlocTransactionData where
+--  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON BlocTransactionData where
   toJSON btd = case btd of
@@ -177,16 +177,12 @@ instance ToSample BlocTransactionData where
             { Deprecated.posttransactionHash = hash "foo",
               Deprecated.posttransactionGasLimit = 100000,
               Deprecated.posttransactionCodeOrData = "Code or Data",
-              Deprecated.posttransactionGasPrice = 1,
               Deprecated.posttransactionTo = Just $ Address 0xdeadbeef,
               Deprecated.posttransactionFrom = Address 0x12345678,
-              Deprecated.posttransactionValue = Strung 0,
               Deprecated.posttransactionR = Hex 0xdeadbeef,
               Deprecated.posttransactionS = Hex 0xdeadbeef,
               Deprecated.posttransactionV = Hex 0x1c,
-              Deprecated.posttransactionNonce = 9876,
-              Deprecated.posttransactionChainId = Nothing,
-              Deprecated.posttransactionMetadata = Nothing
+              Deprecated.posttransactionNonce = 9876
             },
         Upload
           UploadContractDetails
@@ -226,8 +222,8 @@ data BlocTransactionResult = BlocTransactionResult
   }
   deriving (Eq, Show, Generic)
 
-instance Arbitrary BlocTransactionResult where
-  arbitrary = BlocTransactionResult <$> arbitrary <*> arbitrary <*> pure Nothing <*> arbitrary
+--instance Arbitrary BlocTransactionResult where
+--  arbitrary = BlocTransactionResult <$> arbitrary <*> arbitrary <*> pure Nothing <*> arbitrary
 
 instance ToJSON BlocTransactionResult where
   toJSON = genericToJSON (aesonDrop 15 camelCase)

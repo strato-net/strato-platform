@@ -147,7 +147,11 @@ createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPo
     createDirectoryIfMissing True dir
     setCurrentDirectory dir
     privKeyFilePath <- resolvePath privKeyFile
-    privBS <- B.readFile privKeyFilePath
+    privBS <- catch (B.readFile privKeyFilePath) $ \(_ :: SomeException) -> do
+      pk <- newPrivateKey
+      let pkBytes = privToBytes $ pk
+      B.writeFile privKeyFilePath pkBytes
+      pure pkBytes
     case bsToPriv privBS of
       Left e -> error $ e ++ ": " ++ BC.unpack privBS
       Right p -> pure p

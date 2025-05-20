@@ -1,4 +1,4 @@
-contract GasDealState {
+contract record GasDealState {
     enum GasDealState {
         NULL,
         WAIT_COUNTER_PRICE,

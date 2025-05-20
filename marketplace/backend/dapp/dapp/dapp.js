@@ -53,6 +53,7 @@ const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
 const balance = 100000000000000000000;
 let userCert = null;
+let sessionUser = null;
 
 // interface Member {
 //   access?:boolean,
@@ -135,28 +136,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   let userOrganization;
   let userCommonName;
 
-  if (!serviceUser) {
-    let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [
-      rawAdmin,
-    ]);
-
-    //We are not guaranteed the user will have a certificate
-    //99% chance they do, but if this this their first login
-    //the node might not have a certificate in time
-    if (
-      !(
-        userCertificate === null ||
-        userCertificate === undefined ||
-        userCertificate.commonName === null ||
-        userCertificate.commonName === undefined
-      )
-    ) {
-      contract.userOrganization = userCertificate.organization;
-      userOrganization = userCertificate.organization;
-      userCommonName = userCertificate.commonName;
-      userCert = userCertificate; //Attaching user cert to dapp to save from needing make another call to get it
-    }
-  }
+  sessionUser=rawAdmin;
 
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = {
@@ -288,12 +268,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const inventories = await inventoryJs.getAll(
       rawAdmin,
-      { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' },
+      { ...args, owner: sessionUser.address, sort: '-createdDate' },
       getOptions
     );
     const inventoryCount = await inventoryJs.inventoryCount(
       rawAdmin,
-      { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' },
+      { ...args, owner: sessionUser.address, sort: '-createdDate' },
       getOptions
     );
     return { inventories: inventories, inventoryCount: inventoryCount };
@@ -325,7 +305,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName };
     const newArgs = {
       ...restArgs,
-      ownerCommonName: user || userCert?.commonName,
+      owner: user,
       notEqualsField: 'sale',
       notEqualsValue: constants.zeroAddress,
       userProfile: true,
@@ -504,7 +484,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let count = 0;
       const redemptionEvents = await redemptionServiceJs.getRedemptions(
         rawAdmin,
-        { owner: userCert.commonName },
+        { owner: sessionUser.address },
         options
       );
       redemptionEvents.map((r) => {
@@ -533,7 +513,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
         let res = await axios.get(
           new URL(
-            `${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`
+            `${serviceUrl}${getOutgoingRedemptionRoute}/${sessionUser.address}?${queryParams}`
           ).href
         );
         if (res.status === 200) {
@@ -603,7 +583,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let count = 0;
       const redemptionEvents = await redemptionServiceJs.getRedemptions(
         rawAdmin,
-        { issuer: userCert.commonName },
+        { issuer: sessionUser.address },
         options
       );
       const redemptionServiceAddresses = redemptionEvents.map((r) => r.address);
@@ -628,7 +608,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
         const res = await axios.get(
           new URL(
-            `${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`
+            `${serviceUrl}${getIncomingRedemptionRoute}/${sessionUser.address}?${queryParams}`
           ).href
         );
         if (res.status === 200) {
@@ -832,7 +812,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       assetStatus = ASSET_STATUS.ACTIVE;
     }
 
-    if (issuerCommonName !== userCert.commonName) {
+    if (issuerCommonName !== sessioinUser.address) {
       throw new rest.RestError(
         RestStatus.UNAUTHORIZED,
         'Only the issuer can close a redemption request'
@@ -1000,11 +980,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         { originAddress: originAddress },
         options
       );
-      const decimals = assetsOfOriginAsset[0].decimals
-        ? assetsOfOriginAsset[0].decimals
-        : constants.AssetsWithEighteenDecimalPlaces.includes(originAddress)
-        ? 18
-        : 0;
+      const decimals = 18;
       const assetsAddressArr = assetsOfOriginAsset.map((item) => item.address);
       // Aggregate sales for all associated assets
 
@@ -1196,7 +1172,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const userTokenAssets = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
+        owner: sessionUser.address,
         originAddress: tokenAssetRootAddress,
         address: assetAddress,
         status: ASSET_STATUS.ACTIVE,
@@ -1239,18 +1215,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return tokensJs.burnETHST(rawAdmin, burnETHSTArgs, options);
   };
 
-  contract.getUSDSTBalance = async function (_, options = defaultOptions) {
+    contract.getUSDSTBalance = async function ({userAddress}, options = defaultOptions) {
     const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
     const balance = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
-        originAddress: USDSTOriginAddress,
-        queryOptions: { select: 'quantity.sum()' },
+	  owner: userAddress,
+        address: USDSTOriginAddress,
       },
       options
     );
-    return balance[0].sum || 0;
+    return balance[0].quantity || 0;
   };
 
   contract.getCataBalance = async function (_, options = defaultOptions) {
@@ -1258,13 +1233,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const balance = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
-        originAddress: CataOriginAddress,
-        queryOptions: { select: 'quantity.sum()' },
+        owner: sessionUser.address,
+        address: CataOriginAddress,
       },
       options
     );
-    return balance[0].sum || 0;
+    return balance[0].quantity || 0;
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
@@ -1856,7 +1830,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const sellerName = assets[0].ownerCommonName;
       for (const currInventory of assets) {
-        if (currInventory.ownerCommonName == userCert.commonName) {
+        if (currInventory.ownerCommonName == sessionUser.address) {
           throw new rest.RestError(
             RestStatus.BAD_REQUEST,
             'Seller cannot buy his own product'
@@ -1895,7 +1869,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const userUSDSTAssets = await inventoryJs.getAll(
           rawAdmin,
           {
-            ownerCommonName: userCert.commonName,
+            owner: sessionUser.address,
             originAddress: USDSTOriginAddress,
             status: ASSET_STATUS.ACTIVE,
             queryOptions: { select: 'address, quantity' },
@@ -2035,7 +2009,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Step 2: Find the user's assets
       const assetQueryArgs = {
-        ownerCommonName: userCert.commonName,
+        ownerCommonName: sessionUser.address,
         originAddress: asset,
         status: ASSET_STATUS.ACTIVE,
         queryOptions: { select: 'address,quantity' },
@@ -2089,7 +2063,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         );
       await axios
         .post(new URL(createCustomerAddressRoute, serviceURL).href, {
-          commonName: userCert.commonName,
+          commonName: sessionUser.address,
           ...restArgs,
         })
         .then(function (res) {
@@ -2173,7 +2147,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const userAddresses = await axios
         .get(
           new URL(
-            `${getCustomerAddressRoute}/${userCert.commonName}`,
+            `${getCustomerAddressRoute}/${sessionUser.address}`,
             serviceURL
           ).href
         )
@@ -2229,7 +2203,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.userCataRewards = async function (options = defaultOptions) {
     return await escrowJs.userCataRewards(
       rawAdmin,
-      userCert.commonName,
+      sessionUser.address,
       options
     );
   };
@@ -2276,7 +2250,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const userUSDSTAssets = await inventoryJs.getAll(
       rawAdmin,
       {
-        ownerCommonName: userCert.commonName,
+        ownerCommonName: sessionUser.address,
         originAddress: USDSTOriginAddress,
         status: ASSET_STATUS.ACTIVE,
         queryOptions: { select: 'address, quantity' },

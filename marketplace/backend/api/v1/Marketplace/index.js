@@ -83,11 +83,4 @@ router.get(
   MarketplaceController.getStratsAddress
 );
 
-router.get(
-  Marketplace.get18DecimalPlaces,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  MarketplaceController.get18DecimalPlaces
-);
-
 export default router;

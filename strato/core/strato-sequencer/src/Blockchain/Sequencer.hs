@@ -385,7 +385,6 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
   where
     prefix TD.MessageTX {} = "MessageTx [" ++ (format $ txHash t) ++ "]"
     prefix TD.ContractCreationTX {} = "CreationTx[" ++ (format $ txHash t) ++ "]"
-    prefix TD.PrivateHashTX {} = "PrivateHashTx[" ++ (format $ txHash t) ++ "]"
 
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x

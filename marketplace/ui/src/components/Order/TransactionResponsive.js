@@ -21,7 +21,6 @@ const TransactionResponsive = ({
   data,
   user,
   stratAddress,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();
@@ -121,7 +120,6 @@ const TransactionResponsive = ({
             assetAddress,
             assetDescription,
             quantity,
-            decimals,
             from,
             to,
             status,
@@ -131,7 +129,6 @@ const TransactionResponsive = ({
             redemptionService,
             block_timestamp,
             assetOriginAddress,
-            redemption_id,
           },
           index
         ) => {
@@ -152,32 +149,15 @@ const TransactionResponsive = ({
               type,
             },
           ];
-          if (redemption_id) {
-            quantity = quantity.toLocaleString('en-US', {
-              maximumFractionDigits: 6,
+          const assetDecimals = 18;
+          quantity = (quantity / Math.pow(10, assetDecimals)).toLocaleString(
+            'en-US',
+            {
+              maximumFractionDigits: 4,
               minimumFractionDigits: 0,
-            });
-            price = (price * 100).toFixed(2);
-          } else if (
-            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress) ||
-            decimals ||
-            assetOriginAddress === stratAddress
-          ) {
-            const assetDecimals =
-              assetOriginAddress === stratAddress
-                ? 2
-                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                ? 18
-                : decimals || 0;
-            quantity = (quantity / Math.pow(10, assetDecimals)).toLocaleString(
-              'en-US',
-              {
-                maximumFractionDigits: 4,
-                minimumFractionDigits: 0,
-              }
-            );
-            price = (price * Math.pow(10, assetDecimals)).toFixed(2);
-          }
+            }
+          );
+          price = (price * Math.pow(10, assetDecimals)).toFixed(2);
 
           const handleDetailRedirection = () => {
             let route;

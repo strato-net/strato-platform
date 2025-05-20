@@ -15,7 +15,7 @@ const contractName = 'CirrusAccessTest';
 const commonName = "Test"
 const tableName = `${commonName}-${contractName}`
 const contractSrc = `
-contract ${contractName} {
+contract record ${contractName} {
   int x;
   constructor(int _x) {
     x = _x;

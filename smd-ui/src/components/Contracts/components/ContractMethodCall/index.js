@@ -235,28 +235,15 @@ class ContractMethodCall extends Component {
     console.log('HERE')
     return (
       <div>
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-          <AnchorButton
-            className="pt-intent-primary pt-icon-send-to-graph"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              this.handleOpenModal();
-            }}
-            disabled={!this.props.userCertificate}
-            text={this.props.symbolName}
-          />
-        </Popover>
+        <AnchorButton
+          className="pt-intent-primary pt-icon-send-to-graph"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.handleOpenModal();
+          }}
+          text={this.props.symbolName}
+        />
         <form>
           <Dialog
             iconName="exchange"

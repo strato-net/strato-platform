@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 
 /// @title A representation of Carbon assets

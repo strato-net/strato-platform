@@ -1,5 +1,3 @@
-pragma solidvm 11.5;
-
 import "Escrow.sol";
 
 contract SimpleEscrow is Escrow {

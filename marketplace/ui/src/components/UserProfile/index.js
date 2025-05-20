@@ -73,18 +73,6 @@ const UserProfile = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
-  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
-
-  useEffect(() => {
-    const fetchAddresses = async () => {
-      const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-        marketplaceDispatch
-      );
-      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
-    };
-
-    fetchAddresses();
-  }, []);
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
@@ -103,7 +91,7 @@ const UserProfile = ({ user }) => {
     path: routes.MarketplaceUserProfile.url,
     strict: true,
   });
-  const [commonName, setCommonName] = useState(routeMatch?.params?.commonName);
+  const [userAddress, setUserAddress] = useState(routeMatch?.params?.address);
   const [breadcrumbs, setBreadcrumbs] = useState([
     { text: 'Home', path: homeUrl },
   ]);
@@ -133,11 +121,11 @@ const UserProfile = ({ user }) => {
     if (tab === 'my-activity') {
       setActiveTab('2'); // Set '2' to open the "My Activity" tab
     }
-  }, [commonName]);
+  }, [userAddress]);
 
   // helper
-  const ownerSameAsUser = (commonNameOfUser) => {
-    if (user?.commonName === commonNameOfUser) {
+  const ownerSameAsUser = (addressOfUser) => {
+    if (user?.address === addressOfUser) {
       setIsOwner(true);
       return true;
     }
@@ -187,16 +175,16 @@ const UserProfile = ({ user }) => {
 
   //set Common Name to Fetch Inventories
   useEffect(() => {
-    setCommonName(routeMatch?.params?.commonName);
-    ownerSameAsUser(routeMatch?.params?.commonName);
+    setUserAddress(routeMatch?.params?.address);
+    ownerSameAsUser(routeMatch?.params?.address);
   }, [routeMatch]);
 
   // Inventories For Sale fetch
   useEffect(() => {    
-    if(user?.commonName === commonName){
-      inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined, '', commonName);
+    if(user?.address){
+      inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined, '', user.address);
     }
-  }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
+  }, [dispatch, hasChecked, isAuthenticated, loginUrl]);
 
   // Tab selection
   const handleTabSelect = (key) => {
@@ -208,7 +196,7 @@ const UserProfile = ({ user }) => {
     if (!user) {
       return;
     }
-    const profile = user.commonName;
+    const profile = user.address;
     userActivityActions.fetchUserActivity(userActivityDispatch, profile);
   }, [userActivityDispatch, user]);
 
@@ -355,7 +343,7 @@ const UserProfile = ({ user }) => {
       {/* User Name and Edit Profile */}
       <div className="text-center my-12">
         <h1 className="text-lg sm:text-xl md:text-2xl font-bold">
-          {commonName}
+	  {user.preferred_username} (0x{user.address})
         </h1>
         {/* <p className="text-gray-600">Joined Oct 2023</p> */}
         <Button
@@ -403,7 +391,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
                         })
@@ -432,7 +419,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
                         })
@@ -461,7 +447,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
                         })

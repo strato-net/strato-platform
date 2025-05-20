@@ -14,7 +14,7 @@ import "./Node.sol";
 * #return none
 */
 
-contract NodeManager is RestStatus, BeanstalkErrorCodes {
+contract record NodeManager is RestStatus, BeanstalkErrorCodes {
   address public dappAddress;
   BeanstalkPermissionManager permissionManager;
   /**

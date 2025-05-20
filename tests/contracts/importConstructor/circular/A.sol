@@ -1,7 +1,7 @@
 import "B.sol";
 
 
-contract C {
+contract record C {
     D d;
 
     uint storedC;

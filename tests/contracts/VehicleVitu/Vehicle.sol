@@ -8,7 +8,7 @@ import "./VehicleHistoryEventType.sol";
 /**
  * Vehicle root
  */
-contract Vehicle is ErrorCodes, Util, VehicleHistoryEventType {
+contract record Vehicle is ErrorCodes, Util, VehicleHistoryEventType {
   uint public timestamp;
   // creator of the contract
   int public updateCounter = -1;

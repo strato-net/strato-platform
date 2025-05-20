@@ -1,4 +1,4 @@
-contract GasDealEvent {
+contract record GasDealEvent {
     enum GasDealEvent {
         NULL,
         TRADER_PRICE,

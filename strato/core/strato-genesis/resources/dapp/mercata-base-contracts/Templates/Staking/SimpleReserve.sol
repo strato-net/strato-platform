@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 contract SimpleReserve is Reserve{
     constructor(
         address _assetOracle, 

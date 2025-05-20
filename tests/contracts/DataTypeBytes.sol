@@ -1,4 +1,4 @@
-contract DataTypeBytes {
+contract record DataTypeBytes {
     bytes32 storedData;
 
     bytes32[] storedDatum;

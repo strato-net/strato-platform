@@ -1,4 +1,4 @@
-contract TestHistory {
+contract record TestHistory {
   uint x;
   constructor(uint _x) {
     x = _x;

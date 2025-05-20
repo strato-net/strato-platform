@@ -18,7 +18,6 @@ const StakeItemActions = ({
   debouncedSearchTerm,
   category,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
@@ -55,11 +54,7 @@ const StakeItemActions = ({
     : 0;
 
   // Calculate quantity
-  let quantity = inventory?.inventories
-    ? inventory.totalQuantity / Math.pow(10, inventory?.decimals || 0)
-    : assetsWithEighteenDecimalPlaces.includes(inventory?.root || '')
-    ? inventory?.quantity / 1e18
-    : inventory?.quantity / Math.pow(10, inventory?.decimals || 0);
+  let quantity = inventory?.quantity / 1e18;
 
   // Calculate collateralValue
   const uniqueEscrowsPrime = new Set();
@@ -140,15 +135,7 @@ const StakeItemActions = ({
     Math.floor((borrowAmount / Math.pow(10, 18)) * 100) / 100
   ).toFixed(2);
 
-  /**
-   * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
-   * This matches the logic used in StakeModal and BorrowModal.
-   */
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    inventory?.root || ''
-  )
-    ? 18
-    : inventory?.decimals || 0;
+  const decimals = 18;
 
   if (decimals > 0) {
     collateralQuantity /= Math.pow(10, decimals);
@@ -234,7 +221,6 @@ const StakeItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -247,7 +233,6 @@ const StakeItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -261,7 +246,6 @@ const StakeItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
     </div>

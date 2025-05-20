@@ -48,11 +48,11 @@ describe('Slipstream', function () {
   this.timeout(config.timeout);
   
   const newContract = `
-contract X {
+contract record X {
   uint public z = 7624;
 }
 
-contract Y {
+contract record Y {
   X x;
   constructor() public {
     x = new X();
@@ -71,7 +71,7 @@ contract Y {
 
 
   const Counter = `
-contract Z {
+contract record Z {
   uint public count = 0;
   function incr() public {
     count++;
@@ -98,7 +98,7 @@ contract Z {
 
 
 const eventsContract = `
-contract EventTest {
+contract record EventTest {
   event SlipstreamTest ( uint magic );
   function emitTest ( uint magic ) {
     emit SlipstreamTest ( magic );
@@ -146,7 +146,7 @@ contract EventTest {
   });
 
 const keywordEventsContract = `
-contract KeywordEventTest {
+contract record KeywordEventTest {
   event Keywords (uint from, uint to);
   function emitKeyword (uint from, uint to) {
     emit Keywords(from, to);
@@ -171,8 +171,8 @@ contract KeywordEventTest {
 
 
   it("Will expand Cirrus tables when contract versions with new fields are created", async () => {
-    const version1 = "contract ExpansionTest { uint x; constructor() { x = 0; } }";
-    const version2 = "contract ExpansionTest { uint x; uint y; constructor() { x = 2; y = 10; } }";
+    const version1 = "contract record ExpansionTest { uint x; constructor() { x = 0; } }";
+    const version2 = "contract record ExpansionTest { uint x; uint y; constructor() { x = 2; y = 10; } }";
 
     const [user, contract] = await upload("ExpansionTest", version1, options);
     const v1SearchList = await rest.searchUntil(user, {...contract, name: toTableName("ExpansionTest")}, (r) => r.length > 0, {...options, query: {address: `eq.${contract.address}`}});

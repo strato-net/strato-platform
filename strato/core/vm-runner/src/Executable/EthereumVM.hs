@@ -21,7 +21,7 @@ where
 
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
-import Blockchain.BlockChain
+--import Blockchain.BlockChain
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
@@ -72,7 +72,7 @@ ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
-    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
+--    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     initializeBestBlock
 

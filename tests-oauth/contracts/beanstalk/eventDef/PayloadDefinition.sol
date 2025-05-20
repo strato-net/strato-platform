@@ -8,7 +8,7 @@ import "/dapp/dapp/contracts/PrivateChainType.sol";
  * #return none
  */
 
-contract PayloadDefinition {
+contract record PayloadDefinition {
 
   address public dappAddress;
   address public owner;

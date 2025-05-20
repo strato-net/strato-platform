@@ -8,7 +8,7 @@
 * #return none
 */
 
-contract ExceptionType {
+contract record ExceptionType {
   enum ExceptionType {
     VALUE,
     TIMEOUT

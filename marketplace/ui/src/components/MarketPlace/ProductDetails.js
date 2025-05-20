@@ -101,7 +101,7 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -503,11 +503,7 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
-  const decimals = assetsWithEighteenDecimalPlaces.includes(
-    details?.originAddress
-  )
-    ? 18
-    : details?.decimals || 0;
+  const decimals = 18;
 
   const onKeyDownPress = (e) => {
     if (decimals) {
@@ -788,12 +784,7 @@ const ProductDetails = ({ user, users }) => {
                       value={
                         !isStakeable || !ownerSameAsUser()
                           ? `${qty}`
-                          : assetsWithEighteenDecimalPlaces.includes(
-                              inventoryDetails.root
-                            )
-                          ? inventoryDetails.quantity / 1e18
-                          : inventoryDetails.quantity /
-                            Math.pow(10, decimals || 0)
+                          : inventoryDetails.quantity / 1e18
                       }
                       controls={false}
                       onChange={(e) => {
@@ -1153,7 +1144,7 @@ const ProductDetails = ({ user, users }) => {
                     </div>
                   )}
                 <div>
-                  {priceHistory?.originRecords?.length !== 0 && (
+                  {priceHistory?.originRecords?.length && priceHistory?.originRecords?.length !== 0 && (
                     <>
                       <h2 className="w-full text-center font-bold text-2xl">
                         12-Month Historical Data
@@ -1180,7 +1171,6 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -1190,7 +1180,6 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -1200,7 +1189,6 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {message && openToastInventory('bottom')}

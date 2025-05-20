@@ -20,24 +20,16 @@
 module Strato.Lite.Simulator where
 
 import BlockApps.X509.Certificate as X509
-import qualified Blockchain.Data.AlternateTransaction as U
 import Blockchain.Data.BlockDB ()
--- import Blockchain.Data.GenesisInfo
-import Blockchain.Data.Transaction (getSigVals)
-import Blockchain.Data.TransactionDef
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Host
-import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
-import Blockchain.Strato.Model.Wei
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
@@ -55,7 +47,7 @@ import Data.Default
 import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -225,46 +217,6 @@ createGermophobicSimulatorConnection server'' client'' = do
 
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (first fromPrivateKey)
-
-mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
-mkSignedTx privKey utx md =
-  let Nonce n = U.unsignedTransactionNonce utx
-      Gas gl = U.unsignedTransactionGasLimit utx
-      Wei gp = U.unsignedTransactionGasPrice utx
-      Wei val = U.unsignedTransactionValue utx
-      (r', s', v') = getSigVals . signMsg privKey $ U.rlpHash utx
-   in if isJust $ U.unsignedTransactionTo utx
-        then -- then let Code c = U.unsignedTransactionInitOrData utx
-
-          let c = case U.unsignedTransactionInitOrData utx of
-                Code c' -> c'
-                _ -> error "mkSignedTx: impossible"
-           in MessageTX
-                { transactionNonce = fromIntegral n,
-                  transactionGasPrice = fromIntegral gp,
-                  transactionGasLimit = fromIntegral gl,
-                  transactionTo = fromJust $ U.unsignedTransactionTo utx,
-                  transactionValue = fromIntegral val,
-                  transactionData = c,
-                  transactionChainId = Nothing,
-                  transactionR = fromIntegral r',
-                  transactionS = fromIntegral s',
-                  transactionV = v',
-                  transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
-                }
-        else
-          ContractCreationTX
-            { transactionNonce = fromIntegral n,
-              transactionGasPrice = fromIntegral gp,
-              transactionGasLimit = fromIntegral gl,
-              transactionValue = fromIntegral val,
-              transactionInit = U.unsignedTransactionInitOrData utx,
-              transactionChainId = Nothing,
-              transactionR = fromIntegral r',
-              transactionS = fromIntegral s',
-              transactionV = v',
-              transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
-            }
 
 runSimulatorConnection ::
   SimulatorP2PConnection ->

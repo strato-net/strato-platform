@@ -14,7 +14,7 @@ import "./MembershipEvent.sol";
 * #return none
 */
 
-contract MembershipFSM is FSM, MembershipState, MembershipEvent {
+contract record MembershipFSM is FSM, MembershipState, MembershipEvent {
 
   /**
   * Constructor

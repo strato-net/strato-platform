@@ -19,6 +19,7 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
+import Blockchain.Blockstanbul.Options (flags_test_mode_bypass_blockstanbul)
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -308,6 +309,12 @@ eventLoop ctx = execStateC ctx $
           -- this is for sending out a new block,
           -- may be a good candidtate for sending newCerts
           let blk = scrubConsensus blk'
+          when flags_test_mode_bypass_blockstanbul $ do
+            vs <- use validators
+            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            pseal <- proposerSeal blockWithVs
+            commitBlock $ addProposerSeal pseal blockWithVs
+            yieldR MakeBlockCommand
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert

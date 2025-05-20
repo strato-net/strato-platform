@@ -420,8 +420,8 @@ instance FromJSON BlocChainOrTransactionResult where
     (BlocTxResult <$> parseJSON o)
       <|> (BlocChainResult <$> parseJSON o)
 
-instance Arbitrary BlocChainOrTransactionResult where
-  arbitrary = GR.genericArbitrary GR.uniform
+--instance Arbitrary BlocChainOrTransactionResult where
+--  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample BlocChainOrTransactionResult where
   toSamples _ =

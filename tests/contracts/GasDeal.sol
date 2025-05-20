@@ -16,7 +16,7 @@ import "./GasDeal/GasVolumeUnits.sol";
 /**
  * Gas Deal data container
  */
-contract GasDeal is BaseDeal, Util, Args, GasDealState, GasDealEvent, GasVolumeUnits, Constants {
+contract record GasDeal is BaseDeal, Util, Args, GasDealState, GasDealEvent, GasVolumeUnits, Constants {
   // internal
   GasDealFSM public gasDealFSM;
   GasDealState public gasDealState;

@@ -1,4 +1,4 @@
-contract DealType {
+contract record DealType {
 
   enum DealType {
     NULL,

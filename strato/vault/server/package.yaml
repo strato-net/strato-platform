@@ -145,6 +145,7 @@ tests:
       - bytestring
       - clockwork
       - cryptonite
+      - ethereum-rlp
       - hspec
       - labeled-error
       - blockapps-secp256k1-haskell

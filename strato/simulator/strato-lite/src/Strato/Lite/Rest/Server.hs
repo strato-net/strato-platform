@@ -17,15 +17,12 @@ import Bloc.Monad
 import Bloc.Server
 import BlockApps.Logging
 import Blockchain.Blockstanbul
-import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.DB.SQLDB
-import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
-import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.Validator
 import Control.Lens
 import Control.Monad.IO.Class
@@ -35,7 +32,7 @@ import Control.Monad.Trans.Resource
 import Core.API
 import Data.Aeson (Value)
 import Data.Bifunctor (first)
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, listToMaybe)
 import qualified Data.Text as T
@@ -91,15 +88,6 @@ postTimeout mgr rn = do
   peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
   liftIO $ traverse_ (postEvent ev . snd) peers
 
-postTx :: NetworkManager -> T.Text -> PostTxParams -> Handler ()
-postTx mgr nodeLabel (PostTxParams tx md) = do
-  mPeer <- liftIO $ fmap (M.lookup nodeLabel . _nodes) . readTVarIO $ mgr ^. network
-  liftIO . for_ mPeer $ \(s,c) -> do
-    ts <- liftIO $ getCurrentMicrotime
-    let signedTx = mkSignedTx (s ^. simulatorPeerPrivKey) tx md
-        ev = UnseqEvents [IETx ts $ IngestTx Origin.API signedTx]
-    postEvent ev c
-
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
   getNodes mgr
@@ -107,7 +95,6 @@ stratoLiteRestServer mgr =
     :<|> postAddNode mgr
     :<|> postRemoveNode mgr
     :<|> postTimeout mgr
-    :<|> postTx mgr
 
 type CirrusAPI = "cirrus" :> "search" :> Capture "contractName" T.Text :> Get '[JSON] Value
 
