@@ -54,7 +54,6 @@ import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Block
-import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Metadata as Metadata
 import Handlers.Options
@@ -150,7 +149,6 @@ type CoreAPI =
            :<|> BatchTransactionResult.API
            :<|> BlkLast.API
            :<|> Block.API
-           :<|> Faucet.API
            :<|> Identity.API
            :<|> Metadata.API
            :<|> Peers.API
@@ -179,7 +177,6 @@ coreServer =
     :<|> BatchTransactionResult.server
     :<|> BlkLast.server
     :<|> Block.server
-    :<|> Faucet.server
     :<|> Identity.server
     :<|> Metadata.server
     :<|> Peers.server
