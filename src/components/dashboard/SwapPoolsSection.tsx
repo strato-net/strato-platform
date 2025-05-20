@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Swap, CircleArrowUp, CircleArrowDown } from "lucide-react";
+import { ChevronRight, ArrowLeftRight, CircleArrowUp, CircleArrowDown } from "lucide-react";
 import { Link } from 'react-router-dom';
 
 interface SwapPool {
@@ -119,7 +119,7 @@ const SwapPoolsSection = () => {
                       Deposit
                     </Button>
                     <Button size="sm" variant="outline" className="border-strato-purple text-strato-purple hover:bg-strato-purple/10">
-                      <Swap className="mr-1 h-4 w-4" />
+                      <ArrowLeftRight className="mr-1 h-4 w-4" />
                       Swap
                     </Button>
                     <Link to={`/dashboard/pools/${pool.id}`}>
