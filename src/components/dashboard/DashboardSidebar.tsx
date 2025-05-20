@@ -10,7 +10,7 @@ const DashboardSidebar = () => {
   const navItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
     { icon: <Wallet size={20} />, label: 'Assets', path: '/dashboard/assets' },
-    { icon: <List size={20} />, label: 'Assets List', path: '/dashboard/assets-list' },
+    // { icon: <List size={20} />, label: 'Assets List', path: '/dashboard/assets-list' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
