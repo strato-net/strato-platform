@@ -50,8 +50,7 @@ createGenesisInfo network = do
         case network of
           "helium" -> HELIUM.genesisBlock
           "mercata-uranium" -> URANIUM.genesisBlock
-          "mercata" -> productionGenesisBlock
-          _ -> HELIUM.testGenesisBlock
+          _ -> productionGenesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
   liftIO $ putStrLn $ "Done. Output genesis block info was written"

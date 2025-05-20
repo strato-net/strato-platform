@@ -5,6 +5,7 @@ module Blockchain.Data.ExecResults
   ( calculateReturned,
     evmErrorResults,
     solidvmErrorResults,
+    emptyResults,
     ExecResults (..),
   )
 where
@@ -73,6 +74,30 @@ errorResults ck remainingGas e =
       erAction = Nothing,
       erException = Just e,
       erKind = ck,
+      -- , erNewX509Certs = M.empty
+      erPragmas = [],
+      erCreator = "",
+      erAppName = "",
+      erNewValidators = [],
+      erRemovedValidators = [],
+      erNewCerts = [],
+      erRevokedCerts = []
+    }
+
+emptyResults :: ExecResults
+emptyResults =
+  ExecResults
+    { erRemainingTxGas = 0,
+      erRefund = 0,
+      erReturnVal = Nothing,
+      erTrace = [],
+      erLogs = [],
+      erEvents = [],
+      erNewContractAddress = Nothing,
+      erSuicideList = S.empty,
+      erAction = Nothing,
+      erException = Nothing,
+      erKind = SolidVM,
       -- , erNewX509Certs = M.empty
       erPragmas = [],
       erCreator = "",

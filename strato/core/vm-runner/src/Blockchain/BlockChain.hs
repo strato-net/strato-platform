@@ -517,14 +517,15 @@ payFees ::
   ExceptT TransactionFailureCause m ExecResults
 payFees b availableGas tAddr t proposer = do
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
+      decider = Address 0xDEC1DE
   -- BEGIN: Custom Validation Check
   -- Call validation contract at 0xDEC1DE. Require it returns True.
-
-  lift $
-    SolidVM.call
+  lift $ (addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) decider) >>= \case
+    ExternallyOwned _ -> pure emptyResults
+    _ -> SolidVM.call
       False  -- isRCC
       b  -- blockData
-      (Address 0xDEC1DE)  --codeAddress
+      decider  --codeAddress
       tAddr -- sender
       proposer  --proposer
       (fromIntegral availableGas) --availableGas
