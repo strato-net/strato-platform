@@ -14,12 +14,11 @@ import Transfer from "./pages/Transfer";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import Borrow from "./pages/Borrow";
+import Pools from "./pages/Pools";
 import NotFound from "./pages/NotFound";
 import { UserProvider } from "./context/UserContext";
 import { UserTokensProvider } from "./context/UserTokensContext";
-import { DepositableTokenProvider } from "./context/DepositableTokensContext";
 import { SwapProvider } from "./context/SwapContext";
-import { LoansProvider } from "./context/LoansContext";
 import { LendingProvider } from "./context/LendingContext";
 
 const queryClient = new QueryClient();
@@ -46,6 +45,7 @@ const App = () => (
                       <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
                       <Route path="/dashboard/borrow" element={<Borrow />} />
                       <Route path="/dashboard/transfer" element={<Transfer />} />
+                      <Route path="/dashboard/pools" element={<Pools />} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
