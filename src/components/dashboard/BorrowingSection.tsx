@@ -2,9 +2,10 @@
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { useNavigate } from "react-router-dom";
 
 const BorrowingSection = () => {
+  const navigate = useNavigate()
   const riskPercentage = 36;
   
   return (
@@ -15,7 +16,7 @@ const BorrowingSection = () => {
           <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
         </div>
         <div>
-          <Button className="flex items-center gap-2">
+          <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center gap-2">
             <ArrowUpRight size={16} /> Start Borrowing
           </Button>
         </div>

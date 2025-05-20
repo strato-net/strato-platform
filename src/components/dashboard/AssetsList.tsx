@@ -7,11 +7,12 @@ import DepositOptionsModal from "./DepositOptionsModal";
 import { Token } from "@/interface";
 import { formatUnits } from "ethers";
 
-interface Assets {
+interface AssetsProps {
+  loading: boolean;
   tokens: Token[];
 }
 
-const AssetsList = ({ tokens }: Assets) => {
+const AssetsList = ({ loading, tokens }: AssetsProps) => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
@@ -63,64 +64,70 @@ const AssetsList = ({ tokens }: Assets) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {tokens.slice(0, 5).map((asset, index) => (
-              <tr key={index} className="hover:bg-gray-50 transition-colors">
-                <td className="py-4 px-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="ml-3">
-                      <p className="font-medium text-gray-900">
-                        {asset["BlockApps-Mercata-ERC20"]?._name || ""}
-                      </p>
-                      <p className="text-gray-500 text-xs">
-                        {asset["BlockApps-Mercata-ERC20"]?._symbol || ""}
-                      </p>
-                    </div>
+            {loading ?
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td colSpan={5} className="py-4 px-4 whitespace-nowrap w-full">
+                  <div className="w-full flex justify-center items-center h-16">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
                   </div>
-                </td>
-                <td className="py-4 px-4 whitespace-nowrap text-right">
-                  <p className="font-medium text-gray-900">
-                    {asset?.["price"] || "-"}
-                  </p>
-                </td>
-                <td className="py-4 px-4 whitespace-nowrap text-right">
-                  <div
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      asset?.["change"] >= 0
-                        ? "bg-green-50 text-green-600"
-                        : "bg-red-50 text-red-600"
-                    }`}
-                  >
-                    {asset?.["change"] !== undefined
-                      ? `${asset?.["change"] >= 0 ? "+" : ""}${
-                          asset?.["change"]
-                        }%`
-                      : "-"}
-                  </div>
-                </td>
-                <td className="py-4 px-4 whitespace-nowrap text-right">
-                  <p className="font-medium text-gray-900">
-                    {asset?.["amount"] || "-"}
-                  </p>
-                </td>
-                <td className="py-4 px-4 whitespace-nowrap text-right">
-                  <p className="font-medium text-gray-900">
-                    {parseFloat(
-                      formatUnits(asset?.value || 0, 18)
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 4,
-                    })}
-                  </p>
                 </td>
               </tr>
-            ))}
+              : tokens.slice(0, 5).map((asset, index) => (
+                <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="ml-3">
+                        <p className="font-medium text-gray-900">
+                          {asset["BlockApps-Mercata-ERC20"]?._name || ""}
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                          {asset["BlockApps-Mercata-ERC20"]?._symbol || ""}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 whitespace-nowrap text-right">
+                    <p className="font-medium text-gray-900">
+                      {asset?.["price"] || "-"}
+                    </p>
+                  </td>
+                  <td className="py-4 px-4 whitespace-nowrap text-right">
+                    <div
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${asset?.["change"] >= 0
+                        ? "bg-green-50 text-green-600"
+                        : "bg-red-50 text-red-600"
+                        }`}
+                    >
+                      {asset?.["change"] !== undefined
+                        ? `${asset?.["change"] >= 0 ? "+" : ""}${asset?.["change"]
+                        }%`
+                        : "-"}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 whitespace-nowrap text-right">
+                    <p className="font-medium text-gray-900">
+                      {asset?.["amount"] || "-"}
+                    </p>
+                  </td>
+                  <td className="py-4 px-4 whitespace-nowrap text-right">
+                    <p className="font-medium text-gray-900">
+                      {parseFloat(
+                        formatUnits(asset?.value || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 4,
+                      })}
+                    </p>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
 
       <div className="p-4 text-right border-t border-gray-100">
         <a
-          href="#"
+          href="/dashboard/assets"
           className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end"
         >
           View All <ArrowUpRight size={14} className="ml-1" />

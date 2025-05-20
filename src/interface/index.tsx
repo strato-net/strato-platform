@@ -33,6 +33,17 @@ export interface Token {
   };
 };
 
+export interface DepositableToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  value: string;           // Usually big numbers as strings
+  collateralRatio: string; // string but represents a number
+  interestRate: string;
+  price: string;
+  liquidity: string;
+  ltv?: string
+}
 export interface SwappableToken {
   address: string;
   _name: string;
@@ -43,3 +54,18 @@ export interface SwappableToken {
     value: string;
   }[];
 };
+
+export interface Loan {
+  active: boolean;
+  amount: string;
+  asset: string;
+  collateralAmount: string;
+  collateralAsset: string;
+  lastUpdated: string;
+  user: string;
+  assetName: string;
+  assetSymbol: string;
+  collateralName: string;
+  collateralSymbol: string;
+  interest: string;
+}

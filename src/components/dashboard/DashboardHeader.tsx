@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { useUser } from '@/context/UserContext';
 
 interface DashboardHeaderProps {
   title: string;
@@ -12,16 +13,16 @@ interface DashboardHeaderProps {
 const DashboardHeader = ({ title }: DashboardHeaderProps) => {
   const [copied, setCopied] = useState(false);
   const username = "cryptoTrader";
-  const walletAddress = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
+  const { userAddress } = useUser()
   
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(walletAddress);
+    navigator.clipboard.writeText(userAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
   
   const truncateAddress = (address: string) => {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    return `${address?.substring(0, 6)}...${address?.substring(address.length - 4)}`;
   };
 
   return (
@@ -40,7 +41,7 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
           <div className="flex flex-col items-end mr-3">
             <span className="text-sm font-medium">{username}</span>
             <div className="flex items-center">
-              <span className="text-xs text-gray-500">{truncateAddress(walletAddress)}</span>
+              <span className="text-xs text-gray-500">{truncateAddress(userAddress)}</span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
