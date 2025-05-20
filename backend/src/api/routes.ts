@@ -16,6 +16,7 @@ const router = Router();
 router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
 
 router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
+router.get("/users/", authHandler.authorizeRequest(true), UsersController.getAll);
 
 router.get("/tokens/faucets", authHandler.authorizeRequest(), TokensController.getFaucets);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
