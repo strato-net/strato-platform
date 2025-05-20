@@ -43,7 +43,7 @@ const formatBalance = (value: bigint, decimals: number): string => {
   return formattedBalance.toFixed(decimals);
 };
 
-const access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiJlZjdlMjY5ZS03OTI5LTQ5NzctYmMzZC01NTU3Y2Y4MmZkMzgiLCJleHAiOjE3NDc2NjE0MzIsIm5iZiI6MCwiaWF0IjoxNzQ3NjYwNTMyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJkMTdkYzQ2NS0yNThhLTQ1MGYtYmFjZS01ZTgzMDk0YWY3Y2YiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJkb2NzLnN0cmF0b21lcmNhdGEuY29tIiwiYXV0aF90aW1lIjoxNzQ3NjYwNTIwLCJzZXNzaW9uX3N0YXRlIjoiMmI0MDE0ZGMtYzJjYS00ZWI1LTliMGYtODBlZGNiMmIzYzlhIiwiYWNyIjoiMCIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJCbG9ja0FwcHMgQmxvY2tBcHBzIiwiY29tcGFueSI6IkJsb2NrQXBwcyIsInByZWZlcnJlZF91c2VybmFtZSI6ImJsb2NrYXBwcyIsImdpdmVuX25hbWUiOiJCbG9ja0FwcHMiLCJmYW1pbHlfbmFtZSI6IkJsb2NrQXBwcyIsImVtYWlsIjoiZHVzdGluK2Jsb2NrYXBwc0BibG9ja2FwcHMubmV0In0.mriO_vXMZ3gajZqyBscsdiSK3EHkzt7pb0UMdZugP5CY3Do_skou2h8w_PHMHwhzALU8QDiip4HSjJ5PN9wVnnLOssRXLb2vo0SdCLhVNuk6qAcGr8rdm5D7Kx0p0pYGWHBQX2D6L_i1CDOtmq1WBWNqSCJwUBLNVEIr5K1ae0YyouFUewnEiZIMAZpY4UrS1DwmQno9tmENa7fmiKTHhJq1UB1upzBh4uCfD4iM3g1l4U7geZRl6cOTffUeOKSRcnro1NaiT4-Sgwn_bDSj6HZQNPK5ps5loCxoOIz9H9-VhKMwE7rifAqn-o_NhUCJewJBayEDE5bKycrIE2zEYg';
+const access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiI0Y2I0MjJkYy0wMDc5LTQ2ODktYmI5Ni0xZDRhOWJiZmM0MzQiLCJleHAiOjE3NDc3NDQ2NTIsIm5iZiI6MCwiaWF0IjoxNzQ3NzQzNzUyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJkMTdkYzQ2NS0yNThhLTQ1MGYtYmFjZS01ZTgzMDk0YWY3Y2YiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJkb2NzLnN0cmF0b21lcmNhdGEuY29tIiwiYXV0aF90aW1lIjoxNzQ3NjYwNTIwLCJzZXNzaW9uX3N0YXRlIjoiMmI0MDE0ZGMtYzJjYS00ZWI1LTliMGYtODBlZGNiMmIzYzlhIiwiYWNyIjoiMCIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJCbG9ja0FwcHMgQmxvY2tBcHBzIiwiY29tcGFueSI6IkJsb2NrQXBwcyIsInByZWZlcnJlZF91c2VybmFtZSI6ImJsb2NrYXBwcyIsImdpdmVuX25hbWUiOiJCbG9ja0FwcHMiLCJmYW1pbHlfbmFtZSI6IkJsb2NrQXBwcyIsImVtYWlsIjoiZHVzdGluK2Jsb2NrYXBwc0BibG9ja2FwcHMubmV0In0.V5bd6hohVTwsEySB2o0lsymsvRXcJ_oEgV_fRP6lAnLz24QuAd7_vQNz8udEon92EzpmToZ-Tje2P-Sp8yYesPzMGFWQc9odTKqC8RxTRq3A4wyL7W0bSiCspKfmYDrWdg4KqWihwVvTxDTBgM170hAvlbRaC0OoXNq5nwzFqrx5QPLxv-9wOzEzro-WCmxiYkyM0J8ySk1VDq1mJDV7haqNZDfU5FUHzwCZMuvMmp6wW63k-_tEqq0fO84bldjsHGqYflIyLX2lOfZZnl5VWsNNHP3RLrRHU0pvj0ZgVovKggk_EHasXVzGbpsq7vnhBkjFIiG-pPBm2foUN2q4fQ';
 
 const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalProps) => {
   const [showTransactions, setShowTransactions] = useState(false);
@@ -244,6 +244,12 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const [amountError, setAmountError] = useState<string>("");
 
   const validateAmount = (value: string): boolean => {
+    // Skip validation for STRATO to other networks
+    if (fromChain === 'STRATO' && toChain !== 'STRATO') {
+      setAmountError("");
+      return true;
+    }
+
     if (!value) {
       setAmountError("");
       return true;
@@ -349,7 +355,43 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       return;
     }
 
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      // For STRATO to Mercata transfers
+      if (fromChain === 'STRATO' && toChain === 'Ethereum') {
+        // Get token address the same way as other networks
+        const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+        console.log('Token address lookup:', {
+          fromChain,
+          toChain,
+          fromToken,
+          tokenSymbol: fromToken.symbol,
+          tokenAddress,
+          availableTokens: TOKEN_ADDRESSES[fromChain]
+        });
+        
+        if (!tokenAddress) {
+          toast({
+            title: "Token Error",
+            description: `Invalid token address for ${fromToken.symbol} on ${fromChain}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Call handleBridgeSubmit instead of duplicating the API call
+        await handleBridgeSubmit();
+        return;
+      }
+
       // Check if on correct network
       if (!isChainMatching()) {
         try {
@@ -365,34 +407,19 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
       }
 
-      // More specific token validation
-      if (!fromToken || !fromToken.symbol || !fromToken.name) {
-        console.error('From token validation failed:', fromToken);
+      // Validate token and amount
+      if (!fromToken || !amount || !fromChain || !toChain) {
         toast({
-          title: "Token Error",
-          description: "Please select a valid source token",
+          title: "Invalid Input",
+          description: "Please check token and amount",
           variant: "destructive",
         });
         return;
       }
 
-      if (!toToken || !toToken.symbol || !toToken.name) {
-        console.error('To token validation failed:', toToken);
-        toast({
-          title: "Token Error",
-          description: "Please select a valid destination token",
-          variant: "destructive",
-        });
-        return;
-      }
-
+      // Handle other network transfers (existing code)
       const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
       if (!tokenAddress) {
-        console.error('Token address not found:', {
-          fromChain,
-          symbol: fromToken.symbol,
-          availableTokens: TOKEN_ADDRESSES[fromChain]
-        });
         toast({
           title: "Token Error",
           description: "Invalid token address",
@@ -404,19 +431,12 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       // Determine recipient address based on network direction
       let recipient: string;
       if (fromChain === 'STRATO') {
-        // If sending from STRATO, use the target network's address
         recipient = TOKEN_ADDRESSES[toChain]?.[toToken.symbol] || '';
       } else {
-        // If sending to STRATO, use SAFE_ADDRESS
         recipient = SAFE_ADDRESS;
       }
 
       if (!recipient) {
-        console.error('Recipient address not found:', {
-          fromChain,
-          toChain,
-          toTokenSymbol: toToken.symbol
-        });
         toast({
           title: "Recipient Error",
           description: "Invalid recipient address",
@@ -431,7 +451,8 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         toChain,
         token: fromToken,
         amount,
-        recipient
+        recipient,
+        accessToken: access_token
       };
 
       toast({
@@ -603,15 +624,13 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           updateTransactionStatus?.(transactionHash || '', 'failed');
         }
       }
-
     } catch (error: any) {
-      console.error('Bridge transaction failed:', error);
+      console.error('Bridge error:', error);
       toast({
-        title: "Transaction Failed",
-        description: error.message || "Transaction failed. Please try again.",
+        title: "Transfer Failed",
+        description: error instanceof Error ? error.message : "Failed to process transfer",
         variant: "destructive",
       });
-      updateTransactionStatus?.(transactionHash || '', 'failed');
     }
   };
 
@@ -635,9 +654,65 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
 
     try {
-      // Call checkUserTransaction API with access_token in header
-      const accessToken = access_token; // This should be replaced with actual token
-      const response = await fetch('http://localhost:3002/api/checkUserTransaction', {
+      // For STRATO to other networks transfers, directly call the API
+      if (fromChain === 'STRATO' && toChain !== 'STRATO') {
+        const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+        if (!tokenAddress) {
+          toast({
+            title: "Token Error",
+            description: `Invalid token address for ${fromToken.symbol} on ${fromChain}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Call the STRATO to Mercata transfer endpoint
+        const response = await fetch('http://localhost:8080/api/safe/strato-to-mercata', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${access_token}`
+          },
+          body: JSON.stringify({
+            ethstAddresses: [tokenAddress],
+            quantity: amount,
+            baseAddress: address
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (response.status === 403) {
+            toast({
+              title: "Session Expired",
+              description: "Your session has expired. Please refresh the page and try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw new Error(errorData.error || 'Failed to initiate transfer');
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          toast({
+            title: "Transfer Initiated",
+            description: "Your transfer has been initiated successfully",
+          });
+          setTransactionHash(result.txHash);
+          updateTransactionStatus?.(result.txHash, 'pending');
+          onClose();
+          setShowTransactions(true);
+        } else {
+          throw new Error(result.message || 'Transfer failed');
+        }
+        return;
+      }
+
+      // For other transfers, check user transaction first
+      const accessToken = access_token;
+      const response = await fetch('http://localhost:8080/api/safe/checkUserTransaction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -747,7 +822,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                 {amountError && (
                   <p className="text-sm text-red-500">{amountError}</p>
                 )}
-                {tokenBalance && (
+                {!(fromChain === 'STRATO' && toChain !== 'STRATO') && tokenBalance && (
                   <p className="text-sm text-gray-500">
                     Balance: {tokenBalance} {fromToken?.symbol}
                   </p>
@@ -833,7 +908,16 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
             </Button>
             <Button 
               onClick={handleBridgeSubmit} 
-              disabled={isLoading || !amount || !fromToken || !isConnected || !isChainMatching()}
+              disabled={Boolean(
+                isLoading || 
+                !amount || 
+                !fromToken || 
+                !isConnected || 
+                // Only check chain matching for non-STRATO networks
+                (fromChain !== 'STRATO' && !isChainMatching()) || 
+                // Only validate balance for non-STRATO to other networks transfers
+                (fromChain === 'STRATO' && toChain !== 'STRATO' ? false : amountError !== "")
+              )}
               className="bg-strato-blue hover:bg-strato-blue/90"
             >
               {isLoading ? 'Processing...' : 'Bridge Assets'}
