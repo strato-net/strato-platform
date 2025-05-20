@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft } from 'lucide-react';
 
 const DashboardSidebar = () => {
@@ -50,13 +50,13 @@ const DashboardSidebar = () => {
           <ul className="space-y-1">
             {navItems.map((item, index) => (
               <li key={index}>
-                <a
-                  href={item.path}
+                <Link
+                  to={item.path}
                   className="flex items-center px-4 py-2.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md mx-2"
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   {!collapsed && <span className="ml-3">{item.label}</span>}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
