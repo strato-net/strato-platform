@@ -44,6 +44,13 @@ export interface DepositableToken {
   liquidity: string;
   ltv?: string
 }
+
+export interface WithdrawableToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  value?: string;
+}
 export interface SwappableToken {
   address: string;
   _name: string;

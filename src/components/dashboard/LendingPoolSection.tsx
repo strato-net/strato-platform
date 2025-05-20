@@ -1,37 +1,104 @@
-
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatUnits, ethers } from "ethers";
+import { DollarSign, ArrowDown, ArrowUp } from "lucide-react";
+import api from "@/lib/axios";
+import { useLendingContext } from "@/context/LendingContext";
+import { useUser } from "@/context/UserContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { DollarSign, ArrowDown, ArrowUp, Info } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Token, WithdrawableToken } from "@/interface";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const LendingPoolSection = () => {
+  const { userAddress } = useUser();
+  const { tokens, loading, fetchTokens } = useUserTokens();
+  const {
+    withdrawableTokens,
+    loadingWithdrawableTokens,
+    refreshWithdrawableTokens,
+  } = useLendingContext();
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
-  
-  // USDST lending pool data
-  const poolData = {
-    name: "USDST Lending Pool",
-    symbol: "USDST",
-    apr: "5.2%",
-    totalDeposits: "$432,891.45",
-    userDeposit: "$1,245.00",
-    rewards: "$12.53"
-  };
+  const [usdstToken, setUsdstToken] = useState<Token | null>(null);
+  const [usdstAvailableBalance, setUsdstAvailableBalance] =
+    useState<string>("0");
+  const [depositedUsdstToken, setDepositedUsdstToken] =
+    useState<WithdrawableToken | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
 
-  const handleDeposit = () => {
-    console.log("Depositing:", depositAmount);
-    // Reset input after deposit
-    setDepositAmount("");
-    // In a real app, you would connect to the blockchain here
-  };
+  useEffect(() => {
+    if (userAddress) {
+      fetchTokens(userAddress);
+      refreshWithdrawableTokens();
+    }
+  }, [userAddress]);
 
-  const handleWithdraw = () => {
-    console.log("Withdrawing:", withdrawAmount);
-    // Reset input after withdraw
-    setWithdrawAmount("");
-    // In a real app, you would connect to the blockchain here
+  useEffect(() => {
+    if (tokens && tokens.length > 0) {
+      const usdst = tokens.find(
+        (token) => token["BlockApps-Mercata-ERC20"]._symbol === "USDST"
+      );
+      if (usdst) {
+        setUsdstToken(usdst);
+        setUsdstAvailableBalance(formatUnits(usdst.value, 18));
+      }
+    }
+  }, [tokens]);
+
+  useEffect(() => {
+    if (usdstToken && withdrawableTokens && withdrawableTokens.length > 0) {
+      const match = withdrawableTokens.find(
+        (token) =>
+          token._symbol === "USDST" && token.address === usdstToken.address
+      );
+      if (match) {
+        setDepositedUsdstToken(match);
+      }
+    }
+  }, [withdrawableTokens, usdstToken]);
+
+  const handleLiquidityAction = async (type: "deposit" | "withdraw") => {
+    try {
+      setIsProcessing(true);
+      const amount = type === "deposit" ? depositAmount : withdrawAmount;
+      const amountWei = ethers.parseUnits(amount, 18).toString();
+      await api.post("/lend/manageLiquidity", {
+        asset: usdstToken?.address,
+        amount: amountWei,
+        method: type === "deposit" ? "depositLiquidity" : "withdrawLiquidity",
+      });
+
+      toast({
+        title:
+          type === "deposit" ? "Deposit Successful" : "Withdrawal Successful",
+        description: `You have successfully ${type}ed ${amount} USDST.`,
+        variant: "success",
+      });
+
+      if (type === "deposit") {
+        setDepositAmount("");
+      } else {
+        setWithdrawAmount("");
+      }
+
+      if (userAddress) {
+        fetchTokens(userAddress);
+        refreshWithdrawableTokens();
+      }
+    } catch (error: any) {
+      toast({
+        title: type === "deposit" ? "Deposit Error" : "Withdrawal Error",
+        description: `Something went wrong - ${
+          error?.message || "Please try again later."
+        }`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -39,20 +106,7 @@ const LendingPoolSection = () => {
       <Card className="mb-6">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>{poolData.name}</CardTitle>
-            <div className="flex items-center">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info size={16} className="text-gray-400 cursor-help mr-1" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs">Deposit USDST to earn interest from borrowers. Your funds are used to provide liquidity for the STRATO protocol.</p>
-                </TooltipContent>
-              </Tooltip>
-              <span className="bg-green-100 text-green-700 text-sm px-2 py-1 rounded-md font-medium">
-                APR: {poolData.apr}
-              </span>
-            </div>
+            <CardTitle>USDST Lending Pool</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -63,16 +117,23 @@ const LendingPoolSection = () => {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Total deposits</span>
-                  <span className="font-medium">{poolData.totalDeposits}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-gray-500">Your deposit</span>
-                  <span className="font-medium">{poolData.userDeposit}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Earned rewards</span>
-                  <span className="font-medium text-green-600">{poolData.rewards}</span>
+                  <span className="font-medium">
+                    {loadingWithdrawableTokens ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : depositedUsdstToken ? (
+                      `$${Number(
+                        formatUnits(depositedUsdstToken.value || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
                 </div>
               </div>
             </div>
@@ -92,14 +153,39 @@ const LendingPoolSection = () => {
                       />
                       <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     </div>
-                    <Button 
-                      onClick={handleDeposit} 
+                    <Button
+                      onClick={() => handleLiquidityAction("deposit")}
                       className="bg-strato-blue hover:bg-strato-blue/90"
-                      disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                      disabled={
+                        loading ||
+                        isProcessing ||
+                        !depositAmount ||
+                        parseFloat(depositAmount) <= 0
+                      }
                     >
-                      <ArrowDown className="mr-2 h-4 w-4" />
-                      Deposit
+                      {isProcessing ? (
+                        "Processing..."
+                      ) : (
+                        <>
+                          <ArrowDown className="mr-2 h-4 w-4" />
+                          Deposit
+                        </>
+                      )}
                     </Button>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    Available:{" "}
+                    {loading ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : (
+                      Number(usdstAvailableBalance).toLocaleString(undefined, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 4,
+                      })
+                    )}{" "}
+                    USDST
                   </div>
                 </div>
 
@@ -116,15 +202,38 @@ const LendingPoolSection = () => {
                       />
                       <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     </div>
-                    <Button 
-                      onClick={handleWithdraw}
+                    <Button
+                      onClick={() => handleLiquidityAction("withdraw")}
                       variant="outline"
                       className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
-                      disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
+                      disabled={
+                        loadingWithdrawableTokens ||
+                        isProcessing ||
+                        !withdrawAmount ||
+                        parseFloat(withdrawAmount) <= 0
+                      }
                     >
-                      <ArrowUp className="mr-2 h-4 w-4" />
-                      Withdraw
+                      {isProcessing ? (
+                        "Processing..."
+                      ) : (
+                        <>
+                          <ArrowUp className="mr-2 h-4 w-4" />
+                          Withdraw
+                        </>
+                      )}
                     </Button>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    Deposited:{" "}
+                    {depositedUsdstToken
+                      ? Number(
+                          formatUnits(depositedUsdstToken.value || 0, 18)
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 4,
+                        })
+                      : "0.0000"}{" "}
+                    USDST
                   </div>
                 </div>
               </div>

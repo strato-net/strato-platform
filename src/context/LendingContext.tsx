@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 import api from "@/lib/axios";
-import { DepositableToken, Loan } from "@/interface";
+import { DepositableToken, Loan, WithdrawableToken } from "@/interface";
 
 interface LoanData {
   loans: Loan[];
@@ -17,6 +17,9 @@ type LendingContextType = {
   errorDepositTokens: string | null;
   refreshDepositTokens: () => void;
   refreshLoans: () => void;
+  withdrawableTokens: WithdrawableToken[];
+  refreshWithdrawableTokens: () => void;
+  loadingWithdrawableTokens: boolean;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -27,6 +30,9 @@ export const LendingProvider = ({ children }: { children: React.ReactNode }) => 
   const [loadingDepositTokens, setLoadingDepositTokens] = useState(true);
   const [loadingLoans, setLoadingLoans] = useState(true);
   const [errorDepositTokens, setErrorDepositTokens] = useState<string | null>(null);
+
+  const [withdrawableTokens, setWithdrawableTokens] = useState<WithdrawableToken[]>([]);
+  const [loadingWithdrawableTokens, setLoadingWithdrawableTokens] = useState(true);
 
   const fetchDepositTokens = async () => {
     setLoadingDepositTokens(true);
@@ -41,6 +47,20 @@ export const LendingProvider = ({ children }: { children: React.ReactNode }) => 
       setErrorDepositTokens(err.message || "Failed to load depositable tokens.");
     } finally {
       setLoadingDepositTokens(false);
+    }
+  };
+
+  const fetchWithdrawableTokens = async () => {
+    setLoadingWithdrawableTokens(true);
+    try {
+      const res = await api.get<WithdrawableToken[]>("/withdrawableTokens");
+      if (res.data) {
+        setWithdrawableTokens(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch withdrawable tokens:", err);
+    } finally {
+      setLoadingWithdrawableTokens(false);
     }
   };
 
@@ -63,6 +83,7 @@ export const LendingProvider = ({ children }: { children: React.ReactNode }) => 
   const initialize = () => {
     fetchDepositTokens();
     fetchLoans();
+    fetchWithdrawableTokens();
   };
 
   useEffect(() => {
@@ -79,6 +100,9 @@ export const LendingProvider = ({ children }: { children: React.ReactNode }) => 
         errorDepositTokens,
         refreshDepositTokens: fetchDepositTokens,
         refreshLoans: fetchLoans,
+        withdrawableTokens,
+        refreshWithdrawableTokens: fetchWithdrawableTokens,
+        loadingWithdrawableTokens,
       }}
     >
       {children}
