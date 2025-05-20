@@ -1,5 +1,3 @@
-pragma solidvm 11.5;
-
 import <509>;
 import "Templates/Assets/Asset.sol";
 import "Templates/Assets/Mintable.sol";

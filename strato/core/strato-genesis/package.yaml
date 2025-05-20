@@ -24,6 +24,8 @@ library:
       - containers
       - crypto-api
       - directory
+      - file-embed
+      - filepath
       - format
       - json-stream
       - labeled-error

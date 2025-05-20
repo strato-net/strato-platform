@@ -1,5 +1,5 @@
 import "B.sol";
-contract C {
+contract record C {
     D d;
 
     function testD() returns (uint retVal) {

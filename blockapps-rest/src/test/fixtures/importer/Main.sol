@@ -1,7 +1,7 @@
 import "./A.sol"
 import "./D.sol"
 
-contract Main {
+contract record Main {
   A AA;
   B BB;
   C CC;

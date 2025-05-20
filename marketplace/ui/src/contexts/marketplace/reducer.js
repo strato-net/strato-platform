@@ -284,22 +284,6 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
-    case actionDescriptors.fetchAssetsWithEighteenDecimalPlaces:
-      return {
-        ...state,
-        isFetchingAssetsWithEighteenDecimalPlaces: true,
-      };
-    case actionDescriptors.fetchAssetsWithEighteenDecimalPlacesSuccessful:
-      return {
-        ...state,
-        isFetchingAssetsWithEighteenDecimalPlaces: false,
-        assetsWithEighteenDecimalPlaces: action.payload,
-      };
-    case actionDescriptors.fetchAssetsWithEighteenDecimalPlacesFailed:
-      return {
-        ...state,
-        isFetchingAssetsWithEighteenDecimalPlaces: false,
-      };
 
     case actionDescriptors.fetchCataAddress:
       return {

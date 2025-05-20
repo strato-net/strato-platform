@@ -5,7 +5,7 @@
   *                                                              *
   ***************************************************************/
 
-contract FiscalFactoryEvent {
+contract record FiscalFactoryEvent {
     
     
     event FiscalEvent(

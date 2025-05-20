@@ -2,14 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-import Control.Exception (throw)
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
-import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
-import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 import SolidVM.Solidity.Parse.ParserTypes
@@ -123,7 +120,7 @@ main = do
     (fn : _) -> return fn
   contents <- readFile filename
   File parsedFile <- either (die . show) return $ runParser solidityFile initialParserState "" contents
-  let namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') M.empty xabi) | NamedXabi name (xabi, parents') <- parsedFile]
+  let namedContracts = [(_contractName contr, contr) | FLContract contr <- parsedFile]
       cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) [] []
       typecheck = TC.detector cc
       nodes = codeCollectionCrawler cc

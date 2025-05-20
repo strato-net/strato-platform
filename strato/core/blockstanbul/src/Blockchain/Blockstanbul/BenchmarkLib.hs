@@ -31,15 +31,14 @@ oneTX :: Int -> Transaction
 oneTX size =
   ContractCreationTX
     { transactionNonce = 0,
-      transactionGasPrice = 0,
       transactionGasLimit = 1,
-      transactionValue = 0,
-      transactionInit = Code {codeBytes = BS.replicate size 0xca},
-      transactionChainId = Nothing,
+      transactionCode = Code {codeBytes = BS.replicate size 0xca},
+      transactionContractName = "",
+      transactionArgs = [],
+      transactionNetwork = "",
       transactionR = 1 `shiftL` 200,
       transactionS = 1 `shiftL` 133,
-      transactionV = 27,
-      transactionMetadata = Nothing
+      transactionV = 27
     }
 
 --benchPrivateKey :: PrivateKey

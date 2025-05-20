@@ -41,7 +41,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
   const [paid, setPaid] = useState('Processing');
-  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const navigate = useNavigate();
 
@@ -108,9 +107,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           );
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          prod.root
-        ) ? 18 : prod.decimals || 0;
+        const decimals = 18;
         const productPrice = (prod.price * Math.pow(10, decimals)).toFixed(2);
         const productQuantity = orderQuantities[index] / Math.pow(10, decimals);
         items.push({
@@ -139,7 +136,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       });
       setdata(items);
     }
-  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
+  }, [orderDetails]);
 
   const OrderData = ({ title, value }) => {
     return (

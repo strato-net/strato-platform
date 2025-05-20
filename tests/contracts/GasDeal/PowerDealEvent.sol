@@ -1,4 +1,4 @@
-contract PowerDealEvent {
+contract record PowerDealEvent {
     enum PowerDealEvent {
         NULL,
         TRADER_PRICE,

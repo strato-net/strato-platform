@@ -46,7 +46,6 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   const {
     success: marketplaceSuccess,
     message: marketplaceMessage,
-    assetsWithEighteenDecimalPlaces,
   } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
@@ -185,9 +184,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
-      const decimals = assetsWithEighteenDecimalPlaces.includes(item.key)
-        ? 18
-        : item.decimals || 0;
+      const decimals = 18;
 
       const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);

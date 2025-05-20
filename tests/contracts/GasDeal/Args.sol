@@ -1,4 +1,4 @@
-contract Args {
+contract record Args {
 
   enum Args {
     UID,

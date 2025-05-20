@@ -8,7 +8,7 @@
 * #return none
 */
 
-contract PrivateChainType {
+contract record PrivateChainType {
   enum PrivateChainType {
     dealerChain,
     dealerGrowerChain,

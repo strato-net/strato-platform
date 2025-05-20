@@ -12,7 +12,7 @@
  * #return none
  */
 
-contract Program {
+contract record Program {
 
   address public dappAddress;
   string public programId;

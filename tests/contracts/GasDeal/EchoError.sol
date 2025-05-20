@@ -1,4 +1,4 @@
-contract EchoError {
+contract record EchoError {
 
   enum EchoError {
     NULL,

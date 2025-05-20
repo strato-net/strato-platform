@@ -258,12 +258,6 @@ class CodeEditor extends Component {
               {/* </Popover> */}
             </div>
           
-            <DeployDapp
-              onChangeEditorContractName={this.props.contractNameChange}
-              contractNameFromEditor={this.props.codeEditorData.contractName}
-              enableCreateContract={this.props.codeEditorData.enableCreateAction}
-              textFromEditor={sourceCode}
-              sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
             <CreateContract
               onChangeEditorContractName={this.props.contractNameChange}
               contractNameFromEditor={this.props.codeEditorData.contractName}

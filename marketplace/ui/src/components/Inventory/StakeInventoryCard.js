@@ -30,7 +30,6 @@ const StakeInventoryCard = ({
   offset,
   user,
   supportedTokens,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { reserves } = useInventoryState();
@@ -43,9 +42,7 @@ const StakeInventoryCard = ({
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
-  const decimals = assetsWithEighteenDecimalPlaces?.includes(inventory.root)
-    ? 18
-    : inventory.decimals || 0;
+  const decimals = 18;
 
   const uniqueEscrows = new Set();
   let collateralQuantity = inventory?.inventories
@@ -345,7 +342,6 @@ const StakeInventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -359,7 +355,6 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {stakeModalOpen && (
@@ -373,7 +368,6 @@ const StakeInventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
     </div>

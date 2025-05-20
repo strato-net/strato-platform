@@ -1,4 +1,4 @@
-contract TestContract {
+contract record TestContract {
 
   int public intValue;
   string public stringValue;

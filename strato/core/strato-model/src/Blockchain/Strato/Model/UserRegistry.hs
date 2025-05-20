@@ -9,9 +9,6 @@ import Text.RawString.QQ
 userRegistryContract :: Text
 userRegistryContract =
   [r|
-pragma es6;
-pragma strict;
-pragma builtinCreates;
 
 enum IssuerStatus {
     NULL,
@@ -20,7 +17,7 @@ enum IssuerStatus {
     AUTHORIZED
 }
 
-contract UserRegistry {
+contract record UserRegistry {
     constructor() { 
         // create the first issuer approver
         string _commonName = getUserCert(msg.sender)["commonName"];
@@ -62,7 +59,7 @@ contract UserRegistry {
     }
 }
 
-contract User {
+contract record User {
     address private owner;
     string public commonName;
     IssuerStatus public issuerStatus;

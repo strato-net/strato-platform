@@ -170,6 +170,7 @@ function newnode {
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
     --validatorBehavior=${validatorBehavior:-true} \
+    --test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     "${networkFlag}" "${iFlag}" "${sBFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
@@ -181,9 +182,6 @@ function newnode {
 
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
-  fi
-  if [ -n "${accountNonceLimit}" ]; then
-      aclFlag="--accountNonceLimit=${accountNonceLimit}"
   fi
   if [ -n "${txSizeLimit}" ]; then
       txsFlag="--txSizeLimit=${txSizeLimit}"
@@ -239,9 +237,7 @@ function newnode {
     --sqlDiff=${sqlDiff:-true} \
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
-    --requireCerts=${requireCerts:-true} \
     ${networkFlag} \
-    "${aclFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
     "${creatorFlag}" \
@@ -258,7 +254,6 @@ function newnode {
     --vaultUrl=${VAULT_URL} \
     --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
     "${networkFlag}" \
-    "${aclFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
     "${idServer}" \

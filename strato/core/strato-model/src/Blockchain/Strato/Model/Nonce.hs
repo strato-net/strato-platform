@@ -18,6 +18,8 @@ import Test.QuickCheck hiding ((.&.))
 
 newtype Nonce = Nonce Word256
   deriving (Eq, Show, Generic)
+  deriving newtype (Integral)
+  deriving newtype (Real)
   deriving newtype (Num, Ord, Enum, Bounded)
   deriving anyclass (NFData)
 

@@ -84,11 +84,11 @@ main = do
       t =
         createContractCreationTX
           0 --nonce
-          1 --gas price
           1000000000000000000 --gas limit
-          1 --value
+          ""
+          []
           (Code pushLarges)
-          Nothing
+          ""
           secretKey
 
   signedTransaction' <- liftIO t
@@ -131,7 +131,7 @@ main = do
             addressStateChainId = Nothing
           }
 
-      runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction (Address 0)
+      runExceptT $ addTransaction blockData 10000000000000000000000000000 signedTransaction (Address 0)
 
   case result of
     Left e -> putStrLn $ show e

@@ -1,5 +1,5 @@
 
-contract FSM {
+contract record FSM {
 
     struct Transition {
         uint state;

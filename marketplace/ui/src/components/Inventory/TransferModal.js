@@ -33,21 +33,14 @@ const TransferModal = ({
   limit = 0,
   offset = 0,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const {
     message: marketplaceMsg,
     success: marketplaceSuccess,
-    stratsAddress,
   } = useMarketplaceState();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const isStrat = inventory.originAddress === stratsAddress;
-  const decimals = isStrat
-    ? 2
-    : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-    ? 18
-    : inventory.decimals || 0;
+  const decimals = 18;
   const availableQuantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );

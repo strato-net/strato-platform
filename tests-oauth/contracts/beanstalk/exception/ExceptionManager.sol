@@ -14,7 +14,7 @@ import "/dapp/exceptionDef/contracts/ExceptionType.sol";
 * #see Exception
 */
 
-contract ExceptionManager is RestStatus, ExceptionType, BeanstalkErrorCodes {
+contract record ExceptionManager is RestStatus, ExceptionType, BeanstalkErrorCodes {
 
   constructor() {
   }

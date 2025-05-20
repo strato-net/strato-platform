@@ -9,7 +9,7 @@
 * #return none
 */
 
-contract BeanstalkPermission {
+contract record BeanstalkPermission {
   enum BeanstalkPermission {
     APPROVE_MEMBERSHIP,
     UPDATE_MEMBERSHIP,

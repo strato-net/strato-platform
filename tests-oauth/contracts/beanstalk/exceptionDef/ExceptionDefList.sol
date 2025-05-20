@@ -11,7 +11,7 @@
  * #return none
  */
 
-contract ExceptionDefList {
+contract record ExceptionDefList {
 
   string[] public exceptionIds;
 

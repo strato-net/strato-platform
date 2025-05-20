@@ -48,17 +48,12 @@ const RedeemModal = ({
   const {
     userAddresses,
     isLoadingUserAddresses,
-    assetsWithEighteenDecimalPlaces,
     stratsAddress,
   } = useMarketplaceState();
   const isStrat = inventory.originAddress === stratsAddress;
   const { TextArea } = Input;
 
-  const decimals = isStrat
-    ? 2
-    : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-    ? 18
-    : inventory.decimals || 0;
+  const decimals = 18;
   const displayQuantity = inventory.quantity / Math.pow(10, decimals);
 
   const closeAddressModel = () => {

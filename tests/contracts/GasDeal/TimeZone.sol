@@ -1,4 +1,4 @@
-contract TimeZone {
+contract record TimeZone {
     enum TimeZone {
         EDT,
         CDT,

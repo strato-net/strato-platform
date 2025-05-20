@@ -1,4 +1,4 @@
-contract DataTypeBool {
+contract record DataTypeBool {
     bool storedData;
 
     bool[] storedDatum;

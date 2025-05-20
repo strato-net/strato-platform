@@ -1,4 +1,4 @@
-contract EchoRole {
+contract record EchoRole {
   enum EchoRole {
     NULL,
     ADMIN,

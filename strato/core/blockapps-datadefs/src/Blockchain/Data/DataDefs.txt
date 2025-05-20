@@ -87,22 +87,20 @@ RawTransaction
     timestamp UTCTime
     fromAddress Address
     nonce Integer sqltype=numeric(1000,0)
-    gasPrice Integer sqltype=numeric(1000,0)
     gasLimit Integer sqltype=numeric(1000,0)
     toAddress Address Maybe
-    value Integer sqltype=numeric(1000,0)
-    codeOrData BS.ByteString Maybe
-    contractName String Maybe
-    codePtrAddress Address Maybe
-    chainId Word256
+    funcName Text Maybe
+    contractName Text Maybe
+    args [Text]
+    network Text
+    code Code Maybe
     r Integer
     s Integer
     v Word8
-    metadata [TextPair] Maybe
     blockNumber Int
     txHash Keccak256
     origin TXOrigin
-    UniqueTXHash txHash chainId
+    UniqueTXHash txHash
     deriving Eq Generic Read Show
 
 Storage json

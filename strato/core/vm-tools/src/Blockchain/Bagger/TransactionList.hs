@@ -20,9 +20,6 @@ type TransactionList = M.Map Integer OutputTx
 nonce :: OutputTx -> Integer
 nonce = transactionNonce . otBaseTx
 
-gasPrice :: OutputTx -> Integer
-gasPrice = transactionGasPrice . otBaseTx
-
 --emptyTransactionList :: TransactionList
 --emptyTransactionList = M.empty
 
@@ -38,7 +35,8 @@ insertTransaction t tl =
    in case oldTx of
         Nothing -> (Nothing, t, M.insert nonce' t tl)
         Just existing ->
-          if gasPrice existing <= gasPrice t
+--          if gasPrice existing <= gasPrice t
+          if False
             then (oldTx, t, M.insert nonce' t tl)
             else (Just t, existing, tl)
 

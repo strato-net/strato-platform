@@ -15,7 +15,7 @@ import "./BeanstalkUser.sol";
 * #return none
 */
 
-contract BeanstalkUserManager is RestStatus, BeanstalkErrorCodes, Notification {
+contract record BeanstalkUserManager is RestStatus, BeanstalkErrorCodes, Notification {
   address dappAddress;
   BeanstalkPermissionManager permissionManager;
   Hashmap usersById;

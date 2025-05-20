@@ -1,4 +1,4 @@
-contract DataTypeAddress {
+contract record DataTypeAddress {
     address storedData;
 
     address[] storedDatum;

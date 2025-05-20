@@ -54,7 +54,6 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { isReserveLoading, reserves } = useInventoryState();
@@ -91,19 +90,12 @@ const InventoryCard = ({
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
   const { stratsAddress } = useMarketplaceState();
-  const decimals =
-    stratsAddress === inventory.originAddress
-      ? 2
-      : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-        ? 18
-        : inventory.decimals || 0;
+  const decimals = 18;
   const quantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );
   const price = inventory?.price
-    ? assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-      ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
-      : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
+    ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
     : undefined;
   
   const saleQuantity = (
@@ -661,7 +653,6 @@ const InventoryCard = ({
           categoryName={category}
           user={user}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -686,7 +677,6 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -700,7 +690,6 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -725,7 +714,6 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -737,7 +725,6 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

@@ -1,4 +1,4 @@
-contract Searchable {
+contract record Searchable {
   bool constant isSearchable = true;
   uint searchCounter;
 

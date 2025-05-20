@@ -3,7 +3,7 @@ import "./RestStatus.sol";
 /**
 * Permission Manager for all
 */
-contract PermissionManager is RestStatus {
+contract record PermissionManager is RestStatus {
   // master account
   address master;
   // owner account

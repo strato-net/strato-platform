@@ -4,7 +4,7 @@ import "./PermissionManager.sol";
 /**
  * Permissioned Hashmap
  */
-contract PermissionedHashmap is RestStatus, UnsafeHashmap {
+contract record PermissionedHashmap is RestStatus, UnsafeHashmap {
   PermissionManager public permissionManager;
 
   constructor(address _permissionManager) {

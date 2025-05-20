@@ -1,4 +1,4 @@
-contract SimpleIntStorage {
+contract record SimpleIntStorage {
     uint storedData;
 
     uint[] storedDatum;

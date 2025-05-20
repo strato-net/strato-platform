@@ -25,7 +25,7 @@ import "../user/BeanstalkUserManager.sol";
 * #return none
 */
 
-contract MembershipManager is RestStatus, Util, MembershipEvent, MembershipState, BeanstalkRole, BeanstalkErrorCodes {
+contract record MembershipManager is RestStatus, Util, MembershipEvent, MembershipState, BeanstalkRole, BeanstalkErrorCodes {
   address dappAddress;
   BeanstalkPermissionManager permissionManager;
   AgreementManager agreementManager;

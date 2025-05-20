@@ -5,7 +5,7 @@ import "./Util.sol";
 /**
  *
  */
-contract Vehicle is Util {
+contract record Vehicle is Util {
   uint timestamp;
   string public vin;
   string public s0;

@@ -15,6 +15,7 @@ import saleJs from '../orders/sale';
 import escrowJs from '../escrow/escrow';
 
 const contractName = constants.assetTableName;
+const balancesContractName = `${contractName}-_balances`;
 const transferContractName = `${contractName}.ItemTransfers`;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
@@ -107,6 +108,8 @@ function marshalIn(_args) {
   const args = {
     ...defaultArgs,
     ..._args,
+    _name: _args._name || _args.name,
+    _owner: _args._owner || _args.owner,
   };
   return args;
 }
@@ -142,6 +145,8 @@ async function getHistory(user, chainId, address, options) {
 function marshalOut(_args) {
   const args = {
     ..._args,
+    name: _args.name || _args._name,
+    owner: _args.owner || _args._owner,
   };
   return args;
 }
@@ -462,6 +467,7 @@ async function getAll(admin, args = {}, defaultOptions) {
   const {
     range,
     ownerCommonName,
+    owner,
     assetAddresses,
     status,
     isMarketplaceSearch,
@@ -534,45 +540,55 @@ async function getAll(admin, args = {}, defaultOptions) {
     }
   } else {
     // Fetch all Inventories and join sales table.
-    if (ownerCommonName) {
-      inventories = await searchAllWithQueryArgs(
+    if (owner) {
+      const rawOwnerBalances = await searchAllWithQueryArgs(
+        balancesContractName,
+        { queryOptions: { key: `eq.${owner}`, select: 'address,value' } },
+        options,
+        admin
+      );
+      const ownerBalances = rawOwnerBalances.map((b) => b.address);
+      const balancesMap = rawOwnerBalances.reduce((obj, i) => ({...obj, [i.address]: i}), {});
+      const rawInventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           status,
-          ownerCommonName: ownerCommonName,
           queryOptions: queryOptions
-            ? queryOptions
-            : { select: constants.attachSalesEscrowsAndImagesAndFiles },
+            ? { ...queryOptions, address: `in.(${ownerBalances.join(',')})`, owner: undefined }
+            : { address: `in.(${ownerBalances.join(',')})`, select: constants.attachSalesEscrowsAndImagesAndFiles },
         },
         options,
         admin
       );
+      inventories = rawInventories.map((i) => ({ ...i, owner: undefined, _owner: owner, quantity: (balancesMap[i.address].value || '0') }));
     } else if (assetAddresses) {
-      inventories = await searchAllWithQueryArgs(
+      const rawInventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           address: assetAddresses,
           queryOptions: {
-            select: constants.attachSalesEscrowsAndImagesAndFiles,
+            select: `${constants.attachSalesEscrowsAndImagesAndFiles},${balancesContractName}(key,value)`,
           },
         },
         options,
         admin
       );
+      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: undefined, _owner: b.key, quantity: b.value })))]), []);
     } else {
-      inventories = await searchAllWithQueryArgs(
+      const rawInventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           queryOptions: {
-            select: constants.attachSalesEscrowsAndImagesAndFiles,
+            select: `${constants.attachSalesEscrowsAndImagesAndFiles},${balancesContractName}(key,value)`,
           },
         },
         options,
         admin
       );
+      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: undefined, _owner: b.key, quantity: b.value })))]), []);
     }
 
     // Currently can't filter on second table, so filtering sales fields here.

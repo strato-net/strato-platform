@@ -329,62 +329,6 @@ describe("rest_7", function () {
     });
     */
   });
-
-  describe("send", function () {
-    this.timeout(config.timeout);
-    let user2;
-
-    before(async () => {
-      const user2Args = { token: process.env.USER2_TOKEN };
-      user2 = await factory.createAdmin(user2Args, options);
-    });
-
-    it("send - sync", async () => {
-      const sendTxArgs = factory.createSendTxArgs(user2.address);
-      const result = await rest.send(admin, sendTxArgs, options);
-
-      assert.equal(sendTxArgs.toAddress, result.to, "address");
-      assert.equal(sendTxArgs.value, result.value, "value");
-
-      // TODO: verify balances
-    });
-
-    it("send - async", async () => {
-      const sendTxArgs = factory.createSendTxArgs(user2.address);
-      const pendingTxResult = await rest.send(admin, sendTxArgs, {
-        ...options,
-        isAsync: true
-      });
-      assert.isOk(util.isHash(pendingTxResult.hash), "hash");
-      // must resolve the transaction before the next test
-      await rest.resolveResult(admin, pendingTxResult, options);
-    });
-
-    it("sendMany - sync", async () => {
-      const sendTxs = factory.createSendTxArgsArr(admin.address);
-      const results = await rest.sendMany(admin, sendTxs, { config });
-
-      // Assert every value that was sent
-      results.forEach((result, index) => {
-        assert.equal(sendTxs[index].toAddress, result.to, "address");
-        assert.equal(sendTxs[index].value, result.value, "value");
-      });
-
-      // TODO: verify balances
-    });
-
-    it("sendMany - async", async () => {
-      const sendTxs = factory.createSendTxArgsArr(admin.address);
-
-      const results = await rest.sendMany(admin, sendTxs, { config });
-
-      results.forEach((result, index) => {
-        assert.isOk(util.isHash(result.hash), `hash ${index}`);
-      });
-
-      // TODO: wait for tx to resolve
-    });
-  });
 });
 
 async function createSearchContract(

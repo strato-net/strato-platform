@@ -1,4 +1,4 @@
-contract CutResolutionType {
+contract record CutResolutionType {
   enum CutResolutionType {
     NULL,
     ADJUST,

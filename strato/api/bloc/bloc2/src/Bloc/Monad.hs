@@ -54,7 +54,6 @@ type HasBlocEnv m = Accessible BlocEnv m
 data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
-    accountNonceLimit :: Integer,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Address Nonce,
     txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),

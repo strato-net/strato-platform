@@ -96,9 +96,7 @@ Object {
 
 exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
 "<div>
-  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-    <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} disabled={true} text=\\"setX\\" />
-  </Blueprint.Popover>
+  <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} text=\\"setX\\" />
   <form>
     <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'setX\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">

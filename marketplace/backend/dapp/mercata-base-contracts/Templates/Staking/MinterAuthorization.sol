@@ -1,10 +1,8 @@
-pragma solidvm 11.5;
-
 import <509>;
 
 import "../Utils/Utils.sol";
 
-abstract contract MinterAuthorization is Utils {
+abstract contract record MinterAuthorization is Utils {
     string public name;
     address public owner;
     bool public isActive;

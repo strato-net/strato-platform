@@ -12,7 +12,7 @@
 * #return none
 */
 
-contract Node {
+contract record Node {
 
   address public dappAddress;
   address public owner;

@@ -1,6 +1,6 @@
 import "../D.sol"
 
-contract C {
+contract record C {
   constructor () {
   }
 }

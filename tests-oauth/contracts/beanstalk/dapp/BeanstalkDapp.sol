@@ -13,7 +13,7 @@ import "../user/BeanstalkUserManager.sol";
  * Deployed by the deploy script
  */
 
-contract BeanstalkDapp {
+contract record BeanstalkDapp {
 
   // Public
   address owner;

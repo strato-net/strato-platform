@@ -6,46 +6,35 @@ import constants, { ISSUER_STATUS } from '../../../helpers/constants';
 const options = { config, cacheNonce: true };
 
 class UsersController {
-  static async me(req, res, next) {
+    static async me(req, res, next) {
     try {
-      const { dapp, accessToken, decodedToken, address: userAddress } = req;
+      const { accessToken, decodedToken, address } = req;
       const username = decodedToken.preferred_username;
-      let user = null;
-      if (Object.hasOwn(dapp, 'hasCert')) user = dapp.hasCert;
-      if (user === null || user === undefined) {
-        user = await pollingHelper(dapp.getCertificate, [{ userAddress }]);
-        // user = await dapp.getCertificate({ userAddress })
-        if (user === null || user === undefined)
-          console.log('user not found in after multiple attempts');
-      }
-      console.debug('me USER ', user);
-      if (!user || Object.keys(user).length == 0) {
-        rest.response.status400(res, { username });
-      } else {
-        const walletSearchOptions = {
-          commonName: user.commonName,
+      const email = decodedToken.email;
+      const walletSearchOptions = {
+	  userAddress: address,
           notEqualsField: 'issuerStatus',
           notEqualsValue: 'null',
           sort: '-block_timestamp',
           limit: 1,
-        };
-        const walletResp = await searchAllWithQueryArgs(
+      };
+      const walletResp = await searchAllWithQueryArgs(
           constants.userContractName,
           walletSearchOptions,
           options,
           accessToken
-        );
+      );
 
-        rest.response.status200(res, {
-          ...user,
-          email: decodedToken.email,
-          preferred_username: decodedToken.preferred_username,
+      rest.response.status200(res, {
+	  preferred_username: username,
+	  email: email,
+	  address: address,
           issuerStatus: walletResp[0]
             ? walletResp[0].issuerStatus
             : ISSUER_STATUS.UNAUTHORIZED,
           isAdmin: walletResp[0] ? walletResp[0].isAdmin : false,
-        });
-      }
+      });
+
       return next();
     } catch (e) {
       return next(e);

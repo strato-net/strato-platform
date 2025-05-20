@@ -2,7 +2,7 @@ import "../dapp/Notification.sol";
 import "../membership/MembershipState.sol";
 import "../permission/BeanstalkRole.sol";
 
-contract AgreementMembership is Notification, BeanstalkRole, MembershipState {
+contract record AgreementMembership is Notification, BeanstalkRole, MembershipState {
 
   address public owner;
   address public dappAddress;

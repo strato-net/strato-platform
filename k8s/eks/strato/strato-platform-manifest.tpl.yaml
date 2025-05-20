@@ -537,8 +537,6 @@ spec:
           - containerPort: 30303
             protocol: UDP
         env:
-        - name: accountNonceLimit
-          value: ""
         - name: addBootnodes
           value: ""
         - name: appFetchLimit
@@ -627,8 +625,6 @@ spec:
           value: "6379"
         - name: redisBDBNumber
           value: ""
-        - name: requireCerts
-          value: "true"
         - name: seqEventsBatchSize
           value: ""
         - name: seqEventsCostHeuristic

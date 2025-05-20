@@ -28,7 +28,7 @@ let options:Options={config, cacheNonce: true}
 
 //config.apiDebug=true;
 const nonceOrder = `
-contract NonceOrder {
+contract record NonceOrder {
     uint a = 0;
     uint b = 0;
 
@@ -173,32 +173,6 @@ async function getBalance(user:OAuthUser, address:string) {
 }
 
 describe('Nonce upload orders', async () => {
-
-  it ('will respect the nonce provided on each send tx', async () => {
-    const user = await createNewUser("user3");
-    console.log(`Setting 300, then 4`);
-    const user2 = await createNewUser("user4");
-    const balance1 = await getBalance(user, user2.address);
-    const v1 = 40000000; // These numbers should be higher than any value other tests use
-    const v2 = 3000000000;
-    await send(user, user2.address, [v1, v2]);
-    const balance2 = await getBalance(user, user2.address);
-    const actualDiff = new BigNumber(balance2).minus(balance1).toNumber();
-    assert.isAtLeast(actualDiff, v1+v2, `Difference in balance should be at least ${v1+v2}`);
-  }).timeout(config.timeout);
-  
-  it ("won't collide nonces when none are provided for send txs", async () => {
-    const user = await createNewUser("user3");
-    console.log(`Setting 4, then 300`);
-    const user2 = await createNewUser("user4");
-    const balance1 = await getBalance(user, user2.address);
-    const v1 = 40000000; // These numbers should be higher than any value other tests use
-    const v2 = 3000000000;
-    await sendNoNonces(user, user2.address, [v1, v2]);
-    const balance2 = await getBalance(user, user2.address);
-    const actualDiff = new BigNumber(balance2).minus(balance1).toNumber();
-    assert.isAtLeast(actualDiff, v1+v2, `Difference in balance should be at least ${v1+v2}`);
-  }).timeout(config.timeout);
 
   it ('will respect the nonce provided on each method tx', async () => {
     const [user, contract] = await upload();

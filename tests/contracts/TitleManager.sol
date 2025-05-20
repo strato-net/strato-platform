@@ -9,7 +9,7 @@ import "./Util.sol";
 * Interface for Title data contracts
 */
 
-contract TitleManager is ErrorCodes, Util {
+contract record TitleManager is ErrorCodes, Util {
 
   // creator of the contract
   address creator;

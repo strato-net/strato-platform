@@ -1,11 +1,9 @@
-pragma solidvm 11.5;
-
 import <509>;
 import "../Assets/Asset.sol";
 import "../Staking/Reserve.sol";
 import "../Utils/Utils.sol";
 
-abstract contract Escrow is Utils {
+abstract contract record Escrow is Utils {
     address public reserve;
     uint public collateralQuantity;
     uint public collateralValue;
@@ -19,7 +17,7 @@ abstract contract Escrow is Utils {
     address public borrower;
     string public borrowerCommonName;
     address public assetRootAddress;
-    Asset[] public assets;
+    Asset[] public record assets;
 
     string public version;
 

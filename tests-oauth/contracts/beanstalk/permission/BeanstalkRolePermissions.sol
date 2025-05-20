@@ -13,7 +13,7 @@ import "./BeanstalkRole.sol";
 * #return none
 */
 
-contract BeanstalkRolePermissions is BeanstalkRole, BeanstalkPermission {
+contract record BeanstalkRolePermissions is BeanstalkRole, BeanstalkPermission {
   uint[] rolePermissions;
 
   /**

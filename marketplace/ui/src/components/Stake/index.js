@@ -39,7 +39,7 @@ const USDSTIcon = (
   <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items, assetsWithEighteenDecimalPlaces) {
+function combineInventories(items) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -60,9 +60,7 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
       'BlockApps-Mercata-Asset-images': assetImages,
     } = firstItem;
 
-    const decimals = assetsWithEighteenDecimalPlaces.includes(root)
-      ? 18
-      : firstItem.decimals || 0;
+    const decimals = 18
 
     // Step 3: Sum `quantity` and `saleQuantity` across the group
     const totalQuantity = group.reduce((sum, item) => {
@@ -117,7 +115,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+  const { USDSTAddress } =
     useMarketplaceState();
   const {
     message: ethMsg,
@@ -143,10 +141,9 @@ const Stake = ({ user }) => {
 
   const combinedInventories = useMemo(() => {
     return combineInventories(
-      inventories,
-      assetsWithEighteenDecimalPlaces
+      inventories
     );
-  }, [inventories,assetsWithEighteenDecimalPlaces]);
+  }, [inventories]);
 
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
@@ -256,7 +253,6 @@ const Stake = ({ user }) => {
           offset,
           reserves,
           bridgeableAddresses,
-          assetsWithEighteenDecimalPlaces,
           navigate
         )}
         dataSource={populatedInventories}
@@ -330,8 +326,7 @@ const Stake = ({ user }) => {
                     limit,
                     offset,
                     reserves,
-                    USDSTAddress,
-                    assetsWithEighteenDecimalPlaces
+                    USDSTAddress
                   )}
                   dataSource={combinedInventories?.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
@@ -366,9 +361,6 @@ const Stake = ({ user }) => {
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}
-                    assetsWithEighteenDecimalPlaces={
-                      assetsWithEighteenDecimalPlaces
-                    }
                   />
                 ))}
               </div>

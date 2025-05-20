@@ -42,7 +42,6 @@ const SoldOrderDetails = ({ user, users }) => {
   const { Text } = Typography;
   const [selectedDate, setSelectedDate] = useState('');
   const [status, setStatus] = useState(getStatus(1));
-  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const [paid, setPaid] = useState('Processing');
   const [comment, setComment] = useState('');
@@ -84,9 +83,7 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          prod.root
-        ) ? 18 : prod.decimals || 0;
+        const decimals = 18;
         const productQuantity = orderQuantities[index] / Math.pow(10, decimals);
         const productPrice = (prod.price * Math.pow(10, decimals)).toFixed(2);
 
@@ -116,7 +113,7 @@ const SoldOrderDetails = ({ user, users }) => {
       });
       setdata(items);
     }
-  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
+  }, [orderDetails]);
 
   useEffect(() => {
     setId(routeMatch?.params?.id);

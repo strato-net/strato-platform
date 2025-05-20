@@ -5,7 +5,7 @@ import "./EchoRolePermissions.sol";
 /**
 * Echo Permission Manager
 */
-contract EchoPermissionManager is PermissionManager, EchoPermission, EchoRolePermissions {
+contract record EchoPermissionManager is PermissionManager, EchoPermission, EchoRolePermissions {
 
   constructor(
     address _admin,
