@@ -251,7 +251,7 @@ main = do
               ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
               ("", "helium") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", _) -> error "File server url was not provided and cannot be derived"
+              ("", _) -> "http://localhost"
               (fileServer, _) -> fileServer
           ),
           ( "monitor",

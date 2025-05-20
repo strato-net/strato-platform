@@ -4,8 +4,9 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Blockchain.GenesisBlocks.HeliumGenesisBlock (
-  genesisBlock
+module Blockchain.GenesisBlocks.HeliumGenesisBlock
+  ( genesisBlock
+  , testGenesisBlock
   ) where
 
 import           BlockApps.X509
@@ -36,9 +37,19 @@ import           SolidVM.Model.Storable
 import           Text.RawString.QQ
 
 genesisBlock :: GenesisInfo
-genesisBlock  =
+genesisBlock = genesisBlock' usdstAddress
+  where
+    usdstAddress = case filter ((== "USDST") . GA.name) GA.assets of
+      (a:_) -> GA.root a
+      _ -> error "No USDST contract found in genesis assets"
+
+testGenesisBlock :: GenesisInfo
+testGenesisBlock = genesisBlock' 0x0
+
+genesisBlock' :: Address -> GenesisInfo
+genesisBlock' usdstAddress =
   insertMercataGovernanceContract validators admins
-  . insertDecideContract
+  . insertDecideContract usdstAddress
   . insertCertRegistryContract extraCerts
   $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
