@@ -3,11 +3,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { BridgeProvider } from "@/lib/bridge/BridgeContext";
-import { WagmiProvider } from 'wagmi';
-import { mainnet, polygon, sepolia } from 'wagmi/chains';
-import { getDefaultWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import { createConfig, http } from 'wagmi';
-import '@rainbow-me/rainbowkit/styles.css';
+import { WagmiProvider } from "wagmi";
+import { mainnet, polygon, sepolia } from "wagmi/chains";
+import { getDefaultWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { createConfig, http } from "wagmi";
+import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { SwapProvider } from "@/context/SwapContext";
@@ -18,6 +18,7 @@ import WalletCreated from "./pages/WalletCreated";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
+import Transfer from "./pages/Transfer";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import Borrow from "./pages/Borrow";
@@ -35,8 +36,8 @@ const queryClient = new QueryClient();
 
 // Configure wagmi with RainbowKit
 const { wallets } = getDefaultWallets({
-  appName: 'Mercata Vault Finance',
-  projectId: 'YOUR_PROJECT_ID', // Replace with your WalletConnect project ID
+  appName: "Mercata Vault Finance",
+  projectId: "YOUR_PROJECT_ID", // Replace with your WalletConnect project ID
 });
 
 const config = createConfig({
@@ -57,33 +58,56 @@ const App = () => (
             <UserProvider>
               <UserTokensProvider>
                 <SwapProvider>
-                  <Toaster />
-                  <BrowserRouter>
-                    <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/register" element={<Register />} />
-                      <Route path="/wallet-created" element={<WalletCreated />} />
-                      <Route path="/onboarding" element={<Onboarding />} />
-                      
-                      {/* Dashboard Routes */}
-                      <Route element={<DashboardLayout />}>
+                  <TooltipProvider>
+                    <Toaster />
+                    {/* <Sonner /> */}
+                    <BrowserRouter>
+                      <Routes>
+                        <Route path="/" element={<Index />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route
+                          path="/wallet-created"
+                          element={<WalletCreated />}
+                        />
+                        <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/dashboard/swap" element={<SwapAsset />} />
                         <Route path="/dashboard/assets" element={<Assets />} />
-                        <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
+                        <Route
+                          path="/dashboard/assets/:id"
+                          element={<AssetDetail />}
+                        />
                         <Route path="/dashboard/borrow" element={<Borrow />} />
-                        <Route path="/dashboard/assets-list" element={<AssetsList />} />
-                        <Route path="/dashboard/bridge" element={<BridgePage />} />
-                        <Route path="/dashboard/bridge-transactions" element={<BridgeTransactionsPage />} />
-                        <Route path="/dashboard/deposit" element={<DepositPage />} />
-                        <Route path="/dashboard/deposit-options" element={<DepositOptionsPage />} />
-                      </Route>
-                      
-                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </BrowserRouter>
+                        <Route
+                          path="/dashboard/transfer"
+                          element={<Transfer />}
+                        />
+                        <Route
+                          path="/dashboard/assets-list"
+                          element={<AssetsList />}
+                        />
+                        <Route
+                          path="/dashboard/bridge"
+                          element={<BridgePage />}
+                        />
+                        <Route
+                          path="/dashboard/bridge-transactions"
+                          element={<BridgeTransactionsPage />}
+                        />
+                        <Route
+                          path="/dashboard/deposit"
+                          element={<DepositPage />}
+                        />
+                        <Route
+                          path="/dashboard/deposit-options"
+                          element={<DepositOptionsPage />}
+                        />
+                        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </BrowserRouter>
+                  </TooltipProvider>
                 </SwapProvider>
               </UserTokensProvider>
             </UserProvider>

@@ -3,8 +3,8 @@ import axios from "axios";
 import { toast } from "@/components/ui/sonner";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost/api", // Adjust accordingly
-  withCredentials: true, // if using cookies for auth
+  baseURL: "/api",
+  withCredentials: true,
 });
 
 // Response interceptor to catch 401
