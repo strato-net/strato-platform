@@ -55,6 +55,7 @@ async function main() {
     console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
     console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
     console.log(`Mercata ETH Bridge: ${deployedContract.managers.mercataEthBridge}`);
+    console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting

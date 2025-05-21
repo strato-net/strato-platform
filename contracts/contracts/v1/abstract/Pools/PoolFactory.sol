@@ -15,10 +15,10 @@
 
 import "Pool.sol";
 
-abstract contract PoolFactory is Ownable {
+contract record PoolFactory is Ownable {
     event NewPool(address indexed tokenA, address indexed tokenB, address pool);
 
-    mapping(address => mapping(address => address)) public getPool;
+    mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
 
     constructor() Ownable() {}
@@ -29,13 +29,13 @@ abstract contract PoolFactory is Ownable {
     function createPool(address tokenA, address tokenB) external returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
-        require(getPool[tokenA][tokenB] == address(0) && getPool[tokenB][tokenA] == address(0), "Pool exists");
+        require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
         
         // deploy new pool
         pool = address(new Pool(tokenA, tokenB));
 
-        getPool[tokenA][tokenB] = pool;
-        getPool[tokenB][tokenA] = pool; // support both directions
+        pools[tokenA][tokenB] = pool;
+        pools[tokenB][tokenA] = pool; // support both directions
 
         allPools.push(pool);
         emit NewPool(tokenA, tokenB, pool);
@@ -47,17 +47,17 @@ abstract contract PoolFactory is Ownable {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pool != address(0), "Invalid pool address");
-        require(getPool[tokenA][tokenB] == address(0) && getPool[tokenB][tokenA] == address(0), "Pool already registered");
+        require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool already registered");
         
-        getPool[tokenA][tokenB] = pool;
-        getPool[tokenB][tokenA] = pool;
+        pools[tokenA][tokenB] = pool;
+        pools[tokenB][tokenA] = pool;
 
         allPools.push(pool);
         emit PoolMigrated(tokenA, tokenB, pool);
     }
 
     function getPool(address tokenA, address tokenB) external view returns (address pool) {
-        return getPool[tokenA][tokenB];
+        return pools[tokenA][tokenB];
     }
 
     function allPoolsLength() external view returns (uint256) {

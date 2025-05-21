@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.1.0) (token/ERC20/extensions/IERC20Metadata.sol)
-pragma solidvm 12.0;
-
 import"../IERC20.sol";
 
 /**

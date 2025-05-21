@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)
-pragma solidvm 12.0;
-
 /**
  * @dev Provides information about the current execution context, including the
  * sender of the transaction and its data. While these are generally available
@@ -13,11 +11,12 @@ pragma solidvm 12.0;
  * This contract is only required for intermediate, library-like contracts.
  */
 abstract contract Context {
-    function _msgSender() internal view virtual returns (address) {
+   
+   function _msgSender() internal view virtual returns (address) {
         return msg.sender;
     }
 
-    function _msgData() internal view virtual returns (bytes memory) {
+    function _msgData() internal view virtual returns (bytes ) {//MERCATA_COMPATIBILITY: This exists as bytes calldata in OpenZeppelin but that is not compatible with solidvm so changed to just bytes.
         return msg.data;
     }
 

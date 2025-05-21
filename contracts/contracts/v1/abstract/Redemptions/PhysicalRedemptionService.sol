@@ -1,9 +1,4 @@
-pragma es6;
-pragma strict;
-
-import <BASE_CODE_COLLECTION>;
-
-contract PhysicalRedemptionService is RedemptionService, ERC20Burnable, ERC20 {
+contract record PhysicalRedemptionService is RedemptionService, ERC20Burnable, ERC20 {
     address public owner;
 
     string public serviceName;

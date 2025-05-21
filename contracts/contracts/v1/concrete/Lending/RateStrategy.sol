@@ -1,9 +1,10 @@
-pragma solidvm 12.0;
-
-import "../../abstract/Lending/RateStrategyBase.sol";
-
-contract RateStrategy is RateStrategyBase {
-     constructor() {
-        // No state to set yet; if `SECONDS_IN_YEAR` is needed from a parent, ensure inheritance
+contract record RateStrategy {
+    constructor()  {
     } 
+    
+    function calculateInterest(uint256 principal, uint256 rate, uint256 lastUpdated) pure  returns (uint256) {
+        if (block.timestamp <= lastUpdated) return 0;
+        uint256 duration = block.timestamp - lastUpdated;
+        return (principal * rate * duration) / (365 * 24 * 60 * 100);
+    }
 }
