@@ -33,6 +33,7 @@ import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
 import qualified Blockchain.GenesisBlocks.ProductionGenesisBlock as Production
+import Blockchain.Network
 import Blockchain.Sequencer.DB.DependentBlockDB (DependentBlockDB(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
@@ -99,20 +100,20 @@ createFilesystemPeerAndCorePeer ::
   FilesystemDBs ->
   IO (FilesystemPeer, CorePeer)
 createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav sock fsDBs = do
-  (genesisInfo, bootNodes) <- case network' of
-    "mercata" -> pure (Production.productionGenesisBlock, ["44.209.149.47","54.84.33.40","52.1.78.10","44.198.14.117","3.84.124.109"]) -- nodes 1-4 and dustin-node
-    "mercata-hydrogen" -> pure (Production.productionGenesisBlock, ["52.4.166.179","3.94.32.63","44.216.113.122","52.7.26.21"])
-    "mercata-helium" -> pure (Helium.genesisBlock, [])
+  bootNodes <- maybe [] (Host . T.pack . webAddress <$>) <$> getParams network'
+  genesisInfo <- case network' of
+    "mercata" -> pure Production.productionGenesisBlock
+    "mercata-hydrogen" -> pure Production.productionGenesisBlock
+    "helium" -> pure Helium.genesisBlock
     _ -> do
       let privAndIds = [(privKey, selfId)]
           validatorsPrivKeys = id privAndIds
           vals' = makeValidators validatorsPrivKeys
       certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
       let vals = snd <$> vals'
-          gi = insertBitcoinBridgeContract
-             . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
-             $ insertCertRegistryContract certs defaultGenesisInfo
-      pure (gi, [])
+      pure . insertBitcoinBridgeContract
+           . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
+           $ insertCertRegistryContract certs defaultGenesisInfo
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
   corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
   pure (fsPeer, corePeer)

@@ -10,6 +10,7 @@ description:
 
 dependencies:
   - base
+  - strato-networks
   - vm-tools
 
 executables:
