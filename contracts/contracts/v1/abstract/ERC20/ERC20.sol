@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.2.0) (token/ERC20/ERC20.sol)
-pragma solidvm 12.0;
-
 import "./IERC20.sol";
 import "./extensions/IERC20Metadata.sol";
 import "./utils/Context.sol";
@@ -24,7 +22,7 @@ import "./utils/Context.sol";
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
  */
-abstract contract ERC20 is IERC20, IERC20Metadata{ //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
+abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
     mapping(address => uint256) public record _balances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream
 
     mapping(address => mapping(address => uint256)) public record _allowances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream. Also, I realize now that nested mappings don't work in slipstream so we need to use a different approach to query the allowances for now.
@@ -286,16 +284,4 @@ abstract contract ERC20 is IERC20, IERC20Metadata{ //MERCATA_COMPATIBILITY: Inhe
         }
     }
 
-    function _msgSender() internal view virtual returns (address) {
-        return msg.sender;
-    }
-
-    function _msgData() internal view virtual returns (bytes ) {//MERCATA_COMPATIBILITY: This exists as bytes calldata in OpenZeppelin but that is not compatible with solidvm so changed to just bytes.
-        return msg.data;
-    }
-
-    function _contextSuffixLength() internal view virtual returns (uint256) {
-        return 0;
-    }
-    
 }

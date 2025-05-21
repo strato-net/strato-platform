@@ -1,15 +1,12 @@
-pragma es6;
-pragma strict;
-
 import "../../Utils/Utils.sol";
 
-abstract contract TokenMetadata is Utils {
-    address owner;
-    string ownerCommonName;
+contract record TokenMetadata is Utils {
+    address tokenOwner;
+    string commonName;
 
     constructor(){
-        owner = msg.sender;
-        ownerCommonName = getCommonName(msg.sender);
+        tokenOwner = msg.sender;
+        commonName = getCommonName(msg.sender);
     }
 
     struct MetadataInfo {

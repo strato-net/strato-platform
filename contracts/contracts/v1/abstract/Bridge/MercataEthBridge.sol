@@ -1,5 +1,4 @@
-pragma solidvm 12.0;
-
+import "../Tokens/Token.sol";
 /*
  *  MercataEthBridge – STRATO ↔ Ethereum Safe bridge contract (no OpenZeppelin deps)
  *  ---------------------------------------------------------------------------
@@ -34,17 +33,12 @@ pragma solidvm 12.0;
  *     • Replay protection on deposits via `processed` mapping.
  */
 
-interface IERC20Mintable {
-    function mint(address to, uint256 amount) external;
-    function burnFrom(address from, uint256 amount) external;
-}
-
-abstract contract MercataEthBridge {
+contract record MercataEthBridge {
    // ────────────────── configuration ──────────────────
     address public owner;       // STRATO admin key
     address public relayer;     // off‑chain relayer key
 
-    uint256 public minAmount = 1 ether; // dust guard
+    uint256 public minAmount = 0 ether; // dust guard
 
     // ──────────────────── state ─────────────────────────
     mapping(uint256 => bool) public processed; // ethTxHash(uint256) → minted?
@@ -98,20 +92,20 @@ abstract contract MercataEthBridge {
         require(amount >= minAmount,   "BELOW_MIN");
 
         processed[ethTxHash] = true;
-        IERC20Mintable(token).mint(to, amount);
+        Token(token).mint(to, amount);
         emit DepositRecorded(ethTxHash, to, token, amount);
     }
 
     // ────────── STRATO → Ethereum (burn) ──────────────
-    function withdraw(address token, uint256 amount, address ethRecipient) external {
+    function withdraw(address token, address from, uint256 amount, address ethRecipient) external onlyRelayer{
         require(amount >= minAmount, "BELOW_MIN");
 
         uint256 withdrawId = nextWithdrawId++;
         // No duplicate check needed because ID is unique by construction
 
-        IERC20Mintable(token).burnFrom(msg.sender, amount);
+        Token(token).burn(from, amount);
         withdrawStatus[withdrawId] = WithdrawState.INITIATED;
-        emit WithdrawalInitiated(withdrawId, msg.sender, token, amount, ethRecipient);
+        emit WithdrawalInitiated(withdrawId, from, token, amount, ethRecipient);
     }
 
     /** Relayer marks Safe tx posted → awaiting multisig approvals */

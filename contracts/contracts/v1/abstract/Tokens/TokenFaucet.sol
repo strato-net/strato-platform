@@ -1,5 +1,3 @@
-pragma solidvm 12.0;
-
 import "../ERC20/ERC20.sol";
 
 struct TokenFaucetInfo {
@@ -8,7 +6,7 @@ struct TokenFaucetInfo {
     uint tokenAmount;
 }
 
-abstract contract TokenFaucet {
+contract record TokenFaucet {
     address public owner;
     bool public isActive;
     address[] public callers;

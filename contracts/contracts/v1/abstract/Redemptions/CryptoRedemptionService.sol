@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 import "./RedemptionService.sol";
 import "../Bridge/MercataETHBridge.sol";
 
-contract CryptoRedemptionService is RedemptionService {
-    MercataETHBridge public bridge;
+contract record CryptoRedemptionService is RedemptionService {
+    MercataEthBridge public bridge;
 
     constructor(
         address _token,
@@ -18,7 +18,7 @@ contract CryptoRedemptionService is RedemptionService {
         _initialSpotPrice,
         _maxRedemptionAmount
     ) {
-        bridge = MercataETHBridge(_bridge);
+        bridge = MercataEthBridge(_bridge);
     }
 
     /**

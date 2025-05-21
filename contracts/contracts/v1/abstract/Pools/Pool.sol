@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-
 import "../ERC20/ERC20.sol";
 
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
-abstract contract Pool is ERC20{
+ contract record Pool is ERC20{
     
     // Events
     event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
