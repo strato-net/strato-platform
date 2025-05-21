@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ArrowUpRight, Plus } from 'lucide-react';
 import { Button } from "../ui/button";
 
-import BridgeModal from './BridgeModal';
 import DepositOptionsModal from './DepositOptionsModal';
 import DepositModal from './DepositModal';
 
@@ -18,13 +17,10 @@ interface Asset {
 const AssetsList = () => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
   const handleOptionSelect = (option: 'credit-card' | 'bridge') => {
     setIsOptionsModalOpen(false);
     if (option === 'credit-card') {
       setIsDepositModalOpen(true);
-    } else {
-      setIsBridgeModalOpen(true);
     }
   };
   const assets: Asset[] = [
@@ -147,10 +143,6 @@ const AssetsList = () => {
       <DepositModal 
         isOpen={isDepositModalOpen}
         onClose={() => setIsDepositModalOpen(false)}
-      />
-      <BridgeModal
-        isOpen={isBridgeModalOpen}
-        onClose={() => setIsBridgeModalOpen(false)}
       />
     </div>
   );

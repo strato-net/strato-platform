@@ -2,10 +2,8 @@ import React, { useState } from "react";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "../ui/button";
 import DepositModal from "./DepositModal";
-import BridgeModal from "./BridgeModal";
 import DepositOptionsModal from "./DepositOptionsModal";
-import { Token } from "@/interface";
-import { formatUnits } from "ethers";
+import { Token } from "../../interface";
 
 interface Assets {
   tokens: Token[];
@@ -14,16 +12,32 @@ interface Assets {
 const AssetsList = ({ tokens }: Assets) => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
     if (option === "credit-card") {
       setIsDepositModalOpen(true);
-    } else {
-      setIsBridgeModalOpen(true);
     }
   };
+
+  const getTokenName = (token: Token) => {
+    return token["BlockApps-Mercata-ERC20"]?._name || "";
+  };
+
+  const getTokenSymbol = (token: Token) => {
+    return token["BlockApps-Mercata-ERC20"]?._symbol || "";
+  };
+
+  const getTokenValue = (token: Token) => {
+    return token.value || "-";
+  };
+
+  const getTokenTotalSupply = (token: Token) => {
+    return token["BlockApps-Mercata-ERC20"]?._totalSupply || "-";
+  };
+
+  // Ensure tokens is an array and has items
+  const validTokens = Array.isArray(tokens) ? tokens : [];
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
@@ -63,53 +77,42 @@ const AssetsList = ({ tokens }: Assets) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {tokens.slice(0, 5).map((asset, index) => (
+            {validTokens.slice(0, 5).map((asset: Token, index: number) => (
               <tr key={index} className="hover:bg-gray-50 transition-colors">
                 <td className="py-4 px-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="ml-3">
                       <p className="font-medium text-gray-900">
-                        {asset["BlockApps-Mercata-ERC20"]?._name || ""}
+                        {getTokenName(asset)}
                       </p>
                       <p className="text-gray-500 text-xs">
-                        {asset["BlockApps-Mercata-ERC20"]?._symbol || ""}
+                        {getTokenSymbol(asset)}
                       </p>
                     </div>
                   </div>
                 </td>
                 <td className="py-4 px-4 whitespace-nowrap text-right">
                   <p className="font-medium text-gray-900">
-                    {asset?.["price"] || "-"}
+                    {getTokenValue(asset)}
                   </p>
                 </td>
                 <td className="py-4 px-4 whitespace-nowrap text-right">
                   <div
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      asset?.["change"] >= 0
-                        ? "bg-green-50 text-green-600"
-                        : "bg-red-50 text-red-600"
+                      getTokenTotalSupply(asset) !== "-" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     }`}
                   >
-                    {asset?.["change"] !== undefined
-                      ? `${asset?.["change"] >= 0 ? "+" : ""}${
-                          asset?.["change"]
-                        }%`
-                      : "-"}
+                    {getTokenTotalSupply(asset)}
                   </div>
                 </td>
                 <td className="py-4 px-4 whitespace-nowrap text-right">
                   <p className="font-medium text-gray-900">
-                    {asset?.["amount"] || "-"}
+                    {getTokenTotalSupply(asset)}
                   </p>
                 </td>
                 <td className="py-4 px-4 whitespace-nowrap text-right">
                   <p className="font-medium text-gray-900">
-                    {parseFloat(
-                      formatUnits(asset?.value || 0, 18)
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 4,
-                    })}
+                    {getTokenValue(asset)}
                   </p>
                 </td>
               </tr>
@@ -119,10 +122,7 @@ const AssetsList = ({ tokens }: Assets) => {
       </div>
 
       <div className="p-4 text-right border-t border-gray-100">
-        <a
-          href="#"
-          className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end"
-        >
+        <a href="#" className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end">
           View All <ArrowUpRight size={14} className="ml-1" />
         </a>
       </div>
@@ -132,15 +132,9 @@ const AssetsList = ({ tokens }: Assets) => {
         onClose={() => setIsOptionsModalOpen(false)}
         onSelectOption={handleOptionSelect}
       />
-
       <DepositModal
         isOpen={isDepositModalOpen}
         onClose={() => setIsDepositModalOpen(false)}
-      />
-
-      <BridgeModal
-        isOpen={isBridgeModalOpen}
-        onClose={() => setIsBridgeModalOpen(false)}
       />
     </div>
   );

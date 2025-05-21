@@ -22,10 +22,13 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setError(null);
     try {
       const response = await axios.get(`/tokens/table/balance?key=eq.${userAddress}`);
-      setTokens(response.data);
+      // Ensure we always set an array
+      const responseData = response.data;
+      setTokens(Array.isArray(responseData) ? responseData : []);
     } catch (err: any) {
       console.error("Failed to fetch tokens:", err);
       setError("Failed to fetch token data");
+      setTokens([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
