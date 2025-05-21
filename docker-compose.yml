@@ -8,8 +8,8 @@ services:
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=${NODE_URL}
-      - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
       - BASE_URL=${BASE_URL}
+      - NETWORK=${NETWORK}
     restart: unless-stopped
     logging:
       driver: "json-file"
