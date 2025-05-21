@@ -80,7 +80,7 @@ pipeline {
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
-                idServerUrl=https://\\\$(</host):8001 \\\\
+                idServerUrl=https://\$(</host):8001 \\
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
                 useCustomGenesis=false \\
