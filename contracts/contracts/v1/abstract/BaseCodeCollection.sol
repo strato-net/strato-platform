@@ -43,6 +43,7 @@ contract Mercata {
     LendingRegistry public lendingRegistry;
     MercataEthBridge public mercataEthBridge;
     OnRamp public onRamp;
+    PoolFactory public poolFactory;
 
     constructor() public {
         rateStrategy = RateStrategy(new RateStrategy());
@@ -56,5 +57,6 @@ contract Mercata {
         liquidityPool.setLendingPool(address(lendingPool));
         mercataEthBridge = MercataEthBridge(new MercataEthBridge(address(msg.sender)));
         onRamp = OnRamp(new OnRamp(address(priceOracle), msg.sender));
+        poolFactory = PoolFactory(new PoolFactory());
     }
 }
