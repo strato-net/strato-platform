@@ -684,7 +684,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
 
         // Call the STRATO to Mercata transfer endpoint
-        const response = await fetch('/api/safe/strato-to-mercata', {
+        const response = await fetch('http://localhost:3002/api/safe/strato-to-mercata', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -726,6 +726,19 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
         return;
       }
+
+      // For other transfers, check user transaction first
+      const response = await fetch('http://localhost:3002/api/safe/checkUserTransaction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check user transaction');
+      }  
 
       await handleBridge();
       onClose();
