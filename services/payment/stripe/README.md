@@ -18,6 +18,8 @@ The following environment variables are required to run the Stripe payment servi
 
 - `STRIPE_WEBHOOK_SECRET`: Secret used to verify incoming webhooks from Stripe  
 
+- `NETWORK` : Network name (prod|testnet|testnet2) to load the corresponding preset of contract addresses
+
 ## Running the App
 
 Ensure all required environment variables are set before running the service.
@@ -45,12 +47,13 @@ Build the project and start the compiled service for production:
 #### Dockerized:
 - Create env.list:
 ```
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
 CLIENT_ID=client-id-here
 CLIENT_SECRET=client-secret-here
-NODE_URL=https://marketplace.mercata-testnet2.blockapps.net/
+NODE_URL=https://node5.mercata-testnet.blockapps.net/
 STRIPE_SECRET_KEY=sk_test_key_here
 STRIPE_WEBHOOK_SECRET=whsec_key_here
+NETWORK=testnet
 ```
 - Run:
 ```bash

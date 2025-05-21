@@ -4,6 +4,9 @@ import { fetchOpenIdTokenEndpoint } from "../utils/authHelper";
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
+if (!process.env.NETWORK || !["prod", "testnet", "testnet2"].includes(process.env.NETWORK)) {
+  console.warn("NETWORK env var is not defined or is not a valid value (prod|testnet|testnet2) - using the 'testnet2' preset by default.");
+}
 
 export let openIdTokenEndpoint: string | undefined;
 /**
