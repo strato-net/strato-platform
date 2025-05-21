@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeftRight, ArrowDownUp, History, Wallet, LogOut } from 'lucide-react';
+import { ArrowLeftRight, ArrowDownUp, History, Wallet, LogOut, ArrowLeft } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BridgeTransactionsModal from './BridgeTransactionsModal';
 import { useBridge } from '@/lib/bridge/BridgeContext';
@@ -22,6 +22,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { parseEther, parseUnits, createPublicClient, http } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
 import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 interface BridgeModalProps {
   isOpen: boolean;
@@ -753,210 +754,222 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
   };
 
-  const handleCancel = () => {
-    navigate(-1); // This will navigate back to the previous route
+  const handleBack = () => {
+    navigate(-1);
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-3xl mx-auto p-6">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-2">
-              <ArrowLeftRight className="h-6 w-6 text-blue-600" />
-              <h1 className="text-2xl font-semibold text-gray-900">Bridge Assets</h1>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => setShowTransactions(true)}
-            >
-              <History className="h-4 w-4" />
-              View Transactions
-            </Button>
-          </div>
-
-          <div className="grid gap-6">
-            <div className="flex items-center">
-              {isConnected ? (
-                <div 
-                  onClick={handleDisconnect}
-                  className="relative group cursor-pointer"
+    <>
+      <div className="fixed top-4 left-4 z-50">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleBack}
+          className="rounded-full hover:bg-gray-100 w-10 h-10 border border-gray-200 shadow-sm"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+      </div>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <div className="min-h-screen bg-white">
+          <div className="max-w-3xl mx-auto p-6">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="h-6 w-6 text-blue-600" />
+                  <h1 className="text-2xl font-semibold text-gray-900">Bridge Assets</h1>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => setShowTransactions(true)}
                 >
-                  <div className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity">
-                    Wallet Connected
-                  </div>
-                  <div className="absolute inset-0 bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="text-red-600 font-semibold">Disconnect</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
-                  <ConnectButton label={isNetworkChanged ? "Switch Network" : "Connect Wallet"} />
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="space-y-6">
-                <div className="space-y-1.5">
-                  <Label htmlFor="asset">Select Asset</Label>
-                  <Select
-                    value={fromToken?.symbol || ''}
-                    onValueChange={(value) => {
-                      const token = availableTokens.find(t => t.symbol === value);
-                      if (token) {
-                        setFromToken(token);
-                        setToToken(token);
-                      }
-                    }}
-                  >
-                    <SelectTrigger id="from-token">
-                      <SelectValue>
-                        {fromToken ? `${fromToken.name} (${fromToken.symbol})` : 'Select asset'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTokens.map((token) => (
-                        <SelectItem key={token.symbol} value={token.symbol}>
-                          {token.name} ({token.symbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <History className="h-4 w-4" />
+                  View Transactions
+                </Button>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input
-                    id="amount"
-                    type="text"
-                    inputMode="decimal"
-                    pattern="[0-9]*\.?[0-9]*"
-                    placeholder="0.00"
-                    className={`w-full ${amountError ? 'border-red-500 focus:ring-red-400' : ''}`}
-                    value={amount}
-                    onChange={handleAmountChange}
-                  />
-                  {amountError && (
-                    <p className="text-sm text-red-500">{amountError}</p>
-                  )}
-                  {!(fromChain === 'STRATO' && toChain !== 'STRATO') && tokenBalance && (
-                    <p className="text-sm text-gray-500">
-                      Balance: {tokenBalance} {fromToken?.symbol}
-                    </p>
+              <div className="grid gap-6">
+                <div className="flex items-center">
+                  {isConnected ? (
+                    <div 
+                      onClick={handleDisconnect}
+                      className="relative group cursor-pointer"
+                    >
+                      <div className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity">
+                        Wallet Connected
+                      </div>
+                      <div className="absolute inset-0 bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-red-600 font-semibold">Disconnect</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
+                      <ConnectButton label={isNetworkChanged ? "Switch Network" : "Connect Wallet"} />
+                    </div>
                   )}
                 </div>
+                
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <div className="space-y-6">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="asset">Select Asset</Label>
+                      <Select
+                        value={fromToken?.symbol || ''}
+                        onValueChange={(value) => {
+                          const token = availableTokens.find(t => t.symbol === value);
+                          if (token) {
+                            setFromToken(token);
+                            setToToken(token);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="from-token">
+                          <SelectValue>
+                            {fromToken ? `${fromToken.name} (${fromToken.symbol})` : 'Select asset'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableTokens.map((token) => (
+                            <SelectItem key={token.symbol} value={token.symbol}>
+                              {token.name} ({token.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="from">From Network</Label>
-                    <Select 
-                      value={fromChain} 
-                      onValueChange={handleChainChange}
-                    >
-                      <SelectTrigger id="from-chain">
-                        <SelectValue placeholder="Select network">
-                          {fromChain || 'Select network'}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableNetworks.map((network) => (
-                          <SelectItem key={network} value={network}>
-                            {network}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="amount">Amount</Label>
+                      <Input
+                        id="amount"
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]*\.?[0-9]*"
+                        placeholder="0.00"
+                        className={`w-full ${amountError ? 'border-red-500 focus:ring-red-400' : ''}`}
+                        value={amount}
+                        onChange={handleAmountChange}
+                      />
+                      {amountError && (
+                        <p className="text-sm text-red-500">{amountError}</p>
+                      )}
+                      {!(fromChain === 'STRATO' && toChain !== 'STRATO') && tokenBalance && (
+                        <p className="text-sm text-gray-500">
+                          Balance: {tokenBalance} {fromToken?.symbol}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="to">To Network</Label>
-                    <Select 
-                      value={toChain} 
-                      onValueChange={(value) => {
-                        setToChain(value);
-                      }}
-                    >
-                      <SelectTrigger id="to-chain">
-                        <SelectValue placeholder="Select network">
-                          {toChain || 'Select network'}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="STRATO">STRATO</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 space-y-1.5">
+                        <Label htmlFor="from">From Network</Label>
+                        <Select 
+                          value={fromChain} 
+                          onValueChange={handleChainChange}
+                        >
+                          <SelectTrigger id="from-chain">
+                            <SelectValue placeholder="Select network">
+                              {fromChain || 'Select network'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableNetworks.map((network) => (
+                              <SelectItem key={network} value={network}>
+                                {network}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleSwap}
+                        className="rounded-full hover:bg-gray-100 border border-gray-200 shadow-sm mt-6"
+                      >
+                        <ArrowDownUp className="h-5 w-5 rotate-90" />
+                      </Button>
+
+                      <div className="flex-1 space-y-1.5">
+                        <Label htmlFor="to">To Network</Label>
+                        <Select 
+                          value={toChain} 
+                          onValueChange={(value) => {
+                            setToChain(value);
+                          }}
+                        >
+                          <SelectTrigger id="to-chain">
+                            <SelectValue placeholder="Select network">
+                              {toChain || 'Select network'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="STRATO">STRATO</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex justify-center">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSwap}
-                    className="rounded-full hover:bg-gray-100"
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-900">Transaction Details</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Bridge Fee:</span>
+                        <span>0.1%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Estimated Time:</span>
+                        <span>2-5 minutes</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p>• Bridge assets between Ethereum and STRATO networks</p>
+                      <p>• Small bridge fee applies</p>
+                      <p>• Transaction time varies by network congestion</p>
+                      <p>• STRATO to Ethereum transfers require approval</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleBack}
                   >
-                    <ArrowDownUp className="h-4 w-4" />
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleBridgeSubmit} 
+                    disabled={Boolean(
+                      isLoading || 
+                      !amount || 
+                      !fromToken || 
+                      !isConnected || 
+                      (fromChain !== 'STRATO' && !isChainMatching()) || 
+                      (fromChain === 'STRATO' && toChain !== 'STRATO' ? false : amountError !== "")
+                    )}
+                    className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+                  >
+                    {isLoading ? 'Processing...' : 'Bridge Assets'}
                   </Button>
                 </div>
               </div>
             </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="space-y-4">
-                <h3 className="font-medium text-gray-900">Transaction Details</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Bridge Fee:</span>
-                    <span>0.1%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Estimated Time:</span>
-                    <span>2-5 minutes</span>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 space-y-1">
-                  <p>• Bridge assets between Ethereum and STRATO networks</p>
-                  <p>• Small bridge fee applies</p>
-                  <p>• Transaction time varies by network congestion</p>
-                  <p>• STRATO to Ethereum transfers require approval</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-4">
-              <Button 
-                variant="outline" 
-                onClick={handleCancel}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleBridgeSubmit} 
-                disabled={Boolean(
-                  isLoading || 
-                  !amount || 
-                  !fromToken || 
-                  !isConnected || 
-                  (fromChain !== 'STRATO' && !isChainMatching()) || 
-                  (fromChain === 'STRATO' && toChain !== 'STRATO' ? false : amountError !== "")
-                )}
-                className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-              >
-                {isLoading ? 'Processing...' : 'Bridge Assets'}
-              </Button>
-            </div>
           </div>
         </div>
-      </div>
 
-      <BridgeTransactionsModal
-        isOpen={showTransactions}
-        onClose={() => setShowTransactions(false)}
-      />
-    </div>
+        <BridgeTransactionsModal
+          isOpen={showTransactions}
+          onClose={() => setShowTransactions(false)}
+        />
+      </Dialog>
+    </>
   );
 };
 
