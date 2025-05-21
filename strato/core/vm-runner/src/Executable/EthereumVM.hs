@@ -58,7 +58,6 @@ import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString.Char8 as BC
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
@@ -198,11 +197,7 @@ sendOutEvent (OutAction act) = do
                OMap.assocs $ a ^. Action.actionData
              ) of
           (Just c, Just n, actionDatas) ->
-            let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
-                  Just "EVM" -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
+            let cp = SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
                 cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
                   if _actionDataCodeHash == cp
                     then Just _actionDataCreator

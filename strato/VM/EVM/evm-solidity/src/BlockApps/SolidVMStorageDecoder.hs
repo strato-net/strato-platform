@@ -62,14 +62,8 @@ decodeCacheValues hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.deco
 decodeCacheValuesForCollections :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
 decodeCacheValuesForCollections hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForCollections: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
-      isBasic (StoragePath [Field _, MapIndex _]) = True
-      isBasic (StoragePath [Field _, ArrayIndex _]) = True
-      isBasic (StoragePath [Field _, MapIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
-      isBasic (StoragePath [Field _, ArrayIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
-      isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
-  let pathValues' = filter (isBasic . fst) pathValues
-  finalState <- bimap show HM.toList $ synthesize pathValues'
+  finalState <- bimap show HM.toList $ synthesize pathValues
   mapM (bimapM bsToText return) finalState
 
 bsToText :: B.ByteString -> Either String T.Text
