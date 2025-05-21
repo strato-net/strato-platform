@@ -3,7 +3,7 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import api from "@/lib/axios";
+import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";

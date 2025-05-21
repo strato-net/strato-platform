@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import AuthForm from '../components/AuthForm';
 import axios from "axios"
-import api from '@/lib/axios';
+import {api} from '@/lib/axios';
 import { useUser } from '@/context/UserContext';
 
 const Login = () => {

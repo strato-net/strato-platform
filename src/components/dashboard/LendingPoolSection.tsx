@@ -1,6 +1,6 @@
-import { formatUnits, ethers } from "ethers";
+import { formatUnits, parseUnits } from "ethers";
 import { DollarSign, ArrowDown, ArrowUp } from "lucide-react";
-import api from "@/lib/axios";
+import { api } from "@/lib/axios";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -29,42 +29,74 @@ const LendingPoolSection = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
+  const refreshLendingData = (signal?: AbortSignal) => {
+    if (!userAddress) return;
+    fetchTokens(userAddress, signal);
+    refreshWithdrawableTokens(signal);
+  };
+
+  // 1. Fetch on userAddress change only, with abort controller
   useEffect(() => {
-    if (userAddress) {
-      fetchTokens(userAddress);
-      refreshWithdrawableTokens();
-    }
+    if (!userAddress) return;
+    const abortController = new AbortController();
+    refreshLendingData(abortController.signal);
+    return () => {
+      abortController.abort();
+    };
   }, [userAddress]);
 
+  // 2. Update component-local state when context changes
   useEffect(() => {
-    if (tokens && tokens.length > 0) {
-      const usdst = tokens.find(
-        (token) => token["BlockApps-Mercata-ERC20"]._symbol === "USDST"
-      );
-      if (usdst) {
-        setUsdstToken(usdst);
-        setUsdstAvailableBalance(formatUnits(usdst.value, 18));
-      }
-    }
-  }, [tokens]);
+    const usdst = tokens.find(
+      (token) => token["BlockApps-Mercata-ERC20"]._symbol === "USDST"
+    );
 
-  useEffect(() => {
-    if (usdstToken && withdrawableTokens && withdrawableTokens.length > 0) {
-      const match = withdrawableTokens.find(
-        (token) =>
-          token._symbol === "USDST" && token.address === usdstToken.address
+    if (usdst) {
+      setUsdstToken(usdst);
+      setUsdstAvailableBalance(formatUnits(usdst.value, 18));
+
+      const depositedToken = withdrawableTokens.find(
+        (token) => token._symbol === "USDST" && token.address === usdst.address
       );
-      if (match) {
-        setDepositedUsdstToken(match);
+      if (depositedToken) {
+        setDepositedUsdstToken(depositedToken);
       }
     }
-  }, [withdrawableTokens, usdstToken]);
+  }, [tokens, withdrawableTokens]);
+
+  const isDepositAmountValid = () => {
+    if (!depositAmount) return false;
+    if (!/^\d+(\.\d{1,18})?$/.test(depositAmount)) return false;
+    try {
+      const amountWei = parseUnits(depositAmount, 18);
+      const availableWei = parseUnits(usdstAvailableBalance, 18);
+      if (amountWei <= 0n) return false;
+      if (amountWei > availableWei) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const isWithdrawAmountValid = () => {
+    if (!withdrawAmount) return false;
+    if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
+    try {
+      const amountWei = parseUnits(withdrawAmount, 18);
+      const depositedBalanceWei = BigInt(depositedUsdstToken?.value) ?? 0n;
+      if (amountWei <= 0n) return false;
+      if (amountWei > depositedBalanceWei) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   const handleLiquidityAction = async (type: "deposit" | "withdraw") => {
     try {
       setIsProcessing(true);
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
-      const amountWei = ethers.parseUnits(amount, 18).toString();
+      const amountWei = parseUnits(amount, 18).toString();
       await api.post("/lend/manageLiquidity", {
         asset: usdstToken?.address,
         amount: amountWei,
@@ -84,10 +116,7 @@ const LendingPoolSection = () => {
         setWithdrawAmount("");
       }
 
-      if (userAddress) {
-        fetchTokens(userAddress);
-        refreshWithdrawableTokens();
-      }
+      refreshLendingData();
     } catch (error: any) {
       toast({
         title: type === "deposit" ? "Deposit Error" : "Withdrawal Error",
@@ -156,12 +185,7 @@ const LendingPoolSection = () => {
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
                       className="bg-strato-blue hover:bg-strato-blue/90"
-                      disabled={
-                        loading ||
-                        isProcessing ||
-                        !depositAmount ||
-                        parseFloat(depositAmount) <= 0
-                      }
+                      disabled={loading || isProcessing || !isDepositAmountValid()}
                     >
                       {isProcessing ? (
                         "Processing..."
@@ -209,8 +233,7 @@ const LendingPoolSection = () => {
                       disabled={
                         loadingWithdrawableTokens ||
                         isProcessing ||
-                        !withdrawAmount ||
-                        parseFloat(withdrawAmount) <= 0
+                        !isWithdrawAmountValid()
                       }
                     >
                       {isProcessing ? (

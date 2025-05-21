@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
 
-import api from "@/lib/axios";
+import {api} from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 

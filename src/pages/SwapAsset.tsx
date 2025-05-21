@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { SwappableToken } from "@/interface";
-import api from "@/lib/axios";
+import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';

@@ -3,7 +3,7 @@
 // context/UserContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
-import api from "@/lib/axios";
+import {api} from "@/lib/axios";
 
 interface UserContextType {
   userAddress: string | null;
