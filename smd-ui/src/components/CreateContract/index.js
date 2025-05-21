@@ -563,15 +563,13 @@ export function mapStateToProps(state) {
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      commonName: state.user.userCertificate ? state.user.userCertificate.commonName : 'Verification Pending',
-      address: state.user.userCertificate ? state.user.userCertificate.userAddress : 'Verification Pending',
+      address: state.user.address || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
     selectedChain: state.chains.selectedChain,
-    userCertificate: state.user.userCertificate,
   };
 }
 

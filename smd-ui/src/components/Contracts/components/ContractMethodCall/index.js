@@ -87,8 +87,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}>
-          {isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
         </option>
         {
           users.map((user, i) => {
@@ -113,8 +113,8 @@ class ContractMethodCall extends Component {
         disabled={true}
         required
       >
-        <option value={this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}>
-          {this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}
+        <option value={this.props.address}>
+          {this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -261,16 +261,6 @@ class ContractMethodCall extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   {this.props.contractAddress}
-                </div>
-              </div>
-              <div className='row'>
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Shard
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
                 </div>
               </div>
               <div className="row">
@@ -493,7 +483,7 @@ export function mapStateToProps(state, ownProps) {
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
     oAuthUser: state.user.oauthUser,
-    userCertificate: state.user.userCertificate,
+    address: state.user.address || '',
     selectedChain: state.chains.selectedChain,
   };
 }
