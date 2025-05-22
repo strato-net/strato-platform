@@ -1,51 +1,39 @@
-import "../../Utils/Utils.sol";
+contract TokenMetadata {
+    string description;
+    string[] record images;
+    string[] record files;
+    string[] record fileNames;
 
-contract record TokenMetadata is Utils {
-    address tokenOwner;
-    string commonName;
+    mapping(string => string) public record attributes;
 
-    constructor(){
-        tokenOwner = msg.sender;
-        commonName = getCommonName(msg.sender);
-    }
-
-    struct MetadataInfo {
-        string name;
-        string description;
-        string[] images;
-        string[] files;
-        string[] fileNames;
-        uint createdDate;
-    }
-
-    mapping(address => MetadataInfo) public record metadataInfo;
-    mapping(address => string) public record metadataAttributes;
-
-    function registerMetadata(
-        address tokenAddress,
-        string _name,
+    constructor(
         string _description,
         string[] _images,
         string[] _files,
-        string[] _fileNames,
-        uint _createdDate
-        ) public virtual {
-        require(getCommonName(msg.sender) == tokenAddress.creator || msg.sender == tokenAddress, "Only the the creator or the token can register metadata");
-        metadataInfo[tokenAddress] = MetadataInfo(
-            _name,
-            _description,
-            _images,
-            _files,
-            _fileNames,
-            _createdDate
-        );
+        string[] _fileNames
+    ){
+        description = _description;
+        images = _images;
+        files = _files;
+        fileNames = _fileNames;
     }
 
-    function registerMetadataAttribute(
-        address tokenAddress,
-        string attributes
-    ) public virtual {
-        require(getCommonName(msg.sender) == tokenAddress.creator || msg.sender == tokenAddress, "Only the the creator or the token can register metadata");
-        metadataAttributes[tokenAddress] = attributes;
+    function _setMetadata(
+        string _description,
+        string[] _images,
+        string[] _files,
+        string[] _fileNames
+    ) internal {
+        description = _description;
+        images = _images;
+        files = _files;
+        fileNames = _fileNames;
+    }
+
+    function _setAttribute(
+        string key,
+        string value
+    ) internal {
+        attributes[key] = value;
     }
 }

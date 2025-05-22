@@ -6,3 +6,7 @@
 
 # Google secrets file
 secrets.json
+
+# logs
+/deploy/deployment-logs
+r.log

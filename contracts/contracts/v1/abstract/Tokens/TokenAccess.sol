@@ -6,8 +6,8 @@
 contract TokenAccess {
     address public admin;
     enum Role { NONE, MINTER, BURNER }
-    mapping(address => bool) private minters;
-    mapping(address => bool) private burners;
+    mapping(address => bool) private record minters;
+    mapping(address => bool) private record burners;
 
     event MinterAdded(address indexed accountAddress);
     event MinterRemoved(address indexed accountAddress);

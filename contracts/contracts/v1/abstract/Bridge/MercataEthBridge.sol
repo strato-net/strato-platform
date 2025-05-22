@@ -64,7 +64,7 @@ contract record MercataEthBridge {
     // ───────────────── constructor ─────────────────────
     constructor(address _relayer) {
         require(_relayer != address(0), "ZERO_RELAYER");
-        owner   = msg.sender;
+        owner   = _relayer;
         relayer = _relayer;
     }
 

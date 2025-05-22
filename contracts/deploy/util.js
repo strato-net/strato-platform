@@ -1,6 +1,5 @@
 const config = require('./config');
-const axios = require('axios');
-const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
+const { rest, util } = require('blockapps-rest');
 const auth = require('./auth');
 const path = require('path');
 const fs = require('fs');
@@ -170,11 +169,11 @@ const saveCallListTXDataAsFile = async (callInfo) => {
  * @returns {string} - The environment variable value.
  */
 function getEnvVar(name) {
-    const value = process.env[name];
-    if (!value) {
-      throw new Error(`Invalid ${name}`);
-    }
-    return value;
+  const value = process.env[name];
+  if (value === undefined || value === null) {
+    throw new Error(`Invalid ${name}`);
   }
+  return value;
+}
 
 module.exports = { callListAndWait, createContractArgs, getEnvVar, saveCreateTXDataAsFile, saveCallListTXDataAsFile };

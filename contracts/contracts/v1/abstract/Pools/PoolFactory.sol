@@ -14,6 +14,7 @@
  */
 
 import "Pool.sol";
+import "../ERC20/access/Ownable.sol";
 
 contract record PoolFactory is Ownable {
     event NewPool(address indexed tokenA, address indexed tokenB, address pool);

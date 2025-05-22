@@ -1,15 +1,10 @@
-import "../Enums/RestStatus.sol";
-import "../Utils/Utils.sol";
 import "../ERC20/access/Ownable.sol";
 import "./Metadata/TokenMetadata.sol";
 import "./TokenAccess.sol";
+import "../ERC20/ERC20.sol";
 
-contract record Token is Utils, ERC20, Ownable, TokenMetadata, TokenAccess{
-    string public ownerCommonName;
-    uint8 private customDecimals;
-
-    TokenMetadata metadata;
-    TokenAccess tokenAccess;
+contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess{
+    uint8 public customDecimals;
     
     constructor(
         string _name,
@@ -17,29 +12,17 @@ contract record Token is Utils, ERC20, Ownable, TokenMetadata, TokenAccess{
         string[] _images,
         string[] _files,
         string[] _fileNames,
-        uint _createdDate,
         string _symbol,
         uint256 _initialSupply,
-        uint8 _customDecimals,
-        address _metadataContract,
-        address _tokenAccessContract
-    ) ERC20(_name, _symbol){
-        ownerCommonName = getCommonName(msg.sender);
+        uint8 _customDecimals
+    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(msg.sender) Ownable(){
         customDecimals = _customDecimals;
         mint(msg.sender, _initialSupply);
-
-        metadata = TokenMetadata(_metadataContract);
-        metadata.registerMetadata(address(this), _name, _description, _images, _files, _fileNames, _createdDate);
-        tokenAccess = TokenAccess(_tokenAccessContract);
     }
-
-    //function mint(uint256 amount) public onlyOwner {
-    //    _mint(owner, amount);
-    //}
 
     function mint(address to, uint256 amount) public {
         require(
-            tokenAccess.isMinter(msg.sender), 
+            TokenAccess(this).isMinter(msg.sender), 
             "Token: Caller is not a minter"
         );
         _mint(to, amount);
@@ -47,10 +30,23 @@ contract record Token is Utils, ERC20, Ownable, TokenMetadata, TokenAccess{
 
     function burn(address from, uint256 amount) public {
         require(
-            tokenAccess.isBurner(msg.sender),
+            TokenAccess(this).isBurner(msg.sender),
             "Token: Caller is not a burner"
         );
         _burn(from, amount);
+    }
+
+    function setMetadata (
+        string _description,
+        string[] _images,
+        string[] _files,
+        string[] _fileNames
+    ) public onlyOwner {
+        _setMetadata(_description, _images, _files, _fileNames);
+    }
+
+    function setAttribute(string key, string value) public onlyOwner {
+        _setAttribute(key, value);
     }
     
     function decimals() public view virtual override returns (uint8) {
