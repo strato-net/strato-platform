@@ -336,31 +336,18 @@ class SendTokens extends Component {
       : [];
     return (
       <div className="smd-pad-16">
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-          <AnchorButton 
-            onClick={() => {
-              mixpanelWrapper.track("send_ether_open_click");
-              // TODO: remove public mode
-              isModeOauth && (this.props.initialValues.fromAddress != "Verification Pending") && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
-              this.props.fetchChainIds();
-              this.props.sendTokensOpenModal();
-              this.props.reset();
-            }} 
-            className="pt-intent-primary pt-icon-add"
-            disabled={!this.props.userCertificate}
-            text={"Send Tokens"} 
-          />
-        </Popover>
+        <AnchorButton 
+          onClick={() => {
+            mixpanelWrapper.track("send_ether_open_click");
+            // TODO: remove public mode
+            isModeOauth && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
+            this.props.fetchChainIds();
+            this.props.sendTokensOpenModal();
+            this.props.reset();
+          }} 
+          className="pt-intent-primary pt-icon-add"
+          text={"Send Tokens"} 
+        />
         <form>
           <Dialog
             iconName="inbox"
@@ -486,7 +473,6 @@ export function mapStateToProps(state) {
     balance: state.accounts.currentUserBalance,
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
-    userCertificate: state.user.userCertificate,
   };
 }
 
