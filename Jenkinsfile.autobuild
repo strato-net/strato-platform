@@ -85,7 +85,7 @@ pipeline {
 
               for (service in composeImages.keySet()) {
                 def localImage = composeImages[service]
-                def ecrTag = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata-${service}:${GIT_SHA}"
+                def ecrTag = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}:${GIT_SHA}"
                 def internalTag = "registry-aws.blockapps.net/blockapps-repo/mercata-${service}:${GIT_SHA}"
 
                 sh "docker tag ${localImage} ${ecrTag}"
@@ -132,7 +132,7 @@ pipeline {
           def internalCompose = originalCompose
 
           services.each { svc ->
-            def ecrImage = "image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata-${svc}:${gitSha}"
+            def ecrImage = "image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${svc}:${gitSha}"
             def internalImage = "image: registry-aws.blockapps.net/blockapps-repo/mercata-${svc}:${gitSha}"
 
             ecrCompose = ecrCompose.replaceAll(/image: mercata-${svc}(:latest)?/, ecrImage)
@@ -142,8 +142,8 @@ pipeline {
           writeFile file: 'docker-compose.ecr.yml', text: ecrCompose
           writeFile file: 'docker-compose.yml', text: internalCompose
 
-          echo "📦 Generated docker-compose.yml for internal registry"
-          echo "📦 Generated docker-compose.ecr.yml for ECR"
+          echo "📦 Generated docker-compose.yml (internal registry)"
+          echo "📦 Generated docker-compose.ecr.yml (ECR)"
 
           archiveArtifacts artifacts: 'docker-compose*.yml', fingerprint: true
         }
