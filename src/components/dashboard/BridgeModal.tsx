@@ -729,17 +729,17 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       }
 
       // For other transfers, check user transaction first
-      const response = await fetch('http://localhost:3002/api/safe/checkUserTransaction', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${access_token}`
-        }
-      });
+      // const response = await fetch('http://localhost:3002/api/bridge/checkUserTransaction', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': `Bearer ${access_token}`
+      //   }
+      // });
 
-      if (!response.ok) {
-        throw new Error('Failed to check user transaction');
-      }  
+      // if (!response.ok) {
+      //   throw new Error('Failed to check user transaction');
+      // }  
 
       await handleBridge();
       onClose();
