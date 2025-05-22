@@ -71,20 +71,20 @@ pipeline {
               echo "Changes detected in backend/ui/nginx — rebuilding with docker-compose..."
               sh "docker compose build"
 
-            def composeImages = [
+              def composeImages = [
                 backend: "mercata-backend",
                 ui: "mercata-ui",
                 nginx: "mercata-nginx"
-            ]
+              ]
 
-            for (service in composeImages.keySet()) {
+              for (service in composeImages.keySet()) {
                 def localImage = composeImages[service]
                 def repo = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}"
                 def tag = "${repo}:${GIT_SHA}"
 
                 sh "docker tag ${localImage} ${tag}"
                 sh "docker push ${tag}"
-            }
+              }
 
             } else {
               echo "No changes in backend/ui/nginx — skipping build."
@@ -109,6 +109,23 @@ pipeline {
               echo "No changes in stripe — skipping build."
             }
           }
+        }
+      }
+    }
+
+    stage('Replace latest tags with Git SHA') {
+      steps {
+        script {
+          def composeFile = 'docker-compose.yml'
+          def gitSha = env.GIT_SHA
+
+          // Replace :latest with :<GIT_SHA>
+          sh """
+            sed -i 's/:latest/:${gitSha}/g' ${composeFile}
+          """
+
+          // Archive updated compose file for deployment or debugging
+          archiveArtifacts artifacts: "${composeFile}", fingerprint: true
         }
       }
     }
