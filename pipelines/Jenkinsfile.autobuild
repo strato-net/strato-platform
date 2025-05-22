@@ -271,18 +271,17 @@ pipeline {
                     lib.runSyncTester()
                   }
                 }
-                /* TODO: uncomment to enable the slipstream data integrity test, when the 'strato/indexer/slipstream/integrity_tests/slipstream_sync.py' is updated to not rely on the testnet2-specific contracts (e.g. BlockApps-Mercata-PaymentService.Order)
-                unstash 'slipstream_integrity_tests'
-                dir('strato/indexer/slipstream/integrity_tests') {
-                   withCredentials([
-                        usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-                        usernamePassword(credentialsId: 'keycloak-mercata-localhost-client', passwordVariable: 'KEYCLOAK_MERCATA_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATA_LOCALHOST_ID'),
-                   ]) {
-                    sh "pip3 install -r requirements.txt"
-                    sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATA_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATA_LOCALHOST_SECRET}' 'strato-devel' 'mercata' 40 30 'https://node2.mercata-testnet.blockapps.net'"
-                  }
-                }
-                */
+/* TODO: uncomment to enable the slipstream data integrity test, when the 'strato/indexer/slipstream/integrity_tests/slipstream_sync.py' is updated to not rely on the testnet2-specific contracts (e.g. BlockApps-Mercata-PaymentService.Order) */
+//                unstash 'slipstream_integrity_tests'
+//                dir('strato/indexer/slipstream/integrity_tests') {
+//                   withCredentials([
+//                        usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+//                        usernamePassword(credentialsId: 'keycloak-mercata-localhost-client', passwordVariable: 'KEYCLOAK_MERCATA_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATA_LOCALHOST_ID'),
+//                   ]) {
+//                    sh "pip3 install -r requirements.txt"
+//                    sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATA_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATA_LOCALHOST_SECRET}' 'strato-devel' 'mercata' 40 30 'https://node2.mercata-testnet.blockapps.net'"
+//                  }
+//                }
               }
               post {
                 always {
