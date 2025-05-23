@@ -3,7 +3,6 @@ import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { StratoPaths, constants } from "../../config/constants";
-import { mergeSelectFields } from "../helpers/tokens.helper";
 
 const { tokenSelectFields, tokenBalanceSelectFields } = constants;
 
@@ -21,9 +20,10 @@ export const getTokens = async (
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
 
-    // Merge selects with required fields
-    params.select = mergeSelectFields(tokenSelectFields, params.select);
-
+    // use tokenBalanceSelectFields if no select is provided
+    if (!params.select) {
+      params.select = tokenSelectFields.join(",");
+    }
     const response = await cirrus.get(accessToken, "/" + Token, {
       params,
     });
@@ -55,8 +55,11 @@ export const getBalance = async (
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
 
-    // Merge selects with required fields
-    params.select = mergeSelectFields(tokenBalanceSelectFields, params.select);
+    // use tokenBalanceSelectFields if no select is provided
+    if (!params.select) {
+      params.select = tokenBalanceSelectFields.join(",");
+    }
+
     // Add user address to params
     const response = await cirrus.get(accessToken, "/" + Token + "-_balances", {
       params: { ...params, key: "eq." + address },

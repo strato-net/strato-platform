@@ -26,6 +26,18 @@ export const constants = (() => {
     "balance:value",
     "token:Token(_name,_symbol,_owner,customDecimals,description,images:Token-images(value),attributes:Token-attributes(key,value),minters:Token-minters(user:key,value),burners:Token-burners(user:key,value))",
   ];
+  const poolSelectFields = [
+    "address",
+    "_name",
+    "_symbol",
+    "_totalSupply",
+    "aToBRatio",
+    "bToARatio",
+    "tokenA",
+    "tokenABalance",
+    "tokenB",
+    "tokenBBalance"
+  ];
   const configs = {
     prod: {
       poolFactory: "TBD",
@@ -56,6 +68,7 @@ export const constants = (() => {
     ...selected,
     tokenSelectFields,
     tokenBalanceSelectFields,
+    poolSelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();
