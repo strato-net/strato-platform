@@ -57,7 +57,7 @@ const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
               <Sparkles size={40} className="text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Trial Complete!</CardTitle>
+          <CardTitle className="text-2xl font-bold">Onboarding Complete!</CardTitle>
         </CardHeader>
         
         <CardContent className="text-center">
