@@ -4,7 +4,6 @@ import {
   getTokens,
   getFaucetAddresses,
   getBalance,
-  getState,
   createToken,
   faucetTokens,
   transferToken,
@@ -17,7 +16,7 @@ import {
   validateTransferItemArgs,
   validateApproveArgs,
   validateTransferFromArgs,
-  validateQueryParams
+  validateQueryParams,
 } from "../validators/tokens.validator";
 
 class TokensController {
@@ -79,11 +78,12 @@ class TokensController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query } = req;
+      const { accessToken, query, address } = req;
       validateQueryParams(query);
 
       const balances = await getBalance(
         accessToken,
+        address,
         query as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(balances);
@@ -92,28 +92,19 @@ class TokensController {
     }
   }
 
-  static async getState(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, params } = req;
-      validateAddressArgs(params);
-
-      const allowances = await getState(accessToken, params.address as string);
-      res.status(RestStatus.OK).json(allowances);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
-      validateCreateTokensArgs(body);
 
-      const result = await createToken(accessToken, body);
+      const args = {
+        ...body,
+        images: JSON.parse(body.images || "[]"),
+        files: JSON.parse(body.files || "[]"),
+        fileNames: JSON.parse(body.fileNames || "[]"),
+      };
+      validateCreateTokensArgs(args);
+
+      const result = await createToken(accessToken, args);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {

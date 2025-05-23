@@ -1,136 +1,60 @@
-import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
+import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getInputPrice } from "../helpers/swapping.helper";
 import { approveAsset } from "../helpers/tokens.helper";
-import { getPools as getLendingPool } from "./lending.service";
+import { getPool as getLendingPool } from "./lending.service";
+import { getTokens } from "./tokens.service";
 
-const Pool = "ERC20";
+const { poolSelectFields } = constants;
+const Pool = "Pool";
 const PoolFactory = "PoolFactory";
-
-export const getPoolsWithDetails = async (
-  accessToken: string,
-  rawParams: Record<string, string | undefined> = {}
-) => {
-  try {
-    // Filter out undefined values from query
-    const params = Object.fromEntries(
-      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ) as Record<string, string>;
-
-    params.root = `eq.${constants.poolFactory}`;
-
-    const cirrusResponse = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-ERC20`,
-      { params }
-    );
-
-    if (cirrusResponse.status !== 200 || !Array.isArray(cirrusResponse.data)) {
-      throw new Error("Error fetching pool data from Cirrus");
-    }
-
-    const poolData = cirrusResponse.data;
-
-    // Fetch metadata for all unique token addresses in pools
-    const tokenAddresses = Array.from(
-      new Set(poolData.flatMap((pool) => [pool.data.tokenA, pool.data.tokenB]))
-    );
-
-    const tokenMetaResponse = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-ERC20`,
-      {
-        params: {
-          address: `in.(${tokenAddresses.join(",")})`,
-          select: "address,_name,_symbol",
-        },
-      }
-    );
-
-    if (
-      tokenMetaResponse.status !== 200 ||
-      !Array.isArray(tokenMetaResponse.data)
-    ) {
-      throw new Error("Error fetching token metadata from Cirrus");
-    }
-
-    const tokenMetaMap = tokenMetaResponse.data.reduce((map, token) => {
-      map[token.address] = { name: token._name, symbol: token._symbol };
-      return map;
-    }, {} as Record<string, { name: string; symbol: string }>);
-
-    // Attach name and symbol to each pool object
-    poolData.forEach((pool) => {
-      const metaA = tokenMetaMap[pool.data.tokenA] || { name: "", symbol: "" };
-      const metaB = tokenMetaMap[pool.data.tokenB] || { name: "", symbol: "" };
-      pool.data.tokenAName = metaA.name;
-      pool.data.tokenASymbol = metaA.symbol;
-      pool.data.tokenBName = metaB.name;
-      pool.data.tokenBSymbol = metaB.symbol;
-    });
-
-    // Fetch lending pool info to get oracle address
-    const lendingInfo = await getLendingPool(accessToken);
-    const oracleAddress = lendingInfo.oracle;
-
-    // Fetch latest prices from oracle contract
-    const priceResponse = await bloc.get(
-      accessToken,
-      StratoPaths.state.replace(":contractAddress", oracleAddress)
-    );
-    if (
-      priceResponse.status !== 200 ||
-      !priceResponse.data ||
-      !priceResponse.data?.prices
-    ) {
-      throw new Error("Error fetching prices from PriceOracle");
-    }
-    const pricesMap: Record<string, string> = priceResponse.data.prices;
-
-    // Attach price to each pool object
-    poolData.forEach((pool) => {
-      pool.data.tokenAPrice = pricesMap[pool.data.tokenA] || "0";
-      pool.data.tokenBPrice = pricesMap[pool.data.tokenB] || "0";
-    });
-
-    return poolData;
-  } catch (error) {
-    console.error("Error fetching pools:", error);
-    throw error;
-  }
-};
 
 export const getPools = async (
   accessToken: string,
+  address: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ) => {
-  try {
-    // Filter out undefined values from query
-    const params = Object.fromEntries(
+  const params = {
+    ...Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ) as Record<string, string>;
+    ),
+    select: rawParams.select || poolSelectFields.join(","),
+    root: `eq.${constants.poolFactory}`,
+  };
 
-    params.root = `eq.${constants.poolFactory}`;
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params,
+  });
 
-    const cirrusResponse = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-ERC20`,
-      { params }
-    );
+  const tokenAddresses = [
+    ...new Set(
+      poolData.flatMap((pool: any) =>
+        [pool.tokenA, pool.tokenB].filter(Boolean)
+      )
+    ),
+  ];
 
-    if (cirrusResponse.status !== 200 || !Array.isArray(cirrusResponse.data)) {
-      throw new Error("Error fetching pool data from Cirrus");
-    }
+  if (!tokenAddresses.length) return poolData;
 
-    const poolData = cirrusResponse.data;
+  const [tokenMetadata, lendingInfo] = await Promise.all([
+    getTokens(accessToken, {
+      address: `in.(${tokenAddresses.join(",")})`,
+      ["balances.key"]: `eq.${address}`,
+    }),
+    getLendingPool(accessToken, { select: "oracle" }),
+  ]);
+  const tokenMap = new Map(tokenMetadata.map((t: any) => [t.address, t]));
+  const prices = lendingInfo.oracle?.prices || {};
 
-    return poolData;
-  } catch (error) {
-    console.error("Error fetching pools:", error);
-    throw error;
-  }
+  return poolData.map((pool: any) => ({
+    ...pool,
+    tokenAPrice: prices[pool.tokenA] || 0,
+    tokenBPrice: prices[pool.tokenB] || 0,
+    tokenA: tokenMap.get(pool.tokenA) || pool.tokenA,
+    tokenB: tokenMap.get(pool.tokenB) || pool.tokenB,
+  }));
 };
 
 export const createPool = async (
@@ -164,24 +88,25 @@ export const addLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const pool = await getPools(accessToken, {
+    const pools = await getPools(accessToken, undefined, {
       address: "eq." + body.address,
-      select: "data->>tokenA,data->>tokenB",
+      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
     });
-    if (!pool || pool.length === 0) {
+    if (!pools || pools.length === 0) {
       throw new Error("No pools found for the given address");
     }
+    const pool = pools[0];
 
     await approveAsset(
       accessToken,
-      pool[0].tokenA || "",
+      pool.tokenAAddress || "",
       body.address || "",
       body.max_tokenA_amount || ""
     );
 
     await approveAsset(
       accessToken,
-      pool[0].tokenB || "",
+      pool.tokenBAddress || "",
       body.address || "",
       body.tokenB_amount || ""
     );
@@ -215,16 +140,20 @@ export const removeLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const pool = await getPools(accessToken, {
+    const pools = await getPools(accessToken, undefined, {
       address: "eq." + body.address,
     });
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+    const pool = pools[0];
     // calculate tokenA and tokenB amounts
     const tokenA_amount =
-      (BigInt(pool[0].data.tokenABalance) * BigInt(body.amount || "0")) /
-      BigInt(pool[0]._totalSupply);
+      (BigInt(pool.tokenABalance) * BigInt(body.amount || "0")) /
+      BigInt(pool._totalSupply);
     const tokenB_amount =
-      (BigInt(pool[0].data.tokenBBalance) * BigInt(body.amount || "0")) /
-      BigInt(pool[0]._totalSupply);
+      (BigInt(pool.tokenBBalance) * BigInt(body.amount || "0")) /
+      BigInt(pool._totalSupply);
     // Apply 1% slippage tolerance
     const slippageFactor = BigInt(99); // 99%
     const min_tokenA_amount = (
@@ -266,24 +195,17 @@ export const swap = async (
 ) => {
   try {
     const isTokenAToTokenB = body.method === "tokenAToTokenB";
-    const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {
-      params: {
-        address: "eq." + body.address,
-        select: "data->>tokenA,data->>tokenB",
-      },
-    });
 
-    if (response.status !== 200) {
-      throw new Error(
-        `Error fetching swap pool address: ${response.statusText}`
-      );
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + body.address,
+      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
+    });
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
     }
-    if (!response.data || response.data.length === 0) {
-      throw new Error("Pool data is empty");
-    }
-    const token = isTokenAToTokenB
-      ? response.data[0].tokenA
-      : response.data[0].tokenB;
+    const pool = pools[0];
+
+    const token = isTokenAToTokenB ? pool.tokenAAddress : pool.tokenBAddress;
 
     await approveAsset(
       accessToken,
@@ -323,7 +245,9 @@ export const calculateSwap = async (
   amount: string
 ) => {
   try {
-    const pools = await getPools(accessToken, { address: "eq." + address });
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + address,
+    });
 
     if (!pools || pools.length === 0) {
       throw new Error("No pools found for the given address");
@@ -332,14 +256,14 @@ export const calculateSwap = async (
     if (direction === "true") {
       return getInputPrice(
         BigInt(amount),
-        BigInt(pool.data.tokenBBalance),
-        BigInt(pool.data.tokenABalance)
+        BigInt(pool.tokenBBalance),
+        BigInt(pool.tokenABalance)
       );
     } else {
       return getInputPrice(
         BigInt(amount),
-        BigInt(pool.data.tokenABalance),
-        BigInt(pool.data.tokenBBalance)
+        BigInt(pool.tokenABalance),
+        BigInt(pool.tokenBBalance)
       );
     }
   } catch (error) {

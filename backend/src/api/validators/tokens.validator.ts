@@ -7,9 +7,18 @@ const addressSchema = Joi.object({
 
 const createTokensSchema = Joi.object({
   name: Joi.string().required(),
+  description: Joi.string().required(),
+  images: Joi.array().items(Joi.string()).required(),
+  files: Joi.array().items(Joi.string()).required(),
+  fileNames: Joi.array().items(Joi.string()).required(),
   symbol: Joi.string().required(),
-  initialSupply: Joi.number().integer().min(0).required(),
-  decimals: Joi.number().integer().min(0).max(18).required(),
+  initialSupply: Joi.string()
+    .pattern(/^\d+$/)
+    .required()
+    .messages({
+      'string.pattern.base': '"initialSupply" must be a string of digits',
+    }),
+  customDecimals: Joi.number().integer().min(0).max(18).required(),
 });
 
 const transferItemSchema = Joi.object({

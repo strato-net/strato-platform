@@ -1,38 +1,30 @@
-import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
+import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { combine, usc, cwd } from "../../utils/importer";
-import { StratoPaths } from "../../config/constants";
+import { usc } from "../../utils/importer";
+import { StratoPaths, constants } from "../../config/constants";
 
-const ERC20 = "Demo";
+const { tokenSelectFields, tokenBalanceSelectFields } = constants;
+
+const Token = "Token";
 const TokenFaucet = "TokenFaucet";
-const contractPath = `${cwd}/src/api/contracts/${ERC20}.sol`;
 
-
-// Get all tokens with optional filtering
+// Get all tokens
 export const getTokens = async (
   accessToken: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
   try {
-    // Filter out undefined values (cleaning for axios)
+    // Filter out undefined
     let params = Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
 
-    // Handle select param for balances
-    if (params.select) {
-      // Append BlockApps-Mercata-ERC20-_balances(*) if not already present
-      const selectParts = params.select.split(",");
-      if (!selectParts.includes("BlockApps-Mercata-ERC20-_balances(key,value)")) {
-        selectParts.push("BlockApps-Mercata-ERC20-_balances(key,value)");
-        params.select = selectParts.join(",");
-      }
-    } else {
-      params.select = "*,BlockApps-Mercata-ERC20-_balances(key,value)";
+    // use tokenBalanceSelectFields if no select is provided
+    if (!params.select) {
+      params.select = tokenSelectFields.join(",");
     }
-
-    const response = await cirrus.get(accessToken, `/BlockApps-Mercata-ERC20`, {
+    const response = await cirrus.get(accessToken, "/" + Token, {
       params,
     });
 
@@ -51,51 +43,27 @@ export const getTokens = async (
   }
 };
 
-// Get all faucet contract addresses
-export const getFaucetAddresses = async (accessToken: string) => {
-  try {
-    const response = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-${TokenFaucet}`,
-      {
-        params: {
-          isActive: "eq.true",
-          select: "address",
-        },
-      }
-    );
-
-    if (response.status !== 200) {
-      throw new Error(`Error fetching faucets: ${response.statusText}`);
-    }
-
-    if (!response.data) {
-      throw new Error("Faucets data is empty");
-    }
-
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching faucets:", error);
-    throw error;
-  }
-};
-
+// Get user tokens
 export const getBalance = async (
   accessToken: string,
+  address: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
   try {
-    // Filter out undefined values (cleaning for axios)
-    const params = Object.fromEntries(
+    // Filter out undefined
+    let params = Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ) as Record<string, string>;
-    const response = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-ERC20-_balances`,
-      {
-        params: { select: "*,BlockApps-Mercata-ERC20(*)", ...params },
-      }
-    );
+
+    // use tokenBalanceSelectFields if no select is provided
+    if (!params.select) {
+      params.select = tokenBalanceSelectFields.join(",");
+    }
+
+    // Add user address to params
+    const response = await cirrus.get(accessToken, "/" + Token + "-_balances", {
+      params: { ...params, key: "eq." + address },
+    });
     if (response.status !== 200) {
       throw new Error(`Error fetching balance: ${response.statusText}`);
     }
@@ -109,41 +77,15 @@ export const getBalance = async (
   }
 };
 
-// Fetch state data
-export const getState = async (
-  accessToken: string,
-  address: string
-) => {
-  try {
-    const response = await bloc.get(
-      accessToken,
-      StratoPaths.state.replace(":contractAddress", address)
-    );
-    if (response.status !== 200) {
-      throw new Error(`Error fetching allowance: ${response.statusText}`);
-    }
-    if (!response.data) {
-      throw new Error("Allowance data is empty");
-    }
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching allowance:", error);
-    throw error;
-  }
-};
-
 export const createToken = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
   try {
     const tx = buildDeployTx({
-      contractName: ERC20,
-      source: await combine(contractPath),
-      args: usc({
-        ...body,
-        createdDate: Date.now(),
-      }),
+      contractName: Token,
+      source: `import <${process.env.BASE_CODE_COLLECTION}>;`,
+      args: usc(body),
     });
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -160,40 +102,13 @@ export const createToken = async (
   }
 };
 
-export const faucetTokens = async (
-  accessToken: string,
-  body: Record<string, string | undefined>
-) => {
-  try {
-    const tx = buildFunctionTx({
-      contractName: TokenFaucet,
-      contractAddress: body.address || "",
-      method: "faucet",
-      args: {
-      },
-    });
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return {
-      status,
-      hash,
-    };
-  } catch (error) {
-    console.error("Unknown error:", error);
-    throw error;
-  }
-};
-
 export const transferToken = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: ERC20,
+      contractName: Token,
       contractAddress: body.address || "",
       method: "transfer",
       args: {
@@ -223,7 +138,7 @@ export const approveToken = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: ERC20,
+      contractName: Token,
       contractAddress: body.address || "",
       method: "approve",
       args: {
@@ -250,7 +165,7 @@ export const transferFromToken = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: ERC20,
+      contractName: Token,
       contractAddress: body.address || "",
       method: "transferFrom",
       args: {
@@ -267,6 +182,62 @@ export const transferFromToken = async (
     return { status, hash };
   } catch (error) {
     console.error("Error in transferFrom:", error);
+    throw error;
+  }
+};
+
+// Get tokens from faucet
+export const faucetTokens = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const tx = buildFunctionTx({
+      contractName: TokenFaucet,
+      contractAddress: body.address || "",
+      method: "faucet",
+      args: {},
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return {
+      status,
+      hash,
+    };
+  } catch (error) {
+    console.error("Unknown error:", error);
+    throw error;
+  }
+};
+
+// Get all faucet contract addresses
+export const getFaucetAddresses = async (accessToken: string) => {
+  try {
+    const response = await cirrus.get(
+      accessToken,
+      `/BlockApps-Mercata-${TokenFaucet}`,
+      {
+        params: {
+          isActive: "eq.true",
+          select: "address",
+        },
+      }
+    );
+
+    if (response.status !== 200) {
+      throw new Error(`Error fetching faucets: ${response.statusText}`);
+    }
+
+    if (!response.data) {
+      throw new Error("Faucets data is empty");
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching faucets:", error);
     throw error;
   }
 };

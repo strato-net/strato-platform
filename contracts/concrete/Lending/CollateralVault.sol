@@ -30,12 +30,12 @@ contract record CollateralVault is IERC20, Ownable {
         return keccak256(string(user), string(asset));
     }
 
-    function addCollateral(address borrower, address asset, uint256 amount) public  onlyLendingPool {
+    function addCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         require(amount > 0, "Invalid amount");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
 
         string key = _key(borrower, asset);
-        Collateral storage collateral = collaterals[key];
+        Collateral collateral = collaterals[key];
         collateral.user = borrower;
         collateral.asset = asset;
         collateral.amount += amount;
@@ -44,7 +44,7 @@ contract record CollateralVault is IERC20, Ownable {
         emit CollateralAdded(borrower, asset, amount);
     }
 
-    function removeCollateral(address borrower, address asset, uint256 amount) public  onlyLendingPool {
+    function removeCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         string key = _key(borrower, asset);
         require(collaterals[key].amount >= amount, "Insufficient collateral");
 

@@ -32,7 +32,7 @@ contract record LendingPool is Ownable {
     RateStrategy public rateStrategy;
     PriceOracle public oracle;
 
-    constructor  (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle) {
+    constructor (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle) {
         liquidityPool = LiquidityPool(_liquidityPool);
         collateralVault = CollateralVault(_collateralVault);
         rateStrategy = RateStrategy(_rateStrategy);
@@ -46,17 +46,17 @@ contract record LendingPool is Ownable {
         return keccak256(string(user), string(asset), string(block.timestamp));
    }
 
-    function depositLiquidity(address asset, uint256 amount) onlyOwner  {
+    function depositLiquidity(address asset, uint256 amount) {
         liquidityPool.deposit(asset, amount, msg.sender);
         emit Deposited(msg.sender, asset, amount);
     }
 
-    function withdrawLiquidity(address asset, uint256 amount) onlyOwner {
+    function withdrawLiquidity(address asset, uint256 amount) {
         liquidityPool.withdraw(asset, amount, msg.sender);
         emit Withdrawn(msg.sender, asset, amount);
     }
 
-    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) onlyOwner {
+    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) {
         string loanId = _loanKey(msg.sender, asset);
         uint256 assetPrice = oracle.getAssetPrice(asset);
         require(assetPrice > 0, "Asset price not set");
@@ -86,8 +86,8 @@ contract record LendingPool is Ownable {
         emit Borrowed(msg.sender, asset, amount, collateralAsset, collateralAmount);
     }
 
-    function repayLoan(string loanId, uint256 amount) public onlyOwner {
-        LoanInfo storage loan = loans[loanId];
+    function repayLoan(string loanId, uint256 amount) public {
+        LoanInfo loan = loans[loanId];
         require(loan.active, "No active loan");
         require(amount > 0, "Invalid repayment");
 
@@ -112,7 +112,7 @@ contract record LendingPool is Ownable {
     }
 
     function liquidate(string loanId, address borrower) public onlyOwner {
-        LoanInfo storage loan = loans[loanId];
+        LoanInfo loan = loans[loanId];
         require(loan.active, "Loan inactive");
 
         uint256 interest = rateStrategy.calculateInterest(

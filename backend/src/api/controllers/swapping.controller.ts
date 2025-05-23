@@ -7,9 +7,8 @@ import {
   removeLiquidity,
   swap,
   calculateSwap,
-  getPoolsWithDetails,
 } from "../services/swapping.service";
-import { getBalance, getTokens } from "../services/tokens.service";
+import { getBalance } from "../services/tokens.service";
 import {
   validateAddressArgs,
   validateCreatePoolsArgs,
@@ -29,7 +28,7 @@ class SwappingController {
       const { accessToken, params } = req;
       validateAddressArgs(params);
 
-      const token = await getPools(accessToken, {
+      const token = await getPools(accessToken, undefined, {
         address: "eq." + params.address,
       });
       res.status(RestStatus.OK).json(token);
@@ -44,11 +43,12 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query } = req;
+      const { accessToken, query, address } = req;
       validateQueryParams(query);
 
-      const tokens = await getPoolsWithDetails(
+      const tokens = await getPools(
         accessToken,
+        address,
         query as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(tokens);
@@ -78,24 +78,13 @@ class SwappingController {
     try {
       const { accessToken, address } = req;
 
-      const userTokens = await getBalance(accessToken, {
-        key: "eq." + address,
-      });
+      const userTokens = await getBalance(accessToken, address);
       const userTokensAddresses = userTokens.map((token: any) => token.address);
-      const pools = await getPools(accessToken, {
+      const pools = await getPools(accessToken, address, {
         address: "in.(" + userTokensAddresses.join(",") + ")",
       });
 
-      const poolsWithUserTokens = pools.map((pool: any) => {
-        const userToken = userTokens.find(
-          (token: any) => token.address === pool.address
-        );
-        return {
-          ...pool,
-          ...userToken,
-        };
-      });
-      res.status(RestStatus.OK).json(poolsWithUserTokens);
+      res.status(RestStatus.OK).json(pools);
     } catch (error) {
       next(error);
     }
@@ -172,8 +161,8 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const pools = await getPools(accessToken, {
-        select: "data->>tokenA,data->>tokenB",
+      const pools = await getPools(accessToken, undefined, {
+        select: "tokenA,tokenB",
       });
 
       const uniqueTokens = [
@@ -184,12 +173,7 @@ class SwappingController {
         ),
       ];
 
-      const tokenDetails = await getTokens(accessToken, {
-        address: "in.(" + uniqueTokens.join(",") + ")",
-        select: "address,_name,_symbol",
-      });
-
-      res.status(RestStatus.OK).json(tokenDetails);
+      res.status(RestStatus.OK).json(uniqueTokens);
     } catch (error) {
       next(error);
     }
@@ -204,31 +188,26 @@ class SwappingController {
       const { accessToken, params } = req;
       validateAddressArgs(params);
 
-      const poolA = await getPools(accessToken, {
-        "data->>tokenA": "eq." + params.address,
-        select: "token:data->>tokenB",
+      const poolA = await getPools(accessToken, undefined, {
+        tokenA: "eq." + params.address,
+        select: "tokenB",
       });
 
-      const poolB = await getPools(accessToken, {
-        "data->>tokenB": "eq." + params.address,
-        select: "token:data->>tokenA",
+      const poolB = await getPools(accessToken, undefined, {
+        tokenB: "eq." + params.address,
+        select: "tokenA",
       });
 
       const uniqueTokenPairs = [
         ...new Set(
           [
-            ...poolA.map((pool: any) => pool.token),
-            ...poolB.map((pool: any) => pool.token),
+            ...poolA.map((pool: any) => pool.tokenB),
+            ...poolB.map((pool: any) => pool.tokenA),
           ].filter(Boolean)
         ),
       ];
 
-      const tokenDetails = await getTokens(accessToken, {
-        address: "in.(" + uniqueTokenPairs.join(",") + ")",
-        select: "address,_name,_symbol",
-      });
-
-      res.status(RestStatus.OK).json(tokenDetails);
+      res.status(RestStatus.OK).json(uniqueTokenPairs);
     } catch (error) {
       next(error);
     }
@@ -243,9 +222,9 @@ class SwappingController {
       const { accessToken, query } = req;
       validateQueryParams(query);
 
-      const pools = await getPools(accessToken, {
-        "data->>tokenA": "in.(" + query.tokenPair + ")",
-        "data->>tokenB": "in.(" + query.tokenPair + ")",
+      const pools = await getPools(accessToken, undefined, {
+        tokenA: "in.(" + query.tokenPair + ")",
+        tokenB: "in.(" + query.tokenPair + ")",
       });
       res.status(RestStatus.OK).json(pools);
     } catch (error) {
