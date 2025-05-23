@@ -4,7 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getInputPrice } from "../helpers/swapping.helper";
 import { approveAsset } from "../helpers/tokens.helper";
-import { getPools as getLendingPool } from "./lending.service";
+import { getPool as getLendingPool } from "./lending.service";
 import { getTokens } from "./tokens.service";
 
 const { poolSelectFields } = constants;
@@ -16,86 +16,45 @@ export const getPools = async (
   address: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ) => {
-  try {
-    // Step 1: Clean query params
-    let params = Object.fromEntries(
+  const params = {
+    ...Object.fromEntries(
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ) as Record<string, string>;
+    ),
+    select: rawParams.select || poolSelectFields.join(","),
+    root: `eq.${constants.poolFactory}`,
+  };
 
-    // Add default select fields
-    if (!params.select) {
-      params.select = poolSelectFields.join(",");
-    }
-    params.root = "eq." + constants.poolFactory;
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params,
+  });
 
-    // Step 2: Fetch pools
-    const cirrusResponse = await cirrus.get(accessToken, "/" + Pool, {
-      params,
-    });
-    if (cirrusResponse.status !== 200 || !Array.isArray(cirrusResponse.data)) {
-      throw new Error("Error fetching pool data from Cirrus");
-    }
-    const poolData = cirrusResponse.data;
-
-    // Step 3: Collect all unique token addresses
-    const tokenAddresses = Array.from(
-      new Set(
-        poolData.flatMap((pool) => [pool.tokenA, pool.tokenB].filter(Boolean))
+  const tokenAddresses = [
+    ...new Set(
+      poolData.flatMap((pool: any) =>
+        [pool.tokenA, pool.tokenB].filter(Boolean)
       )
-    );
+    ),
+  ];
 
-    if (tokenAddresses.length === 0) {
-      return poolData; // Return pools without token metadata
-    }
+  if (!tokenAddresses.length) return poolData;
 
-    // Step 4: Fetch token metadata
-    const tokenMetaResponse = await getTokens(accessToken, {
+  const [tokenMetadata, lendingInfo] = await Promise.all([
+    getTokens(accessToken, {
       address: `in.(${tokenAddresses.join(",")})`,
-      ["balances.key"]: "eq." + address,
-    });
-    if (!Array.isArray(tokenMetaResponse)) {
-      throw new Error("Token metadata response is not an array");
-    }
-    const tokenMetaMap = Array.isArray(tokenMetaResponse)
-      ? tokenMetaResponse.reduce((map, token) => {
-          map[token.address] = token;
-          return map;
-        }, {} as Record<string, any>)
-      : {};
+      ["balances.key"]: `eq.${address}`,
+    }),
+    getLendingPool(accessToken, { select: "oracle" }),
+  ]);
+  const tokenMap = new Map(tokenMetadata.map((t: any) => [t.address, t]));
+  const prices = lendingInfo.oracle?.prices || {};
 
-    // Step 5: Get oracle price info (fallback to 0 if unavailable)
-    // let pricesMap: Record<string, string> = {};
-    // try {
-    //   const lendingInfo = await getLendingPool(accessToken);
-    //   const oracleAddress = lendingInfo.oracle;
-
-    //   const priceResponse = await bloc.get(
-    //     accessToken,
-    //     StratoPaths.state.replace(":contractAddress", oracleAddress)
-    //   );
-
-    //   if (priceResponse.status === 200 && priceResponse.data?.prices) {
-    //     pricesMap = priceResponse.data.prices;
-    //   }
-    // } catch (err) {
-    //   console.warn("Oracle price fetch failed, using default price 0");
-    //   // pricesMap remains empty
-    // }
-
-    // Step 6: Decorate pool with token info + prices
-    poolData.forEach((pool) => {
-      pool.tokenA = tokenMetaMap[pool.tokenA] || pool.tokenA;
-      pool.tokenB = tokenMetaMap[pool.tokenB] || pool.tokenB;
-
-      // pool.data.tokenAPrice = pricesMap[pool.data.tokenA] || "0";
-      // pool.data.tokenBPrice = pricesMap[pool.data.tokenB] || "0";
-    });
-
-    return poolData;
-  } catch (error) {
-    console.error("Error in getPools:", error);
-    throw error;
-  }
+  return poolData.map((pool: any) => ({
+    ...pool,
+    tokenAPrice: prices[pool.tokenA] || 0,
+    tokenBPrice: prices[pool.tokenB] || 0,
+    tokenA: tokenMap.get(pool.tokenA) || pool.tokenA,
+    tokenB: tokenMap.get(pool.tokenB) || pool.tokenB,
+  }));
 };
 
 export const createPool = async (

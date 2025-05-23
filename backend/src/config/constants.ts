@@ -36,8 +36,20 @@ export const constants = (() => {
     "tokenA",
     "tokenABalance",
     "tokenB",
-    "tokenBBalance"
+    "tokenBBalance",
   ];
+
+  const lendingPoolSelectFields = [
+    "address",
+    "oracle",
+    "liquidityPool",
+    "collateralVault",
+    "loans:LendingPool-loans(*)",
+    "interestRate:LendingPool-assetInterestRate(*)",
+    "collateralRatio:LendingPool-assetCollateralRatio(*)",
+    "liquidationBonus:LendingPool-assetLiquidationBonus(*)",
+  ];
+
   const configs = {
     prod: {
       poolFactory: "TBD",
@@ -45,9 +57,9 @@ export const constants = (() => {
       onRamp: "TBD",
     },
     testnet: {
-      poolFactory: "a55d216907d9ae9b53645f872b8e10f987b6ffa9",
-      lendingPool: "cd125a1785355c52d894b8539409b73579423f6f",
-      onRamp: "1303452c1a0c734b55bee1483991c3289d4038a4",
+      poolFactory: "ad5feba6e4d06c551d7ae477ea031120aaaddc2c",
+      lendingPool: "70e164caddf5b9e89e7484f7f4490be61b05c997",
+      onRamp: "261e49900fcdb016734696e705ef6b5c8d8026ac",
     },
     testnet2: {
       poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",
@@ -69,6 +81,7 @@ export const constants = (() => {
     tokenSelectFields,
     tokenBalanceSelectFields,
     poolSelectFields,
+    lendingPoolSelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();

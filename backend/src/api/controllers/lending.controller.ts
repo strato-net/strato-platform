@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
-  getPools,
+  getPool,
   manageLiquidity,
   getLoan,
   repayLoan,
@@ -23,11 +23,11 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
-      const pools = await getPools(
+      const pool = await getPool(
         accessToken,
         query as Record<string, string | undefined>
       );
-      res.status(RestStatus.OK).json(pools);
+      res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
     }
