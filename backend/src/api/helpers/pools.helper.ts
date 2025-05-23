@@ -1,5 +1,3 @@
-import { getPools } from "../services/swapping.service";
-import { getBalance } from "../services/tokens.service";
 
 export const getInputPrice = (
   inputAmount: bigint,
@@ -35,40 +33,3 @@ export const getOutputPrice = (
 
   return numerator / denominator + 1n;
 };
-
-export async function getPoolBalances(
-  accessToken: string,
-  poolAddress: string
-) {
-  // Get pool data
-  const pool = await getPools(accessToken, {
-    address: "eq." + poolAddress,
-  });
-  if (!pool || pool.length === 0) throw new Error("Pool not found");
-
-  // Get token addresses
-  const tokenAddress = pool[0].data.token;
-  const stableAddress = pool[0].data.stablecoin;
-
-  // Fetch balances in a single query
-  const balancesResponse = await getBalance(accessToken, {
-    key: "eq." + poolAddress,
-  });
-
-  if (!balancesResponse || !Array.isArray(balancesResponse)) {
-    throw new Error("Failed to fetch balances");
-  }
-
-  // Extract balances
-  const tokenBalance = BigInt(
-    balancesResponse.find((b) => b.address === tokenAddress)?.value || "0"
-  );
-  const stableBalance = BigInt(
-    balancesResponse.find((b) => b.address === stableAddress)?.value || "0"
-  );
-
-  if (tokenBalance <= 0n || stableBalance <= 0n)
-    throw new Error("No liquidity");
-
-  return { tokenBalance, stableBalance, tokenAddress, stableAddress };
-}
