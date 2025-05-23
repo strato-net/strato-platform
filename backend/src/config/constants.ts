@@ -7,6 +7,25 @@ export enum StratoPaths {
 }
 
 export const constants = (() => {
+  const tokenSelectFields = [
+    "address",
+    "_name",
+    "_symbol",
+    "_owner",
+    "customDecimals",
+    "description",
+    "images:Token-images(value)",
+    "attributes:Token-attributes(key,value)",
+    "balances:Token-_balances(user:key,balance:value)",
+    "minters:Token-minters(user:key,value)",
+    "burners:Token-burners(user:key,value)",
+  ];
+  const tokenBalanceSelectFields = [
+    "address",
+    "user:key",
+    "balance:value",
+    "token:Token(_name,_symbol,_owner,customDecimals,description,images:Token-images(value),attributes:Token-attributes(key,value),minters:Token-minters(user:key,value),burners:Token-burners(user:key,value))",
+  ];
   const configs = {
     prod: {
       poolFactory: "TBD",
@@ -26,10 +45,17 @@ export const constants = (() => {
   };
   type Network = keyof typeof configs;
   const envNetwork = process.env["NETWORK"];
-  const network: Network = (envNetwork === "prod" || envNetwork === "testnet" || envNetwork === "testnet2") ? envNetwork : "testnet2";
+  const network: Network =
+    envNetwork === "prod" ||
+    envNetwork === "testnet" ||
+    envNetwork === "testnet2"
+      ? envNetwork
+      : "testnet2";
   const selected = configs[network];
   return {
     ...selected,
+    tokenSelectFields,
+    tokenBalanceSelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();

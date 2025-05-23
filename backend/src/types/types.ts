@@ -40,7 +40,7 @@ export interface BuiltTx {
 
 export interface DeployInput {
   contractName: string;
-  source: Record<string, string>;
+  source: string;
   args: TxPayloadArgs;
 }
 

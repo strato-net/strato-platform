@@ -28,3 +28,23 @@ export const approveAsset = async (
   }
   return { status, hash };
 };
+
+/**
+ * Merges required fields with user-selected fields for a token query.
+ * @param requiredFields - The required fields for the token query.
+ * @param userSelect - The user-selected fields for the token query.
+ * @returns A string of merged fields for the token query.
+ */
+export const mergeSelectFields = (
+  requiredFields: string[],
+  userSelect?: string
+) => {
+  const userFields = userSelect
+    ? userSelect
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  const allFields = new Set([...requiredFields, ...userFields]);
+  return Array.from(allFields).join(",");
+};

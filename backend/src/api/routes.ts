@@ -16,13 +16,11 @@ const router = Router();
 router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
 
 router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
-router.get("/users/", authHandler.authorizeRequest(true), UsersController.getAll);
 
 router.get("/tokens/faucets", authHandler.authorizeRequest(), TokensController.getFaucets);
+router.get("/tokens/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
-router.get("/tokens/state/:address", authHandler.authorizeRequest(true), TokensController.getState);
-router.get("/tokens/table/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
 router.post("/tokens/faucet", authHandler.authorizeRequest(), TokensController.faucet);
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
