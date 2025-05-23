@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -41,21 +42,12 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
       setTimeout(() => {
         if (isRegister) {
           toast({
-            title: "Account created",
-            description: "Your wallet has been successfully created",
+            title: "Registration successful",
+            description: "Please check your email for a verification code",
           });
           
-          // Generate mock wallet data (for demo purposes)
-          const walletData = {
-            username: data.username || "user_" + Math.floor(Math.random() * 10000),
-            blockchainAccount: "0x" + Array.from({length: 40}, () => 
-              "0123456789abcdef"[Math.floor(Math.random() * 16)]).join(''),
-            privateKey: Array.from({length: 64}, () => 
-              "0123456789abcdef"[Math.floor(Math.random() * 16)]).join('')
-          };
-          
-          // Navigate to wallet created page with the wallet data
-          navigate('/wallet-created', { state: { walletData } });
+          // Navigate to email confirmation page with form data
+          navigate('/confirm-email', { state: { formData: data } });
         } else {
           toast({
             title: "Welcome back",
