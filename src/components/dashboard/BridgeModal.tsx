@@ -117,12 +117,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     
     const selectedNetworkChainId = NETWORK_CONFIGS[fromChain]?.chainId;
     const isMatching = chainId === selectedNetworkChainId;
-    
-    console.log('Chain matching check:', {
-      chainId,
-      selectedNetworkChainId,
-      isMatching
-    });
+ 
     
     return isMatching;
   };
@@ -172,7 +167,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   // Add effect to refetch balance when wallet connects
   useEffect(() => {
     if (isConnected && address) {
-      console.log('Wallet connected, fetching balance...');
+    
       if (fromToken?.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
         refetchNativeBalance();
       } else {
@@ -200,21 +195,13 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       }
 
       try {
-        console.log('Updating balance...', {
-          isConnected,
-          address,
-          fromToken,
-          fromChain,
-          nativeBalance,
-          tokenBalanceData
-        });
-
+      
         // Fetch balance based on token type
         if (fromToken.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
           if (nativeBalance) {
             const formattedBalance = formatBalance(nativeBalance.value, nativeBalance.decimals);
             if (mounted) {
-              console.log('Setting native balance:', formattedBalance);
+             
               setTokenBalance(formattedBalance);
             }
           }
@@ -222,7 +209,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           if (tokenBalanceData) {
             const formattedBalance = formatBalance(tokenBalanceData.value, tokenBalanceData.decimals);
             if (mounted) {
-              console.log('Setting token balance:', formattedBalance);
+            
               setTokenBalance(formattedBalance);
             }
           }
@@ -244,7 +231,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   // Add effect to handle network changes
   useEffect(() => {
     if (isConnected && chain) {
-      console.log('Chain changed:', chain);
+   
       // Reset balance when chain changes
       setTokenBalance("0");
       // Refetch balance after a short delay
@@ -387,14 +374,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       if (fromChain === 'STRATO' && toChain === 'Ethereum') {
         // Get token address the same way as other networks
         const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
-        console.log('Token address lookup:', {
-          fromChain,
-          toChain,
-          fromToken,
-          tokenSymbol: fromToken.symbol,
-          tokenAddress,
-          availableTokens: TOKEN_ADDRESSES[fromChain]
-        });
+   
         
         if (!tokenAddress) {
           toast({
@@ -685,6 +665,21 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
 
         // Call the STRATO to Mercata transfer endpoint
+        console.log('Bridge API Call Details:', {
+          url: 'http://localhost:3002/api/safe/strato-to-mercata',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${access_token}`
+          },
+          body: {
+            hash: tokenAddress,  // Using tokenAddress as hash
+            value: amount,      // Using amount as value
+            to: address,        // Using user's address as to
+            from: SAFE_ADDRESS  // Using SAFE_ADDRESS as from
+          }
+        });
+
         const response = await fetch('http://localhost:3002/api/safe/strato-to-mercata', {
           method: 'POST',
           headers: {
@@ -692,9 +687,10 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
             'Authorization': `Bearer ${access_token}`
           },
           body: JSON.stringify({
-            ethstAddresses: [tokenAddress],
-            quantity: amount,
-            baseAddress: address
+            hash: tokenAddress,  // Using tokenAddress as hash
+            value: amount,      // Using amount as value
+            to: address,        // Using user's address as to
+            from: SAFE_ADDRESS  // Using SAFE_ADDRESS as from
           })
         });
 
