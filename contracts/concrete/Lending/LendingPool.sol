@@ -32,7 +32,7 @@ contract record LendingPool is Ownable {
     RateStrategy public rateStrategy;
     PriceOracle public oracle;
 
-    constructor (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle) {
+    constructor (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle) Ownable() {
         liquidityPool = LiquidityPool(_liquidityPool);
         collateralVault = CollateralVault(_collateralVault);
         rateStrategy = RateStrategy(_rateStrategy);
