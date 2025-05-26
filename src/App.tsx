@@ -31,6 +31,9 @@ import BridgePage from "./pages/BridgePage";
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import DepositPage from "./pages/DepositPage";
 import DepositOptionsPage from "./pages/DepositOptionsPage";
+import { LendingProvider } from "./context/LendingContext";
+
+
 
 const queryClient = new QueryClient();
 
@@ -57,6 +60,7 @@ const App = () => (
           <BridgeProvider>
             <UserProvider>
               <UserTokensProvider>
+              <LendingProvider>
                 <SwapProvider>
                   <TooltipProvider>
                     <Toaster />
@@ -109,6 +113,7 @@ const App = () => (
                     </BrowserRouter>
                   </TooltipProvider>
                 </SwapProvider>
+                </LendingProvider>
               </UserTokensProvider>
             </UserProvider>
           </BridgeProvider>

@@ -19,7 +19,7 @@ const Dashboard = () => {
     "idle" | "success" | "error"
   >("idle");
   const { userAddress } = useUser();
-  const { tokens, loading, error, fetchTokens } = useUserTokens();
+  const { tokens, loading, fetchTokens } = useUserTokens();
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     setTimeout(() => {
@@ -138,7 +138,7 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <AssetsList tokens={tokens} />
+            <AssetsList loading={loading} tokens={tokens} />
           </div>
 
           <div className="mb-8">

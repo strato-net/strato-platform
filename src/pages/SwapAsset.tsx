@@ -139,7 +139,7 @@ const SwapAsset = () => {
       toast({
         title: "Success",
         description: `Swap successful: ${fromAmount} ${fromAsset?._symbol || ""} to ${toAmount} ${toAsset?._symbol || ""}`,
-        variant: "default",
+        variant: "success",
       });
       setIsDialogOpen(false);
       setSwapLoading(false);
