@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { BridgeProvider } from "@/lib/bridge/BridgeContext";
 import { WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
-import { getDefaultWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
@@ -26,7 +26,6 @@ import NotFound from "./pages/NotFound";
 import DashboardLayout from "./components/layouts/DashboardLayout";
 
 // Import dashboard components
-import AssetsList from "./components/dashboard/AssetList";
 import BridgePage from "./pages/BridgePage";
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import DepositPage from "./pages/DepositPage";
@@ -37,11 +36,6 @@ import { LendingProvider } from "./context/LendingContext";
 
 const queryClient = new QueryClient();
 
-// Configure wagmi with RainbowKit
-const { wallets } = getDefaultWallets({
-  appName: "Mercata Vault Finance",
-  projectId: "YOUR_PROJECT_ID", // Replace with your WalletConnect project ID
-});
 
 const config = createConfig({
   chains: [mainnet, polygon, sepolia],
@@ -86,10 +80,6 @@ const App = () => (
                         <Route
                           path="/dashboard/transfer"
                           element={<Transfer />}
-                        />
-                        <Route
-                          path="/dashboard/assets-list"
-                          element={<AssetsList />}
                         />
                         <Route
                           path="/dashboard/bridge"
