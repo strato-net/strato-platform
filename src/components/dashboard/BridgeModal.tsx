@@ -665,32 +665,18 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
 
         // Call the STRATO to Mercata transfer endpoint
-        console.log('Bridge API Call Details:', {
-          url: 'http://localhost:3002/api/safe/strato-to-mercata',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${access_token}`
-          },
-          body: {
-            hash: tokenAddress,  // Using tokenAddress as hash
-            value: amount,      // Using amount as value
-            to: address,        // Using user's address as to
-            from: SAFE_ADDRESS  // Using SAFE_ADDRESS as from
-          }
-        });
-
         const response = await fetch('http://localhost:3002/api/safe/strato-to-mercata', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${access_token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            hash: tokenAddress,  // Using tokenAddress as hash
-            value: amount,      // Using amount as value
-            to: address,        // Using user's address as to
-            from: SAFE_ADDRESS  // Using SAFE_ADDRESS as from
+            hash: transactionHash || '',  // Use actual transaction hash
+            value: amount.toString(),    // Convert amount to string
+            to: address,                 // User's address
+            from: SAFE_ADDRESS,          // Safe address
+            token: tokenAddress,         // Token address
+            accessToken: access_token    // Add access token
           })
         });
 
