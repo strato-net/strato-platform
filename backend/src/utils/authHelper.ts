@@ -55,11 +55,11 @@ export const getServiceToken = async (): Promise<string> => {
 };
 
 /**
- * Try to fetch an existing Strato key.
+ * Try to get an existing STRATO key.
  * @returns the address, or null if none exists yet.
  * @throws on non-404 failures.
  */
-async function fetchKey(token: string): Promise<string | null> {
+async function getKey(token: string): Promise<string | null> {
   try {
     const { data } = await strato.get<StratoKeyResponse>(
       token,
@@ -71,45 +71,57 @@ async function fetchKey(token: string): Promise<string | null> {
     if (axios.isAxiosError(err) && err.response?.status === 404) {
       return null;
     }
-    console.error("Error fetching key:", err);
+    console.error("Error getting key:", err);
     throw new Error("Key retrieval failed");
   }
 }
 
 /**
- * Hit the identity endpoint to create the key.
- * We fire‐and‐forget any errors here so they don’t block you.
+ * Create a STRATO key.
+ * @returns the address, or null in case of an error
+ * @throws on failures.
  */
-async function createKeyViaIdentity(token: string): Promise<void> {
+async function createKey(token: string): Promise<string | null> {
   try {
-    await eth.get(token, StratoPaths.identity);
+    const { data } = await strato.post<StratoKeyResponse>(
+      token,
+      StratoPaths.key
+    );
+    return data.address ?? null;
   } catch (err) {
-    console.warn("Failed to create key via identity endpoint:", err);
+    console.error("Error creating key:", err);
+    return null;
   }
 }
 
+// DEPRECATED: Identity Server and proxy are deprecated as of May 26th 2025
+// /**
+//  * Hit the identity endpoint to create the key.
+//  * We fire‐and‐forget any errors here so they don’t block you.
+//  */
+// async function createKeyViaIdentity(token: string): Promise<void> {
+//   try {
+//     await eth.get(token, StratoPaths.identity);
+//   } catch (err) {
+//     console.warn("Failed to create key via identity endpoint:", err);
+//   }
+// }
+
 /**
- * Fetches an existing Strato key, or creates one (and registers its identity) if none exists.
+ * Fetches an existing STRATO key, or creates one if none exists.
  *
  * @param token - Bearer token for authorization
  * @returns the address string
  */
 export async function createOrGetKey(token: string): Promise<string> {
-  // 1️⃣ Try to fetch an existing key
-  let address = await fetchKey(token);
-  if (address) {
-    return address;
+  let address = await getKey(token);
+  if (!address) {
+    console.info("No key found for the user, creating a new one…");
+    address = await createKey(token);
   }
 
-  console.info("No key found, creating a new one via identity endpoint…");
-
-  // 2️⃣ Create it
-  await createKeyViaIdentity(token);
-
-  // 3️⃣ Re-fetch; if still no address, that’s a real failure
-  address = await fetchKey(token);
   if (!address) {
-    throw new Error("Key creation failed: no address after identity call");
+    throw new Error("Key creation failed: no address returned after attempting to create a new key");
   }
 
   return address;
