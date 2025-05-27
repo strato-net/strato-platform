@@ -22,7 +22,7 @@ contract record LendingPool is Ownable {
         address collateralAsset;
         uint256 collateralAmount;
       }
-    address public lendingPool;
+
     mapping(string => LoanInfo) public record loans;
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;

@@ -31,7 +31,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
     }	
 
    function setLendingPool(address _lendingPool) external onlyOwner {	
-        //require(address(lendingPool) == address(0), "LendingPool already set");	
         require(_lendingPool != address(0), "Invalid address");	
         lendingPool = _lendingPool;	
     }
