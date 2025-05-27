@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeftRight, ArrowDownUp, History, Wallet, LogOut, ArrowLeft } from 'lucide-react';
+import { ArrowLeftRight, ArrowDownUp, History, ArrowLeft } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BridgeTransactionsModal from './BridgeTransactionsModal';
 import { useBridge } from '@/lib/bridge/BridgeContext';
@@ -17,25 +17,17 @@ import {
   BRIDGE_ABI,
   NATIVE_TOKEN_ADDRESS
 } from '@/lib/bridge/constants';
-import { useAccount, useDisconnect, useChainId, useSwitchChain, useBalance, useToken, useConnect, useSendTransaction, useWriteContract } from 'wagmi';
+import { useAccount, useDisconnect, useChainId, useSwitchChain, useBalance, useConnect, useSendTransaction, useWriteContract } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { parseEther, parseUnits, createPublicClient, http } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog } from '@/components/ui/dialog';
 
 interface BridgeModalProps {
   isOpen: boolean;
   onClose: () => void;
   updateTransactionStatus?: (hash: string, status: string) => void;
-}
-
-interface Token {
-  symbol: string;
-  stSymbol: string;
-  name: string;
-  stName: string;
-  decimals?: number;
 }
 
 // Add utility function for formatting balance
@@ -44,12 +36,9 @@ const formatBalance = (value: bigint, decimals: number): string => {
   return formattedBalance.toFixed(decimals);
 };
 
-const access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiI0Y2I0MjJkYy0wMDc5LTQ2ODktYmI5Ni0xZDRhOWJiZmM0MzQiLCJleHAiOjE3NDc3NDQ2NTIsIm5iZiI6MCwiaWF0IjoxNzQ3NzQzNzUyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJkMTdkYzQ2NS0yNThhLTQ1MGYtYmFjZS01ZTgzMDk0YWY3Y2YiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJkb2NzLnN0cmF0b21lcmNhdGEuY29tIiwiYXV0aF90aW1lIjoxNzQ3NjYwNTIwLCJzZXNzaW9uX3N0YXRlIjoiMmI0MDE0ZGMtYzJjYS00ZWI1LTliMGYtODBlZGNiMmIzYzlhIiwiYWNyIjoiMCIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJCbG9ja0FwcHMgQmxvY2tBcHBzIiwiY29tcGFueSI6IkJsb2NrQXBwcyIsInByZWZlcnJlZF91c2VybmFtZSI6ImJsb2NrYXBwcyIsImdpdmVuX25hbWUiOiJCbG9ja0FwcHMiLCJmYW1pbHlfbmFtZSI6IkJsb2NrQXBwcyIsImVtYWlsIjoiZHVzdGluK2Jsb2NrYXBwc0BibG9ja2FwcHMubmV0In0.V5bd6hohVTwsEySB2o0lsymsvRXcJ_oEgV_fRP6lAnLz24QuAd7_vQNz8udEon92EzpmToZ-Tje2P-Sp8yYesPzMGFWQc9odTKqC8RxTRq3A4wyL7W0bSiCspKfmYDrWdg4KqWihwVvTxDTBgM170hAvlbRaC0OoXNq5nwzFqrx5QPLxv-9wOzEzro-WCmxiYkyM0J8ySk1VDq1mJDV7haqNZDfU5FUHzwCZMuvMmp6wW63k-_tEqq0fO84bldjsHGqYflIyLX2lOfZZnl5VWsNNHP3RLrRHU0pvj0ZgVovKggk_EHasXVzGbpsq7vnhBkjFIiG-pPBm2foUN2q4fQ';
-
 const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalProps) => {
   const [showTransactions, setShowTransactions] = useState(false);
   const [isNetworkChanged, setIsNetworkChanged] = useState(false);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [transactionHash, setTransactionHash] = useState<`0x${string}` | undefined>();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -94,7 +83,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     setToToken,
     setAmount,
     setTokenBalance,
-    handleBridge: bridgeContextHandleBridge,
     swapChains,
   } = useBridge();
 
@@ -102,7 +90,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { connect } = useConnect();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
 
@@ -117,8 +104,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     
     const selectedNetworkChainId = NETWORK_CONFIGS[fromChain]?.chainId;
     const isMatching = chainId === selectedNetworkChainId;
- 
-    
     return isMatching;
   };
 
@@ -350,7 +335,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
   }, [fromToken]);
 
-  const handleBridge = async () => {
+  const handleBridgeIn = async () => {
     if (!isConnected) {
       toast({
         title: "Wallet not connected",
@@ -370,26 +355,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
 
     try {
-      // For STRATO to Mercata transfers
-      if (fromChain === 'STRATO' && toChain === 'Ethereum') {
-        // Get token address the same way as other networks
-        const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
-   
-        
-        if (!tokenAddress) {
-          toast({
-            title: "Token Error",
-            description: `Invalid token address for ${fromToken.symbol} on ${fromChain}`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Call handleBridgeSubmit instead of duplicating the API call
-        await handleBridgeSubmit();
-        return;
-      }
-
       // Check if on correct network
       if (!isChainMatching()) {
         try {
@@ -433,25 +398,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       } else {
         recipient = SAFE_ADDRESS;
       }
-
-      if (!recipient) {
-        toast({
-          title: "Recipient Error",
-          description: "Invalid recipient address",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Prepare transaction data
-      const transactionData = {
-        fromChain,
-        toChain,
-        token: fromToken,
-        amount,
-        recipient,
-        accessToken: userAddress
-      };
 
       toast({
         title: "Preparing transaction...",
@@ -665,7 +611,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
 
         // Call the STRATO to Mercata transfer endpoint
-        const response = await fetch('http://localhost:3002/api/safe/strato-to-mercata', {
+        const response = await fetch(`${import.meta.env.VITE_BRIDGE_API_BASE_URL}/api/safe/strato-to-ethereum`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -673,10 +619,9 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           body: JSON.stringify({
             hash: transactionHash || '',  // Use actual transaction hash
             value: amount.toString(),    // Convert amount to string
+            from: SAFE_ADDRESS,
             to: address,                 // User's address
-            from: SAFE_ADDRESS,          // Safe address
             token: tokenAddress,         // Token address
-            accessToken: access_token    // Add access token
           })
         });
 
@@ -710,20 +655,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         return;
       }
 
-      // For other transfers, check user transaction first
-      // const response = await fetch('http://localhost:3002/api/bridge/checkUserTransaction', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${access_token}`
-      //   }
-      // });
-
-      // if (!response.ok) {
-      //   throw new Error('Failed to check user transaction');
-      // }  
-
-      await handleBridge();
+      await handleBridgeIn();
       onClose();
       setShowTransactions(true);
     } catch (error: any) {
@@ -761,7 +693,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                   <ArrowLeftRight className="h-6 w-6 text-blue-600" />
                   <h1 className="text-2xl font-semibold text-gray-900">Bridge Assets</h1>
                 </div>
-                <Button
+                {/* <Button
                   variant="ghost"
                   size="sm"
                   className="flex items-center gap-2"
@@ -769,7 +701,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                 >
                   <History className="h-4 w-4" />
                   View Transactions
-                </Button>
+                </Button> */}
               </div>
 
               <div className="grid gap-6">
