@@ -344,23 +344,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   }, [fromToken]);
 
   const handleBridgeIn = async () => {
-    if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
+   
 
     try {
       // Check if on correct network
