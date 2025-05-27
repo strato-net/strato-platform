@@ -10,13 +10,15 @@ const Pool = "LendingPool";
 
 export const getPool = async (
   accessToken: string,
-  rawParams: Record<string, string | undefined> = {}
-) => {
+  options: Record<string, string> = {}
+): Promise<Record<string, any>> => {
+  const { select, ...filters } = options;
+  const cleanedFilters = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined)
+  );
   const params = {
-    ...Object.fromEntries(
-      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ),
-    select: rawParams.select || lendingPoolSelectFields.join(","),
+    ...cleanedFilters,
+    select: select ?? lendingPoolSelectFields.join(","),
     address: `eq.${lendingPool}`,
   };
 
@@ -24,40 +26,11 @@ export const getPool = async (
     data: [poolData],
   } = await cirrus.get(accessToken, `/${Pool}`, { params });
 
-  if (!poolData) throw new Error("Error fetching pool data from Cirrus");
+  if (!poolData) {
+    throw new Error(`Error fetching ${Pool} data from Cirrus`);
+  }
 
-  // Parallel fetch oracle and liquidity pool if addresses exist
-  const [oracleData, liquidityPoolData] = await Promise.all([
-    poolData.oracle
-      ? cirrus
-          .get(accessToken, "/PriceOracle", {
-            params: {
-              address: `eq.${poolData.oracle}`,
-              select: "address,prices:PriceOracle-prices(*)",
-            },
-          })
-          .then((r) => r.data?.[0])
-      : null,
-
-    poolData.liquidityPool
-      ? cirrus
-          .get(accessToken, "/LiquidityPool", {
-            params: {
-              address: `eq.${poolData.liquidityPool}`,
-              select:
-                "address,totalLiquidity:LiquidityPool-totalLiquidity(*),deposited:LiquidityPool-deposited(*)",
-            },
-          })
-          .then((r) => r.data?.[0])
-      : null,
-  ]);
-
-  return {
-    ...poolData,
-    oracle: oracleData || poolData.oracle,
-    liquidityPool: liquidityPoolData || poolData.liquidityPool,
-    collateralVault: { address: poolData.collateralVault },
-  };
+  return poolData;
 };
 
 export const manageLiquidity = async (
@@ -66,10 +39,10 @@ export const manageLiquidity = async (
 ) => {
   try {
     if (body.method === "depositLiquidity") {
-      const response = await getPool(accessToken, {
+      const lendingPool = await getPool(accessToken, {
         select: "liquidityPool",
       });
-      const liquidityPool = response.liquidityPool.address;
+      const liquidityPool = lendingPool.liquidityPool;
 
       await approveAsset(
         accessToken,
@@ -108,10 +81,10 @@ export const getLoan = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const response = await getPool(accessToken, {
+    const lendingPool = await getPool(accessToken, {
       select: "collateralVault",
     });
-    const collateralVault = response.collateralVault.address;
+    const collateralVault = lendingPool.collateralVault;
 
     await approveAsset(
       accessToken,
@@ -151,10 +124,10 @@ export const repayLoan = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const response = await getPool(accessToken, {
+    const lendingPool = await getPool(accessToken, {
       select: "liquidityPool",
     });
-    const liquidityPool = response.liquidityPool.address;
+    const liquidityPool = lendingPool.liquidityPool;
 
     await approveAsset(
       accessToken,
@@ -191,17 +164,18 @@ export const getDepositableTokens = async (
   accessToken: string,
   address: string
 ) => {
-  const [pool, userTokens] = await Promise.all([
+  const [lendingPool, userTokens] = await Promise.all([
     getPool(accessToken),
     getBalance(accessToken, address),
   ]);
 
   const userTokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
 
-  return Object.entries(pool.assetCollateralRatio || {})
+  return Object.entries(lendingPool.collateralRatio || {})
     .filter(
       ([token]) =>
-        pool.oracle?.prices?.[token] !== undefined && userTokenMap.has(token)
+        lendingPool.oracle?.prices?.[token] !== undefined &&
+        userTokenMap.has(token)
     )
     .map(([token, collateralRatio]) => {
       const userToken = userTokenMap.get(token) as any;
@@ -211,9 +185,9 @@ export const getDepositableTokens = async (
         _symbol: userToken?.token?._symbol || "",
         value: userToken?.balance?.toString() || "0",
         collateralRatio: collateralRatio || 0,
-        interestRate: pool.assetInterestRate?.[token] || 0,
-        price: pool.oracle?.prices?.[token] || 0,
-        liquidity: pool.liquidityPool?.totalLiquidity?.[token] || "0",
+        interestRate: lendingPool.interestRate?.[token] || 0,
+        price: lendingPool.oracle?.prices?.[token] || 0,
+        liquidity: lendingPool.liquidityPool?.totalLiquidity?.[token] || "0",
       };
     });
 };
@@ -224,10 +198,10 @@ export const getWithdrawableTokens = async (
 ): Promise<
   { address: string; _name: string; _symbol: string; value: string }[]
 > => {
-  const pool = await getPool(accessToken);
+  const lendingPool = await getPool(accessToken);
 
   const userDeposits = Object.values(
-    pool.liquidityPool?.deposited || {}
+    lendingPool.liquidityPool?.deposited || {}
   ).filter((d: any) => d.user === address) as {
     asset: string;
     amount: string;
@@ -259,13 +233,13 @@ export const getLoans = async (
   accessToken: string,
   address: string
 ): Promise<any> => {
-  const pool = await getPool(accessToken);
+  const lendingPool = await getPool(accessToken);
 
-  const userLoans = Object.entries(pool.loans || {}).filter(
+  const userLoans = Object.entries(lendingPool.loans || {}).filter(
     ([_, loan]: [string, any]) => loan.user === address && loan?.active
   );
 
-  if (!userLoans.length) return { ...pool, loans: {} };
+  if (!userLoans.length) return { ...lendingPool, loans: {} };
 
   const tokenMap = new Map(
     (
@@ -286,7 +260,7 @@ export const getLoans = async (
   const divisor = BigInt(365 * 24 * 60 * 100);
 
   return {
-    ...pool,
+    ...lendingPool,
     loans: Object.fromEntries(
       userLoans.map(([key, loan]: [string, any]) => {
         const assetToken = tokenMap.get(loan.asset) as any;
@@ -302,7 +276,7 @@ export const getLoans = async (
             collateralSymbol: collateralToken?._symbol || "",
             interest: (
               (BigInt(loan.amount) *
-                BigInt(pool.assetInterestRate?.[loan.asset] || 0) *
+                BigInt(lendingPool.interestRate?.[loan.asset] || 0) *
                 BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
               divisor
             ).toString(),

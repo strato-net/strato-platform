@@ -41,13 +41,13 @@ export const constants = (() => {
 
   const lendingPoolSelectFields = [
     "address",
-    "oracle",
-    "liquidityPool",
-    "collateralVault",
     "loans:LendingPool-loans(*)",
     "interestRate:LendingPool-assetInterestRate(*)",
     "collateralRatio:LendingPool-assetCollateralRatio(*)",
     "liquidationBonus:LendingPool-assetLiquidationBonus(*)",
+    "oracle:oracle_fkey(address,prices:PriceOracle-prices(*))",
+    "liquidityPool:liquidityPool_fkey(address,deposited:LiquidityPool-deposited(*),totalLiquidity:LiquidityPool-totalLiquidity(*),borrowed:LiquidityPool-borrowed(*))",
+    "collateralVault:collateralVault_fkey(address,collaterals:CollateralVault-collaterals(*))",
   ];
 
   const configs = {
