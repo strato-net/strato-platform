@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeftRight, ArrowDownUp, History, ArrowLeft } from 'lucide-react';
+import { ArrowLeftRight, ArrowDownUp, History, ArrowLeft, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BridgeTransactionsModal from './BridgeTransactionsModal';
 import { useBridge } from '@/lib/bridge/BridgeContext';
@@ -50,7 +50,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const [transactionHash, setTransactionHash] = useState<`0x${string}` | undefined>();
   const { toast } = useToast();
   const navigate = useNavigate();
-  // const [userAddress, setUserAddress] = useState<string>('');
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
 
   // Add useEffect to get user address from localStorage
   // useEffect(() => {
@@ -118,15 +118,15 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   // Network switching based on selected network
   const handleNetworkSwitch = async () => {
     try {
+      setIsBalanceLoading(true);
+      setTokenBalance("");
+      
       const targetChainId = NETWORK_CONFIGS[fromChain]?.chainId;
       if (!targetChainId) {
         throw new Error('Invalid network selected');
       }
 
       await switchChain({ chainId: targetChainId });
-      // Reset balance after network switch
-      setTokenBalance("0");
-      setIsNetworkChanged(false);
     } catch (error) {
       console.error('Network switch error:', error);
       toast({
@@ -134,6 +134,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         description: `Please switch to ${fromChain} network in your wallet`,
         variant: "destructive",
       });
+      setIsBalanceLoading(false);
     }
   };
 
@@ -169,32 +170,39 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
   }, [isConnected, address, fromToken, refetchNativeBalance, refetchTokenBalance]);
 
-  // Update balance effect
+  // Update the balance fetching effect
   useEffect(() => {
     let mounted = true;
+    let isInitialFetch = true; // Add flag for initial fetch
 
     const updateBalance = async () => {
       if (!mounted) return;
       
       if (!isConnected || !address || !fromToken || !fromChain) {
         setTokenBalance("0");
+        setIsBalanceLoading(false);
         return;
       }
 
       // Only fetch balance if we're on the correct network
       if (!isChainMatching()) {
         setTokenBalance("0");
+        setIsBalanceLoading(false);
         return;
       }
 
       try {
-      
+        // Only show loading on initial fetch or network switch
+        if (isInitialFetch) {
+          setIsBalanceLoading(true);
+          setTokenBalance("");
+        }
+        
         // Fetch balance based on token type
         if (fromToken.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
           if (nativeBalance) {
             const formattedBalance = formatBalance(nativeBalance.value, nativeBalance.decimals);
             if (mounted) {
-             
               setTokenBalance(formattedBalance);
             }
           }
@@ -202,18 +210,29 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           if (tokenBalanceData) {
             const formattedBalance = formatBalance(tokenBalanceData.value, tokenBalanceData.decimals);
             if (mounted) {
-            
               setTokenBalance(formattedBalance);
             }
           }
         }
       } catch (error) {
         console.error('Error fetching balance:', error);
-        if (mounted) setTokenBalance("0");
+        if (mounted) {
+          setTokenBalance("0");
+        }
+      } finally {
+        if (mounted) {
+          setIsBalanceLoading(false);
+          isInitialFetch = false;
+        }
       }
     };
 
-    debouncedUpdateBalance(updateBalance);
+    // Only use debounce for subsequent updates, not initial fetch
+    if (isInitialFetch) {
+      updateBalance();
+    } else {
+      debouncedUpdateBalance(updateBalance);
+    }
 
     // Cleanup function
     return () => {
@@ -768,10 +787,21 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                       {amountError && (
                         <p className="text-sm text-red-500">{amountError}</p>
                       )}
-                      {!(fromChain === 'STRATO' && toChain !== 'STRATO') && tokenBalance && (
-                        <p className="text-sm text-gray-500">
-                          Balance: {tokenBalance} {fromToken?.symbol}
-                        </p>
+                      {!(fromChain === 'STRATO' && toChain !== 'STRATO') && (
+                        <div className="flex items-center gap-2 mt-1">
+                          {isBalanceLoading ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                              <p className="text-sm text-gray-500">Fetching balance...</p>
+                            </div>
+                          ) : (
+                            tokenBalance && (
+                              <p className="text-sm text-gray-500">
+                                Balance: {tokenBalance} {fromToken?.symbol}
+                              </p>
+                            )
+                          )}
+                        </div>
                       )}
                     </div>
 
