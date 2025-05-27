@@ -41,13 +41,13 @@ export const constants = (() => {
 
   const lendingPoolSelectFields = [
     "address",
-    "loans:LendingPool-loans(*)",
-    "interestRate:LendingPool-assetInterestRate(*)",
-    "collateralRatio:LendingPool-assetCollateralRatio(*)",
-    "liquidationBonus:LendingPool-assetLiquidationBonus(*)",
-    "oracle:oracle_fkey(address,prices:PriceOracle-prices(*))",
-    "liquidityPool:liquidityPool_fkey(address,deposited:LiquidityPool-deposited(*),totalLiquidity:LiquidityPool-totalLiquidity(*),borrowed:LiquidityPool-borrowed(*))",
-    "collateralVault:collateralVault_fkey(address,collaterals:CollateralVault-collaterals(*))",
+    "loans:LendingPool-loans(key,LoanInfo:value)",
+    "interestRate:LendingPool-assetInterestRate(asset:key,rate:value)",
+    "collateralRatio:LendingPool-assetCollateralRatio(asset:key,ratio:value)",
+    "liquidationBonus:LendingPool-assetLiquidationBonus(asset:key,bonus:value)",
+    "oracle:oracle_fkey(address,prices:PriceOracle-prices(asset:key,price:value))",
+    "liquidityPool:liquidityPool_fkey(address,deposited:LiquidityPool-deposited(key,Deposit:value),totalLiquidity:LiquidityPool-totalLiquidity(asset:key,amount:value),borrowed:LiquidityPool-borrowed(key,Borrow:value))",
+    "collateralVault:collateralVault_fkey(address,collaterals:CollateralVault-collaterals(key,Collateral:value))",
   ];
 
   const configs = {
@@ -57,9 +57,9 @@ export const constants = (() => {
       onRamp: "TBD",
     },
     testnet: {
-      poolFactory: "ad5feba6e4d06c551d7ae477ea031120aaaddc2c",
-      lendingPool: "70e164caddf5b9e89e7484f7f4490be61b05c997",
-      onRamp: "261e49900fcdb016734696e705ef6b5c8d8026ac",
+      poolFactory: "dd7be8c9121326b3571fb33720b135fbaf0beded",
+      lendingPool: "1acf2f656993b24cc49b6e079e3f608fd47c45eb",
+      onRamp: "ddb00b9b6191db29665f356d9ac7f43ce1c3df9f",
     },
     testnet2: {
       poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",

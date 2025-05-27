@@ -19,6 +19,7 @@ export const getPool = async (
   const params = {
     ...cleanedFilters,
     select: select ?? lendingPoolSelectFields.join(","),
+    ...(select ? {} : { "loans.value->>active": "eq.true" }),
     address: `eq.${lendingPool}`,
   };
 
