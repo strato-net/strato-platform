@@ -1157,9 +1157,11 @@ insertCollectionTableQuery ms =
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
     collectiontype = excluded.collectiontype,
-    value = excluded.value|],
-                      ";"
-                    ]
+    value = CASE 
+      WHEN jsonb_typeof(excluded.value) = 'object' AND jsonb_typeof("|], tableNameToDoubleQuoteText tableName, [r|.value) = 'object'
+      THEN "|], tableNameToDoubleQuoteText tableName, [r|.value || excluded.value
+      ELSE excluded.value
+    END|],";"]
 
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertEventArrayTableQuery [] = []
