@@ -696,15 +696,15 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                   <ArrowLeftRight className="h-6 w-6 text-blue-600" />
                   <h1 className="text-2xl font-semibold text-gray-900">Bridge Assets</h1>
                 </div>
-                {/* <Button
+                <Button
                   variant="ghost"
                   size="sm"
                   className="flex items-center gap-2"
-                  onClick={() => setShowTransactions(true)}
+                  onClick={() => navigate('/dashboard/bridge-transactions')}
                 >
                   <History className="h-4 w-4" />
                   View Transactions
-                </Button> */}
+                </Button>
               </div>
 
               <div className="grid gap-6">
