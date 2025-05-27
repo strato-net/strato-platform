@@ -138,7 +138,7 @@ class Contracts extends Component {
           <div className="col-sm-2 text-left">
             <h3>Contracts</h3>
           </div>
-        <div className="col-sm-6 smd-pad-16">
+          <div className="col-sm-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
               <input
@@ -149,12 +149,12 @@ class Contracts extends Component {
                 dir="auto" />
             </div>
           </div>
-    
-        </div>
-        <div className='row pt-dark' style={{ display: 'flex', alignItems: 'center'}}>
-            <div className="col-sm-2 text-right smd-pad-8">
-              <CreateContract />
-            </div>
+          <div className="col-sm-2">
+            {/* Me know CSS real good */}
+          </div>
+          <div className="col-sm-2 text-right smd-pad-8">
+            <CreateContract />
+          </div>
         </div>
         {!cards.length && !this.props.isLoading &&
           <div className="row pt-dark" key={'contract-card-'}>
