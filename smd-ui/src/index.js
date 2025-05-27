@@ -51,7 +51,7 @@ import { watchCompileSourceFromEditor } from './components/CodeEditor/codeEditor
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
-import {watchFetchUser, watchFetchPubKey, watchuserCert} from './components/User/user.saga';
+import {watchFetchUser, watchFetchPubKey} from './components/User/user.saga';
 import {
   watchFetchState,
   watchFetchCirrusContracts,
@@ -144,7 +144,6 @@ const rootSaga = function* startForeman() {
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchFetchPubKey),
-    fork(watchuserCert),
     // fork(watchCreateBlocUser),
     // fork(watchUploadFile),
     // fork(watchFetchUpload),

@@ -93,7 +93,6 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Binary as Bin
 import Data.Bool (bool)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
 import Data.Either.Extra
@@ -666,11 +665,7 @@ extractCodeCollectionAddedMessages a =
          O.assocs $ a ^. Action.actionData
        ) of
     (Just c, Just n, actionDatas) ->
-      let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-            Just "SolidVM" -> SolidVMCode (T.unpack n) $ hash $ encodeUtf8 c
-            Just "EVM" -> ExternallyOwned $ hash $ BC.pack $ T.unpack c
-            Just v -> error $ "Unknown VM: " ++ show v
-            Nothing -> ExternallyOwned $ hash $ BC.pack $ T.unpack c
+      let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
           cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
             if _actionDataCodeHash == cp
               then Just _actionDataCreator
@@ -681,12 +676,7 @@ extractCodeCollectionAddedMessages a =
                                             --  . (constructor .~ Nothing)
                                              . (modifiers .~ M.empty)
                                              )
-          -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
-          abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
-          contracts'' = if S.null abstractNames
-                          then M.filter (isNothing . _importedFrom) contracts'
-                          else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
-          cc' = emptyCodeCollection & contracts .~ contracts''
+          cc' = emptyCodeCollection & contracts .~ contracts'
        in Just $
             CodeCollectionAdded
               { codeCollection = const () <$> cc',

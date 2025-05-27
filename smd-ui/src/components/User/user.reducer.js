@@ -11,8 +11,8 @@ import {
 const initialState = {
   oauthUser: undefined,
   publicKey : "abcde",
+  address: '',
   certificateLoading: false,
-  userCertificate: undefined,
   certificateError: undefined,
 };
 
@@ -32,29 +32,12 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         publicKey : action.publicKey,
+        address: action.address,
       }
     case FETCH_USER_PUBLIC_KEY_FAILURE:
       return {
         ...state,
         error : action.error
-      }
-    case FETCH_USER_CERT_REQUEST:
-      return {
-        ...state,
-        certificateLoading: true
-      }
-    case FETCH_USER_CERT_SUCCESS:
-      return {
-        ...state,
-        certificateLoading: false,
-        certificateError: undefined,
-        userCertificate: action.cert,
-      }
-    case FETCH_USER_CERT_FAILURE:
-      return {
-        ...state,
-        certificateLoading: false,
-        certificateError: action.error,
       }
     default:
       return state;

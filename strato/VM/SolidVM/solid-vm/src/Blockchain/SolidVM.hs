@@ -197,6 +197,13 @@ create ::
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
   isRunningTests <- checkIfRunningTests
+
+  initCode <- case code of
+    Code c -> pure c
+    PtrToCode cp -> do
+      hsh <- codePtrToSHA cp
+      fromMaybe "" . fmap snd . join <$> traverse getCode hsh
+
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
@@ -204,7 +211,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.metadata = Nothing,
+            Env.metadata = Just $ M.fromList [("src", either (const "") id $ DT.decodeUtf8' initCode), ("name", contractName)],
             Env.runningTests = isRunningTests
           }
   let gasInfo' =
@@ -214,12 +221,6 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             _gasInitialAllotment = availableGas,
             _gasMetadata = ""
           }
-
-  initCode <- case code of
-    Code c -> pure c
-    PtrToCode cp -> do
-      hsh <- codePtrToSHA cp
-      fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
     let argString = T.unpack $ "(" <> T.intercalate "," argsStrings <> ")"

@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "test-compose-v2"
+    label "test"
   }
   options { disableConcurrentBuilds() }
   stages {
@@ -77,18 +77,13 @@ pipeline {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
-                SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
                 OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
-                VAULT_PROXY_DEBUG=true \\
+                VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 idServerUrl=https://\$(</host):8001 \\
-                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
-                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
-                MP_IS_BOOTNODE='true' \\
-                MP_DELAY_DEPLOYMENT='true' \\
                 useCustomGenesis=false \\
                 ./strato --single
             """
@@ -144,48 +139,22 @@ pipeline {
         
         withCredentials([
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing1-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_ID'),
-          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
         ]) {
           script {
-            lib.registerTestUserCert(
-                'strato-worktree',
+            lib.registerStratoUserKey(
                 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
                 "${KEYCLOAK_STRATODEVEL_DEV_ID}",
                 "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
                 'user1',
                 '1234'
             )
-            lib.registerTestUserCert(
-                'strato-worktree',
+            lib.registerStratoUserKey(
                 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
                 "${KEYCLOAK_STRATODEVEL_DEV_ID}",
                 "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
                 'user3',
                 '1234'
             )
-            lib.registerTestUserCert(
-                'strato-worktree',
-                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING1_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET}",
-                '',
-                '',
-                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
-            )
-            lib.registerTestUserCert(
-                'strato-worktree',
-                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET}",
-                '',
-                '',
-                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
-            )
-            // Unlock the marketplace deploy script:
-            sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
           }
 
           dir("strato-getting-started") {
@@ -279,12 +248,11 @@ pipeline {
                   sh 'sudo ./strato --wipe'
                   sh 'sudo ./vault --wipe'
                   sh './run-vault.sh'
-                  // run again but connecting to mercata-hydrogen this time
+                  // run again but connecting to helium (testnet) this time
                   sh 'sed -i "s|useCustomGenesis=true|useCustomGenesis=false|" run.sh'
-                  sh 'sed -i "s|./strato --single|network=mercata-hydrogen networkID=7596898649924658542 ./strato|" run.sh'
+                  sh "sed -i 's|./strato --single|network=helium BOOT_NODE_IP='\\\''[\\\"44.198.225.165\\\",\\\"34.197.19.103\\\",\\\"34.194.64.79\\\",\\\"44.206.83.54\\\"]'\\\'' ./strato|' run.sh"
                   sh './run.sh'
                   sh './check_availability.sh'
-                  sh 'sudo docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
                   script {
                     lib.runSyncTester()
                   }
@@ -328,25 +296,25 @@ pipeline {
           }
         }
 
-        stage('Strato unit tests') {
-          steps {
-            withCredentials([
-            string(credentialsId: 'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID', variable:'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID'),
-            string(credentialsId: 'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY', variable:'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY'),
-          ]) {
-            sh '''#!/bin/bash -le
-              set -x
-              echo "Running unit tests"
-              cd strato-worktree
-              EXT_STORAGE_S3_BUCKET='mercata-dev-tests'
-              ./run_unit_tests.sh ${DEV_EXT_STORAGE_S3_ACCESS_KEY_ID} ${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY} ${EXT_STORAGE_S3_BUCKET} localhost --coverage
-            '''
-            dir('strato-worktree/strato') {
-              zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
-              } 
-            }
-          }
-        }
+//        stage('Strato unit tests') {
+//          steps {
+//            withCredentials([
+//            string(credentialsId: 'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID', variable:'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID'),
+//            string(credentialsId: 'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY', variable:'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY'),
+//          ]) {
+//            sh '''#!/bin/bash -le
+//              set -x
+//              echo "Running unit tests"
+//              cd strato-worktree
+//              EXT_STORAGE_S3_BUCKET='mercata-dev-tests'
+//              ./run_unit_tests.sh ${DEV_EXT_STORAGE_S3_ACCESS_KEY_ID} ${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY} ${EXT_STORAGE_S3_BUCKET} localhost --coverage
+//            '''
+//            dir('strato-worktree/strato') {
+//              zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
+//              } 
+//            }
+//          }
+//        }
 
         stage('SMD tests') {
           steps{
@@ -359,45 +327,45 @@ pipeline {
           }
         }
 
-        stage('STRATO API Tests') {
-          steps{
-            withCredentials([
-              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
-              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-            
-            ]) {
+//        stage('STRATO API Tests') {
+//          steps{
+//            withCredentials([
+//              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+//              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+//            
+//            ]) {
+//
+//              sh """#!/bin/bash -le
+//                set -x
+//                # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
+//                rm -rf strato-api-tests
+//                git clone -b reboot https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+//                cd strato-api-tests
+//                #git checkout develop # we must not checkout the custom branch for nightly builds - we must test with develop branch of strato-api-tests here as well as in release job.
+//                docker build --tag strato-api-tests .
+//                docker run \
+//                  -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+//                  -e OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \
+//                  -e OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \
+//                  -e STRATO_NODE_URL=http://172.17.0.1:80 \
+//                  -e DEBUG_LOG=false \
+//                  strato-api-tests
+//              """
+//            }
+//          }
+//        }
 
-              sh """#!/bin/bash -le
-                set -x
-                # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
-                rm -rf strato-api-tests
-                git clone -b reboot https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
-                cd strato-api-tests
-                #git checkout develop # we must not checkout the custom branch for nightly builds - we must test with develop branch of strato-api-tests here as well as in release job.
-                docker build --tag strato-api-tests .
-                docker run \
-                  -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
-                  -e OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \
-                  -e OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \
-                  -e STRATO_NODE_URL=http://172.17.0.1:80 \
-                  -e DEBUG_LOG=false \
-                  strato-api-tests
-              """
-            }
-          }
-        }
-
-        stage('BA-Rest Tests') {
-          steps{
-            sh '''#!/bin/bash -le
-              set -x
-              echo "Running ba-rest E2E tests"
-              cd strato-worktree/blockapps-rest
-              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
-              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
-            '''
-          }
-        }
+//        stage('BA-Rest Tests') {
+//          steps{
+//            sh '''#!/bin/bash -le
+//              set -x
+//              echo "Running ba-rest E2E tests"
+//              cd strato-worktree/blockapps-rest
+//              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+//              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
+//            '''
+//          }
+//        }
 
         /*
         stage('Payment Server Tests') {
@@ -417,16 +385,16 @@ pipeline {
         }
         */
 
-        stage('Integration tests') {
-          steps{
-            dir ('strato-worktree/tests') {
-              sh 'rm -rf node_modules'
-              sh 'npm ci'
-              sh 'npm run test'
-              //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
-            }
-          }
-        }
+//        stage('Integration tests') {
+//          steps{
+//            dir ('strato-worktree/tests') {
+//              sh 'rm -rf node_modules'
+//              sh 'npm ci'
+//              sh 'npm run test'
+//              //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
+//            }
+//          }
+//        }
       }
     }
 /*

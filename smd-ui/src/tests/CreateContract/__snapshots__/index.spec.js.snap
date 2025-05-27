@@ -219,17 +219,20 @@ Object {
   "contractName": "Cloner",
   "createDisabled": false,
   "initialValues": Object {
-    "address": "Verification Pending",
+    "address": "",
     "chainId": "",
     "chainLabel": "",
-    "commonName": "Verification Pending",
   },
   "isOpen": true,
   "isToasts": false,
+  "oAuthUser": Object {
+    "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "id": 6,
+    "username": "tanuj41",
+  },
   "selectedChain": undefined,
   "toastsError": undefined,
   "toastsMessage": "message",
-  "userCertificate": undefined,
   "username": "",
   "usingSampleContract": undefined,
 }
