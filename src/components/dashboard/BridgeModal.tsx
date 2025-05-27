@@ -428,7 +428,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           const txHash = await sendTransactionAsync({
             to: recipient as `0x${string}`,
             value: parseEther(amount),
-            data: `0x${stringToHex(JSON.stringify(metadata))}` // Use stringToHex instead of Buffer
           });
 
           if (!txHash) {
@@ -508,7 +507,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
             ] as const,
             chain: NETWORK_CONFIGS[fromChain],
             account: address,
-            data: `0x${stringToHex(JSON.stringify(metadata))}` // Use stringToHex instead of Buffer
           };
 
           hash = await writeContractAsync(contractConfig);
