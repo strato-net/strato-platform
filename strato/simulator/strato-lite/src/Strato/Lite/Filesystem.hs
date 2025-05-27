@@ -45,8 +45,10 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens ((.~))
 import Control.Monad.Reader
+import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import Data.List (isPrefixOf)
 import Data.Pool (withResource)
 import Data.Text (Text)
@@ -101,7 +103,7 @@ createFilesystemPeerAndCorePeer ::
   IO (FilesystemPeer, CorePeer)
 createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav sock fsDBs = do
   bootNodes <- maybe [] (Host . T.pack . webAddress <$>) <$> getParams network'
-  genesisInfo <- case network' of
+  genesisInfo' <- case network' of
     "mercata" -> pure Production.productionGenesisBlock
     "mercata-hydrogen" -> pure Production.productionGenesisBlock
     "helium" -> pure Helium.genesisBlock
@@ -114,6 +116,8 @@ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myH
       pure . insertBitcoinBridgeContract
            . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
            $ insertCertRegistryContract certs defaultGenesisInfo
+  B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo'
+  genesisInfo <- getGenesisInfo
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
   corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
   pure (fsPeer, corePeer)
