@@ -3,23 +3,33 @@ import "../../abstract/ERC20/access/Ownable.sol";
 contract record CollateralVault is IERC20, Ownable {
     event CollateralAdded(address indexed user, address indexed asset, uint256 amount);
     event CollateralRemoved(address indexed user, address indexed asset, uint256 amount);
-
     struct Collateral {   
         address user;
         address asset;
         uint256 amount;
     }
-    
+    address public lendingPool;
     mapping(string => Collateral) public record collaterals;
 
     constructor(address initialOwner) Ownable(initialOwner) {
+    }
+
+    modifier onlyLendingPool() {
+        require(msg.sender == lendingPool, "Caller is not LendingPool");
+        _;
+    }	
+
+    function setLendingPool(address _lendingPool) external onlyOwner {	
+        //require(lendingPool == address(0), "LendingPool already set");	
+        require(_lendingPool != address(0), "Invalid address");	
+        lendingPool = _lendingPool;	
     }
 
     function _key(address user, address asset) pure returns (string) {
         return keccak256(string(user), string(asset));
     }
 
-    function addCollateral(address borrower, address asset, uint256 amount) public onlyOwner {
+    function addCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         require(amount > 0, "Invalid amount");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
 
@@ -33,7 +43,7 @@ contract record CollateralVault is IERC20, Ownable {
         emit CollateralAdded(borrower, asset, amount);
     }
 
-    function removeCollateral(address borrower, address asset, uint256 amount) public onlyOwner {
+    function removeCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         string key = _key(borrower, asset);
         require(collaterals[key].amount >= amount, "Insufficient collateral");
 

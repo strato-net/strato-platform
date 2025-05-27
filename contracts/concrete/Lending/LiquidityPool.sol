@@ -17,7 +17,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         address asset;
         uint256 amount;
     }
-
+    address public lendingPool;
     mapping(string => Deposit) public record deposited;
     mapping(address => uint256) public record totalLiquidity;
     mapping(string => Borrow) public record borrowed;
@@ -25,11 +25,22 @@ import "../../abstract/ERC20/access/Ownable.sol";
     constructor(address initialOwner) Ownable(initialOwner) {
     } 
 
+    modifier onlyLendingPool() {	
+        require(msg.sender == lendingPool, "Caller is not LendingPool");	
+        _;	
+    }	
+
+   function setLendingPool(address _lendingPool) external onlyOwner {	
+        //require(address(lendingPool) == address(0), "LendingPool already set");	
+        require(_lendingPool != address(0), "Invalid address");	
+        lendingPool = _lendingPool;	
+    }
+
     function _key(address user, address asset) pure returns (string) {
         return keccak256(string(user), string(asset));
     }
 
-    function deposit(address asset, uint256 amount, address onBehalfOf) public onlyOwner {
+    function deposit(address asset, uint256 amount, address onBehalfOf) public onlyLendingPool {
         string key = _key(onBehalfOf, asset);
         require(amount > 0, "Amount must be greater than 0");
         require(onBehalfOf != address(0), "Invalid user address");
@@ -42,7 +53,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         emit Deposited(onBehalfOf, asset, amount);
     }
 
-    function withdraw(address asset, uint256 amount, address to) public onlyOwner {
+    function withdraw(address asset, uint256 amount, address to) public onlyLendingPool {
         require(amount > 0, "Amount must be greater than 0");
         require(to != address(0), "Invalid recipient address");
         string key = _key(to, asset);
@@ -53,7 +64,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         emit Withdrawn(to, asset, amount);
     }
 
-    function borrow(address asset, uint256 amount, address borrower) public onlyOwner {
+    function borrow(address asset, uint256 amount, address borrower) public onlyLendingPool {
         string key = _key(borrower, asset);
         require(amount > 0, "Amount must be greater than 0");
         require(borrower != address(0), "Invalid borrower address");
@@ -66,7 +77,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         emit Borrowed(borrower, asset, amount);
     }
 
-    function repay(address asset, uint256 amount, uint256 totalOwed, address borrower) public onlyOwner {
+    function repay(address asset, uint256 amount, uint256 totalOwed, address borrower) public onlyLendingPool {
         require(amount > 0, "Amount must be greater than 0");
         require(borrower != address(0), "Invalid borrower address");
         string key = _key(borrower, asset);

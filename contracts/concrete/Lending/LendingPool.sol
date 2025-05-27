@@ -22,7 +22,7 @@ contract record LendingPool is Ownable {
         address collateralAsset;
         uint256 collateralAmount;
       }
-
+    address public lendingPool;
     mapping(string => LoanInfo) public record loans;
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;
@@ -32,11 +32,11 @@ contract record LendingPool is Ownable {
     RateStrategy public rateStrategy;
     PriceOracle public oracle;
 
-    constructor (address initialOwner) Ownable(initialOwner) {
-        liquidityPool = new LiquidityPool(address(this));
-        collateralVault = new CollateralVault(address(this));
-        rateStrategy = new RateStrategy();
-        oracle = new PriceOracle(initialOwner);
+    constructor (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle, address initialOwner) Ownable(initialOwner) {
+        liquidityPool = LiquidityPool(_liquidityPool);
+        collateralVault = CollateralVault(_collateralVault);
+        rateStrategy = RateStrategy(_rateStrategy);
+        oracle = PriceOracle(_oracle);
         assetCollateralRatio[address(0)] = 150;
         assetLiquidationBonus[address(0)] = 105;
         assetInterestRate[address(0)] = 5; // default example rate

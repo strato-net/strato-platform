@@ -47,8 +47,12 @@ async function main() {
     console.log('\n====== Deployment Successful ======');
     console.log(`Contract: ${deployedContract.name}`);
     console.log(`Address: ${deployedContract.address}`);
+    console.log(`Rate Strategy: ${deployedContract.managers.rateStrategy}`);
+    console.log(`Collateral Vault: ${deployedContract.managers.collateralVault}`);
+    console.log(`Price Oracle: ${deployedContract.managers.priceOracle}`);
     console.log(`Pool Configurator: ${deployedContract.managers.poolConfigurator}`);
     console.log(`Lending Pool: ${deployedContract.managers.lendingPool}`);
+    console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
     console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
     console.log(`Mercata ETH Bridge: ${deployedContract.managers.mercataEthBridge}`);
     console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
