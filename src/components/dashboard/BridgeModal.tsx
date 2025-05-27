@@ -26,6 +26,11 @@ import { Dialog } from '@/components/ui/dialog';
 
 const   BRIDGE_API_BASE_URL = import.meta.env.VITE_BRIDGE_API_BASE_URL;
 
+const stringToHex = (str: string): string => {
+  return Array.from(str)
+    .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+    .join('');
+};
 
 interface BridgeModalProps {
   isOpen: boolean;
@@ -383,6 +388,11 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         return;
       }
 
+      // Add metadata for the transaction
+      const metadata = {
+        description: `Hello my name is Tanuj Soni and I am a software engineer`,
+      };
+
       // Handle other network transfers (existing code)
       const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
       if (!tokenAddress) {
@@ -414,7 +424,8 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           // Native token logic using wagmi's sendTransactionAsync
           const txHash = await sendTransactionAsync({
             to: recipient as `0x${string}`,
-            value: parseEther(amount)
+            value: parseEther(amount),
+            data: `0x${stringToHex(JSON.stringify(metadata))}` // Use stringToHex instead of Buffer
           });
 
           if (!txHash) {
@@ -493,7 +504,8 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
               recipient as `0x${string}`
             ] as const,
             chain: NETWORK_CONFIGS[fromChain],
-            account: address
+            account: address,
+            data: `0x${stringToHex(JSON.stringify(metadata))}` // Use stringToHex instead of Buffer
           };
 
           hash = await writeContractAsync(contractConfig);
