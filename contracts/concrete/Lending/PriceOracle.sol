@@ -1,7 +1,7 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PriceOracle is Ownable {
-   constructor() Ownable(){      
+   constructor() Ownable() {      
     } 
      event PriceUpdated(address indexed asset, uint256 price);
 

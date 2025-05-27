@@ -53,10 +53,22 @@ contract Mercata {
         lendingPool = LendingPool(new LendingPool(address(liquidityPool), address(collateralVault), address(rateStrategy), address(priceOracle)));
         poolConfigurator = PoolConfigurator(new PoolConfigurator(address(lendingPool)));
         lendingRegistry = LendingRegistry(new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy)));
+
         collateralVault.setLendingPool(address(lendingPool));
         liquidityPool.setLendingPool(address(lendingPool));
+
+        Ownable(priceOracle).transferOwnership(msg.sender);
+        Ownable(collateralVault).transferOwnership(msg.sender);
+        Ownable(liquidityPool).transferOwnership(msg.sender);
+        Ownable(lendingPool).transferOwnership(msg.sender);
+        Ownable(poolConfigurator).transferOwnership(msg.sender);
+        Ownable(lendingRegistry).transferOwnership(msg.sender);
+
+
         mercataEthBridge = MercataEthBridge(new MercataEthBridge(address(msg.sender)));
         onRamp = OnRamp(new OnRamp(address(priceOracle), msg.sender));
+
         poolFactory = PoolFactory(new PoolFactory());
+        Ownable(poolFactory).transferOwnership(msg.sender);
     }
 }
