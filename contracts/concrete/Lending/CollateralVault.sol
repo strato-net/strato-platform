@@ -1,4 +1,5 @@
 import "../../abstract/ERC20/access/Ownable.sol";
+import "./LendingRegistry.sol";
 
 contract record CollateralVault is IERC20, Ownable {
     event CollateralAdded(address indexed user, address indexed asset, uint256 amount);
@@ -8,21 +9,17 @@ contract record CollateralVault is IERC20, Ownable {
         address asset;
         uint256 amount;
     }
-    address public lendingPool;
+    LendingRegistry public immutable registry;
     mapping(string => Collateral) public record collaterals;
 
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+        require(_registry != address(0), "Invalid registry address");
+        registry = LendingRegistry(_registry);
     }
 
     modifier onlyLendingPool() {
-        require(msg.sender == lendingPool, "Caller is not LendingPool");
+        require(msg.sender == registry.lendingPool(), "Caller is not LendingPool");
         _;
-    }	
-
-    function setLendingPool(address _lendingPool) external onlyOwner {	
-        //require(lendingPool == address(0), "LendingPool already set");	
-        require(_lendingPool != address(0), "Invalid address");	
-        lendingPool = _lendingPool;	
     }
 
     function _key(address user, address asset) pure returns (string) {

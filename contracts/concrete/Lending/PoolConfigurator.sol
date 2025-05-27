@@ -1,37 +1,47 @@
+import "./LendingRegistry.sol";
 import "./LendingPool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract record PoolConfigurator is Ownable{
+contract record PoolConfigurator is Ownable, LendingRegistry {
    
-    event LendingPoolUpdated(address indexed newAddress);
-    event InterestRateUpdated(address indexed asset, uint256 newRate);
-    event CollateralRatioUpdated(address indexed asset, uint256 newRatio);
-    event LiquidationBonusUpdated(address indexed asset,uint256 newBonus);
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
-    LendingPool public lendingPool;
-
-    constructor (address _lendingPool, address initialOwner) Ownable(initialOwner) {
-        require(_lendingPool != address(0), "Invalid LendingPool address");
-        lendingPool = LendingPool(_lendingPool);
+    // Registry Setters
+    function updateLendingPool(address newAddress) external onlyOwner {
+        require(newAddress != address(0), "Invalid address");
+        setLendingPool(newAddress);
     }
 
-    function updateLendingPool(address newAddress) public onlyOwner {
-        lendingPool = LendingPool(newAddress);
-        emit LendingPoolUpdated(newAddress);
+    function updateLiquidityPool(address newAddress) external onlyOwner {
+        require(newAddress != address(0), "Invalid address");
+        setLiquidityPool(newAddress);
     }
 
-    function setInterestRate(address asset, uint256 newRate) public onlyOwner {
-        lendingPool.setInterestRate(asset, newRate);
-        emit InterestRateUpdated(asset, newRate);
+    function updateCollateralVault(address newAddress) external onlyOwner {
+        require(newAddress != address(0), "Invalid address");
+        setCollateralVault(newAddress);
     }
 
-    function setCollateralRatio(address asset, uint256 newRatio) public onlyOwner {
-        lendingPool.setCollateralRatio(asset, newRatio);
-        emit CollateralRatioUpdated(asset, newRatio);
+    function updateRateStrategy(address newAddress) external onlyOwner {
+        require(newAddress != address(0), "Invalid address");
+        setRateStrategy(newAddress);
     }
 
-    function setLiquidationBonus(address asset, uint256 newBonus) public onlyOwner {
-        lendingPool.setLiquidationBonus(asset, newBonus);
-        emit LiquidationBonusUpdated(asset,newBonus);
+    function updatePriceOracle(address newAddress) external onlyOwner {
+        require(newAddress != address(0), "Invalid address");
+        setPriceOracle(newAddress);
+    }
+
+    // LendingPool Risk Parameters
+    function setInterestRate(address asset, uint256 newRate) external onlyOwner {
+        LendingPool(lendingPool).setInterestRate(asset, newRate);
+    }
+
+    function setCollateralRatio(address asset, uint256 newRatio) external onlyOwner {
+        LendingPool(lendingPool).setCollateralRatio(asset, newRatio);
+    }
+
+    function setLiquidationBonus(address asset, uint256 newBonus) external onlyOwner {
+        LendingPool(lendingPool).setLiquidationBonus(asset, newBonus);
     }
 }

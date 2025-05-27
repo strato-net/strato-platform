@@ -27,40 +27,53 @@ contract record LendingPool is Ownable {
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;
     mapping(address => uint256) public record assetLiquidationBonus;
-    LiquidityPool public liquidityPool;
-    CollateralVault public collateralVault;
-    RateStrategy public rateStrategy;
-    PriceOracle public oracle;
 
-    constructor (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle, address initialOwner) Ownable(initialOwner) {
-        liquidityPool = LiquidityPool(_liquidityPool);
-        collateralVault = CollateralVault(_collateralVault);
-        rateStrategy = RateStrategy(_rateStrategy);
-        oracle = PriceOracle(_oracle);
+    LendingRegistry public immutable registry;
+
+    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+        require(_registry != address(0), "Invalid registry address");
+        registry = LendingRegistry(_registry);
+
         assetCollateralRatio[address(0)] = 150;
         assetLiquidationBonus[address(0)] = 105;
-        assetInterestRate[address(0)] = 5; // default example rate
+        assetInterestRate[address(0)] = 5;
     }
 
+    function _liquidityPool() internal view returns (address) {
+        return registry.liquidityPool();
+    }
+
+    function _collateralVault() internal view returns (address) {
+        return registry.collateralVault();
+    }
+
+    function _rateStrategy() internal view returns (address) {
+        return registry.rateStrategy();
+    }
+
+    function _priceOracle() internal view returns (address) {
+        return registry.priceOracle();
+    }
+    
     function _loanKey(address user, address asset)  returns (string) {
         return keccak256(string(user), string(asset), string(block.timestamp));
-   }
+    }
 
     function depositLiquidity(address asset, uint256 amount) {
-        liquidityPool.deposit(asset, amount, msg.sender);
+        LiquidityPool(_liquidityPool()).deposit(asset, amount, msg.sender);
         emit Deposited(msg.sender, asset, amount);
     }
 
     function withdrawLiquidity(address asset, uint256 amount) {
-        liquidityPool.withdraw(asset, amount, msg.sender);
+        LiquidityPool(_liquidityPool()).withdraw(asset, amount, msg.sender);
         emit Withdrawn(msg.sender, asset, amount);
     }
 
     function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) {
         string loanId = _loanKey(msg.sender, asset);
-        uint256 assetPrice = oracle.getAssetPrice(asset);
+        uint256 assetPrice = PriceOracle(_priceOracle()).getAssetPrice(asset);
         require(assetPrice > 0, "Asset price not set");
-        uint256 collateralPrice = oracle.getAssetPrice(collateralAsset);
+        uint256 collateralPrice = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
         require(collateralPrice > 0, "Collateral price not set");
 
         uint256 loanValue = (amount * assetPrice) / 1e18;
@@ -70,8 +83,8 @@ contract record LendingPool is Ownable {
         require(ratio > 0, "Collateral ratio not set");
         require(collateralValue * 100 >= loanValue * ratio, "Undercollateralized");
 
-        collateralVault.addCollateral(msg.sender, collateralAsset, collateralAmount);
-        liquidityPool.borrow(asset, amount, msg.sender);
+        CollateralVault(_collateralVault()).addCollateral(msg.sender, collateralAsset, collateralAmount);
+        LiquidityPool(_liquidityPool()).borrow(asset, amount, msg.sender);
 
         loans[loanId] = LoanInfo(
             msg.sender,
@@ -91,17 +104,17 @@ contract record LendingPool is Ownable {
         require(loan.active, "No active loan");
         require(amount > 0, "Invalid repayment");
 
-        uint256 interest = rateStrategy.calculateInterest(
+        uint256 interest = RateStrategy(_rateStrategy()).calculateInterest(
             loan.amount,
             assetInterestRate[loan.asset],
             loan.lastUpdated
         );
         uint256 totalOwed = loan.amount + interest;
      
-        liquidityPool.repay(loan.asset, amount, totalOwed, msg.sender);
+        LiquidityPool(_liquidityPool()).repay(loan.asset, amount, totalOwed, msg.sender);
 
         if (amount >= totalOwed) {
-            collateralVault.removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
+            CollateralVault(_collateralVault()).removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
             loan.active = false;
         } else {
             loan.amount = totalOwed - amount;
@@ -115,29 +128,29 @@ contract record LendingPool is Ownable {
         LoanInfo loan = loans[loanId];
         require(loan.active, "Loan inactive");
 
-        uint256 interest = rateStrategy.calculateInterest(
+        uint256 interest = RateStrategy(_rateStrategy()).calculateInterest(
             loan.amount,
             assetInterestRate[loan.collateralAsset],
             loan.lastUpdated
         );
         uint256 totalOwed = loan.amount + interest;
 
-        uint256 assetPrice = oracle.getAssetPrice(loan.collateralAsset);
-        uint256 collateralPrice = oracle.getAssetPrice(loan.collateralAsset);
+        uint256 assetPrice = PriceOracle(_priceOracle()).getAssetPrice(loan.collateralAsset);
+        uint256 collateralPrice = PriceOracle(_priceOracle()).getAssetPrice(loan.collateralAsset);
 
         uint256 loanValue = (totalOwed * assetPrice) / 1e18;
-        uint256 userCollateral = collateralVault.getCollateral(borrower, loan.collateralAsset);
+        uint256 userCollateral = CollateralVault(_collateralVault()).getCollateral(borrower, loan.collateralAsset);
         uint256 collateralValue = (userCollateral * collateralPrice) / 1e18;
 
         uint256 ratio = assetCollateralRatio[loan.collateralAsset];
         require(ratio > 0 && collateralValue * 100 < loanValue * ratio, "Healthy loan");
 
-        liquidityPool.repay(loan.collateralAsset, totalOwed, totalOwed, msg.sender);
+        LiquidityPool(_liquidityPool()).repay(loan.collateralAsset, totalOwed, totalOwed, msg.sender);
         uint256 bonus = assetLiquidationBonus[loan.collateralAsset];
         uint256 seizeAmount = (totalOwed * bonus * 1e18) / (collateralPrice * 100);
 
         require(userCollateral >= seizeAmount, "Insufficient collateral");
-        collateralVault.removeCollateral(borrower, loan.collateralAsset, seizeAmount);
+        CollateralVault(_collateralVault()).removeCollateral(borrower, loan.collateralAsset, seizeAmount);
 
         loan.active = false;
         emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
@@ -159,6 +172,6 @@ contract record LendingPool is Ownable {
     }
 
     function getAvailableLiquidity(address asset)  view  returns (uint256) {
-        return liquidityPool.getUserBalance(msg.sender, asset);
+        return LiquidityPool(_liquidityPool()).getUserBalance(msg.sender, asset);
     }
 }
