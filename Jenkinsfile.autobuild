@@ -86,7 +86,7 @@ pipeline {
               for (service in composeImages.keySet()) {
                 def localImage = composeImages[service]
                 def ecrTag = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}:${GIT_SHA}"
-                def internalTag = "registry-aws.blockapps.net:5000/blockapps-repo/mercata-${service}:${GIT_SHA}"
+                def internalTag = "registry-aws.blockapps.net:5000/blockapps/mercata-${service}:${GIT_SHA}"
 
                 sh "docker tag ${localImage} ${ecrTag}"
                 sh "docker push ${ecrTag}"
@@ -133,7 +133,7 @@ pipeline {
 
           services.each { svc ->
             def ecrImage = "image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${svc}:${gitSha}"
-            def internalImage = "image: registry-aws.blockapps.net:5000/blockapps-repo/mercata-${svc}:${gitSha}"
+            def internalImage = "image: registry-aws.blockapps.net:5000/blockapps/mercata-${svc}:${gitSha}"
 
             ecrCompose = ecrCompose.replaceAll(/image: mercata-${svc}(:latest)?/, ecrImage)
             internalCompose = internalCompose.replaceAll(/image: mercata-${svc}(:latest)?/, internalImage)
