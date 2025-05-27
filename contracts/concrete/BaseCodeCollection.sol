@@ -46,17 +46,19 @@ contract Mercata {
     PoolFactory public poolFactory;
 
     constructor() public {
-        rateStrategy = RateStrategy(new RateStrategy());
-        priceOracle = PriceOracle(new PriceOracle());
-        collateralVault = CollateralVault(new CollateralVault());
-        liquidityPool = LiquidityPool(new LiquidityPool());
-        lendingPool = LendingPool(new LendingPool(address(liquidityPool), address(collateralVault), address(rateStrategy), address(priceOracle)));
-        poolConfigurator = PoolConfigurator(new PoolConfigurator(address(lendingPool)));
-        lendingRegistry = LendingRegistry(new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy)));
+        rateStrategy = new RateStrategy();
+        priceOracle = new PriceOracle(msg.sender);
+        collateralVault = new CollateralVault(this);
+        liquidityPool = new LiquidityPool(this);
+        lendingPool = new LendingPool(address(liquidityPool), address(collateralVault), address(rateStrategy), address(priceOracle), msg.sender);
+        poolConfigurator = new PoolConfigurator(address(lendingPool), msg.sender);
+        lendingRegistry = new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy), msg.sender);
         collateralVault.setLendingPool(address(lendingPool));
+        Ownable(collateralVault).transferOwnership(msg.sender);
         liquidityPool.setLendingPool(address(lendingPool));
-        mercataEthBridge = MercataEthBridge(new MercataEthBridge(address(msg.sender)));
-        onRamp = OnRamp(new OnRamp(address(priceOracle), msg.sender));
-        poolFactory = PoolFactory(new PoolFactory());
+        Ownable(liquidityPool).transferOwnership(msg.sender);
+        poolFactory = new PoolFactory(msg.sender);
+        mercataEthBridge = new MercataEthBridge(msg.sender);
+        onRamp = new OnRamp(address(priceOracle), msg.sender);
     }
 }

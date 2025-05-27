@@ -22,7 +22,7 @@ contract record PoolFactory is Ownable {
     mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
 
-    constructor() Ownable() {}
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     event PoolMigrated(address indexed tokenA, address indexed tokenB, address pool);
 

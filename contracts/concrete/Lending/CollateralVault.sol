@@ -7,23 +7,22 @@ contract record CollateralVault is IERC20, Ownable {
         address user;
         address asset;
         uint256 amount;
-      }
+    }
     address public lendingPool;
     mapping(string => Collateral) public record collaterals;
 
-    constructor() Ownable() {
-        // Set lendingPool later
+    constructor(address initialOwner) Ownable(initialOwner) {
     }
-    
+
     modifier onlyLendingPool() {
         require(msg.sender == lendingPool, "Caller is not LendingPool");
         _;
-    }
-    
-    function setLendingPool(address _lendingPool) external onlyOwner {
-        //require(lendingPool == address(0), "LendingPool already set");
-        require(_lendingPool != address(0), "Invalid address");
-        lendingPool = _lendingPool;
+    }	
+
+    function setLendingPool(address _lendingPool) external onlyOwner {	
+        //require(lendingPool == address(0), "LendingPool already set");	
+        require(_lendingPool != address(0), "Invalid address");	
+        lendingPool = _lendingPool;	
     }
 
     function _key(address user, address asset) pure returns (string) {
