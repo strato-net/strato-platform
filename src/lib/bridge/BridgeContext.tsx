@@ -23,11 +23,13 @@ interface BridgeContextType {
   swapChains: () => void;
 }
 
+const SHOW_TESTNET = import.meta.env.VITE_SHOW_TESTNET;
+
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [showTestnet] = useState(
-    import.meta.env.VITE_SHOW_TESTNET === 'true'
+    SHOW_TESTNET === 'true'
   );
   const [fromChain, setFromChain] = useState(showTestnet ? 'Sepolia' : 'Ethereum');
   const [toChain, setToChain] = useState('STRATO');
@@ -42,7 +44,6 @@ export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoading, setIsLoading] = useState(false);
 
   const { address } = useAccount();
-  const chainId = useChainId();
   const { writeContract } = useWriteContract();
 
 

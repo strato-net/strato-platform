@@ -24,6 +24,9 @@ import { mainnet, sepolia } from 'viem/chains';
 import { useNavigate } from 'react-router-dom';
 import { Dialog } from '@/components/ui/dialog';
 
+const   BRIDGE_API_BASE_URL = import.meta.env.VITE_BRIDGE_API_BASE_URL;
+
+
 interface BridgeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,22 +45,22 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const [transactionHash, setTransactionHash] = useState<`0x${string}` | undefined>();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [userAddress, setUserAddress] = useState<string>('');
+  // const [userAddress, setUserAddress] = useState<string>('');
 
   // Add useEffect to get user address from localStorage
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUserData = JSON.parse(userData);
-        if (parsedUserData.userAddress) {
-          setUserAddress(parsedUserData.userAddress);
-        }
-      } catch (error) {
-        console.error('Error parsing user data from localStorage:', error);
-      }
-    }
-  }, []);
+  // useEffect(() => {
+  //   const userData = localStorage.getItem('user');
+  //   if (userData) {
+  //     try {
+  //       const parsedUserData = JSON.parse(userData);
+  //       if (parsedUserData.userAddress) {
+  //         setUserAddress(parsedUserData.userAddress);
+  //       }
+  //     } catch (error) {
+  //       console.error('Error parsing user data from localStorage:', error);
+  //     }
+  //   }
+  // }, []);
 
   // Create debounced update function using useMemo
   const debouncedUpdateBalance = React.useMemo(() => {
@@ -610,8 +613,8 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           return;
         }
 
-        // Call the STRATO to Mercata transfer endpoint
-        const response = await fetch(`${import.meta.env.VITE_BRIDGE_API_BASE_URL}/api/safe/strato-to-ethereum`, {
+        // Call the STRATO to Ethereum transfer endpoint
+        const response = await fetch(`${BRIDGE_API_BASE_URL}/api/safe/strato-to-ethereum`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -620,7 +623,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
             hash: transactionHash || '',  // Use actual transaction hash
             value: amount.toString(),    // Convert amount to string
             from: SAFE_ADDRESS,
-            to: address,                 // User's address
+            to: address,                 // User's Wallet address
             token: tokenAddress,         // Token address
           })
         });
