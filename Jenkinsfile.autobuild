@@ -23,6 +23,7 @@ pipeline {
             currentBuild.description = "${nodeUsed} // ${buildUser}"
             env.NODE_USED = nodeUsed
             env.GIT_SHA = env.GIT_COMMIT.take(7)
+            echo "🔧 Using Git SHA: ${env.GIT_SHA}"
           }
         }
 
@@ -38,21 +39,22 @@ pipeline {
       steps {
         withCredentials([
           usernamePassword(credentialsId: 'aws-ecr-write-access-account', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
-          usernamePassword(credentialsId: 'blockapps-cd-github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')
+          usernamePassword(credentialsId: 'blockapps-cd-github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN'),
+          usernamePassword(credentialsId: 'docker-aws-registry-login', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWD')
         ]) {
           script {
             def GIT_SHA = env.GIT_SHA
             def baseBranch = env.CHANGE_TARGET ?: 'develop'
             def headBranch = env.CHANGE_BRANCH ?: 'HEAD'
 
-            // Set GitHub remote and fetch both base and head
+            // Set GitHub remote and fetch
             sh """
               git remote set-url origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/mercata.git
               git fetch origin ${baseBranch} --quiet
               ${env.CHANGE_BRANCH ? "git fetch origin ${env.CHANGE_BRANCH} --quiet" : ""}
             """
 
-            // Login to ECR
+            // Login to AWS ECR
             sh """
               AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
               AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
@@ -61,7 +63,11 @@ pipeline {
               docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
             """
 
-            // --- main app (backend, ui, nginx) ---
+            // Login to BlockApps registry (port 5000)
+            sh """
+              echo "${DOCKER_PASSWD}" | docker login -u "${DOCKER_USER}" --password-stdin registry-aws.blockapps.net:5000
+            """
+
             def composeChanged = sh(
               script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- backend ui nginx || echo changed",
               returnStdout: true
@@ -79,18 +85,20 @@ pipeline {
 
               for (service in composeImages.keySet()) {
                 def localImage = composeImages[service]
-                def repo = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}"
-                def tag = "${repo}:${GIT_SHA}"
+                def ecrTag = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}:${GIT_SHA}"
+                def internalTag = "registry-aws.blockapps.net:5000/blockapps/mercata-${service}:${GIT_SHA}"
 
-                sh "docker tag ${localImage} ${tag}"
-                sh "docker push ${tag}"
+                sh "docker tag ${localImage} ${ecrTag}"
+                sh "docker push ${ecrTag}"
+
+                sh "docker tag ${localImage} ${internalTag}"
+                sh "docker push ${internalTag}"
               }
 
             } else {
               echo "No changes in backend/ui/nginx — skipping build."
             }
 
-            // --- External services: Stripe ---
             def stripeChanged = sh(
               script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- services/payment/stripe || echo changed",
               returnStdout: true
@@ -113,19 +121,31 @@ pipeline {
       }
     }
 
-    stage('Replace latest tags with Git SHA') {
+    stage('Generate docker-compose files') {
       steps {
         script {
-          def composeFile = 'docker-compose.yml'
           def gitSha = env.GIT_SHA
+          def services = ['backend', 'ui', 'nginx']
 
-          // Replace :latest with :<GIT_SHA>
-          sh """
-            sed -i 's/:latest/:${gitSha}/g' ${composeFile}
-          """
+          def originalCompose = readFile('docker-compose.yml')
+          def ecrCompose = originalCompose
+          def internalCompose = originalCompose
 
-          // Archive updated compose file for deployment or debugging
-          archiveArtifacts artifacts: "${composeFile}", fingerprint: true
+          services.each { svc ->
+            def ecrImage = "image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${svc}:${gitSha}"
+            def internalImage = "image: registry-aws.blockapps.net:5000/blockapps/mercata-${svc}:${gitSha}"
+
+            ecrCompose = ecrCompose.replaceAll(/image: mercata-${svc}(:latest)?/, ecrImage)
+            internalCompose = internalCompose.replaceAll(/image: mercata-${svc}(:latest)?/, internalImage)
+          }
+
+          writeFile file: 'docker-compose.ecr.yml', text: ecrCompose
+          writeFile file: 'docker-compose.yml', text: internalCompose
+
+          echo "📦 Generated docker-compose.yml (internal registry)"
+          echo "📦 Generated docker-compose.ecr.yml (ECR)"
+
+          archiveArtifacts artifacts: 'docker-compose*.yml', fingerprint: true
         }
       }
     }
@@ -139,7 +159,7 @@ pipeline {
     success {
       slackSend (
         color: 'good',
-        message: "Mercata build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' on *${env.NODE_USED ?: 'unknown'}* → ${env.BUILD_URL}"
+        message: "Mercata build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' on *${env.NODE_USED ?: 'unknown'}* (Git SHA: `${env.GIT_SHA}`) → ${env.BUILD_URL}"
       )
     }
 
