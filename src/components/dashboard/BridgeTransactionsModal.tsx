@@ -31,27 +31,26 @@ const ITEMS_PER_PAGE = 10;
 const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalProps) => {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
   const [transactionType, setTransactionType] = useState<TransactionType>('DepositRecorded');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchBridgeTransactions = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get(`${BRIDGE_API_BASE_URL}/api/safe/transaction/${transactionType.toLowerCase()}`);
-        setTransactions(response.data.data || []);
-        setCurrentPage(1);
-      } catch (error) {
-        // Handle error silently
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(true);
+      const limit = ITEMS_PER_PAGE;
+      const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+      const response = await axios.get(`${BRIDGE_API_BASE_URL}/api/safe/transaction/${transactionType.toLowerCase()}`, {
+        params: { limit, offset }
+      });
+      setTransactions(response.data.data || response.data || []);
+      setIsLoading(false);
     };
+    if (isOpen) fetchBridgeTransactions();
+  }, [isOpen, transactionType, currentPage]);
 
-    if (isOpen) {
-      fetchBridgeTransactions();
-    }
-  }, [isOpen, transactionType]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [transactionType]);
 
   const formatAmount = (amount: string) => {
     const numAmount = Number(amount) / 1e18; // Convert from wei to ETH
@@ -83,10 +82,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
     return 'STRATO';
   };
 
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentTransactions = transactions.slice(startIndex, endIndex);
+  const currentTransactions = transactions;
 
   const handlePendingClick = (tx: BridgeTransaction) => {
     console.log('Full Transaction Data:', tx);
@@ -157,7 +153,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                     ) : (
                       currentTransactions.map((tx, index) => (
                         <tr key={tx.transaction_hash} className="hover:bg-gray-50/50">
-                          <td className="py-3 px-4 text-sm text-gray-500">{startIndex + index + 1}</td>
+                          <td className="py-3 px-4 text-sm text-gray-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
                           <td className="py-3 px-4 text-sm">{getFromChain(tx)}</td>
                           <td className="py-3 px-4 text-sm">{getToChain(tx)}</td>
                           <td className="py-3 px-4 text-sm font-medium">{formatAmount(tx.amount)}</td>
@@ -184,7 +180,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
               {!isLoading && transactions.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50/80">
                   <div className="text-sm text-gray-500">
-                    Showing {startIndex + 1} to {Math.min(endIndex, transactions.length)} of {transactions.length} transactions
+                    Showing {currentPage * ITEMS_PER_PAGE - ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, transactions.length)} of {transactions.length} transactions
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -192,19 +188,17 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                       size="sm"
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
-                      className="hover:bg-blue-50"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <span className="text-sm text-gray-500">
-                      Page {currentPage} of {totalPages}
+                      Page {currentPage}
                     </span>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className="hover:bg-blue-50"
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={transactions.length < ITEMS_PER_PAGE}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
