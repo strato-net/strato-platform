@@ -15,8 +15,9 @@ contract record LendingRegistry is Ownable {
         address _lendingPool,
         address _liquidityPool,
         address _collateralVault,
-        address _rateStrategy
-    ) Ownable() {
+        address _rateStrategy,
+        address initialOwner
+    ) Ownable(initialOwner) {
         lendingPool = _lendingPool;
         liquidityPool = _liquidityPool;
         collateralVault = _collateralVault;

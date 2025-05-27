@@ -10,7 +10,7 @@ contract record PoolConfigurator is Ownable{
 
     LendingPool public lendingPool;
 
-    constructor (address _lendingPool) Ownable() {
+    constructor (address _lendingPool, address initialOwner) Ownable(initialOwner) {
         require(_lendingPool != address(0), "Invalid LendingPool address");
         lendingPool = LendingPool(_lendingPool);
     }

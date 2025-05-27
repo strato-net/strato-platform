@@ -32,11 +32,11 @@ contract record LendingPool is Ownable {
     RateStrategy public rateStrategy;
     PriceOracle public oracle;
 
-    constructor (address _liquidityPool, address _collateralVault, address _rateStrategy, address _oracle) Ownable() {
-        liquidityPool = LiquidityPool(_liquidityPool);
-        collateralVault = CollateralVault(_collateralVault);
-        rateStrategy = RateStrategy(_rateStrategy);
-        oracle = PriceOracle(_oracle);
+    constructor (address initialOwner) Ownable(initialOwner) {
+        liquidityPool = new LiquidityPool(msg.sender);
+        collateralVault = new CollateralVault(msg.sender);
+        rateStrategy = new RateStrategy();
+        oracle = new PriceOracle(msg.sender);
         assetCollateralRatio[address(0)] = 150;
         assetLiquidationBonus[address(0)] = 105;
         assetInterestRate[address(0)] = 5; // default example rate

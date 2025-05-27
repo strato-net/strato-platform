@@ -15,7 +15,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess{
         string _symbol,
         uint256 _initialSupply,
         uint8 _customDecimals
-    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(msg.sender) Ownable(){
+    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(msg.sender) Ownable(msg.sender){
         customDecimals = _customDecimals;
         mint(msg.sender, _initialSupply);
     }
