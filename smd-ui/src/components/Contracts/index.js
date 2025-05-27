@@ -149,7 +149,7 @@ class Contracts extends Component {
                 dir="auto" />
             </div>
           </div>
-          <div className="col-sm-2 text-right smd-pad-8">
+          <div className="col-sm-2">
             {/* Me know CSS real good */}
           </div>
           <div className="col-sm-2 text-right smd-pad-8">
