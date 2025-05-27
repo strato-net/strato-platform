@@ -15,8 +15,9 @@ contract record LendingRegistry is Ownable {
         address _lendingPool,
         address _liquidityPool,
         address _collateralVault,
-        address _rateStrategy
-    ) {
+        address _rateStrategy,
+        address initialOwner
+    ) Ownable(initialOwner) {
         lendingPool = _lendingPool;
         liquidityPool = _liquidityPool;
         collateralVault = _collateralVault;
@@ -28,7 +29,7 @@ contract record LendingRegistry is Ownable {
         emit RateStrategyUpdated(_rateStrategy);
     }
 
-    function updateLendingPool(address _lendingPool) public onlyOwner  {
+    function updateLendingPool(address _lendingPool) public onlyOwner {
         lendingPool = _lendingPool;
         emit LendingPoolUpdated(_lendingPool);
     }
