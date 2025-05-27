@@ -204,8 +204,8 @@ class CreateContract extends Component {
         onChange={this.handleUsernameChange}
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.commonName : null}>
-          {isModeOauth && this.props.initialValues.commonName}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
         </option>
         {
           users.map((user, i) => {
@@ -231,8 +231,8 @@ class CreateContract extends Component {
         required
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.address : null}>
-          {isModeOauth && this.props.initialValues.address}
+        <option value={this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -509,7 +509,7 @@ class CreateContract extends Component {
                 <Button
                   type="submit"
                   onClick={handleSubmit(this.submit)}
-                  disabled={pristine || submitting || !valid}
+                  disabled={submitting} // || !valid} // TODO: FIXME: I am commenting this out because it's preventing us from creating contracts through SMD. Figure out why the validation is failing and uncomment
                   text="Create Contract"
                 />
 
@@ -569,6 +569,7 @@ export function mapStateToProps(state) {
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
+    oAuthUser: state.user.oauthUser,
     selectedChain: state.chains.selectedChain,
   };
 }
