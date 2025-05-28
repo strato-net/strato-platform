@@ -33,11 +33,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx payment-server payment-server-nginx notification-server notification-server-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx payment-server payment-server-nginx notification-server notification-server-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx payment-server payment-server-nginx notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -59,29 +59,29 @@ smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
 
-marketplace-backend:
-	@echo Now building marketplace-backend...
-	BASIL_DOCKER_TAG=${REPO_URL}marketplace-backend:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-backend:${VERSION} make --directory=marketplace/backend/
+# marketplace-backend:
+# 	@echo Now building marketplace-backend...
+# 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-backend:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-backend:${VERSION} make --directory=marketplace/backend/
 
-marketplace-ui:
-	@echo Now building marketplace-ui...
-	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
+# marketplace-ui:
+# 	@echo Now building marketplace-ui...
+# 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
 
-payment-server:
-	@echo Now building payment server...
-	BASIL_DOCKER_TAG=${REPO_URL}payment-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server:${VERSION} make --directory=payment-server/
+# payment-server:
+# 	@echo Now building payment server...
+# 	BASIL_DOCKER_TAG=${REPO_URL}payment-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server:${VERSION} make --directory=payment-server/
 
-payment-server-nginx:
-	@echo Now building payment-server-nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}payment-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server-nginx:${VERSION} make --directory=payment-server-nginx/
+# payment-server-nginx:
+# 	@echo Now building payment-server-nginx...
+# 	BASIL_DOCKER_TAG=${REPO_URL}payment-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server-nginx:${VERSION} make --directory=payment-server-nginx/
 
-notification-server:
-	@echo Now building notification server...
-	BASIL_DOCKER_TAG=${REPO_URL}notification-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server:${VERSION} make --directory=notification-server/
+# notification-server:
+# 	@echo Now building notification server...
+# 	BASIL_DOCKER_TAG=${REPO_URL}notification-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server:${VERSION} make --directory=notification-server/
 
-notification-server-nginx:
-	@echo Now building notification-server-nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}notification-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server-nginx:${VERSION} make --directory=notification-server-nginx/
+# notification-server-nginx:
+# 	@echo Now building notification-server-nginx...
+# 	BASIL_DOCKER_TAG=${REPO_URL}notification-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server-nginx:${VERSION} make --directory=notification-server-nginx/
 
 eks:
 	@echo Now generating eks manifest files
@@ -189,15 +189,15 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
-identity-provider: build_common
-	@echo Now building Identity Server...
-	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
-	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
+# identity-provider: build_common
+# 	@echo Now building Identity Server...
+# 	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
+# 	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+# 	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
 
-identity-nginx:
-	@echo Now building identity-nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}identity-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}identity-nginx:${VERSION} make --directory=identity-nginx/
+# identity-nginx:
+# 	@echo Now building identity-nginx...
+# 	BASIL_DOCKER_TAG=${REPO_URL}identity-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}identity-nginx:${VERSION} make --directory=identity-nginx/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
@@ -206,34 +206,34 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
-	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.yml
-	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
-	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.yml
-	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
-	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.oracle.tpl.yml > docker-compose.oracle.push.yml
-	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.oracle.tpl.yml > docker-compose.oracle.push.ecr.yml
-	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
-	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.oracle.tpl.yml > docker-compose.oracle.push.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.oracle.tpl.yml > docker-compose.oracle.push.ecr.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
+# 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 	awk '/build: ./{getline} 1' docker-compose.push.ecr.yml > docker-compose.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
-	awk '/build: ./{getline} 1' docker-compose.identity.push.yml > docker-compose.identity.yml
-	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
+# 	awk '/build: ./{getline} 1' docker-compose.identity.push.yml > docker-compose.identity.yml
+# 	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
-	awk '/build: ./{getline} 1' docker-compose.payment.push.yml > docker-compose.payment.yml
-	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
-	awk '/build: ./{getline} 1' docker-compose.oracle.push.yml > docker-compose.oracle.yml
-	awk '/build: ./{getline} 1' docker-compose.oracle.push.ecr.yml > docker-compose.oracle.ecr.yml
-    # Oracle uses the payment server docker image - not pushing oracle image separately
-	rm -rf docker-compose.oracle.push.yml docker-compose.oracle.push.ecr.yml
-	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
-	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
+# 	awk '/build: ./{getline} 1' docker-compose.payment.push.yml > docker-compose.payment.yml
+# 	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
+# 	awk '/build: ./{getline} 1' docker-compose.oracle.push.yml > docker-compose.oracle.yml
+# 	awk '/build: ./{getline} 1' docker-compose.oracle.push.ecr.yml > docker-compose.oracle.ecr.yml
+#     # Oracle uses the payment server docker image - not pushing oracle image separately
+# 	rm -rf docker-compose.oracle.push.yml docker-compose.oracle.push.ecr.yml
+# 	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
+# 	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
