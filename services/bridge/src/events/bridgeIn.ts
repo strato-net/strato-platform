@@ -43,40 +43,19 @@ export async function handleBridgeIn(
     // Convert hash to uint256 decimal string
     const txHashNumber = BigInt(hash.startsWith("0x") ? hash : `0x${hash}`);
 
-    // const txPayload = {
-    //   txs: [
-    //     {
-    //       payload: {
-    //         contractName: "BridgeContract",
-    //         contractAddress,
-    //         method: "recordDeposit",
-    //         args: {
-    //           ethTxHash: txHashNumber.toString(), // decimal string
-    //           token: tokenAddress,
-    //           to: receiverAddress,
-    //           amount: amount.toString(),
-    //         },
-    //       },
-    //       type: "FUNCTION",
-    //     },
-    //   ],
-    //   txParams: {
-    //     gasLimit: 150000,
-    //     gasPrice: 30000000000,
-    //   },
-    // };
+  
 
     const txPayload = {
       txs: [
         {
           payload: {
             contractName: "BridgeContract",
-            contractAddress: contractAddress.toLowerCase(),
+            contractAddress: contractAddress.toLowerCase().replace("0x", ""),
             method: "recordDeposit",
             args: {
-              ethTxHash: txHashNumber.toString(),
-              token: tokenAddress.toLowerCase(),
-              to: receiverAddress.toLowerCase(),
+              ethTxHash: txHashNumber.toString().replace("0x", ""),
+              token: tokenAddress.toLowerCase().replace("0x", ""),
+              to: receiverAddress.toLowerCase().replace("0x", ""),
               amount: amount.toString(),
             },
           },
