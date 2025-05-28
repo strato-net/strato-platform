@@ -19,8 +19,6 @@ SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 APEX_HOST=${APEX_HOST:-apex:3009}
 DOCS_HOST=${DOCS_HOST:-docs:8080}
-MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST:-marketplace-backend:3030}
-MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST:-marketplace-ui:3003}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
 SMD_HOST=${SMD_HOST:-smd:3002}
@@ -111,8 +109,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Replacing HOST NAME PLACEHOLDERS
   sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
   sed -i "s/__DOCS_HOST__/$DOCS_HOST/g" /tmp/nginx.conf
-  sed -i "s/__MARKETPLACE_BACKEND_HOST__/$MARKETPLACE_BACKEND_HOST/g" /tmp/nginx.conf
-  sed -i "s/__MARKETPLACE_UI_HOST__/$MARKETPLACE_UI_HOST/g" /tmp/nginx.conf
   sed -i "s/__POSTGREST_HOST__/$POSTGREST_HOST/g" /tmp/nginx.conf
   sed -i "s/__PROMETHEUS_HOST__/$PROMETHEUS_HOST/g" /tmp/nginx.conf
   sed -i "s/__SMD_HOST__/$SMD_HOST/g" /tmp/nginx.conf
