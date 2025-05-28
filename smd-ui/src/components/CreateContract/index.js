@@ -509,7 +509,7 @@ class CreateContract extends Component {
                 <Button
                   type="submit"
                   onClick={handleSubmit(this.submit)}
-                  disabled={submitting} // || !valid} // TODO: FIXME: I am commenting this out because it's preventing us from creating contracts through SMD. Figure out why the validation is failing and uncomment
+                  disabled={submitting || !valid}
                   text="Create Contract"
                 />
 
@@ -563,7 +563,7 @@ export function mapStateToProps(state) {
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      address: state.user.address || '',
+      address: state.user.oauthUser ? state.user.oauthUser.address : (state.user.address) || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
