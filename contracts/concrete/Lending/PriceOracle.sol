@@ -1,6 +1,12 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract record PriceOracle is Ownable {
+/**
+ * @title PriceOracle
+ * @notice Provides asset price feeds used for loan value and collateral validation.
+ * @dev Asset prices are set manually for now; can be upgraded to use external oracles.
+ */
+ 
+ contract record PriceOracle is Ownable {
    constructor(address initialOwner) Ownable(initialOwner) {      
     } 
      event PriceUpdated(address indexed asset, uint256 price);

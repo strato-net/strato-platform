@@ -1,9 +1,16 @@
 import "./LendingRegistry.sol";
+import "./PoolConfigurator.sol";
 import "./CollateralVault.sol";
 import "./RateStrategy.sol";
 import "./LiquidityPool.sol";
 import "./PriceOracle.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+
+/**
+ * @title LendingPool
+ * @notice Core lending logic contract managing deposits, borrows, repayments, and liquidations.
+ * @dev Risk parameters are configured by PoolConfigurator; operational functions may be owner-gated.
+ */
 
 contract record LendingPool is Ownable {
  
@@ -12,6 +19,9 @@ contract record LendingPool is Ownable {
     event Borrowed(address indexed user, address indexed asset, uint256 amount, address indexed collateralAsset, uint256 collateralAmount);
     event Repaid(address indexed user, address indexed asset, uint256 amount);
     event Liquidated(address indexed borrower, address indexed asset, uint256 repaidAmount, address indexed collateralAsset, uint256 collateralSeized);
+    event InterestRateSet(address indexed asset, uint256 newRate);
+    event CollateralRatioSet(address indexed asset, uint256 newRatio);
+    event LiquidationBonusSet(address indexed asset, uint256 newBonus);
 
     struct LoanInfo {
         address user;
@@ -28,17 +38,25 @@ contract record LendingPool is Ownable {
     mapping(address => uint256) public record assetCollateralRatio;
     mapping(address => uint256) public record assetLiquidationBonus;
 
-    LendingRegistry public immutable registry;
+    LendingRegistry public registry;
+    address public poolConfigurator;
 
-    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
+        require(_poolConfigurator != address(0), "Invalid pool configurator address");
+        poolConfigurator = _poolConfigurator;
 
         assetCollateralRatio[address(0)] = 150;
         assetLiquidationBonus[address(0)] = 105;
         assetInterestRate[address(0)] = 5;
     }
 
+    modifier onlyPoolConfigurator() {
+        require(msg.sender == poolConfigurator, "Caller is not PoolConfigurator");
+        _;
+    }
+    
     function _liquidityPool() internal view returns (address) {
         return registry.liquidityPool();
     }
@@ -69,7 +87,7 @@ contract record LendingPool is Ownable {
         emit Withdrawn(msg.sender, asset, amount);
     }
 
-    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) {
+    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) public {
         string loanId = _loanKey(msg.sender, asset);
         uint256 assetPrice = PriceOracle(_priceOracle()).getAssetPrice(asset);
         require(assetPrice > 0, "Asset price not set");
@@ -156,17 +174,17 @@ contract record LendingPool is Ownable {
         emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
     }
 
-     function setInterestRate(address asset, uint256 newRate) onlyOwner{
+     function setInterestRate(address asset, uint256 newRate) onlyPoolConfigurator{
         require(newRate <= 100, "Rate too high");
         assetInterestRate[asset] = newRate;
     }
 
-    function setCollateralRatio(address asset, uint256 newRatio) onlyOwner {
+    function setCollateralRatio(address asset, uint256 newRatio) onlyPoolConfigurator {
         require(newRatio >= 100, "Ratio too low");
         assetCollateralRatio[asset] = newRatio;
     }
 
-    function setLiquidationBonus(address asset, uint256 newBonus)  onlyOwner{
+    function setLiquidationBonus(address asset, uint256 newBonus)  onlyPoolConfigurator{
         require(newBonus >= 100, "Bonus too low");
         assetLiquidationBonus[asset] = newBonus;
     }

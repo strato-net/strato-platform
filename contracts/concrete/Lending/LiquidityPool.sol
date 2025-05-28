@@ -1,6 +1,12 @@
 import "./LendingRegistry.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
+/**
+ * @title LiquidityPool
+ * @notice Manages token liquidity for lending and borrowing, including ERC20 token transfers.
+ * @dev Only callable by LendingPool; holds deposited funds and tracks borrowed balances.
+ */
+
  contract record LiquidityPool is IERC20, Ownable  {
     event Deposited(address indexed user, address indexed asset, uint256 amount);
     event Withdrawn(address indexed user, address indexed asset, uint256 amount);

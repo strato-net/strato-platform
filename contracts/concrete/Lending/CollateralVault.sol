@@ -1,6 +1,12 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "./LendingRegistry.sol";
 
+/**
+ * @title CollateralVault
+ * @notice Holds and tracks collateral for active loans; enforces collateralization requirements.
+ * @dev Only callable by LendingPool for adding or removing user collateral.
+ */
+ 
 contract record CollateralVault is IERC20, Ownable {
     event CollateralAdded(address indexed user, address indexed asset, uint256 amount);
     event CollateralRemoved(address indexed user, address indexed asset, uint256 amount);
@@ -9,7 +15,7 @@ contract record CollateralVault is IERC20, Ownable {
         address asset;
         uint256 amount;
     }
-    LendingRegistry public immutable registry;
+    LendingRegistry public registry;
     mapping(string => Collateral) public record collaterals;
 
     constructor(address _registry, address initialOwner) Ownable(initialOwner) {

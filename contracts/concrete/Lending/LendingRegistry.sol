@@ -1,5 +1,12 @@
 import "../../abstract/ERC20/access/Ownable.sol";
-contract record LendingRegistry is Ownable {
+
+/**
+ * @title LendingRegistry
+ * @notice Central registry contract storing addresses of core lending protocol components.
+ * @dev Can only be updated by the PoolConfigurator contract via access control or ownership.
+ */
+ 
+ contract record LendingRegistry is Ownable {
     address public lendingPool;
     address public liquidityPool;
     address public collateralVault;
