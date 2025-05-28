@@ -1,4 +1,10 @@
-contract record RateStrategy {
+/**
+ * @title RateStrategy
+ * @notice Defines the interest rate calculation logic based on loan duration and static rates.
+ * @dev Called by LendingPool to compute interest owed on active loans.
+ */
+ 
+ contract record RateStrategy {
     constructor()  {
     } 
     
