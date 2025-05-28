@@ -1478,7 +1478,7 @@ def replaceServerPortsDocker() {
   '''
 
   sh 'chmod +x replace_server_ports_docker.sh'
-  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.payment.yml'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml'
 }
 
 return this
