@@ -18,7 +18,6 @@ contract record LendingPool is Ownable {
         address asset;
         uint256 amount;
         uint256 lastUpdated;
-        bool active;
         address collateralAsset;
         uint256 collateralAmount;
       }
@@ -88,7 +87,7 @@ contract record LendingPool is Ownable {
 
     function repayLoan(string loanId, uint256 amount) public {
         LoanInfo loan = loans[loanId];
-        require(loan.active, "No active loan");
+        require(loan.amount > 0, "Loan inactive");
         require(amount > 0, "Invalid repayment");
 
         uint256 interest = rateStrategy.calculateInterest(
@@ -102,7 +101,7 @@ contract record LendingPool is Ownable {
 
         if (amount >= totalOwed) {
             collateralVault.removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
-            loan.active = false;
+            loan.amount = 0;
         } else {
             loan.amount = totalOwed - amount;
             loan.lastUpdated = block.timestamp;
@@ -113,7 +112,7 @@ contract record LendingPool is Ownable {
 
     function liquidate(string loanId, address borrower) public onlyOwner {
         LoanInfo loan = loans[loanId];
-        require(loan.active, "Loan inactive");
+        require(loan.amount > 0, "Loan inactive");
 
         uint256 interest = rateStrategy.calculateInterest(
             loan.amount,
@@ -139,7 +138,7 @@ contract record LendingPool is Ownable {
         require(userCollateral >= seizeAmount, "Insufficient collateral");
         collateralVault.removeCollateral(borrower, loan.collateralAsset, seizeAmount);
 
-        loan.active = false;
+        loan.amount = 0;
         emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
     }
 

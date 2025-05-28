@@ -19,7 +19,12 @@ export const getPool = async (
   const params = {
     ...cleanedFilters,
     select: select ?? lendingPoolSelectFields.join(","),
-    ...(select ? {} : { "loans.value->>active": "eq.true" }),
+    ...(select
+      ? {}
+      : {
+          "loans.value->>amount": "gt.0",
+          "collateralVault.collaterals.value->>amount": "gt.0",
+        }),
     address: `eq.${lendingPool}`,
   };
 
@@ -237,7 +242,7 @@ export const getLoans = async (
   const lendingPool = await getPool(accessToken);
 
   const userLoans = Object.entries(lendingPool.loans || {}).filter(
-    ([_, loan]: [string, any]) => loan.user === address && loan?.active
+    ([_, loan]: [string, any]) => loan.user === address && loan.amount > 0
   );
 
   if (!userLoans.length) return { ...lendingPool, loans: {} };
