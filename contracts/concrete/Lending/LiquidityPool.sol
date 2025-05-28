@@ -1,5 +1,11 @@
-import "./LendingPool.sol";
+import "./LendingRegistry.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+
+/**
+ * @title LiquidityPool
+ * @notice Manages token liquidity for lending and borrowing, including ERC20 token transfers.
+ * @dev Only callable by LendingPool; holds deposited funds and tracks borrowed balances.
+ */
 
  contract record LiquidityPool is IERC20, Ownable  {
     event Deposited(address indexed user, address indexed asset, uint256 amount);
@@ -17,23 +23,20 @@ import "../../abstract/ERC20/access/Ownable.sol";
         address asset;
         uint256 amount;
     }
-    address public lendingPool;
+    LendingRegistry public registry;
     mapping(string => Deposit) public record deposited;
     mapping(address => uint256) public record totalLiquidity;
     mapping(string => Borrow) public record borrowed;
 
-    constructor(address initialOwner) Ownable(initialOwner) {
-    } 
-
-    modifier onlyLendingPool() {	
-        require(msg.sender == lendingPool, "Caller is not LendingPool");	
-        _;	
-    }	
-
-   function setLendingPool(address _lendingPool) external onlyOwner {	
-        require(_lendingPool != address(0), "Invalid address");	
-        lendingPool = _lendingPool;	
+    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+        require(_registry != address(0), "Invalid registry");
+        registry = LendingRegistry(_registry);
     }
+
+    modifier onlyLendingPool() {
+        require(msg.sender == registry.lendingPool(), "Caller is not LendingPool");
+        _;
+    }	
 
     function _key(address user, address asset) pure returns (string) {
         return keccak256(string(user), string(asset));
