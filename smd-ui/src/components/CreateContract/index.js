@@ -563,7 +563,7 @@ export function mapStateToProps(state) {
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      address: state.user.oauthUser ? state.user.oauthUser.address : (state.user.address) || '',
+      address: state.user.oauthUser ? state.user.oauthUser.address : state.user.address || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
