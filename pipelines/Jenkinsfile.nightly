@@ -47,7 +47,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b develop
+          git clone https://github.com/blockapps/strato-getting-started -b strato-erc20-revamp
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
           cp strato-worktree/docker-compose.highway.yml strato-getting-started/
