@@ -905,10 +905,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           </div>
         </div>
 
-        <BridgeTransactionsModal
-          isOpen={showTransactions}
-          onClose={() => setShowTransactions(false)}
-        />
       </Dialog>
     </>
   );
