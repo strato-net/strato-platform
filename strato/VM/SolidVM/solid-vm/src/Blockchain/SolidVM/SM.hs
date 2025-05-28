@@ -452,6 +452,7 @@ getVariableOfName name = do
                           CC._usings = M.empty,
                           CC._contractType = currentContract x ^. CC.contractType,
                           CC._importedFrom = Nothing,
+                          CC._isContractRecord = currentContract x ^. CC.isContractRecord,
                           CC._contractContext = currentContract x ^. CC.contractContext
                         }
                   }
@@ -833,11 +834,11 @@ getXabiType acct field = do
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
-  let field = MS.getField path
-  mType <- getXabiType loc field
-  case mType of
-    Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
+  case MS.getField path of
+    Left e -> typeError "getXabiValueType/invalid storage path" e
+    Right field -> getXabiType loc field >>= \case
+      Nothing -> todo "getXabiValueType/unknown storage reference" field
+      Just v -> return $!! loop ccs' (tail $ MS.toList path) v
   where
     loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
     loop _ [] = id
@@ -988,7 +989,10 @@ getArrayNamesFromContract c =
    in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
-  MonadSM m =>
+  ( MonadLogger m
+  , A.Selectable Address AddressState m
+  , HasSolidStorageDB m
+  ) =>
   Address ->
   T.Text ->
   T.Text ->

@@ -1,5 +1,5 @@
 const { dbApiClient } = require("../helper/apiClient");
-const { mintAndTransfer, wbtcContractAddress, blockAppsPublicKey } = require("../config");
+const { mintAndTransfer, blockAppsPublicKey } = require("../config");
 const { createTransactionPayload } = require("../helper/transaction");
 const { ethers } = require("ethers");
 
@@ -25,12 +25,7 @@ const parseERC20TransferLog = (log) => {
   const to = ethers.getAddress(`0x${topics[2].slice(26)}`);
   const value = BigInt(data).toString(); // Decode the transfer amount
 
-  // Confirm that this matches the WBTC contract address
-  if (address.toLowerCase() === wbtcContractAddress.toLowerCase()) {
-    return { from, to, value, token: "WBTC" };
-  }
-
-  return null; // Ignore non-WBTC transfers
+  return { address, from, to, value };
 };
 
 /**
@@ -84,6 +79,7 @@ async function handleBridgeIn(transaction, timeout = DEFAULT_TIMEOUT) {
     console.log("Processing BridgeIn transaction:", { hash, value });
 
     let tokenType = "ETH";
+    let tokenAddress = "";
     let transferValue = BigInt(value).toString(); // Default: ETH value
 
     if (BigInt(value) === 0n && transaction.tx) {
@@ -93,15 +89,19 @@ async function handleBridgeIn(transaction, timeout = DEFAULT_TIMEOUT) {
         erc20Transfer &&
         erc20Transfer.to.toLowerCase() === blockAppsPublicKey.toLowerCase()
       ) {
-        tokenType = erc20Transfer.token; // We assume this is WBTC if valid ERC-20 `transfer` input
-        transferValue = erc20Transfer.value; // ERC-20 transfer value
+        tokenType = "ERC20: ";
+        tokenAddress = erc20Transfer.address;
+        transferValue = erc20Transfer.value;
       } else {
         console.error("Transaction doesn't match expected token transfer");
-        return; // Skip unsupported transactions
+        return;
       }
     }
 
-    console.log(`Detected ${tokenType} transfer:`, { blockAppsPublicKey, transferValue });
+    console.log(`Detected ${tokenType}${tokenAddress} transfer:`, {
+      blockAppsPublicKey,
+      transferValue,
+    });
 
     // Wait until the condition is met or the timeout is reached
     const queryBody = await until(hash, timeout);

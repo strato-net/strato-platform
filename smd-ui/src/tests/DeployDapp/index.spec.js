@@ -219,7 +219,6 @@ describe('DeployDapp: index', () => {
       touch: jest.fn(),
       reset: jest.fn(),
       store: store,
-      userCertificate: { userAddress: "456789"}
     };
 
     const wrapper = shallow(

@@ -13,7 +13,7 @@ import LoadingBar from 'react-redux-loading-bar'
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { isOauthEnabled } from '../lib/checkMode';
-import { getOrCreateOauthUserRequest, getUserCertificateRequest } from '../components/User/user.actions';
+import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
 import { fetchHealth, fetchMetadata } from './app.actions';
 import ReactGA from "react-ga4";
 
@@ -61,7 +61,6 @@ class App extends Component {
 export function mapStateToProps(state) {
   return ({
     oauthUser: state.user.oauthUser,
-    userCertificate: state.user.userCertificate,
     appMetadata: state.appMetadata,
   })
 }

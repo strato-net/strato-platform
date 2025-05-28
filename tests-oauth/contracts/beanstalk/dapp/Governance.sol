@@ -4,7 +4,7 @@ import "../permission/BeanstalkRole.sol";
 import "../event/EventManager.sol";
 import "../exception/ExceptionManager.sol";
 
-contract Governance is RestStatus, BeanstalkRole, BeanstalkErrorCodes {
+contract record Governance is RestStatus, BeanstalkRole, BeanstalkErrorCodes {
   EventManager eventManager;
   ExceptionManager exceptionManager;
 

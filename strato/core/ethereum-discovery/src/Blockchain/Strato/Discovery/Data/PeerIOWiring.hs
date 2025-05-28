@@ -1,41 +1,40 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoDeriveAnyClass #-}
+{-# LANGUAGE NoDeriveAnyClass      #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
 module Blockchain.Strato.Discovery.Data.PeerIOWiring where
 
-import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
-import Blockchain.Data.PersistTypes ()
-import Blockchain.MiscJSON ()
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Discovery.Data.Peer
-import Control.Monad (void)
-import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Reader
-import Crypto.Types.PubKey.ECC (Point)
-import Data.IP
-import qualified Data.Text as T
-import Data.Time
-import qualified Database.Persist.Postgresql as SQL
-import Prometheus
-import UnliftIO
+import           Blockchain.Data.PersistTypes          ()
+import           Blockchain.DB.SQLDB                   (runSqlPool,
+                                                        withGlobalSQLPool)
+import           Blockchain.MiscJSON                   ()
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256     (zeroHash)
+import           Control.Monad                         (void)
+import qualified Control.Monad.Change.Alter            as A
+import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC               (Point)
+import           Data.IP
+import qualified Data.Text                             as T
+import           Data.Time
+import qualified Database.Esqueleto.Experimental       as E
+import qualified Database.Persist.Postgresql           as SQL
+import           Numeric.Natural
+import           Prometheus
+import           UnliftIO
 
 
 
@@ -82,6 +81,10 @@ instance MonadIO m => (A.Selectable (Host, Point) PeerBondingState) m where
       flip runSqlPool sqldb $
         SQL.selectFirst [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] []
 
+instance MonadIO m => (A.Replaceable PPeer PeerLastBestBlockHash) m where
+  replace _ p (PeerLastBestBlockHash h) = liftIO $ withGlobalSQLPool $ runSqlPool $
+    SQL.updateWhere [PPeerHost SQL.==. pPeerHost p, PPeerPubkey SQL.==. pPeerPubkey p] [PPeerLastBestBlockHash SQL.=. h]
+
 instance MonadIO m => Mod.Accessible BondedPeers m where
   access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
@@ -94,7 +97,7 @@ instance MonadIO m => Mod.Accessible BondedPeersForUDP m where
     currentTime <- getCurrentTime
     fmap (BondedPeersForUDP . map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
+        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime, PPeerLastBestBlockHash SQL.!=. zeroHash] []
 
 instance MonadIO m => Mod.Accessible UnbondedPeersForUDP m where
   access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
@@ -103,11 +106,32 @@ instance MonadIO m => Mod.Accessible UnbondedPeersForUDP m where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => A.Selectable Point ClosestPeers m where
-  select _ point = liftIO $ withGlobalSQLPool $ \sqldb ->
+instance MonadIO m => A.Selectable (Point, Natural) ClosestPeers m where
+  select _ (point, limit) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     fmap (Just . ClosestPeers . map SQL.entityVal) $
-      flip runSqlPool sqldb $
-        SQL.selectList [PPeerPubkey SQL.!=. Nothing, PPeerPubkey SQL.!=. Just point] []
+      flip runSqlPool sqldb $ do
+        lowers <- E.select $ do
+          peer <- E.from $ E.table @PPeer
+          E.where_ (       (peer E.^. PPeerPubkey E.>. E.val (Just point))
+                     E.&&. (peer E.^. PPeerBondState E.==. E.val 2)
+                     E.&&. (peer E.^. PPeerLastBestBlockHash E.!=. E.val zeroHash)
+                   )
+          E.orderBy [E.asc $ peer E.^. PPeerPubkey]
+          E.limit (fromIntegral limit * 2)
+          pure peer
+        highers <- E.select $ do
+          peer <- E.from $ E.table @PPeer
+          E.where_ (       (peer E.^. PPeerPubkey E.<. E.val (Just point))
+                     E.&&. (peer E.^. PPeerBondState E.==. E.val 2)
+                     E.&&. (peer E.^. PPeerLastBestBlockHash E.!=. E.val zeroHash)
+                   )
+          E.orderBy [E.desc $ peer E.^. PPeerPubkey]
+          E.limit (fromIntegral limit * 2)
+          pure peer
+        let zipAll (a:as) (b:bs) = [a, b] ++ zipAll as bs
+            zipAll as [] = as
+            zipAll [] bs = bs
+        pure . take (fromIntegral limit) $ zipAll lowers highers
 
 instance MonadIO m => A.Replaceable PPeer UdpEnableTime m where
   replace _ peer (UdpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do

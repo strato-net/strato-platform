@@ -43,10 +43,10 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -315,7 +315,7 @@ instance (Address `A.Selectable` X509Certificate) MemContextM where
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where

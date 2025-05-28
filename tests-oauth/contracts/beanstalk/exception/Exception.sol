@@ -9,7 +9,7 @@ import "../dapp/BeanstalkErrorCodes.sol";
  * #see ExceptionManager
  */
 
-contract Exception is BeanstalkErrorCodes {
+contract record Exception is BeanstalkErrorCodes {
 
   address public owner;
   string agreementId;

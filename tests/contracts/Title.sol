@@ -4,7 +4,7 @@ import "./TitleMo.sol";
 /**
  * Title wrapper
  */
-contract Title is TitleMo {
+contract record Title is TitleMo {
   // NOTE: members must be public to be indexed for search
   string public vin;
 

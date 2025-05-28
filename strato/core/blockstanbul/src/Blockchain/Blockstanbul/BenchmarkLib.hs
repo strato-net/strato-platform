@@ -10,8 +10,8 @@ where
 
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
-import Blockchain.Data.Json
 import Blockchain.Data.TransactionDef
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Data.Aeson
@@ -31,15 +31,14 @@ oneTX :: Int -> Transaction
 oneTX size =
   ContractCreationTX
     { transactionNonce = 0,
-      transactionGasPrice = 0,
       transactionGasLimit = 1,
-      transactionValue = 0,
-      transactionInit = Code {codeBytes = BS.replicate size 0xca},
-      transactionChainId = Nothing,
+      transactionCode = Code {codeBytes = BS.replicate size 0xca},
+      transactionContractName = "",
+      transactionArgs = [],
+      transactionNetwork = "",
       transactionR = 1 `shiftL` 200,
       transactionS = 1 `shiftL` 133,
-      transactionV = 27,
-      transactionMetadata = Nothing
+      transactionV = 27
     }
 
 --benchPrivateKey :: PrivateKey

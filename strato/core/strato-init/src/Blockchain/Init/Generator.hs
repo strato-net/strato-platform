@@ -9,54 +9,82 @@ module Blockchain.Init.Generator (
 
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.Data.GenesisInfo
+import qualified Blockchain.Data.GenesisInfoOld as OLD
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
-import Blockchain.Data.GenesisInfo
 import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
+import Blockchain.GenesisBlocks.ProductionGenesisBlock
+import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
+import Blockchain.GenesisBlocks.UraniumGenesisBlock as URANIUM
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
 import Blockchain.Strato.Model.Options (flags_network)
 import Conduit
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Reader
-import qualified Data.Aeson as Ae
-import qualified Data.ByteString.Char8 as C8
-import Data.FileEmbed
+import qualified Data.Aeson as JSON
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.String
 import qualified Data.Text as T
 import qualified Text.Colors as CL
 import qualified Data.Map as M
-import Data.Text.Encoding (decodeUtf8)
-import qualified Data.Text.IO as TIO
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import SelectAccessible ()
-import System.Exit
 import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-import UnliftIO.IO hiding (withFile)
 
-genesisFiles :: [(FilePath, C8.ByteString)]
-genesisFiles = $(embedDir "genesisBlocks")
+createGenesisInfo :: MonadIO m => String -> m ()
+createGenesisInfo network = do
+  let genesisInfo = 
+        case network of
+          "helium" -> HELIUM.genesisBlock
+          "mercata-uranium" -> URANIUM.genesisBlock
+          _ -> productionGenesisBlock
 
-mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, MonadMask m, HasKafka m) =>
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
+  liftIO $ putStrLn $ "Done. Output genesis block info was written"
+
+convertGenesisFromOld :: MonadIO m => m ()
+convertGenesisFromOld = do
+  oldGenesis <- OLD.getGenesisInfo
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode $ convertFromOld oldGenesis
+  liftIO $ putStrLn $ "Done. Output genesis block info was written"
+
+mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
          String -> m ()
-mkAll genesisBlockName = do
+mkAll network = do
   ethconf <- liftIO genEthConf
 
   let dir = ".ethereumH"
   liftIO $ createDirectoryIfMissing True dir
   liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
+
+  genesisExists <- doesFileExist "genesis.json"
+  genesisOldExists <- doesFileExist "genesisOld.json"
+
+  case (genesisExists, genesisOldExists) of
+    (False, False) -> do
+      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
+      createGenesisInfo network
+    (False, True) -> do
+      $logInfoS "mkAll" "Converting 'genesis.json' from old format 'genesisOld.json'"
+      convertGenesisFromOld
+    (True, _) -> do
+      $logInfoS "mkAll" "Using provided 'genesis.json'"
+      return ()
+
 
   let pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
@@ -102,59 +130,12 @@ mkAll genesisBlockName = do
   $logInfoLS "ethconf/bootnodes" bootnodes
   EthDiscovery.setup bootnodes
 
-  let genesisFileName = genesisBlockName ++ "Genesis.json"
-      accountInfoFileName = genesisBlockName ++ "AccountInfo"
-
-  sendGenesisJson genesisFileName
-  sendAccountInfo accountInfoFileName
-
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
     $logInfoS "runWorker" "Adding empty code"
     void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
     $logInfoS "runWorker" "Processing genesis block"
-    initializeGenesisBlock genesisBlockName
+    initializeGenesisBlock
     $logInfoS "runWorker" "done. here I am once again"
-
-sendGenesisJson :: HasKafka m =>
-                   FilePath -> m ()
-sendGenesisJson genesisFilename = do
-  fsFile <- doesFileExist genesisFilename
-  eGenInfo <-
-    if fsFile
-      then liftIO $ Ae.eitherDecodeFileStrict' genesisFilename
-      else return $ do
-        contents <- maybe (Left "file not found") Right $ lookup genesisFilename genesisFiles
-        Ae.eitherDecodeStrict' contents
-  case (eGenInfo :: Either String GenesisInfo) of
-    Left err -> liftIO $ die err
-    Right genInfo -> do
-      let blockFile = "Genesis.json"
-      liftIO $ Ae.encodeFile blockFile genInfo
-      liftIO $ makeReadOnly blockFile
-
-sendAccountInfo :: (MonadMask m, HasKafka m) =>
-                   FilePath -> m ()
-sendAccountInfo accountInfoFileName = do
-  fsFile <- doesFileExist accountInfoFileName
-  if fsFile
-    then do
-      let sendChunks :: HasKafka m => Handle -> m ()
-          sendChunks h = do
-            acs <- liftIO $ TIO.hGetChunk h
-            unless (T.null acs) $ do
-
-              let accountFile = "AccountInfo"
-              liftIO $ TIO.appendFile accountFile acs
-
-              sendChunks h
-      bracket (openFile accountInfoFileName ReadMode) hClose $ \h -> do
-        hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
-        sendChunks h
-    else case lookup accountInfoFileName genesisFiles of
-      Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
-      Just acs -> do
-          let accountFile = "AccountInfo"
-          liftIO $ TIO.appendFile accountFile $ decodeUtf8 acs
 
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo

@@ -41,9 +41,7 @@ const { Title } = Typography;
 const GlobalTransaction = ({
   user,
   USDSTAddress,
-  assetsWithEighteenDecimalPlaces,
-  ethstAddress,
-  wbtcstAddress,
+  bridgeableAddresses,
   stratsAddress,
 }) => {
   const USDSTIcon = (
@@ -102,11 +100,7 @@ const GlobalTransaction = ({
   }, [globalTransactions]);
 
   const Content = ({ data }) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      data.assetOriginAddress
-    )
-      ? 18
-      : data.decimals || 0;
+    const decimals = 18;
     const price = (data?.assetPrice || data?.price) * Math.pow(10, decimals);
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -163,16 +157,9 @@ const GlobalTransaction = ({
   };
 
   const handleAssetRedirection = (data) => {
-    const isEthst = data?.assetOriginAddress === ethstAddress;
-    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    if (isEthst) {
-      const url = routes.EthstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (isWbtcst) {
-      const url = routes.WbtcstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
+    if (bridgeableAddresses?.includes(data?.assetOriginAddress)) {
+      const url = routes.bridgeableProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data?.assetName)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {
@@ -244,12 +231,7 @@ const GlobalTransaction = ({
           formattedQuantity = quantity;
         } else {
           if (quantity) {
-            const value =
-              assetOriginAddress === stratsAddress
-                ? (quantity / 100).toFixed(2)
-                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                ? quantity / Math.pow(10, 18)
-                : quantity / Math.pow(10, decimals || 0);
+            const value = quantity / Math.pow(10, 18)
 
             formattedQuantity = value.toLocaleString('en-US', {
               maximumFractionDigits: 6,
@@ -271,29 +253,13 @@ const GlobalTransaction = ({
         <>
           <p className="text-base flex justify-end items-center">
             {price
-              ? formattedNum(
-                  assetOriginAddress === stratsAddress
-                    ? (price * 100).toFixed(2)
-                    : assetsWithEighteenDecimalPlaces.includes(
-                        assetOriginAddress
-                      )
-                    ? (price * Math.pow(10, 18)).toFixed(2)
-                    : (price * Math.pow(10, decimals || 0)).toFixed(2)
-                )
+              ? formattedNum((price * Math.pow(10, 18)).toFixed(2))
               : '--'}
             <span>{price && USDSTIcon}</span>
           </p>
           <p className="text-xs">
             {price
-              ? `$ ${formattedNum(
-                  assetOriginAddress === stratsAddress
-                    ? (price * 100).toFixed(2)
-                    : assetsWithEighteenDecimalPlaces.includes(
-                        assetOriginAddress
-                      )
-                    ? (price * Math.pow(10, 18)).toFixed(2)
-                    : (price * Math.pow(10, decimals || 0)).toFixed(2)
-                )}`
+              ? `$ ${formattedNum((price * Math.pow(10, 18)).toFixed(2))}`
               : '--'}
           </p>
         </>
@@ -468,9 +434,7 @@ const GlobalTransaction = ({
               data={list}
               user={user}
               isTransactionLoading={isTransactionLoading}
-              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-              ethstAddress={ethstAddress}
-              wbtcstAddress={wbtcstAddress}
+              bridgeableAddresses={bridgeableAddresses}
               stratsAddress={stratsAddress}
             />
           </Row>

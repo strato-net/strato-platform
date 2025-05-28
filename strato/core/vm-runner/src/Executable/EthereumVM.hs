@@ -21,7 +21,8 @@ where
 
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
-import Blockchain.BlockChain
+--import Blockchain.BlockChain
+import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
@@ -31,6 +32,8 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
@@ -39,12 +42,12 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
+import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
@@ -55,14 +58,12 @@ import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString.Char8 as BC
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as UTF8
 import Debugger
@@ -77,7 +78,7 @@ ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
-    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
+--    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     initializeBestBlock
 
@@ -196,11 +197,7 @@ sendOutEvent (OutAction act) = do
                OMap.assocs $ a ^. Action.actionData
              ) of
           (Just c, Just n, actionDatas) ->
-            let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
-                  Just "EVM" -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
+            let cp = SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
                 cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
                   if _actionDataCodeHash == cp
                     then Just _actionDataCreator
@@ -211,12 +208,7 @@ sendOutEvent (OutAction act) = do
                                                   --  . (constructor .~ Nothing)
                                                    . (modifiers .~ M.empty)
                                                    )
-                -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
-                abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
-                contracts'' = if S.null abstractNames
-                                then M.filter (isNothing . _importedFrom) contracts'
-                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
-                cc' = emptyCodeCollection & contracts .~ contracts''
+                cc' = emptyCodeCollection & contracts .~ contracts'
              in Just $
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc',

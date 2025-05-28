@@ -1,4 +1,4 @@
-contract A {
+contract record A {
     string storedA;
 
     function A(string caA) {

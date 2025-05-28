@@ -26,4 +26,4 @@ b16Decode :: String -> ByteString -> ByteString
 b16Decode label input =
   case B16.decode input of
     Right val -> val
-    _ -> error $ "[" ++ label ++ "]: 'b16Decode' was called on invalid data"
+    _ -> error $ "[" ++ label ++ "]: 'b16Decode' was called on invalid data: " ++ show input

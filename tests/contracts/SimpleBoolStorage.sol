@@ -1,4 +1,4 @@
-contract SimpleBoolStorage {
+contract record SimpleBoolStorage {
     bool storedData;
 
     bool[] storedDatum;

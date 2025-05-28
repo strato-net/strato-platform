@@ -4,7 +4,7 @@
  * Users' notification preferences for agreement exceptions
  */
 
-contract Notification {
+contract record Notification {
   enum Notification {
     NONE,
     EMAIL,

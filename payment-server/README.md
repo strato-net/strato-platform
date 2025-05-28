@@ -8,6 +8,11 @@ Paste the following to planttext.com to see the sequence diagram of docker-run.s
 @startuml
 start
 :Container started (similar for ORACLE_MODE=true|false);
+if (Env vars valid and oracle.json provided(for Oracle)?) then (yes)
+else (no)
+#pink:Unexpected case - exit 2;
+kill
+endif
 if (config.yaml exists in docker volume?) then (yes)
   if (deploy.yaml exists in docker volume?) then (yes)
     if (.deployed file exists?) then (yes)
@@ -38,7 +43,6 @@ endif;
 stop
 @enduml
 ```
-
 ## Endpoints
 
 ##### GET `/ping`
@@ -206,3 +210,166 @@ The payment server uses `jest` as its testing framework. In order to run the tes
 
 **It is highly recommended to use a separate database for testing purposes**. Afterwards, simply run `npm run test`.
 
+# Oracle Container Guide
+
+## Overview
+This document provides a comprehensive guide to starting the oracle container. The oracle container is responsible for the creation and deactivation of the Oracle contracts as well as updating the oracle price.
+
+## About the Container
+The oracle container runs on the `mercata-testnet2-payments` and `mercata-payments` virtual machines, which are accessible via SSH (granted by the DevOps team). Once logged into these VMs, you can view the running docker containers using:
+
+```sh
+sudo docker ps
+```
+
+On the test network, the container should appear as oracle_oracle_1 and on the production network as oracle-oracle-1.
+
+The two key files required to run the oracle container are:
+	•	docker-compose.oracle.yml: The docker compose file that defines the Oracle service.
+	•	run-oracle.sh: The shell script that starts the oracle container.
+
+Both files are located in the strato-getting-started directory:
+```sh
+cd /datadrive/testnet2/strato-getting-started   # For test network
+cd /datadrive/prod/strato-getting-started         # For production network
+```
+
+The docker-compose.oracle.yml file is typically obtained from the Jenkins build of a specific branch, while the run-oracle.sh script is maintained in the same directory.
+
+Key Environment Variables
+
+Before starting the container, ensure that the following non-network-related environment variables are set:
+```sh
+	•	BASE_CODE_COLLECTION: Sets the oracle version.
+	•	METALS_API_KEY: API key for fetching metal prices from metals.dev.
+	•	ALCHEMY_API_KEY: API key for fetching ERC20 token prices from Alchemy.
+	•	UPGRADE_ORACLE_CONTRACTS: Flag that instructs the docker script to deactivate old contracts and create new ones.
+```
+Note: Even with this flag, the oracle_config.yaml file is not updated if it already exists. Please consult the DevOps team for further details.
+
+Additionally, the oracle container requires an oracle.json file to start:
+	•	oracle.json: This file, generated from template.oracle.json (located in the root of the payment-server directory), contains details about the oracles that will be deployed and the assets whose sale prices need updating.
+
+Running the Container
+
+Preparing the Docker Compose File
+1.	Navigate to the strato-getting-started directory:
+```sh
+cd /datadrive/testnet2/strato-getting-started   # or /datadrive/prod/strato-getting-started
+```
+
+2.	Backup and update the docker-compose.oracle.yml file: (Back up the existing file.)
+
+```sh
+nano docker-compose.oracle.yml
+```
+
+
+Replace its contents with the desired Jenkins build version.
+
+Starting the Oracle Container
+
+Before launching, verify that:
+	•	The run-oracle.sh script has the correct environment variables.
+	•	The oracle.json file is present and correctly configured with all required oracle and asset details.
+	•	If deploying new oracles, ensure that oracle.json includes the new details and that UPGRADE_ORACLE_CONTRACTS is set to true.
+
+To start the container, execute:
+```sh
+sudo ./run-oracle.sh
+```
+
+Viewing Container Logs
+
+To view the logs of the running container, use:
+```sh
+sudo docker logs -f <container_name>
+```
+Replace <container_name> with the actual container name (e.g., oracle_oracle_1 or oracle-oracle-1).
+
+Post-Deployment Steps
+
+If you set UPGRADE_ORACLE_CONTRACTS to true to deploy new oracles:
+	•	Use the newly deployed oracles to update existing reserves using the script located at marketplace/backend/config/update-reserve-oracle.
+	•	The required environment variables for running this script are in the same directory.
+
+Additional Considerations
+	•	Environment Variables:
+After a contract upgrade, remove the UPGRADE_ORACLE_CONTRACTS flag from the run-oracle.sh script once the container is running. This helps prevent accidental redeployments by nightly builds or developers.
+	•	Configuration File Updates:
+Changes to the oracle_config.yaml file or its variable values must be made manually. Container restarts do not automatically update this file.
+To edit the file:
+1.	Enter the container:
+```
+sudo docker exec -it <container_name> sh
+```
+
+
+2.	Use an editor like vi to modify /config/oracle_config.yaml.
+
+PlantUML Sequence Diagram for Oracle Container Logic
+
+To visualize the sequence diagram of the Oracle container startup process, paste the following code into PlantText:
+```plantuml
+@startuml
+start
+:Container started (ORACLE_MODE=true);
+if (oracle.json exists in /mnt?) then (yes)
+  :Copy oracle.json to /tmp;
+  :Set oracle.json permissions to read-only;
+else (no)
+  #pink:Error: oracle.json not found; exit
+  stop
+endif
+if (Required env vars set? (METALS_API_KEY, ALCHEMY_API_KEY, ...)) then (yes)
+else (no)
+  #pink:Missing env vars; exit
+  stop
+endif
+if (oracle_config.yaml exists in /config?) then (yes)
+  if (oracle_deploy.yaml exists?) then (yes)
+    if (.deploy_attempted flag exists?) then (continue)
+    else
+      if (UPGRADE_ORACLE_CONTRACTS=true?) then (yes)
+        :yarn deactivate-oracle;
+        :yarn deploy-oracle;
+        :Create .deploy_attempted flag;
+      endif
+    endif
+  else (no)
+    if (SKIP_ORACLE_DEPLOYMENT != true?) then (yes)
+      :Generate oracle_config.yaml from template;
+      :Create .deploy_attempted flag;
+      :yarn deploy-oracle;
+    else (no)
+      :Skip oracle deployment;
+    endif
+  endif
+else (no)
+  :Generate oracle_config.yaml from template;
+  if (oracle_deploy.yaml exists?) then (error)
+    #pink:Error: oracle_deploy.yaml exists without config; exit
+    stop
+  else (no)
+    if (SKIP_ORACLE_DEPLOYMENT != true?) then (yes)
+      :Create .deploy_attempted flag;
+      :yarn deploy-oracle;
+    else (no)
+      :Skip oracle deployment;
+    endif
+  endif
+endif
+:Start submit-price script;
+stop
+@enduml
+```
+## Summary
+
+- **Purpose:** The Oracle container manages oracle contracts and updates prices.
+- **Setup:** Ensure all required files and environment variables are correctly set.
+- **Deployment:** Use the run-oracle.sh script to start the container and monitor its logs.
+- **Post-Deployment:** Update reserves as needed and remove the upgrade flag to prevent accidental redeployments.
+
+For further assistance or more detailed instructions, please contact your DevOps team.
+
+This Markdown file (e.g., `README.md`) provides a comprehensive guide for developers and DevOps engineers to start, manage, and troubleshoot the Oracle container.

@@ -10,7 +10,7 @@ import "../dapp/BeanstalkErrorCodes.sol";
  * #see ExceptionDefManager
  */
 
-contract ExceptionDef is ExceptionType, PrivateChainType, BeanstalkErrorCodes {
+contract record ExceptionDef is ExceptionType, PrivateChainType, BeanstalkErrorCodes {
 
   address public dappAddress;
   address public owner;

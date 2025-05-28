@@ -4,6 +4,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-# OPTIONS -fno-warn-incomplete-uni-patterns #-}
+
 module SolidVM.Model.Storable where
 
 import Blockchain.Data.RLP
@@ -14,9 +16,11 @@ import Blockchain.Strato.Model.ExtendedWord
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Exception
+import qualified Data.Aeson as JSON
 import Data.Attoparsec.ByteString as Atto
 import Data.Attoparsec.ByteString.Char8 (scientific)
 import Data.Binary
+import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Internal as BI
@@ -24,7 +28,12 @@ import qualified Data.ByteString.UTF8 as UTF8
 import qualified Data.ByteString.Unsafe as BU
 import Data.Char
 import Data.Hashable
+import Data.Maybe
 import Data.Scientific (isInteger, toBoundedInteger)
+import Data.String
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Generics
@@ -32,6 +41,8 @@ import qualified LabeledError
 import SolidVM.Model.SolidString
 import System.IO.Unsafe
 import Text.Format
+import Text.Read
+import Text.Regex.TDFA
 
 data BasicValue
   = BInteger !Integer
@@ -45,7 +56,52 @@ data BasicValue
     -- a column for this mapping
     BMappingSentinel
   | BDefault -- Indicates a not present value
-  deriving (Show, Eq, Generic, NFData, Hashable, Binary)
+  deriving (Show, Read, Eq, Generic, NFData, Hashable, Binary)
+
+instance IsString BasicValue where
+  fromString s = BString $ C8.pack s
+
+instance JSON.ToJSON BasicValue where
+  toJSON v = JSON.toJSON $ format v
+  
+instance JSON.FromJSON BasicValue where
+  parseJSON v =
+    fmap readOrError $ JSON.parseJSON v
+    where
+      readOrError theString =
+        case basicParse theString of
+          Just theBasicValue -> theBasicValue
+          Nothing -> error $ "in parseJSON for BasicValue, basicParse fails for: " ++ show theString
+
+basicParse :: String -> Maybe BasicValue
+basicParse input =
+  case readMaybe input of
+    Just val -> return $ BString val
+    Nothing -> foldr tryMatch Nothing patterns
+  where
+    tryMatch :: (String, [String] -> Maybe BasicValue) -> Maybe BasicValue -> Maybe BasicValue
+    tryMatch (regex, constructor) acc =
+                case input =~ regex :: [[String]] of
+                          [_:matches] -> constructor matches
+                          _ -> acc
+    patterns :: [(String, [String] -> Maybe BasicValue)]
+    patterns =
+      [
+        ("false", \[] -> Just $ BBool False),
+        ("true", \[] -> Just $ BBool True),
+        ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAccount $ read accountString),
+        ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
+        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
+      ]
+
+textToBasicValue :: Text -> BasicValue
+textToBasicValue v =
+  let v' = fromMaybe (BString $ encodeUtf8 v)
+           $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
+         <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
+         <|> (BInteger <$> readMaybe (T.unpack v))
+         <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
+   in if isDefault v' then BDefault else v'
 
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i) = i == 0
@@ -105,9 +161,9 @@ empty = StoragePath []
 singleton :: B.ByteString -> StoragePath
 singleton bs = StoragePath [Field bs]
 
-getField :: StoragePath -> B.ByteString
-getField (StoragePath (Field f : _)) = f
-getField path = error "StoragePath must begin with field" path
+getField :: StoragePath -> Either String B.ByteString
+getField (StoragePath (Field f : _)) = Right f
+getField path = Left $ "StoragePath must begin with field: " ++ show path
 
 snoc :: StoragePath -> StoragePathPiece -> StoragePath
 snoc (StoragePath p) piece = StoragePath $ p ++ [piece]

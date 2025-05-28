@@ -9,7 +9,7 @@
 * #return none
 */
 
-contract MembershipState {
+contract record MembershipState {
   enum MembershipState {
     NULL,
     REQUESTED,

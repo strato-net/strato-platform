@@ -18,6 +18,13 @@ import { SearchOutlined, DeleteOutlined } from '@ant-design/icons';
 import { OLD_SADDOG_ORIGIN_ADDRESS } from '../../helpers/constants';
 import { useLocation } from 'react-router-dom';
 
+const truncateAddress = (address) => {
+  if (!address) return '';
+  return (
+    address.substring(0, 6) + '...' + address.substring(address.length - 4)
+  );
+};
+
 const TransferModal = ({
   open,
   handleCancel,
@@ -26,21 +33,14 @@ const TransferModal = ({
   limit = 0,
   offset = 0,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const {
     message: marketplaceMsg,
     success: marketplaceSuccess,
-    stratsAddress,
   } = useMarketplaceState();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const isStrat = inventory.originAddress === stratsAddress;
-  const decimals = isStrat
-    ? 2
-    : assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
-    ? 18
-    : inventory.decimals || 0;
+  const decimals = 18;
   const availableQuantity = new BigNumber(inventory.quantity).dividedBy(
     new BigNumber(10).pow(decimals)
   );
@@ -144,8 +144,8 @@ const TransferModal = ({
     )
     .map((record) => ({
       label: isBurner
-        ? `burner - ${record.organization}`
-        : `${record.commonName} - ${record.organization}`,
+        ? `burner - ${truncateAddress(record.userAddress)}`
+        : `${record.commonName} - ${truncateAddress(record.userAddress)}`,
       value: record.userAddress,
     }));
 
@@ -299,18 +299,6 @@ const TransferModal = ({
             handleQuantityChange(record.id, new BigNumber(value))
           }
           disabled={index !== transfers.length - 1}
-          formatter={(val) => {
-            if (val === undefined || val === null) return record.quantity;
-            const strVal = val.toString();
-            // Only modify the string if it contains a decimal point
-            if (strVal.includes('.')) {
-              // Remove trailing zeros and remove a trailing decimal point if it remains
-              return strVal.replace(/0+$/, '').replace(/\.$/, '');
-            }
-
-            // For whole numbers, return the string as is
-            return strVal;
-          }}
           // Parser to limit input to decimals
           parser={(val) => {
             if (!val) return record.quantity;
@@ -354,7 +342,8 @@ const TransferModal = ({
           options={filteredUsersList}
           optionFilterProp="value"
           filterOption={(input, option) =>
-            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+            (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
           }
           open={record.openDropdown}
           suffixIcon={<SearchOutlined />}
@@ -363,6 +352,7 @@ const TransferModal = ({
           popupClassName="custom-select-dropdown"
           defaultValue={isBurner ? filteredUsersList[0] : null}
           disabled={index !== transfers.length - 1}
+          placeholder={'Search by username or user address'}
         />
       ),
     },
@@ -512,7 +502,10 @@ const TransferModal = ({
             options={filteredUsersList}
             optionFilterProp="value"
             filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              (option?.label ?? '')
+                .toLowerCase()
+                .includes(input.toLowerCase()) ||
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
             }
             open={mobileTransfer.openDropdown}
             suffixIcon={<SearchOutlined />}
@@ -520,6 +513,7 @@ const TransferModal = ({
             onBlur={() => handleDropdownOpenChange(mobileTransfer.id, false)}
             popupClassName="custom-select-dropdown"
             defaultValue={isBurner ? filteredUsersList[0] : null}
+            placeholder="Search by username or user address"
           />
         </div>
       </div>

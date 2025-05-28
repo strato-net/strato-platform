@@ -29,7 +29,7 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult
 import Blockchain.Database.MerklePatricia (StateRoot (..))
-import Blockchain.Sequencer.Event (OutputBlock (..), OutputTx (..))
+import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
@@ -104,12 +104,11 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
   return $ case res of -- currently only get GasLimit errors out of mineTransactions'
     Nothing -> Right (newStateRoot, ranTxs, newGas)
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
+    Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
-    Just f@TFChainIdMismatch {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
     Just f@TFCodeCollectionNotFound {} -> recoverable f
     Just f@TFInvalidPragma {} -> recoverable f
-    Just f@TFNonceLimitExceeded {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFKnownFailedTX {} -> recoverable f
     Just f@TFTransactionGasExceeded {} -> recoverable f
@@ -163,12 +162,11 @@ cacheRunResults bd (sr, gasRemaining, trrs) = do
   -- the hydrated transaction will reach a different stateroot.
   -- Filtering them out makes the assumption that the inclusion of the unhydrated
   -- private txs reach the same stateroot as the public txs alone.
-  let publicTrrs = filter ((== Nothing) . txChainId . trrTransaction) trrs
-      bhash = blockHeaderPartialHash bd
-  $logInfoLS "cacheRunResults" (bhash, length publicTrrs)
+  let bhash = blockHeaderPartialHash bd
+  $logInfoLS "cacheRunResults" (bhash, length trrs)
   $logDebugLS "cacheRunResults" bd
   cache <- Mod.access (Mod.Proxy @TRC.Cache)
-  liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
+  liftIO $ TRC.insert cache bhash (sr, gasRemaining, trrs)
 
 getCachedRunResults :: MonadBagger m => BlockHeader -> m (Maybe (StateRoot, Integer, [TxRunResult]))
 getCachedRunResults bd = do 
@@ -187,8 +185,6 @@ getCachedRunResults bd = do
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-  WrongChainId s q OutputTx {otHash = hsh, otBaseTx = bt} ->
-    (p' s q ++ "chainId (expected: main, actual: " ++ TD.formatChainId (txChainId bt) ++ ")", hsh)
   NonceTooLow s q expected OutputTx {otHash = hsh, otBaseTx = bt} ->
     (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
   BalanceTooLow s q needed actual OutputTx {otHash = hsh} ->
@@ -201,14 +197,12 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
   InvalidPragma s q erPragmas OutputTx {otHash = hsh} ->
     (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
-  NonceLimitExceeded s q e l OutputTx {otHash = hsh} ->
-    (p s q ++ "account nonce limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
   TXSizeLimitExceeded s q e l OutputTx {otHash = hsh} ->
     (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
   GasLimitExceeded s q e l OutputTx {otHash = hsh} ->
     (p s q ++ "transaction gas limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
   KnownFailedTX s q OutputTx {otHash = hsh} ->
-    (p s q ++ "known failed tx: " ++ show hsh, hsh)
+    (p s q ++ "known failed tx: " ++ format hsh, hsh)
   where
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
@@ -224,16 +218,10 @@ updateBaggerState :: MonadBagger m => (B.BaggerState -> B.BaggerState) -> m ()
 updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
 
 addTransactionsToMempool :: MonadBagger m => [OutputTx] -> m ()
-addTransactionsToMempool ts = do
-  let publicTxs = filter ((/= PrivateHash) . txType) ts
-      privateTxs = filter ((== PrivateHash) . txType) ts
-  $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs"
+addTransactionsToMempool txs = do
+  $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length txs) ++ " txs"
   withBagger $ do
-    sequence_ (addToQueued Insertion <$> publicTxs)
-    state <- getBaggerState
-    let cache = B.miningCache state
-        hashes = B.privateHashes cache `DL.append` DL.fromList privateTxs
-    putBaggerState state {B.miningCache = cache {B.privateHashes = hashes}}
+    sequence_ (addToQueued Insertion <$> txs)
     promoteExecutables
 
 processNewBestBlock :: MonadBagger m => Keccak256 -> BlockHeader -> [Keccak256] -> m ()
@@ -514,18 +502,15 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressNonce > txn)
     . throwE
     $ NonceTooLow Validation Incoming addressNonce t
-  when (addressNonce >= flags_accountNonceLimit)
-    . throwE
-    $ NonceLimitExceeded Validation Incoming addressNonce flags_accountNonceLimit t
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t
   when (txSize >= toInteger flags_txSizeLimit)
     . throwE
     $ TXSizeLimitExceeded Validation Incoming txSize (toInteger flags_txSizeLimit) t
-  when (otHash t `S.member` knownFailedTxs)
-    . throwE
-    $ KnownFailedTX Validation Incoming t
+  when (otHash t `S.member` knownFailedTxs) $ do
+    liftIO $ putStrLn $ "################################ otHash = " ++ format (otHash t)
+    throwE $ KnownFailedTX Validation Incoming t
   return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()

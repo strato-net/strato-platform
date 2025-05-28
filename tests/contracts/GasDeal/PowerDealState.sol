@@ -1,4 +1,4 @@
-contract PowerDealState {
+contract record PowerDealState {
     enum PowerDealState {
         NULL,
         WAIT_COUNTER_PRICE,

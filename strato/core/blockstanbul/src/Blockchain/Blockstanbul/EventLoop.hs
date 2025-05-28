@@ -19,6 +19,7 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
+import Blockchain.Blockstanbul.Options (flags_test_mode_bypass_blockstanbul)
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -182,12 +183,6 @@ nextRound nt = do
 
   when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` vals)
 
-  yieldR . NewCheckpoint
-    =<< liftA2
-      Checkpoint
-      (use view)
-      (uses validators S.toList)
-
 applyValidatorAndCertChanges ::
   ( (Address `A.Alters` X509CertInfoState) m
   , MonadState BlockstanbulContext m
@@ -314,6 +309,12 @@ eventLoop ctx = execStateC ctx $
           -- this is for sending out a new block,
           -- may be a good candidtate for sending newCerts
           let blk = scrubConsensus blk'
+          when flags_test_mode_bypass_blockstanbul $ do
+            vs <- use validators
+            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            pseal <- proposerSeal blockWithVs
+            commitBlock $ addProposerSeal pseal blockWithVs
+            yieldR MakeBlockCommand
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
@@ -550,7 +551,6 @@ recordOutEvent eev =
         ResetTimer {} -> inc "reset_timer"
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
-        NewCheckpoint {} -> inc "new_checkpoint"
         RunPreprepare {} -> inc "run_preprepare"
 
 validatorTimingHack :: (MonadState BlockstanbulContext m)  =>

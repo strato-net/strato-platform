@@ -1,4 +1,4 @@
-contract PriceType {
+contract record PriceType {
 
   enum PriceType {
     NULL,

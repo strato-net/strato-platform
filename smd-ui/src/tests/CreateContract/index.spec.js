@@ -280,7 +280,6 @@ describe('CreateContract: index', () => {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
       },
-      userCertificate: { userAddress: "456789"}
     }
     const wrapper = mount(
       <Provider store={store}>
@@ -330,7 +329,6 @@ describe('CreateContract: index', () => {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
       },
-      userCertificate: { userAddress: "456789"}
 
     }
     const wrapper = mount(
@@ -381,7 +379,6 @@ describe('CreateContract: index', () => {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
       },
-      userCertificate: { userAddress: "456789"}
 
     }
     const wrapper = shallow(

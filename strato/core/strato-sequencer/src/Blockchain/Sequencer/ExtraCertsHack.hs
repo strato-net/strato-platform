@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8 as BC
 getCert :: [String] -> X509Certificate
 getCert certLines =
   let eCert = 
-        bsToCert $
+        bytesToCert $
           BC.pack $
             unlines certLines
    in case eCert of

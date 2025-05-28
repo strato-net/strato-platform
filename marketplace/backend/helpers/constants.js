@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import BigNumber from 'bignumber.js';
 dayjs.extend(utc);
 
 export default {
@@ -37,14 +38,12 @@ export default {
   testnetNetworkId: '7596898649924658542',
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
+  
   prodUSDSTAddress: '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
   testnetUSDSTAddress: '3aea6a1bd049bbf57f2e64a4f68a264ebfafcba9',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
-  testnetETHSTAddress: 'fa4e951fdb86f10394a23efc89ddeef83a0b1c17',
-  prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
-  testnetWBTCSTAddress: 'ae20770679fe2012ff7a0a3a0b6a939d29c64da7',
-  prodWBTCSTAddress: '7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9',
+
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
@@ -62,20 +61,57 @@ export default {
     'blockapps_art',
     'blockapps_spirits',
   ],
-  AssetsWithEighteenDecimalPlaces: [
-    '2680dc6693021cd3fefb84351570874fbef8332a', //prodCataAddress
-    '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
-    '93fb7295859b2d70199e0a4883b7c320cf874e6c', //prodETHSTAddress
-    'fa4e951fdb86f10394a23efc89ddeef83a0b1c17', //testnetETHSTAddress
-    '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
-    '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
-    'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
-    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
-  ],
+  AssetsWithEighteenDecimalPlaces: [],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
   testTokenServerUrl: 'https://campaigns-test.blockapps.net',
   prodTokenServerUrl: 'https://campaigns.blockapps.net',
+
+  tokensArray: [
+    {
+      name: 'WBTCST',
+      ethTestnetAddress: '0x29f2D40B0605204364af54EC677bD022dA425d03',
+      ethMainnetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+      decimals: 8,
+      precision: 0.0001,
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
+    },
+    {
+      name: 'USDTST',
+      ethTestnetAddress: '0xAF0F6e8b0Dc5c913bbF4d14c22B4E78Dd14310B6',
+      ethMainnetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+      decimals: 6,
+      precision: 0.01,
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
+    },
+    {
+      name: 'USDCST',
+      ethTestnetAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
+      ethMainnetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      decimals: 6,
+      precision: 0.01,
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
+    },
+    {
+      name: 'PAXGST',
+      ethTestnetAddress: '0x8599eA38e03E9D0A8B9e86A47aC119FC78d6b6D3',
+      ethMainnetAddress: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
+      decimals: 18,
+      precision: 0.01,
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5'
+    },
+    {
+      name: 'ETHST',
+      mercataTestnetAddress: '0x0E5fC82D0a9493c133370f314342eAeF70D5A1aE',
+      mercataMainnetAddress: '0x8c458F866e603335ef179A63a2528F357732f5d5',
+      precision: 0.01
+    }
+  ]
+
 };
 
 export const DECIMAL_FACTOR_18 = Math.pow(10, 18);
@@ -180,8 +216,22 @@ export const calculateAverageSalePrice = (records, decimals) => {
 };
 
 export const calculatePriceFluctuation = (records, decimals) => {
-  const prices = records.map((record) => record.price);
-  return { min: Math.min(...prices) * Math.pow(10, decimals), max: Math.max(...prices) * Math.pow(10, decimals) };
+  const len = records?.length;
+  if (!len) return { min: 0, max: 0 };
+
+  const factor = new BigNumber(10).pow(decimals);
+  // Initialize from the first record
+  const firstScaled = new BigNumber(records[0].price).times(factor);
+  let min = firstScaled;
+  let max = firstScaled;
+
+  for (let i = 1; i < len; i++) {
+    const scaled = new BigNumber(records[i].price).times(factor);
+    if (scaled.lt(min)) min = scaled;
+    if (scaled.gt(max)) max = scaled;
+  }
+
+  return { min: min.toNumber(), max: max.toNumber() };
 };
 
 export const calculateVolumeTraded = (records, decimals) => {

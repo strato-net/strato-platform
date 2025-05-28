@@ -10,6 +10,46 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export DOCKERIZED="true"
   export SALE_UPDATE=${SALE_UPDATE:-false}
 
+  if [ ! -f /mnt/oracle.json ]; then
+    echo "Error: /mnt/oracle.json not found. Exiting."
+    exit 1
+  fi
+
+  # Copy the file to /tmp
+  cp /mnt/oracle.json /tmp/oracle.json || exit 2
+  chmod 444 /tmp/oracle.json
+
+  echo "oracle.json copied to /tmp:"
+  ls -l /tmp
+
+   # Validate the env vars
+  if [ -z "$METALS_API_KEY" ]; then
+    echo 'Error: METALS_API_KEY is not set. submit-price script will not run. Exiting.'
+    exit 11
+  fi
+  if [ -z "$ALCHEMY_API_KEY" ]; then
+    echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
+    exit 12
+  fi
+  if [ "${SALE_UPDATE}" = "true" ]; then
+    if [ -z "$METALS_USERNAME" ]; then
+      echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
+      exit 13
+    fi
+    if [ -z "$METALS_PASSWORD" ]; then
+      echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
+      exit 14
+    fi
+    if [ -z "$TOKENS_USERNAME" ]; then
+      echo 'Error: TOKENS_USERNAME is not set. Token Sale price update script will not run. Exiting'
+      exit 13
+    fi
+    if [ -z "$TOKENS_PASSWORD" ]; then
+      echo 'Error: TOKENS_PASSWORD is not set. Token Sale price update script will not run. Exiting'
+      exit 14
+    fi
+  fi
+
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
   export STRATO_HOST=${STRATO_HOST}
@@ -18,6 +58,8 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
   export METALS_USERNAME=${METALS_USERNAME}
   export METALS_PASSWORD=${METALS_PASSWORD}
+  export TOKENS_USERNAME=${TOKENS_USERNAME}
+  export TOKENS_PASSWORD=${TOKENS_PASSWORD}
   export OAUTH_SCOPE=${OAUTH_SCOPE}
   export OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
   export METALS_API_KEY=${METALS_API_KEY}
@@ -26,17 +68,6 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
   export UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS:-false}
 
-  export ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL:-60000}
-  export SALE_UPDATE_TIME=${SALE_UPDATE_TIME:-11} # 11:00 UTC
-  export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
-  export GOLD_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Gold'}
-  export ETH_ORACLE_NAME_VALUE=${ETH_ORACLE_NAME_VALUE:-'ETH'}
-  export BTC_ORACLE_NAME_VALUE=${BTC_ORACLE_NAME_VALUE:-'BTC'}
-  export GOLDST_ORACLE_NAME_VALUE=${GOLDST_ORACLE_NAME_VALUE:-'GOLDST'}
-  export USD_ORACLE_NAME_VALUE=${USD_ORACLE_NAME_VALUE:-'USD'}
-  export SILVER_ASSET_ADDRESSES=${SILVER_ASSET_ADDRESSES:-''}
-  export GOLD_ASSET_ADDRESSES=${GOLD_ASSET_ADDRESSES:-''}
-
   echo "OAuth OpenID discovery url: $OAUTH_DISCOVERY_URL"
 
   if [ ! -f "${CONFIG_DIR_PATH}/oracle_config.yaml" ]; then
@@ -44,39 +75,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   
     cp ./config/template.oracle_config.yaml /tmp/tmp.oracle_config.yaml
   
-    # Validate the env vars
-    if [ -z "$METALS_API_KEY" ]; then
-      echo 'Error: METALS_API_KEY is not set. submit-price script will not run. Exiting.'
-      exit 11
-    fi
-    if [ -z "$ALCHEMY_API_KEY" ]; then
-      echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
-      exit 12
-    fi
-    if [ "${SALE_UPDATE}" = "true" ]; then
-      if [ -z "$METALS_USERNAME" ]; then
-      echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
-      exit 13
-      fi
-      if [ -z "$METALS_PASSWORD" ]; then
-      echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
-      exit 14
-      fi
-    fi
-    # TODO: in future we can check the other env vars here
-  
     # Replace placeholders in Oracle config template
-    sed -i 's*<oracleFetchInterval_value>*'"${ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<saleUpdateTime_value>*'"${SALE_UPDATE_TIME}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<gold_oracle_name_value>*'"${GOLD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<eth_oracle_name_value>*'"${ETH_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<btc_oracle_name_value>*'"${BTC_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<goldst_oracle_name_value>*'"${GOLDST_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<silver_asset_addresses_value>*'"${SILVER_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<gold_asset_addresses_value>*'"${GOLD_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
-  
     sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.oracle_config.yaml
@@ -87,7 +86,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
     sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.oracle_config.yaml
-    sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/login/"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.oracle_config.yaml
@@ -235,7 +234,7 @@ else
     sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/login/"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/"'*g' /tmp/tmp.config.yaml
     sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml

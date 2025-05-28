@@ -12,6 +12,7 @@ import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from '../../contexts/marketplace';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import {
   useInventoryState,
   useInventoryDispatch,
@@ -19,6 +20,7 @@ import {
 import { useOrderState, useOrderDispatch } from '../../contexts/order';
 import { actions } from '../../contexts/marketplace/actions';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 import { Images } from '../../images';
 import { useState, useEffect } from 'react';
 import './index.css';
@@ -42,22 +44,21 @@ const Checkout = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const inventoryDispatch = useInventoryDispatch();
+  const ethDispatch = useEthDispatch();
   const { paymentServices, arePaymentServicesLoading } =
     usePaymentServiceState();
   const { reserves, isReservesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList } = useMarketplaceState();
+  const { bridgeableTokens } = useEthState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
+  const [inputErrors, setInputErrors] = useState({});
 
   const calculateTax = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    )
-      ? 18
-      : item.product.decimals || 0;
+    const decimals = 18;
     let price = new BigNumber(item.product.price).multipliedBy(
       new BigNumber(10).pow(decimals)
     );
@@ -68,11 +69,7 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    )
-      ? 18
-      : item.product.decimals || 0;
+    const decimals = 18;
     let price = new BigNumber(item.product.price).multipliedBy(
       new BigNumber(10).pow(decimals)
     );
@@ -89,6 +86,7 @@ const Checkout = () => {
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
     inventoryActions.getAllReserve(inventoryDispatch);
+    ethActions.fetchBridgeableTokens(ethDispatch)
   }, [paymentServiceDispatch, inventoryDispatch]);
 
   useEffect(() => {
@@ -111,16 +109,22 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          item.product.originAddress
-        )
-          ? 18
-          : item.product.decimals || 0;
-        const parts = item.product.contract_name.split('-');
-        let amount = calculateAmount(item);
-        let quantity = new BigNumber(item.product.saleQuantity).dividedBy(
+        const decimals = 18;
+        const saleQuantity = new BigNumber(item.product.saleQuantity).dividedBy(
           new BigNumber(10).pow(decimals)
         );
+        let step;
+        const precision = bridgeableTokens?.find((token) => token.address === item.product.originAddress)?.precision;
+
+        if (precision) {
+          step = precision;
+        } else if (decimals) {
+          step = 0.01;
+        } else {
+          step = 1;
+        }
+        const parts = item.product.contract_name.split('-');
+        let amount = calculateAmount(item);
 
         modifiedValue.push({
           key: item.product.address,
@@ -128,7 +132,7 @@ const Checkout = () => {
             name: item.product.name,
             image:
               item.product['BlockApps-Mercata-Asset-images'] &&
-              item.product['BlockApps-Mercata-Asset-images'].length > 0
+                item.product['BlockApps-Mercata-Asset-images'].length > 0
                 ? item.product['BlockApps-Mercata-Asset-images'][0].value
                 : image_placeholder,
             status: 'Active',
@@ -141,14 +145,16 @@ const Checkout = () => {
           unitPrice: new BigNumber(item.product.price).multipliedBy(
             new BigNumber(10).pow(decimals)
           ),
-          quantity,
+          saleQuantity,
           decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
           action: item.product.address,
-          qty: Math.min(item.qty, quantity),
+          qty: item.qty,
           assetRootAddress: item.product.originAddress,
+          step,
+          disabled: inputErrors[item.product.address] ? true : false
         });
       });
 
@@ -159,46 +165,75 @@ const Checkout = () => {
       };
     });
     setmapData(mapDataArray);
-  }, [marketplaceDispatch, cartList]);
+  }, [marketplaceDispatch, cartList, bridgeableTokens]);
 
   const MinusQty = (qty, product) => {
-    if (qty <= 0) {
-      return;
-    }
-    let items = [...cartList];
-    cartList.forEach((element, index) => {
-      if (element.product.address === product.key) {
-        if (items[index].qty - 0.01 >= 0) {
-          if (product.decimals === 0) {
-            items[index].qty -= 1;
+    if (new BigNumber(qty).isGreaterThan(new BigNumber(product.step))) {
+      let items = [...cartList];
+      cartList.forEach((element, index) => {
+        if (element.product.address === product.key) {
+          const step = new BigNumber(product.step);
+          const availableQty = new BigNumber(product.saleQuantity);
+
+          // Get the number of decimal places in the step
+          const stepStr = step.toString();
+          const decimalPlaces = stepStr.includes('.')
+            ? stepStr.split('.')[1].length
+            : 0;
+
+          // Calculate new qty and round to specific decimal places
+          const newQty = new BigNumber(qty).minus(step);
+          // Round to the nearest step
+          const factor = new BigNumber(10).pow(decimalPlaces);
+          const roundedQty = newQty
+            .multipliedBy(factor)
+            .integerValue(BigNumber.ROUND_FLOOR)
+            .dividedBy(factor);
+
+          // Handle the case where the rounded quantity exceeds available quantity
+          let finalQty;
+          if (roundedQty.isGreaterThan(availableQty)) {
+            finalQty = availableQty.toNumber();
+          } else if (roundedQty.isLessThan(step)) {
+            finalQty = step.toNumber();
+          } else {
+            finalQty = roundedQty.toNumber();
           }
-          else {
-            if (items[index].qty > 0) {
-              items[index].qty = parseFloat((items[index].qty - 0.01).toFixed(4));
-            }
-          }
+
+          items[index].qty = finalQty;
           actions.addItemToCart(marketplaceDispatch, items);
         }
-      }
-    });
+      });
+      // All checks passed, clear any previous error
+      setInputErrors((prev) => ({ ...prev, [product.key]: '' }));
+    }
   };
 
-  const AddQty = (product) => {
-    let items = [...cartList];
-    cartList.forEach((element, index) => {
-      if (element.product.address === product.key) {
-        const availableQuantity = product.quantity ? product.quantity : 1;
-        if (items[index].qty + 1 <= availableQuantity) {
-          if (product.decimals === 0) {
-            items[index].qty += 1;
-          }
-          else {
-            items[index].qty = parseFloat((items[index].qty + 0.01).toFixed(4));
-          }
+  const AddQty = (qty, product) => {
+    if (
+      new BigNumber(qty)
+        .plus(new BigNumber(product.step))
+        .lte(product.saleQuantity)
+    ) {
+      let items = [...cartList];
+      cartList.forEach((element, index) => {
+        if (element.product.address === product.key) {
+          // Calculate new qty and round to match step precision
+          const step = new BigNumber(product.step);
+          const newQty = new BigNumber(qty).plus(step);
+          // Round to the nearest step value
+          const roundedQty = newQty
+            .dividedBy(step)
+            .integerValue(BigNumber.ROUND_FLOOR)
+            .multipliedBy(step);
+
+          items[index].qty = roundedQty.toNumber();
           actions.addItemToCart(marketplaceDispatch, items);
         }
-      }
-    });
+      });
+      // All checks passed, clear any previous error
+      setInputErrors((prev) => ({ ...prev, [product.key]: '' }));
+    }
   };
 
   const removeCartList = (text) => {
@@ -231,19 +266,67 @@ const Checkout = () => {
     actions.deleteCartItem(marketplaceDispatch, items);
   };
 
-  const ValueQty = (product, e) => {
-    e = parseFloat(e || 0);
+  const ValueQty = (product, input) => {
+    // Convert input to string for precision checking
+    const decimalsAllowed = product.decimals;
+    const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
+    const minValBN = new BigNumber(1).dividedBy(
+      new BigNumber(10).pow(decimalsAllowed)
+    );
+    const minVal = minValBN.toFixed(decimalsAllowed);
+
+    // Clear any previous errors first
+    let hasError = false;
+
+    // Check 1: Exceeding allowed decimal precision
+    if (input.includes('.')) {
+      const decimalPart = input.split('.')[1];
+      if (decimalPart.length > decimalsAllowed) {
+        setInputErrors((prev) => ({
+          ...prev,
+          [product.key]: `Maximum precision is ${decimalsAllowed} decimal places`,
+        }));
+        hasError = true;
+      }
+    }
+
+    // Check 2: Minimum value check
+    if (
+      (!hasError &&
+        (new BigNumber(input).isLessThan(minVal) ||
+          new BigNumber(input).isNaN())) ||
+      new BigNumber(input).isLessThanOrEqualTo(0)
+    ) {
+      setInputErrors((prev) => ({
+        ...prev,
+        [product.key]: `Minimum quantity is ${minVal}`,
+      }));
+      hasError = true;
+    }
+
+    // Check 3: Maximum value check
+    if (
+      !hasError &&
+      new BigNumber(input).isGreaterThan(new BigNumber(availableQuantity))
+    ) {
+      setInputErrors((prev) => ({
+        ...prev,
+        [product.key]: `Maximum quantity is ${availableQuantity}`,
+      }));
+      hasError = true;
+    }
+
+    // Clear error if all validations pass
+    if (!hasError) {
+      setInputErrors((prev) => ({ ...prev, [product.key]: '' }));
+    }
+
+    const parsed = parseFloat(input) || 0;
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-        const availableQuantity = product.quantity ? product.quantity : 1;
-        if (e <= availableQuantity) {
-          items[index].qty = e;
-          actions.addItemToCart(marketplaceDispatch, items);
-        } else {
-          items[index].qty = availableQuantity;
-          actions.addItemToCart(marketplaceDispatch, items);
-        }
+        items[index].qty = parsed;
+        actions.addItemToCart(marketplaceDispatch, items);
       }
     });
   };
@@ -267,20 +350,7 @@ const Checkout = () => {
   };
 
   const onKeyDownPress = (e, topSellingProduct) => {
-    if (topSellingProduct.decimals === null) {
-      // Prevent decimals
-      if (e.key === "." || e.key === ",") {
-        e.preventDefault();
-      }
-      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
-      if (!/^[0-9]$/.test(e.key) && 
-          e.key !== "Backspace" && 
-          e.key !== "Delete" && 
-          e.key !== "ArrowLeft" && 
-          e.key !== "ArrowRight") {
-        e.preventDefault();
-      }
-    } else {
+    if (topSellingProduct?.decimals) {
       // Allow decimals for products with defined decimal places
       if (
         !/[0-9.]/.test(e.key) &&
@@ -289,6 +359,20 @@ const Checkout = () => {
         e.key !== "ArrowLeft" &&
         e.key !== "ArrowRight"
       ) {
+        e.preventDefault();
+      }
+    }
+    else {
+      // Prevent decimals
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+      }
+      // Prevent non-numeric keys except Backspace, Delete, and navigation keys
+      if (!/^[0-9]$/.test(e.key) &&
+        e.key !== "Backspace" &&
+        e.key !== "Delete" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowRight") {
         e.preventDefault();
       }
     }
@@ -351,54 +435,48 @@ const Checkout = () => {
       render: (_, product) => {
         let qty = product.qty;
         return (
-          <div className="flex items-center justify-center mt-2">
-            <div
-              onClick={() => {
-                MinusQty(qty, product);
-              }}
-              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-              }`}
-            >
-              -
+          <div>
+            <div className="flex items-center justify-center mt-2">
+              <div
+                onClick={() => {
+                  MinusQty(qty, product);
+                }}
+                className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${new BigNumber(qty).lte(product.step)
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer'
+                  }`}
+              >
+                -
+              </div>
+              <InputNumber
+                className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
+                value={qty}
+                defaultValue={qty}
+                controls={false}
+                stringMode
+                onChange={(e) => {
+                  ValueQty(product, e);
+                }}
+              />
+              <div
+                onClick={() => {
+                  AddQty(qty, product);
+                }}
+                className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${new BigNumber(qty).isGreaterThanOrEqualTo(
+                  product.saleQuantity
+                )
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer'
+                  }`}
+              >
+                +
+              </div>
             </div>
-
-            <InputNumber
-              className="w-[100px] bg-[transparent] border-none text-[#202020] font-semibold text-sm text-center flex flex-col justify-center"
-              min={1 / Math.pow(10, product.decimals || 0)}
-              value={qty}
-              controls={false}
-              onChange={(e) => {
-                if (!isNaN(e)) {
-                  let value = e.toString();
-                  let [integer, decimal] = value.split(".");
-
-                  if (decimal && decimal.length > (product.decimals || 0)) {
-                    value = parseFloat(integer + "." + decimal.slice(0, product.decimals));
-                  } else {
-                    value = parseFloat(value);
-                  }
-
-                  ValueQty(product, value);
-                }
-              }}
-              onKeyDown={(e) => {
-                onKeyDownPress(e, product);
-              }}
-            />
-
-            <div
-              onClick={() => {
-                AddQty(product, product.decimals);
-              }}
-              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
-                qty >= product.quantity
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer'
-              }`}
-            >
-              +
-            </div>
+            {inputErrors[product.key] && (
+              <div className="text-xs mt-2" style={{ color: 'red' }}>
+                {inputErrors[product.key]}
+              </div>
+            )}
           </div>
         );
       },
@@ -451,8 +529,9 @@ const Checkout = () => {
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ||
-      arePaymentServicesLoading ||
-      isReservesLoading ? (
+        arePaymentServicesLoading ||
+        isReservesLoading ||
+        !bridgeableTokens ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
@@ -468,13 +547,6 @@ const Checkout = () => {
               <p className="text-sm text-[#202020] font-medium">Checkout</p>
             </Breadcrumb.Item>
           </Breadcrumb>
-
-          {/* Title for Cart Page: My Cart */}
-          {/* <div className="pt-[18px] lg:pt-6">
-            <p className="text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
-              My Cart
-            </p>
-          </div> */}
           <div className="grid grid-cols-1 sm:place-items-center gap-3 lg:block">
             {mapData.length === 0 ? (
               <div className="flex flex-col items-center">
@@ -508,6 +580,7 @@ const Checkout = () => {
                       removeCartList={removeCartList}
                       openToastOrder={openToastOrder}
                       reserve={filterReserve(e.value.items)}
+                      inputErrors={inputErrors}
                     />
                   </div>
                 </React.Fragment>

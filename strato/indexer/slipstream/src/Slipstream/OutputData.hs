@@ -22,13 +22,11 @@ module Slipstream.OutputData (
   insertIndexTable,
   insertForeignKeys,
   insertCollectionTable,
-  insertMappingTableQuery,
-  insertArrayTableQuery,
+  insertCollectionTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
   createIndexTable,
-  createMappingTable,
-  createArrayTable,
+  createCollectionTable,
   createAbstractTable,
   createExpandEventTables,
   createExpandIndexTable,
@@ -67,7 +65,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map.Strict                 as Map
-import           Data.Maybe                      (catMaybes, fromMaybe)
+import           Data.Maybe                      (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Traversable                (for)
@@ -124,7 +122,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     blockNumber :: Integer,
     transactionHash :: Keccak256,
     transactionSender :: Address,
-    collectionDataKey :: V.Value,
+    collectionDataKeys :: [V.Value],
     collectionDataValue :: V.Value
   }
   deriving (Show)
@@ -354,7 +352,7 @@ uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
 compareCollectionRows :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
-compareCollectionRows x y = collectionDataKey x == collectionDataKey y &&
+compareCollectionRows x y = collectionDataKeys x == collectionDataKeys y &&
                    creator x == creator y &&
                    application x == application y &&
                    contractname x == contractname y &&
@@ -546,12 +544,12 @@ getDeferredForeignKeysForEventCollection tableName creator a =
       }
   ]
 
-getDeferredForeignKeysForArrayType :: TableName -> Text -> Text -> Text -> [ForeignKeyInfo]
-getDeferredForeignKeysForArrayType tableName creator a arrType =
+getDeferredForeignKeysForCollectionType :: TableName -> Text -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForCollectionType tableName creator a collectionType =
   [ ForeignKeyInfo
       { tableName = tableName,
         columnNames = [T.pack "value_fkey"],
-        foreignTableName = indexTableName creator a arrType,
+        foreignTableName = indexTableName creator a collectionType,
         foreignColumnNames = [T.pack "address"]
       }
   ]
@@ -588,32 +586,21 @@ createAbstractTable contract (creator, a, n) abstracts' cc = do
   yield $ createAbstractTableQuery (creator, a, n) listCombined
   getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
 
--- if flag from solidvm that it is a record, vmevent
-createMappingTable ::
-  OutputM m =>
-  --
-  (Text, Text, Text) ->
-  Text ->
-  ConduitM () Text m [ForeignKeyInfo]
-createMappingTable (creator, a, n) m = do
-  let tableName = collectionTableName creator a n m
-  yield $ (createMappingTableQuery (creator, a, n, m))
-  return $ getDeferredForeignKeysForCollection tableName creator a
-
-createArrayTable ::
+createCollectionTable ::
   OutputM m =>
   (Text, Text, Text) ->
-  (Text, SVMType.Type) ->
   ContractF () ->
   CodeCollectionF () ->
+  (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () Text m [ForeignKeyInfo]
-createArrayTable (creator, a, n) (arr, arrType) c cc = do
-  let tableName = collectionTableName creator a n arr
-      arrSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc arrType
-  yield $ (createArrayTableQuery (creator, a, n, arr, arrSqlType))
+createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType) = do
+  let tableName = collectionTableName creator a n collectionName
+      keySqlTypes = fromMaybe "text" . solidityTypeToSQLType False (Just c) cc <$> keyTypes
+      valueSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc valueType
+  yield $ createCollectionTableQuery creator a n collectionName keySqlTypes valueSqlType
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
-      fkeys2 = case arrType of
-                (SVMType.UnknownLabel contractNameForFkey _) -> getDeferredForeignKeysForArrayType tableName creator a (T.pack $ contractNameForFkey)
+      fkeys2 = case valueType of
+                (SVMType.UnknownLabel contractNameForFkey _) -> getDeferredForeignKeysForCollectionType tableName creator a (T.pack $ contractNameForFkey)
                 _  -> []
   return $ fkeys1 ++ fkeys2
 
@@ -630,7 +617,7 @@ createEventArrayTable (creator, a, n, e) (arr, arrType) = do
   yield $ (createEventArrayTableQuery (creator, a, n, e, arr))
   -- let list = ["key", "value"]
   let fkeys1 = getDeferredForeignKeysForEventCollection tableName creator a
-      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+      fkeys2 = getDeferredForeignKeysForCollectionType tableName creator a arrType
   return $ fkeys1 ++ fkeys2
 
 createHistoryTable' ::
@@ -829,9 +816,8 @@ insertCollectionTable maps = do
 processGroupedData :: [ProcessedCollectionRow] -> [Text]
 processGroupedData rows@(row:_) =
   case collectiontype row of
-    "Array" -> insertArrayTableQuery rows
     "Event Array" -> insertEventArrayTableQuery rows
-    _ -> insertMappingTableQuery rows
+    _ -> insertCollectionTableQuery rows
 processGroupedData [] = []
 
 insertForeignKeys ::
@@ -949,26 +935,13 @@ createIndexTableQuery (creator, a, n) cols =
           ",\n  PRIMARY KEY (address) );"
         ]
 
-createMappingTableQuery :: (Text, Text, Text, Text) -> Text
-createMappingTableQuery (creator, a, n, m) =
-  let tableName = collectionTableName creator a n m
-   in T.concat
-        [ "CREATE TABLE IF NOT EXISTS ",
-          tableNameToDoubleQuoteText tableName,
-          " (",
-          csv $ baseColumnsQuery ++
-            [ "contract_name text",
-              "collectionname text",
-              "collectiontype text",
-              "key text",
-              "value text"
-            ],
-          ",\n  PRIMARY KEY (address, key));"
-        ]
+keyColumnNames :: [a] -> [(Text, a)]
+keyColumnNames = map (\(i,t) -> ("key" <> (if i == 1 then "" else T.pack $ show i), t)) . zip [(1 :: Int)..]
 
-createArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
-createArrayTableQuery (creator, a, n, arr, arrType) =
-  let tableName = collectionTableName creator a n arr
+createCollectionTableQuery :: Text -> Text -> Text -> Text -> [Text] -> Text -> Text
+createCollectionTableQuery creator a n collectionName keyTypes valueType =
+  let tableName = collectionTableName creator a n collectionName
+      keyNames = keyColumnNames keyTypes
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
@@ -976,12 +949,13 @@ createArrayTableQuery (creator, a, n, arr, arrType) =
           csv $ baseColumnsQuery ++
             [ "contract_name text",
               "collectionname text",
-              "collectiontype text",
-              "key text",
-              "value " <> arrType,
+              "collectiontype text"
+            ]
+            ++ ((\(k,t) -> k <> " " <> t) <$> keyNames) ++
+            [ "value " <> valueType,
               "value_fkey text"
             ],
-          ",\n  PRIMARY KEY (address, key));"
+          ",\n  PRIMARY KEY (" <> T.intercalate ", " ("address":(fst <$> keyNames)) <> "));"
         ]
 
 createEventArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
@@ -1129,77 +1103,21 @@ insertIndexTableQuery cs =
                     ]
     in processContract cs'
 
-
-insertMappingTableQuery :: [ProcessedCollectionRow] -> [Text]
-insertMappingTableQuery [] = []
-insertMappingTableQuery ms =
+insertCollectionTableQuery :: [ProcessedCollectionRow] -> [Text]
+insertCollectionTableQuery [] = []
+insertCollectionTableQuery ms =
   concat $
-    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", collectionDataKey m), ("value", collectionDataValue m)])) <$> ms
+    let ms' = (\m -> (m, fmap (fromMaybe "NULL" . valueToSQLText) <$> ((keyColumnNames $ collectionDataKeys m) ++ [("value", collectionDataValue m)]))) <$> ms
      in flip map (map snd $ partitionWith (length . snd) ms') $ \case
           [] -> []
-          mappings@((x, list) : _) ->
-            let tableName =
-                  collectionTableName
-                    (case (cc_creator x) of 
-                      Just cc_creator' -> cc_creator'
-                      Nothing -> (creator x))
-                    (application x)
-                    (contractname x)
-                    (collectionname x)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list)
-                baseVals =
-                  [ tshow . address,
-                    T.pack . keccak256ToHex . blockHash,
-                    tshow . blockTimestamp,
-                    tshow . blockNumber,
-                    T.pack . keccak256ToHex . transactionHash,
-                    tshow . transactionSender,
-                    creator,
-                    root,
-                    contractname,
-                    collectionname,
-                    collectiontype
-                  ]
-                vals = flip map mappings $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                inserts = csv vals
-             in (: []) $
-                  T.concat
-                    [ "INSERT INTO ",
-                      tableNameToDoubleQuoteText tableName,
-                      " ",
-                      keySt,
-                      "\n  VALUES ",
-                      inserts,
-                      [r|
-  ON CONFLICT (address, key) DO UPDATE SET
-    address = excluded.address,
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    collectionname = excluded.collectionname,
-    collectiontype = excluded.collectiontype,
-    value = excluded.value|],
-                      ";"
-                    ]
-
-insertArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
-insertArrayTableQuery [] = []
-insertArrayTableQuery ms =
-  concat $
-    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", collectionDataKey m), ("value", collectionDataValue m)])) <$> ms
-     in flip map (map snd $ partitionWith (length . snd) ms') $ \case
-          [] -> []
-          arrays@((x, list) : _) ->
+          collections@((x, list) : _) ->
             let tableName =
                   collectionTableName
                     (creator x)
                     (application x)
                     (contractname x)
                     (collectionname x)
+                onConflictCols = T.intercalate ", " $ "address" : (fst <$> keyColumnNames (collectionDataKeys x))
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey"]
                 baseVals =
                   [ tshow . address,
@@ -1214,7 +1132,7 @@ insertArrayTableQuery ms =
                     collectionname,
                     collectiontype
                   ]
-                vals = flip map arrays $ \(row, rowList) ->
+                vals = flip map collections $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]--value_fkey
                 valsForSQL = vals
                 inserts = csv valsForSQL
@@ -1226,8 +1144,10 @@ insertArrayTableQuery ms =
                       keySt,
                       "\n  VALUES ",
                       inserts,
+                      "\n ON CONFLICT (",
+                      onConflictCols,
+                      ") DO UPDATE SET",
                       [r|
-  ON CONFLICT (address, key) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
@@ -1245,7 +1165,7 @@ insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertEventArrayTableQuery [] = []
 insertEventArrayTableQuery ms =
   concat $
-    let ms' = (\m -> (m, valueToSQLText $ collectionDataKey m, valueToSQLText $ collectionDataValue m)) <$> ms
+    let ms' = mapMaybe (\m -> (\k -> (m, valueToSQLText k, valueToSQLText $ collectionDataValue m)) <$> listToMaybe (collectionDataKeys m)) ms
      in flip map ms' $ \case
           (x,mk,mv) ->
             let tNull = T.pack "NULL"
@@ -1567,7 +1487,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       blockNumber = eventBlockNumber ae,
       transactionHash = eventTxHash ae,
       transactionSender = eventTxSender ae,
-      collectionDataKey = index,
+      collectionDataKeys = [index],
       collectionDataValue = value,
       root = "",
       cc_creator = Just ""

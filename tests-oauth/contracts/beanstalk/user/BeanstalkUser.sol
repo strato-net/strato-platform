@@ -18,7 +18,7 @@ import "../membership/Membership.sol";
  * #return none
  */
 
-contract BeanstalkUser is RestStatus, BeanstalkErrorCodes, Notification {
+contract record BeanstalkUser is RestStatus, BeanstalkErrorCodes, Notification {
 
   address public owner;
   address public dappAddress;

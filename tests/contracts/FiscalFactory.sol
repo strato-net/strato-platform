@@ -1,4 +1,4 @@
-contract Fiscal {
+contract record Fiscal {
   
   struct Business {
     string countryCode;
@@ -74,7 +74,7 @@ contract Fiscal {
   *                                                              *
   ***************************************************************/
 
-contract FiscalFactory {
+contract record FiscalFactory {
 
 
   function createFiscal( string src_countryCode

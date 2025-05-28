@@ -25,6 +25,16 @@
       ]
     },
     {
+      "name": "Bridgeable",
+      "imageKey": "",
+      "subCategories": [
+        {
+          "name": "Bridgeable Tokens",
+          "contract": "BridgeableTokens"
+        }
+      ]
+    },
+    {
       "name": "Clothing",
       "imageKey": "",
       "subCategories": [

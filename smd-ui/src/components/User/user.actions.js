@@ -34,37 +34,17 @@ export const fetchUserPubkey = function() {
   }
 }
 
-export const fetchUserPubKeySuccess = function(publicKey) {
+export const fetchUserPubKeySuccess = function(publicKey, address) {
   return {
     type : FETCH_USER_PUBLIC_KEY_SUCCESS,
-    publicKey
+    publicKey,
+    address
   }
 }
 
 export const fetchUserPubKeyFailure = function(error) {
   return {
     type : FETCH_USER_PUBLIC_KEY_FAILURE,
-    error
-  }
-}
-
-export const getUserCertificateRequest = function(userAddress) {
-  return {
-    type : FETCH_USER_CERT_REQUEST,
-    userAddress
-  }
-}
-
-export const getUserCertificateSuccess = function(cert) {
-  return {
-    type : FETCH_USER_CERT_SUCCESS,
-    cert
-  }
-}
-
-export const getUserCertificateFailure = function(error) {
-  return {
-    type : FETCH_USER_CERT_FAILURE,
     error
   }
 }

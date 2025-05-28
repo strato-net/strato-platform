@@ -1,10 +1,9 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 module Blockchain.Strato.Discovery.Data.Peer
   (
     PPeer(..),
@@ -23,6 +22,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     BondedPeersForUDP(..),
     ClosestPeers(..),
     UnbondedPeersForUDP(..),
+    PeerLastBestBlockHash(..),
     ValidatorAddresses(..),
     createPeer,
     pointToNodeID,
@@ -44,7 +44,6 @@ module Blockchain.Strato.Discovery.Data.Peer
     getActivePeers,
     getBondedPeers,
     jamshidBirth,
-    lengthenPeerDisable,
     lengthenPeerDisableBy,
     pPeerString,
     nonviolentDisable,
@@ -55,43 +54,46 @@ module Blockchain.Strato.Discovery.Data.Peer
   )
 where
 
-import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
-import Blockchain.Data.PersistTypes ()
-import Blockchain.Data.PubKey
-import Blockchain.Data.RLP
-import BlockApps.Logging
-import Blockchain.MiscJSON ()
-import Blockchain.Strato.Discovery.Metrics
-import Blockchain.Strato.Discovery.Data.PeerDefinition
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Model.Address (Address, fromPublicKey)
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Util (byteString2Integer)
-import Control.Exception hiding (try)
-import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
-import Crypto.Types.PubKey.ECC
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.IP
-import Data.List (sortBy)
-import Data.Maybe (fromJust)
-import qualified Data.Set as Set
-import Data.String
-import qualified Data.Text as T
-import Data.Time
-import Data.Time.Clock.POSIX
-import qualified Database.Persist.Postgresql as SQL
-import GHC.Bits (xor)
+import           BlockApps.Logging
+import           Blockchain.Data.PersistTypes                    ()
+import           Blockchain.Data.PubKey
+import           Blockchain.Data.RLP
+import           Blockchain.DB.SQLDB                             (runSqlPool,
+                                                                  withGlobalSQLPool)
+import           Blockchain.MiscJSON                             ()
+import           Blockchain.Strato.Discovery.Data.PeerDefinition
+import           Blockchain.Strato.Discovery.Metrics
+import           Blockchain.Strato.Model.Address                 (Address)
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util                    (byteString2Integer)
+import           Blockchain.Strato.Model.Validator
+import           Control.Exception                               hiding (try)
+import qualified Control.Monad.Change.Alter                      as A
+import qualified Control.Monad.Change.Modify                     as Mod
+import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString                                 as B
+import qualified Data.ByteString.Base16                          as B16
+import qualified Data.ByteString.Char8                           as BC
+import           Data.IP
+import           Data.List                                       (sortBy)
+import qualified Data.Set                                        as Set
+import           Data.String
+import qualified Data.Text                                       as T
+import           Data.Time
+import           Data.Time.Clock.POSIX
+import qualified Database.Persist.Postgresql                     as SQL
+import           GHC.Bits                                        (xor)
 import qualified LabeledError
-import Network.Socket
-import Network.URI (URI (..), URIAuth (..))
-import qualified Network.URI as URI
-import Prometheus
-import Text.Format
-import UnliftIO
+import           Network.Socket
+import           Network.URI                                     (URI (..),
+                                                                  URIAuth (..))
+import qualified Network.URI                                     as URI
+import           Numeric.Natural
+import           Prometheus
+import           Text.Format
+import           UnliftIO
 
 newtype AvailablePeers = AvailablePeers {unAvailablePeers :: [PPeer]}
 
@@ -117,6 +119,8 @@ newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
 
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
+newtype PeerLastBestBlockHash = PeerLastBestBlockHash { unPeerLastBestBlockHash :: Keccak256 }
+
 newtype ValidatorAddresses = ValidatorAddresses {unValidatorAddresses :: [Address]}
 
 type HasPeerDB m = (
@@ -128,11 +132,12 @@ type HasPeerDB m = (
   Mod.Accessible BondedPeers m,
   Mod.Accessible BondedPeersForUDP m,
   Mod.Accessible UnbondedPeersForUDP m,
-  A.Selectable Point ClosestPeers m,
+  A.Selectable (Point, Natural) ClosestPeers m,
   A.Replaceable PPeer UdpEnableTime m,
   A.Replaceable PPeer IP m,
   A.Replaceable PPeer TcpEnableTime m,
   A.Replaceable PPeer PeerDisable m,
+  A.Replaceable PPeer PeerLastBestBlockHash m,
   A.Replaceable PPeer PeerUdpDisable m,
   A.Replaceable PPeer Point m,
   A.Replaceable PPeer T.Text m,
@@ -141,25 +146,25 @@ type HasPeerDB m = (
 
 data PeerDisable
   = ExtendPeerDisableTime
-      { epdtTcpEnableTime :: TcpEnableTime,
+      { epdtTcpEnableTime           :: TcpEnableTime,
         epdtNextDisableWindowFactor :: Int
       }
   | SetPeerDisableTime
-      { spdtTcpEnableTime :: TcpEnableTime,
+      { spdtTcpEnableTime            :: TcpEnableTime,
         spdtNextDisableWindowSeconds :: Int,
-        spdtDisableExpiration :: UTCTime
+        spdtDisableExpiration        :: UTCTime
       }
   deriving (Eq, Ord)
 
 data PeerUdpDisable
   = ExtendPeerUdpDisableTime
-      { epdtUdpDisableTime :: UdpEnableTime,
+      { epdtUdpDisableTime             :: UdpEnableTime,
         epdtNextUdpDisableWindowFactor :: Int
       }
   | SetPeerUdpDisableTime
-      { epdtUdpDisableTime :: UdpEnableTime,
+      { epdtUdpDisableTime              :: UdpEnableTime,
         spdtNextUdpDisableWindowSeconds :: Int,
-        spdtUdpDisableExpiration :: UTCTime
+        spdtUdpDisableExpiration        :: UTCTime
       }
   | ResetPeerUdpDisable
   deriving (Eq, Ord)
@@ -219,13 +224,14 @@ parseEnode enode =
     mUriAuth = URI.parseURI enode >>= validateURIScheme >>= URI.uriAuthority
 
 validateURIScheme :: URI -> Maybe URI
-validateURIScheme uri = case URI.uriScheme uri == "enode:" of
-  True -> Just uri
-  False -> Nothing
+validateURIScheme uri =
+  if URI.uriScheme uri == "enode:"
+  then Just uri
+  else Nothing
 
 parsePublicKey :: URIAuth -> Maybe String
 parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of
-  [] -> Nothing
+  []        -> Nothing
   publicKey -> Just publicKey
 
 parseHostname :: URIAuth -> Host
@@ -258,7 +264,7 @@ setPeerBondingState host point state = do
 
 setPeerPubkey :: HasPeerDB m =>
                  PPeer -> Point -> m ()
-setPeerPubkey peer point = A.replace (A.Proxy @Point) peer point
+setPeerPubkey = A.replace (A.Proxy @Point)
 
 getBondedPeers :: (MonadUnliftIO m, Mod.Accessible BondedPeers m) => m (Either SomeException [PPeer])
 getBondedPeers = try $ unBondedPeers <$> Mod.access (Mod.Proxy @BondedPeers)
@@ -282,7 +288,7 @@ disableUDPPeerForSeconds ::
   m (Either SomeException ())
 disableUDPPeerForSeconds peer seconds = try $ do
   currentTime <- liftIO getCurrentTime
-  if (currentTime < pPeerUdpEnableTime peer)
+  if currentTime < pPeerUdpEnableTime peer
     then return ()
     else
       let seconds' = thisOr100Years seconds
@@ -305,12 +311,6 @@ nonviolentDisable peer' = try $ do
 -- window is doubled, but those windows are reset every day. This prevents a mostly healthy node
 -- from building up longer and longer disables, e.g. if it caused an exception once a day
 -- by the end of the month it would be disabled for years.
-lengthenPeerDisable ::
-  (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m) =>
-  PPeer ->
-  m (Either SomeException ())
-lengthenPeerDisable = lengthenPeerDisableBy (24 * 60 * 60)
-
 lengthenPeerDisableBy ::
   (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m) =>
   NominalDiffTime ->
@@ -318,7 +318,7 @@ lengthenPeerDisableBy ::
   m (Either SomeException ())
 lengthenPeerDisableBy secs peer = try $ do
   currentTime <- liftIO getCurrentTime
-  let disable = if (currentTime < pPeerDisableExpiration peer)
+  let disable = if currentTime < pPeerDisableExpiration peer
                 then ExtendPeerDisableTime (TcpEnableTime $ fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime) 2
                 else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
   A.replace (A.Proxy @PeerDisable) peer disable
@@ -331,8 +331,8 @@ lengthenPeerDisable' ::
 lengthenPeerDisable' peer' = try $ do
   currentTime <- liftIO getCurrentTime
   let disable =
-        if (currentTime < pPeerDisableExpiration peer')
-          then 
+        if currentTime < pPeerDisableExpiration peer'
+          then
             let seconds = thisOr100Years $ pPeerNextUdpDisableWindowSeconds peer'
             in ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral seconds `addUTCTime` currentTime) 2
           else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
@@ -343,7 +343,7 @@ storeDisableException ::
   PPeer ->
   T.Text ->
   m (Either SomeException ())
-storeDisableException peer' e = try $ A.replace (A.Proxy) peer' e
+storeDisableException peer' e = try $ A.replace A.Proxy peer' e
 
 getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m Int
 getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
@@ -361,26 +361,28 @@ pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256To
 
 getPeersClosestTo ::
   ( MonadLogger m
-  , A.Selectable Point ClosestPeers m
-  , Mod.Accessible ValidatorAddresses m
+  , A.Selectable (Point, Natural) ClosestPeers m
+  , Mod.Accessible [Validator] m
   ) =>
+  Natural ->
   NodeID ->
   Point ->
   m [PPeer]
-getPeersClosestTo targetNID requesterPubkey = do 
-    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) requesterPubkey
+getPeersClosestTo limit targetNID requesterPubkey = do
+    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) (requesterPubkey, limit)
     $logInfoS "getPeersClosestTo" $ T.pack $ "peer list: " ++ show peers
-    ValidatorAddresses valAdds <- Mod.access (Mod.Proxy @ValidatorAddresses)
-    $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show valAdds
+    validators <- Mod.access (Mod.Proxy @[Validator])
+    $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show validators
     let targetPt = nodeIDToPoint targetNID
-        (vals, nonvals) = Set.partition (\p -> (fromPublicKey . pointToSecPubKey . fromJust $ pPeerPubkey p) `elem` valAdds) peers
+        hostToValidator (Host v) = Validator v
+        (vals, nonvals) = Set.partition (\p -> hostToValidator (pPeerHost p) `elem` validators) peers
     return $
       Set.toList vals ++
-      (take 20 . 
-      sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) ((dist targetPt (pPeerPubkey peerB)))) $
+      (take (fromIntegral limit) .
+      sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) (dist targetPt (pPeerPubkey peerB))) $
       Set.toList nonvals)
-      
-  where 
+
+  where
     dist :: Point -> Maybe Point -> B.ByteString
     dist p1@(Point _ _) (Just p2@(Point _ _)) = -- xor of the points
       B.packZipWith xor (pointToBytes p1) (pointToBytes p2)
@@ -391,7 +393,7 @@ updateLastMessage ::
   T.Text ->
   PPeer ->
   m ()
-updateLastMessage message peer = A.replace (A.Proxy @PPeer) message peer
+updateLastMessage = A.replace (A.Proxy @PPeer)
 
 resetPeerUdp ::
   (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m) =>
@@ -402,5 +404,5 @@ resetPeerUdp peer' = try $ A.replace (A.Proxy @PeerUdpDisable) peer' ResetPeerUd
 addressIP :: SockAddr -> IP
 addressIP (SockAddrInet _ addr)      = IPv4 (fromHostAddress addr)
 addressIP (SockAddrInet6 _ _ addr _) = IPv6 (fromHostAddress6 addr)
-addressIP _ = error "Unsupported address type"
+addressIP _                          = error "Unsupported address type"
 

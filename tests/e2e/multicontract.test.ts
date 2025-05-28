@@ -29,7 +29,7 @@ config.apiDebug=true;
 const SIZE=10
 const transactions = Array.from(Array(SIZE).keys()).map(i => {
   const name = `ScatterUpload_${i}`
-  return { nonce: i, name: name, src: `contract ${name} \{\}` }
+  return { nonce: i, name: name, src: `contract record ${name} \{\}` }
 })
 
 async function sleep(timeout) {

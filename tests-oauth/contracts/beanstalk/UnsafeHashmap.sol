@@ -1,6 +1,6 @@
 import "./Util.sol";
 
-contract UnsafeHashmap is Util {
+contract record UnsafeHashmap is Util {
 
   address[] public values;
   string[] public keys;

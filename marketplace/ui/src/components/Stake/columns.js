@@ -12,7 +12,7 @@ const USDSTIcon = (
 );
 
 // Make sure you have any necessary variables or functions defined/imported
-// You may need to pass user, limit, offset, reserves, USDSTAddress, assetsWithEighteenDecimalPlaces as params,
+// You may need to pass user, limit, offset, reserves, USDSTAddress as params,
 // or handle them in the file where you call these columns.
 
 export const aggregateStakeColumns = (
@@ -20,8 +20,7 @@ export const aggregateStakeColumns = (
   limit,
   offset,
   reserves,
-  USDSTAddress,
-  assetsWithEighteenDecimalPlaces
+  USDSTAddress
 ) => {
   return [
     {
@@ -125,9 +124,7 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -170,14 +167,44 @@ export const aggregateStakeColumns = (
         let totalCataRewardsIssued = 0;
 
         if (record?.inventories) {
-          totalCataRewardsIssued = record.inventories.reduce((sum, item) => {
+          // Collect unique escrow assets across all inventories
+          const uniqueEscrowAssetsMap = new Map();
+
+          record.inventories.forEach((item) => {
             const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
-            return sum + sumCataRewardsFromAssets(escrowAssets);
-          }, 0);
+            if (Array.isArray(escrowAssets)) {
+              escrowAssets.forEach((asset) => {
+                // Only add the asset if it has an address and hasn't been added yet
+                if (
+                  asset?.address &&
+                  !uniqueEscrowAssetsMap.has(asset.address)
+                ) {
+                  uniqueEscrowAssetsMap.set(asset.address, asset);
+                }
+              });
+            }
+          });
+
+          // Sum rewards using the array of unique escrow assets
+          totalCataRewardsIssued = sumCataRewardsFromAssets(
+            Array.from(uniqueEscrowAssetsMap.values())
+          );
         } else {
-          // If no inventories, check record['BlockApps-Mercata-Escrow-assets']
+          // If no inventories exist, process record assets similarly
           const recordAssets = record['BlockApps-Mercata-Escrow-assets'];
-          totalCataRewardsIssued = sumCataRewardsFromAssets(recordAssets);
+          const uniqueRecordAssetsMap = new Map();
+
+          if (Array.isArray(recordAssets)) {
+            recordAssets.forEach((asset) => {
+              if (asset?.address && !uniqueRecordAssetsMap.has(asset.address)) {
+                uniqueRecordAssetsMap.set(asset.address, asset);
+              }
+            });
+          }
+
+          totalCataRewardsIssued = sumCataRewardsFromAssets(
+            Array.from(uniqueRecordAssetsMap.values())
+          );
         }
 
         // If these rewards also follow 18 decimals, apply division
@@ -205,7 +232,6 @@ export const aggregateStakeColumns = (
             debouncedSearchTerm={''}
             user={user}
             reserves={reserves}
-            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -251,8 +277,7 @@ export const stakeColumns = (
   limit,
   offset,
   reserves,
-  USDSTAddress,
-  assetsWithEighteenDecimalPlaces,
+  bridgeableTokens,
   navigate
 ) => {
   return [
@@ -305,9 +330,7 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         const displayedQuantity = record.quantity / Math.pow(10, decimals)
         return <div>{displayedQuantity || 0}</div>;
       },
@@ -327,9 +350,7 @@ export const stakeColumns = (
             return true;
           }
         };
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         // Parse quantity safely
         const parsedQuantity = parseFloat(record.quantity) || 0;
         const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
@@ -366,9 +387,7 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
+        const decimals = 18;
         return (
           <div>
             { matchingQuantity / Math.pow(10, decimals) }
@@ -428,7 +447,7 @@ export const stakeColumns = (
           debouncedSearchTerm={''}
           user={user}
           reserves={reserves}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          bridgeableTokens={bridgeableTokens}
         />
       ),
     },

@@ -2,7 +2,7 @@
  * @see: https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
  * @see: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
  */
-contract RestStatus {
+contract record RestStatus {
   uint constant OK = 200;
   uint constant CREATED = 201;
   uint constant ACCEPTED = 202;

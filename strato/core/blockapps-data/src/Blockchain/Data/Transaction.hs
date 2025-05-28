@@ -19,9 +19,7 @@ module Blockchain.Data.Transaction
     insertTXIfNew,
     insertTXIfNew',
     createMessageTX,
-    createChainMessageTX,
     createContractCreationTX,
-    createChainContractCreationTX,
     isContractCreationTX,
     whoSignedThisTransaction,
     transactionHash,
@@ -48,93 +46,62 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.PositiveInteger
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
--- import qualified Data.ByteString.Short as B (ShortByteString, toShort, fromShort)
 import Control.DeepSeq
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
 import qualified Crypto.Secp256k1 as SEC
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as BSS
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Text (Text)
 import Data.Time.Clock
 import Data.Word
 import qualified Database.Persist.Postgresql as SQL
 import System.Clock
-
--- import Data.ByteString (ByteString)
+import System.IO.Unsafe (unsafePerformIO)
+import Test.QuickCheck
 
 instance TransactionLike Transaction where
-  txHash = \case
-    PrivateHashTX {..} -> transactionTxHash
-    t -> hash . rlpSerialize $ rlpEncode t
-  txPartialHash = \case
-    PrivateHashTX {..} -> transactionTxHash
-    t -> hash . rlpSerialize $ partialRLPEncode t
-  txChainHash = \case
-    PrivateHashTX {..} -> transactionChainHash
-    _ -> error "Transaction.txChainHash: Not a private transaction"
-  txSigner = \case
-    PrivateHashTX {} -> Just (Address 0) -- TODO: Should this be an error instead?
-    t -> whoSignedThisTransaction t
-  txNonce = \case
-    PrivateHashTX {} -> 0
-    t -> transactionNonce t
-  txSignature = \case
-    PrivateHashTX {..} -> (fromIntegral $ keccak256ToWord256 transactionTxHash, fromIntegral $ keccak256ToWord256 transactionChainHash, 0)
-    t -> (transactionR t, transactionS t, transactionV t)
-  txValue = \case
-    PrivateHashTX {} -> 0
-    t -> transactionValue t
-  txGasPrice = \case
-    PrivateHashTX {} -> 0
-    t -> transactionGasPrice t
-  txGasLimit = \case
-    PrivateHashTX {} -> 0
-    t -> transactionGasLimit t
-  txChainId = \case
-    PrivateHashTX {} -> Nothing
-    t -> transactionChainId t
-  txMetadata = \case
-    PrivateHashTX {} -> Nothing
-    t -> transactionMetadata t
+  txHash = hash . rlpSerialize . rlpEncode
+  txPartialHash = hash . rlpSerialize . partialRLPEncode
+  txChainHash = error "Transaction.txChainHash: Not a private transaction"
+  txSigner = whoSignedThisTransaction
+  txNonce = transactionNonce
+  txNetwork = transactionNetwork
+  txFuncName t = case t of
+    MessageTX{..} -> Just transactionFuncName
+    _ -> Nothing
+  txContractName t = case t of
+    ContractCreationTX{..} -> Just transactionContractName
+    _ -> Nothing
+  txArgs = transactionArgs
+  txSignature t = (transactionR t, transactionS t, transactionV t)
+  txGasLimit = transactionGasLimit
 
   txType MessageTX {} = Message
   txType ContractCreationTX {} = ContractCreation
-  txType PrivateHashTX {} = PrivateHash
 
   txDestination MessageTX {..} = Just transactionTo
   txDestination ContractCreationTX {} = Nothing
-  txDestination PrivateHashTX {} = Nothing
 
   txCode MessageTX {} = Nothing
-  txCode ContractCreationTX {..} = Just transactionInit
-  txCode PrivateHashTX {} = Nothing
-
-  txData MessageTX {..} = Just transactionData
-  txData ContractCreationTX {} = Nothing
-  txData PrivateHashTX {} = Nothing
+  txCode ContractCreationTX {..} = Just transactionCode
 
   morphTx t = case type' of
-    Message -> MessageTX n gp gl dest val dat chainId r s v md
-    ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md
-    PrivateHash -> PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger r) (unsafeCreateKeccak256FromWord256 $ fromInteger s)
+    Message -> MessageTX n gl dest (fromJust $ txFuncName t) args network r s v
+    ContractCreation -> ContractCreationTX n gl (fromJust contractName) args network code r s v
     where
       type' = txType t
       n = txNonce t
-      gp = txGasPrice t
       gl = txGasLimit t
-      val = txValue t
+      args = txArgs t
+      contractName = txContractName t
       dest = fromJust (txDestination t)
-      dat = fromJust (txData t)
+      network = txNetwork t
       code = fromJust (txCode t)
       (r, s, v) = txSignature t
-      chainId = txChainId t
-      md = txMetadata t
 
 codePtrHash :: CodePtr -> Maybe Keccak256
 codePtrHash (ExternallyOwned k) = Just k
@@ -151,28 +118,19 @@ codePtrAddress (CodeAtAccount a _) = Just a
 codePtrAddress _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Just dat) _ _ cid r s v md _ _ _) =
-  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 (Just init') _ _ 0 h ch 0 Nothing _ _ _)
-  | init' == B.empty =
-    PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val (Just init') _ _ cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val (Code init') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val Nothing (Just contractName') (Just codePtrAddress') cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val(PtrToCode $ CodeAtAccount codePtrAddress' contractName') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just funcName) Nothing args network Nothing r s v _ _ _) =
+  MessageTX nonce' gl to' funcName args network r s v
+rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just contractName) args network (Just code) r s v _ _ _) =
+  ContractCreationTX nonce' gl contractName args network code r s v
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
-    (MessageTX nonce' gp gl to' val dat cid r s v md) ->
-      RawTransaction time signer nonce' gp gl (Just to') val (Just dat) Nothing Nothing (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX nonce' gp gl val( Code init') cid r s v md) ->
-      RawTransaction time signer nonce' gp gl Nothing val (Just init') Nothing Nothing  (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX nonce' gp gl val (PtrToCode init') cid r s v md) ->
-      RawTransaction time signer nonce' gp gl Nothing val Nothing (codePtrName init') (codePtrAddress init')  (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (PrivateHashTX h ch) ->
-      RawTransaction time signer 0 0 0 Nothing 0 (Just B.empty) Nothing Nothing 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+    MessageTX{..} ->
+      RawTransaction time signer transactionNonce transactionGasLimit (Just transactionTo) (Just transactionFuncName) Nothing transactionArgs transactionNetwork Nothing transactionR transactionS transactionV (fromIntegral blkNum) (txHash tx) origin
+    ContractCreationTX{..} ->
+      RawTransaction time signer transactionNonce transactionGasLimit Nothing Nothing (Just transactionContractName) transactionArgs transactionNetwork (Just transactionCode) transactionR transactionS transactionV (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -215,9 +173,6 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> B.ByteString -> Maybe (Map Text Text) -> EC.PrivateKey -> IO Transaction
-createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl to' val theData Nothing md prvKey
-
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
 getSigVals :: EC.Signature -> (Word256, Word256, Word8)
@@ -225,31 +180,27 @@ getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
   let convert = bytesToWord256 . BSS.fromShort
    in (convert r, convert s, v + 0x1b)
 
-createChainMessageTX ::
-  Integer ->
+createMessageTX ::
   Integer ->
   Integer ->
   Address ->
-  Integer ->
-  B.ByteString ->
-  Maybe Word256 ->
-  Maybe (Map Text Text) ->
+  Text ->
+  [Text] ->
+  Text ->
   EC.PrivateKey ->
   IO Transaction
-createChainMessageTX n gp gl to' val theData cid md prvKey = do
+createMessageTX n gl toAddr funcName args network prvKey = do
   let unsignedTX =
         MessageTX
           { transactionNonce = n,
-            transactionGasPrice = gp,
             transactionGasLimit = gl,
-            transactionTo = to',
-            transactionValue = val,
-            transactionData = theData,
-            transactionChainId = cid,
+            transactionTo = toAddr,
+            transactionFuncName = funcName,
+            transactionArgs = args,
+            transactionNetwork = network,
             transactionR = 0,
             transactionS = 0,
-            transactionV = 0,
-            transactionMetadata = md
+            transactionV = 0
           }
   let theHash = partialTransactionHash unsignedTX
 
@@ -259,32 +210,27 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
     MessageTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
     _ -> error "createChainMessageTX: PrivateHashTX not supported should be impossible"
 
-createContractCreationTX :: Integer -> Integer -> Integer -> Integer -> Code -> Maybe (Map Text Text) -> EC.PrivateKey -> IO Transaction
-createContractCreationTX n gp gl val init' md prvKey = createChainContractCreationTX n gp gl val init' Nothing md prvKey
-
-createChainContractCreationTX ::
+createContractCreationTX ::
   Integer ->
   Integer ->
-  Integer ->
-  Integer ->
+  Text ->
+  [Text] ->
   Code ->
-  Maybe Word256 ->
-  Maybe (Map Text Text) ->
+  Text ->
   EC.PrivateKey ->
   IO Transaction
-createChainContractCreationTX n gp gl val init' cid md prvKey = do
+createContractCreationTX n gl contractName args code network prvKey = do
   let unsignedTX =
         ContractCreationTX
           { transactionNonce = n,
-            transactionGasPrice = gp,
             transactionGasLimit = gl,
-            transactionValue = val,
-            transactionInit = init',
-            transactionChainId = cid,
+            transactionContractName = contractName,
+            transactionArgs = args,
+            transactionNetwork = network,
+            transactionCode = code,
             transactionR = 0,
             transactionS = 0,
-            transactionV = 0,
-            transactionMetadata = md
+            transactionV = 0
           }
 
   let theHash = partialTransactionHash unsignedTX
@@ -302,13 +248,11 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 -}
 
 whoSignedThisTransaction :: Transaction -> Maybe Address
-whoSignedThisTransaction tx = case tx of
-  PrivateHashTX {} -> Just (Address 0)
-  t -> fromPublicKey <$> EC.recoverPub sig mesg
+whoSignedThisTransaction tx = fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
-      mesg = keccak256ToByteString $ partialTransactionHash t
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR tx) (intToBSS $ transactionS tx) ((transactionV tx) - 0x1b))
+      mesg = keccak256ToByteString $ partialTransactionHash tx
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address
 whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
@@ -338,11 +282,29 @@ isContractCreationTX ContractCreationTX {} = True
 isContractCreationTX _ = False
 
 transactionHash :: Transaction -> Keccak256
-transactionHash = \case
-  PrivateHashTX {..} -> transactionTxHash
-  t -> hash . rlpSerialize $ rlpEncode t
+transactionHash = hash . rlpSerialize . rlpEncode
 
 partialTransactionHash :: Transaction -> Keccak256
-partialTransactionHash = \case
-  PrivateHashTX {..} -> transactionTxHash -- TODO: Should this be an error instead?
-  t -> hash . rlpSerialize $ partialRLPEncode t
+partialTransactionHash = hash . rlpSerialize . partialRLPEncode
+
+
+instance Arbitrary Transaction where
+  arbitrary = do
+        nonce <- unboxPI <$> arbitrary
+        gasPrice <- unboxPI <$> arbitrary
+        gasLimit <- arbitrary `suchThat` (> gasPrice)
+        prvKey <- arbitrary
+        isMessage <- arbitrary :: Gen Bool
+        network <- arbitrary
+        args <- arbitrary
+        case isMessage of
+          True -> do
+            to <- arbitrary
+            funcName <- arbitrary
+            return . unsafePerformIO $
+              createMessageTX nonce gasLimit to funcName args network prvKey
+          False -> do
+            contractCode <- arbitrary
+            contractName <- arbitrary
+            return . unsafePerformIO $
+              createContractCreationTX nonce gasLimit contractName args contractCode network prvKey

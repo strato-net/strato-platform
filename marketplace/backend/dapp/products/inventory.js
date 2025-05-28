@@ -15,6 +15,7 @@ import saleJs from '../orders/sale';
 import escrowJs from '../escrow/escrow';
 
 const contractName = constants.assetTableName;
+const balancesContractName = `${contractName}-_balances`;
 const transferContractName = `${contractName}.ItemTransfers`;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
@@ -107,6 +108,8 @@ function marshalIn(_args) {
   const args = {
     ...defaultArgs,
     ..._args,
+    _name: _args._name || _args.name,
+    _owner: _args._owner || _args.owner,
   };
   return args;
 }
@@ -142,6 +145,8 @@ async function getHistory(user, chainId, address, options) {
 function marshalOut(_args) {
   const args = {
     ..._args,
+    name: _args.name || _args._name,
+    owner: _args.owner || _args._owner,
   };
   return args;
 }
@@ -462,6 +467,7 @@ async function getAll(admin, args = {}, defaultOptions) {
   const {
     range,
     ownerCommonName,
+    owner,
     assetAddresses,
     status,
     isMarketplaceSearch,
@@ -534,45 +540,55 @@ async function getAll(admin, args = {}, defaultOptions) {
     }
   } else {
     // Fetch all Inventories and join sales table.
-    if (ownerCommonName) {
-      inventories = await searchAllWithQueryArgs(
+    if (owner) {
+      const rawOwnerBalances = await searchAllWithQueryArgs(
+        balancesContractName,
+        { queryOptions: { key: `eq.${owner}`, select: 'address,value' } },
+        options,
+        admin
+      );
+      const ownerBalances = rawOwnerBalances.map((b) => b.address);
+      const balancesMap = rawOwnerBalances.reduce((obj, i) => ({...obj, [i.address]: i}), {});
+      const rawInventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           status,
-          ownerCommonName: ownerCommonName,
           queryOptions: queryOptions
-            ? queryOptions
-            : { select: constants.attachSalesEscrowsAndImagesAndFiles },
+            ? { ...queryOptions, address: `in.(${ownerBalances.join(',')})`, owner: undefined }
+            : { address: `in.(${ownerBalances.join(',')})`, select: constants.attachSalesEscrowsAndImagesAndFiles },
         },
         options,
         admin
       );
+      inventories = rawInventories.map((i) => ({ ...i, owner: undefined, _owner: owner, quantity: (balancesMap[i.address].value || '0') }));
     } else if (assetAddresses) {
-      inventories = await searchAllWithQueryArgs(
+      const rawInventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           address: assetAddresses,
           queryOptions: {
-            select: constants.attachSalesEscrowsAndImagesAndFiles,
+            select: `${constants.attachSalesEscrowsAndImagesAndFiles},${balancesContractName}(key,value)`,
           },
         },
         options,
         admin
       );
+      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: undefined, _owner: b.key, quantity: b.value })))]), []);
     } else {
-      inventories = await searchAllWithQueryArgs(
+      const rawInventories = await searchAllWithQueryArgs(
         contractName,
         {
           ...restArgs,
           queryOptions: {
-            select: constants.attachSalesEscrowsAndImagesAndFiles,
+            select: `${constants.attachSalesEscrowsAndImagesAndFiles},${balancesContractName}(key,value)`,
           },
         },
         options,
         admin
       );
+      inventories = rawInventories.reduce((arr, i) => ([...arr, ...(i[`${balancesContractName}`].map((b) => ({ ...i, owner: undefined, _owner: b.key, quantity: b.value })))]), []);
     }
 
     // Currently can't filter on second table, so filtering sales fields here.
@@ -674,7 +690,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               });
             }
           } else {
-            if(!userProfile){
+            if (!userProfile) {
               finalInventory.push({ escrow, ...inventory });
             }
           }
@@ -693,6 +709,146 @@ async function getAll(admin, args = {}, defaultOptions) {
         return marshalOut(inventory);
       })
     : undefined;
+}
+
+async function getStakeableProducts(admin, defaultOptions) {
+  // Merge default options with constant properties.
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+  try {
+    // Get stakeable asset origin addresses from Reserves
+    const reserveSearchOptions = {
+      ...options,
+      query: {
+        select: 'assetRootAddress',
+        creator: 'in.(BlockApps,mercata_usdst)',
+        isActive: 'eq.true',
+        name: 'not.like.*TEMP',
+      },
+    };
+    const reserveResponse = await rest.search(
+      admin,
+      { name: 'BlockApps-Mercata-Reserve' },
+      reserveSearchOptions
+    );
+    const stakeableAssets = reserveResponse.map(
+      (asset) => asset.assetRootAddress
+    );
+    if (stakeableAssets.length === 0) {
+      return [];
+    }
+    const queryRoot = `in.(${stakeableAssets.join(',')})`;
+
+    // Build search options to get the total count of assets.
+    const searchOptions = {
+      ...options,
+      query: {
+        select: 'count',
+        root: queryRoot,
+        offset: 0,
+        limit: undefined,
+      },
+    };
+
+    // Get the total count of assets.
+    const countResponse = await rest.search(
+      admin,
+      { name: 'BlockApps-Mercata-Asset' },
+      searchOptions
+    );
+    const totalCount = countResponse?.[0]?.count || 0;
+    if (totalCount <= 0) {
+      return [];
+    }
+
+    // Map to hold the best sale UTXO per asset root.
+    const bestSalesByRoot = new Map();
+    const batchSize = 100;
+
+    // Process UTXOs in batches.
+    for (let offset = 0; offset < totalCount; offset += batchSize) {
+      const batchOptions = {
+        ...options,
+        query: {
+          select: constants.attachSalesEscrowsAndImagesAndFiles,
+          root: queryRoot,
+          offset,
+          limit: batchSize,
+        },
+      };
+
+      const batchUtxos = await rest.search(
+        admin,
+        { name: 'BlockApps-Mercata-Asset' },
+        batchOptions
+      );
+
+      batchUtxos.forEach((utxo) => {
+        // Retrieve sale data and look for an open sale.
+        const sales = utxo['BlockApps-Mercata-Sale'] || [];
+        const openSale = sales.find((sale) => sale.isOpen === true);
+
+        // Validate UTXO based on sale state.
+        if (openSale) {
+          if (utxo.ownerCommonName !== utxo.data?.minterCommonName) return;
+        } else {
+          if (utxo.address !== utxo.root) return;
+        }
+
+        // Check and update the best sale for this root.
+        const currentBest = bestSalesByRoot.get(utxo.root);
+        if (!currentBest) {
+          bestSalesByRoot.set(
+            utxo.root,
+            openSale
+              ? { ...utxo, 'BlockApps-Mercata-Sale': [openSale] }
+              : { ...utxo, sale: null, 'BlockApps-Mercata-Sale': [] }
+          );
+        } else if (openSale) {
+          const currentSale = currentBest['BlockApps-Mercata-Sale']?.find(
+            (s) => s.isOpen
+          );
+          if ((currentSale?.quantity || 0) < (openSale.quantity || 0)) {
+            bestSalesByRoot.set(utxo.root, utxo);
+          }
+        }
+      });
+    }
+
+    const filteredSales = Array.from(bestSalesByRoot.values());
+
+    // Map over the filtered UTXOs to update them with sale details.
+    const updatedInventories = filteredSales.map((utxo) => {
+      const sale = utxo['BlockApps-Mercata-Sale']?.[0];
+      return {
+        ...utxo,
+        assetToBeSold: sale?.assetToBeSold,
+        sale: sale?.address,
+        price: sale?.price,
+        saleAddress: sale?.address,
+        saleQuantity: sale?.quantity,
+        saleDate: sale?.block_timestamp,
+        totalLockedQuantity: sale?.totalLockedQuantity,
+        paymentServices: sale
+          ? sale['BlockApps-Mercata-Sale-paymentServices']
+          : null,
+        // Remove the nested sale data to avoid redundancy.
+        'BlockApps-Mercata-Sale': undefined,
+      };
+    });
+
+    // Sort the images by their key order and marshal each inventory.
+    return updatedInventories.map((inventory) => {
+      if (Array.isArray(inventory['BlockApps-Mercata-Asset-images'])) {
+        inventory['BlockApps-Mercata-Asset-images'].sort(
+          (a, b) => parseInt(a.key) - parseInt(b.key)
+        );
+      }
+      return marshalOut(inventory);
+    });
+  } catch (error) {
+    console.error('Error in getStakeableProducts:', error);
+    throw error;
+  }
 }
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
@@ -838,6 +994,7 @@ export default {
   checkSaleQuantity,
   get,
   getAll,
+  getStakeableProducts,
   getOwnershipHistory,
   getAllItemTransferEvents,
   inventoryCount,

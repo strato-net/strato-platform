@@ -11,14 +11,14 @@ export default {
   },
   MarketplaceUserProfile: {
     label: 'Marketplace User Profile',
-    url: '/profile/:commonName',
+    url: '/profile/:address',
   },
   MarketplaceProductDetail: {
     label: 'Marketplace Product Detail',
     url: '/dp/:address/:name',
   },
   EthstProductDetail: { label: 'ETHST Product Detail', url: '/ethst/:address' },
-  WbtcstProductDetail: { label: 'WBTCST Product Detail', url: '/wbtcst/:address' },
+  bridgeableProductDetail: { label: 'Bridgeable Product Detail', url: '/:bridgeableAsset/:address' },
   LoginRedirect: { label: 'LoginRedirect', url: '/login' },
   Checkout: { label: 'Checkout', url: '/checkout' },
   ConfirmOrder: { label: 'Confirm Order', url: '/confirmOrder' },

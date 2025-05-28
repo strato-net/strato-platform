@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Breadcrumb,
   notification,
@@ -28,7 +28,9 @@ import PurchasableStakeItems from './PurchasableStakeItems';
 import StakeSteps from './StakeSteps';
 import StakeInventoryCard from '../Inventory/StakeInventoryCard';
 import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import { actions as categoryActions } from '../../contexts/category/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
 
@@ -37,7 +39,7 @@ const USDSTIcon = (
   <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items, assetsWithEighteenDecimalPlaces) {
+function combineInventories(items) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -58,9 +60,7 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
       'BlockApps-Mercata-Asset-images': assetImages,
     } = firstItem;
 
-    const decimals = assetsWithEighteenDecimalPlaces.includes(root)
-      ? 18
-      : firstItem.decimals || 0;
+    const decimals = 18
 
     // Step 3: Sum `quantity` and `saleQuantity` across the group
     const totalQuantity = group.reduce((sum, item) => {
@@ -103,6 +103,7 @@ const { Title } = Typography;
 const Stake = ({ user }) => {
   const inventoryDispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const ethDispatch = useEthDispatch();
   const {
     reserves,
     inventories,
@@ -114,8 +115,23 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+  const { USDSTAddress } =
     useMarketplaceState();
+  const {
+    message: ethMsg,
+    success: ethSuccess,
+    bridgeableTokens
+  } = useEthState();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+  
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
+
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -123,10 +139,12 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(
-    inventories,
-    assetsWithEighteenDecimalPlaces
-  );
+  const combinedInventories = useMemo(() => {
+    return combineInventories(
+      inventories
+    );
+  }, [inventories]);
+
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -168,6 +186,24 @@ const Stake = ({ user }) => {
       api.error({
         message: message,
         onClose: inventoryActions.resetMessage(inventoryDispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
+  const openEthToast = (placement) => {
+    if (ethSuccess) {
+      api.success({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: ethMsg,
+        onClose: ethActions.resetMessage(ethDispatch),
         placement,
         key: 2,
       });
@@ -216,8 +252,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          USDSTAddress,
-          assetsWithEighteenDecimalPlaces,
+          bridgeableAddresses,
           navigate
         )}
         dataSource={populatedInventories}
@@ -279,7 +314,7 @@ const Stake = ({ user }) => {
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <StakeSteps />
           <PurchasableStakeItems />
-          {user && (
+          {user && combinedInventories?.length && (
             <>
               <div className="hidden md:block">
                 <Title className="px-3 !text-3xl !text-left mt-10">
@@ -291,10 +326,9 @@ const Stake = ({ user }) => {
                     limit,
                     offset,
                     reserves,
-                    USDSTAddress,
-                    assetsWithEighteenDecimalPlaces
+                    USDSTAddress
                   )}
-                  dataSource={combinedInventories.slice(offset, offset + limit)}
+                  dataSource={combinedInventories?.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
                   className="custom-table"
                   pagination={false}
@@ -307,7 +341,7 @@ const Stake = ({ user }) => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={combinedInventories.length}
+                  total={combinedInventories?.length}
                   showTotal={(total) => `Total ${total} items`}
                   className="flex justify-center my-5 custom-pagination"
                 />
@@ -327,9 +361,6 @@ const Stake = ({ user }) => {
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}
-                    assetsWithEighteenDecimalPlaces={
-                      assetsWithEighteenDecimalPlaces
-                    }
                   />
                 ))}
               </div>
@@ -338,6 +369,7 @@ const Stake = ({ user }) => {
         </div>
       </div>
       {message && openToast('bottom')}
+      {ethMsg && openEthToast('bottom')}
     </>
   );
 };

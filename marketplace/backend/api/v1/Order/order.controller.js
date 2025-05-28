@@ -223,7 +223,7 @@ class OrderController {
         address: Joi.string().required(),
         serviceName: Joi.string().required(),
       }).required(),
-      buyerOrganization: Joi.string().required(),
+      buyerOrganization: Joi.string().allow('').required(),
       orderList: Joi.array()
         .min(1)
         .items(

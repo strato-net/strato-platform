@@ -5,7 +5,7 @@ import "./UnsafeHashmap.sol";
  * of an UnsafeHashmap. All function calls are restricted to the
  * owner of the contract.
  */
-contract Hashmap is UnsafeHashmap {
+contract record Hashmap is UnsafeHashmap {
   address public owner;
 
   function Hashmap() {

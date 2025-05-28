@@ -42,6 +42,7 @@ library:
     - blockapps-datadefs
     - blockapps-init
     - blockapps-mpdbs
+    - blockDB
     - blockstanbul
     - bytestring
     - common-log

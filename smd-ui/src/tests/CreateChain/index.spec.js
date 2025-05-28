@@ -206,7 +206,6 @@ describe('CreateChain: index', () => {
       touch: jest.fn(),
       reset: jest.fn(),
       store: store,
-      userCertificate: { userAddress: "4567890" }
     };
 
     const wrapper = shallow(

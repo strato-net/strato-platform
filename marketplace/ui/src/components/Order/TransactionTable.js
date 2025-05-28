@@ -34,7 +34,7 @@ import {
   useTransactionDispatch,
   useTransactionState,
 } from '../../contexts/transaction';
-import { useEthState } from '../../contexts/eth';
+import { useEthState, useEthDispatch } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
@@ -49,12 +49,12 @@ import {
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
+import { actions as ethActions } from '../../contexts/eth/actions';
 
 const TransactionTable = ({
   user,
   download,
   stratAddress,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -82,7 +82,17 @@ const TransactionTable = ({
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokenss = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokenss();
+  }, []);
+
+  const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -192,9 +202,7 @@ const TransactionTable = ({
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
-    const decimals = assetsWithEighteenDecimalPlaces.includes(
-      data?.assetOriginAddress
-    ) ? 18 : data?.decimals || 0;
+    const decimals = 18;
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -291,16 +299,9 @@ const TransactionTable = ({
   };
 
   const handleAssetRedirection = (data) => {
-    const isEthst = data?.assetOriginAddress === ethstAddress;
-    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    if (isEthst) {
-      const url = routes.EthstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (isWbtcst) {
-      const url = routes.WbtcstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
+    if (bridgeableAddresses?.includes(data?.assetOriginAddress)) {
+      const url = routes.bridgeableProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress).replace(':bridgeableAsset', data.assetName)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {
@@ -382,13 +383,7 @@ const TransactionTable = ({
       render: (_, { quantity, assetOriginAddress, decimals, redemption_id }) => (
         <span>
           {quantity
-            ? (stratAddress === assetOriginAddress ? (quantity / 100).toFixed(2) :
-              redemption_id
-                ? quantity 
-                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                ? quantity / Math.pow(10, 18)
-                : quantity / Math.pow(10, decimals)
-              ).toLocaleString('en-US', {
+            ? (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               })
@@ -405,13 +400,7 @@ const TransactionTable = ({
       render: (_, { price, assetOriginAddress, decimals }) => (
         <p>
           {price
-            ? formattedNum(
-                assetOriginAddress === stratAddress
-                  ? (price * 100).toFixed(2)
-                  : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                  ? (price * Math.pow(10, 18)).toFixed(2)
-                  : (price * Math.pow(10, decimals)).toFixed(2)
-              )
+            ? formattedNum((price * Math.pow(10, 18)).toFixed(2))
             : '--'}
         </p>
       ),
@@ -661,9 +650,6 @@ const TransactionTable = ({
                   data={paginatedTransactions}
                   user={user}
                   stratAddress={stratAddress}
-                  assetsWithEighteenDecimalPlaces={
-                    assetsWithEighteenDecimalPlaces
-                  }
                 />
                 <Pagination
                   className="mx-auto mt-5"

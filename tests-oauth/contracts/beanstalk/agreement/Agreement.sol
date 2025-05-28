@@ -26,7 +26,7 @@ import "../dapp/BeanstalkDapp.sol"
  * #return none
  */
 
-contract Agreement is RestStatus, BeanstalkErrorCodes, PrivateChainType {
+contract record Agreement is RestStatus, BeanstalkErrorCodes, PrivateChainType {
   address public dappAddress;
   BeanstalkPermissionManager permissionManager;
   ProgramManager programManager;

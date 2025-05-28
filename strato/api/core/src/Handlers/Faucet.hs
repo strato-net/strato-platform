@@ -21,13 +21,13 @@ module Handlers.Faucet
 where
 
 import BlockApps.Logging
-import Blockchain.Constants
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.EthConf (runKafkaMConfigured)
-import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..))
+import Blockchain.Model.WrappedBlock
+import Blockchain.Sequencer.Event (IngestEvent (IETx))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -111,11 +111,11 @@ postFaucetC target = do
 
   maxNonce <- acquireNewMaxNonce minNonce
   $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
-  mapM (putTX maxNonce key target) [maxNonce, minNonce]
+  mapM (putTX key target) [maxNonce, minNonce]
   where
-    putTX maxN k a n = do
+    putTX k a n = do
       ts <- liftIO getCurrentMicrotime
-      tx <- makeSendTX maxN k a n
+      tx <- makeSendTX k a n
       yield . IETx ts $ IngestTx API tx
       pure $ txHash tx
 
@@ -190,24 +190,24 @@ emitKafkaTransactions = loop id
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
       void $ liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
 
-makeSendTX :: MonadIO m => Integer -> PrivateKey -> Address -> Integer -> m Transaction
-makeSendTX maxN k a n = do
+makeSendTX :: MonadIO m => PrivateKey -> Address -> Integer -> m Transaction
+makeSendTX k a n = do
   -- We use a declining gas schedule to prevent ejecting faucets that
   -- might more urgently need a nonce. For example, if faucet(y) is
   -- given [n] and faucet(x) is given [n, n+1], x's faucet
   -- should only take nonce n if y's faucet fails. In turn, faucet(z)
   -- with [n, n+1, n+2] has highest priority for n+2, second priority for n+1,
   -- and will only take n if both faucet(x) and faucet(y) don't.
-  let gasPrice = 50000000000 - 100000 * (maxN - n)
-  liftIO $ createMessageTX n gasPrice 100000 a (1000 * ether) "" Nothing k
+  liftIO $ createMessageTX n 100000 a "" [] "" k
 
 -- TODO(tim): Add a queryparam for contracts with variable length bin-runtimes, rather
 -- than these that have empty bin-runtimes.
 makeSizedTX :: MonadIO m => Integer -> Int -> PrivateKey -> m Transaction
 makeSizedTX nonce size pk =
   let code = Code $ B.replicate size 0x0
-      gasPrice = 50000000000
       gasLimit = 100000
-      val = 0
-      mk = createContractCreationTX nonce gasPrice gasLimit val code Nothing pk
+      contractName = ""
+      args = []
+      network = ""
+      mk = createContractCreationTX nonce gasLimit contractName args code network pk
    in liftIO mk

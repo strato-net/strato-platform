@@ -57,9 +57,6 @@ const actionDescriptors = {
   fetchStratsAddress: 'fetch_strats_address',
   fetchStratsAddressSuccessful: 'fetch_strats_address_successful',
   fetchStratsAddressFailed: 'fetch_strats_address_failed',
-  fetchAssetsWithEighteenDecimalPlaces: 'fetch_assets_with_eighteen_decimal_places',
-  fetchAssetsWithEighteenDecimalPlacesSuccessful: 'fetch_assets_with_eighteen_decimal_places_successful',
-  fetchAssetsWithEighteenDecimalPlacesFailed: 'fetch_assets_with_eighteen_decimal_places_failed',
   fetchCataAddress: 'fetch_cata_address',
   fetchCataAddressSuccessful: 'fetch_cata_address_successful',
   fetchCataAddressFailed: 'fetch_cata_address_failed',
@@ -354,21 +351,13 @@ const actions = {
     }
   },
 
-  fetchStakeableProducts: async (
-    dispatch,
-    assetAddresses
-  ) => {
+  fetchStakeableProducts: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStakeableProducts });
 
-    const addressQuery = assetAddresses ? `assetAddresses[]=${assetAddresses}` : '';
-
     try {
-      const response = await fetch(
-        `${apiUrl}/marketplace/stake?${addressQuery}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
+      const response = await fetch(`${apiUrl}/marketplace/stake`, {
+        method: HTTP_METHODS.GET,
+      });
 
       const body = await response.json();
 
@@ -692,47 +681,6 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchStratsAddressFailed,
         payload: 'Error while fetching STRATS address',
-      });
-      return null;
-    }
-  },
-  fetchAssetsWithEighteenDecimalPlaces: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchAssetsWithEighteenDecimalPlaces });
-    try {
-      let response = await fetch(`${apiUrl}/marketplace/18DecimalPlaces`, {
-        method: HTTP_METHODS.GET,
-        credentials: 'same-origin',
-      });
-
-      const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.fetchAssetsWithEighteenDecimalPlacesFailed,
-          payload: 'Error while fetching asset addresses',
-        });
-        return null;
-      }
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchAssetsWithEighteenDecimalPlacesSuccessful,
-          payload: body?.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchAssetsWithEighteenDecimalPlacesFailed,
-        payload: 'Error while fetching asset addresses',
-      });
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchAssetsWithEighteenDecimalPlacesFailed,
-        payload: 'Error while fetching asset addresses',
       });
       return null;
     }

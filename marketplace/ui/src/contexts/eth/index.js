@@ -9,9 +9,10 @@ const EthProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
-    ethstAddress: null,
+    bridgeableAddress: null,
     isAddingHash: false,
-    wbtcstAddress: null,
+    isBridgingOut: false,
+    bridgeableTokens: null
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

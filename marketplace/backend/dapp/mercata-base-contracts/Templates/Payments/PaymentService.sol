@@ -1,12 +1,9 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 import "../Sales/Sale.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
-abstract contract PaymentService is Utils {
+abstract contract record PaymentService is Utils {
     address public owner;
     string public ownerCommonName;
 

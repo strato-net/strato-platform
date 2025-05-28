@@ -16,7 +16,7 @@ import "../ErrorCodes.sol";
 * #return none
 */
 
-contract EventManager is RestStatus, ErrorCodes, Util, BeanstalkErrorCodes {
+contract record EventManager is RestStatus, ErrorCodes, Util, BeanstalkErrorCodes {
   Hashmap events;
 
   /**

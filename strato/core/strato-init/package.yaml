@@ -23,7 +23,9 @@ library:
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
+  - blockDB
   - bytestring
+  - certificateDB
   - common-log
   - conduit
   - containers
@@ -39,6 +41,7 @@ library:
   - http-client
   - http-types
   - kafka-monad
+  - lens
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
@@ -46,8 +49,8 @@ library:
   - persistent-postgresql
   - redis-monad
   - resourcet
-  - seqevents
   - servant-client
+  - solid-vm
   - solid-vm-compiler
   - solid-vm-model
   - sql-monad
@@ -56,16 +59,13 @@ library:
   - strato-index
   - strato-model
   - strato-networks
-  - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
   # - strato-p2p
-  - temporary
   - text
   - transformers
   - turtle
   - unliftio
-  - unliftio-core
   - vm-tools
   - yaml
   - ordered-containers
@@ -95,19 +95,3 @@ executables:
       - strato-model
     other-modules: []
 
-tests:
-  strato-init-test:
-    source-dirs: test/
-    main: Main.hs
-    ghc-options: -dynamic
-    dependencies:
-      - aeson
-      - blockapps-data
-      - bytestring
-      - hspec
-      - json-stream
-      - labeled-error
-      - merkle-patricia-db
-      - strato-genesis
-      - strato-model
-      - time

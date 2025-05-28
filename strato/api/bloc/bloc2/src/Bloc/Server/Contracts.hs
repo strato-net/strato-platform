@@ -30,7 +30,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json hiding (Contract)
+import Blockchain.Model.JsonBlock
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
@@ -84,7 +84,7 @@ getContracts mName mOffset mLimit chainId = do
       accountsFilterParams
         { _qaChainId = maybeToList chainId,
           _qaExternal = Just False,
-          _qaContractName = mName,
+          _qaSearch = mName,
           _qaOffset = fromIntegral <$> mOffset,
           _qaLimit = fromIntegral <$> mLimit
         }

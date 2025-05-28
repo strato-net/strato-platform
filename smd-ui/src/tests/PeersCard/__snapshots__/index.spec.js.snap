@@ -82,7 +82,7 @@ ShallowWrapper {
             className="col-xs-3"
           >
             <small>
-              IP:
+              Host:
             </small>
           </div>
           <div
@@ -91,9 +91,7 @@ ShallowWrapper {
             <Text
               ellipsize={true}
             >
-              <small>
-                192.168.10.36
-              </small>
+              <small />
             </Text>
           </div>
           <div
@@ -138,7 +136,7 @@ ShallowWrapper {
             className="col-xs-3"
           >
             <small>
-              IP:
+              Host:
             </small>
           </div>
           <div
@@ -147,9 +145,7 @@ ShallowWrapper {
             <Text
               ellipsize={true}
             >
-              <small>
-                192.168.10.33
-              </small>
+              <small />
             </Text>
           </div>
           <div
@@ -202,7 +198,7 @@ ShallowWrapper {
               className="col-xs-3"
             >
               <small>
-                IP:
+                Host:
               </small>
             </div>,
             <div
@@ -211,9 +207,7 @@ ShallowWrapper {
               <Text
                 ellipsize={true}
               >
-                <small>
-                  192.168.10.36
-                </small>
+                <small />
               </Text>
             </div>,
             <div
@@ -307,7 +301,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <small>
-                IP:
+                Host:
               </small>,
               "className": "col-xs-3",
             },
@@ -317,10 +311,10 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "IP:",
+                "children": "Host:",
               },
               "ref": null,
-              "rendered": "IP:",
+              "rendered": "Host:",
               "type": "small",
             },
             "type": "div",
@@ -333,9 +327,7 @@ ShallowWrapper {
               "children": <Text
                 ellipsize={true}
               >
-                <small>
-                  192.168.10.36
-                </small>
+                <small />
               </Text>,
               "className": "col-xs-9",
             },
@@ -345,9 +337,7 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "class",
               "props": Object {
-                "children": <small>
-                  192.168.10.36
-                </small>,
+                "children": <small />,
                 "ellipsize": true,
               },
               "ref": null,
@@ -356,10 +346,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "192.168.10.36",
+                  "children": undefined,
                 },
                 "ref": null,
-                "rendered": "192.168.10.36",
+                "rendered": null,
                 "type": "small",
               },
               "type": [Function],
@@ -460,7 +450,7 @@ ShallowWrapper {
               className="col-xs-3"
             >
               <small>
-                IP:
+                Host:
               </small>
             </div>,
             <div
@@ -469,9 +459,7 @@ ShallowWrapper {
               <Text
                 ellipsize={true}
               >
-                <small>
-                  192.168.10.33
-                </small>
+                <small />
               </Text>
             </div>,
             <div
@@ -565,7 +553,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <small>
-                IP:
+                Host:
               </small>,
               "className": "col-xs-3",
             },
@@ -575,10 +563,10 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "IP:",
+                "children": "Host:",
               },
               "ref": null,
-              "rendered": "IP:",
+              "rendered": "Host:",
               "type": "small",
             },
             "type": "div",
@@ -591,9 +579,7 @@ ShallowWrapper {
               "children": <Text
                 ellipsize={true}
               >
-                <small>
-                  192.168.10.33
-                </small>
+                <small />
               </Text>,
               "className": "col-xs-9",
             },
@@ -603,9 +589,7 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "class",
               "props": Object {
-                "children": <small>
-                  192.168.10.33
-                </small>,
+                "children": <small />,
                 "ellipsize": true,
               },
               "ref": null,
@@ -614,10 +598,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "192.168.10.33",
+                  "children": undefined,
                 },
                 "ref": null,
-                "rendered": "192.168.10.33",
+                "rendered": null,
                 "type": "small",
               },
               "type": [Function],
@@ -725,7 +709,7 @@ ShallowWrapper {
               className="col-xs-3"
             >
               <small>
-                IP:
+                Host:
               </small>
             </div>
             <div
@@ -734,9 +718,7 @@ ShallowWrapper {
               <Text
                 ellipsize={true}
               >
-                <small>
-                  192.168.10.36
-                </small>
+                <small />
               </Text>
             </div>
             <div
@@ -781,7 +763,7 @@ ShallowWrapper {
               className="col-xs-3"
             >
               <small>
-                IP:
+                Host:
               </small>
             </div>
             <div
@@ -790,9 +772,7 @@ ShallowWrapper {
               <Text
                 ellipsize={true}
               >
-                <small>
-                  192.168.10.33
-                </small>
+                <small />
               </Text>
             </div>
             <div
@@ -845,7 +825,7 @@ ShallowWrapper {
                 className="col-xs-3"
               >
                 <small>
-                  IP:
+                  Host:
                 </small>
               </div>,
               <div
@@ -854,9 +834,7 @@ ShallowWrapper {
                 <Text
                   ellipsize={true}
                 >
-                  <small>
-                    192.168.10.36
-                  </small>
+                  <small />
                 </Text>
               </div>,
               <div
@@ -950,7 +928,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <small>
-                  IP:
+                  Host:
                 </small>,
                 "className": "col-xs-3",
               },
@@ -960,10 +938,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "IP:",
+                  "children": "Host:",
                 },
                 "ref": null,
-                "rendered": "IP:",
+                "rendered": "Host:",
                 "type": "small",
               },
               "type": "div",
@@ -976,9 +954,7 @@ ShallowWrapper {
                 "children": <Text
                   ellipsize={true}
                 >
-                  <small>
-                    192.168.10.36
-                  </small>
+                  <small />
                 </Text>,
                 "className": "col-xs-9",
               },
@@ -988,9 +964,7 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "class",
                 "props": Object {
-                  "children": <small>
-                    192.168.10.36
-                  </small>,
+                  "children": <small />,
                   "ellipsize": true,
                 },
                 "ref": null,
@@ -999,10 +973,10 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": "192.168.10.36",
+                    "children": undefined,
                   },
                   "ref": null,
-                  "rendered": "192.168.10.36",
+                  "rendered": null,
                   "type": "small",
                 },
                 "type": [Function],
@@ -1103,7 +1077,7 @@ ShallowWrapper {
                 className="col-xs-3"
               >
                 <small>
-                  IP:
+                  Host:
                 </small>
               </div>,
               <div
@@ -1112,9 +1086,7 @@ ShallowWrapper {
                 <Text
                   ellipsize={true}
                 >
-                  <small>
-                    192.168.10.33
-                  </small>
+                  <small />
                 </Text>
               </div>,
               <div
@@ -1208,7 +1180,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <small>
-                  IP:
+                  Host:
                 </small>,
                 "className": "col-xs-3",
               },
@@ -1218,10 +1190,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "IP:",
+                  "children": "Host:",
                 },
                 "ref": null,
-                "rendered": "IP:",
+                "rendered": "Host:",
                 "type": "small",
               },
               "type": "div",
@@ -1234,9 +1206,7 @@ ShallowWrapper {
                 "children": <Text
                   ellipsize={true}
                 >
-                  <small>
-                    192.168.10.33
-                  </small>
+                  <small />
                 </Text>,
                 "className": "col-xs-9",
               },
@@ -1246,9 +1216,7 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "class",
                 "props": Object {
-                  "children": <small>
-                    192.168.10.33
-                  </small>,
+                  "children": <small />,
                   "ellipsize": true,
                 },
                 "ref": null,
@@ -1257,10 +1225,10 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": "192.168.10.33",
+                    "children": undefined,
                   },
                   "ref": null,
-                  "rendered": "192.168.10.33",
+                  "rendered": null,
                   "type": "small",
                 },
                 "type": [Function],

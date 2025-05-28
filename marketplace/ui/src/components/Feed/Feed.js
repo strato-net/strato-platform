@@ -13,21 +13,24 @@ import GlobalTransaction from './GlobalTransaction';
 
 const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces, stratsAddress } =
+  const { USDSTAddress, stratsAddress } =
     useMarketplaceState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { bridgeableTokens } = useEthState();
+  const ethDispatch = useEthDispatch();
+
+  useEffect(() => {
+    const fetchBridgeableTokens = async () => {
+      await ethActions.fetchBridgeableTokens(ethDispatch);
+    };
+    fetchBridgeableTokens();
+  }, []);
 
   const marketplaceDispatch = useMarketplaceDispatch();
-  const ethDispatch = useEthDispatch();
 
   useEffect(() => {
     const fetchAddresses = async () => {
       await marketplaceActions.fetchUSDSTAddress(marketplaceDispatch);
-      await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-        marketplaceDispatch
-      );
-      await ethActions.fetchETHSTAddress(ethDispatch);
-      await ethActions.fetchWBTCSTAddress(ethDispatch);
+      await ethActions.fetchBridgeableTokens(ethDispatch);
     };
 
     fetchAddresses();
@@ -46,13 +49,11 @@ const Feed = ({ user }) => {
           <p className=" text-sm text-[#202020] font-medium">Activity Feed</p>
         </Breadcrumb.Item>
       </Breadcrumb>
-      {USDSTAddress && assetsWithEighteenDecimalPlaces?.length > 0 && (
+      {USDSTAddress && (
         <GlobalTransaction
           user={user}
           USDSTAddress={USDSTAddress}
-          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          ethstAddress={ethstAddress}
-          wbtcstAddress={wbtcstAddress}
+          bridgeableAddresses={bridgeableTokens?.map((token) => token.address)}
           stratsAddress={stratsAddress}
         />
       )}

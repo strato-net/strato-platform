@@ -163,7 +163,6 @@ describe('SendTokens: index', () => {
           from: 'Admin_1177_49507',
           fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
         },
-        userCertificate: { userAddress: "456789" }
       };
 
       const wrapper = shallow(
@@ -269,7 +268,6 @@ describe('SendTokens: index', () => {
         from: 'Admin_1177_49507',
         fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
       },
-      userCertificate: { userAddress: "456789"}
     };
 
     const wrapper = mount(
@@ -307,7 +305,6 @@ describe('SendTokens: index', () => {
         from: 'Admin_1177_49507',
         fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
       },
-      userCertificate: { userAddress: "456789"}
     };
 
     const values = {

@@ -9,7 +9,7 @@ import "../dapp/BeanstalkErrorCodes.sol";
  * #return none
  */
 
-contract EventPayload {
+contract record EventPayload {
 
   address public owner;
   string agreementId;

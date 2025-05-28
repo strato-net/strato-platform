@@ -99,18 +99,14 @@ pipeline {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
-                SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
                 OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
-                VAULT_PROXY_DEBUG=true \\
+                VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 idServerUrl=https://\$(</host):8001 \\
-                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
-                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
-                MP_IS_BOOTNODE='true' \\
-                MP_DELAY_DEPLOYMENT='true' \\
+                useCustomGenesis=false \\
                 ./strato --single
             """
           }
@@ -141,8 +137,6 @@ pipeline {
           '''
           sh 'chmod +x check_availability.sh'
           sh './check_availability.sh'
-          // don't want it to get overwritten
-          sh "cp genesis-block.json genesis-block-official.json"
         }
 
         script {
@@ -151,8 +145,10 @@ pipeline {
 
         dir("strato-getting-started") {
           sh './strato --wipe'
-
+          
+          sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
           sh './run.sh'
+          sh 'docker cp genesis-block.json strato-strato-1:/var/lib/strato/genesis.json'
 
           sh 'docker ps'
 
@@ -170,26 +166,13 @@ pipeline {
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
         ]) {
           script {
-            lib.registerTestUserCert(
-                'strato-worktree',
+            lib.registerStratoUserKey(
                 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
                 "${KEYCLOAK_STRATODEVEL_DEV_ID}",
                 "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
                 'user1',
                 '1234'
             )
-            lib.registerTestUserCert(
-                'strato-worktree',
-                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET}",
-                '',
-                '',
-                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
-            )
-            // Unlock the marketplace deploy script:
-            sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
           }
           dir("strato-getting-started") {
             script {

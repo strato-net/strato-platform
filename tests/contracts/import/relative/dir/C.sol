@@ -1,2 +1,2 @@
 import "../A.sol";
-contract C is A {}
+contract record C is A {}

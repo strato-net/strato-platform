@@ -12,6 +12,7 @@ module OutputDataSpec where
 import Conduit
 import Control.Monad
 import qualified Data.ByteString as B
+import Data.Default (def)
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -61,7 +62,7 @@ createInsertsCollection :: OutputM m
 createInsertsCollection collections = do
   unless (null collections) $ do
     let collection = head collections
-    _ <- createMappingTable  (creator collection, application collection, contractname collection) (collectionname collection)
+    _ <- createCollectionTable  (creator collection, application collection, contractname collection) def def (collectionname collection, [SVMType.String Nothing], SVMType.String Nothing)
     insertCollectionTable collections
 
 createInsertsAbstract :: OutputM m
@@ -102,6 +103,7 @@ createDummyContract v =
       _usings=undefined,
       _contractType=undefined,
       _importedFrom=undefined,
+      _isContractRecord=undefined,
       _contractContext=undefined
     }
 
@@ -744,7 +746,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           blockNumber = 123,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          collectionDataKey = V.SimpleValue $ V.ValueString "hi-key",
+          collectionDataKeys = [V.SimpleValue $ V.ValueString "hi-key"],
           collectionDataValue = V.SimpleValue $ V.ValueString "hi-value"
           }     ]
 

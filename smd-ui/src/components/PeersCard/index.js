@@ -27,12 +27,12 @@ class PeersCard extends Component {
                   </small>
                 </div>
                 <div className="col-xs-3">
-                  <small>IP:
+                  <small>Host:
                   </small>
                 </div>
                 <div className="col-xs-9">
                   <Text ellipsize={true}>
-                    <small>{peer}</small>
+                    <small>{node.peers[peer].host}</small>
                   </Text>
                 </div>
                 <div className="col-xs-3">

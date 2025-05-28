@@ -1,6 +1,3 @@
-pragma es6;
-pragma strict;
-
 import <509>;
 
 import "../Assets/Asset.sol";
@@ -11,7 +8,7 @@ import "../Structs/Structs.sol";
 import "../Utils/Utils.sol";
 import "MinterAuthorization.sol";
 
-abstract contract Reserve is Utils, Structs {
+abstract contract record Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
     address public usdstToken;
     Asset public cataToken;

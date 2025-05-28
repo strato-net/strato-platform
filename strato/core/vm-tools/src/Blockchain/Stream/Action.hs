@@ -313,6 +313,9 @@ mergeActionData newData oldData =
       arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
    in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
 
+instance Semigroup ActionData where
+  (<>) = mergeActionData
+
 instance ToJSON ActionData where
   toJSON ActionData {..} =
     object

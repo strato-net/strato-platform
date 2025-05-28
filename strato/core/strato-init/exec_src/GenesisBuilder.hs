@@ -8,7 +8,7 @@
 
 import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlock
+import Blockchain.GenesisBlocks.Builder
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import qualified Data.Aeson as Ae

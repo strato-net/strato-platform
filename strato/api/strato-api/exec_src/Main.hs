@@ -25,7 +25,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -247,16 +247,17 @@ main = do
           ("oauthDiscovery", flags_oauthDiscoveryUrl),
           ("notificationServer", flags_notificationServerUrl),
           ( "fileServer",
-            case (flags_fileServerUrl, computeNetworkID) of
-              ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
-              ("", 6909499098523985262) -> "https://fileserver.mercata.blockapps.net/highway"
+            case (flags_fileServerUrl, flags_network) of
+              ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
+              ("", "helium") -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
               (fileServer, _) -> fileServer
           ),
           ( "monitor",
-            case computeNetworkID of
-              7596898649924658542 -> "https://monitor.mercata-testnet2.blockapps.net:18080"
-              6909499098523985262 -> "https://monitor.mercata.blockapps.net:18080"
+            case flags_network of
+              "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
+              "mercata" -> "https://monitor.mercata.blockapps.net:18080"
               _ -> ""
           )
         ]
@@ -284,7 +285,6 @@ main = do
   let env =
         BlocEnv
           { txSizeLimit = flags_txSizeLimit,
-            accountNonceLimit = flags_accountNonceLimit,
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,

@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-contract Random {
+contract record Random {
   bytes32 value;
 
   constructor() {

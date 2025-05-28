@@ -127,7 +127,6 @@ services:
     - postgres
     - redis
     environment:
-    - accountNonceLimit=${accountNonceLimit}
     - addBootnodes=${addBootnodes}
     - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}
@@ -149,7 +148,6 @@ services:
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - generateKey=${generateKey:-true}
-    - genesis=${genesis}
     - idServerUrl=${idServerUrl}
     - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
@@ -179,7 +177,6 @@ services:
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
-    - requireCerts=${requireCerts:-true}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
@@ -195,10 +192,12 @@ services:
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
+    - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     - txSizeLimit=${txSizeLimit}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
     - useBuiltinUserRegistry=${useBuiltinUserRegistry}
+    - useCustomGenesis=${useCustomGenesis}
     - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
@@ -219,7 +218,6 @@ services:
         max-file: "3"
     volumes:
       - stratodata:/var/lib/strato
-      - ./genesis-block.json:/var/lib/strato/${genesis:-gettingStarted}Genesis.json
   postgrest:
     depends_on:
     - postgres

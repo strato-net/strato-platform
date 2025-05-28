@@ -9,7 +9,7 @@
 * #return none
 */
 
-contract BeanstalkRole {
+contract record BeanstalkRole {
   enum BeanstalkRole {
     NULL,
     BOOT_NODE_SERVICE_ACCOUNT,

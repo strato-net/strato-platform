@@ -1,4 +1,4 @@
-contract Event {
+contract record Event {
     string someString;
     uint someInt;
 
@@ -16,7 +16,7 @@ contract Event {
     }
 }
 
-contract EventManager {
+contract record EventManager {
     address[] public events;
     uint uid;
 
@@ -30,7 +30,7 @@ contract EventManager {
     }
 }
 
-contract Ticket {
+contract record Ticket {
     string ticketNumber;
     string pnr;
 
@@ -40,7 +40,7 @@ contract Ticket {
     }
 }
 
-contract TicketManager {
+contract record TicketManager {
     address[] public tickets;
     uint uid;
 
@@ -54,7 +54,7 @@ contract TicketManager {
     }
 }
 
-contract Transaction {
+contract record Transaction {
     string transactionId;
 
     constructor(string _transactionId) public {
@@ -62,7 +62,7 @@ contract Transaction {
     }
 }
 
-contract TransactionManager {
+contract record TransactionManager {
     address[] public transactions;
     uint uid;
 
@@ -76,7 +76,7 @@ contract TransactionManager {
     }
 }
 
-contract AdminInterface {
+contract record AdminInterface {
     EventManager eventManager;
     TicketManager ticketManager;
     TransactionManager transactionManager;

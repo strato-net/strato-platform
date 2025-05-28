@@ -29,19 +29,14 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
-import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((***))
-import Control.Exception
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
-import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
 import Data.ByteString as BS hiding (map, zip)
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import Data.List.Split (chunksOf)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
@@ -79,7 +74,7 @@ putAccount ::
     Mem.HasMemAddressStateDB m,
     HasStateDB m,
     HasStorageDB m,
-    HasMemStorageDB m,
+    HasMemRawStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
   AccountInfo ->
@@ -112,7 +107,7 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-    putStorageTrie address slots
+    putStorageTrie address $ map (\(k, v) -> (k, rlpSerialize $ rlpEncode v)) $ slots
 
 initializeStateDB ::
   ( MonadLogger m,
@@ -138,48 +133,12 @@ initializeStateDBAndAccountInfos ::
     HasMemStorageDB m,
     (Maybe Word256 `A.Alters` StateRoot) m,
     (Address `A.Alters` AddressState) m,
-    (StateRoot `A.Alters` NodeData) m,
-    MonadIO m
+    (StateRoot `A.Alters` NodeData) m
   ) =>
   [AccountInfo] ->
-  String ->
   m ()
-initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
+initializeStateDBAndAccountInfos addressInfo = do
   initializeStateDB addressInfo
-
-  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-
-  $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
-    "Attempting to read account info from file: " ++ accountInfoFilename
-
-  accountInfoBatches <-
-    fmap (chunksOf 10000 . BLC.lines) $
-      liftIO $
-        fmap (either (const "" :: SomeException -> BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
-
-  forM_ (zip [(1 :: Integer) ..] accountInfoBatches) $ \(batchCount, batch) -> do
-    forM_ batch $ \theLine -> do
-      case words $ BLC.unpack theLine of
-        [] -> return ()
-        ["s", a, k, v] -> do
-          let address = Ad.Address $ parseHex a
-          putStorageKeyVal' address (parseHex k) (parseHex v)
-        ["a", a, b] -> do
-          let address = Ad.Address $ parseHex a
-          $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
-            "adding account: " ++ format address
-          A.insert A.Proxy address blankAddressState {addressStateBalance = read b}
-        ["a", a, b, c] -> do
-          let address = Ad.Address $ parseHex a
-          $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
-            "adding address: " ++ format address
-          A.insert A.Proxy address blankAddressState {addressStateBalance = read b, addressStateCodeHash = ExternallyOwned $ unsafeCreateKeccak256FromWord256 $ parseHex c}
-        _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
-
-    $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
-      "flushing batch: " ++ show batchCount
-    flushMemStorageDB
-    Mem.flushMemAddressStateDB
 
   forM_ addressInfo $ \account -> do
     $logInfoS "initializeStateDBAndAccountInfos" . T.pack $ format account
@@ -193,15 +152,15 @@ parseHex theString =
     _ -> error $ "parseHex: error parsing string: " ++ theString
 
 initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
-initializeCodeDB "EVM" x = do
-  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
+--initializeCodeDB "EVM" x = do
+--  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
 initializeCodeDB "SolidVM" x = do
-  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> T.encodeUtf8 src)) x
+  mapM_ (addCode SolidVM . (\(CodeInfo src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
 zipSourceInfo accounts codes =
-  let hashPair c@(CodeInfo bs _ _) = (hash bs, c)
+  let hashPair c@(CodeInfo source _) = (hash $ T.encodeUtf8 source, c)
       codeMap = Map.fromList . map hashPair $ codes
       findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
       findCodeFor (NonContract _ _) = Nothing
@@ -224,20 +183,17 @@ genesisInfoToGenesisBlock ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Address `A.Alters` AddressState) m,
-    MonadIO m
+    (Address `A.Alters` AddressState) m
   ) =>
   GenesisInfo ->
-  String ->
-  [AccountInfo] ->
   m ([(AccountInfo, CodeInfo)], Block)
-genesisInfoToGenesisBlock gi gn as = do
+genesisInfoToGenesisBlock gi = do
   let codes = genesisInfoCodeInfo gi
   let accounts = genesisInfoAccountInfo gi
   initializeCodeDB "SolidVM" codes
-  initializeStateDBAndAccountInfos accounts gn
+  initializeStateDBAndAccountInfos accounts
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
-  let sourceInfo = zipSourceInfo (accounts ++ as) codes
+  let sourceInfo = zipSourceInfo accounts codes
       bData =
         BlockHeader
           { parentHash = genesisInfoParentHash gi,
