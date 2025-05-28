@@ -46,14 +46,14 @@ contract record PoolConfigurator is Ownable {
 
     // LendingPool Risk Parameters
     function setInterestRate(address asset, uint256 newRate) external onlyOwner {
-        LendingPool(registry.lendingPool()).setInterestRate(asset, newRate);
+        registry.lendingPool().setInterestRate(asset, newRate);
     }
 
     function setCollateralRatio(address asset, uint256 newRatio) external onlyOwner {
-        LendingPool(registry.lendingPool()).setCollateralRatio(asset, newRatio);
+        registry.lendingPool().setCollateralRatio(asset, newRatio);
     }
 
     function setLiquidationBonus(address asset, uint256 newBonus) external onlyOwner {
-        LendingPool(registry.lendingPool()).setLiquidationBonus(asset, newBonus);
+        registry.lendingPool().setLiquidationBonus(asset, newBonus);
     }
 }

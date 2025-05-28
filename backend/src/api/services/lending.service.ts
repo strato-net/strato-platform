@@ -5,8 +5,9 @@ import { StratoPaths, constants } from "../../config/constants";
 import { approveAsset } from "../helpers/tokens.helper";
 import { getBalance, getTokens } from "./tokens.service";
 
-const { lendingPoolSelectFields, lendingPool } = constants;
+const { registrySelectFields, lendingPool } = constants;
 const Pool = "LendingPool";
+const Registry = "LendingRegistry";
 
 export const getPool = async (
   accessToken: string,
@@ -18,22 +19,22 @@ export const getPool = async (
   );
   const params = {
     ...cleanedFilters,
-    select: select ?? lendingPoolSelectFields.join(","),
+    select: select ?? registrySelectFields.join(","),
     ...(select
       ? {}
       : {
-          "loans.value->>amount": "gt.0",
+          "lendingPool.loans.value->>amount": "gt.0",
           "collateralVault.collaterals.value->>amount": "gt.0",
         }),
-    address: `eq.${lendingPool}`,
+    lendingPool: `eq.${lendingPool}`,
   };
 
   const {
     data: [poolData],
-  } = await cirrus.get(accessToken, `/${Pool}`, { params });
+  } = await cirrus.get(accessToken, `/${Registry}`, { params });
 
   if (!poolData) {
-    throw new Error(`Error fetching ${Pool} data from Cirrus`);
+    throw new Error(`Error fetching ${Registry} data from Cirrus`);
   }
 
   return poolData;
@@ -170,17 +171,17 @@ export const getDepositableTokens = async (
   accessToken: string,
   address: string
 ) => {
-  const [lendingPool, userTokens] = await Promise.all([
+  const [registry, userTokens] = await Promise.all([
     getPool(accessToken),
     getBalance(accessToken, address),
   ]);
 
   const userTokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
 
-  return Object.entries(lendingPool.collateralRatio || {})
+  return Object.entries(registry.lendingPool.collateralRatio || {})
     .filter(
       ([token]) =>
-        lendingPool.oracle?.prices?.[token] !== undefined &&
+        registry.oracle?.prices?.[token] !== undefined &&
         userTokenMap.has(token)
     )
     .map(([token, collateralRatio]) => {
@@ -191,9 +192,9 @@ export const getDepositableTokens = async (
         _symbol: userToken?.token?._symbol || "",
         value: userToken?.balance?.toString() || "0",
         collateralRatio: collateralRatio || 0,
-        interestRate: lendingPool.interestRate?.[token] || 0,
-        price: lendingPool.oracle?.prices?.[token] || 0,
-        liquidity: lendingPool.liquidityPool?.totalLiquidity?.[token] || "0",
+        interestRate: registry.lendingPool.interestRate?.[token] || 0,
+        price: registry.oracle?.prices?.[token] || 0,
+        liquidity: registry.liquidityPool?.totalLiquidity?.[token] || "0",
       };
     });
 };
@@ -204,10 +205,10 @@ export const getWithdrawableTokens = async (
 ): Promise<
   { address: string; _name: string; _symbol: string; value: string }[]
 > => {
-  const lendingPool = await getPool(accessToken);
+  const registry = await getPool(accessToken);
 
   const userDeposits = Object.values(
-    lendingPool.liquidityPool?.deposited || {}
+    registry.liquidityPool?.deposited || {}
   ).filter((d: any) => d.user === address) as {
     asset: string;
     amount: string;
@@ -239,13 +240,13 @@ export const getLoans = async (
   accessToken: string,
   address: string
 ): Promise<any> => {
-  const lendingPool = await getPool(accessToken);
+  const registry = await getPool(accessToken);
 
-  const userLoans = Object.entries(lendingPool.loans || {}).filter(
+  const userLoans = Object.entries(registry.lendingPool.loans || {}).filter(
     ([_, loan]: [string, any]) => loan.user === address && loan.amount > 0
   );
 
-  if (!userLoans.length) return { ...lendingPool, loans: {} };
+  if (!userLoans.length) return { ...registry.lendingPool, loans: {} };
 
   const tokenMap = new Map(
     (
@@ -266,7 +267,7 @@ export const getLoans = async (
   const divisor = BigInt(365 * 24 * 60 * 100);
 
   return {
-    ...lendingPool,
+    ...registry.lendingPool,
     loans: Object.fromEntries(
       userLoans.map(([key, loan]: [string, any]) => {
         const assetToken = tokenMap.get(loan.asset) as any;
@@ -282,7 +283,7 @@ export const getLoans = async (
             collateralSymbol: collateralToken?._symbol || "",
             interest: (
               (BigInt(loan.amount) *
-                BigInt(lendingPool.interestRate?.[loan.asset] || 0) *
+                BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
                 BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
               divisor
             ).toString(),

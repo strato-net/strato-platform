@@ -38,16 +38,24 @@ export const constants = (() => {
     "tokenB",
     "tokenBBalance",
   ];
-
-  const lendingPoolSelectFields = [
-    "address",
-    "loans:LendingPool-loans(key,LoanInfo:value)",
-    "interestRate:LendingPool-assetInterestRate(asset:key,rate:value)",
-    "collateralRatio:LendingPool-assetCollateralRatio(asset:key,ratio:value)",
-    "liquidationBonus:LendingPool-assetLiquidationBonus(asset:key,bonus:value)",
-    "oracle:oracle_fkey(address,prices:PriceOracle-prices(asset:key,price:value))",
-    "liquidityPool:liquidityPool_fkey(address,deposited:LiquidityPool-deposited(key,Deposit:value),totalLiquidity:LiquidityPool-totalLiquidity(asset:key,amount:value),borrowed:LiquidityPool-borrowed(key,Borrow:value))",
-    "collateralVault:collateralVault_fkey(address,collaterals:CollateralVault-collaterals(key,Collateral:value))",
+  const registrySelectFields = [
+    "lendingPool: lendingPool_fkey(" +
+      "address," +
+      "loans:LendingPool-loans(key,LoanInfo:value)," +
+      "interestRate:LendingPool-assetInterestRate(asset:key,rate:value)," +
+      "collateralRatio:LendingPool-assetCollateralRatio(asset:key,ratio:value)," +
+      "liquidationBonus:LendingPool-assetLiquidationBonus(asset:key,bonus:value))",
+    "oracle:priceOracle_fkey(" +
+      "address," +
+      "prices:PriceOracle-prices(asset:key,price:value))",
+    "liquidityPool:liquidityPool_fkey(" +
+      "address," +
+      "deposited:LiquidityPool-deposited(key,Deposit:value)," +
+      "totalLiquidity:LiquidityPool-totalLiquidity(asset:key,amount:value)," +
+      "borrowed:LiquidityPool-borrowed(key,Borrow:value))",
+    "collateralVault:collateralVault_fkey(" +
+      "address," +
+      "collaterals:CollateralVault-collaterals(key,Collateral:value))",
   ];
 
   const configs = {
@@ -57,9 +65,9 @@ export const constants = (() => {
       onRamp: "TBD",
     },
     testnet: {
-      poolFactory: "dd7be8c9121326b3571fb33720b135fbaf0beded",
-      lendingPool: "1acf2f656993b24cc49b6e079e3f608fd47c45eb",
-      onRamp: "ddb00b9b6191db29665f356d9ac7f43ce1c3df9f",
+      poolFactory: "1106e1c8eb74b8906345e7776458047644ea83af",
+      lendingPool: "c7cd81afe44fc64f1d6460c8c640d214eb4b89e8",
+      onRamp: "de54f4b4c44949c8708311e8d03f32b19ce45104",
     },
     testnet2: {
       poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",
@@ -81,7 +89,7 @@ export const constants = (() => {
     tokenSelectFields,
     tokenBalanceSelectFields,
     poolSelectFields,
-    lendingPoolSelectFields,
+    registrySelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();

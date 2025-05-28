@@ -24,7 +24,7 @@ contract record CollateralVault is IERC20, Ownable {
     }
 
     modifier onlyLendingPool() {
-        require(msg.sender == registry.lendingPool(), "Caller is not LendingPool");
+        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
         _;
     }
 
