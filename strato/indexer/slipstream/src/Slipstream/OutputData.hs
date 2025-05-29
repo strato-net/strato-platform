@@ -1136,17 +1136,6 @@ insertCollectionTableQuery ms =
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]
                 valsForSQL = vals
                 inserts = csv valsForSQL
-                -- Unified let for isStructDeep and mergeValueSql
-                mergeValueSql =
-                  let isStructDeep :: V.Value -> Bool
-                      isStructDeep (V.ValueStruct _) = True
-                      isStructDeep (V.ValueArrayFixed _ vs) = any isStructDeep vs
-                      isStructDeep (V.ValueArrayDynamic vs) = any isStructDeep vs
-                      isStructDeep (V.ValueMapping m) = any isStructDeep (Map.elems m)
-                      isStructDeep _ = False
-                   in if isStructDeep (collectionDataValue x)
-                        then "table.value || excluded.value"
-                        else "excluded.value"
              in (: []) $
                   T.concat
                     [ "INSERT INTO ",
@@ -1168,8 +1157,7 @@ insertCollectionTableQuery ms =
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
     collectiontype = excluded.collectiontype,
-    value = |],
-                      mergeValueSql,
+    value = excluded.value|],
                       ";"
                     ]
 
