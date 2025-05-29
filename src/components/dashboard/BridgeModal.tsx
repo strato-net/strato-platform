@@ -397,7 +397,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         // Show initial toast
         toast({
           title: "Transaction Submitted",
-          description: "Waiting for signer to approve",
+          // description: "Waiting for signer to approve",
         });
 
         // Call the STRATO to Ethereum transfer endpoint
