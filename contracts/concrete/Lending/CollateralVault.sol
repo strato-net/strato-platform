@@ -38,9 +38,10 @@ contract record CollateralVault is IERC20, Ownable {
 
         string key = _key(borrower, asset);
 
-        collaterals[key].user = borrower;
-        collaterals[key].asset = asset;
-        collaterals[key].amount += amount;
+        Collateral collateral = collaterals[key];
+        collateral.user = borrower;
+        collateral.asset = asset;
+        collateral.amount += amount;
 
         emit CollateralAdded(borrower, asset, amount);
     }
