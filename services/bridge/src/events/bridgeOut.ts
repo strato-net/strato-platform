@@ -6,9 +6,6 @@ import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 
-
-
-
 interface BridgeOutTransaction {
   hash: string;
   value: string;
@@ -24,7 +21,7 @@ export async function handleBridgeOut(
   transaction: BridgeOutTransaction
 ): Promise<void> {
   try {
-    console.log("🚀 Starting BRIDGE-OUT flow (STRATO to ETH)...");
+    logger.info("🚀 Starting BRIDGE-OUT flow (STRATO to ETH)...");
     const { hash, value, to, from, token, accessToken } = transaction;
 
     // Validate input parameters
@@ -38,7 +35,6 @@ export async function handleBridgeOut(
     try {
       // Remove any whitespace and ensure it's a string
       const cleanValue = value.toString().trim();
-      
       // Check if the value is a valid number
       if (isNaN(Number(cleanValue))) {
         throw new Error("Value must be a valid number");
@@ -51,11 +47,11 @@ export async function handleBridgeOut(
         throw new Error("Amount must be greater than 0");
       }
     } catch (error) {
-      console.error("Amount formatting error:", error);
+      logger.error("Amount formatting error:", error);
       throw new Error("Invalid amount format. Please provide a valid number");
     }
 
-    console.log("Formatted amount:", amount.toString());
+   
 
     const formatAddress = (addr: string): string => {
       const lower = addr.toLowerCase();
@@ -83,7 +79,7 @@ export async function handleBridgeOut(
             method: "withdraw",
             args: {
               token: strip0xPrefix(token),
-              from: strip0xPrefix(config.bridge.address),
+              from: strip0xPrefix('0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce'),
               amount: amount.toString(),
               ethRecipient: formatAddress(to).replace("0x", ""),
             },
@@ -97,7 +93,7 @@ export async function handleBridgeOut(
       },
     };
 
-    console.log("🧾 Full txPayload:", JSON.stringify(txPayload, null, 2));
+    logger.info("🧾 Full txPayload:", JSON.stringify(txPayload, null, 2));
 
     const response = await axios.post(
       `${nodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
@@ -111,10 +107,10 @@ export async function handleBridgeOut(
       }
     );
 
-    console.log("Contract Response:", response.data);
+    logger.info("Contract Response:", response.data);
 
     if (response.data && response.data[0].hash) {
-      console.log("Transaction submitted with hash:", response.data[0].hash);
+      logger.info("Transaction submitted with hash:", response.data[0].hash);
     } else {
       throw new Error("Transaction submission failed");
     }
@@ -130,14 +126,14 @@ export async function handleBridgeOut(
       }
     );
 
-    console.log("Event Response:", eventResponse.data);
+  
 
     const matchingEvent = eventResponse.data.find(
       (event: any) => event.transaction_hash === response.data[0].hash
     );
 
     if (matchingEvent) {
-      console.log("Matching event found:", matchingEvent);
+      logger.info("Matching event found:", matchingEvent);
 
       const apiKit = new SafeApiKit({
         chainId: 11155111n,
@@ -150,7 +146,7 @@ export async function handleBridgeOut(
       });
 
       const safeTransactionData: MetaTransactionData = {
-        to: formatAddress(to).replace("0x", ""),
+        to: to,
         value: amount.toString(),
         data: "0x",
         operation: OperationType.Call,
@@ -173,16 +169,16 @@ export async function handleBridgeOut(
         senderAddress: config.safe.safeOwnerAddress || "",
         senderSignature: signature.data,
       });
-
-      console.log("Safe transaction proposed successfully");
+      
+      logger.info("Safe transaction proposed successfully");
     } else {
-      console.log("No matching event found for transaction hash:", response.data[0].hash);
+      logger.info("No matching event found for transaction hash:", response.data[0].hash);
     }
   } catch (error: any) {
-    console.error("Error in handleBridgeOut:", error?.message);
+    logger.error("Error in handleBridgeOut:", error?.message);
     if (error.response) {
-      console.error("API Error Response:", error.response.data);
-      console.error("API Error Status:", error.response.status);
+      logger.error("API Error Response:", error.response.data);
+      logger.error("API Error Status:", error.response.status);
     }
     throw error;
   }
