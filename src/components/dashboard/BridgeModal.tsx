@@ -362,9 +362,105 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
   }, [fromToken]);
 
-  const handleBridgeIn = async () => {
-   
+  const handleBridgeSubmit = async () => {
+    if (!isConnected) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // For STRATO to other networks transfers, directly call the API
+      if (fromChain === 'STRATO' && toChain !== 'STRATO') {
+        const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+        if (!tokenAddress) {
+          toast({
+            title: "Token Error",
+            description: `Invalid token address for ${fromToken.symbol} on ${fromChain}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Show initial toast
+        toast({
+          title: "Transaction Submitted",
+          description: "Waiting for signer to approve",
+        });
+
+        // Call the STRATO to Ethereum transfer endpoint
+        const response = await fetch(`${BRIDGE_API_BASE_URL}/api/safe/strato-to-ethereum`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            hash: transactionHash || '',
+            value: amount.toString(),
+            from: SAFE_ADDRESS,
+            to: address,
+            token: tokenAddress,
+          })
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+          const errorData = result;
+          if (response.status === 403) {
+            toast({
+              title: "Session Expired",
+              description: "Your session has expired. Please refresh the page and try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw new Error(errorData.error || 'Failed to initiate transfer');
+        }
+
+        // Check if the response indicates success (either through success flag or status code)
+        if (response.ok || result.success) {
+          toast({
+            title: "Transaction Proposed Successfully",
+            description: "Your transaction has been proposed and is waiting for approval"
+          });
+          setTransactionHash(result.txHash);
+          updateTransactionStatus?.(result.txHash, 'pending');
+          onClose();
+          setShowTransactions(true);
+        } else {
+          throw new Error(result.message || 'Transfer failed');
+        }
+        return;
+      }
+
+      // For other network transfers, use handleBridgeIn
+      await handleBridgeIn();
+      onClose();
+      setShowTransactions(true);
+    } catch (error: any) {
+      console.error('Bridge transaction failed:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to bridge assets. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBridgeIn = async () => {
     try {
       // Check if on correct network
       if (!isChainMatching()) {
@@ -390,13 +486,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         });
         return;
       }
-
-      // Add metadata for the transaction
-      const metadata = {
-        description: `Hello my name is Tanuj Soni and I am a software engineer`,
-      };
-
-      // Handle other network transfers (existing code)
+      
       const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
       if (!tokenAddress) {
         toast({
@@ -408,12 +498,9 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       }
 
       // Determine recipient address based on network direction
-      let recipient: string;
-      if (fromChain === 'STRATO') {
-        recipient = TOKEN_ADDRESSES[toChain]?.[toToken.symbol] || '';
-      } else {
-        recipient = SAFE_ADDRESS;
-      }
+      const recipient = fromChain === 'STRATO' 
+        ? TOKEN_ADDRESSES[toChain]?.[toToken.symbol] || ''
+        : SAFE_ADDRESS;
 
       toast({
         title: "Preparing transaction...",
@@ -589,96 +676,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       toast({
         title: "Transfer Failed",
         description: error instanceof Error ? error.message : "Failed to process transfer",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBridgeSubmit = async () => {
-    if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // For STRATO to other networks transfers, directly call the API
-      if (fromChain === 'STRATO' && toChain !== 'STRATO') {
-        const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
-        if (!tokenAddress) {
-          toast({
-            title: "Token Error",
-            description: `Invalid token address for ${fromToken.symbol} on ${fromChain}`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Call the STRATO to Ethereum transfer endpoint
-        const response = await fetch(`${BRIDGE_API_BASE_URL}/api/safe/strato-to-ethereum`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            hash: transactionHash || '',  // Use actual transaction hash
-            value: amount.toString(),    // Convert amount to string
-            from: SAFE_ADDRESS,
-            to: address,                 // User's Wallet address
-            token: tokenAddress,         // Token address
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          if (response.status === 403) {
-            toast({
-              title: "Session Expired",
-              description: "Your session has expired. Please refresh the page and try again.",
-              variant: "destructive",
-            });
-            return;
-          }
-          throw new Error(errorData.error || 'Failed to initiate transfer');
-        }
-
-        const result = await response.json();
-        
-        if (result.success) {
-          toast({
-            title: "Transfer Initiated",
-            description: "Your transfer has been initiated successfully",
-          });
-          setTransactionHash(result.txHash);
-          updateTransactionStatus?.(result.txHash, 'pending');
-          onClose();
-          setShowTransactions(true);
-        } else {
-          throw new Error(result.message || 'Transfer failed');
-        }
-        return;
-      }
-
-      await handleBridgeIn();
-      onClose();
-      setShowTransactions(true);
-    } catch (error: any) {
-      console.error('Bridge transaction failed:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to bridge assets. Please try again.",
         variant: "destructive",
       });
     }
