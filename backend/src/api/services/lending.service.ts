@@ -241,57 +241,61 @@ export const getWithdrawableTokens = async (
 export const getLoans = async (
   accessToken: string,
   address: string
-): Promise<any> => {
+): Promise<{ key: string; loan: any }[]> => {
   const registry = await getPool(accessToken);
 
-  const userLoans = Object.entries(registry.lendingPool.loans || {}).filter(
-    ([_, loan]: [string, any]) => loan.user === address && loan.amount > 0
+  // Filter user-specific loans
+  const userLoans = (registry.lendingPool.loans || []).filter(
+    (entry: any) => entry.LoanInfo.user.toLowerCase() === address.toLowerCase()
   );
 
-  if (!userLoans.length) return { ...registry.lendingPool, loans: {} };
+  if (!userLoans.length) return [];
 
+  // Collect all unique token addresses used in user loans
+  const tokenAddresses = [
+    ...new Set(
+      userLoans.flatMap((entry: any) => [
+        entry.LoanInfo.asset,
+        entry.LoanInfo.collateralAsset,
+      ])
+    ),
+  ];
+
+  // Fetch token metadata and build a lookup map
   const tokenMap = new Map(
     (
       await getTokens(accessToken, {
-        address: `in.(${[
-          ...new Set(
-            userLoans.flatMap(([_, l]: [string, any]) => [
-              l.asset,
-              l.collateralAsset,
-            ])
-          ),
-        ].join(",")})`,
+        address: `in.(${tokenAddresses.join(",")})`,
       })
     ).map((t: any) => [t.address, t])
   );
 
   const now = Math.floor(Date.now() / 1000);
-  const divisor = BigInt(365 * 24 * 60 * 100);
+  const divisor = BigInt(365 * 24 * 60 * 100); // Interest annualization factor
 
-  return {
-    ...registry.lendingPool,
-    loans: Object.fromEntries(
-      userLoans.map(([key, loan]: [string, any]) => {
-        const assetToken = tokenMap.get(loan.asset) as any;
-        const collateralToken = tokenMap.get(loan.collateralAsset) as any;
+  // Return structured array of enriched loan objects
+  return userLoans.map((entry: any) => {
+    const loan = entry.LoanInfo;
+    const key = entry.key;
 
-        return [
-          key,
-          {
-            ...loan,
-            assetName: assetToken?._name || "",
-            assetSymbol: assetToken?._symbol || "",
-            collateralName: collateralToken?._name || "",
-            collateralSymbol: collateralToken?._symbol || "",
-            interest: (
-              (BigInt(loan.amount) *
-                BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
-                BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
-              divisor
-            ).toString(),
-          },
-        ];
-      })
-    ),
-  };
+    const assetToken = tokenMap.get(loan.asset) as any;
+    const collateralToken = tokenMap.get(loan.collateralAsset) as any;
+
+    return {
+      key,
+      loan: {
+        ...loan,
+        assetName: assetToken?._name || "",
+        assetSymbol: assetToken?._symbol || "",
+        collateralName: collateralToken?._name || "",
+        collateralSymbol: collateralToken?._symbol || "",
+        interest: (
+          (BigInt(loan.amount) *
+            BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
+            BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
+          divisor
+        ).toString(),
+      },
+    };
+  });
 };
