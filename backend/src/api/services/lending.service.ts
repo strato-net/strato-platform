@@ -25,6 +25,8 @@ export const getPool = async (
       : {
           "lendingPool.loans.value->>active": "eq.true",
           "collateralVault.collaterals.value->>amount": "gt.0",
+          "liquidityPool.deposited.value->>amount": "gt.0",
+          "liquidityPool.borrowed.value->>amount": "gt.0",
         }),
     lendingPool: `eq.${lendingPool}`,
   };
