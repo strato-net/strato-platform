@@ -28,6 +28,7 @@ contract record LendingPool is Ownable {
         address asset;
         uint256 amount;
         uint256 lastUpdated;
+        bool active;
         address collateralAsset;
         uint256 collateralAmount;
       }
@@ -104,6 +105,7 @@ contract record LendingPool is Ownable {
             asset,
             amount,
             block.timestamp,
+            true,
             collateralAsset,
             collateralAmount
         );
@@ -113,7 +115,7 @@ contract record LendingPool is Ownable {
 
     function repayLoan(string loanId, uint256 amount) public {
         LoanInfo loan = loans[loanId];
-        require(loan.amount > 0, "Loan inactive");
+        require(loan.active, "Loan inactive");
         require(amount > 0, "Invalid repayment");
 
         uint256 interest = RateStrategy(_rateStrategy()).calculateInterest(
@@ -128,8 +130,10 @@ contract record LendingPool is Ownable {
         if (amount >= totalOwed) {
             CollateralVault(_collateralVault()).removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
             loan.amount = 0;
+            loan.active = false;
         } else {
             loan.amount = totalOwed - amount;
+            loan.active = true;
         }
         loan.user = loan.user;
         loan.asset = loan.asset;
@@ -142,7 +146,7 @@ contract record LendingPool is Ownable {
 
     function liquidate(string loanId, address borrower) public onlyOwner {
         LoanInfo loan = loans[loanId];
-        require(loan.amount > 0, "Loan inactive");
+        require(loan.active, "Loan inactive");
 
         uint256 interest = RateStrategy(_rateStrategy()).calculateInterest(
             loan.amount,
@@ -171,9 +175,11 @@ contract record LendingPool is Ownable {
         loan.amount = 0;
         loan.user = loan.user;
         loan.asset = loan.asset;
+        loan.lastUpdated = block.timestamp;
+        loan.active = false;
         loan.collateralAsset = loan.collateralAsset;
         loan.collateralAmount = loan.collateralAmount;
-        loan.lastUpdated = block.timestamp;
+
         emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
     }
 
