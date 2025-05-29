@@ -43,7 +43,9 @@ export const getPools = async (
       address: `in.(${tokenAddresses.join(",")})`,
       ["balances.key"]: `eq.${address}`,
     }),
-    getLendingPool(accessToken, { select: "oracle" }),
+    getLendingPool(accessToken, {
+      select: "oracle:priceOracle_fkey(address,prices:PriceOracle-prices(*))",
+    }),
   ]);
   const tokenMap = new Map(tokenMetadata.map((t: any) => [t.address, t]));
   const prices = lendingInfo.oracle?.prices || {};
