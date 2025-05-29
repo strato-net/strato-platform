@@ -16,7 +16,6 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -69,10 +68,6 @@ instance Format TransactionResult where
       ++ "\n"
       ++ "status: "
       ++ show transactionResultStatus
-      ++ "\n"
-      ++ "\n"
-      ++ "kind: "
-      ++ show transactionResultKind
 
 instance NFData TransactionResult
 
@@ -101,7 +96,6 @@ exampleTxResult =
     "New Storage"
     "Deleted Storage"
     Nothing
-    (Just SolidVM)
     "BlockApps"
     "Sample App"
 

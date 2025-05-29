@@ -22,7 +22,6 @@ module Blockchain.StateRootMismatch
 where
 
 import BlockApps.Logging
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
@@ -42,6 +41,7 @@ import Data.Foldable (for_)
 import Data.List (intercalate)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
@@ -126,11 +126,11 @@ showEvAccDiff AccountDiff{..} = intercalate "\n"
 
 showIncStorDiff :: StorageDiff 'Incremental -> String
 showIncStorDiff (EVMDiff e) = intercalate "\n" $ (\(k,v) -> format k ++ ": " ++ showIncDiff format v) <$> M.toList e
-showIncStorDiff (SolidVMDiff s) = intercalate "\n" $ (\(k,v) -> BC.unpack k ++ ": " ++ showIncDiff (format . rlpDecode @BasicValue . rlpDeserialize) v) <$> M.toList s
+showIncStorDiff (SolidVMDiff s) = intercalate "\n" $ (\(k,v) -> BC.unpack k ++ ": " ++ showIncDiff (T.unpack . storageValueByteStringToText) v) <$> M.toList s
 
 showEvStorDiff :: StorageDiff 'Eventual -> String
 showEvStorDiff (EVMDiff e) = intercalate "\n" $ (\(k,v) -> format k ++ ": " ++ showEvDiff format v) <$> M.toList e
-showEvStorDiff (SolidVMDiff s) = intercalate "\n" $ (\(k,v) -> BC.unpack k ++ ": " ++ showEvDiff (format . rlpDecode @BasicValue . rlpDeserialize) v) <$> M.toList s
+showEvStorDiff (SolidVMDiff s) = intercalate "\n" $ (\(k,v) -> BC.unpack k ++ ": " ++ showEvDiff (T.unpack . storageValueByteStringToText) v) <$> M.toList s
 
 showIncDiff :: (a -> String) -> (Diff a 'Incremental) -> String
 showIncDiff f (Create a)   = "In local state: " ++ f a

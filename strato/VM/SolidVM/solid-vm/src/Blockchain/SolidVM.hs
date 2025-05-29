@@ -234,7 +234,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
     Code c -> pure c
     PtrToCode cp -> do
       hsh <- codePtrToSHA cp
-      fromMaybe "" . fmap snd . join <$> traverse getCode hsh
+      fromMaybe "" . join <$> traverse getCode hsh
 
   let env' =
         Env.Environment
@@ -371,7 +371,6 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         erSuicideList = S.empty,
         erAction = Just finalAct,
         erException = Nothing,
-        erKind = SolidVM,
         erPragmas = CC._pragmas cc,
         erCreator = issuerName,
         erAppName = parentName',
@@ -449,7 +448,6 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
           erSuicideList = S.empty,
           erAction = Just $ finalAct,
           erException = Nothing, -- tells me if theres an exception
-          erKind = SolidVM,
           erPragmas = [],
           erCreator = creator,
           erAppName = appName,
@@ -2305,7 +2303,7 @@ evaluateAccountMember a _ "code" = do
   -- Find the code using the codehash
   cd <- A.lookup (A.Proxy @DBCode) ch'
   let cd' = case cd of
-        Just (_, bs) -> bs
+        Just bs -> bs
         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at address" (format a)
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result

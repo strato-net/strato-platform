@@ -153,9 +153,9 @@ parseHex theString =
 
 initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
 --initializeCodeDB "EVM" x = do
---  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
+--  mapM_ (addCode . (\(CodeInfo bin _ _) -> bin)) x
 initializeCodeDB "SolidVM" x = do
-  mapM_ (addCode SolidVM . (\(CodeInfo src _) -> T.encodeUtf8 src)) x
+  mapM_ (addCode . (\(CodeInfo src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]

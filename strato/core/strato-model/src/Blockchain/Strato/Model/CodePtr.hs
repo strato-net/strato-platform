@@ -5,16 +5,15 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Model.CodePtr
-  ( CodePtr (..),
-    CodeKind (..),
+  ( CodePtr (..)
   )
 where
 
 import Blockchain.Data.RLP
-import Blockchain.SolidVM.Model (CodeKind (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -62,10 +61,10 @@ instance Show CodePtr where
 -}
 
 instance Ae.ToJSON CodePtr where
-  toJSON (ExternallyOwned hsh) = Ae.object [("kind", Ae.toJSON EVM), ("digest", Ae.toJSON hsh)]
+  toJSON (ExternallyOwned hsh) = Ae.object [("kind", Ae.toJSON $ T.pack "ExternallyOwned"), ("digest", Ae.toJSON hsh)]
   toJSON (SolidVMCode name hsh) =
     Ae.object
-      [ ("kind", Ae.toJSON SolidVM),
+      [ ("kind", Ae.toJSON $ T.pack "SolidVM"),
         ("name", Ae.toJSON name),
         ("digest", Ae.toJSON hsh)
       ]
@@ -78,16 +77,16 @@ instance Ae.ToJSON CodePtr where
 instance Ae.FromJSON CodePtr where
   parseJSON (st@Ae.String {}) = ExternallyOwned <$> Ae.parseJSON st
   parseJSON (Ae.Object o) = do
-    kind <- o Ae..:? "kind"
+    kind :: Maybe T.Text <- o Ae..:? "kind"
     case kind of
-      Just EVM -> do
+      Just "ExternallyOwned" -> do
         hsh <- o Ae..: "digest"
         return $ ExternallyOwned hsh
-      Just SolidVM -> do
+      Just "SolidVM" -> do
         hsh <- o Ae..: "digest"
         name <- o Ae..: "name"
         return $ SolidVMCode name hsh
-      Nothing -> do
+      _ -> do
         acct <- o Ae..: "account"
         name <- o Ae..: "name"
         return $ CodeAtAccount acct name
