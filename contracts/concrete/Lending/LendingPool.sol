@@ -45,10 +45,6 @@ contract record LendingPool is Ownable {
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
         poolConfigurator = _poolConfigurator;
-
-        assetCollateralRatio[address(0)] = 150;
-        assetLiquidationBonus[address(0)] = 105;
-        assetInterestRate[address(0)] = 5;
     }
 
     modifier onlyPoolConfigurator() {
@@ -118,8 +114,12 @@ contract record LendingPool is Ownable {
             loan.amount = 0;
         } else {
             loan.amount = totalOwed - amount;
-            loan.lastUpdated = block.timestamp;
         }
+        loan.user = loan.user;
+        loan.asset = loan.asset;
+        loan.collateralAsset = loan.collateralAsset;
+        loan.collateralAmount = loan.collateralAmount;
+        loan.lastUpdated = block.timestamp;
 
         emit Repaid(msg.sender, loan.asset, amount);
     }
@@ -153,6 +153,11 @@ contract record LendingPool is Ownable {
         registry.collateralVault().removeCollateral(borrower, loan.collateralAsset, seizeAmount);
 
         loan.amount = 0;
+        loan.user = loan.user;
+        loan.asset = loan.asset;
+        loan.collateralAsset = loan.collateralAsset;
+        loan.collateralAmount = loan.collateralAmount;
+        loan.lastUpdated = block.timestamp;
         emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
     }
 
