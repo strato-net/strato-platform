@@ -1133,7 +1133,7 @@ insertCollectionTableQuery ms =
                     collectiontype
                   ]
                 vals = flip map collections $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]--value_fkey
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]
                 valsForSQL = vals
                 inserts = csv valsForSQL
              in (: []) $
