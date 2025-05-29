@@ -1137,7 +1137,7 @@ insertCollectionTableQuery ms =
                     collectiontype
                   ]
                 vals = flip map collections $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"] -- value_fkey
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]
                 valsForSQL = vals
                 inserts = csv valsForSQL
              in (: []) $
@@ -1161,15 +1161,7 @@ insertCollectionTableQuery ms =
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
     collectiontype = excluded.collectiontype,
-    value = CASE 
-      WHEN jsonb_typeof(excluded.value) = 'object' AND jsonb_typeof(|]
-                        <> tableNameToDoubleQuoteText tableName
-                        <> [r|.value) = 'object'
-      THEN |]
-                        <> tableNameToDoubleQuoteText tableName
-                        <> [r|.value || excluded.value
-      ELSE excluded.value
-    END|],
+    value = excluded.value|],
                       ";"
                     ]
 
