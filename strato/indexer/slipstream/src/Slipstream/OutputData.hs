@@ -1136,6 +1136,18 @@ insertCollectionTableQuery ms =
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"] -- value_fkey
                 valsForSQL = vals
                 inserts = csv valsForSQL
+                -- Recursive isStructDeep helper
+                let isStructDeep :: V.Value -> Bool
+                    isStructDeep (V.ValueStruct _) = True
+                    isStructDeep (V.ValueArrayFixed _ vs) = any isStructDeep vs
+                    isStructDeep (V.ValueArrayDynamic vs) = any isStructDeep vs
+                    isStructDeep (V.ValueMapping m) = any isStructDeep (Map.elems m)
+                    isStructDeep _ = False
+                -- Haskell-side conditional for struct merge logic
+                mergeValueSql =
+                  if isStructDeep (collectionDataValue x)
+                    then "table.value || excluded.value"
+                    else "excluded.value"
              in (: []) $
                   T.concat
                     [ "INSERT INTO ",
@@ -1157,17 +1169,7 @@ insertCollectionTableQuery ms =
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
     collectiontype = excluded.collectiontype,
-    value = CASE 
-      WHEN jsonb_typeof(excluded.value) = 'object' AND jsonb_typeof(|]
-                        <> tableNameToDoubleQuoteText tableName
-                        <> [r|.value) = 'object'
-      THEN |]
-                        <> tableNameToDoubleQuoteText tableName
-                        <> [r|.value || excluded.value
-      ELSE excluded.value
-    END|],
-                      ";"
-                    ]
+    value = |],mergeValueSql,";"]
 
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertEventArrayTableQuery [] = []
