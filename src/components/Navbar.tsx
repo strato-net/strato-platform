@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -35,14 +34,9 @@ const Navbar = () => {
           </div>
           <div className="hidden md:block">
             <div className="ml-4 flex items-center md:ml-6">
-              <Link to="/login" className="text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5 px-4 py-2 rounded-full mr-3 text-sm font-medium">
+              <a href="/login" className="text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5 px-4 py-2 rounded-full mr-3 text-sm font-medium">
                 Login
-              </Link>
-              <Link to="/register">
-                <Button className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                  <ArrowRight className="mr-2 h-4 w-4" /> Launch App
-                </Button>
-              </Link>
+              </a>
             </div>
           </div>
           <div className="flex md:hidden">
@@ -80,14 +74,9 @@ const Navbar = () => {
               About
             </a>
             <div className="pt-4 pb-2 border-t border-gray-200">
-              <Link to="/login" className="block text-center w-full text-strato-blue border border-strato-blue hover:bg-strato-blue/5 px-4 py-2 rounded-full mb-2">
+              <a href="/login" className="block text-center w-full text-strato-blue border border-strato-blue hover:bg-strato-blue/5 px-4 py-2 rounded-full mb-2">
                 Login
-              </Link>
-              <Link to="/register" className="block w-full">
-                <Button className="w-full bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                  <ArrowRight className="mr-2 h-4 w-4" /> Launch App
-                </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
