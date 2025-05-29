@@ -51,7 +51,7 @@ addrBS :: Address -> B.ByteString
 addrBS = BC.pack . formatAddressWithoutColor
 
 blockappsAddress :: Address
-blockappsAddress = 0x0dbb9131d99c8317aa69a70909e124f2e02446e8
+blockappsAddress = 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce --0x0dbb9131d99c8317aa69a70909e124f2e02446e8
 
 mercataAddress :: Address
 mercataAddress = 0x1000
@@ -85,6 +85,9 @@ onRampAddress = 0x1009
 
 poolFactoryAddress :: Address
 poolFactoryAddress = 0x100a
+
+baseContractAddresses :: [Address]
+baseContractAddresses = [mercataAddress..poolFactoryAddress]
 
 genesisBlock :: GenesisInfo
 genesisBlock  =
@@ -154,6 +157,7 @@ assetToAccountInfos GA.Asset{..} =
                              )
             else Nothing
         ) $ M.elems balances
+      contractBalances = if root == usdstAddress then (\a -> ("._balances<a:" <> addrBS a <> ">", BInteger $ correctQuantity 0 name 100000)) <$> baseContractAddresses else []
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
    in case allBalances of
         [] -> Nothing
@@ -169,6 +173,7 @@ assetToAccountInfos GA.Asset{..} =
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ mapMaybe (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData)
             ++ allBalances
+            ++ contractBalances
             ++ maybeToList ((\(_,v) -> (".icon", BString $ encodeUtf8 v)) <$> (listToMaybe $ M.toList images))
   where maybeDefault BDefault = Nothing
         maybeDefault v        = Just v
