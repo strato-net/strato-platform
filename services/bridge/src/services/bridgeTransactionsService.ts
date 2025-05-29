@@ -25,6 +25,7 @@ export async function getAllBridgeTransactions(type: string, limit?: number, off
     const params: any = {};
     if (limit !== undefined) params.limit = limit;
     if (offset !== undefined) params.offset = offset;
+    params.order = 'block_timestamp.desc';
 
     const response = await axios.get(
       `${process.env.NODE_URL}/cirrus/search/${eventType}`,
