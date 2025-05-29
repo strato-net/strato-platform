@@ -42,21 +42,12 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
       setTimeout(() => {
         if (isRegister) {
           toast({
-            title: "Account created",
-            description: "Your wallet has been successfully created",
+            title: "Registration successful",
+            description: "Please check your email for a verification code",
           });
           
-          // Generate mock wallet data (for demo purposes)
-          const walletData = {
-            username: data.username || "user_" + Math.floor(Math.random() * 10000),
-            blockchainAccount: "0x" + Array.from({length: 40}, () => 
-              "0123456789abcdef"[Math.floor(Math.random() * 16)]).join(''),
-            privateKey: Array.from({length: 64}, () => 
-              "0123456789abcdef"[Math.floor(Math.random() * 16)]).join('')
-          };
-          
-          // Navigate to wallet created page with the wallet data
-          navigate('/wallet-created', { state: { walletData } });
+          // Navigate to email confirmation page with form data
+          navigate('/confirm-email', { state: { formData: data } });
         } else {
           toast({
             title: "Welcome back",
@@ -114,6 +105,44 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
               )}
             />
           )}
+
+          {isRegister && (
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <Input className="pl-10" placeholder="your@email.com" {...field} />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          
+          {!isRegister && (
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username or Email</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <Input className="pl-10" placeholder="your@email.com" {...field} />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
           
           <FormField
             control={form.control}
@@ -133,53 +162,17 @@ const AuthForm = ({ isRegister = false }: AuthFormProps) => {
           />
           
           {isRegister && (
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                      <Input className="pl-10" type="password" placeholder="••••••••" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-          
-          {!isRegister ? (
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                      <Input className="pl-10" placeholder="your@email.com" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ) : (
             <>
               <FormField
                 control={form.control}
-                name="email"
+                name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (optional)</FormLabel>
+                    <FormLabel>Confirm Password</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                        <Input className="pl-10" placeholder="your@email.com" {...field} />
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                        <Input className="pl-10" type="password" placeholder="••••••••" {...field} />
                       </div>
                     </FormControl>
                     <FormMessage />

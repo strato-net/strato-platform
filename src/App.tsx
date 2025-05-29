@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ConfirmEmail from "./pages/ConfirmEmail";
 import WalletCreated from "./pages/WalletCreated";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
@@ -14,6 +15,7 @@ import Transfer from "./pages/Transfer";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import Borrow from "./pages/Borrow";
+import Pools from "./pages/Pools";
 import NotFound from "./pages/NotFound";
 import { UserProvider } from "./context/UserContext";
 import { UserTokensProvider } from "./context/UserTokensContext";
@@ -38,6 +40,7 @@ const App = () => (
                       <Route path="/" element={<Index />} />
                       <Route path="/login" element={<Login />} />
                       <Route path="/register" element={<Register />} />
+                      <Route path="/confirm-email" element={<ConfirmEmail />} />
                       <Route path="/wallet-created" element={<WalletCreated />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/dashboard" element={<Dashboard />} />
@@ -45,6 +48,7 @@ const App = () => (
                       <Route path="/dashboard/assets" element={<Assets />} />
                       <Route path="/dashboard/assets/:id" element={<AssetDetail />} />
                       <Route path="/dashboard/borrow" element={<Borrow />} />
+                      <Route path="/dashboard/pools" element={<Pools />} />
                       <Route path="/dashboard/transfer" element={<Transfer />} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
