@@ -23,7 +23,7 @@ export const getPool = async (
     ...(select
       ? {}
       : {
-          "lendingPool.loans.value->>amount": "gt.0",
+          "lendingPool.loans.value->>active": "eq.true",
           "collateralVault.collaterals.value->>amount": "gt.0",
         }),
     lendingPool: `eq.${lendingPool}`,

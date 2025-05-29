@@ -12,7 +12,7 @@ export const constants = (() => {
       onRamp: "TBD",
     },
     testnet: {
-      onRamp: "82446ad8f2b8982824f001df53710d9a86ace703",
+      onRamp: "1bd046f77f8a5d75b5566149ecc55e8d694b8632",
     },
     testnet2: {
       onRamp: "5f0f4f4bdde0ed657c189351685cfbd5b0d62a50",
