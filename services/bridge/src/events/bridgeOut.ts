@@ -1,10 +1,17 @@
 import axios from "axios";
 import logger from "../utils/logger";
 import { config } from "../config";
+import sgMail from '@sendgrid/mail';
 
 import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
+
+// Initialize SendGrid with API key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
+
+
+const BLOCKAPPS_EMAIL = process.env.BLOCKAPPS_EMAIL ;
 
 interface BridgeOutTransaction {
   hash: string;
@@ -171,6 +178,37 @@ export async function handleBridgeOut(
       });
       
       logger.info("Safe transaction proposed successfully");
+
+      // Send email notification
+      try {
+        if (!BLOCKAPPS_EMAIL) {
+          logger.error('BLOCKAPPS_EMAIL environment variable is not set');
+          return;
+        }
+
+        const msg = {
+          to: BLOCKAPPS_EMAIL,
+          from: BLOCKAPPS_EMAIL,
+          subject: 'New Bridge Transaction Proposed',
+          html: `
+            <h2>New Bridge Transaction Details</h2>
+            <p><strong>Transaction Hash:</strong> ${response.data[0].hash}</p>
+            <p><strong>From Address:</strong> ${from}</p>
+            <p><strong>To Address:</strong> ${to}</p>
+            <p><strong>Amount:</strong> ${value} ${token}</p>
+            <p><strong>Safe Transaction Hash:</strong> ${safeTxHash}</p>
+            <p><strong>Status:</strong> Proposed for Signing</p>
+            <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+            <p>Please review and sign the transaction in the Safe interface.</p>
+          `,
+        };
+
+        await sgMail.send(msg);
+        logger.info('Transaction notification email sent successfully to:', BLOCKAPPS_EMAIL);
+      } catch (emailError) {
+        logger.error('Failed to send email notification:', emailError);
+        // Don't throw the error as email failure shouldn't affect the main flow
+      }
     } else {
       logger.info("No matching event found for transaction hash:", response.data[0].hash);
     }
