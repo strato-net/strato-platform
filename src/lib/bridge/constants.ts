@@ -1,5 +1,6 @@
 export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const SAFE_ADDRESS = import.meta.env.VITE_SAFE_ADDRESS;
+export const BRIDGE_TOKEN_ADDRESS = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
 
 export const BRIDGE_ABI = [
   {

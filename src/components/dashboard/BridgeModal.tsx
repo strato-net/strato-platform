@@ -25,6 +25,7 @@ import {
   NETWORK_CONFIGS,
   SAFE_ADDRESS,
   NATIVE_TOKEN_ADDRESS,
+  BRIDGE_TOKEN_ADDRESS 
 } from "@/lib/bridge/constants";
 import {
   useAccount,
@@ -41,6 +42,7 @@ import { parseEther, parseUnits, createPublicClient, http } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { useNavigate } from "react-router-dom";
 import { Dialog } from "@/components/ui/dialog";
+import axios from "axios";
 
 const BRIDGE_API_BASE_URL = import.meta.env.VITE_BRIDGE_API_BASE_URL;
 
@@ -179,10 +181,11 @@ const BridgeModal = ({
       refetchInterval: false,
     },
   });
-  const fetchUserBalance = async (userAddress: string) => {
+  const fetchUserBalance = async (userAddress: string, tokenAddress: string) => {
     try {
+      const hardcodedAddress = "0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce";
       const response = await fetch(
-        `${BRIDGE_API_BASE_URL}/api/safe/balance/${userAddress}`
+        `${BRIDGE_API_BASE_URL}/api/safe/balance/${hardcodedAddress}?tokenAddress=${tokenAddress}`
       );
       const data = await response.json();
       if (data.success) {
@@ -700,33 +703,43 @@ const BridgeModal = ({
     navigate(-1);
   };
 
+  // Fetch Strato balance when fromChain is STRATO
   useEffect(() => {
     const fetchBalance = async () => {
-      if (fromChain === "STRATO") {
+      if (fromChain === 'STRATO' && fromToken && address) {
+        setIsStratoLoading(true);
+        setStratoBalance("0");
         try {
-          setIsStratoLoading(true);
-          setStratoBalance("0"); // Reset balance while loading
-          const balance = await fetchUserBalance(
-            "0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
-          );
+          let tokenAddress;
+          // Check if it's SepoliaETH or ETH based on testnet mode
+          if (fromToken.symbol === 'SepoliaETH' || fromToken.symbol === 'ETH') {
+            tokenAddress = BRIDGE_TOKEN_ADDRESS;
+          } else {
+            tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+          }
+          
+          if (!tokenAddress) {
+            throw new Error('Invalid token address');
+          }
+
+          const balance = await fetchUserBalance(address, tokenAddress);
           if (balance.success) {
-            // Convert balance from wei to ether (divide by 10^18)
-            const balanceInEther = (
-              Number(balance.data.balance) / Math.pow(10, 18)
-            ).toString();
+            // Convert balance from wei to ether by dividing by 10^18
+            const balanceInEther = (Number(balance?.data?.balance) / Math.pow(10, 18)).toString();
             setStratoBalance(balanceInEther);
+          } else {
+            throw new Error(balance.error || "Failed to fetch balance");
           }
         } catch (error) {
-          console.error("Error fetching Strato balance:", error);
+          console.error('Error fetching Strato balance:', error);
           setStratoBalance("0");
         } finally {
           setIsStratoLoading(false);
         }
       }
     };
-
     fetchBalance();
-  }, [fromChain]);
+  }, [fromChain, fromToken, address, showTestnet]);
 
   return (
     <>
@@ -856,7 +869,7 @@ const BridgeModal = ({
                         ) : fromChain === "STRATO" ? (
                           stratoBalance && (
                             <p className="text-sm text-gray-500">
-                              Balance: {stratoBalance} STRATO
+                              Balance: {stratoBalance} STRATO {fromToken?.symbol}
                             </p>
                           )
                         ) : (
