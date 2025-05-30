@@ -7,10 +7,10 @@ export async function getAllBridgeTransactionsHandler(req: Request, res: Respons
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
     
-    if (!type || !['withdrawalinitiated', 'depositrecorded'].includes(type.toLowerCase())) {
+    if (!type || !['withdrawalinitiated', 'withdrawalpendingapproval', 'withdrawalcompleted', 'depositrecorded'].includes(type.toLowerCase())) {
       return res.status(400).json({
         success: false,
-        error: "Invalid transaction type. Must be either 'withdrawalinitiated' or 'depositrecorded'"
+        error: "Invalid transaction type. Must be one of: 'withdrawalinitiated', 'withdrawalpendingapproval', 'withdrawalcompleted', or 'depositrecorded'"
       });
     }
 

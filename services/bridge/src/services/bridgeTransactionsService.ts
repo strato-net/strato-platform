@@ -18,9 +18,18 @@ export async function getAllBridgeTransactions(type: string, limit?: number, off
       throw new Error("Failed to get access token");
     }
 
-    const eventType = type === 'withdrawalinitiated' 
-      ? 'MercataEthBridge.WithdrawalInitiated'
-      : 'MercataEthBridge.DepositRecorded';
+    let eventType;
+    if (type === 'withdrawalinitiated') {
+      eventType = 'MercataEthBridge.WithdrawalInitiated';
+    } else if (type === 'withdrawalpendingapproval') {
+      eventType = 'MercataEthBridge.WithdrawalPendingApproval';
+    } else if (type === 'withdrawalcompleted') {
+      eventType = 'MercataEthBridge.WithdrawalCompleted';
+    } else if (type === 'depositrecorded') {
+      eventType = 'MercataEthBridge.DepositRecorded';
+    } else {
+      throw new Error("Invalid transaction type");
+    }
 
     const params: any = {};
     if (limit !== undefined) params.limit = limit;
