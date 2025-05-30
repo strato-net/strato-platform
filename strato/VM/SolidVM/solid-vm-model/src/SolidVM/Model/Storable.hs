@@ -91,7 +91,6 @@ basicParse input =
         ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAccount $ read accountString),
         ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
-        ("([a-fA-F0-9]+)", \[accountString] -> Just $ BAccount $ read accountString),
         ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
       ]
 
@@ -129,7 +128,7 @@ instance Format BasicValue where
 
 formatBasicValueForSQL :: BasicValue -> Text
 formatBasicValueForSQL (BInteger i) = T.pack $ show i
-formatBasicValueForSQL (BString s) = either (const . T.pack $ UTF8.toString s) id $ decodeUtf8' s
+formatBasicValueForSQL (BString s) = either (const . T.pack $ C8.unpack s) id $ decodeUtf8' s
 formatBasicValueForSQL (BDecimal v) = T.pack $ show v
 formatBasicValueForSQL (BBool True) = "true"
 formatBasicValueForSQL (BBool False) = "false"
