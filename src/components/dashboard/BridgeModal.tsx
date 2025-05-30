@@ -334,7 +334,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     setFromChain(value);
     // Disconnect wallet when network changes
     if (isConnected) {
-      disconnect();
+      // disconnect();  
       setIsNetworkChanged(true);
     }
     // Reset tokens when chain changes
@@ -344,10 +344,10 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
 
   const handleSwap = () => {
     swapChains();
-    if (isConnected) {
-      disconnect();
-      setIsNetworkChanged(true);
-    }
+    // if (isConnected) {
+    //   disconnect();
+    //   setIsNetworkChanged(true);
+    // }
   };
 
   // Add effect to reset isNetworkChanged when wallet connects
