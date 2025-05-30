@@ -41,7 +41,12 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
       setIsLoading(true);
       const limit = ITEMS_PER_PAGE;
       const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-      const endpoint = transactionType === 'WithdrawalInitiated' ? withdrawalStatus.toLowerCase() : transactionType.toLowerCase();
+      let endpoint;
+      if (transactionType === 'WithdrawalInitiated') {
+        endpoint = withdrawalStatus.toLowerCase();
+      } else {
+        endpoint = transactionType.toLowerCase();
+      }
       const response = await axios.get(`${BRIDGE_API_BASE_URL}/api/safe/transaction/${endpoint}`, {
         params: { limit, offset }
       });
@@ -110,13 +115,13 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                     value="DepositRecorded"
                     className="h-auto py-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg transition-all duration-200 hover:bg-gray-50/80 text-gray-600 font-medium text-center"
                   >
-                    Deposit Recorded
+                    Deposit 
                   </TabsTrigger>
                   <TabsTrigger 
                     value="WithdrawalInitiated"
                     className="h-auto py-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg transition-all duration-200 hover:bg-gray-50/80 text-gray-600 font-medium text-center"
                   >
-                    Withdrawal Initiated
+                    Withdrawal 
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -162,7 +167,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                       <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">From</th>
                       <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">To</th>
                       <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Amount</th>
-                      {(withdrawalStatus === 'WithdrawalInitiated' || withdrawalStatus === 'WithdrawalPendingApproval') && (
+                      {withdrawalStatus === 'WithdrawalPendingApproval' && (
                         <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Status</th>
                       )}
                       <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Time</th>
@@ -194,7 +199,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                           <td className="py-3 px-4 text-sm">{getFromChain(tx)}</td>
                           <td className="py-3 px-4 text-sm">{getToChain(tx)}</td>
                           <td className="py-3 px-4 text-sm font-medium">{formatAmount(tx.amount)}</td>
-                          {(withdrawalStatus === 'WithdrawalInitiated' || withdrawalStatus === 'WithdrawalPendingApproval') && (
+                          {withdrawalStatus === 'WithdrawalPendingApproval' && (
                             <td className="py-3 px-4">
                               <div 
                                 className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-1 rounded transition-colors"
