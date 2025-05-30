@@ -1,19 +1,18 @@
 import axios from 'axios';
 import { Request, Response } from 'express';
-import { config } from '../config';
 import { getUserToken } from '../auth';
 import logger from '../utils/logger';
 
 const nodeUrl = process.env.NODE_URL;
 
-export async function fetchUserBalance(address: string): Promise<{ address: string; balance: string }> {
+export async function fetchUserBalance(address: string, tokenAddress: string): Promise<{ address: string; balance: string }> {
   try {
     if (!nodeUrl) {
       throw new Error('NODE_URL environment variable is not configured');
     }
 
-    if (!config.bridge.tokenAddress) {
-      throw new Error('BRIDGE_TOKEN_ADDRESS environment variable is not configured');
+    if (!tokenAddress) {
+      throw new Error('Token address is required');
     }
 
     const accessToken = await getUserToken();
@@ -26,7 +25,7 @@ export async function fetchUserBalance(address: string): Promise<{ address: stri
         {
           payload: {
             contractName: "Token",
-            contractAddress: config.bridge.tokenAddress.toLowerCase().replace("0x", ""),
+            contractAddress: tokenAddress.toLowerCase().replace("0x", ""),
             method: "balanceOf",
             args: {
                 accountAddress: address.toLowerCase().replace("0x", "")
@@ -95,8 +94,9 @@ export const getUserBalance = async (req: Request, res: Response) => {
 
   try {
     const { address } = req.params;
+    const { tokenAddress } = req.body;
     
-    logger.info('Fetching balance for address:', address);
+    logger.info('Fetching balance for address:', address, 'and token:', tokenAddress);
 
     if (!address) {
       logger.error('Error: Address is missing');
@@ -107,7 +107,16 @@ export const getUserBalance = async (req: Request, res: Response) => {
       return;
     }
 
-    const balanceData = await fetchUserBalance(address);
+    if (!tokenAddress) {
+      logger.error('Error: Token address is missing');
+      res.status(400).json({
+        success: false,
+        error: 'Token address is required'
+      });
+      return;
+    }
+
+    const balanceData = await fetchUserBalance(address, tokenAddress);
     logger.info('Successfully fetched balance:', balanceData);
 
     res.json({

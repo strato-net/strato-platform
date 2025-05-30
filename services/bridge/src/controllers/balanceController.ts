@@ -11,6 +11,7 @@ class BalanceController {
   ): Promise<void> {
     try {
       const { address } = req.params;
+      const { tokenAddress } = req.body;
 
       if (!address) {
         logger.error('Address is missing in request');
@@ -21,8 +22,17 @@ class BalanceController {
         return;
       }
 
-      logger.info('Fetching balance for address:', address);
-      const balanceData = await fetchUserBalance(address);
+      if (!tokenAddress) {
+        logger.error('Token address is missing in request');
+        res.status(RestStatus.BAD_REQUEST).json({
+          success: false,
+          error: 'Token address is required'
+        });
+        return;
+      }
+
+      logger.info('Fetching balance for address:', address, 'and token:', tokenAddress);
+      const balanceData = await fetchUserBalance(address, tokenAddress);
       
       logger.info('Successfully fetched balance:', balanceData);
       res.status(RestStatus.OK).json({

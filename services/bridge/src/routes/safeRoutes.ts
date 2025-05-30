@@ -46,7 +46,11 @@ export function createSafeRoutes(): Router {
   router.get("/transaction/:type", getAllBridgeTransactionsHandler);
 
   // Route for getting token balance
-  router.get('/balance/:address', BalanceController.getBalance);
+  router.get('/balance/:address', (req, res, next) => {
+    const { tokenAddress } = req.query;
+    req.body = { tokenAddress }; // Pass tokenAddress to the controller
+    BalanceController.getBalance(req, res, next);
+  });
 
   return router;
 }
