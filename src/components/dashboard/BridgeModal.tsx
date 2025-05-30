@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeftRight, ArrowDownUp, History, ArrowLeft, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import BridgeTransactionsModal from './BridgeTransactionsModal';
 import { useBridge } from '@/lib/bridge/BridgeContext';
 import { 
   BRIDGEABLE_TOKENS, 
@@ -23,6 +22,7 @@ import { parseEther, parseUnits, createPublicClient, http } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
 import { useNavigate } from 'react-router-dom';
 import { Dialog } from '@/components/ui/dialog';
+
 
 const   BRIDGE_API_BASE_URL = import.meta.env.VITE_BRIDGE_API_BASE_URL;
 
@@ -45,27 +45,15 @@ const formatBalance = (value: bigint, decimals: number): string => {
 };
 
 const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalProps) => {
-  const [showTransactions, setShowTransactions] = useState(false);
   const [isNetworkChanged, setIsNetworkChanged] = useState(false);
   const [transactionHash, setTransactionHash] = useState<`0x${string}` | undefined>();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [stratoBalance, setStratoBalance] = useState<string>("0");
+  const [isStratoLoading, setIsStratoLoading] = useState(false);
+  const [isTokenLoading, setIsTokenLoading] = useState(false);
 
-  // Add useEffect to get user address from localStorage
-  // useEffect(() => {
-  //   const userData = localStorage.getItem('user');
-  //   if (userData) {
-  //     try {
-  //       const parsedUserData = JSON.parse(userData);
-  //       if (parsedUserData.userAddress) {
-  //         setUserAddress(parsedUserData.userAddress);
-  //       }
-  //     } catch (error) {
-  //       console.error('Error parsing user data from localStorage:', error);
-  //     }
-  //   }
-  // }, []);
 
   // Create debounced update function using useMemo
   const debouncedUpdateBalance = React.useMemo(() => {
@@ -100,6 +88,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const { switchChain } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
+  
 
   // Filter tokens based on testnet status
   const availableTokens = showTestnet 
@@ -157,11 +146,29 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       refetchInterval: false
     }
   });
+  const fetchUserBalance = async (userAddress: string) => {
+    try {
+      const response = await fetch(`${BRIDGE_API_BASE_URL}/api/safe/balance/${userAddress}`);
+      const data = await response.json();
+      if (data.success) {
+        return data;
+      } else {
+        throw new Error(data.error || 'Failed to fetch balance');
+      }
+    } catch (error: any) {
+      console.error('Error fetching user balance:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch balance",
+        variant: "destructive",
+      });
+      return "0";
+    }
+  };
 
   // Add effect to refetch balance when wallet connects
   useEffect(() => {
     if (isConnected && address) {
-    
       if (fromToken?.symbol === (showTestnet ? 'SepoliaETH' : 'ETH')) {
         refetchNativeBalance();
       } else {
@@ -173,7 +180,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   // Update the balance fetching effect
   useEffect(() => {
     let mounted = true;
-    let isInitialFetch = true; // Add flag for initial fetch
+    let isInitialFetch = true;
 
     const updateBalance = async () => {
       if (!mounted) return;
@@ -194,8 +201,8 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       try {
         // Only show loading on initial fetch or network switch
         if (isInitialFetch) {
-          setIsBalanceLoading(true);
-          setTokenBalance("");
+          setIsTokenLoading(true);
+          setTokenBalance("0"); // Reset balance while loading
         }
         
         // Fetch balance based on token type
@@ -221,7 +228,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
         }
       } finally {
         if (mounted) {
-          setIsBalanceLoading(false);
+          setIsTokenLoading(false);
           isInitialFetch = false;
         }
       }
@@ -243,7 +250,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   // Add effect to handle network changes
   useEffect(() => {
     if (isConnected && chain) {
-   
       // Reset balance when chain changes
       setTokenBalance("0");
       // Refetch balance after a short delay
@@ -261,19 +267,15 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const [amountError, setAmountError] = useState<string>("");
 
   const validateAmount = (value: string): boolean => {
-    // Skip validation for STRATO to other networks
-    if (fromChain === 'STRATO' && toChain !== 'STRATO') {
-      setAmountError("");
-      return true;
-    }
-
     if (!value) {
       setAmountError("");
       return true;
     }
 
     const numericAmount = parseFloat(value);
-    const numericBalance = parseFloat(tokenBalance);
+    const numericBalance = fromChain === 'STRATO' 
+      ? parseFloat(stratoBalance)
+      : parseFloat(tokenBalance);
 
     if (isNaN(numericAmount)) {
       setAmountError("Please enter a valid number");
@@ -286,7 +288,7 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
     }
 
     if (numericAmount > numericBalance) {
-      setAmountError(`Insufficient balance. Maximum amount: ${tokenBalance}`);
+      setAmountError(`Insufficient balance. Maximum amount: ${fromChain === 'STRATO' ? stratoBalance : tokenBalance} ${fromChain === 'STRATO' ? 'STRATO' : fromToken?.symbol}`);
       return false;
     }
 
@@ -439,7 +441,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
           setTransactionHash(result.txHash);
           updateTransactionStatus?.(result.txHash, 'pending');
           onClose();
-          setShowTransactions(true);
         } else {
           throw new Error(result.message || 'Transfer failed');
         }
@@ -449,7 +450,6 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
       // For other network transfers, use handleBridgeIn
       await handleBridgeIn();
       onClose();
-      setShowTransactions(true);
     } catch (error: any) {
       console.error('Bridge transaction failed:', error);
       toast({
@@ -684,6 +684,30 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
   const handleBack = () => {
     navigate(-1);
   };
+  
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (fromChain === 'STRATO') {
+        try {
+          setIsStratoLoading(true);
+          setStratoBalance("0"); // Reset balance while loading
+          const balance = await fetchUserBalance("0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce");
+          if (balance.success) {
+            // Convert balance from wei to ether (divide by 10^18)
+            const balanceInEther = (Number(balance.data.balance) / Math.pow(10, 18)).toString();
+            setStratoBalance(balanceInEther);
+          }
+        } catch (error) {
+          console.error('Error fetching Strato balance:', error);
+          setStratoBalance("0");
+        } finally {
+          setIsStratoLoading(false);
+        }
+      }
+    };
+
+    fetchBalance();
+  }, [fromChain]); 
 
   return (
     <>
@@ -778,26 +802,33 @@ const BridgeModal = ({ isOpen, onClose, updateTransactionStatus }: BridgeModalPr
                         className={`w-full ${amountError ? 'border-red-500 focus:ring-red-400' : ''}`}
                         value={amount}
                         onChange={handleAmountChange}
+                        disabled={fromChain === 'STRATO' && (isStratoLoading || !stratoBalance)}
                       />
                       {amountError && (
                         <p className="text-sm text-red-500">{amountError}</p>
                       )}
-                      {!(fromChain === 'STRATO' && toChain !== 'STRATO') && (
-                        <div className="flex items-center gap-2 mt-1">
-                          {isBalanceLoading ? (
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                              <p className="text-sm text-gray-500">Fetching balance...</p>
-                            </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {(isBalanceLoading || isStratoLoading || isTokenLoading) ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                            <p className="text-sm text-gray-500">Fetching balance...</p>
+                          </div>
+                        ) : (
+                          fromChain === 'STRATO' ? (
+                            stratoBalance && (
+                              <p className="text-sm text-gray-500">
+                                Balance: {stratoBalance} STRATO
+                              </p>
+                            )
                           ) : (
                             tokenBalance && (
                               <p className="text-sm text-gray-500">
                                 Balance: {tokenBalance} {fromToken?.symbol}
                               </p>
                             )
-                          )}
-                        </div>
-                      )}
+                          )
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-4">
