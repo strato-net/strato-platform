@@ -11,6 +11,8 @@ export interface BridgeTransaction {
   // Add other fields as needed
 }
 
+const NODE_URL = process.env.NODE_URL;
+
 export async function getAllBridgeTransactions(type: string, limit?: number, offset?: number): Promise<BridgeTransaction[]> {
   try {
     const accessToken = await getUserToken();
@@ -37,7 +39,7 @@ export async function getAllBridgeTransactions(type: string, limit?: number, off
     params.order = 'block_timestamp.desc';
 
     const response = await axios.get(
-      `${process.env.NODE_URL}/cirrus/search/${eventType}`,
+      `${NODE_URL}/cirrus/search/${eventType}`,
       {
         headers: {
           accept: "application/json;charset=utf-8",

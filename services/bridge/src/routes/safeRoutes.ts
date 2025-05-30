@@ -5,6 +5,7 @@ import { handleBridgeOut } from "../events/bridgeOut";
 import { config } from "../config";
 import { ethers } from "ethers";
 import { getAllBridgeTransactionsHandler } from "../controllers/bridgeTransactionsController";
+import BalanceController from "../controllers/balanceController";
 
 export function createSafeRoutes(): Router {
   const router = Router();
@@ -43,6 +44,9 @@ export function createSafeRoutes(): Router {
   
   // Route for getting all bridge transactions
   router.get("/transaction/:type", getAllBridgeTransactionsHandler);
+
+  // Route for getting token balance
+  router.get('/balance/:address', BalanceController.getBalance);
 
   return router;
 }
