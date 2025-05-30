@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAccount, useChainId, useBalance, useToken, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, parseUnits } from 'viem';
-import { BRIDGEABLE_TOKENS, TOKEN_ADDRESSES, BRIDGE_CONTRACT_ADDRESS, BRIDGE_ABI } from './constants';
+import { useAccount, useBalance, useWriteContract } from 'wagmi';
+import { BRIDGEABLE_TOKENS, TOKEN_ADDRESSES } from './constants';
 import { mainnet, polygon, sepolia } from 'wagmi/chains';
 
 interface BridgeContextType {
@@ -19,7 +18,6 @@ interface BridgeContextType {
   setToToken: (token: typeof BRIDGEABLE_TOKENS[0] | null) => void;
   setAmount: (amount: string) => void;
   setTokenBalance: (balance: string) => void;
-  handleBridge: () => Promise<void>;
   swapChains: () => void;
 }
 
@@ -60,38 +58,6 @@ export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setTokenBalance('0');
     }
   }, [balance]);
-
-  const handleBridge = async () => {
-    if (!fromToken || !amount || !address) return;
-
-    setIsLoading(true);
-    try {
-      const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
-      if (!tokenAddress) throw new Error('Invalid token address');
-
-      const amountInWei = fromToken.symbol === 'ETH' || fromToken.symbol === 'SepoliaETH'
-        ? parseEther(amount)
-        : parseUnits(amount, 18); // Assuming 18 decimals for other tokens
-
-      const chain = fromChain === 'Ethereum' 
-        ? (showTestnet ? sepolia : mainnet)
-        : polygon;
-
-      await writeContract({
-        address: BRIDGE_CONTRACT_ADDRESS as `0x${string}`,
-        abi: BRIDGE_ABI,
-        functionName: 'bridge',
-        args: [tokenAddress as `0x${string}`, amountInWei, address],
-        account: address,
-        chain,
-      });
-    } catch (error) {
-      console.error('Bridge error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const swapChains = () => {
     // Store current values
@@ -143,7 +109,6 @@ export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setToToken,
     setAmount,
     setTokenBalance,
-    handleBridge,
     swapChains,
   };
 
