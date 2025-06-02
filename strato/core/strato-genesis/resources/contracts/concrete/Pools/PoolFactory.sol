@@ -13,9 +13,6 @@
  * - All trading/core functions happen directly with pool contracts
  */
 
-import "Pool.sol";
-import "../../abstract/ERC20/access/Ownable.sol";
-
 contract record PoolFactory is Ownable {
     event NewPool(address indexed tokenA, address indexed tokenB, address pool);
 

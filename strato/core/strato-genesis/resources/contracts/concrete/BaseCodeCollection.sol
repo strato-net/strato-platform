@@ -1,38 +1,3 @@
-//ERC20
-import "../abstract/ERC20/ERC20.sol";
-//import "ERC20/extensions/ERC20Burnable.sol";
-
-//Generic token
-import "Tokens/Token.sol";
-import "Tokens/TokenFaucet.sol";
-//import "Tokens/Metadata/TokenMetadata.sol";
-//import "Tokens/TokenAccess.sol";
-
-//Swap
-import "Pools/Pool.sol";
-import "Pools/PoolFactory.sol";
-
-//OnRamp
-import "OnRamp/OnRamp.sol";
-
-//Redemption
-//import "Redemptions/RedemptionService.sol";
-//import "Redemptions/CryptoRedemptionService.sol"; incomplete
-//import "Redemptions/PhysicalRedemptionService.sol"; doesn't compile
-
-//Lending
-import "Lending/CollateralVault.sol";
-import "Lending/LendingPool.sol";
-import "LendingRegistry.sol";
-import "Lending/LiquidityPool.sol";
-import "Lending/PoolConfigurator.sol";
-import "Lending/PriceOracle.sol";
-import "Lending/RateStrategy.sol";
-
-//Bridging
-import "Bridge/MercataEthBridge.sol";
-
-//TODO
 contract Mercata {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;

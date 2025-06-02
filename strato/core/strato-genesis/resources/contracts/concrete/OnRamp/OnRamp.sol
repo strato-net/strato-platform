@@ -1,6 +1,3 @@
-import "./../abstract/ERC20/IERC20.sol";
-import "../Lending/PriceOracle.sol";
-
 contract record OnRamp {
     event TokenWhitelisted(address token);
     event SellerApproved(address seller, bool approved);
