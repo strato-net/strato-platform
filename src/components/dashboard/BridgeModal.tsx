@@ -869,7 +869,7 @@ const BridgeModal = ({
                         ) : fromChain === "STRATO" ? (
                           stratoBalance && (
                             <p className="text-sm text-gray-500">
-                              Balance: {stratoBalance} STRATO {fromToken?.symbol}
+                              Balance: {Number(stratoBalance).toFixed(18)} STRATO {fromToken?.symbol}
                             </p>
                           )
                         ) : (
