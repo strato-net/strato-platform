@@ -1,5 +1,5 @@
 FROM openresty/openresty:1.21.4.4-1-alpine-fat
-MAINTAINER BlockApps Inc.
+LABEL maintainer="BlockApps Inc."
 
 RUN apk add bash apache2-utils vim nano bind-tools jq && \
     mkdir -p /usr/local/openresty/nginx/lua && \
