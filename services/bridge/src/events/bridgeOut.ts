@@ -100,19 +100,32 @@ export async function handleBridgeOut(
       },
     };
 
+    // console.log("txPayload", txPayload);
+
     logger.info("🧾 Full txPayload:", JSON.stringify(txPayload, null, 2));
 
-    const response = await axios.post(
-      `${nodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
-      txPayload,
-      {
-        headers: {
-          accept: "application/json;charset=utf-8",
-          "content-type": "application/json;charset=utf-8",
-          authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    // console.log("accessToken", accessToken);
+
+    let response: any;
+
+    try{
+      response = await axios.post(
+        `${nodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+        txPayload,
+        {
+          headers: {
+            accept: "application/json;charset=utf-8",
+            "content-type": "application/json;charset=utf-8",
+            authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+      // console.log("Contract Response:", response.data);
+    }catch(e){
+      console.log("Contract Response:", e);
+    }
+
+    // console.log("Contract Response:", response.data);
 
     logger.info("Contract Response:", response.data);
 
@@ -167,6 +180,8 @@ export async function handleBridgeOut(
         safeTransaction
       );
 
+      // console.log("safeTxHash", safeTxHash);
+
       const signature = await protocolKitOwner1.signHash(safeTxHash);
 
       await apiKit.proposeTransaction({
@@ -179,35 +194,79 @@ export async function handleBridgeOut(
       
       logger.info("Safe transaction proposed successfully");
 
-      // Send email notification
-      try {
-        if (!BLOCKAPPS_EMAIL) {
-          logger.error('BLOCKAPPS_EMAIL environment variable is not set');
-          return;
+      // Call markPendingApproval
+      const markPendingTxPayload = {
+        txs: [
+          {
+            payload: {
+              contractName: "BridgeContract",
+              contractAddress: config.bridge.address,
+              method: "markPendingApproval",
+              args: {
+                withdrawId: matchingEvent.withdrawId, // Assuming withdrawId is in the event data
+              },
+            },
+            type: "FUNCTION",
+          },
+        ],
+        txParams: {
+          gasLimit: 150000,
+          gasPrice: 30000000000,
+        },
+      };
+
+      const markPendingResponse = await axios.post(
+        `${nodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+        markPendingTxPayload,
+        {
+          headers: {
+            accept: "application/json;charset=utf-8",
+            "content-type": "application/json;charset=utf-8",
+            authorization: `Bearer ${accessToken}`,
+          },
         }
+      );
 
-        const msg = {
-          to: BLOCKAPPS_EMAIL,
-          from: BLOCKAPPS_EMAIL,
-          subject: 'New Bridge Transaction Proposed',
-          html: `
-            <h2>New Bridge Transaction Details</h2>
-            <p><strong>Transaction Hash:</strong> ${response.data[0].hash}</p>
-            <p><strong>From Address:</strong> ${from}</p>
-            <p><strong>To Address:</strong> ${to}</p>
-            <p><strong>Amount:</strong> ${value} ${token}</p>
-            <p><strong>Safe Transaction Hash:</strong> ${safeTxHash}</p>
-            <p><strong>Status:</strong> Proposed for Signing</p>
-            <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-            <p>Please review and sign the transaction in the Safe interface.</p>
-          `,
-        };
+    
 
-        await sgMail.send(msg);
-        logger.info('Transaction notification email sent successfully to:', BLOCKAPPS_EMAIL);
-      } catch (emailError) {
-        logger.error('Failed to send email notification:', emailError);
-        // Don't throw the error as email failure shouldn't affect the main flow
+
+
+      if (markPendingResponse.data && markPendingResponse.data[0].hash) {
+        logger.info("MarkPendingApproval transaction submitted with hash:", markPendingResponse.data[0].hash);
+        
+        // Send email notification only after both transactions are successful
+        try {
+          if (!BLOCKAPPS_EMAIL) {
+            logger.error('BLOCKAPPS_EMAIL environment variable is not set');
+            return;
+          }
+
+          const msg = {
+            to: BLOCKAPPS_EMAIL,
+            from: BLOCKAPPS_EMAIL,
+            subject: 'New Bridge Transaction Proposed and Pending Approval',
+            html: `
+              <h2>New Bridge Transaction Details</h2>
+              <p><strong>Initial Transaction Hash:</strong> ${response.data[0].hash}</p>
+              <p><strong>From Address:</strong> ${from}</p>
+              <p><strong>To Address:</strong> ${to}</p>
+              <p><strong>Amount:</strong> ${value} ${token}</p>
+              <p><strong>Safe Transaction Hash:</strong> ${safeTxHash}</p>
+              <p><strong>Mark Pending Approval Hash:</strong> ${markPendingResponse.data[0].hash}</p>
+              <p><strong>Status:</strong> Pending Approval</p>
+              <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+              <p>Please review and sign the transaction in the Safe interface.</p>
+            `,
+          };
+
+          await sgMail.send(msg);
+          logger.info('Transaction notification email sent successfully to:', BLOCKAPPS_EMAIL);
+        } catch (emailError) {
+          logger.error('Failed to send email notification:', emailError);
+          // Don't throw the error as email failure shouldn't affect the main flow
+        }
+      } else {
+        throw new Error("MarkPendingApproval transaction submission failed");
       }
     } else {
       logger.info("No matching event found for transaction hash:", response.data[0].hash);
