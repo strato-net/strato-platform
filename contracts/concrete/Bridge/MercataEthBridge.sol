@@ -1,36 +1,41 @@
 import "./Tokens/Token.sol";
 /*
  *  MercataEthBridge – STRATO ↔ Ethereum Safe bridge contract (no OpenZeppelin deps)
- *  ---------------------------------------------------------------------------
+ *  ------------------------------------------------------------------------------
  *  FUNCTIONAL OVERVIEW
  *  -------------------
  *  1. **Deposit → Mint (Ethereum → STRATO)**
- *     • A relayer observes deposits into a Gnosis Safe wallet on Ethereum.
- *     • For every confirmed deposit it calls `recordDeposit(...)`, which mints
- *       wrapped tokens (or ETH representation) on STRATO for the recipient.
- *     • The Ethereum tx‑hash is tracked in `processed` to prevent re‑minting.
+ *     • A relayer monitors Ethereum for deposits into a Gnosis Safe wallet.
+ *     • For each verified deposit, it calls `deposit(...)`:
+ *         – Marks the Ethereum txHash as **INITIATED** in `depositStatus`.
+ *         – Emits `DepositInitiated`, including the original Ethereum sender,
+ *           STRATO recipient, amount, and Mercata user address.
+ *     • After the relayer confirms off-chain validation, it calls `confirmDeposit(...)`:
+ *         – Mints the corresponding wrapped token amount to the STRATO recipient.
+ *         – Marks the deposit as **COMPLETED** in `depositStatus`.
+ *         – Emits `DepositCompleted`.
+ *     • Replays are prevented via the `depositStatus` mapping.
  *
- *  2. **Burn → Withdrawal Request (STRATO → Ethereum)**
- *     • Users burn their wrapped tokens via `withdraw(...)` and supply the
- *       20‑byte Ethereum address where they want the original asset.
- *     • A deterministic `withdrawId` is generated and stored with state
- *       **INITIATED**; an event is emitted for front‑ends and the relayer.
+ *  2. **Withdraw → Burn and Ethereum Payout (STRATO → Ethereum)**
+ *     • A relayer initiates a withdrawal on behalf of a Mercata user by calling `withdraw(...)`:
+ *         – Burns the specified amount of wrapped tokens from the STRATO Safe account.
+ *         – Records the withdrawal under `withdrawStatus` with state **INITIATED**.
+ *         – Emits `WithdrawalInitiated`
+ *     • Once the relayer constructs and submits a corresponding Safe transaction on Ethereum,
+ *       it calls `markWithdrawalPendingApproval(...)`:
+ *         – Updates the withdrawal status to **PENDING_APPROVAL**.
+ *         – Emits `WithdrawalPendingApproval`.
+ *     • After the Ethereum transaction is executed and confirmed on-chain,
+ *       the relayer calls `confirmWithdrawal(...)`:
+ *         – Finalizes the withdrawal by marking it as **COMPLETED**.
+ *         – Emits `WithdrawalCompleted`.
+ *     • Duplicate execution is prevented via `withdrawStatus`.
  *
- *  3. **Safe Release Workflow**
- *     • The off‑chain relayer builds a matching Safe multisig transaction.
- *     • Once posted to the Safe Tx Service it calls `markPendingApproval()`
- *       to update the status to **PENDING_APPROVAL**.
- *     • After the Safe executes on Ethereum, the relayer calls
- *       `confirmWithdrawal()` to mark the request **COMPLETED**.
- *
- *  4. **Security Features**
- *     • Single `owner` key (ideally a STRATO multisig) with power to pause,
- *       change relayer, and tweak dust limit.
- *     • `relayer` key allowed to record deposits and advance withdrawal state.
- *     • `paused` circuit breaker controlled by owner.
- *     • `nonReentrant` modifier based on simple status flag.
- *     • `minAmount` guard blocks dust / spam.
- *     • Replay protection on deposits via `processed` mapping.
+ *  3. **Security Features**
+ *     • `owner`: STRATO admin key (ideally a multisig) with authority to update relayer and `minAmount`.
+ *     • `relayer`: Off-chain trusted agent that manages bridging operations and lifecycle transitions.
+ *     • `minAmount`: Enforces a lower bound on transfer sizes to prevent dust/spam.
+ *     • Replay protection: Enforced via `depositStatus` and `withdrawStatus` mappings keyed by `txHash`.
  */
 
 contract record MercataEthBridge {
@@ -41,18 +46,23 @@ contract record MercataEthBridge {
     uint256 public minAmount = 0 ether; // dust guard
 
     // ──────────────────── state ─────────────────────────
-    mapping(uint256 => bool) public processed; // ethTxHash(uint256) → minted?
+    //mapping(uint256 => bool) public processed; // ethTxHash(uint256) → minted?
 
     enum WithdrawState { NONE, INITIATED, PENDING_APPROVAL, COMPLETED }
-    mapping(uint256 => WithdrawState) public withdrawStatus; // withdrawId → state
+    mapping(string => WithdrawState) public withdrawStatus; 
 
-    uint256 public nextWithdrawId = 1; // monotonically increasing ID counter
+    enum DepositState { NONE, INITIATED, COMPLETED }
+    mapping(string => DepositState) public depositStatus; 
+
+    //uint256 public nextWithdrawId = 1; // monotonically increasing ID counter
 
     // ─────────────────── events ─────────────────────────
-    event DepositRecorded(uint256 indexed ethTxHash, address indexed to, address indexed token, uint256 amount);
-    event WithdrawalInitiated(uint256 indexed withdrawId, address indexed from, address indexed token, uint256 amount, address ethRecipient);
-    event WithdrawalPendingApproval(uint256 indexed withdrawId);
-    event WithdrawalCompleted(uint256 indexed withdrawId);
+    //event DepositRecorded(uint256 indexed ethTxHash, address indexed to, address indexed token, uint256 amount);
+    event DepositInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
+    event DepositCompleted(string indexed txHash);
+    event WithdrawalInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
+    event WithdrawalPendingApproval(string indexed txHash);
+    event WithdrawalCompleted(string indexed txHash);
     event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
     event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
     event MinAmountUpdated(uint256 oldVal, uint256 newVal);
@@ -87,38 +97,47 @@ contract record MercataEthBridge {
     }
 
     // ────────── Ethereum → STRATO (mint) ──────────────
-    function recordDeposit(uint256 ethTxHash, address token, address to, uint256 amount) external onlyRelayer {
-        require(!processed[ethTxHash], "ALREADY_PROCESSED");
-        require(amount >= minAmount,   "BELOW_MIN");
-
-        processed[ethTxHash] = true;
-        Token(token).mint(to, amount);
-        emit DepositRecorded(ethTxHash, to, token, amount);
-    }
-
-    // ────────── STRATO → Ethereum (burn) ──────────────
-    function withdraw(address token, address from, uint256 amount, address ethRecipient) external onlyRelayer{
+    // txHash = Ethereum TX hash, from = depositor's Eth address, to = Safe wallet address
+    // mercataUser = Mercata user address of user initiating the deposit
+    function deposit(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
+        require(depositStatus[txHash] == DepositState.NONE, "ALREADY_PROCESSED");
         require(amount >= minAmount, "BELOW_MIN");
 
-        uint256 withdrawId = nextWithdrawId++;
-        // No duplicate check needed because ID is unique by construction
+        depositStatus[txHash] = DepositState.INITIATED;
+        emit DepositInitiated(txHash, from, token, amount, to, mercataUser);
+    }
+
+    function confirmDeposit(string calldata txHash, address token, address to, uint256 amount) external onlyRelayer {
+        require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
+
+        Token(token).mint(to, amount);
+        depositStatus[txHash] = DepositState.COMPLETED;
+        emit DepositCompleted(txHash);
+    }
+     
+    // ────────── STRATO → Ethereum (burn) ──────────────
+    // txHash = Safe TX hash, from = Safe wallet address, to = Eth address of recipient
+    // mercataUser = Mercata user address of user initiating the withdrawal
+    function withdraw(string calldata txHash, address token, address from, uint256 amount, address ethRecipient, address mercataUser) external onlyRelayer {
+        require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
+        require(amount >= minAmount, "BELOW_MIN");
 
         Token(token).burn(from, amount);
-        withdrawStatus[withdrawId] = WithdrawState.INITIATED;
-        emit WithdrawalInitiated(withdrawId, from, token, amount, ethRecipient);
+        withdrawStatus[txHash] = WithdrawState.INITIATED;
+
+        emit WithdrawalInitiated(txHash, from, token, amount, ethRecipient, mercataUser);
     }
 
-    /** Relayer marks Safe tx posted → awaiting multisig approvals */
-    function markPendingApproval(uint256 withdrawId) external onlyRelayer {
-        require(withdrawStatus[withdrawId] == WithdrawState.INITIATED, "BAD_STATE");
-        withdrawStatus[withdrawId] = WithdrawState.PENDING_APPROVAL;
-        emit WithdrawalPendingApproval(withdrawId);
+    function markWithdrawalPendingApproval(string calldata txHash) external onlyRelayer {
+        require(withdrawStatus[txHash] == WithdrawState.INITIATED, "BAD_STATE");
+        withdrawStatus[txHash] = WithdrawState.PENDING_APPROVAL;
+        emit WithdrawalPendingApproval(txHash);
     }
 
-    /** Relayer marks Safe executed → funds released */
-    function confirmWithdrawal(uint256 withdrawId) external onlyRelayer {
-        require(withdrawStatus[withdrawId] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
-        withdrawStatus[withdrawId] = WithdrawState.COMPLETED;
-        emit WithdrawalCompleted(withdrawId);
-    }
+    function confirmWithdrawal(string calldata txHash) external onlyRelayer {
+        require(withdrawStatus[txHash] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
+        withdrawStatus[txHash] = WithdrawState.COMPLETED;
+        emit WithdrawalCompleted(txHash);
+    }    
+
 }
