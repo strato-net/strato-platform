@@ -1,5 +1,11 @@
-import "./LendingPool.sol";
+import "./LendingRegistry.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+
+/**
+ * @title LiquidityPool
+ * @notice Manages token liquidity for lending and borrowing, including ERC20 token transfers.
+ * @dev Only callable by LendingPool; holds deposited funds and tracks borrowed balances.
+ */
 
  contract record LiquidityPool is IERC20, Ownable  {
     event Deposited(address indexed user, address indexed asset, uint256 amount);
@@ -17,23 +23,20 @@ import "../../abstract/ERC20/access/Ownable.sol";
         address asset;
         uint256 amount;
     }
-    address public lendingPool;
+    LendingRegistry public registry;
     mapping(string => Deposit) public record deposited;
     mapping(address => uint256) public record totalLiquidity;
     mapping(string => Borrow) public record borrowed;
 
-    constructor(address initialOwner) Ownable(initialOwner) {
-    } 
-
-    modifier onlyLendingPool() {	
-        require(msg.sender == lendingPool, "Caller is not LendingPool");	
-        _;	
-    }	
-
-   function setLendingPool(address _lendingPool) external onlyOwner {	
-        require(_lendingPool != address(0), "Invalid address");	
-        lendingPool = _lendingPool;	
+    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+        require(_registry != address(0), "Invalid registry");
+        registry = LendingRegistry(_registry);
     }
+
+    modifier onlyLendingPool() {
+        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
+        _;
+    }	
 
     function _key(address user, address asset) pure returns (string) {
         return keccak256(string(user), string(asset));
@@ -58,6 +61,8 @@ import "../../abstract/ERC20/access/Ownable.sol";
         string key = _key(to, asset);
         require(deposited[key].amount >= amount, "Insufficient balance");
         deposited[key].amount -= amount;
+        deposited[key].user = deposited[key].user;
+        deposited[key].asset = deposited[key].asset;
         totalLiquidity[asset] -= amount;
         require(IERC20(asset).transfer(to, amount), "Withdraw failed");
         emit Withdrawn(to, asset, amount);
@@ -85,6 +90,8 @@ import "../../abstract/ERC20/access/Ownable.sol";
         require(borrowed[key].amount > 0, "No outstanding debt");
         uint256 repayAmount = amount > totalOwed ? totalOwed : amount;
         borrowed[key].amount -= repayAmount;
+        borrowed[key].user = borrowed[key].user;
+        borrowed[key].asset = borrowed[key].asset;
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Repay failed");
         totalLiquidity[asset] += repayAmount;
         emit Repaid(borrower, asset, repayAmount);

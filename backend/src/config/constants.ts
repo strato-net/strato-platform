@@ -38,16 +38,24 @@ export const constants = (() => {
     "tokenB",
     "tokenBBalance",
   ];
-
-  const lendingPoolSelectFields = [
-    "address",
-    "oracle",
-    "liquidityPool",
-    "collateralVault",
-    "loans:LendingPool-loans(*)",
-    "interestRate:LendingPool-assetInterestRate(*)",
-    "collateralRatio:LendingPool-assetCollateralRatio(*)",
-    "liquidationBonus:LendingPool-assetLiquidationBonus(*)",
+  const registrySelectFields = [
+    "lendingPool: lendingPool_fkey(" +
+      "address," +
+      "loans:LendingPool-loans(key,LoanInfo:value)," +
+      "interestRate:LendingPool-assetInterestRate(asset:key,rate:value)," +
+      "collateralRatio:LendingPool-assetCollateralRatio(asset:key,ratio:value)," +
+      "liquidationBonus:LendingPool-assetLiquidationBonus(asset:key,bonus:value))",
+    "oracle:priceOracle_fkey(" +
+      "address," +
+      "prices:PriceOracle-prices(asset:key,price:value))",
+    "liquidityPool:liquidityPool_fkey(" +
+      "address," +
+      "deposited:LiquidityPool-deposited(key,Deposit:value)," +
+      "totalLiquidity:LiquidityPool-totalLiquidity(asset:key,amount:value)," +
+      "borrowed:LiquidityPool-borrowed(key,Borrow:value))",
+    "collateralVault:collateralVault_fkey(" +
+      "address," +
+      "collaterals:CollateralVault-collaterals(key,Collateral:value))",
   ];
 
   const configs = {
@@ -57,9 +65,9 @@ export const constants = (() => {
       onRamp: "TBD",
     },
     testnet: {
-      poolFactory: "ad5feba6e4d06c551d7ae477ea031120aaaddc2c",
-      lendingPool: "70e164caddf5b9e89e7484f7f4490be61b05c997",
-      onRamp: "261e49900fcdb016734696e705ef6b5c8d8026ac",
+      poolFactory: "d33fe6842d4ee45572f50e9bc8bd7138b6d95289",
+      lendingPool: "3ea34e3516912b0bc5c54a6200e0fa010afc02f3",
+      onRamp: "1bd046f77f8a5d75b5566149ecc55e8d694b8632",
     },
     testnet2: {
       poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",
@@ -81,7 +89,7 @@ export const constants = (() => {
     tokenSelectFields,
     tokenBalanceSelectFields,
     poolSelectFields,
-    lendingPoolSelectFields,
+    registrySelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();

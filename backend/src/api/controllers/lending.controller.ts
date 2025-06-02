@@ -25,7 +25,7 @@ class LendingController {
       const { accessToken, query } = req;
       const pool = await getPool(
         accessToken,
-        query as Record<string, string | undefined>
+        query as Record<string, string>
       );
       res.status(RestStatus.OK).json(pool);
     } catch (error) {

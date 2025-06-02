@@ -46,17 +46,24 @@ contract Mercata {
     PoolFactory public poolFactory;
 
     constructor() public {
+
+        lendingRegistry = new LendingRegistry(this);
+        collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
+        liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
         rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(msg.sender);
-        collateralVault = new CollateralVault(this);
-        liquidityPool = new LiquidityPool(this);
-        lendingPool = new LendingPool(address(liquidityPool), address(collateralVault), address(rateStrategy), address(priceOracle), msg.sender);
-        poolConfigurator = new PoolConfigurator(address(lendingPool), msg.sender);
-        lendingRegistry = new LendingRegistry(address(lendingPool), address(liquidityPool), address(collateralVault), address(rateStrategy), msg.sender);
-        collateralVault.setLendingPool(address(lendingPool));
-        Ownable(collateralVault).transferOwnership(msg.sender);
-        liquidityPool.setLendingPool(address(lendingPool));
-        Ownable(liquidityPool).transferOwnership(msg.sender);
+        priceOracle = new PriceOracle(msg.sender); 
+        poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender);
+           
+        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
+        poolConfigurator.setLendingPool(address(lendingPool));
+        poolConfigurator.setLiquidityPool(address(liquidityPool));
+        poolConfigurator.setCollateralVault(address(collateralVault));
+        poolConfigurator.setRateStrategy(address(rateStrategy));
+        poolConfigurator.setPriceOracle(address(priceOracle)); 
+        Ownable(poolConfigurator).transferOwnership(msg.sender);
+        
+
         poolFactory = new PoolFactory(msg.sender);
         mercataEthBridge = new MercataEthBridge(msg.sender);
         onRamp = new OnRamp(address(priceOracle), msg.sender);

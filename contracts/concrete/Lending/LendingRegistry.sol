@@ -1,51 +1,60 @@
 import "../../abstract/ERC20/access/Ownable.sol";
+import "./LendingPool.sol";
+import "./LiquidityPool.sol";
+import "./CollateralVault.sol";
+import "./RateStrategy.sol";
+import "./PriceOracle.sol";
 
-contract record LendingRegistry is Ownable {
-    event LendingPoolUpdated(address indexed newAddress);
-    event LiquidityPoolUpdated(address indexed newAddress);
-    event CollateralVaultUpdated(address indexed newAddress);
-    event RateStrategyUpdated(address indexed newAddress);
+/**
+ * @title LendingRegistry
+ * @notice Central registry contract storing addresses of core lending protocol components.
+ * @dev Can only be updated by the PoolConfigurator contract via access control or ownership.
+ */
+ 
+ contract record LendingRegistry is Ownable {
+    LendingPool public lendingPool;
+    LiquidityPool public liquidityPool;
+    CollateralVault public collateralVault;
+    RateStrategy public rateStrategy;
+    PriceOracle public priceOracle;
 
-    address public lendingPool;
-    address public liquidityPool;
-    address public collateralVault;
-    address public rateStrategy;
+    event LendingPoolSet(address indexed newAddress);
+    event LiquidityPoolSet(address indexed newAddress);
+    event CollateralVaultSet(address indexed newAddress);
+    event RateStrategySet(address indexed newAddress);
+    event PriceOracleSet(address indexed newAddress);
 
-    constructor (
-        address _lendingPool,
-        address _liquidityPool,
-        address _collateralVault,
-        address _rateStrategy,
-        address initialOwner
-    ) Ownable(initialOwner) {
-        lendingPool = _lendingPool;
-        liquidityPool = _liquidityPool;
-        collateralVault = _collateralVault;
-        rateStrategy = _rateStrategy;
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
-        emit LendingPoolUpdated(_lendingPool);
-        emit LiquidityPoolUpdated(_liquidityPool);
-        emit CollateralVaultUpdated(_collateralVault);
-        emit RateStrategyUpdated(_rateStrategy);
+    // External setter functions, gated by onlyOwner (e.g. PoolConfigurator)
+
+    function setLendingPool(address _lendingPool) public onlyOwner {
+        require(_lendingPool != address(0), "Invalid address");
+        lendingPool = LendingPool(_lendingPool);
+        emit LendingPoolSet(_lendingPool);
     }
 
-    function updateLendingPool(address _lendingPool) public onlyOwner {
-        lendingPool = _lendingPool;
-        emit LendingPoolUpdated(_lendingPool);
+    function setLiquidityPool(address _liquidityPool) public onlyOwner {
+        require(_liquidityPool != address(0), "Invalid address");
+        liquidityPool = LiquidityPool(_liquidityPool);
+        emit LiquidityPoolSet(_liquidityPool);
     }
 
-    function updateLiquidityPool(address _liquidityPool) public onlyOwner {
-        liquidityPool = _liquidityPool;
-        emit LiquidityPoolUpdated(_liquidityPool);
+    function setCollateralVault(address _collateralVault) public onlyOwner {
+        require(_collateralVault != address(0), "Invalid address");
+        collateralVault = CollateralVault(_collateralVault);
+        emit CollateralVaultSet(_collateralVault);
     }
 
-    function updateCollateralVault(address _collateralVault) public onlyOwner {
-        collateralVault = _collateralVault;
-        emit CollateralVaultUpdated(_collateralVault);
+    function setRateStrategy(address _rateStrategy) public onlyOwner {
+        require(_rateStrategy != address(0), "Invalid address");
+        rateStrategy = RateStrategy(_rateStrategy);
+        emit RateStrategySet(_rateStrategy);
     }
 
-    function updateRateStrategy(address _rateStrategy) public onlyOwner {
-        rateStrategy = _rateStrategy;
-        emit RateStrategyUpdated(_rateStrategy);
+    function setPriceOracle(address _priceOracle) public onlyOwner {
+        require(_priceOracle != address(0), "Invalid address");
+        priceOracle = PriceOracle(_priceOracle);
+        emit PriceOracleSet(_priceOracle);
     }
 }
