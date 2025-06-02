@@ -390,27 +390,13 @@ class CreateChain extends Component {
 
     return (
       <div className="smd-pad-16">
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-
-          <AnchorButton onClick={() => {
-            mixpanelWrapper.track('create_chain_open_click');
-            this.props.reset();
-            this.props.openCreateChainOverlay();
-          }} className="pt-intent-primary pt-icon-add"
-          id="chains-create-chain-button"
-          disabled={!this.props.userCertificate}
-          text={"Create Shard"} />
-        </Popover>
+        <AnchorButton onClick={() => {
+          mixpanelWrapper.track('create_chain_open_click');
+          this.props.reset();
+          this.props.openCreateChainOverlay();
+        }} className="pt-intent-primary pt-icon-add"
+        id="chains-create-chain-button"
+        text={"Create Shard"} />
 
         <Dialog
           iconName="flows"
@@ -699,7 +685,6 @@ export function mapStateToProps(state) {
     abi: state.createChain.abi,
     contractName: state.createChain.contractName,
     publicKey: state.user.publicKey,
-    userCertificate: state.user.userCertificate,
   };
 }
 

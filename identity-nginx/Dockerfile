@@ -1,22 +1,14 @@
-FROM openresty/openresty:1.19.3.1-7-buster
-MAINTAINER BlockApps Inc.
+FROM openresty/openresty:1.21.4.4-1-alpine-fat
+LABEL maintainer="BlockApps Inc."
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && \
-    apt-get install -y apache2-utils curl wget vim nano openresty-opm dnsutils python3 python3-pip && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+RUN apk add bash apache2-utils vim nano bind-tools jq && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/0.20181120/prometheus.lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    pip3 install pyyaml requests && \
-    opm get zmartzone/lua-resty-openidc=1.7.4 && \
-    opm remove bungle/lua-resty-session && \
-    opm get bungle/lua-resty-session=3.10    
-    # ^ Remove lines to reinstall lua-resty-session once switched to lua-resty-openidc=1.7.6-3 (when 1.7.6 is available in OPM, see here in the bottoms: https://opm.openresty.org/package/zmartzone/lua-resty-openidc/ )
-    # ^ Additional dependency issue context: https://github.com/zmartzone/lua-resty-openidc/issues/463
-    # ^ NOTE: There is a same workaround used in STRATO nginx
+    luarocks install lua-resty-openidc 1.7.6 --only-server https://raw.githubusercontent.com/rocks-moonscript-org/moonrocks-mirror/daab2726276e3282dc347b89a42a5107c3500567
+    # The --only-server url added to avoid the error in luarocks: "main function has more than 65536 constants"
+
+RUN apk add python3 py-yaml py-requests  # Adding with a separate layer to make the previous steps match with other nginx images. TODO: refactor to reuse build base
 
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \

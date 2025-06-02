@@ -1189,16 +1189,9 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
 }
 
 /**
- * Register certificate for test user
- * If registering w/ resource owner password flow, provide username & password and leave adminClientId = '' = adminClientSecret
- * If registering w/ client credentials flow, provide client id & secret that already has cert on chain for adminClientId & 
- * adminClientSecret. Leave username = '' = password
- * @param TBD
- * @return
+ * Register a STRATO key for a user
  */
-def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, clientSecret, username='', password='', adminClientId='', adminClientSecret='') {
-  // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
-  sh "echo ${stratoPlatformPath} > _platform_path_tmp"
+def registerStratoUserKey(OAuthDiscoveryUrl, clientId, clientSecret, username='', password='') {
   
   def oauth_token_endpoint = sh(returnStdout: true, script: "curl --fail -s ${OAuthDiscoveryUrl} | jq -r .token_endpoint ").trim()
   sh "echo ${oauth_token_endpoint} > _oauth_token_endpoint_tmp"
@@ -1210,41 +1203,12 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
   def user_token = sh(returnStdout: true, script: "curl --fail -s -X POST ${oauth_token_endpoint} -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic ${client_b64string}' ${data_url_encoded} | jq -r .access_token ").trim()
   sh "echo ${user_token} > _user_token_tmp"
   
-  if (adminClientId.isEmpty() || adminClientSecret.isEmpty()){
-    sh "echo ${client_b64string} > _admin_client_b64string_tmp"
-  } else {
-    def admin_client_b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${adminClientId}:${adminClientSecret}'))\"").trim()
-    sh "echo ${admin_client_b64string} > _admin_client_b64string_tmp"
-  }
-  
   sh '''#!/bin/bash -le
       set -xe
       # make sure user is created (now or earlier):
       docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $(<_user_token_tmp)" -X POST "localhost:80/strato/v2.3/key"
       userPubKey=$(docker exec strato-nginx-1 curl --fail -s -H "Authorization: Bearer $(<_user_token_tmp)" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
-      
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
-      sudo docker exec strato-strato-1 sed -i 's/"organization": ".*"/"organization": ""/g' /x509-generator/subject.tpl.json
-      sudo docker exec -e pubkey="${userPubKey}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
-          --issuer=/x509-generator/rootCert.pem \\
-          --subject=/x509-generator/subject.json \\
-          --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCert.pem
-      echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /x509-generator/certs.json""" > reformat-cert.sh
-      sudo docker cp reformat-cert.sh strato-strato-1:/x509-generator/
-      sudo docker exec strato-strato-1 bash /x509-generator/reformat-cert.sh
-      # escaped cert is now saved as /x509-generator/certs.json inside the container
-      CERT_ESCAPED=$(sudo docker exec strato-strato-1 cat /x509-generator/certs.json)
-      CERT_ESCAPED=$(echo "${CERT_ESCAPED:2: -2}")
-      ADMIN_TOKEN=$(curl --fail -L -X POST "$(<_oauth_token_endpoint_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_admin_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
-      
-      docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction/parallel?resolve=true" \\
-        -H 'Accept: application/json' \\
-        -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
-        -H 'Content-Type: application/json' \\
-        --data-binary "{\\"txs\\":[{\\"payload\\":{\\"contractName\\":\\"CertificateRegistry\\",\\"contractAddress\\":\\"509\\",\\"method\\":\\"registerCertificate\\",\\"args\\":{\\"newCertificateString\\":\\"${CERT_ESCAPED}\\"},\\"metadata\\":{}},\\"type\\":\\"FUNCTION\\"}]}"
-    '''
+  '''
 }
 
 /**
@@ -1496,16 +1460,8 @@ def replaceServerPortsDocker() {
       exit 1
     fi
 
-    if [ -z "$2" ]; then
-      echo "Please provide the path to your docker-compose file as an argument."
-      exit 1
-    fi
-
     sed -i "s/PORT:-443/PORT:-44300/" $1
     sed -i "s/PORT:-80/PORT:-8081/" $1
-
-    sed -i "s/PORT:-443/PORT:-44301/" $2
-    sed -i "s/PORT:-80/PORT:-8082/" $2
 
     if [ $? -ne 0 ]; then
       echo "Error occurred while modifying the file."
@@ -1514,7 +1470,7 @@ def replaceServerPortsDocker() {
   '''
 
   sh 'chmod +x replace_server_ports_docker.sh'
-  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.payment.yml'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml'
 }
 
 return this

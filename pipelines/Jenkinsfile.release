@@ -74,9 +74,6 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
           cp strato-worktree/docker-compose.highway.yml strato-getting-started/
-          cp strato-worktree/docker-compose.identity.yml strato-getting-started/
-          cp strato-worktree/docker-compose.payment.yml strato-getting-started/
-          cp strato-worktree/docker-compose.notification.yml strato-getting-started/
         '''
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
@@ -87,30 +84,21 @@ pipeline {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
-            lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
           }
 
           // TODO: run node on https (also update check_availability function)
           withCredentials([
-              usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
-              usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
               usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
-                SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
                 OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
-                VAULT_PROXY_DEBUG=true \\
+                VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
-                idServerUrl=https://\$(</host):8001 \\
-                GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
-                GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
-                MP_IS_BOOTNODE='true' \\
-                MP_DELAY_DEPLOYMENT='true' \\
                 useCustomGenesis=false \\
                 ./strato --single
             """
@@ -171,31 +159,13 @@ pipeline {
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
         ]) {
           script {
-            lib.registerTestUserCert(
-                'strato-worktree',
+            lib.registerStratoUserKey(
                 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
                 "${KEYCLOAK_STRATODEVEL_DEV_ID}",
                 "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
                 'user1',
                 '1234'
             )
-            lib.registerTestUserCert(
-                'strato-worktree',
-                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET}",
-                '',
-                '',
-                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
-                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
-            )
-            // Unlock the marketplace deploy script:
-            sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
-          }
-          dir("strato-getting-started") {
-            script {
-              lib.spinUpPaymentServer()
-            }
           }
         }
       }
@@ -227,17 +197,11 @@ pipeline {
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker compose -f docker-compose.push.yml push 2>&1
               docker compose -f docker-compose.vault.push.yml push 2>&1
-              docker compose -f docker-compose.identity.push.yml push 2>&1
               docker compose -f docker-compose.highway.push.yml push 2>&1
-              docker compose -f docker-compose.payment.push.yml push 2>&1
-              docker compose -f docker-compose.notification.push.yml push 2>&1
               AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
               docker compose -f docker-compose.push.ecr.yml push 2>&1
               docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
               docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.payment.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.notification.push.ecr.yml push 2>&1
             '''
 
             // Release to blockapps/strato-getting-started
@@ -254,18 +218,10 @@ pipeline {
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.yml" --file ./docker-compose.identity.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.yml" --file ./docker-compose.payment.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.oracle.yml" --file ./docker-compose.oracle.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.yml" --file ./docker-compose.notification.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.ecr.yml" --file ./docker-compose.identity.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.ecr.yml" --file ./docker-compose.payment.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.oracle.ecr.yml" --file ./docker-compose.oracle.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.ecr.yml" --file ./docker-compose.notification.ecr.yml
             '''
 
             // Merge release code to ${env.RELEASE_TYPE}
