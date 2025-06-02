@@ -241,9 +241,13 @@ export async function handleBridgeOut(
             return;
           }
 
+          // Split email addresses and trim whitespace
+          const emailAddresses = BLOCKAPPS_EMAIL.split(',').map(email => email.trim());
+
+          // Create email message
           const msg = {
-            to: BLOCKAPPS_EMAIL,
-            from: BLOCKAPPS_EMAIL,
+            to: emailAddresses, // SendGrid will handle multiple recipients
+            from: emailAddresses[0], // Use first email as sender
             subject: 'New Bridge Transaction Proposed and Pending Approval',
             html: `
               <h2>New Bridge Transaction Details</h2>
@@ -259,8 +263,9 @@ export async function handleBridgeOut(
             `,
           };
 
+          // Send email to all recipients
           await sgMail.send(msg);
-          logger.info('Transaction notification email sent successfully to:', BLOCKAPPS_EMAIL);
+          logger.info('Transaction notification email sent successfully to:', emailAddresses.join(', '));
         } catch (emailError) {
           logger.error('Failed to send email notification:', emailError);
           // Don't throw the error as email failure shouldn't affect the main flow
