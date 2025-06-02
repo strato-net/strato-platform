@@ -458,18 +458,17 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
               functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
               functionpayloadValue = Nothing,
               functionpayloadTxParams = Nothing,
-              functionpayloadChainid = Nothing,
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing True False txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->
       if all txSuccess response
         then $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response
         else do -- got a pending or failure
-          let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+          let pending = [hash | BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash} <- response]
           if (not $ null pending) 
             then do 
               eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
@@ -499,9 +498,9 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
               "Received following error when trying to register cert on fallback node: " ++ show err
           throwIO $ IdentityError "Failed to register cert"
 
-txSuccess :: BlocChainOrTransactionResult -> Bool
+txSuccess :: BlocTransactionResult -> Bool
 -- txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
-txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
+txSuccess (BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
 registerUserWalletAsync ::
@@ -546,11 +545,10 @@ registerUserWallet
                 functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
                 functionpayloadValue = Nothing,
                 functionpayloadTxParams = Nothing,
-                functionpayloadChainid = Nothing,
                 functionpayloadMetadata = Nothing
               }
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing True False txRequest)
     eresponse <- liftIO $ postBlocTx clientEnv
     case eresponse of
       Right response ->
@@ -561,7 +559,7 @@ registerUserWallet
               $ "Response after registering user wallet was: " ++ show response
             return True
           else do -- got a pending or failure
-            let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+            let pending = [hash | BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash} <- response]
             if (not $ null pending) 
               then do 
                 eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv

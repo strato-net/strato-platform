@@ -31,10 +31,7 @@ module Bloc.API.Users
     MethodCall (..),
     BlocTransactionData (..),
     UploadContractDetails (..),
-    uploadlistcontractChainid,
     uploadlistcontractTxParams,
-    sendtransactionChainid,
-    methodcallChainid,
     methodcallTxParams,
     sendtransactionTxParams,
   )
@@ -49,7 +46,6 @@ import BlockApps.Solidity.SolidityValue
 import Blockchain.Data.TransactionResult
 import Blockchain.Model.JsonBlock (RawTransaction', UnsignedRawTransaction')
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
@@ -332,7 +328,6 @@ data TransferParameters = TransferParameters
     value :: Strung Natural,
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Eq, Show, Generic)
@@ -346,7 +341,6 @@ data ContractParameters = ContractParameters
     value :: Maybe (Strung Natural),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    chainId :: Maybe ChainId,
     resolve :: Bool,
     ptr2Code :: Maybe Code
   }
@@ -358,7 +352,6 @@ data UploadListContract = UploadListContract
     uploadlistcontractArgs :: Map Text ArgValue,
     _uploadlistcontractTxParams :: Maybe TxParams,
     uploadlistcontractValue :: Maybe (Strung Natural),
-    _uploadlistcontractChainid :: Maybe ChainId,
     uploadlistcontractMetadata :: Maybe (Map Text Text),
     uploadlistcontractPtr2Code :: Maybe Code
   }
@@ -376,7 +369,6 @@ instance ToJSON UploadListContract where
         "args" .= uploadlistcontractArgs,
         "txParams" .= _uploadlistcontractTxParams,
         "value" .= uploadlistcontractValue,
-        "chainid" .= _uploadlistcontractChainid,
         "metadata" .= uploadlistcontractMetadata,
         "ptr2code" .= uploadlistcontractPtr2Code
       ]
@@ -389,7 +381,6 @@ instance FromJSON UploadListContract where
       <*> (o .: "args")
       <*> (o .:? "txParams")
       <*> (o .:? "value")
-      <*> (o .:? "chainid")
       <*> (o .:? "metadata")
       <*> (o .:? "ptr2Code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
@@ -408,7 +399,6 @@ instance ToSchema UploadListContract where
             uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 1)],
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
             uploadlistcontractValue = Nothing,
-            _uploadlistcontractChainid = Nothing,
             uploadlistcontractMetadata = Nothing,
             uploadlistcontractPtr2Code = Nothing
           }
@@ -416,7 +406,6 @@ instance ToSchema UploadListContract where
 data ContractListParameters = ContractListParameters
   { fromAddr :: Address,
     contracts :: [UploadListContract],
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Eq, Show, Generic)
@@ -430,7 +419,6 @@ data FunctionParameters = FunctionParameters
     value :: Maybe (Strung Natural),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
 
@@ -439,7 +427,6 @@ data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address,
     sendtransactionValue :: Strung Natural,
     _sendtransactionTxParams :: Maybe TxParams,
-    _sendtransactionChainid :: Maybe ChainId,
     sendtransactionMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
@@ -503,14 +490,12 @@ instance ToSchema SendTransaction where
                     (Just $ Wei 345)
                     (Just $ Nonce 9876)
                 ),
-            _sendtransactionChainid = Nothing,
             sendtransactionMetadata = (Just $ Map.fromList [("purpose", "groceries")])
           }
 
 data TransferListParameters = TransferListParameters
   { fromAddr :: Address,
     txs :: [SendTransaction],
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Show, Eq)
@@ -609,14 +594,12 @@ instance ToSchema MethodCall where
             methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)],
             methodcallMethodName = "getHoroscope",
             methodcallContractAddress = Address 0xdeadbeef,
-            _methodcallChainid = Nothing,
             methodcallMetadata = Nothing
           }
 
 data FunctionListParameters = FunctionListParameters
   { fromAddr :: Address,
     txs :: [MethodCall],
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Show, Eq)
@@ -652,7 +635,6 @@ methodErroredExample =
           methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)],
           methodcallMethodName = "getHoroscope",
           methodcallContractAddress = Address 0xdeadbeef,
-          _methodcallChainid = Nothing,
           methodcallMetadata = Nothing
         }
 
@@ -672,7 +654,6 @@ data MethodCall = MethodCall
     methodcallArgs :: Map Text ArgValue,
     methodcallValue :: Strung Natural,
     _methodcallTxParams :: Maybe TxParams,
-    _methodcallChainid :: Maybe ChainId,
     methodcallMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
