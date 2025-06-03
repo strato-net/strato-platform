@@ -35,11 +35,16 @@ import           Data.Text.Encoding
 import           SolidVM.Model.Storable
 import           Text.RawString.QQ
 
+list :: b -> (a -> [a] -> b) -> [a] -> b
+list onEmpty onCons as = case as of
+  [] -> onEmpty
+  (a:as') -> onCons a as'
+
 assetMap :: M.Map Address GA.Asset
 assetMap = foldr (\k -> M.insert (GA.root k) k) M.empty GA.assets
 
 usdstAsset :: GA.Asset
-usdstAsset = head $ filter ((== "USDST") . GA.name) GA.assets
+usdstAsset = list (error "usdstAsset: No asset named USDST found") const $ filter ((== "USDST") . GA.name) GA.assets
 
 usdstAddress :: Address
 usdstAddress = GA.root usdstAsset
@@ -208,7 +213,7 @@ liquidityPool :: AccountInfo
 liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount mercataAddress "LiquidityPool") $ ownedByBlockApps mercataAddress ++
   [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
   , (".totalLiquidity<a:" <> addrBS usdstAddress <> ">", BInteger mercataUsdstBalance)
-  , (".deposited<\"1\">.user", BAccount . unspecifiedChain . GA.owner . head . filter ((== "mercata_usdst") . GA.ownerCommonName) . M.elems $ GA.balances usdstAsset)
+  , (".deposited<\"1\">.user", BAccount . unspecifiedChain . GA.owner . list (error "usdstAsset: mercata_usdst has no USDST balance") const . filter ((== "mercata_usdst") . GA.ownerCommonName) . M.elems $ GA.balances usdstAsset)
   , (".deposited<\"1\">.asset", BAccount $ unspecifiedChain usdstAddress)
   , (".deposited<\"1\">.amount", BInteger mercataUsdstBalance)
   ] ++ concatMap (\(i, GE.Escrow{..}) -> if borrowedAmount == 0 then [] else
