@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { createSafeRoutes } from './routes/safeRoutes';
+import bridgeTransactionRoutes from './routes/bridgeTransactionRoutes';
 import bodyParser from 'body-parser';
 import { initializeSockets } from './sockets/initializeSockets';
 
@@ -18,6 +19,7 @@ app.use(bodyParser.json());
 const safeRoutes = createSafeRoutes();
 
 app.use('/api/safe', safeRoutes);
+app.use('/api/bridge', bridgeTransactionRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getAllBridgeTransactions } from '../services/bridgeTransactionsService';
+import { getAllBridgeTransactions, processBridgeTransaction } from '../services/bridgeTransactionsService';
 
 export async function getAllBridgeTransactionsHandler(req: Request, res: Response) {
   try {
@@ -34,6 +34,47 @@ export async function getAllBridgeTransactionsHandler(req: Request, res: Respons
     res.status(500).json({
       success: false,
       error: error?.message || "Failed to fetch bridge transactions"
+    });
+  }
+}
+
+export async function processBridgeTransactionHandler(req: Request, res: Response) {
+  try {
+    const {
+      fromAddress,
+      toAddress,
+      amount,
+      tokenAddress,
+      ethHash
+    } = req.body;
+
+    // Validate required parameters
+    if (!fromAddress || !toAddress || !amount || !tokenAddress || !ethHash) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required parameters'
+      });
+      return;
+    }
+
+    await processBridgeTransaction({
+      fromAddress,
+      toAddress,
+      amount,
+      tokenAddress,
+      ethHash
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Bridge transaction processed successfully'
+    });
+
+  } catch (error: any) {
+    console.error("Error in processBridgeTransactionHandler:", error?.message);
+    res.status(500).json({
+      success: false,
+      error: error?.message || "Failed to process bridge transaction"
     });
   }
 } 

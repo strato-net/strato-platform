@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { config } from '../config';
 import { getUserToken } from '../auth';
+import logger from '../utils/logger';
+import { handleBridgeInProposeTransaction } from '../events/bridgeIn';
 
 export interface BridgeTransaction {
   transaction_hash: string;
@@ -9,6 +11,14 @@ export interface BridgeTransaction {
   ethRecipient: string;
   timestamp: string;
   // Add other fields as needed
+}
+
+interface BridgeTransactionParams {
+  fromAddress: string;
+  toAddress: string;
+  amount: string;
+  tokenAddress: string;
+  ethHash: string;
 }
 
 const NODE_URL = process.env.NODE_URL;
@@ -57,6 +67,33 @@ export async function getAllBridgeTransactions(type: string, limit?: number, off
       console.error("API Error Response:", error.response.data);
       console.error("API Error Status:", error.response.status);
     }
+    throw error;
+  }
+}
+
+export async function processBridgeTransaction(params: BridgeTransactionParams): Promise<void> {
+  try {
+    // Log all received parameters
+    logger.info('Bridge Transaction Parameters:', {
+      fromAddress: params.fromAddress,
+      toAddress: params.toAddress,
+      amount: params.amount,
+      tokenAddress: params.tokenAddress,
+      ethHash: params.ethHash
+    });
+
+    // Call handleBridgeInProposeTransaction with the transaction details
+    await handleBridgeInProposeTransaction({
+      hash: params.ethHash,
+      value: params.amount,
+      from: params.fromAddress,
+      token: params.tokenAddress
+    });
+
+    logger.info('Bridge transaction processed successfully');
+
+  } catch (error) {
+    logger.error('Error processing bridge transaction:', error);
     throw error;
   }
 } 
