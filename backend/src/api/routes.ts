@@ -7,15 +7,12 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
-import AuthenticationController from "./controllers/authentication.controller";
 import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
 
 const router = Router();
 
-router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
-
-router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
+router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
 router.get("/tokens/faucets", authHandler.authorizeRequest(), TokensController.getFaucets);
 router.get("/tokens/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
@@ -50,9 +47,9 @@ router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.g
 router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
 
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
-router.post("/onramp/sell", authHandler.authorizeRequest(true), OnRampController.onRampSell);
-router.post("/onramp/lock", authHandler.authorizeRequest(true), OnRampController.onRampLock);
-router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampController.unlockTokens);
+router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
+router.post("/onramp/lock", authHandler.authorizeRequest(), OnRampController.onRampLock);
+router.post("/onramp/unlock", authHandler.authorizeRequest(), OnRampController.unlockTokens);
 
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
