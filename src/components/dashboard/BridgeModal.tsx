@@ -42,7 +42,7 @@ import { parseEther, parseUnits, createPublicClient, http } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { useNavigate } from "react-router-dom";
 import { Dialog } from "@/components/ui/dialog";
-import axios from "axios";
+
 
 const BRIDGE_API_BASE_URL = import.meta.env.VITE_BRIDGE_API_BASE_URL;
 
@@ -62,6 +62,41 @@ interface BridgeModalProps {
 const formatBalance = (value: bigint, decimals: number): string => {
   const formattedBalance = Number(value) / Math.pow(10, decimals);
   return formattedBalance.toFixed(decimals);
+};
+// API endpoint for bridge
+const BRIDGE_API = {
+  ethToStrato: async (params: {
+    amount: string;
+    fromAddress: string;
+    toAddress: string;
+    tokenAddress: string;
+    ethHash: string;
+  }) => {
+    try {
+      console.log('Calling bridge API with params:', params);
+      // const response = await fetch('/api/bridge/eth-to-strato',
+      const response = await fetch(`${BRIDGE_API_BASE_URL}/api/bridge/transaction`,
+         {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+      });
+
+      const responseData = await response.json();
+      console.log('Bridge API response:', responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Bridge transaction failed');
+      }
+
+      return responseData;
+    } catch (error: any) {
+      console.error('Bridge API error:', error);
+      throw error;
+    }
+  }
 };
 
 const BridgeModal = ({
@@ -564,7 +599,16 @@ const BridgeModal = ({
         return;
       }
 
+      // let tokenAddress;
+
+      // if (fromToken.symbol === 'SepoliaETH' || fromToken.symbol === 'ETH') {
+      //   tokenAddress = BRIDGE_TOKEN_ADDRESS;
+      // } else {
+      //   tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+      // }
+
       const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+         
       if (!tokenAddress) {
         toast({
           title: "Token Error",
@@ -605,6 +649,22 @@ const BridgeModal = ({
             description: "Waiting for confirmation...",
           });
           setTransactionHash(hash);
+
+          // Call bridge API with transaction details
+          try {
+            const bridgeResponse = await BRIDGE_API.ethToStrato({
+              amount,
+              fromAddress: address as string,
+              toAddress: recipient,
+              tokenAddress:BRIDGE_TOKEN_ADDRESS,
+              ethHash: hash
+            });
+
+            console.log('Bridge API response:', bridgeResponse);
+          } catch (bridgeError) {
+            console.error('Bridge API error:', bridgeError);
+            // Don't throw here, let the transaction continue
+          }
 
           // Wait for transaction confirmation
           const client = createPublicClient({
