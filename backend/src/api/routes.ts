@@ -17,8 +17,8 @@ router.get("/authentication/logout", authHandler.authorizeRequest(), Authenticat
 
 router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
 
-router.get("/tokens/faucets", authHandler.authorizeRequest(), TokensController.getFaucets);
-router.get("/tokens/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
+router.get("/tokens/faucets", authHandler.authorizeRequest(true), TokensController.getFaucets);
+router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
@@ -31,7 +31,7 @@ router.get("/swappableTokens/", authHandler.authorizeRequest(true), SwappingCont
 router.get("/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
 router.get("/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 router.get("/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
-router.get("/lpToken", authHandler.authorizeRequest(true), SwappingController.getLPTokens);
+router.get("/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
 
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);
@@ -40,9 +40,9 @@ router.post("/swap/addLiquidity", authHandler.authorizeRequest(), SwappingContro
 router.post("/swap/removeLiquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
 router.post("/swap/swap", authHandler.authorizeRequest(), SwappingController.swap);
 
-router.get("/depositableTokens/", authHandler.authorizeRequest(true), LendingController.getDepositableTokens);
-router.get("/withdrawableTokens/", authHandler.authorizeRequest(true), LendingController.getWithdrawableTokens);
-router.get("/loans/", authHandler.authorizeRequest(true), LendingController.getLoans);
+router.get("/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
+router.get("/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
+router.get("/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
 
 router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
@@ -50,9 +50,9 @@ router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.g
 router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
 
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
-router.post("/onramp/sell", authHandler.authorizeRequest(true), OnRampController.onRampSell);
-router.post("/onramp/lock", authHandler.authorizeRequest(true), OnRampController.onRampLock);
-router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampController.unlockTokens);
+router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
+router.post("/onramp/lock", authHandler.authorizeRequest(), OnRampController.onRampLock);
+router.post("/onramp/unlock", authHandler.authorizeRequest(), OnRampController.unlockTokens);
 
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
