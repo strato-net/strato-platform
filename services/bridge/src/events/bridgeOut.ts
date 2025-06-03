@@ -14,7 +14,6 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 const BLOCKAPPS_EMAIL = process.env.BLOCKAPPS_EMAIL ;
 
 interface BridgeOutTransaction {
-  hash: string;
   value: string;
   to?: string;
   from?: string;
@@ -29,7 +28,7 @@ export async function handleBridgeOut(
 ): Promise<void> {
   try {
     logger.info("🚀 Starting BRIDGE-OUT flow (STRATO to ETH)...");
-    const { hash, value, to, from, token, accessToken } = transaction;
+    const {  value, to, from, token, accessToken } = transaction;
 
     // Validate input parameters
     if (!token) throw new Error("Token address is required for withdrawal");
@@ -85,10 +84,12 @@ export async function handleBridgeOut(
             contractAddress: config.bridge.address,
             method: "withdraw",
             args: {
+              txHash: 'fdxcghgvhmbmh'.toString().replace("0x", ""),
               token: strip0xPrefix(token),
               from: strip0xPrefix('0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce'),
               amount: amount.toString(),
               ethRecipient: formatAddress(to).replace("0x", ""),
+              mercataUser: formatAddress(to).replace("0x", ""),
             },
           },
           type: "FUNCTION",
@@ -201,9 +202,9 @@ export async function handleBridgeOut(
             payload: {
               contractName: "BridgeContract",
               contractAddress: config.bridge.address,
-              method: "markPendingApproval",
+              method: "markWithdrawalPendingApproval",
               args: {
-                withdrawId: matchingEvent.withdrawId, // Assuming withdrawId is in the event data
+                txHash: safeTxHash.toString().replace("0x", ""),
               },
             },
             type: "FUNCTION",

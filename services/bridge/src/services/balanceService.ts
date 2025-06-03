@@ -20,15 +20,26 @@ export async function fetchUserBalance(address: string, tokenAddress: string): P
       throw new Error("Failed to get access token");
     }
 
+    // Ensure addresses are properly formatted
+    const formattedAddress = address.toLowerCase().replace("0x", "");
+    const formattedTokenAddress = tokenAddress.toLowerCase().replace("0x", "");
+
+    logger.info('Formatted addresses:', {
+      originalAddress: address,
+      formattedAddress,
+      originalTokenAddress: tokenAddress,
+      formattedTokenAddress
+    });
+
     const txPayload = {
       txs: [
         {
           payload: {
             contractName: "Token",
-            contractAddress: tokenAddress.toLowerCase().replace("0x", ""),
+            contractAddress: formattedTokenAddress,
             method: "balanceOf",
             args: {
-                accountAddress: address.toLowerCase().replace("0x", "")
+              accountAddress: formattedAddress
             }
           },
           type: "FUNCTION"
@@ -78,10 +89,19 @@ export async function fetchUserBalance(address: string, tokenAddress: string): P
       logger.error("API Error Response:", error.response.data);
       logger.error("API Error Status:", error.response.status);
       logger.error("API Error Headers:", error.response.headers);
+      // Add more detailed error information
+      if (error.response.data?.error) {
+        throw new Error(`Node error: ${error.response.data.error}`);
+      }
+      if (error.response.data?.message) {
+        throw new Error(`Node error: ${error.response.data.message}`);
+      }
     } else if (error.request) {
       logger.error("No response received. Request details:", error.request);
+      throw new Error("No response received from node");
     } else {
       logger.error("Error setting up request:", error.message);
+      throw error;
     }
     throw error;
   }

@@ -12,9 +12,9 @@ export function createSafeRoutes(): Router {
 
   router.post("/strato-to-ethereum", async (req, res, next) => {
     try {
-      const { hash, value, to, from } = req.body;
+      const { value, to, from } = req.body;
       logger.info("Request body:", req.body);
-      logger.info("Extracted transaction details:", { hash, value, to, from });
+      logger.info("Extracted transaction details:", {  value, to, from });
 
       if (!value) {
         throw new Error("Value is required in the request body");
@@ -27,7 +27,6 @@ export function createSafeRoutes(): Router {
 
       // Call handleBridgeOut with the transaction details
       await handleBridgeOut({
-        hash,
         value,
         to,
         from,
