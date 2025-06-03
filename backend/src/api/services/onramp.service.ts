@@ -1,6 +1,7 @@
 import { strato, bloc, cirrus } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
+import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { baseUrl } from "../../config/config";
 import { approveAsset } from "../helpers/tokens.helper";
@@ -8,8 +9,7 @@ import { isValidUrl, calculateTotalAmount } from "../helpers/onramp.helper";
 import axios from "axios";
 
 const contractAddress = constants.onRamp!;
-
-const OnRamp = "OnRamp";
+const { OnRamp } = constants;
 
 // Get all tokens with optional filtering
 export const get = async (accessToken: string) => {
@@ -134,7 +134,7 @@ export const sell = async (
     const { token, amount, marginBps, providerAddresses } = body;
     await approveAsset(accessToken, token || "", contractAddress, amount || "");
     const tx = buildFunctionTx({
-      contractName: OnRamp,
+      contractName: extractContractName(OnRamp),
       contractAddress,
       method: "createListing",
       args: {
@@ -170,7 +170,7 @@ export async function lock(
 ): Promise<{ sessionId: string; url: string }> {
   // 1. Lock tokens on the blockchain
   const lockTx = buildFunctionTx({
-    contractName: OnRamp,
+    contractName: extractContractName(OnRamp),
     contractAddress,
     method: "lockTokens",
     args: { listingId, amount },
@@ -286,7 +286,7 @@ export async function unlockTokens(
 ): Promise<{ status: string; hash: string }> {
   try {
     const tx = buildFunctionTx({
-      contractName: OnRamp,
+      contractName: extractContractName(OnRamp),
       contractAddress,
       method: "unlockTokens",
       args: { listingId },
