@@ -65,9 +65,9 @@ export const constants = (() => {
       onRamp: "TBD",
     },
     testnet: {
-      poolFactory: "100a",
-      lendingPool: "1005",
-      onRamp: "1009",
+      poolFactory: "000000000000000000000000000000000000100a",
+      lendingPool: "0000000000000000000000000000000000001005",
+      onRamp: "0000000000000000000000000000000000001009",
     },
     testnet2: {
       poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",
