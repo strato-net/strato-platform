@@ -48,10 +48,10 @@ contract record MercataEthBridge {
     //mapping(uint256 => bool) public processed; // ethTxHash(uint256) → minted?
 
     enum WithdrawState { NONE, INITIATED, PENDING_APPROVAL, COMPLETED }
-    mapping(string => WithdrawState) public withdrawStatus; 
+    mapping(string => WithdrawState) public record withdrawStatus; 
 
     enum DepositState { NONE, INITIATED, COMPLETED }
-    mapping(string => DepositState) public depositStatus; 
+    mapping(string => DepositState) public record depositStatus; 
 
     // ─────────────────── events ─────────────────────────
     event DepositInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
