@@ -199,7 +199,7 @@ priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mer
 
 collateralVault :: AccountInfo
 collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAccount mercataAddress "CollateralVault") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   ] ++ concatMap (\(i, GE.Escrow{..}) -> case M.lookup assetRootAddress assetMap of
     Nothing -> []
     Just GA.Asset{..} ->
@@ -211,7 +211,7 @@ collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAcc
 
 liquidityPool :: AccountInfo
 liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount mercataAddress "LiquidityPool") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   , (".totalLiquidity<a:" <> addrBS usdstAddress <> ">", BInteger mercataUsdstBalance)
   , (".deposited<\"1\">.user", BAccount . unspecifiedChain . GA.owner . list (error "usdstAsset: mercata_usdst has no USDST balance") const . filter ((== "mercata_usdst") . GA.ownerCommonName) . M.elems $ GA.balances usdstAsset)
   , (".deposited<\"1\">.asset", BAccount $ unspecifiedChain usdstAddress)
@@ -225,10 +225,8 @@ liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount
 
 lendingPool :: AccountInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
-  [ (".liquidityPool", BAccount $ unspecifiedChain liquidityPoolAddress)
-  , (".collateralVault", BAccount $ unspecifiedChain collateralVaultAddress)
-  , (".rateStrategy", BAccount $ unspecifiedChain rateStrategyAddress)
-  , (".oracle", BAccount $ unspecifiedChain priceOracleAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+  , (".poolConfigurator", BAccount $ unspecifiedChain poolConfiguratorAddress)
   , (".assetInterestRate<a:" <> addrBS 0x0 <> ">", BInteger 5)
   , (".assetCollateralRatio<a:" <> addrBS 0x0 <> ">", BInteger 150)
   , (".assetLiquidationBonus<a:" <> addrBS 0x0 <> ">", BInteger 105)
@@ -253,15 +251,16 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
 
 poolConfigurator :: AccountInfo
 poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 (CodeAtAccount mercataAddress "PoolConfigurator") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   ]
 
 lendingRegistry :: AccountInfo
 lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAccount mercataAddress "LendingRegistry") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
-  , (".liquidityPool", BAccount $ unspecifiedChain liquidityPoolAddress)
-  , (".collateralVault", BAccount $ unspecifiedChain collateralVaultAddress)
-  , (".rateStrategy", BAccount $ unspecifiedChain rateStrategyAddress)
+  [ (".lendingPool", BContract "LendingPool" $ unspecifiedChain lendingPoolAddress)
+  , (".liquidityPool", BContract "LiquidityPool" $ unspecifiedChain liquidityPoolAddress)
+  , (".collateralVault", BContract "CollateralVault" $ unspecifiedChain collateralVaultAddress)
+  , (".rateStrategy", BContract "RateStrategy" $ unspecifiedChain rateStrategyAddress)
+  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
 mercataEthBridge :: AccountInfo
@@ -277,7 +276,7 @@ onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddres
   , (".adminCount", BInteger 1)
   , (".LOCK_EXPIRY", BInteger 1800)
   , (".nextListingId", BInteger 1)
-  , (".priceOracle", BAccount $ unspecifiedChain priceOracleAddress)
+  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
 poolFactory :: AccountInfo

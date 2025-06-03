@@ -424,7 +424,9 @@ createForeignIndexesForJoins foreignKey = do
       srcColumns = csv $ wrapDoubleQuotes <$> columnNames foreignKey
       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
       targetColumns = csv $ wrapDoubleQuotes <$> foreignColumnNames foreignKey
-      fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
+      fkNameSrcToTarget = tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
+      fkNameHash = T.pack . take 8 . formatKeccak256WithoutColor . hash $ encodeUtf8 fkNameSrcToTarget
+      fkName = textToDoubleQuoteText $ tableShortName (tableName foreignKey) <> "_" <> tableShortName (foreignTableName foreignKey) <> "_" <> fkNameHash
       -- fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
       logMessage = 
         "createForeignIndexesForJoins srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
@@ -432,7 +434,7 @@ createForeignIndexesForJoins foreignKey = do
   $logInfoS "createForeignIndexesForJoins" logMessage
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
-          <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
+          <> " ADD CONSTRAINT " <> fkName <> " FOREIGN KEY (" 
           <> srcColumns <> ") REFERENCES " <> targetTable <> " (" <> targetColumns <> ");"
 
 notifyPostgREST ::
@@ -1111,7 +1113,7 @@ insertCollectionTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertCollectionTableQuery [] = []
 insertCollectionTableQuery ms =
   concat $
-    let ms' = (\m -> (m, fmap (fromMaybe "NULL" . valueToSQLText) <$> ((keyColumnNames $ collectionDataKeys m) ++ [("value", collectionDataValue m)]))) <$> ms
+    let ms' = (\m -> (m, fmap (fromMaybe "NULL" . valueToSQLText' False) <$> ((keyColumnNames $ collectionDataKeys m) ++ [("value", collectionDataValue m)]))) <$> ms
      in flip map (map snd $ partitionWith (length . snd) ms') $ \case
           [] -> []
           collections@((x, list) : _) ->
@@ -1650,33 +1652,36 @@ solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.
 valueToSQLTextFilterContract :: Value -> Maybe Text
 valueToSQLTextFilterContract x = valueToSQLText x
 
-valueToSQLText :: Value -> Maybe Text
-valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
-valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
-valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
-valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
-valueToSQLText (SimpleValue (ValueAddress (Address addr))) =
-  if fromIntegral addr == (0 :: Integer)
+valueToSQLText' :: Bool -> Value -> Maybe Text
+valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
+valueToSQLText' _ (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
+valueToSQLText' _ (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
+valueToSQLText' z (SimpleValue (ValueAddress (Address 0))) = if z then Just "NULL" else Just "0000000000000000000000000000000000000000"
+valueToSQLText' z (SimpleValue (ValueAddress (Address addr))) =
+  if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) = 
-  if fromIntegral addr == (0 :: Integer)
+valueToSQLText' z (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) = 
+  if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $
+valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
   wrapSingleQuotes $
     escapeQuotes $ case decodeUtf8' bytes of
       Left _ -> decodeUtf8 $ Base16.encode bytes
       Right x -> x
-valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
-valueToSQLText (ValueContract acct@(NamedAccount (Address addr) _)) = 
-  if fromIntegral addr == (0 :: Integer)
+valueToSQLText' _ (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
+valueToSQLText' z (ValueContract acct@(NamedAccount (Address addr) _)) = 
+  if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (ValueFunction _ _ _) = Nothing
-valueToSQLText (ValueMapping _) = Nothing
-valueToSQLText (ValueArrayFixed _ _) = Nothing
-valueToSQLText (ValueArrayDynamic _) = Nothing
-valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
+valueToSQLText' _ (ValueFunction _ _ _) = Nothing
+valueToSQLText' _ (ValueMapping _) = Nothing
+valueToSQLText' _ (ValueArrayFixed _ _) = Nothing
+valueToSQLText' _ (ValueArrayDynamic _) = Nothing
+valueToSQLText' _ struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
 
-valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
+valueToSQLText' _ x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
+
+valueToSQLText :: Value -> Maybe Text
+valueToSQLText = valueToSQLText' True
