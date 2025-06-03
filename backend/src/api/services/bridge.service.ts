@@ -1,4 +1,4 @@
-import logger from "../../utils/logger";
+
 import axios from 'axios';
 
 interface BridgeParams {
@@ -13,15 +13,7 @@ interface BridgeParams {
 export class BridgeService {
   public async ethToStrato(params: BridgeParams): Promise<any> {
     try {
-      logger.info('Received ETH to STRATO bridge request with params:', {
-        amount: params.amount,
-        fromAddress: params.fromAddress,
-        toAddress: params.toAddress,
-        tokenAddress: params.tokenAddress,
-        ethHash: params.ethHash,
-        userToken: params.userToken
-      });
-
+     console.log("params",params);
       // Make API call to bridge service
       const response = await axios.post(
         'http://localhost:3002/api/bridge/transaction',
@@ -40,7 +32,7 @@ export class BridgeService {
         }
       );
 
-      logger.info('Bridge service API response:', response.data);
+     console.log('Bridge service API response:', response.data);
 
       // Return the response from bridge service
       return {
@@ -58,11 +50,7 @@ export class BridgeService {
       };
 
     } catch (error: any) {
-      logger.error('Error processing bridge request', {
-        error: error.message,
-        stack: error.stack,
-        params
-      });
+     console.log("error",error);
       throw error;
     }
   }
