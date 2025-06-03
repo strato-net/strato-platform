@@ -1,15 +1,14 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
+import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getInputPrice } from "../helpers/swapping.helper";
 import { approveAsset } from "../helpers/tokens.helper";
 import { getPool as getLendingPool } from "./lending.service";
 import { getTokens } from "./tokens.service";
 
-const { poolSelectFields } = constants;
-const Pool = "Pool";
-const PoolFactory = "PoolFactory";
+const { poolSelectFields, Pool, PoolFactory, PriceOracle } = constants;
 
 export const getPools = async (
   accessToken: string,
@@ -21,7 +20,7 @@ export const getPools = async (
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ),
     select: rawParams.select || poolSelectFields.join(","),
-    root: `eq.${constants.poolFactory}`,
+    root: `eq.${constants.baseCodeCollection}`,
   };
 
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
@@ -44,16 +43,18 @@ export const getPools = async (
       ["balances.key"]: `eq.${address}`,
     }),
     getLendingPool(accessToken, {
-      select: "oracle:priceOracle_fkey(address,prices:PriceOracle-prices(*))",
+      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
     }),
   ]);
   const tokenMap = new Map(tokenMetadata.map((t: any) => [t.address, t]));
-  const prices = lendingInfo.oracle?.prices || {};
-
+  const rawPrices = lendingInfo.oracle?.prices || [];
+  const priceMap = new Map<string, number>(
+    rawPrices.map((p: any) => [p.key, p.value])
+  );
   return poolData.map((pool: any) => ({
     ...pool,
-    tokenAPrice: prices[pool.tokenA] || 0,
-    tokenBPrice: prices[pool.tokenB] || 0,
+    tokenAPrice: priceMap.get(pool.tokenA) || 0,
+    tokenBPrice: priceMap.get(pool.tokenB) || 0,
     tokenA: tokenMap.get(pool.tokenA) || pool.tokenA,
     tokenB: tokenMap.get(pool.tokenB) || pool.tokenB,
   }));
@@ -65,7 +66,7 @@ export const createPool = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: PoolFactory,
+      contractName: extractContractName(PoolFactory),
       contractAddress: constants.poolFactory,
       method: "createPool",
       args: body,
@@ -114,7 +115,7 @@ export const addLiquidity = async (
     );
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(Pool),
       contractAddress: body.address || "",
       method: "addLiquidity",
       args: {
@@ -167,7 +168,7 @@ export const removeLiquidity = async (
       BigInt(100)
     ).toString();
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(Pool),
       contractAddress: body.address || "",
       method: "removeLiquidity",
       args: {
@@ -217,7 +218,7 @@ export const swap = async (
     );
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(Pool),
       contractAddress: body.address || "",
       method: body.method || "",
       args: {

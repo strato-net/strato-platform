@@ -2,11 +2,11 @@ import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
+import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 
-const { tokenSelectFields, tokenBalanceSelectFields } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token } = constants;
 
-const Token = "Token";
 const TokenFaucet = "TokenFaucet";
 
 // Get all tokens
@@ -83,7 +83,7 @@ export const createToken = async (
 ) => {
   try {
     const tx = buildDeployTx({
-      contractName: Token,
+      contractName: extractContractName(Token),
       source: `import <${process.env.BASE_CODE_COLLECTION}>;`,
       args: usc(body),
     });
@@ -108,7 +108,7 @@ export const transferToken = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: Token,
+      contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transfer",
       args: {
@@ -138,7 +138,7 @@ export const approveToken = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: Token,
+      contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "approve",
       args: {
@@ -165,7 +165,7 @@ export const transferFromToken = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: Token,
+      contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transferFrom",
       args: {

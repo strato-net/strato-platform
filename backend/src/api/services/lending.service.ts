@@ -4,10 +4,10 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { approveAsset } from "../helpers/tokens.helper";
 import { getBalance, getTokens } from "./tokens.service";
+import { extractContractName } from "../../utils/utils";
 
-const { registrySelectFields, lendingPool } = constants;
-const Pool = "LendingPool";
-const Registry = "LendingRegistry";
+const { registrySelectFields, lendingPool, LendingPool, LendingRegistry } =
+  constants;
 
 export const getPool = async (
   accessToken: string,
@@ -33,10 +33,12 @@ export const getPool = async (
 
   const {
     data: [poolData],
-  } = await cirrus.get(accessToken, `/${Registry}`, { params });
+  } = await cirrus.get(accessToken, `/${LendingRegistry}`, { params });
 
   if (!poolData) {
-    throw new Error(`Error fetching ${Registry} data from Cirrus`);
+    throw new Error(
+      `Error fetching ${extractContractName(LendingRegistry)} data from Cirrus`
+    );
   }
 
   return poolData;
@@ -62,7 +64,7 @@ export const manageLiquidity = async (
     }
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
       method: body.method || "",
       args: {
@@ -103,7 +105,7 @@ export const getLoan = async (
     );
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
       method: "getLoan",
       args: {
@@ -146,7 +148,7 @@ export const repayLoan = async (
     );
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
       method: "repayLoan",
       args: {
