@@ -8,17 +8,16 @@ import "./Tokens/Token.sol";
  *     • A relayer monitors Ethereum for deposits into a Gnosis Safe wallet.
  *     • For each verified deposit, it calls `deposit(...)`:
  *         – Marks the Ethereum txHash as **INITIATED** in `depositStatus`.
- *         – Emits `DepositInitiated`, including the original Ethereum sender,
- *           STRATO recipient, amount, and Mercata user address.
+ *         – Emits `DepositInitiated`
  *     • After the relayer confirms off-chain validation, it calls `confirmDeposit(...)`:
- *         – Mints the corresponding wrapped token amount to the STRATO recipient.
+ *         – Mints the corresponding wrapped token amount to the STRATO user.
  *         – Marks the deposit as **COMPLETED** in `depositStatus`.
  *         – Emits `DepositCompleted`.
  *     • Replays are prevented via the `depositStatus` mapping.
  *
  *  2. **Withdraw → Burn and Ethereum Payout (STRATO → Ethereum)**
  *     • A relayer initiates a withdrawal on behalf of a Mercata user by calling `withdraw(...)`:
- *         – Burns the specified amount of wrapped tokens from the STRATO Safe account.
+ *         – Burns the specified amount of wrapped tokens from the STATO user
  *         – Records the withdrawal under `withdrawStatus` with state **INITIATED**.
  *         – Emits `WithdrawalInitiated`
  *     • Once the relayer constructs and submits a corresponding Safe transaction on Ethereum,
@@ -54,10 +53,7 @@ contract record MercataEthBridge {
     enum DepositState { NONE, INITIATED, COMPLETED }
     mapping(string => DepositState) public depositStatus; 
 
-    //uint256 public nextWithdrawId = 1; // monotonically increasing ID counter
-
     // ─────────────────── events ─────────────────────────
-    //event DepositRecorded(uint256 indexed ethTxHash, address indexed to, address indexed token, uint256 amount);
     event DepositInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
     event DepositCompleted(string indexed txHash);
     event WithdrawalInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
@@ -99,6 +95,7 @@ contract record MercataEthBridge {
     // ────────── Ethereum → STRATO (mint) ──────────────
     // txHash = Ethereum TX hash, from = depositor's Eth address, to = Safe wallet address
     // mercataUser = Mercata user address of user initiating the deposit
+    // token = wrapped token
     function deposit(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.NONE, "ALREADY_PROCESSED");
         require(amount >= minAmount, "BELOW_MIN");
@@ -107,10 +104,10 @@ contract record MercataEthBridge {
         emit DepositInitiated(txHash, from, token, amount, to, mercataUser);
     }
 
-    function confirmDeposit(string calldata txHash, address token, address to, uint256 amount) external onlyRelayer {
+    function confirmDeposit(string calldata txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
 
-        Token(token).mint(to, amount);
+        Token(token).mint(mercataUser, amount);
         depositStatus[txHash] = DepositState.COMPLETED;
         emit DepositCompleted(txHash);
     }
@@ -118,14 +115,15 @@ contract record MercataEthBridge {
     // ────────── STRATO → Ethereum (burn) ──────────────
     // txHash = Safe TX hash, from = Safe wallet address, to = Eth address of recipient
     // mercataUser = Mercata user address of user initiating the withdrawal
-    function withdraw(string calldata txHash, address token, address from, uint256 amount, address ethRecipient, address mercataUser) external onlyRelayer {
+    // token = wrapped token
+    function withdraw(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
         require(amount >= minAmount, "BELOW_MIN");
 
-        Token(token).burn(from, amount);
+        Token(token).burn(mercataUser, amount);
         withdrawStatus[txHash] = WithdrawState.INITIATED;
 
-        emit WithdrawalInitiated(txHash, from, token, amount, ethRecipient, mercataUser);
+        emit WithdrawalInitiated(txHash, from, token, amount, to, mercataUser);
     }
 
     function markWithdrawalPendingApproval(string calldata txHash) external onlyRelayer {
