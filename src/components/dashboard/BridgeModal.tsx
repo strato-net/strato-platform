@@ -396,10 +396,14 @@ const BridgeModal = ({
     }
 
     if (numericAmount > numericBalance) {
+      const displayBalance = fromChain === "STRATO" 
+        ? Number(stratoBalance).toFixed(18) 
+        : tokenBalance;
+      
       setAmountError(
-        `Insufficient balance. Maximum amount: ${
-          fromChain === "STRATO" ? stratoBalance : tokenBalance
-        } ${fromChain === "STRATO" ? "STRATO" : fromToken?.symbol}`
+        `Insufficient balance. Maximum amount: ${displayBalance} ${
+          fromChain === "STRATO" ? "STRATO" : fromToken?.symbol
+        }`
       );
       return false;
     }
