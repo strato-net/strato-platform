@@ -220,7 +220,13 @@ const BridgeModal = ({
     try {
       const hardcodedAddress = "0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce";
       const response = await fetch(
-        `${BRIDGE_API_BASE_URL}/api/safe/balance/${hardcodedAddress}?tokenAddress=${tokenAddress}`
+        `${BRIDGE_API_BASE_URL}/api/safe/balance/${hardcodedAddress}?tokenAddress=${tokenAddress}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
       const data = await response.json();
       if (data.success) {
@@ -517,7 +523,6 @@ const BridgeModal = ({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              hash: transactionHash || "",
               value: amount.toString(),
               from: SAFE_ADDRESS,
               to: address,
