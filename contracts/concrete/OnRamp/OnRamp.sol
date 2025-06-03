@@ -162,7 +162,7 @@ contract record OnRamp {
         require(providerAddresses.length > 0, "No providers specified");
 
         uint256 existing = activeListingFor[token];
-        require(existing == 0 || listings[existing].id != 0, "Active listing exists");
+        require(existing == 0, "Active listing exists");
 
         IERC20(token).transferFrom(msg.sender, address(this), amount);
 
