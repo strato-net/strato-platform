@@ -419,8 +419,9 @@ createForeignIndexesForJoins foreignKey = do
       srcColumns = csv $ wrapDoubleQuotes <$> columnNames foreignKey
       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
       targetColumns = csv $ wrapDoubleQuotes <$> foreignColumnNames foreignKey
-      fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
-      fkNameHash = textToDoubleQuoteText . T.pack . take 40 . formatKeccak256WithoutColor . hash $ encodeUtf8 fkNameSrcToTarget
+      fkNameSrcToTarget = tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
+      fkNameHash = T.pack . take 8 . formatKeccak256WithoutColor . hash $ encodeUtf8 fkNameSrcToTarget
+      fkName = textToDoubleQuoteText $ tableShortName (tableName foreignKey) <> "_" <> tableShortName (foreignTableName foreignKey) <> "_" <> fkNameHash
       -- fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
       logMessage = 
         "createForeignIndexesForJoins srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
@@ -428,7 +429,7 @@ createForeignIndexesForJoins foreignKey = do
   $logInfoS "createForeignIndexesForJoins" logMessage
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
-          <> " ADD CONSTRAINT " <> fkNameHash <> " FOREIGN KEY (" 
+          <> " ADD CONSTRAINT " <> fkName <> " FOREIGN KEY (" 
           <> srcColumns <> ") REFERENCES " <> targetTable <> " (" <> targetColumns <> ");"
 
 notifyPostgREST ::
