@@ -10,8 +10,10 @@ import LendingController from "./controllers/lending.controller";
 import AuthenticationController from "./controllers/authentication.controller";
 import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
+import { BridgeController } from "./controllers/bridge.controller";
 
 const router = Router();
+const bridgeController = new BridgeController();
 
 router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
 
@@ -53,6 +55,7 @@ router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get)
 router.post("/onramp/sell", authHandler.authorizeRequest(true), OnRampController.onRampSell);
 router.post("/onramp/lock", authHandler.authorizeRequest(true), OnRampController.onRampLock);
 router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampController.unlockTokens);
+router.post("/bridge/eth-to-strato", authHandler.authorizeRequest(true), bridgeController.ethToStrato);
 
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
