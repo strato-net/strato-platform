@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 import "../../abstract/ERC20/ERC20.sol";
+import "../Tokens/Token.sol";
 
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
- contract record Pool is ERC20{
+ contract record Pool {
     
     // Events
     event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
@@ -11,8 +12,9 @@ import "../../abstract/ERC20/ERC20.sol";
     event AddLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
     event RemoveLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
 
-    ERC20 public tokenA;                             // ERC20 tokenA traded on this contract
-    ERC20 public tokenB;                        // ERC20 traded on this contract
+    ERC20 public tokenA;
+    ERC20 public tokenB;
+    Token public lpToken;
 
     bool private locked;   
     
@@ -32,7 +34,8 @@ import "../../abstract/ERC20/ERC20.sol";
     constructor(
         address tokenAAddr, 
         address tokenBAddr
-    ) ERC20("LPT " + ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name(),"LPT " + ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol()){
+    ) {
+        lpToken = new Token(ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token", "", [], [], [], ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP", 0, 18);
         tokenA = ERC20(tokenAAddr);
         tokenB = ERC20(tokenBAddr);
     }
@@ -50,7 +53,7 @@ import "../../abstract/ERC20/ERC20.sol";
         uint256 max_tokenA_amount
     ) external returns (uint256) {
         require(tokenB_amount > 0 && max_tokenA_amount > 0, "Invalid inputs");
-        uint256 total_liquidity = totalSupply();
+        uint256 total_liquidity = ERC20(lpToken).totalSupply();
         
         if (total_liquidity > 0) {
             require(tokenB_amount > 0, "Min liquidity required");
@@ -60,13 +63,12 @@ import "../../abstract/ERC20/ERC20.sol";
             uint256 liquidity_minted = tokenB_amount * total_liquidity / tokenB_reserve;
             
             require(max_tokenA_amount >= tokenA_amount, "Insufficient tokenA amount");
-            _mint(msg.sender, liquidity_minted);
+            lpToken.mint(msg.sender, liquidity_minted);
             
             require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
             require(tokenA.transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
             
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-            emit Transfer(address(0), msg.sender, liquidity_minted);
 
             updateStateVars();
 
@@ -76,13 +78,12 @@ import "../../abstract/ERC20/ERC20.sol";
             
             uint256 tokenA_amount = max_tokenA_amount;
             uint256 initial_liquidity = tokenB_amount;
-            _mint(msg.sender, initial_liquidity);
+            lpToken.mint(msg.sender, initial_liquidity);
             
             require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
             require(tokenA.transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
             
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-            emit Transfer(address(0), msg.sender, initial_liquidity);
             
             updateStateVars();
 
@@ -97,7 +98,7 @@ import "../../abstract/ERC20/ERC20.sol";
         uint256 min_tokenA_amount
     ) external returns (uint256, uint256) {
         require(amount > 0 && min_tokenB > 0 && min_tokenA_amount > 0, "Invalid inputs");
-        uint256 total_liquidity = totalSupply();
+        uint256 total_liquidity = ERC20(lpToken).totalSupply();
         require(total_liquidity > 0, "No liquidity");
         uint256 tokenA_reserve = tokenA.balanceOf(address(this));
         uint256 tokenB_reserve = tokenB.balanceOf(address(this));
@@ -110,9 +111,8 @@ import "../../abstract/ERC20/ERC20.sol";
         require(tokenA.transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
         
         emit RemoveLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-        emit Transfer(msg.sender, address(0), amount);
         
-        _burn(msg.sender, amount);
+        lpToken.burn(msg.sender, amount);
         
         updateStateVars();
 
