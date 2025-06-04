@@ -21,7 +21,6 @@ pipeline {
             }
             def nodeUsed = env.NODE_NAME ?: 'unknown'
             currentBuild.description = "${nodeUsed} // ${buildUser}"
-            env.NODE_USED = nodeUsed
             env.GIT_SHA = env.GIT_COMMIT.take(7)
             echo "🔧 Using Git SHA: ${env.GIT_SHA}"
           }
@@ -47,12 +46,15 @@ pipeline {
             def baseBranch = env.CHANGE_TARGET ?: 'develop'
             def headBranch = env.CHANGE_BRANCH ?: 'HEAD'
 
-            // Set GitHub remote and fetch
+            // Set GitHub remote and fetch, for identifying the diffs
             sh """
               git remote set-url origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/mercata.git
               git fetch origin ${baseBranch} --quiet
               ${env.CHANGE_BRANCH ? "git fetch origin ${env.CHANGE_BRANCH} --quiet" : ""}
             """
+
+            // Update submodules
+            sh "git submodule update --recursive --init"
 
             // Login to AWS ECR
             sh """
@@ -69,7 +71,7 @@ pipeline {
             """
 
             def composeChanged = sh(
-              script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- backend ui nginx || echo changed",
+              script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- backend ui nginx docker-compose.yml || echo changed",
               returnStdout: true
             ).trim()
 
@@ -96,7 +98,7 @@ pipeline {
               }
 
             } else {
-              echo "No changes in backend/ui/nginx — skipping build."
+              echo "No changes in backend/ui/nginx/docker-compose.yml — skipping build."
             }
 
             def stripeChanged = sh(
