@@ -282,9 +282,9 @@ instance Binary ActionData
 
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
-  let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
-        (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
-        (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
+  let diffs = case (_actionDataStorageDiffs oldData, _actionDataStorageDiffs newData) of
+        (EVMDiff o, EVMDiff n) -> EVMDiff $ o <> n
+        (SolidVMDiff o, SolidVMDiff n) -> SolidVMDiff $ o <> n
         _ -> error "mismatched action kinds at the same address"
       calls = ((++) `on` _actionDataCallTypes) oldData newData
       cc = _actionDataCodeCollection oldData <> _actionDataCodeCollection newData
