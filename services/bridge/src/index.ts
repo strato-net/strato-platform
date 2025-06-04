@@ -1,11 +1,10 @@
-import logger from './utils/logger';
-import dotenv from 'dotenv';
-import express from 'express';
-import cors from 'cors';
-import { createSafeRoutes } from './routes/safeRoutes';
-import bridgeTransactionRoutes from './routes/bridgeTransactionRoutes';
-import bodyParser from 'body-parser';
-import { initializeSockets } from './sockets/initializeSockets';
+import logger from "./utils/logger";
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import bridgeRoutes from "./routes/bridgeRoutes";
+import bodyParser from "body-parser";
+import { initializeSockets } from "./sockets/initializeSockets";
 
 // Load environment variables
 dotenv.config();
@@ -16,22 +15,19 @@ const port = 3002; // Fixed port to 3002
 app.use(cors());
 app.use(bodyParser.json());
 
-const safeRoutes = createSafeRoutes();
-
-app.use('/api/safe', safeRoutes);
-app.use('/api/bridge', bridgeTransactionRoutes);
+app.use("/api/bridge", bridgeRoutes);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 // Initialize WebSocket connections
-initializeSockets().catch(error => {
-  logger.error('Failed to initialize WebSocket connections:', error);
+initializeSockets().catch((error) => {
+  logger.error("Failed to initialize WebSocket connections:", error);
 });
 
 // Start the server
 app.listen(port, () => {
   logger.info(`Bridge service listening on port ${port}`);
-}); 
+});

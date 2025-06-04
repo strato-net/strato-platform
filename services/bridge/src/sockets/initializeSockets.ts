@@ -1,4 +1,4 @@
-import { AlchemyWebSocket } from './alchemyWebSocket';
+import { AlchemyWebSocket } from "./alchemyWebSocket";
 
 export async function initializeSockets() {
   try {

@@ -66,12 +66,6 @@ class OAuthUtil {
       // @ts-ignore - ResourceOwnerPassword exists at runtime but not in types
       this.oauth2 = new simpleOauth2.ResourceOwnerPassword(credentials);
       
-      console.log('🔍 OpenID Configuration:', {
-        tokenEndpoint: this.tokenEndpoint,
-        issuer: config.issuer,
-        supportedGrantTypes: config.grant_types_supported,
-        supportedScopes: config.scopes_supported
-      });
     } catch (error: any) {
       console.error('❌ OpenID Configuration Error:', {
         error: error?.message,
@@ -104,17 +98,6 @@ class OAuthUtil {
    */
   async getAccessTokenByResourceOwnerCredential(username: string, password: string): Promise<TokenResponse> {
     try {
-      console.log('🔑 Token Request:', {
-        tokenEndpoint: this.tokenEndpoint,
-        params: {
-          grant_type: 'password',
-          client_id: this.clientId,
-          username,
-          scope: this.scope,
-          password: '***' // Hide password in logs
-        }
-      });
-
       const tokenParams = {
         username,
         password,
@@ -130,11 +113,6 @@ class OAuthUtil {
         refresh_expires_in: Number(result.token.refresh_expires_in) || 0,
         expires_at: (Date.now() / 1000) + (Number(result.token.expires_in) || 0)
       };
-
-      console.log('✅ Token Response:', {
-        hasToken: !!result,
-        tokenFields: Object.keys(tokenData)
-      });
 
       return {
         token: tokenData

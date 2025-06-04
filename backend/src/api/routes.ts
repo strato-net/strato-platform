@@ -55,8 +55,9 @@ router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get)
 router.post("/onramp/sell", authHandler.authorizeRequest(true), OnRampController.onRampSell);
 router.post("/onramp/lock", authHandler.authorizeRequest(true), OnRampController.onRampLock);
 router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampController.unlockTokens);
-router.post("/bridge/eth-to-strato", authHandler.authorizeRequest(true), bridgeController.ethToStrato);
-
+router.post("/bridge/bridgeIn", authHandler.authorizeRequest(true), bridgeController.bridgeIn);
+router.post("/bridge/bridgeOut", authHandler.authorizeRequest(true), bridgeController.bridgeOut);
+router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(true), bridgeController.getBalance);
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({

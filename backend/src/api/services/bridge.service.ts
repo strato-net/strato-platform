@@ -1,29 +1,36 @@
-
 import axios from 'axios';
+import { BigNumber } from 'bignumber.js';
 
-interface BridgeParams {
+interface BridgeInParams {
   amount: string;
   fromAddress: string;
-  toAddress: string;
-  userToken: string;
+  accessToken: string;
   tokenAddress: string;
   ethHash: string;
 }
 
+interface BridgeOutParams {
+  amount: string;
+  toAddress: string;
+  tokenAddress: string;
+  accessToken: string;
+}
+
+const BRIDGE_API_BASE_URL = process.env.BRIDGE_API_BASE_URL || 'http://localhost:3002';
+
 export class BridgeService {
-  public async ethToStrato(params: BridgeParams): Promise<any> {
+  public async bridgeIn(params: BridgeInParams): Promise<any> {
     try {
-     console.log("params",params);
+      console.log("params",params);
       // Make API call to bridge service
       const response = await axios.post(
-        'http://localhost:3002/api/bridge/transaction',
+        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeIn`,
         {
           fromAddress: params.fromAddress,
-          toAddress: params.toAddress,
-          amount: params.amount,
+          amount: new BigNumber(params.amount).multipliedBy(10**18).toString(),
           tokenAddress: params.tokenAddress,
-          userToken: params.userToken,
-          ethHash: params.ethHash
+          accessToken: params.accessToken,
+          ethHash: params.ethHash || ''
         },
         {
           headers: {
@@ -32,26 +39,70 @@ export class BridgeService {
         }
       );
 
-     console.log('Bridge service API response:', response.data);
-
-      // Return the response from bridge service
       return {
-        transactionId: params.ethHash,
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-        details: {
-          amount: params.amount,
-          fromAddress: params.fromAddress,
-          toAddress: params.toAddress,
-          tokenAddress: params.tokenAddress,
-          ethHash: params.ethHash
-        },
-        bridgeServiceResponse: response.data
+        status: response.data.status,
+        hash: response.data.hash,
       };
-
     } catch (error: any) {
-     console.log("error",error);
+      console.log("error",error.message);
       throw error;
     }
   }
-} 
+
+  public async bridgeOut(params: BridgeOutParams): Promise<any> {
+    try {
+      console.log(params);
+
+      const response = await axios.post(
+        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeOut`,
+        {
+          amount: new BigNumber(params.amount).multipliedBy(10**18).toString(),
+          toAddress: params.toAddress,
+          tokenAddress: params.tokenAddress,
+          accessToken: params.accessToken
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log("response",response.data);
+
+      return response.data;
+    } catch (error: any) {
+      console.log("Error in stratoToEth:", error.message);
+      throw error;
+    }
+  }
+
+  public async getBalance(params: {
+    accessToken: string;
+    tokenAddress: string;
+  }): Promise<any> {
+    try {
+      // Balance endpoint
+      const response = await axios.post(
+        `${BRIDGE_API_BASE_URL}/api/bridge/stratoTokenBalance`,
+        {
+          tokenAddress: params.tokenAddress,
+          accessToken: params.accessToken
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // divide balance by 10^18
+      const balance = new BigNumber(response.data.data.balance).div(10**18);
+      return {
+        balance: balance.toString(),
+      };
+    } catch (error: any) {
+      console.log("Error in getBalance:", error.message);
+      throw error;
+    }
+  }
+}
