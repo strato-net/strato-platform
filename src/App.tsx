@@ -14,9 +14,7 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { UserTokensProvider } from "./context/UserTokensContext";
-import { DepositableTokenProvider } from "./context/DepositableTokensContext";
 import { SwapProvider } from "./context/SwapContext";
-import { LoansProvider } from "./context/LoansContext";
 import { LendingProvider } from "./context/LendingContext";
 
 const queryClient = new QueryClient();
