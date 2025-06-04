@@ -45,26 +45,6 @@ const reducer = function (state = initialState, action) {
       const contractNames = Object.getOwnPropertyNames(action.contracts);
       const updatedContracts = {};
       contractNames.forEach((name) => {
-        if (state.contracts[name]) {
-          // new instances
-          const newInstances = action.contracts[name]
-            .filter((instance) => {
-              return state.contracts[name].instances
-                .filter((i) => {
-                  return i.address === instance.address
-                }).length === 0;
-            })
-            .map((instance) => {
-              return {
-                ...instance,
-                fromBloc: true
-              }
-            });
-          updatedContracts[name] = {
-            instances: state.contracts[name].instances.concat(newInstances)
-          };
-        }
-        else {
           updatedContracts[name] = {
             instances: action.contracts[name]
               .map((instance) => {
@@ -74,7 +54,6 @@ const reducer = function (state = initialState, action) {
                 }
               })
           };
-        }
       });
       return {
         contracts: updatedContracts,
