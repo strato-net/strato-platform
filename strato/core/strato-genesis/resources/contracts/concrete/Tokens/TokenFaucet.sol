@@ -1,5 +1,3 @@
-import "../../abstract/ERC20/ERC20.sol";
-
 struct TokenFaucetInfo {
     string tokenName;
     address tokenAddress;

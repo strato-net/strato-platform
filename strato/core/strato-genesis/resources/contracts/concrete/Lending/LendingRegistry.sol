@@ -1,5 +1,3 @@
-import "../../abstract/ERC20/access/Ownable.sol";
-
 /**
  * @title LendingRegistry
  * @notice Central registry contract storing addresses of core lending protocol components.
@@ -7,11 +5,11 @@ import "../../abstract/ERC20/access/Ownable.sol";
  */
  
  contract record LendingRegistry is Ownable {
-    address public lendingPool;
-    address public liquidityPool;
-    address public collateralVault;
-    address public rateStrategy;
-    address public priceOracle;
+    LendingPool public lendingPool;
+    LiquidityPool public liquidityPool;
+    CollateralVault public collateralVault;
+    RateStrategy public rateStrategy;
+    PriceOracle public priceOracle;
 
     event LendingPoolSet(address indexed newAddress);
     event LiquidityPoolSet(address indexed newAddress);
@@ -25,31 +23,31 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
     function setLendingPool(address _lendingPool) public onlyOwner {
         require(_lendingPool != address(0), "Invalid address");
-        lendingPool = _lendingPool;
+        lendingPool = LendingPool(_lendingPool);
         emit LendingPoolSet(_lendingPool);
     }
 
     function setLiquidityPool(address _liquidityPool) public onlyOwner {
         require(_liquidityPool != address(0), "Invalid address");
-        liquidityPool = _liquidityPool;
+        liquidityPool = LiquidityPool(_liquidityPool);
         emit LiquidityPoolSet(_liquidityPool);
     }
 
     function setCollateralVault(address _collateralVault) public onlyOwner {
         require(_collateralVault != address(0), "Invalid address");
-        collateralVault = _collateralVault;
+        collateralVault = CollateralVault(_collateralVault);
         emit CollateralVaultSet(_collateralVault);
     }
 
     function setRateStrategy(address _rateStrategy) public onlyOwner {
         require(_rateStrategy != address(0), "Invalid address");
-        rateStrategy = _rateStrategy;
+        rateStrategy = RateStrategy(_rateStrategy);
         emit RateStrategySet(_rateStrategy);
     }
 
     function setPriceOracle(address _priceOracle) public onlyOwner {
         require(_priceOracle != address(0), "Invalid address");
-        priceOracle = _priceOracle;
+        priceOracle = PriceOracle(_priceOracle);
         emit PriceOracleSet(_priceOracle);
     }
 }

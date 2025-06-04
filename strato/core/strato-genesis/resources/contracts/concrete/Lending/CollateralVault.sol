@@ -1,6 +1,3 @@
-import "../../abstract/ERC20/access/Ownable.sol";
-import "./LendingRegistry.sol";
-
 /**
  * @title CollateralVault
  * @notice Holds and tracks collateral for active loans; enforces collateralization requirements.
@@ -24,7 +21,7 @@ contract record CollateralVault is IERC20, Ownable {
     }
 
     modifier onlyLendingPool() {
-        require(msg.sender == registry.lendingPool(), "Caller is not LendingPool");
+        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
         _;
     }
 
@@ -37,11 +34,11 @@ contract record CollateralVault is IERC20, Ownable {
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
 
         string key = _key(borrower, asset);
+
         Collateral collateral = collaterals[key];
         collateral.user = borrower;
         collateral.asset = asset;
         collateral.amount += amount;
-        //collaterals[key] += amount;
 
         emit CollateralAdded(borrower, asset, amount);
     }
@@ -49,7 +46,9 @@ contract record CollateralVault is IERC20, Ownable {
     function removeCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         string key = _key(borrower, asset);
         require(collaterals[key].amount >= amount, "Insufficient collateral");
-
+        
+        collaterals[key].user = collaterals[key].user;
+        collaterals[key].asset = collaterals[key].asset;
         collaterals[key].amount -= amount;
         require(IERC20(asset).transfer(borrower, amount), "Transfer failed");
 

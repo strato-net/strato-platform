@@ -28,7 +28,7 @@ import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
 import qualified Data.Map.Strict                                 as M
-import           Data.Maybe                                      (listToMaybe, mapMaybe, maybeToList)
+import           Data.Maybe                                      (mapMaybe)
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
@@ -134,14 +134,19 @@ createdByBlockApps originAddress =
 ownedByBlockApps :: Address -> [(B.ByteString, BasicValue)]
 ownedByBlockApps originAddress = ("._owner", BAccount $ unspecifiedChain blockappsAddress) : createdByBlockApps originAddress
 
+getDecimals :: Integer -> Text -> Integer
+getDecimals d n =
+  if d < 0 || d >= 18 || n == "CATA" || n == "ETHST"
+    then 18
+    else if n == "STRAT"
+           then 4
+           else d
+
 correctQuantity :: Integer -> Text -> Integer -> Integer
 correctQuantity d n q =
   let times10ToThe a b = foldr (*) a $ replicate b 10
-   in if d < 0 || d >= 18 || n == "CATA" || n == "ETHST"
-        then q
-        else if n == "STRAT"
-               then q `times10ToThe` 14
-               else q `times10ToThe` (fromIntegral $ 18 - d)
+      decs = getDecimals d n
+   in q `times10ToThe` (fromIntegral $ 18 - decs)
 
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
 assetToAccountInfos GA.Asset{..} =
@@ -163,20 +168,20 @@ assetToAccountInfos GA.Asset{..} =
         [] -> Nothing
         _ -> Just . SolidVMContractWithStorage root 0 (CodeAtAccount mercataAddress "Token") $
           ownedByBlockApps root ++
-          [ (".originAddress", BAccount $ unspecifiedChain root)
-          , ("._name", BString $ encodeUtf8 name)
+          [ ("._name", BString $ encodeUtf8 name)
           , ("._symbol", BString $ encodeUtf8 $ takeCaps name)
           , (".description", BString $ encodeUtf8 description)
-          , (".quantity", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
+          , (".customDecimals", BInteger 18)
+          , ("._totalSupply", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
+          , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
+          , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
+          , (".admin", BAccount $ unspecifiedChain blockappsAddress)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
-            ++ mapMaybe (\(k,v) -> ("." <> encodeUtf8 k,) <$> maybeDefault (textToBasicValue v)) (M.toList assetData)
+            ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
             ++ allBalances
             ++ contractBalances
-            ++ maybeToList ((\(_,v) -> (".icon", BString $ encodeUtf8 v)) <$> (listToMaybe $ M.toList images))
-  where maybeDefault BDefault = Nothing
-        maybeDefault v        = Just v
 
 rateStrategy :: AccountInfo
 rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount mercataAddress "RateStrategy") $ createdByBlockApps mercataAddress
@@ -184,12 +189,12 @@ rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount m
 priceOracle :: AccountInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
   ownedByBlockApps mercataAddress ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
-    (".prices<a:" <> addrBS assetRootAddress <> ">", BInteger . round $ lastUpdatedOraclePrice ** (fromInteger $ GA.decimals a))
+    (".prices<a:" <> addrBS assetRootAddress <> ">", BInteger . round $ lastUpdatedOraclePrice * (10.0 ** (fromInteger $ 18 + getDecimals (GA.decimals a) (GA.name a))))
   ) GR.reserves
 
 collateralVault :: AccountInfo
 collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAccount mercataAddress "CollateralVault") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   ] ++ concatMap (\(i, GE.Escrow{..}) -> case M.lookup assetRootAddress assetMap of
     Nothing -> []
     Just GA.Asset{..} ->
@@ -201,7 +206,7 @@ collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAcc
 
 liquidityPool :: AccountInfo
 liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount mercataAddress "LiquidityPool") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   , (".totalLiquidity<a:" <> addrBS usdstAddress <> ">", BInteger mercataUsdstBalance)
   , (".deposited<\"1\">.user", BAccount . unspecifiedChain . GA.owner . head . filter ((== "mercata_usdst") . GA.ownerCommonName) . M.elems $ GA.balances usdstAsset)
   , (".deposited<\"1\">.asset", BAccount $ unspecifiedChain usdstAddress)
@@ -215,10 +220,8 @@ liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount
 
 lendingPool :: AccountInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
-  [ (".liquidityPool", BAccount $ unspecifiedChain liquidityPoolAddress)
-  , (".collateralVault", BAccount $ unspecifiedChain collateralVaultAddress)
-  , (".rateStrategy", BAccount $ unspecifiedChain rateStrategyAddress)
-  , (".oracle", BAccount $ unspecifiedChain priceOracleAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+  , (".poolConfigurator", BAccount $ unspecifiedChain poolConfiguratorAddress)
   , (".assetInterestRate<a:" <> addrBS 0x0 <> ">", BInteger 5)
   , (".assetCollateralRatio<a:" <> addrBS 0x0 <> ">", BInteger 150)
   , (".assetLiquidationBonus<a:" <> addrBS 0x0 <> ">", BInteger 105)
@@ -243,15 +246,16 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
 
 poolConfigurator :: AccountInfo
 poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 (CodeAtAccount mercataAddress "PoolConfigurator") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   ]
 
 lendingRegistry :: AccountInfo
 lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAccount mercataAddress "LendingRegistry") $ ownedByBlockApps mercataAddress ++
-  [ (".lendingPool", BAccount $ unspecifiedChain lendingPoolAddress)
-  , (".liquidityPool", BAccount $ unspecifiedChain liquidityPoolAddress)
-  , (".collateralVault", BAccount $ unspecifiedChain collateralVaultAddress)
-  , (".rateStrategy", BAccount $ unspecifiedChain rateStrategyAddress)
+  [ (".lendingPool", BContract "LendingPool" $ unspecifiedChain lendingPoolAddress)
+  , (".liquidityPool", BContract "LiquidityPool" $ unspecifiedChain liquidityPoolAddress)
+  , (".collateralVault", BContract "CollateralVault" $ unspecifiedChain collateralVaultAddress)
+  , (".rateStrategy", BContract "RateStrategy" $ unspecifiedChain rateStrategyAddress)
+  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
 mercataEthBridge :: AccountInfo
@@ -267,7 +271,7 @@ onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddres
   , (".adminCount", BInteger 1)
   , (".LOCK_EXPIRY", BInteger 1800)
   , (".nextListingId", BInteger 1)
-  , (".priceOracle", BAccount $ unspecifiedChain priceOracleAddress)
+  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
 poolFactory :: AccountInfo

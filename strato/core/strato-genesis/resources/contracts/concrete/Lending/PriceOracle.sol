@@ -1,5 +1,3 @@
-import "../../abstract/ERC20/access/Ownable.sol";
-
 /**
  * @title PriceOracle
  * @notice Provides asset price feeds used for loan value and collateral validation.

@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: MIT
-import "../../abstract/ERC20/ERC20.sol";
-
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
  contract record Pool is ERC20{
