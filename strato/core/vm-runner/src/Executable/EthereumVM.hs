@@ -215,10 +215,6 @@ sendOutEvent (OutAction act) = do
                       codePtr = cp,
                       creator = cn,
                       application = n,
-                      historyList =
-                        case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
-                          Nothing -> []
-                          Just v -> T.splitOn "," v,
                       abstracts = abstracts',
                       recordMappings = []
                     }

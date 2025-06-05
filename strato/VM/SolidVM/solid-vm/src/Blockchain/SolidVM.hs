@@ -2769,10 +2769,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                                      (SolidVMCode contractName' hsh) 
                                      (T.pack ctrName)
                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
-                                     ( case join $ fmap (M.lookup "history") (metadata) of
-                                         Nothing -> []
-                                         Just v -> (T.splitOn "," v)
-                                     )
                                      M.empty
                                      []
                                    ]
@@ -2812,10 +2808,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                                       (SolidVMCode contractName' hsh) 
                                       (T.pack ctrName) 
                                       (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
-                                      ( case join $ fmap (M.lookup "history") (metadata) of
-                                          Nothing -> []
-                                          Just v -> (T.splitOn "," v)
-                                      )
                                       M.empty
                                       []
                                    ]

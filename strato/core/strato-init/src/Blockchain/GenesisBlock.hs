@@ -247,7 +247,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
                   pure (abstrs', mappings, arrays, cc)
             _ -> pure (Map.empty, [], [], emptyCodeCollection)
           let cca = case ch of
-                SolidVMCode n _ -> Just $ CodeCollectionAdded (const () <$> cc) ch creator' (T.pack n) [] abstrs maps
+                SolidVMCode n _ -> Just $ CodeCollectionAdded (const () <$> cc) ch creator' (T.pack n) abstrs maps
                 _ -> Nothing
               act = Just . NewAction $ A.Action
                 { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
