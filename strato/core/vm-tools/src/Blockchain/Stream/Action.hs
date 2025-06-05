@@ -5,6 +5,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -27,7 +28,6 @@ module Blockchain.Stream.Action (
   actionDataCCCreator,
   actionDataRoot,
   actionDataApplication,
-  actionDataCodeKind,
   actionDataStorageDiffs,
   actionDataAbstracts,
   actionDataMappings,
@@ -47,12 +47,12 @@ module Blockchain.Stream.Action (
 
   ) where
 
+import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
+import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
@@ -219,9 +219,7 @@ data DataDiff
 instance Format DataDiff where
   format x@(EVMDiff _) = show x
   format (SolidVMDiff vals) =
-    let formatVal (Left e) = "Error: " ++ show e
-        formatVal (Right v) = format v
-     in "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (formatVal . hexStorageToBasic . HexStorage) vals)) ++ "]"
+    "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (format . rlpDecode @BasicValue . rlpDeserialize) vals)) ++ "]"
 
 instance Binary DataDiff
 
@@ -231,20 +229,6 @@ instance ToJSON DataDiff where
 
 sequenceTuple :: Monad m => (m a, m b) -> m (a, b)
 sequenceTuple = uncurry (liftM2 (,))
-
--- There is intentionally no FromJSON instance. The ToJSON instance does
--- not have enough information to recover the original type, and it is
--- expected that a sibling of DataDiff will have the information to
--- determine with parser to use.
-parseDiffEVM :: Value -> Parser DataDiff
-parseDiffEVM (Object obs) =
-  fmap (EVMDiff . M.fromList)
-    . mapM (sequenceTuple . bimap (f . String) f)
-    $ BF.first DAK.toText <$> KM.toList obs
-  where
-    f :: Value -> Parser Word256
-    f = fmap bytesToWord256 . parseJSON
-parseDiffEVM x = typeMismatch "EVMDiff" x
 
 parseDiffSolidVM :: Value -> Parser DataDiff
 parseDiffSolidVM (Object obs) =
@@ -263,7 +247,6 @@ data ActionData = ActionData
     _actionDataCCCreator :: Maybe Text,
     _actionDataRoot :: Text,
     _actionDataApplication :: Text,
-    _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
     _actionDataAbstracts :: Map (Address, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
     _actionDataMappings :: [Text],
@@ -289,9 +272,6 @@ instance Format ActionData where
       ++ "actionDataApplication: "
       ++ T.unpack _actionDataApplication
       ++ "\n"
-      ++ "actionDataCodeKind: "
-      ++ show _actionDataCodeKind
-      ++ "\n"
       ++ "actionDataStorageDiffs: "
       ++ format _actionDataStorageDiffs
       ++ "\n"
@@ -311,7 +291,7 @@ mergeActionData newData oldData =
       abstracts = _actionDataAbstracts oldData <> _actionDataAbstracts newData
       mappings = nub $ _actionDataMappings oldData ++ _actionDataMappings newData
       arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs abstracts mappings arrays calls
 
 instance Semigroup ActionData where
   (<>) = mergeActionData
@@ -329,8 +309,7 @@ instance ToJSON ActionData where
         "abstracts" .= _actionDataAbstracts,
         "mappings" .= _actionDataMappings,
         "arrays" .= _actionDataArrays,
-        "types" .= _actionDataCallTypes,
-        "codeKind" .= _actionDataCodeKind
+        "types" .= _actionDataCallTypes
       ]
 
 instance FromJSON ActionData where
@@ -341,19 +320,12 @@ instance FromJSON ActionData where
     ccr <- o .: "cc_creator"
     rt <- o .: "root"
     ap <- o .: "application"
-    ck <- o .:? "codeKind" .!= EVM
-    df <-
-      ( case ck of
-          EVM -> explicitParseField parseDiffEVM
-          SolidVM -> explicitParseField parseDiffSolidVM
-        )
-        o
-        "diff"
+    df <- explicitParseField parseDiffSolidVM o "diff"
     da <- o .: "abstracts"
     dm <- o .: "mappings"
     dr <- o .: "arrays"
     dt <- o .: "types"
-    return $ ActionData ch cc cr ccr rt ap ck df da dm dr dt
+    return $ ActionData ch cc cr ccr rt ap df da dm dr dt
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall

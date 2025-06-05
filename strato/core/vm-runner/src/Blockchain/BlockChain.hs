@@ -94,7 +94,6 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
-import Data.Either.Extra
 import Data.Foldable (traverse_)
 import Data.List
 import qualified Data.Map as M
@@ -642,7 +641,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultNewStorage = "",
         transactionResultDeletedStorage = "",
         transactionResultStatus = Just txrStatus,
-        transactionResultKind = erKind <$> eitherToMaybe result,
         transactionResultCreator = creator,
         transactionResultAppName = appName
       }

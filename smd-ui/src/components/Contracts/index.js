@@ -62,7 +62,9 @@ class Contracts extends Component {
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
-    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
+    this.setState({ offset: 0 }, () => {
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
+    });
   }
 
   onChainSearch = () => {

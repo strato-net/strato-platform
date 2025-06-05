@@ -189,9 +189,6 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [ -n "${creatorForkBlockNumber}" ]; then
-      creatorFlag="--creatorForkBlockNumber=${creatorForkBlockNumber}"
-  fi
   if [ -n "${idServerUrl}" ]; then
       idServer="--identityServerUrl=${idServerUrl}"
   fi
@@ -240,7 +237,6 @@ function newnode {
     ${networkFlag} \
     "${txsFlag}" \
     "${gasFlag}" \
-    "${creatorFlag}" \
     "${iFlag}" \
     "${sgFlag}" \
     "${sglFlag}" \

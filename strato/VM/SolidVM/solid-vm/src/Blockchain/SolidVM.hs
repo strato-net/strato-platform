@@ -56,7 +56,6 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
@@ -234,7 +233,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
     Code c -> pure c
     PtrToCode cp -> do
       hsh <- codePtrToSHA cp
-      fromMaybe "" . fmap snd . join <$> traverse getCode hsh
+      fromMaybe "" . join <$> traverse getCode hsh
 
   let env' =
         Env.Environment
@@ -331,9 +330,8 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
       parentName' = bool parentName "" (useWallet && parentName == "User")
-      issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env
   -- set creator
-  setCreator issuer originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
+  setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' argExps
@@ -342,7 +340,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   void . withCallInfo newAddress contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
-    setCreator issuer originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
+    setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAddress
@@ -371,7 +369,6 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         erSuicideList = S.empty,
         erAction = Just finalAct,
         erException = Nothing,
-        erKind = SolidVM,
         erPragmas = CC._pragmas cc,
         erCreator = issuerName,
         erAppName = parentName',
@@ -449,7 +446,6 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
           erSuicideList = S.empty,
           erAction = Just $ finalAct,
           erException = Nothing, -- tells me if theres an exception
-          erKind = SolidVM,
           erPragmas = [],
           erCreator = creator,
           erAppName = appName,
@@ -713,11 +709,7 @@ callWithResult from to fnCalltype mContract functionName isRCC argExps = snd <$>
 setCreator :: MonadSM m => Address -> Address -> Address -> CC.Contract -> Integer -> m ()
 setCreator creator originAddress contract _ _ = do
   maybeCert <- A.select (A.Proxy @X509Certificate) creator
-  blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-  let forkYeah = shouldDoCreatorFork blockNumber
-      _cn = if forkYeah
-                then fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
-                else fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+  let _cn = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
 
   case maybeCert of
     (Just cert) -> do
@@ -735,8 +727,7 @@ setCreator creator originAddress contract _ _ = do
     else do
       $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty creator field"
   
-  when forkYeah $ do
-    putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount $ NamedAccount originAddress MainChain)
+  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount $ NamedAccount originAddress MainChain)
 
 getCreator :: MonadSM m => Address -> m (Address, Address, String) -- (creatorAddress, originAddress, creatorName)
 getCreator caller = do
@@ -748,10 +739,7 @@ getCreator caller = do
       -- caller is a user account, so they are creating the first instance of this app
       -- we will look up their cert in the DB and use it to get the org name for this app
       maybeCert <- A.select (A.Proxy @X509Certificate) caller
-      blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-      let creator' = if shouldDoCreatorFork blockNumber
-                        then fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
-                        else fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+      let creator' = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
       $logDebugS "getCreator/versioning" . T.pack $ "The creator is " ++ (show creator')
       return (caller, caller, creator')
     x -> do
@@ -775,14 +763,6 @@ getCreator caller = do
             (_ , _)-> do
               $logDebugS "getCreator/versioning" . T.pack $ "Its creator is unset. Returning empty string"
               return (caller, caller, "") --TODO: have better sane default
-  
--- helper function for getCreator and setCreator
--- once mercata-hydrogen and mercata networks dismantled, this function and flag will be obsolete
-shouldDoCreatorFork :: Integer -> Bool
-shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetworkID) of 
-  (-1, 7596898649924658542) -> curBlockNo >= 37000 -- on mercata-hydrogen, switch at block 37,000
-  (-1, 6909499098523985262) -> curBlockNo >= 6200 -- on mercata, switch at block 6,200
-  (b, _) -> curBlockNo >= b -- do whatever the flag says
 
 logFunctionCall :: MonadSM m => ValList -> Address -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -2305,7 +2285,7 @@ evaluateAccountMember a _ "code" = do
   -- Find the code using the codehash
   cd <- A.lookup (A.Proxy @DBCode) ch'
   let cd' = case cd of
-        Just (_, bs) -> bs
+        Just bs -> bs
         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at address" (format a)
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result
