@@ -1,4 +1,3 @@
-
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -30,7 +29,10 @@ const Hero = () => {
               Easily earn on vaulted gold, silver & crypto. Get instant credit. Built by ETH veterans.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Link to="/register" className="cta-button flex items-center justify-center">
+              <Link 
+                to="/dashboard"
+                className="cta-button flex items-center justify-center"
+              >
                 Launch App
               </Link>
               <a href="#how-it-works" className="secondary-button flex items-center justify-center">

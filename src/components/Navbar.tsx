@@ -1,11 +1,28 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from 'lucide-react';
+import { useUser } from '@/context/UserContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isLoggedIn, logout, loading } = useUser();
+
+  const handleAuthClick = () => {
+    // Don't do anything if still loading
+    if (loading) return;
+    
+    if (isLoggedIn) {
+      logout();
+    } else {
+      window.location.href = '/login';
+    }
+  };
+
+  // Simple spinner component
+  const Spinner = () => (
+    <div className="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+  );
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white bg-opacity-80 backdrop-blur-md shadow-sm">
@@ -33,17 +50,28 @@ const Navbar = () => {
               </div>
             </div>
           </div>
-          <div className="hidden md:block">
-            <div className="ml-4 flex items-center md:ml-6">
-              <Link to="/login" className="text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5 px-4 py-2 rounded-full mr-3 text-sm font-medium">
-                Login
+          <div className="hidden md:flex items-center space-x-4">
+            {isLoggedIn && (
+              <Link 
+                to="/dashboard"
+                className="bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
+              >
+                Launch App
               </Link>
-              <Link to="/register">
-                <Button className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                  <ArrowRight className="mr-2 h-4 w-4" /> Launch App
-                </Button>
-              </Link>
-            </div>
+            )}
+            <button 
+              onClick={handleAuthClick}
+              disabled={loading}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                loading 
+                  ? 'opacity-75 cursor-not-allowed text-gray-500 border border-gray-300'
+                  : isLoggedIn 
+                    ? 'text-red-600 border border-red-300 hover:bg-red-50' 
+                    : 'text-strato-blue border border-strato-blue/30 hover:bg-strato-blue/5'
+              }`}
+            >
+              {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login'}
+            </button>
           </div>
           <div className="flex md:hidden">
             <button
@@ -79,15 +107,28 @@ const Navbar = () => {
             <a href="#about" className="text-gray-700 hover:text-strato-blue block px-3 py-2 rounded-md text-base font-medium">
               About
             </a>
-            <div className="pt-4 pb-2 border-t border-gray-200">
-              <Link to="/login" className="block text-center w-full text-strato-blue border border-strato-blue hover:bg-strato-blue/5 px-4 py-2 rounded-full mb-2">
-                Login
-              </Link>
-              <Link to="/register" className="block w-full">
-                <Button className="w-full bg-strato-blue hover:bg-strato-blue/90 text-white rounded-full">
-                  <ArrowRight className="mr-2 h-4 w-4" /> Launch App
-                </Button>
-              </Link>
+            <div className="pt-4 pb-2 border-t border-gray-200 space-y-2">
+              {isLoggedIn && (
+                <Link 
+                  to="/dashboard"
+                  className="block text-center w-full bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
+                >
+                  Launch App
+                </Link>
+              )}
+              <button 
+                onClick={handleAuthClick}
+                disabled={loading}
+                className={`block text-center w-full px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  loading 
+                    ? 'opacity-75 cursor-not-allowed text-gray-500 border border-gray-300'
+                    : isLoggedIn 
+                      ? 'text-red-600 border border-red-300 hover:bg-red-50' 
+                      : 'text-strato-blue border border-strato-blue hover:bg-strato-blue/5'
+                }`}
+              >
+                {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login'}
+              </button>
             </div>
           </div>
         </div>

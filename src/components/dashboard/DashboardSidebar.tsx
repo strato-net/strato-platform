@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send } from 'lucide-react';
+import { useUser } from '@/context/UserContext';
 
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const { logout } = useUser();
 
   const navItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
@@ -50,13 +52,13 @@ const DashboardSidebar = () => {
           <ul className="space-y-1">
             {navItems.map((item, index) => (
               <li key={index}>
-                <a
-                  href={item.path}
+                <Link
+                  to={item.path}
                   className="flex items-center px-4 py-2.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md mx-2"
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   {!collapsed && <span className="ml-3">{item.label}</span>}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -64,7 +66,7 @@ const DashboardSidebar = () => {
 
         <div className="mt-auto">
           <button
-            onClick={() => navigate('/auth/logout')}
+            onClick={logout}
             className={`flex items-center text-red-400 hover:bg-red-500/10 w-full rounded-md px-4 py-2.5 ${
               collapsed ? 'justify-center mx-auto' : ''
             }`}
