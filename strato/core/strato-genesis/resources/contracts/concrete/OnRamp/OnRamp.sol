@@ -31,25 +31,25 @@ contract record OnRamp {
 
     // Approval management
     uint256 public adminCount;
-    mapping(address => bool) public admins;
-    mapping(address => bool) public approvedSellers;
-    mapping(address => bool) public approvedTokens;
-    PaymentProviderInfo[] public paymentProviders;
-    mapping(address => uint) public paymentProviderIndex;
+    mapping(address => bool) public record admins;
+    mapping(address => bool) public record approvedSellers;
+    mapping(address => bool) public record approvedTokens;
+    PaymentProviderInfo[] public record paymentProviders;
+    mapping(address => uint) public record paymentProviderIndex;
 
     // Price oracle
     PriceOracle public priceOracle;
 
     // Listing management
     uint256 public nextListingId = 1;
-    mapping(uint256 => Listing) public listings;
-    mapping(address => uint256) public activeListingFor;
-    mapping(uint256 => mapping(address => bool)) public listingProviders; // listingId => provider => bool
+    mapping(uint256 => Listing) public record listings;
+    mapping(address => uint256) public record activeListingFor;
+    mapping(uint256 => mapping(address => bool)) public record listingProviders; // listingId => provider => bool
 
     // Lock management
     uint256 public LOCK_EXPIRY = 1800; // 30 minutes in seconds
-    mapping(uint256 => mapping(address => Lock)) public locks; // listingId => buyer => lock
-    mapping(uint256 => uint256) public lockedAmounts; // listingId => total locked amount
+    mapping(uint256 => mapping(address => Lock)) public record locks; // listingId => buyer => lock
+    mapping(uint256 => uint256) public record lockedAmounts; // listingId => total locked amount
 
     // Constructor
     constructor(address _oracle, address _admin) {
@@ -159,7 +159,7 @@ contract record OnRamp {
         require(providerAddresses.length > 0, "No providers specified");
 
         uint256 existing = activeListingFor[token];
-        require(existing == 0 || listings[existing].id != 0, "Active listing exists");
+        require(existing == 0, "Active listing exists");
 
         IERC20(token).transferFrom(msg.sender, address(this), amount);
 
@@ -227,12 +227,12 @@ contract record OnRamp {
 
         uint256 remaining = listing.amount;
         IERC20(listing.token).transfer(msg.sender, remaining);
-
+        
+        activeListingFor[listing.token] = 0;
         listing.id = 0;
         listing.marginBps = 0;
         listing.seller = address(0);
         listing.token = address(0);
-        activeListingFor[listing.token] = 0;
         listing.amount = 0;
 
         emit ListingCancelled(listingId);
