@@ -37,15 +37,13 @@ export const constants = (() => {
   ];
   const poolSelectFields = [
     "address",
-    "_name",
-    "_symbol",
-    "_totalSupply",
     "aToBRatio",
     "bToARatio",
     "tokenA",
     "tokenABalance",
     "tokenB",
     "tokenBBalance",
+    "lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals)",
   ];
   const registrySelectFields = [
     "lendingPool: lendingPool_fkey(" +

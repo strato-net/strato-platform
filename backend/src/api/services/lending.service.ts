@@ -6,8 +6,13 @@ import { approveAsset } from "../helpers/tokens.helper";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 
-const { registrySelectFields, lendingPool, LendingPool, LendingRegistry } =
-  constants;
+const {
+  registrySelectFields,
+  lendingPool,
+  LendingPool,
+  LendingRegistry,
+  PriceOracle,
+} = constants;
 
 export const getPool = async (
   accessToken: string,
@@ -320,10 +325,14 @@ export const setPrice = async (
   body: Record<string, string | undefined>
 ) => {
   try {
+    const registry = await getPool(accessToken, {
+      select: "priceOracle",
+    });
+    const priceOracle = registry.priceOracle;
     const tx = buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: "setPrice",
+      contractName: extractContractName(PriceOracle),
+      contractAddress: priceOracle,
+      method: "setAssetPrice",
       args: {
         asset: body.token,
         price: body.price,
