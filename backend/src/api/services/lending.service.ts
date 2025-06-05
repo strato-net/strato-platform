@@ -4,10 +4,15 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { approveAsset } from "../helpers/tokens.helper";
 import { getBalance, getTokens } from "./tokens.service";
+import { extractContractName } from "../../utils/utils";
 
-const { registrySelectFields, lendingPool } = constants;
-const Pool = "LendingPool";
-const Registry = "LendingRegistry";
+const {
+  registrySelectFields,
+  lendingPool,
+  LendingPool,
+  LendingRegistry,
+  PriceOracle,
+} = constants;
 
 export const getPool = async (
   accessToken: string,
@@ -33,10 +38,12 @@ export const getPool = async (
 
   const {
     data: [poolData],
-  } = await cirrus.get(accessToken, `/${Registry}`, { params });
+  } = await cirrus.get(accessToken, `/${LendingRegistry}`, { params });
 
   if (!poolData) {
-    throw new Error(`Error fetching ${Registry} data from Cirrus`);
+    throw new Error(
+      `Error fetching ${extractContractName(LendingRegistry)} data from Cirrus`
+    );
   }
 
   return poolData;
@@ -62,7 +69,7 @@ export const manageLiquidity = async (
     }
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
       method: body.method || "",
       args: {
@@ -103,7 +110,7 @@ export const getLoan = async (
     );
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
       method: "getLoan",
       args: {
@@ -146,7 +153,7 @@ export const repayLoan = async (
     );
 
     const tx = buildFunctionTx({
-      contractName: Pool,
+      contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
       method: "repayLoan",
       args: {
@@ -179,24 +186,37 @@ export const getDepositableTokens = async (
   ]);
 
   const userTokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
-
-  return Object.entries(registry.lendingPool.collateralRatio || {})
-    .filter(
-      ([token]) =>
-        registry.oracle?.prices?.[token] !== undefined &&
-        userTokenMap.has(token)
+  const oraclePriceMap = new Map(
+    (registry.oracle.prices || []).map(
+      ({ asset, price }: { asset: string; price: string }) => [asset, price]
     )
-    .map(([token, collateralRatio]) => {
-      const userToken = userTokenMap.get(token) as any;
+  );
+  const interestRateMap = new Map(
+    (registry.lendingPool.interestRate || []).map(
+      ({ asset, rate }: { asset: string; rate: number }) => [asset, rate]
+    )
+  );
+  const liquidityMap = new Map(
+    (registry.liquidityPool.totalLiquidity || []).map(
+      ({ asset, amount }: { asset: string; amount: string }) => [asset, amount]
+    )
+  );
+  return (registry.lendingPool.collateralRatio || [])
+    .filter(
+      ({ asset }: any) =>
+        oraclePriceMap.has(asset) !== undefined && userTokenMap.has(asset)
+    )
+    .map(({ asset, ratio }: { asset: string; ratio: number }) => {
+      const userToken = userTokenMap.get(asset) as any;
       return {
-        address: token,
+        address: asset,
         _name: userToken?.token?._name || "",
         _symbol: userToken?.token?._symbol || "",
         value: userToken?.balance?.toString() || "0",
-        collateralRatio: collateralRatio || 0,
-        interestRate: registry.lendingPool.interestRate?.[token] || 0,
-        price: registry.oracle?.prices?.[token] || 0,
-        liquidity: registry.liquidityPool?.totalLiquidity?.[token] || "0",
+        collateralRatio: ratio || 0,
+        interestRate: interestRateMap.get(asset) || 0,
+        price: oraclePriceMap.get(asset) || "0",
+        liquidity: liquidityMap.get(asset) || "0",
       };
     });
 };
@@ -209,9 +229,9 @@ export const getWithdrawableTokens = async (
 > => {
   const registry = await getPool(accessToken);
 
-  const userDeposits = Object.values(
-    registry.liquidityPool?.deposited || {}
-  ).filter((d: any) => d.user === address) as {
+  const userDeposits = Object.values(registry.liquidityPool?.deposited || {})
+    .map((entry: any) => entry.Deposit)
+    .filter((d: any) => d.user === address) as {
     asset: string;
     amount: string;
     user: string;
@@ -298,4 +318,37 @@ export const getLoans = async (
       },
     };
   });
+};
+
+export const setPrice = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const registry = await getPool(accessToken, {
+      select: "priceOracle",
+    });
+    const priceOracle = registry.priceOracle;
+    const tx = buildFunctionTx({
+      contractName: extractContractName(PriceOracle),
+      contractAddress: priceOracle,
+      method: "setAssetPrice",
+      args: {
+        asset: body.token,
+        price: body.price,
+      },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return {
+      status,
+      hash,
+    };
+  } catch (error) {
+    console.error("Error setting price:", error);
+    throw error;
+  }
 };

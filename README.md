@@ -36,15 +36,15 @@ The app consists of multiple parts:
 ```
 cd backend/
 npm i
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=client-id-here \
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+  OAUTH_CLIENT_ID=localhost \
   OAUTH_CLIENT_SECRET=client-secret-here \
-  NODE_URL=https://marketplace.mercata-testnet2.blockapps.net \
-  NETWORK=testnet2 \
+  NODE_URL=https://node5.mercata-testnet.blockapps.net \
+  NETWORK=testnet \
   BASE_URL=http://localhost \
   npm run dev
 ```
-- `NETWORK` options are: `prod|testnet|testnet2`.
+- `NETWORK` options are: `testnet|prod`.
 
 ### Run UI:
 ```
@@ -56,7 +56,7 @@ npm run dev
 ### Run Nginx Standalone:
 ```
 cd ../nginx
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration \
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
   OAUTH_CLIENT_ID=localhost \
   OAUTH_CLIENT_SECRET=client-secret-here \
   ssl=false \
@@ -84,7 +84,7 @@ sudo \
   OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
   OAUTH_CLIENT_ID=client-id-here \
   OAUTH_CLIENT_SECRET=client-secret-here \
-  NODE_URL=https://marketplace.mercata.blockapps.net \
+  NODE_URL=https://node5.mercata.blockapps.net \
   NETWORK=testnet \
   ssl=true \
   BASE_URL=host-url-here \

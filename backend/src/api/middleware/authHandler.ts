@@ -53,6 +53,13 @@ class AuthHandler {
           req.address = address;
           req.accessToken = token;
           return next();
+        } else {
+          res.set('WWW-Authenticate', 'Bearer');
+          res.status(401).json({
+            error: 'unauthorized',
+            message: 'Authentication required. Please log in at /login',
+            redirect: '/login'
+          });
         }
       } catch (err) {
         return next(err);

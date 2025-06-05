@@ -7,7 +7,6 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
-import AuthenticationController from "./controllers/authentication.controller";
 import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
 import { BridgeController } from "./controllers/bridge.controller";
@@ -15,12 +14,10 @@ import { BridgeController } from "./controllers/bridge.controller";
 const router = Router();
 const bridgeController = new BridgeController();
 
-router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
+router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
-router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
-
-router.get("/tokens/faucets", authHandler.authorizeRequest(), TokensController.getFaucets);
-router.get("/tokens/balance", authHandler.authorizeRequest(true), TokensController.getBalance);
+router.get("/tokens/faucets", authHandler.authorizeRequest(true), TokensController.getFaucets);
+router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
@@ -33,7 +30,7 @@ router.get("/swappableTokens/", authHandler.authorizeRequest(true), SwappingCont
 router.get("/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
 router.get("/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 router.get("/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
-router.get("/lpToken", authHandler.authorizeRequest(true), SwappingController.getLPTokens);
+router.get("/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
 
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);
@@ -42,9 +39,10 @@ router.post("/swap/addLiquidity", authHandler.authorizeRequest(), SwappingContro
 router.post("/swap/removeLiquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
 router.post("/swap/swap", authHandler.authorizeRequest(), SwappingController.swap);
 
-router.get("/depositableTokens/", authHandler.authorizeRequest(true), LendingController.getDepositableTokens);
-router.get("/withdrawableTokens/", authHandler.authorizeRequest(true), LendingController.getWithdrawableTokens);
-router.get("/loans/", authHandler.authorizeRequest(true), LendingController.getLoans);
+router.get("/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
+router.get("/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
+router.get("/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
+router.post("/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
 
 router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);

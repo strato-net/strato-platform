@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-import "../../abstract/ERC20/ERC20.sol";
+import "../Tokens/Token.sol";
 
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
- contract record Pool is ERC20{
+ contract record Pool {
     
     // Events
     event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
@@ -11,8 +11,9 @@ import "../../abstract/ERC20/ERC20.sol";
     event AddLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
     event RemoveLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
 
-    ERC20 public tokenA;                             // ERC20 tokenA traded on this contract
-    ERC20 public tokenB;                        // ERC20 traded on this contract
+    Token public tokenA;
+    Token public tokenB;
+    Token public lpToken;
 
     bool private locked;   
     
@@ -32,16 +33,17 @@ import "../../abstract/ERC20/ERC20.sol";
     constructor(
         address tokenAAddr, 
         address tokenBAddr
-    ) ERC20("LPT " + ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name(),"LPT " + ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol()){
-        tokenA = ERC20(tokenAAddr);
-        tokenB = ERC20(tokenBAddr);
+    ) {
+        lpToken = new Token(ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token", "", [], [], [], ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP", 0, 18);
+        tokenA = Token(tokenAAddr);
+        tokenB = Token(tokenBAddr);
     }
 
     function updateStateVars() internal {
         aToBRatio = getCurrentTokenABRatio();
         bToARatio = getCurrentTokenBARatio();
-        tokenABalance = tokenA.balanceOf(address(this));
-        tokenBBalance = tokenB.balanceOf(address(this));
+        tokenABalance = ERC20(tokenA).balanceOf(address(this));
+        tokenBBalance = ERC20(tokenB).balanceOf(address(this));
     }
 
     // Core functions
@@ -50,23 +52,22 @@ import "../../abstract/ERC20/ERC20.sol";
         uint256 max_tokenA_amount
     ) external returns (uint256) {
         require(tokenB_amount > 0 && max_tokenA_amount > 0, "Invalid inputs");
-        uint256 total_liquidity = totalSupply();
+        uint256 total_liquidity = ERC20(lpToken).totalSupply();
         
         if (total_liquidity > 0) {
             require(tokenB_amount > 0, "Min liquidity required");
-            uint256 tokenB_reserve = tokenB.balanceOf(address(this));
-            uint256 tokenA_reserve = tokenA.balanceOf(address(this));
+            uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
+            uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
             uint256 tokenA_amount = (tokenB_amount * tokenA_reserve / tokenB_reserve) + 1;
             uint256 liquidity_minted = tokenB_amount * total_liquidity / tokenB_reserve;
             
             require(max_tokenA_amount >= tokenA_amount, "Insufficient tokenA amount");
-            _mint(msg.sender, liquidity_minted);
+            lpToken.mint(msg.sender, liquidity_minted);
             
-            require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
-            require(tokenA.transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
+            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
+            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
             
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-            emit Transfer(address(0), msg.sender, liquidity_minted);
 
             updateStateVars();
 
@@ -76,13 +77,12 @@ import "../../abstract/ERC20/ERC20.sol";
             
             uint256 tokenA_amount = max_tokenA_amount;
             uint256 initial_liquidity = tokenB_amount;
-            _mint(msg.sender, initial_liquidity);
+            lpToken.mint(msg.sender, initial_liquidity);
             
-            require(tokenB.transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
-            require(tokenA.transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
+            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
+            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
             
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-            emit Transfer(address(0), msg.sender, initial_liquidity);
             
             updateStateVars();
 
@@ -97,22 +97,21 @@ import "../../abstract/ERC20/ERC20.sol";
         uint256 min_tokenA_amount
     ) external returns (uint256, uint256) {
         require(amount > 0 && min_tokenB > 0 && min_tokenA_amount > 0, "Invalid inputs");
-        uint256 total_liquidity = totalSupply();
+        uint256 total_liquidity = ERC20(lpToken).totalSupply();
         require(total_liquidity > 0, "No liquidity");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
+        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
         uint256 tokenB_amount = amount * tokenB_reserve / total_liquidity;
         uint256 tokenA_amount = amount * tokenA_reserve / total_liquidity;
         
         require(tokenB_amount >= min_tokenB && tokenA_amount >= min_tokenA_amount, "Insufficient amounts");
         
-        require(tokenB.transfer(msg.sender, tokenB_amount), "TokenB transfer failed");
-        require(tokenA.transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
+        require(ERC20(tokenB).transfer(msg.sender, tokenB_amount), "TokenB transfer failed");
+        require(ERC20(tokenA).transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
         
         emit RemoveLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-        emit Transfer(msg.sender, address(0), amount);
         
-        _burn(msg.sender, amount);
+        lpToken.burn(msg.sender, amount);
         
         updateStateVars();
 
@@ -135,8 +134,8 @@ import "../../abstract/ERC20/ERC20.sol";
     // Public price functions
     function getTokenAQuantityNeededForTokenBQuantity(uint256 amount, bool isTokenBToTokenA) external view returns (uint256) {
         require(amount > 0, "Invalid stable amount");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
+        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
 
         if (isTokenBToTokenA) {
             return getInputPrice(amount, tokenB_reserve, tokenA_reserve);
@@ -147,8 +146,8 @@ import "../../abstract/ERC20/ERC20.sol";
 
     // Price view functions
     function getCurrentTokenABRatio() public view returns (decimal) {
-        decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)));
-        decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)));
+        decimal tokenA_reserve = decimal(ERC20(tokenA).balanceOf(address(this)));
+        decimal tokenB_reserve = decimal(ERC20(tokenB).balanceOf(address(this)));
         require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 tokenA in stablecoins (tokenB_reserve / tokenA_reserve)
         return decimal((tokenB_reserve * 1.000000000000000000 ) / tokenA_reserve) / 1.000000000000000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
@@ -156,8 +155,8 @@ import "../../abstract/ERC20/ERC20.sol";
 
 
     function getCurrentTokenBARatio() public view returns (decimal) {
-        decimal tokenA_reserve = decimal(tokenA.balanceOf(address(this)))* 1.000000000000000000;
-        decimal tokenB_reserve = decimal(tokenB.balanceOf(address(this)))* 1.000000000000000000;
+        decimal tokenA_reserve = decimal(ERC20(tokenA).balanceOf(address(this)))* 1.000000000000000000;
+        decimal tokenB_reserve = decimal(ERC20(tokenB).balanceOf(address(this)))* 1.000000000000000000;
         require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
         // Price of 1 tokenB in tokens (tokenA_reserve / tokenB_reserve)
         return decimal((tokenA_reserve * 1.000000000000000000) / tokenB_reserve) / 1.000000000000000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
@@ -169,14 +168,14 @@ import "../../abstract/ERC20/ERC20.sol";
         uint256 min_tokens  
     ) external nonReentrant returns (uint256) {
         require(tokenB_sold > 0 && min_tokens > 0, "Invalid inputs");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
+        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
         uint256 tokens_bought = getInputPrice(tokenB_sold, tokenB_reserve, tokenA_reserve);
         
         require(tokens_bought >= min_tokens, "Insufficient output amount");
         
-        require(tokenB.transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
-        require(tokenA.transfer(msg.sender, tokens_bought), "TokenA transfer failed");
+        require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
+        require(ERC20(tokenA).transfer(msg.sender, tokens_bought), "TokenA transfer failed");
         
         updateStateVars();
 
@@ -189,14 +188,14 @@ import "../../abstract/ERC20/ERC20.sol";
         uint256 min_tokenB
     ) external nonReentrant returns (uint256) {
         require(tokenA_sold > 0 && min_tokenB > 0, "Invalid inputs");
-        uint256 tokenA_reserve = tokenA.balanceOf(address(this));
-        uint256 tokenB_reserve = tokenB.balanceOf(address(this));
+        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
+        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
         uint256 tokenB_bought = getInputPrice(tokenA_sold, tokenA_reserve, tokenB_reserve);
         
         require(tokenB_bought >= min_tokenB, "Insufficient output amount");
         
-        require(tokenA.transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
-        require(tokenB.transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
+        require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
+        require(ERC20(tokenB).transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
         
         updateStateVars();
         

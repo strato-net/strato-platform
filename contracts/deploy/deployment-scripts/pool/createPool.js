@@ -31,7 +31,7 @@ async function createPool(tokenAAddress, tokenBAddress, poolFactoryAddress) {
 
   if (final.status !== "Success") {
     throw new Error(
-      `Transaction failed with status: ${result.status}. Transaction hash: ${result.hash}`
+      `Transaction failed with status: ${final.status}. Transaction hash: ${final.hash}`
     );
   }
 
@@ -44,12 +44,12 @@ async function createPool(tokenAAddress, tokenBAddress, poolFactoryAddress) {
     transactionHash: final.hash,
     status: final.status,
     poolAddress:
-      final.status === "Success" ? final.txResult.contractsCreated : "Failed",
+      final.status === "Success" ? final.txResult.contractsCreated[1] : "Failed",
   };
 
   saveCallListTXDataAsFile(poolInfo);
 
-  return final.status === "Success" ? final.txResult.contractsCreated : null;
+  return final.status === "Success" ? final.txResult.contractsCreated[1] : null;
 }
 
 async function main() {
