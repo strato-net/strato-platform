@@ -956,8 +956,8 @@ getCodeAndCollection address' = do
           Just (SolidVMCode cn ch') -> do
             cc' <- codeCollectionFromHash True ch'
             return (stringToLabel cn, ch', cc')
-          Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
-          Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
+          Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+          Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
