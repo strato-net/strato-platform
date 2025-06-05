@@ -8,6 +8,7 @@ import {
   getDepositableTokens,
   getWithdrawableTokens,
   getLoans,
+  setPrice,
 } from "../services/lending.service";
 import {
   validateManageLiquidityArgs,
@@ -23,10 +24,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
-      const pool = await getPool(
-        accessToken,
-        query as Record<string, string>
-      );
+      const pool = await getPool(accessToken, query as Record<string, string>);
       res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
@@ -123,6 +121,20 @@ class LendingController {
     try {
       const { accessToken, address } = req;
       const result = await getLoans(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      const result = await setPrice(accessToken, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

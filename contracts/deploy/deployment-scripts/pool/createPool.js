@@ -31,7 +31,7 @@ async function createPool(tokenAAddress, tokenBAddress, poolFactoryAddress) {
 
   if (final.status !== "Success") {
     throw new Error(
-      `Transaction failed with status: ${result.status}. Transaction hash: ${result.hash}`
+      `Transaction failed with status: ${final.status}. Transaction hash: ${final.hash}`
     );
   }
 
