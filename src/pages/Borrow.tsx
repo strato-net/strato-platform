@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 
 import { DepositableToken } from "@/interface";
+import { usdstAddress } from "@/lib/contants";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -79,7 +80,7 @@ const Borrow = () => {
     const filteredTokens: DepositableToken[] = [];
 
     for (const token of depositableTokens) {
-      if (token?._name === "USDST") {
+      if (token?.address === usdstAddress) {
         usdtToken = token;
       } else {
         filteredTokens.push(token);
@@ -177,7 +178,7 @@ const Borrow = () => {
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
-                  ) : (
+                  ) : sortedAssets.length > 0 ? (
                     sortedAssets.map((asset) => (
                       <TableRow key={asset?.address}>
                         <TableCell>
@@ -216,7 +217,15 @@ const Borrow = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                  )}
+                  ) :
+                   <TableRow>
+                      <TableCell colSpan={4}>
+                        <div className="w-full flex justify-center items-center mt-4">
+                          No data to show
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  }
                 </TableBody>
               </Table>
             </CardContent>
@@ -243,7 +252,7 @@ const Borrow = () => {
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
-                  ) : (
+                  ) : activeLoans.length > 0 ? (
                     activeLoans.map((loan, loanIndex) => (
                       <TableRow key={loanIndex}>
                         <TableCell>
@@ -267,7 +276,15 @@ const Borrow = () => {
                         <TableCell>{formatEther(loan?.interest || 0)}</TableCell>
                       </TableRow>
                     ))
-                  )}
+                  ) : 
+                   <TableRow>
+                      <TableCell colSpan={4}>
+                        <div className="w-full flex justify-center items-center mt-4">
+                          No data to show
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  }
                 </TableBody>
               </Table>
             </CardContent>

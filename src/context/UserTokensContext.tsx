@@ -27,7 +27,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     setError(null);
     try {
       const response = await api.get(
-        `/tokens/table/balance?key=eq.${userAddress}`,
+        `/tokens/balance?key=eq.${userAddress}`,
         { signal }
       );
       // Only update state if not aborted and data has actually changed

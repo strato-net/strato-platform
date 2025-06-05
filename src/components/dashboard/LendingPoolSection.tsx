@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Token, WithdrawableToken } from "@/interface";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { usdstAddress } from "@/lib/contants";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
@@ -48,16 +49,16 @@ const LendingPoolSection = () => {
   // 2. Update component-local state when context changes
   useEffect(() => {
     const usdst = tokens.find(
-      (token) => token["BlockApps-Mercata-ERC20"]._symbol === "USDST"
+      (token) => token?.address === usdstAddress
     );
-
+    
     if (usdst) {
       setUsdstToken(usdst);
-      setUsdstAvailableBalance(formatUnits(usdst.value, 18));
+      setUsdstAvailableBalance(formatUnits(usdst?.balance?.toLocaleString('fullwide', { useGrouping: false }), 18));
 
       const depositedToken = withdrawableTokens.find(
         (token) => token._symbol === "USDST" && token.address === usdst.address
-      );
+    );
       if (depositedToken) {
         setDepositedUsdstToken(depositedToken);
       }

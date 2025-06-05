@@ -10,8 +10,17 @@ export interface Token {
   contract_name: string;
   collectionname: string;
   collectiontype: string;
+  token?: {
+    _name: string;
+    _symbol: string;
+    address?: string;
+  },
+  balance?: string;
   key: string;
   value: string;
+  price?: string;
+  _name?: string;
+  _symbol?: string;
   "BlockApps-Mercata-ERC20"?: {
     data: {
       token: string;
