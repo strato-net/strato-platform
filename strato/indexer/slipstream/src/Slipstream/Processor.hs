@@ -194,7 +194,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
-withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
+withSourceFirst = Down . any (isJust . actionSrc) . snd
 
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
 parseActions events' =
