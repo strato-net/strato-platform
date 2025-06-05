@@ -14,7 +14,6 @@
 module Bloc.API.Transaction where
 
 import Bloc.API.SwaggerSchema
-import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
@@ -37,7 +36,6 @@ import Data.Text (Text)
 import Data.Word
 import GHC.Generics
 import qualified Generic.Random as GR
-import Numeric.Natural
 import Servant.API as S
 import Servant.Docs
 import Test.QuickCheck hiding (Success)
@@ -197,7 +195,6 @@ instance ToSample PostBlocTransactionRequest where
         [ BlocTransfer $
             TransferPayload
               (Address 0x12345678)
-              (Strung 600)
               Nothing
               (Just $ Map.fromList [("purpose", "groceries")])
         ]
@@ -218,7 +215,6 @@ instance ToSchema PostBlocTransactionRequest where
           [ BlocTransfer $
               TransferPayload
                 (Address 0x12345678)
-                (Strung 600)
                 Nothing
                 (Just $ Map.fromList [("purpose", "groceries")])
           ]
@@ -252,7 +248,6 @@ data ContractPayload = ContractPayload
   { contractpayloadSrc :: SourceMap,
     contractpayloadContract :: Maybe Text,
     contractpayloadArgs :: Maybe (Map Text ArgValue),
-    contractpayloadValue :: Maybe (Strung Natural),
     contractpayloadTxParams :: Maybe TxParams,
     contractpayloadCodePtr :: Maybe Address,
     contractpayloadMetadata :: Maybe (Map Text Text)
@@ -261,7 +256,6 @@ data ContractPayload = ContractPayload
 
 data TransferPayload = TransferPayload
   { transferpayloadToAddress :: Address,
-    transferpayloadValue :: Strung Natural,
     transferpayloadTxParams :: Maybe TxParams,
     transferpayloadMetadata :: Maybe (Map Text Text)
   }
@@ -271,7 +265,6 @@ data FunctionPayload = FunctionPayload
   { functionpayloadContractAddress :: Address,
     functionpayloadMethod :: Text,
     functionpayloadArgs :: Map Text ArgValue,
-    functionpayloadValue :: Maybe (Strung Natural),
     functionpayloadTxParams :: Maybe TxParams,
     functionpayloadMetadata :: Maybe (Map Text Text)
   }
@@ -292,7 +285,6 @@ instance ToJSON ContractPayload where
       [ "contract" .= contractpayloadContract,
         "src" .= contractpayloadSrc,
         "args" .= contractpayloadArgs,
-        "value" .= contractpayloadValue,
         "txParams" .= contractpayloadTxParams,
         "codePtr" .= contractpayloadCodePtr,
         "metadata" .= contractpayloadMetadata
@@ -310,7 +302,6 @@ instance FromJSON ContractPayload where
       <$> (fromMaybe mempty <$> o .:? "src")
       <*> (o .:? "contract")
       <*> (o .:? "args")
-      <*> (o .:? "value")
       <*> (o .:? "txParams")
       <*> (o .:? "codePtr")
       <*> (o .:? "metadata")
@@ -336,7 +327,6 @@ instance ToSchema BlocTransactionPayload where
             { contractpayloadSrc = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }",
               contractpayloadContract = Nothing,
               contractpayloadArgs = Just $ Map.fromList [("_x", ArgInt 1)],
-              contractpayloadValue = Nothing,
               contractpayloadTxParams = Nothing,
               contractpayloadCodePtr = Nothing,
               contractpayloadMetadata = Nothing
@@ -355,7 +345,6 @@ instance ToSchema ContractPayload where
           { contractpayloadSrc = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }",
             contractpayloadContract = Nothing,
             contractpayloadArgs = Just $ Map.fromList [("_x", ArgInt 1)],
-            contractpayloadValue = Nothing,
             contractpayloadTxParams = Nothing,
             contractpayloadCodePtr = Nothing,
             contractpayloadMetadata = Nothing
@@ -372,7 +361,6 @@ instance ToSchema TransferPayload where
       ex =
         TransferPayload
           { transferpayloadToAddress = Address (0xdeadbeef),
-            transferpayloadValue = Strung 1000000,
             transferpayloadTxParams = Nothing,
             transferpayloadMetadata = Nothing
           }
@@ -390,7 +378,6 @@ instance ToSchema FunctionPayload where
           { functionpayloadContractAddress = Address (0xdeadbeef),
             functionpayloadMethod = "set",
             functionpayloadArgs = Map.fromList [("_x", ArgInt 5)],
-            functionpayloadValue = Nothing,
             functionpayloadTxParams = Nothing,
             functionpayloadMetadata = Nothing
           }

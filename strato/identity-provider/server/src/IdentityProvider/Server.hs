@@ -456,7 +456,6 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
             { functionpayloadContractAddress = 0x509,
               functionpayloadMethod = "registerCertificate",
               functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
-              functionpayloadValue = Nothing,
               functionpayloadTxParams = Nothing,
               functionpayloadMetadata = Nothing
             }
@@ -543,7 +542,6 @@ registerUserWallet
               { functionpayloadContractAddress = userRegAddr,
                 functionpayloadMethod = "createUser",
                 functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
-                functionpayloadValue = Nothing,
                 functionpayloadTxParams = Nothing,
                 functionpayloadMetadata = Nothing
               }

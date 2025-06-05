@@ -63,7 +63,6 @@ import Data.Source.Map
 import Data.Text (Text)
 import GHC.Generics
 import qualified Generic.Random as GR
-import Numeric.Natural
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck hiding (Failure, Success)
@@ -325,7 +324,6 @@ instance ToParam (QueryParam "use_wallet" Bool) where
 data TransferParameters = TransferParameters
   { fromAddress :: Address,
     toAddress :: Address,
-    value :: Strung Natural,
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     resolve :: Bool
@@ -338,7 +336,6 @@ data ContractParameters = ContractParameters
     src :: SourceMap,
     contract :: Maybe Text,
     args :: Maybe (Map Text ArgValue),
-    value :: Maybe (Strung Natural),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     resolve :: Bool,
@@ -351,7 +348,6 @@ data UploadListContract = UploadListContract
     uploadlistcontractSrc :: SourceMap,
     uploadlistcontractArgs :: Map Text ArgValue,
     _uploadlistcontractTxParams :: Maybe TxParams,
-    uploadlistcontractValue :: Maybe (Strung Natural),
     uploadlistcontractMetadata :: Maybe (Map Text Text),
     uploadlistcontractPtr2Code :: Maybe Code
   }
@@ -368,7 +364,6 @@ instance ToJSON UploadListContract where
         "src" .= uploadlistcontractSrc,
         "args" .= uploadlistcontractArgs,
         "txParams" .= _uploadlistcontractTxParams,
-        "value" .= uploadlistcontractValue,
         "metadata" .= uploadlistcontractMetadata,
         "ptr2code" .= uploadlistcontractPtr2Code
       ]
@@ -380,7 +375,6 @@ instance FromJSON UploadListContract where
       <*> (fromMaybe mempty <$> o .:? "src")
       <*> (o .: "args")
       <*> (o .:? "txParams")
-      <*> (o .:? "value")
       <*> (o .:? "metadata")
       <*> (o .:? "ptr2Code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
@@ -398,7 +392,6 @@ instance ToSchema UploadListContract where
             uploadlistcontractSrc = mempty,
             uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 1)],
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
-            uploadlistcontractValue = Nothing,
             uploadlistcontractMetadata = Nothing,
             uploadlistcontractPtr2Code = Nothing
           }
@@ -416,7 +409,6 @@ data FunctionParameters = FunctionParameters
     contractAddr :: Address,
     funcName :: Text,
     args :: Map Text ArgValue,
-    value :: Maybe (Strung Natural),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     resolve :: Bool
@@ -425,7 +417,6 @@ data FunctionParameters = FunctionParameters
 --------------------------------------------------------------------------------
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address,
-    sendtransactionValue :: Strung Natural,
     _sendtransactionTxParams :: Maybe TxParams,
     sendtransactionMetadata :: Maybe (Map Text Text)
   }
@@ -482,7 +473,6 @@ instance ToSchema SendTransaction where
       ex =
         SendTransaction
           { sendtransactionToAddress = Address 0xdeadbeef,
-            sendtransactionValue = Strung 100000000000000,
             _sendtransactionTxParams =
               Just
                 ( TxParams
@@ -590,7 +580,6 @@ instance ToSchema MethodCall where
       ex =
         MethodCall
           { _methodcallTxParams = Nothing,
-            methodcallValue = Strung 1000000000,
             methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)],
             methodcallMethodName = "getHoroscope",
             methodcallContractAddress = Address 0xdeadbeef,
@@ -631,7 +620,6 @@ methodErroredExample =
     exMethodCall =
       MethodCall
         { _methodcallTxParams = Nothing,
-          methodcallValue = Strung 1000000000,
           methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)],
           methodcallMethodName = "getHoroscope",
           methodcallContractAddress = Address 0xdeadbeef,
@@ -652,7 +640,6 @@ data MethodCall = MethodCall
   { methodcallContractAddress :: Address,
     methodcallMethodName :: Text,
     methodcallArgs :: Map Text ArgValue,
-    methodcallValue :: Strung Natural,
     _methodcallTxParams :: Maybe TxParams,
     methodcallMetadata :: Maybe (Map Text Text)
   }
