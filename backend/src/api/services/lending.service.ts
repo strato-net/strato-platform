@@ -314,3 +314,32 @@ export const getLoans = async (
     };
   });
 };
+
+export const setPrice = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const tx = buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: "setPrice",
+      args: {
+        asset: body.token,
+        price: body.price,
+      },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return {
+      status,
+      hash,
+    };
+  } catch (error) {
+    console.error("Error setting price:", error);
+    throw error;
+  }
+};

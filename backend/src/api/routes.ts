@@ -43,6 +43,7 @@ router.post("/swap/swap", authHandler.authorizeRequest(), SwappingController.swa
 router.get("/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
 router.get("/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
 router.get("/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
+router.post("/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
 
 router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
