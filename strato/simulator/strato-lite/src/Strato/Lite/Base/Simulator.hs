@@ -504,7 +504,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address Integer (MonadSim
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Keccak256 SourceMap (MonadSimulator m) where
   select _ ch = A.lookup (A.Proxy @DBCode) ch >>= \case 
     Nothing -> pure Nothing
-    Just (_, codeBS) -> case Aeson.decode' $ BL.fromStrict codeBS of
+    Just codeBS -> case Aeson.decode' $ BL.fromStrict codeBS of
       Just codeMap -> pure . Just . SourceMap $ M.toList codeMap
       Nothing -> case Text.decodeUtf8' codeBS of
         Left _ -> pure Nothing

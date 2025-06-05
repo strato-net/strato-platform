@@ -24,8 +24,6 @@ module Blockchain.Data.AddressStateDB
     resolveCodePtrParent,
     codePtrToSHA,
     resolvedCodePtrToSHA,
-    codePtrToCodeKind,
-    unsafeCodePtrToCodeKind,
     getAppAccount,
   )
 where
@@ -207,22 +205,6 @@ resolvedCodePtrToSHA :: CodePtr -> Keccak256
 resolvedCodePtrToSHA (ExternallyOwned hsh) = hsh
 resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
-
-codePtrToCodeKind ::
-  ( Selectable Address AddressState m
-  ) =>
-  CodePtr ->
-  m CodeKind
-codePtrToCodeKind =
-  resolveCodePtr >=> \case
-    Just (SolidVMCode _ _) -> pure SolidVM
-    _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
-
-unsafeCodePtrToCodeKind :: Selectable Address AddressState m => CodePtr -> m CodeKind
-unsafeCodePtrToCodeKind =
-  unsafeResolveCodePtr >=> \case
-    Just (SolidVMCode _ _) -> pure SolidVM
-    _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
 
 getAppAccount ::
   ( Selectable Address AddressState m

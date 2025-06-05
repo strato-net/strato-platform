@@ -193,7 +193,9 @@ rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount m
 
 priceOracle :: AccountInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
-  ownedByBlockApps mercataAddress ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
+  (".prices<a:" <> addrBS usdstAddress <> ">", BInteger 1000000000000000000)
+  : ownedByBlockApps mercataAddress
+  ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
     (".prices<a:" <> addrBS assetRootAddress <> ">", BInteger . round $ lastUpdatedOraclePrice * (10.0 ** (fromInteger $ 18 + getDecimals (GA.decimals a) (GA.name a))))
   ) GR.reserves
 
@@ -230,6 +232,9 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".assetInterestRate<a:" <> addrBS 0x0 <> ">", BInteger 5)
   , (".assetCollateralRatio<a:" <> addrBS 0x0 <> ">", BInteger 150)
   , (".assetLiquidationBonus<a:" <> addrBS 0x0 <> ">", BInteger 105)
+  , (".assetInterestRate<a:" <> addrBS usdstAddress <> ">", BInteger 0)
+  , (".assetCollateralRatio<a:" <> addrBS usdstAddress <> ">", BInteger 150)
+  , (".assetLiquidationBonus<a:" <> addrBS usdstAddress <> ">", BInteger 105)
   ] ++ concatMap (\(i, GE.Escrow{..}) -> case (isActive && borrowedAmount > 0, M.lookup assetRootAddress assetMap) of
     (True, Just GA.Asset{..}) ->
       [ (".loans<\"" <> BC.pack (show i) <> "\">.user", BAccount $ unspecifiedChain borrower)

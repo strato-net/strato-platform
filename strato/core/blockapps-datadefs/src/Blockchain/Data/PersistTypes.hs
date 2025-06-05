@@ -7,7 +7,6 @@ module Blockchain.Data.PersistTypes where
 
 import BlockApps.Solidity.Xabi
 import Blockchain.Data.PubKey
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.StateRoot
 import Crypto.Types.PubKey.ECC
@@ -54,24 +53,6 @@ instance PersistField Integer where
             Nothing -> case readMaybe s :: Maybe Double of
               Just d -> Right $ round d
               Nothing -> Left $ "Invalid Integer: " <> t
-
-instance PersistField CodeKind where
-  toPersistValue = PersistText . T.pack . show
-  fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/CodeKind" . T.unpack $ t
-  fromPersistValue x = Left . T.pack $ "PersistField CodeKind: expected int: " ++ show x
-
-instance PersistFieldSql CodeKind where
-  sqlType _ = SqlString
-
-instance PersistField HexStorage where
-  toPersistValue (HexStorage hs) = PersistText . decodeUtf8 . B16.encode $ hs
-  fromPersistValue (PersistText t) = case B16.decode (encodeUtf8 t) of
-    Right h -> Right $ HexStorage h
-    _ -> Left $ T.pack $ "Invalid hex text: " ++ show t
-  fromPersistValue x = Left $ T.pack $ "PersistField HexStorage: expected varchar: " ++ (show x)
-
-instance PersistFieldSql HexStorage where
-  sqlType _ = SqlString
 
 instance PersistField Word256 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 64 (fromIntegral i :: Integer)

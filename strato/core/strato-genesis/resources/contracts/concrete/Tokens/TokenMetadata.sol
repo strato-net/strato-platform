@@ -1,8 +1,8 @@
 contract TokenMetadata {
     string description;
-    string[] public record images;
-    string[] public record files;
-    string[] public record fileNames;
+    string[] record images;
+    string[] record files;
+    string[] record fileNames;
 
     mapping(string => string) public record attributes;
 

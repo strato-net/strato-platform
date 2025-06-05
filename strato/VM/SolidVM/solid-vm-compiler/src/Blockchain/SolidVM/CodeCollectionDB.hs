@@ -233,7 +233,7 @@ codeCollectionFromSource typeCheck initCode = do
       return (hsh, cc)
     (_, Nothing) -> do
       recordCacheEvent StorageWrite
-      hsh' <- addCode SolidVM canonicalInitCode
+      hsh' <- addCode canonicalInitCode
       ecc <- compileSource typeCheck initMap
       let cc = case ecc of
             Right a -> a
@@ -277,7 +277,7 @@ codeCollectionFromHashNoCache ::
 codeCollectionFromHashNoCache mergeFuncs typeCheck hsh =
   getCode hsh >>= \case
     Nothing -> internalError "unknown code hash" hsh
-    Just (_, initCode) -> do
+    Just initCode -> do
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just l -> M.fromList l
             Nothing -> M.singleton T.empty (decodeUtf8 initCode)

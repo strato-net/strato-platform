@@ -773,12 +773,9 @@ data TransactionHeader = TransactionHeader
 postUsersSend' ::
   ( MonadUnliftIO m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
-    HasCodeDB m,
     MonadLogger m,
     HasBlocEnv m,
     HasVault m
@@ -810,7 +807,6 @@ postUsersContractSolidVM' ::
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasCodeDB m,
     HasBlocEnv m,
@@ -861,7 +857,6 @@ postUsersUploadListSolidVM' ::
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasCodeDB m,
     HasBlocEnv m,
@@ -911,11 +906,8 @@ postUsersSendList' ::
   ( MonadUnliftIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
     HasVault m
@@ -1363,11 +1355,8 @@ getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 getResultAndRespond ::
   ( MonadUnliftIO m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m
   ) =>
   [Keccak256] ->

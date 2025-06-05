@@ -85,7 +85,7 @@ instance {-# OVERLAPPING #-} (Keccak256 `Selectable` SourceMap) m => (Keccak256 
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = fmap (SolidVM,) <$> getCodeByteStringFromPostgres k
+  lookup _ k = getCodeByteStringFromPostgres k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 

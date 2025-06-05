@@ -150,7 +150,6 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
           transactionResultNewStorage = "",
           transactionResultDeletedStorage = "",
           transactionResultStatus = Just (txRejectionToAPIFailureCause rejection),
-          transactionResultKind = Nothing,
           transactionResultCreator = "",
           transactionResultAppName = ""
         }

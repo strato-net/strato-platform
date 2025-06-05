@@ -286,11 +286,6 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr = do
                         mCreator'
                         originAddress'
                         appName'
-                        ( case cp of
-                            ExternallyOwned _ -> EVM
-                            SolidVMCode _ _ -> SolidVM
-                            _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
-                        )
                         storageDiff
                         abstrs maps arrs
                         [A.Create]),
