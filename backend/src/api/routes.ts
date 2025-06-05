@@ -7,15 +7,12 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
-import AuthenticationController from "./controllers/authentication.controller";
 import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
 
 const router = Router();
 
-router.get("/authentication/logout", authHandler.authorizeRequest(), AuthenticationController.logout);
-
-router.get("/users/me", authHandler.authorizeRequest(true), UsersController.me);
+router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
 router.get("/tokens/faucets", authHandler.authorizeRequest(true), TokensController.getFaucets);
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);

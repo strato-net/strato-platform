@@ -57,7 +57,7 @@ export const getServiceToken = async (): Promise<string> => {
 /**
  * Try to get an existing STRATO key.
  * @returns the address, or null if none exists yet.
- * @throws on non-404 failures.
+ * @throws on non-400 failures.
  */
 async function getKey(token: string): Promise<string | null> {
   try {
@@ -67,12 +67,13 @@ async function getKey(token: string): Promise<string | null> {
     );
     return data.address ?? null;
   } catch (err) {
-    // 404 means “no key yet”, rest bubble up
-    if (axios.isAxiosError(err) && err.response?.status === 404) {
+    // 400 means "no key yet" for that API endpoint (STRATO API should ideally return 404, but we work with what we have)
+    if (axios.isAxiosError(err) && err.response?.status === 400) {
       return null;
+    } else {
+      console.error("Error getting key:", err);
+      throw new Error("Key retrieval failed");
     }
-    console.error("Error getting key:", err);
-    throw new Error("Key retrieval failed");
   }
 }
 
