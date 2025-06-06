@@ -83,4 +83,48 @@ export class BridgeController {
       next(error);
     }
   };
+
+  public userDepositStatus = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { accessToken } = req;
+
+      const result = await this.bridgeService.getUserDepositStatus({
+        accessToken
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  };
+
+
+  public userWithdrawalStatus = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { accessToken } = req;
+
+      const result = await this.bridgeService.getUserWithdrawalStatus({
+        accessToken
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  };
+
 }

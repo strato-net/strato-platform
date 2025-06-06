@@ -105,4 +105,47 @@ export class BridgeService {
       throw error;
     }
   }
+
+
+  public async getUserDepositStatus(params: {
+    accessToken: string;
+  }): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${BRIDGE_API_BASE_URL}/api/bridge/userDepositStatus`,
+        {
+          headers: {
+            'Authorization': `Bearer ${params.accessToken}`
+          }
+        }
+      );
+      console.log('Bridge Service Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.log("Error in get user deposit Status:", error.message);
+      throw error;
+    }
+  }
+
+
+  public async getUserWithdrawalStatus(params: {
+    accessToken: string;
+  }): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${BRIDGE_API_BASE_URL}/api/bridge/userWithdrawalStatus`,
+        {
+          headers: {
+            'Authorization': `Bearer ${params.accessToken}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      return null;
+      throw error;
+    }
+  }
+  
+
 }

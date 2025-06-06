@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import logger from "../utils/logger";
 import { getUserAddressFromToken } from "../utils";
-import { bridgeIn, stratoTokenBalance, bridgeOut } from "../services/bridgeService";
+import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus } from "../services/bridgeService";
 import { config } from "../config";
 
 class BridgeController {
@@ -66,6 +66,7 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { tokenAddress, accessToken } = req.body;
+
       // Get user address from token
       const userAddress = await getUserAddressFromToken(accessToken);
       console.log("userAddress", userAddress);
@@ -79,6 +80,43 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in stratoToBalance:", error?.message);
+      next(error);
+    }
+  }
+
+
+  static async userDepositStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const depositStatus = await userDepositStatus();
+
+      res.json({
+        success: true,
+        data: depositStatus,
+      });
+    } catch (error: any) {
+      logger.error("Error in fetching deposit status:", error?.message);
+      next(error);
+    }
+  }
+
+  static async userWithdrawalStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const withdrawalStatus = await userWithdrawalStatus();
+
+      res.json({
+        success: true,
+        data: withdrawalStatus,
+      });
+    } catch (error: any) {
+      logger.error("Error in fetching deposit status:", error?.message);
       next(error);
     }
   }

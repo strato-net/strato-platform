@@ -12,7 +12,7 @@ class TokenContractCall {
   async balanceOf(args: any) {
     const tokenContract = await contractCall(tokenContractName, this.contractAddress, "balanceOf", args);
     return tokenContract.data.contents[0];
-  }
+  }    
 }
 
 export default TokenContractCall;

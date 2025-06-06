@@ -1,7 +1,18 @@
+import { config } from "../config";
+import { getUserToken } from "../auth";
 import BridgeContractCall from "../utils/bridgeContractCall";
 import TokenContractCall from "../utils/tokenContractCall";
 import sendEmail from "./emailService";
 import safeTransactionGenerator, { checkEthTransaction } from "./safeService";
+import { fetchCirrusData } from "./cirrusService";
+
+const checkDepositStatus = async (txHash: string): Promise<any | null> => {
+  const strippedHash = txHash.toLowerCase().replace(/^0x/, '');
+  const data = await fetchCirrusData('MercataEthBridge-depositStatus');
+
+  if (!Array.isArray(data)) return null;
+  return data.find((item: any) => item.key?.toLowerCase() === strippedHash) || null;
+};
 
 export const stratoTokenBalance = async (
   userAddress: string,
@@ -42,8 +53,6 @@ export const bridgeOut = async (tokenAddress: string, fromAddress: string, amoun
   const generator = await safeTransactionGenerator(amount, toAddress);
   const { value: { hash } } = await generator.next();
 
-  console.log('hash', hash);
-
   const bridgeContract = new BridgeContractCall();
   await bridgeContract.withdraw({
     txHash: hash.toString().replace("0x", ""),
@@ -55,7 +64,7 @@ export const bridgeOut = async (tokenAddress: string, fromAddress: string, amoun
   });
 
   const { value: { success } } = await generator.next();
-  console.log('Transaction proposed:', success);
+
 
   const markPendindResponse = await bridgeContract.markWithdrawalPendingApproval({
     txHash: hash.toString().replace("0x", ""),
@@ -68,40 +77,60 @@ export const bridgeOut = async (tokenAddress: string, fromAddress: string, amoun
 
 // get the possible data from alchemy and verify in this call
 export const confirmBridgeIn = async (tx: any) => {
-  // const transactionHash = tx.hash;
-  // // TODO: call cirrus API to get the info about the tx using eth hash make a cirrus service for this
-  // const transaction = await checkEthTransaction(transactionHash);
+  if (!tx.hash) {
+    return null;
+  }
 
-  // if (!transaction) {
-  //   return;
-  // }
+  if (!config.bridge?.tokenAddress) {
+    return null;
+  }
 
-  // // TODO: call cirrus API to get the info about the tx using eth hash make a cirrus service for this
+  if (!config.safe?.address) {
+    return null;
+  }
 
-  // const bridgeContract = new BridgeContractCall();
-  // await bridgeContract.confirmDeposit({
-  //   txHash: ethHash.toString().replace("0x", ""),
-  //   token: tokenAddress.toLowerCase().replace("0x", ""),
-  //   to: toAddress.toLowerCase().replace("0x", ""),
-  //   amount: amount.toString(),
-  //   mercataUser: userAddress.toLowerCase().replace("0x", ""),
-  // });
-}
+  // Check deposit status from Mercata endpoint
+  const depositStatus = await checkDepositStatus(tx.hash);
+  
+  if (!depositStatus) {
+    return null;
+  }
+
+  try {
+    const bridgeContract = new BridgeContractCall();
+    await bridgeContract.confirmDeposit({
+      txHash: depositStatus.key.toString().replace("0x", ""),
+      token: config.bridge.tokenAddress.toLowerCase().replace("0x", ""),
+      // TODO: get the amount from the deposit status
+      to: config.safe.address.toLowerCase().replace("0x", ""),
+      amount: '1000000000'.toString(),
+      mercataUser: depositStatus.transaction_sender.toLowerCase().replace("0x", ""),
+    });
+  } catch (error) {
+    return null;
+  }
+};
 
 export const confirmBridgeOut = async (tx: any) => {
   const transactionHash = tx.hash;
   const transaction = await checkEthTransaction(transactionHash);
 
   if (!transaction) {
-    return;
+    return null;
   }
 
   const safeTxHash = transaction.safeTxHash.toString().replace("0x", "");
-
-  console.log("transaction", safeTxHash);
 
   const bridgeContract = new BridgeContractCall();
   await bridgeContract.confirmWithdrawal({
     txHash: safeTxHash,
   });
+}
+
+export const userDepositStatus = async () => {
+  return await fetchCirrusData('MercataEthBridge-depositStatus');
+}
+
+export const userWithdrawalStatus = async () => {
+  return await fetchCirrusData('MercataEthBridge-withdrawStatus');
 }
