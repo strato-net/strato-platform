@@ -18,6 +18,7 @@ module Blockchain.Stream.Action (
   transactionSender,
   actionData,
   metadata,
+  src,
   events,
   delegatecalls,
 
@@ -387,6 +388,7 @@ data Action = Action
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
     _metadata :: Maybe (Map Text Text),
+    _src :: Maybe Text,
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }
@@ -452,6 +454,7 @@ instance ToJSON Action where
         "sender" .= _transactionSender,
         "data" .= _actionData,
         "metadata" .= _metadata,
+        "src" .= _src,
         "events" .= _events,
         "delegatecalls" .= _delegatecalls
       ]
@@ -466,6 +469,7 @@ instance FromJSON Action where
       <*> (o .: "sender")
       <*> (o .: "data")
       <*> (o .: "metadata")
+      <*> (o .: "src")
       <*> (o .: "events")
       <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))
   parseJSON o = fail $ "parseJSON Action: Expected object, got: " ++ show o

@@ -791,8 +791,8 @@ completeDiff ::
   Keccak256 ->
   Integer ->
   ConduitT a VmOutEvent m ()
-completeDiff src dst hsh num = withCurrentBlockHash hsh $ do
-  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src, "to", format dst]
+completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
+  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src', "to", format dst]
   runConduit $
-    SD.stateDiff Nothing num hsh src dst
+    SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)

@@ -405,12 +405,13 @@ startingAction maybeCode env' =
       _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _metadata =
+      _metadata = Env.metadata env',
+      _src =
         case maybeCode of
           Just (Code theCode) ->
-            Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
-          Just (PtrToCode _) -> Env.metadata env'
-          Nothing -> Env.metadata env',
+            Just $ T.pack $ UTF8.toString theCode
+          Just (PtrToCode _) -> join $ fmap (M.lookup "src") $ Env.metadata env'
+          Nothing -> join $ fmap (M.lookup "src") $ Env.metadata env',
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
