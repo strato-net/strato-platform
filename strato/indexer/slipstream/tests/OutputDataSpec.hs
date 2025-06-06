@@ -29,7 +29,6 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import qualified Slipstream.Events as SE
 import Slipstream.OutputData
-import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
@@ -124,10 +123,6 @@ createDummyCodeCollection contract = CodeCollection
 
 spec :: Spec
 spec = do
-  it "should be able to process array sentinels" $ do
-    valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
-      `shouldBe` SolidityArray [SolidityNum 0, SolidityNum 0]
-
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"

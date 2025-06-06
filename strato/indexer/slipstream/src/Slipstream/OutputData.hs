@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MonoLocalBinds  #-}
 {-# LANGUAGE BlockArguments #-}
@@ -1115,12 +1116,12 @@ insertCollectionTableQuery rows =
           isObject = case val of
                        V.ValueStruct _ -> True
                        _               -> False
-          keyValuePairs =
-            fmap (fromMaybe "NULL" . valueToSQLText' False)
-              <$> (keyColumnNames (collectionDataKeys m) ++ [("value", val)])
-       in (m, isObject, keyValuePairs)
+          mKeyValuePairs =
+            traverse (traverse $ valueToSQLText' False)
+              (keyColumnNames (collectionDataKeys m) ++ [("value", val)])
+       in (\kvps -> (m, isObject, kvps)) <$> mKeyValuePairs
 
-    preparedRows = map prepareRow rows
+    preparedRows = mapMaybe prepareRow rows
 
     groupedRows =
       map snd $
@@ -1728,9 +1729,9 @@ valueToSQLText' _ (ValueFunction _ _ _) = Nothing
 valueToSQLText' _ (ValueMapping _) = Nothing
 valueToSQLText' _ (ValueArrayFixed _ _) = Nothing
 valueToSQLText' _ (ValueArrayDynamic _) = Nothing
-valueToSQLText' _ struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
+valueToSQLText' _ struct@(ValueStruct _) = wrapSingleQuotes . solidityValueToText <$> valueToSolidityValue struct
 
-valueToSQLText' _ x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
+valueToSQLText' _ x = wrapSingleQuotes . solidityValueToText <$> valueToSolidityValue x
 
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText = valueToSQLText' True
