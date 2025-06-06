@@ -1162,14 +1162,22 @@ insertCollectionTableQuery ms =
         AND |]
                         <> tableNameToDoubleQuoteText tableName
                         <> [r|.value IS NOT NULL
-      AND jsonb_typeof(excluded.value) = 'object'
-      AND jsonb_typeof(|]
+        AND pg_typeof(excluded.value) = 'jsonb'::regtype
+        AND pg_typeof(|]
+                        <> tableNameToDoubleQuoteText tableName
+                        <> [r|.value) = 'jsonb'::regtype
+        AND jsonb_typeof(excluded.value) = 'object'
+        AND jsonb_typeof(|]
                         <> tableNameToDoubleQuoteText tableName
                         <> [r|.value) = 'object'
       THEN |]
                         <> tableNameToDoubleQuoteText tableName
                         <> [r|.value || excluded.value
-      ELSE excluded.value
+      WHEN excluded.value IS NOT NULL
+      THEN excluded.value
+      ELSE |]
+                        <> tableNameToDoubleQuoteText tableName
+                        <> [r|.value
     END|],
                       ";"
                     ]
