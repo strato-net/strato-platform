@@ -13,7 +13,7 @@ import { api } from "@/lib/axios";
 import { DepositableToken, Loan, WithdrawableToken } from "@/interface";
 
 interface LoanData {
-  loans: Loan[];
+  loans: Loan;
 }
 
 type LendingContextType = {
@@ -103,19 +103,17 @@ export const LendingProvider = ({
   const fetchLoans = async (signal?: AbortSignal) => {
     setLoadingLoans(true);
     try {
-      const res = await api.get<LoanData>("/loans", { signal });
-      if (res.data && res.data.loans) {
-        const newLoans = Object.values(res.data.loans);
-        setLoans((prev) => (isEqual(prev, newLoans) ? prev : newLoans));
-      } else {
-        setLoans((prev) => (isEqual(prev, []) ? prev : []));
-      }
+      const res = await api.get("/loans", { signal });
+
+      const loanEntries: Loan[] = Array.isArray(res.data)
+        ? res.data
+        : Object.values((res.data as LoanData)?.loans || {});
+
+      setLoans(loanEntries);
     } catch (err: any) {
-      if (err.name === "CanceledError" || err.name === "AbortError") {
-        // Request was aborted, do not update state
-        return;
-      }
+      if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch loans:", err);
+      setLoans([]);
     } finally {
       setLoadingLoans(false);
     }

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
 
-import {api} from "@/lib/axios";
+import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 
@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { DepositableToken } from "@/interface";
+import { DepositableToken, Loan } from "@/interface";
 import { usdstAddress } from "@/lib/contants";
 
 const LoadingSpinner = () => (
@@ -39,8 +39,18 @@ const formatTokenAmount = (value: any) =>
 
 const formatMaxBorrowable = (asset: DepositableToken) => {
   try {
-    const price = parseFloat(formatUnits(asset?.price || "0", 18));
-    const value = parseFloat(formatUnits(asset?.value || "0", 18));
+    const price = parseFloat(formatUnits(
+      typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
+        ? BigInt(Number(asset.price)).toString()
+        : asset?.price?.toString() || "0",
+      18
+    ));
+    const value = parseFloat(formatUnits(
+      typeof asset?.value === "number" || (typeof asset?.value === "string" && asset.value.includes("e"))
+        ? BigInt(Number(asset.value)).toString()
+        : asset?.value?.toString() || "0",
+      18
+    ));
     const ratio = Number(asset?.collateralRatio || "0") / 100;
     if (ratio === 0) return "$0.00";
     const maxBorrowable = (price * value) / ratio;
@@ -136,13 +146,13 @@ const Borrow = () => {
         title: "Borrow Error",
         description: `Something went wrong - ${
           error?.message || "Please try again later."
-        }`,
+          }`,
         variant: "destructive",
       });
     }
   };
 
-  const activeLoans = loans.filter((loan) => loan.active);
+  const activeLoans = loans.filter((loan: Loan) => loan?.loan?.active);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -199,9 +209,9 @@ const Borrow = () => {
                         <TableCell>
                           {asset?.collateralRatio
                             ? (Number(asset.collateralRatio) / 100).toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })
                             : "-"}
                         </TableCell>
                         <TableCell>{formatMaxBorrowable(asset)}</TableCell>
@@ -218,7 +228,7 @@ const Borrow = () => {
                       </TableRow>
                     ))
                   ) :
-                   <TableRow>
+                    <TableRow>
                       <TableCell colSpan={4}>
                         <div className="w-full flex justify-center items-center mt-4">
                           No data to show
@@ -252,8 +262,8 @@ const Borrow = () => {
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
-                  ) : activeLoans.length > 0 ? (
-                    activeLoans.map((loan, loanIndex) => (
+                  ) : activeLoans?.length > 0 ? (
+                    activeLoans?.map((loan, loanIndex) => (
                       <TableRow key={loanIndex}>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -261,23 +271,23 @@ const Borrow = () => {
                               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
                               style={{ backgroundColor: "red" }}
                             >
-                              {loan?.assetSymbol.slice(0, 2)}
+                              {loan?.loan?.assetSymbol?.slice(0, 2)}
                             </div>
                             <div>
-                              <div className="font-medium">{loan.assetName || loan.asset}</div>
-                              <div className="text-xs text-gray-500">{loan?.assetSymbol}</div>
+                              <div className="font-medium">{loan?.loan.assetName || loan?.loan.asset}</div>
+                              <div className="text-xs text-gray-500">{loan?.loan?.assetSymbol}</div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>${formatUnits(loan?.amount, 18)}</TableCell>
+                        <TableCell>${formatUnits(loan?.loan?.amount?.toString(), 18)}</TableCell>
                         <TableCell>
-                          {loan.collateralName || loan.collateralAsset} {formatEther(loan?.collateralAmount || 0)}
+                          {loan?.loan.collateralName || loan?.loan.collateralAsset} {formatEther(loan?.loan?.collateralAmount || 0)}
                         </TableCell>
-                        <TableCell>{formatEther(loan?.interest || 0)}</TableCell>
+                        <TableCell>{formatEther(loan?.loan?.interest || 0)}</TableCell>
                       </TableRow>
                     ))
-                  ) : 
-                   <TableRow>
+                  ) :
+                    <TableRow>
                       <TableCell colSpan={4}>
                         <div className="w-full flex justify-center items-center mt-4">
                           No data to show

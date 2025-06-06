@@ -71,7 +71,7 @@ export interface SwappableToken {
   }[];
 };
 
-export interface Loan {
+export interface LoanData {
   active: boolean;
   amount: string;
   asset: string;
@@ -84,4 +84,9 @@ export interface Loan {
   collateralName: string;
   collateralSymbol: string;
   interest: string;
+}
+
+export interface Loan {
+  key: string;
+  loan: LoanData;
 }

@@ -1,4 +1,4 @@
-import api from './axios';
+import { api } from './axios';
 
 // Check authentication status via server API call (works with HttpOnly cookies)
 export const isAuthenticated = async (): Promise<boolean> => {
