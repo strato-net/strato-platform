@@ -412,6 +412,7 @@ startingAction maybeCode env' =
             Just $ T.pack $ UTF8.toString theCode
           Just (PtrToCode _) -> join $ fmap (M.lookup "src") $ Env.metadata env'
           Nothing -> join $ fmap (M.lookup "src") $ Env.metadata env',
+      _name = join $ fmap (M.lookup "name") $ Env.metadata env',
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
