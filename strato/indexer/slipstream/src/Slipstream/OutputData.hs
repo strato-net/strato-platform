@@ -1157,7 +1157,20 @@ insertCollectionTableQuery ms =
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
     collectiontype = excluded.collectiontype,
-    value = excluded.value|],
+    value = CASE 
+      WHEN excluded.value IS NOT NULL
+        AND |]
+                        <> tableNameToDoubleQuoteText tableName
+                        <> [r|.value IS NOT NULL
+      AND jsonb_typeof(excluded.value) = 'object'
+      AND jsonb_typeof(|]
+                        <> tableNameToDoubleQuoteText tableName
+                        <> [r|.value) = 'object'
+      THEN |]
+                        <> tableNameToDoubleQuoteText tableName
+                        <> [r|.value || excluded.value
+      ELSE excluded.value
+    END|],
                       ";"
                     ]
 
