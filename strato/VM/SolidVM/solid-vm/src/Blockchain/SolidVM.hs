@@ -2927,7 +2927,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           var <- createVar correctedVal
           return (n, (t, var))
 
-  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
+  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False . pushSender from $ do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
@@ -2973,7 +2973,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
         let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
         logVals lhs rhs
         _ <- runStatementBlock' lhs
-        _ <- pushSender from $ runStatementBlock commands
+        _ <- runStatementBlock commands
         _ <- runStatementBlock' rhs
         pure ()
       Nothing -> return ()

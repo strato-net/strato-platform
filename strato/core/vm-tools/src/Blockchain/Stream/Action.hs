@@ -43,7 +43,8 @@ module Blockchain.Stream.Action (
   omapLens,
   omapMap,
   omapUnionWith,
-  mergeActionData
+  mergeActionData,
+  mergeActionDataStorageDiffs
 
   ) where
 
@@ -292,6 +293,14 @@ mergeActionData newData oldData =
       mappings = nub $ _actionDataMappings oldData ++ _actionDataMappings newData
       arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
    in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs abstracts mappings arrays calls
+
+mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
+mergeActionDataStorageDiffs newData oldData =
+  let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
+        (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
+        (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
+        _ -> error "mismatched action kinds at the same address"
+   in newData & actionDataStorageDiffs .~ diffs
 
 instance Semigroup ActionData where
   (<>) = mergeActionData

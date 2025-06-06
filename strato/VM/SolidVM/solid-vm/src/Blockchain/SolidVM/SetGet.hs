@@ -67,7 +67,7 @@ findDefault = \case
   TBool -> SBool False
   TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
-  TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
+  TEnumVal n -> SEnumVal n "" 0x0
   TStruct n fs -> todo "findDefault/struct" (n, fs)
   TComplex -> todo "finddefault/complex" TComplex
   Todo msg -> todo "findDefault/todo" msg
