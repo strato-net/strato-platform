@@ -1103,14 +1103,28 @@ insertIndexTableQuery cs =
                     ]
     in processContract cs'
 
+-- Add this helper function to check if a Value is a JSON object
+isJSONObjectValue :: V.Value -> Bool
+isJSONObjectValue (V.ValueStruct _) = True -- Structs are always JSON objects
+isJSONObjectValue _ = False -- All other Value types are not JSON objects
+
 insertCollectionTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertCollectionTableQuery [] = []
 insertCollectionTableQuery ms =
   concat $
-    let ms' = (\m -> (m, fmap (fromMaybe "NULL" . valueToSQLText) <$> ((keyColumnNames $ collectionDataKeys m) ++ [("value", collectionDataValue m)]))) <$> ms
-     in flip map (map snd $ partitionWith (length . snd) ms') $ \case
+    let ms' =
+          ( \m ->
+              let isObjectValue = isJSONObjectValue (collectionDataValue m)
+               in ( m,
+                    isObjectValue,
+                    fmap (fromMaybe "NULL" . valueToSQLText)
+                      <$> ((keyColumnNames $ collectionDataKeys m) ++ [("value", collectionDataValue m)])
+                  )
+          )
+            <$> ms
+     in flip map (map snd $ partitionWith (\(_, isObj, list) -> (length list, isObj)) ms') $ \case
           [] -> []
-          collections@((x, list) : _) ->
+          collections@((x, isObjectMerge, list) : _) ->
             let tableName =
                   collectionTableName
                     (creator x)
@@ -1132,31 +1146,16 @@ insertCollectionTableQuery ms =
                     collectionname,
                     collectiontype
                   ]
-                vals = flip map collections $ \(row, rowList) ->
+                vals = flip map collections $ \(row, _, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]
                 valsForSQL = vals
                 inserts = csv valsForSQL
-             in (: []) $
-                  T.concat
-                    [ "INSERT INTO ",
-                      tableNameToDoubleQuoteText tableName,
-                      " ",
-                      keySt,
-                      "\n  VALUES ",
-                      inserts,
-                      "\n ON CONFLICT (",
-                      onConflictCols,
-                      ") DO UPDATE SET",
+
+                -- Move the conditional logic outside the raw string
+                valueMergeLogic =
+                  if isObjectMerge
+                    then
                       [r|
-    address = excluded.address,
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    collectionname = excluded.collectionname,
-    collectiontype = excluded.collectiontype,
     value = CASE 
       WHEN excluded.value IS NOT NULL
         AND |]
@@ -1178,7 +1177,34 @@ insertCollectionTableQuery ms =
       ELSE |]
                         <> tableNameToDoubleQuoteText tableName
                         <> [r|.value
-    END|],
+    END|]
+                    else
+                      [r|
+    value = COALESCE(excluded.value, |]
+                        <> tableNameToDoubleQuoteText tableName
+                        <> [r|.value)|]
+             in (: []) $
+                  T.concat
+                    [ "INSERT INTO ",
+                      tableNameToDoubleQuoteText tableName,
+                      " ",
+                      keySt,
+                      "\n  VALUES ",
+                      inserts,
+                      "\n ON CONFLICT (",
+                      onConflictCols,
+                      ") DO UPDATE SET",
+                      [r|
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    contract_name = excluded.contract_name,
+    collectionname = excluded.collectionname,
+    collectiontype = excluded.collectiontype,|],
+                      valueMergeLogic, -- Use the pre-computed conditional logic
                       ";"
                     ]
 
