@@ -25,13 +25,13 @@ import {
   NETWORK_CONFIGS,
   SAFE_ADDRESS,
   NATIVE_TOKEN_ADDRESS,
-  BRIDGE_TOKEN_ADDRESS,
+  BRIDGE_TOKEN_ADDRESS_ETH,
+  BRIDGE_TOKEN_ADDRESS_USDC,
 } from "@/lib/bridge/constants";
 import {
   useAccount,
   useDisconnect,
   useChainId,
-  useSwitchChain,
   useBalance,
   useSendTransaction,
   useWriteContract,
@@ -65,8 +65,6 @@ const BRIDGE_API = {
       });
 
       const responseData = await response.json();
-      console.log("Bridge API response:", responseData);
-
       if (!response.ok) {
         throw new Error(responseData.error || "Bridge transaction failed");
       }
@@ -93,8 +91,6 @@ const BRIDGE_API = {
       });
 
       const responseData = await response.json();
-      console.log("Bridge API response:", responseData);
-
       if (!response.ok) {
         throw new Error(responseData.error || "Bridge transaction failed");
       }
@@ -106,10 +102,7 @@ const BRIDGE_API = {
     }
   },
 
-  getBalance: async (params: {
-    tokenAddress: string;
-  }) => {
-    console.log("params", params);
+  getBalance: async (params: { tokenAddress: string }) => {
     const response = await fetch(`/api/bridge/balance/${params.tokenAddress}`, {
       method: "GET",
       headers: {
@@ -122,10 +115,9 @@ const BRIDGE_API = {
 };
 
 const BridgePage = () => {
-  const { address, isConnected, chain } = useAccount();
+  const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
-  const { switchChain } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
 
@@ -150,7 +142,6 @@ const BridgePage = () => {
   // Filter tokens based on testnet status
   const availableTokens = showTestnet ? TESTNET_TOKENS : MAINNET_TOKENS;
 
-  const [isNetworkChanged, setIsNetworkChanged] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
@@ -167,43 +158,16 @@ const BridgePage = () => {
     };
   }, []);
 
-  // Network validation based on selected network
-  const isChainMatching = () => {
-    if (!isConnected || !chainId || !fromChain) return false;
-
-    const selectedNetworkChainId = NETWORK_CONFIGS[fromChain]?.chainId;
-    const isMatching = chainId === selectedNetworkChainId;
-    return isMatching;
-  };
-
-  // Network switching based on selected network
-  const handleNetworkSwitch = async () => {
-    try {
-      setIsBalanceLoading(true);
-      setTokenBalance("");
-
-      const targetChainId = NETWORK_CONFIGS[fromChain]?.chainId;
-      if (!targetChainId) {
-        throw new Error("Invalid network selected");
-      }
-
-      await switchChain({ chainId: targetChainId });
-    } catch (error) {
-      setIsBalanceLoading(false);
-    }
-  };
-
   // Update balance fetching hooks with proper configuration
   const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
     address,
-    chainId: NETWORK_CONFIGS[fromChain]?.chainId,
+    chainId: showTestnet ? 11155111 : 1,
     query: {
       enabled:
         isConnected &&
         !!address &&
         !!fromChain &&
-        fromToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") &&
-        isChainMatching(),
+        fromToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH"),
       refetchInterval: false,
     },
   });
@@ -220,8 +184,7 @@ const BridgePage = () => {
         !!address &&
         !!fromChain &&
         !!fromToken &&
-        fromToken.symbol !== (showTestnet ? "SepoliaETH" : "ETH") &&
-        isChainMatching(),
+        fromToken.symbol !== (showTestnet ? "SepoliaETH" : "ETH"),
       refetchInterval: false,
     },
   });
@@ -249,21 +212,6 @@ const BridgePage = () => {
     let isInitialFetch = true;
 
     const updateBalance = async () => {
-      if (!mounted) return;
-
-      if (!isConnected || !address || !fromToken || !fromChain) {
-        setTokenBalance("0");
-        setIsBalanceLoading(false);
-        return;
-      }
-
-      // Only fetch balance if we're on the correct network
-      if (!isChainMatching()) {
-        setTokenBalance("0");
-        setIsBalanceLoading(false);
-        return;
-      }
-
       try {
         // Only show loading on initial fetch or network switch
         if (isInitialFetch) {
@@ -325,30 +273,7 @@ const BridgePage = () => {
     nativeBalance,
     tokenBalanceData,
     chainId,
-    isChainMatching,
     debouncedUpdateBalance,
-  ]);
-
-  // Add effect to handle network changes
-  useEffect(() => {
-    if (isConnected && chain) {
-      // Reset balance when chain changes
-      setTokenBalance("0");
-      // Refetch balance after a short delay
-      setTimeout(() => {
-        if (fromToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
-          refetchNativeBalance();
-        } else {
-          refetchTokenBalance();
-        }
-      }, 1000);
-    }
-  }, [
-    chain,
-    isConnected,
-    fromToken,
-    refetchNativeBalance,
-    refetchTokenBalance,
   ]);
 
   // Add amount validation
@@ -402,10 +327,20 @@ const BridgePage = () => {
     }
   };
 
+  const ethToStratoTokenMapping = showTestnet
+    ? {
+        SepoliaETH: { name: "SepoliaETHST", symbol: "SepoliaETHST" },
+        USDC: { name: "USDCST", symbol: "USDCST" },
+      }
+    : {
+        ETH: { name: "ETHST", symbol: "ETHST" },
+        USDC: { name: "USDCST", symbol: "USDCST" },
+      };
+
   // Update available networks based on testnet status
   const availableNetworks = showTestnet
-    ? ["Sepolia", "Ethereum"] // Show both Sepolia and Ethereum in testnet mode
-    : ["Ethereum", "Polygon", "STRATO"];
+    ? ["Sepolia"] // Show both Sepolia and Ethereum in testnet mode
+    : ["Ethereum"];
 
   // Set initial network and token
   useEffect(() => {
@@ -418,42 +353,10 @@ const BridgePage = () => {
         : MAINNET_TOKENS.find((t) => t.symbol === "ETH");
       if (defaultToken) {
         setFromToken(defaultToken);
-        setToToken(defaultToken); // Set toToken to same as fromToken
+        setToToken(ethToStratoTokenMapping[defaultToken.symbol]); // Set toToken to same as fromToken
       }
     }
   }, [showTestnet, fromChain, fromToken]);
-
-  const handleDisconnect = () => {
-    disconnect();
-    setIsNetworkChanged(false); // Reset network changed state when manually disconnected
-  };
-
-  const handleChainChange = (value: string) => {
-    setFromChain(value);
-    // Disconnect wallet when network changes
-    if (isConnected) {
-      // disconnect();
-      setIsNetworkChanged(true);
-    }
-    // Reset tokens when chain changes
-    setFromToken(null);
-    setToToken(null);
-  };
-
-  const handleSwap = () => {
-    swapChains();
-    // if (isConnected) {
-    //   disconnect();
-    //   setIsNetworkChanged(true);
-    // }
-  };
-
-  // Add effect to reset isNetworkChanged when wallet connects
-  useEffect(() => {
-    if (isConnected) {
-      setIsNetworkChanged(false);
-    }
-  }, [isConnected]);
 
   // Add effect to ensure toToken is always same as fromToken
   useEffect(() => {
@@ -463,70 +366,47 @@ const BridgePage = () => {
   }, [fromToken]);
 
   const mapping = {
-    [NATIVE_TOKEN_ADDRESS]: BRIDGE_TOKEN_ADDRESS,
-    [TOKEN_ADDRESSES["Sepolia"]?.["USDC"]]: BRIDGE_TOKEN_ADDRESS,
+    [NATIVE_TOKEN_ADDRESS]: BRIDGE_TOKEN_ADDRESS_ETH,
+    [TOKEN_ADDRESSES["Sepolia"]?.["USDC"]]: BRIDGE_TOKEN_ADDRESS_USDC,
   };
 
   const handleBridgeSubmit = async () => {
-    if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       // For STRATO to other networks transfers, directly call the API
       if (fromChain === "STRATO" && toChain !== "STRATO") {
         // Show initial toast
         toast({
           title: "Transaction Submitted",
-          // description: "Waiting for signer to approve",
         });
 
+        // Determine the correct bridge token address based on the selected token
+        let bridgeTokenAddress;
+        if (fromToken?.symbol === "SepoliaETH" || fromToken?.symbol === "ETH") {
+          bridgeTokenAddress = BRIDGE_TOKEN_ADDRESS_ETH;
+        } else if (fromToken?.symbol === "USDC") {
+          bridgeTokenAddress = BRIDGE_TOKEN_ADDRESS_USDC;
+        } else {
+          throw new Error("Unsupported token for bridging");
+        }
         // Call the STRATO to Ethereum transfer endpoint
         const response = await BRIDGE_API.bridgeOut({
           amount: amount.toString(),
           toAddress: address as string,
-          tokenAddress: mapping[NATIVE_TOKEN_ADDRESS],
+          tokenAddress: bridgeTokenAddress,
         });
 
-        const result = response;
-
-        if (!response.ok) {
-          const errorData = result;
-          if (response.status === 403) {
-            toast({
-              title: "Session Expired",
-              description:
-                "Your session has expired. Please refresh the page and try again.",
-              variant: "destructive",
-            });
-            return;
-          }
-          throw new Error(errorData.error || "Failed to initiate transfer");
-        }
-
-        // Check if the response indicates success (either through success flag or status code)
-        if (response.ok || result.success) {
+      
+        if (response?.data?.success && response?.data?.bridgeOutResponse?.status === "Success") {
           toast({
             title: "Transaction Proposed Successfully",
-            description:
-              "Your transaction has been proposed and is waiting for approval",
+            description: "Your transaction has been proposed and is waiting for approval",
           });
         } else {
-          throw new Error(result.message || "Transfer failed");
+          toast({
+            title: "Failed to initiate transfer",
+            description: "Please try again later",
+          });
+          throw new Error("Failed to initiate transfer");
         }
         return;
       }
@@ -536,211 +416,123 @@ const BridgePage = () => {
     } catch (error: any) {
       console.error("Bridge transaction failed:", error);
       toast({
-        title: "Error",
-        description:
-          error.message || "Failed to bridge assets. Please try again.",
-        variant: "destructive",
+        title: "Failed to initiate transfer",
+        description: "Please try again later",
       });
     }
   };
 
   const handleBridgeIn = async () => {
-    try {
-      // Check if on correct network
-      if (!isChainMatching()) {
-        try {
-          await handleNetworkSwitch();
-        } catch (error) {
-          console.error("Failed to switch chain:", error);
-          toast({
-            title: "Network Error",
-            description: "Please switch to the correct network in your wallet",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
+    const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
 
-      // Validate token and amount
-      if (!fromToken || !amount || !fromChain || !toChain) {
-        toast({
-          title: "Invalid Input",
-          description: "Please check token and amount",
-          variant: "destructive",
-        });
-        return;
-      }
+    toast({
+      title: "Preparing transaction...",
+      description: "Please wait while we prepare your transaction",
+    });
 
-      const tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+    let hash: `0x${string}` | undefined;
 
-      console.log("tokenAddress", tokenAddress);
-
-      if (!tokenAddress) {
-        toast({
-          title: "Token Error",
-          description: "Invalid token address",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Determine recipient address based on network direction
-      const recipient =
-        fromChain === "STRATO"
-          ? TOKEN_ADDRESSES[toChain]?.[toToken.symbol] || ""
-          : SAFE_ADDRESS;
-
-      toast({
-        title: "Preparing transaction...",
-        description: "Please wait while we prepare your transaction",
+    if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
+      // Native token logic using wagmi's sendTransactionAsync
+      const txHash = await sendTransactionAsync({
+        to: SAFE_ADDRESS as `0x${string}`,
+        value: parseEther(amount),
       });
 
-      try {
-        let hash: `0x${string}` | undefined;
-
-        if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
-          // Native token logic using wagmi's sendTransactionAsync
-          const txHash = await sendTransactionAsync({
-            to: recipient as `0x${string}`,
-            value: parseEther(amount),
-          });
-
-          if (!txHash) {
-            throw new Error("Transaction failed to submit");
-          }
-
-          hash = txHash as `0x${string}`;
-        } else {
-          // ERC20 token logic using writeContractAsync
-          const txHash = await writeContractAsync({
-            address: tokenAddress as `0x${string}`,
-            abi: [
-              {
-                name: "transfer",
-                type: "function",
-                stateMutability: "nonpayable",
-                inputs: [
-                  { name: "recipient", type: "address" },
-                  { name: "amount", type: "uint256" },
-                ],
-                outputs: [{ name: "", type: "bool" }],
-              },
+      hash = txHash as `0x${string}`;
+    } else {
+      // ERC20 token logic using writeContractAsync
+      const txHash = await writeContractAsync({
+        address: tokenAddress as `0x${string}`,
+        abi: [
+          {
+            name: "transfer",
+            type: "function",
+            stateMutability: "nonpayable",
+            inputs: [
+              { name: "recipient", type: "address" },
+              { name: "amount", type: "uint256" },
             ],
-            functionName: "transfer",
-            args: [recipient as `0x${string}`, parseEther(amount)],
-            chain: showTestnet ? sepolia : mainnet,
-            account: address as `0x${string}`,
-          });
-
-          if (!txHash) {
-            throw new Error("Transaction failed to submit");
-          }
-
-          hash = txHash as `0x${string}`;
-        }
-
-        toast({
-          title: "Transaction submitted",
-          description: "Waiting for confirmation...",
-        });
-
-        // Call bridge API with transaction details
-        try {
-          const bridgeResponse = await BRIDGE_API.bridgeIn({
-            amount,
-            fromAddress: address as string,
-            tokenAddress: mapping[tokenAddress],
-            ethHash: hash,
-          });
-
-          console.log("Bridge API response:", bridgeResponse);
-        } catch (bridgeError) {
-          console.error("Bridge API error:", bridgeError);
-          // Don't throw here, let the transaction continue
-        }
-
-        // Wait for transaction confirmation
-        const client = createPublicClient({
-          chain: showTestnet ? sepolia : mainnet,
-          transport: http(),
-        });
-        const receipt = await client.waitForTransactionReceipt({ hash });
-
-        if (receipt.status === "success") {
-          // Refresh balance after successful transfer
-          if (fromToken.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
-            const balance = await client.getBalance({
-              address: address as `0x${string}`,
-            });
-            const formattedBalance = formatBalance(balance, 18);
-
-            // Force state update and UI refresh
-            setTokenBalance("0"); // Reset first to trigger change
-            setTimeout(() => {
-              setTokenBalance(formattedBalance);
-              // Show success toast with new balance
-              toast({
-                title: "Transaction Successful",
-                description: `New balance: ${formattedBalance} ${fromToken.symbol}`,
-              });
-            }, 100);
-          } else {
-            // For ERC20 tokens, we need to read the contract
-            const balance = await client.readContract({
-              address: tokenAddress as `0x${string}`,
-              abi: [
-                {
-                  name: "balanceOf",
-                  type: "function",
-                  stateMutability: "view",
-                  inputs: [{ name: "account", type: "address" }],
-                  outputs: [{ name: "", type: "uint256" }],
-                },
-              ],
-              functionName: "balanceOf",
-              args: [address as `0x${string}`],
-            });
-            const formattedBalance = formatBalance(balance, 18);
-
-            // Force state update and UI refresh
-            setTokenBalance("0"); // Reset first to trigger change
-            setTimeout(() => {
-              setTokenBalance(formattedBalance);
-              // Show success toast with new balance
-              toast({
-                title: "Transaction Successful",
-                description: `New balance: ${formattedBalance} ${fromToken.symbol}`,
-              });
-            }, 100);
-          }
-        }
-      } catch (error: any) {
-        console.error("Transaction error:", error);
-
-        if (error.message?.toLowerCase().includes("user rejected")) {
-          toast({
-            title: "Transaction Rejected",
-            description: "Transaction was rejected by user",
-            variant: "destructive",
-          });
-        } else {
-          console.log("Transaction failed:", error.message);
-          toast({
-            title: "Transaction Failed",
-            description:
-              error.message || "Transaction failed. Please try again.",
-            variant: "destructive",
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error("Bridge error:", error);
-      toast({
-        title: "Transfer Failed",
-        description:
-          error instanceof Error ? error.message : "Failed to process transfer",
-        variant: "destructive",
+            outputs: [{ name: "", type: "bool" }],
+          },
+        ],
+        functionName: "transfer",
+        args: [SAFE_ADDRESS as `0x${string}`, parseEther(amount)],
+        chain: showTestnet ? sepolia : mainnet,
+        account: address as `0x${string}`,
       });
+
+      hash = txHash as `0x${string}`;
+    }
+
+    toast({
+      title: "Transaction submitted",
+      description: "Waiting for confirmation...",
+    });
+
+    // Call bridge API with transaction details
+    await BRIDGE_API.bridgeIn({
+      amount,
+      fromAddress: address as string,
+      tokenAddress: mapping[tokenAddress],
+      ethHash: hash,
+    });
+
+    // Wait for transaction confirmation
+    const client = createPublicClient({
+      chain: showTestnet ? sepolia : mainnet,
+      transport: http(),
+    });
+    
+    const receipt = await client.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === "success") {
+      // Refresh balance after successful transfer
+      if (fromToken.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
+        const balance = await client.getBalance({
+          address: address as `0x${string}`,
+        });
+        const formattedBalance = formatBalance(balance, 18);
+
+        // Force state update and UI refresh
+        setTokenBalance("0"); // Reset first to trigger change
+        setTimeout(() => {
+          setTokenBalance(formattedBalance);
+          // Show success toast with new balance
+          toast({
+            title: "Transaction Successful",
+            description: `New balance: ${formattedBalance} ${fromToken.symbol}`,
+          });
+        }, 100);
+      } else {
+        // For ERC20 tokens, we need to read the contract
+        const balance = await client.readContract({
+          address: tokenAddress as `0x${string}`,
+          abi: [
+            {
+              name: "balanceOf",
+              type: "function",
+              stateMutability: "view",
+              inputs: [{ name: "account", type: "address" }],
+              outputs: [{ name: "", type: "uint256" }],
+            },
+          ],
+          functionName: "balanceOf",
+          args: [address as `0x${string}`],
+        });
+        const formattedBalance = formatBalance(balance, 18);
+
+        // Force state update and UI refresh
+        setTokenBalance("0"); // Reset first to trigger change
+        setTimeout(() => {
+          setTokenBalance(formattedBalance);
+          // Show success toast with new balance
+          toast({
+            title: "Transaction Successful",
+            description: `New balance: ${formattedBalance} ${fromToken.symbol}`,
+          });
+        }, 100);
+      }
     }
   };
 
@@ -754,38 +546,46 @@ const BridgePage = () => {
       if (fromChain === "STRATO" && fromToken && address) {
         setIsStratoLoading(true);
         setStratoBalance("0");
-        try {
-          let tokenAddress;
-          console.log("fromToken", fromToken, BRIDGE_TOKEN_ADDRESS);
-          // Check if it's SepoliaETH or ETH based on testnet mode
-          if (fromToken.symbol === "SepoliaETH" || fromToken.symbol === "ETH") {
-            tokenAddress = BRIDGE_TOKEN_ADDRESS;
-          } else {
-            tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
-          }
+        let tokenAddress;
 
-          if (!tokenAddress) {
-            throw new Error("Invalid token address");
-          }
+        // Determine which bridge token address to use
+        if (fromToken.symbol === "SepoliaETH" || fromToken.symbol === "ETH") {
+          tokenAddress = BRIDGE_TOKEN_ADDRESS_ETH;
+        } else if (
+          fromToken.symbol === "USDCST" ||
+          fromToken.symbol === "USDC"
+        ) {
+          tokenAddress = BRIDGE_TOKEN_ADDRESS_USDC;
+        } else {
+          tokenAddress = TOKEN_ADDRESSES[fromChain]?.[fromToken.symbol];
+        }
 
-          const balanceData = await BRIDGE_API.getBalance({
-            tokenAddress
-          });
-          setStratoBalance(balanceData.balance);
-        } catch (error) {
-          console.error("Error fetching Strato balance:", error);
-          setStratoBalance("0");
-        } finally {
+
+        if (!tokenAddress) {
+          throw new Error("Invalid token address");
+        }
+
+        const balanceData = await BRIDGE_API.getBalance({
+          tokenAddress,
+        });
+
+        if (balanceData && balanceData.balance) {
           setIsStratoLoading(false);
+          setStratoBalance(balanceData.balance);
+        } else {
+          setIsStratoLoading(false);
+          setStratoBalance("0");
         }
       }
     };
+
+    // Call fetchBalance when dependencies change
     fetchBalance();
   }, [fromChain, fromToken, address, showTestnet]);
 
   return (
     <>
-    {/* Back Button */}
+      {/* Back Button */}
       <div className="fixed top-4 left-4 z-50">
         <Button
           variant="ghost"
@@ -822,7 +622,7 @@ const BridgePage = () => {
               <div className="flex items-center">
                 {isConnected ? (
                   <div
-                    onClick={handleDisconnect}
+                    onClick={() => disconnect()}
                     className="relative group cursor-pointer"
                   >
                     <div className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity">
@@ -836,11 +636,7 @@ const BridgePage = () => {
                   </div>
                 ) : (
                   <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
-                    <ConnectButton
-                      label={
-                        isNetworkChanged ? "Switch Network" : "Connect Wallet"
-                      }
-                    />
+                    <ConnectButton label={"Connect Wallet"} />
                   </div>
                 )}
               </div>
@@ -855,10 +651,9 @@ const BridgePage = () => {
                         const token = availableTokens.find(
                           (t) => t.symbol === value
                         );
-                        console.log({ token })
                         if (token) {
                           setFromToken(token);
-                          setToToken(token);
+                          setToToken(ethToStratoTokenMapping[token.symbol]);
                         }
                       }}
                     >
@@ -930,7 +725,7 @@ const BridgePage = () => {
                       <Label htmlFor="from">From Network</Label>
                       <Select
                         value={fromChain}
-                        onValueChange={handleChainChange}
+                        onValueChange={(value) => setFromChain(value)}
                       >
                         <SelectTrigger id="from-chain">
                           <SelectValue placeholder="Select network">
@@ -950,7 +745,7 @@ const BridgePage = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={handleSwap}
+                      onClick={swapChains}
                       className="rounded-full hover:bg-gray-100 border border-gray-200 shadow-sm mt-6"
                     >
                       <ArrowDownUp className="h-5 w-5 rotate-90" />
@@ -977,31 +772,6 @@ const BridgePage = () => {
                   </div>
                 </div>
               </div>
-
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <div className="space-y-4">
-                  <h3 className="font-medium text-gray-900">
-                    Transaction Details
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Bridge Fee:</span>
-                      <span>0.1%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Estimated Time:</span>
-                      <span>2-5 minutes</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>• Bridge assets between Ethereum and STRATO networks</p>
-                    <p>• Small bridge fee applies</p>
-                    <p>• Transaction time varies by network congestion</p>
-                    <p>• STRATO to Ethereum transfers require approval</p>
-                  </div>
-                </div>
-              </div>
-
               <div className="flex justify-end gap-4">
                 <Button variant="outline" onClick={handleBack}>
                   Cancel
@@ -1009,14 +779,7 @@ const BridgePage = () => {
                 <Button
                   onClick={handleBridgeSubmit}
                   disabled={Boolean(
-                    isLoading ||
-                      !amount ||
-                      !fromToken ||
-                      !isConnected ||
-                      (fromChain !== "STRATO" && !isChainMatching()) ||
-                      (fromChain === "STRATO" && toChain !== "STRATO"
-                        ? false
-                        : amountError !== "")
+                    isLoading || !amount || !fromToken || !isConnected
                   )}
                   className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
                 >

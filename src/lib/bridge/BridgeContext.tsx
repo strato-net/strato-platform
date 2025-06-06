@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useAccount, useBalance, useWriteContract } from "wagmi";
+import { useAccount, useBalance } from "wagmi";
 import { TOKEN_ADDRESSES } from "./constants";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
 
@@ -33,14 +33,19 @@ export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({
     showTestnet ? "Sepolia" : "Ethereum"
   );
   const [toChain, setToChain] = useState("STRATO");
-  const [fromToken, setFromToken] = useState<{ symbol: string; name: string } | null>(null);
-  const [toToken, setToToken] = useState<{ symbol: string; name: string } | null>(null);
+  const [fromToken, setFromToken] = useState<{
+    symbol: string;
+    name: string;
+  } | null>(null);
+  const [toToken, setToToken] = useState<{
+    symbol: string;
+    name: string;
+  } | null>(null);
   const [amount, setAmount] = useState("");
   const [tokenBalance, setTokenBalance] = useState("0");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
 
   const { address } = useAccount();
-  const { writeContract } = useWriteContract();
 
   const { data: balance } = useBalance({
     address,

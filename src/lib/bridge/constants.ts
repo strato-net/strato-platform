@@ -2,6 +2,8 @@ export const NATIVE_TOKEN_ADDRESS =
   "0x0000000000000000000000000000000000000000";
 export const SAFE_ADDRESS = import.meta.env.VITE_SAFE_ADDRESS;
 export const BRIDGE_TOKEN_ADDRESS = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
+export const BRIDGE_TOKEN_ADDRESS_ETH = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
+export const BRIDGE_TOKEN_ADDRESS_USDC = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS_USDC;
 
 export const BRIDGE_ABI = [
   {
@@ -34,10 +36,10 @@ export const TESTNET_TOKENS = [
     symbol: "SepoliaETH",
     name: "Sepolia Ether",
   },
-  {
-    symbol: "USDC",
-    name: "USD Coin",
-  },
+  // {
+  //   symbol: "USDC",
+  //   name: "USD Coin",
+  // },
 ];
 
 export const MAINNET_TOKENS = [
