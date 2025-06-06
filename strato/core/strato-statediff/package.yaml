@@ -24,6 +24,7 @@ library:
     - nibblestring
     - persistent
     - persistent-postgresql
+    - solid-vm-model
     - strato-conf
     - strato-model
     - text

@@ -821,7 +821,6 @@ data TransactionHeader = TransactionHeader
 postUsersSend' ::
   ( A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasCodeDB m,
     MonadLogger m,
     HasBlocEnv m,
     HasVault m,
@@ -949,7 +948,6 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
 postUsersSendList' ::
   ( MonadLogger m,
     A.Selectable Address AddressState m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
@@ -986,7 +984,6 @@ postUsersContractMethodList' ::
   ( MonadLogger m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
@@ -1043,7 +1040,6 @@ postUsersContractMethod' ::
   ( MonadLogger m,
     A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
@@ -1387,7 +1383,6 @@ getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 
 getResultAndRespond ::
   ( A.Selectable Address AddressState m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
     HasSQL m

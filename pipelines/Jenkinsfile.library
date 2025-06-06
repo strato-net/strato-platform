@@ -1460,16 +1460,8 @@ def replaceServerPortsDocker() {
       exit 1
     fi
 
-    if [ -z "$2" ]; then
-      echo "Please provide the path to your docker-compose file as an argument."
-      exit 1
-    fi
-
     sed -i "s/PORT:-443/PORT:-44300/" $1
     sed -i "s/PORT:-80/PORT:-8081/" $1
-
-    sed -i "s/PORT:-443/PORT:-44301/" $2
-    sed -i "s/PORT:-80/PORT:-8082/" $2
 
     if [ $? -ne 0 ]; then
       echo "Error occurred while modifying the file."
@@ -1478,7 +1470,7 @@ def replaceServerPortsDocker() {
   '''
 
   sh 'chmod +x replace_server_ports_docker.sh'
-  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.payment.yml'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml'
 }
 
 return this

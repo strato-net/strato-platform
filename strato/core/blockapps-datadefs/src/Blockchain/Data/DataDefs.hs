@@ -27,7 +27,6 @@ import Blockchain.Data.PersistTypes ()
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.MiscJSON ()
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.CodePtr

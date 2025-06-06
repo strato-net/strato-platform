@@ -1035,7 +1035,6 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
               erSuicideList = suicideList vmState,
               erAction = Just $ _action vmState,
               erException = Just (Right e),
-              erKind = EVM,
               -- , erNewX509Certs       = M.empty
               erPragmas = [],
               erCreator = "",
@@ -1180,7 +1179,7 @@ create' = do
   where
     assignCode :: EVMBase m => B.ByteString -> Address -> VMM m ()
     assignCode codeBytes address = do
-      hsh <- addCode EVM codeBytes
+      hsh <- addCode codeBytes
       A.adjustWithDefault_ (A.Proxy @AddressState) address $ \newAddressState ->
         pure newAddressState {addressStateCodeHash = ExternallyOwned hsh}
     assignDetails = do
@@ -1191,7 +1190,7 @@ create' = do
           %~ (:) Action.Create
 
     -- insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-    -- insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+    -- insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" "" (Action.EVMDiff M.empty) M.empty [] [] []
 
 call ::
   EVMBase m =>
@@ -1292,11 +1291,11 @@ call' noValueTransfer = do
   return (fromMaybe B.empty $ returnVal vmState)
   where
     insertFunc2 :: Keccak256 -> Maybe Action.ActionData -> Maybe Action.ActionData
-    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" Nothing "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty [] [] []
 
 
 insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" Nothing "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty [] [] []
 
 callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m B.ByteString
 callPrecompiled' noValueTransfer precompiled = do
@@ -1468,7 +1467,6 @@ vmStateToExecResults vmState = do
         erSuicideList = suicideList vmState,
         erAction = Just $ _action vmState,
         erException = Nothing,
-        erKind = EVM,
         -- , erNewX509Certs       = M.empty
         erPragmas = [],
         erCreator = "",

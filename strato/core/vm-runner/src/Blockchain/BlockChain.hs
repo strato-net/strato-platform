@@ -94,7 +94,6 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
-import Data.Either.Extra
 import Data.Foldable (traverse_)
 import Data.List
 import qualified Data.Map as M
@@ -424,7 +423,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       availableGas = fromInteger adjustedTxGasLimit
 
   feeResult <- payFees b availableGas tAddr t proposer
-  let attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const (<>)) $ _actionData a)) <$> erAction er}) $ erAction feeResult
+  let attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
 
   if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
     then do
@@ -642,7 +641,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultNewStorage = "",
         transactionResultDeletedStorage = "",
         transactionResultStatus = Just txrStatus,
-        transactionResultKind = erKind <$> eitherToMaybe result,
         transactionResultCreator = creator,
         transactionResultAppName = appName
       }

@@ -898,7 +898,7 @@ initializeAction :: MonadSM m
                  -> [T.Text]
                  -> m ()
 initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -956,8 +956,8 @@ getCodeAndCollection address' = do
           Just (SolidVMCode cn ch') -> do
             cc' <- codeCollectionFromHash True ch'
             return (stringToLabel cn, ch', cc')
-          Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
-          Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
+          Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+          Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 

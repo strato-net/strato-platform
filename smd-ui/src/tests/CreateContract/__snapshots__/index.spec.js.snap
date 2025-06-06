@@ -219,7 +219,7 @@ Object {
   "contractName": "Cloner",
   "createDisabled": false,
   "initialValues": Object {
-    "address": "",
+    "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
     "chainId": "",
     "chainLabel": "",
   },
