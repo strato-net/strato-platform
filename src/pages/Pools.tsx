@@ -4,6 +4,7 @@ import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 

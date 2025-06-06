@@ -51,14 +51,14 @@ const LendingPoolSection = () => {
     const usdst = tokens.find(
       (token) => token?.address === usdstAddress
     );
-    
+
     if (usdst) {
       setUsdstToken(usdst);
       setUsdstAvailableBalance(formatUnits(usdst?.balance?.toLocaleString('fullwide', { useGrouping: false }), 18));
 
       const depositedToken = withdrawableTokens.find(
         (token) => token._symbol === "USDST" && token.address === usdst.address
-    );
+      );
       if (depositedToken) {
         setDepositedUsdstToken(depositedToken);
       }
@@ -121,9 +121,8 @@ const LendingPoolSection = () => {
     } catch (error: any) {
       toast({
         title: type === "deposit" ? "Deposit Error" : "Withdrawal Error",
-        description: `Something went wrong - ${
-          error?.message || "Please try again later."
-        }`,
+        description: `Something went wrong - ${error?.message || "Please try again later."
+          }`,
         variant: "destructive",
       });
     } finally {
@@ -251,11 +250,11 @@ const LendingPoolSection = () => {
                     Deposited:{" "}
                     {depositedUsdstToken
                       ? Number(
-                          formatUnits(depositedUsdstToken.value || 0, 18)
-                        ).toLocaleString(undefined, {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 4,
-                        })
+                        formatUnits(depositedUsdstToken.value || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 4,
+                      })
                       : "0.0000"}{" "}
                     USDST
                   </div>
