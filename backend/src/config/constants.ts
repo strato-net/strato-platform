@@ -39,11 +39,11 @@ export const constants = (() => {
     "address",
     "aToBRatio",
     "bToARatio",
-    "tokenA",
+    `tokenA:tokenA_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
     "tokenABalance",
-    "tokenB",
+    `tokenB:tokenB_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
     "tokenBBalance",
-    "lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals)",
+    `lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals,balances:${Token}-_balances(user:key,balance:value))`,
   ];
   const registrySelectFields = [
     "lendingPool: lendingPool_fkey(" +
@@ -63,6 +63,15 @@ export const constants = (() => {
     "collateralVault:collateralVault_fkey(" +
       "address," +
       `collaterals:${CollateralVault}-collaterals(key,Collateral:value))`,
+  ];
+
+  const onRampSelectFields = [
+    "address",
+    `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value))`,
+    `listings:${OnRamp}-listings(key,ListingInfo:value)`,
+    `paymentProviders:${OnRamp}-paymentProviders(key,PaymentProviderInfo:value)`,
+    `approvedTokens:${OnRamp}-approvedTokens(token:key,value)`,
+    `listingProviders:${OnRamp}-listingProviders(paymentProvider:key2,value)`,
   ];
 
   const configs = {
@@ -109,6 +118,7 @@ export const constants = (() => {
     tokenBalanceSelectFields,
     poolSelectFields,
     registrySelectFields,
+    onRampSelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();

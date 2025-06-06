@@ -9,111 +9,111 @@ import { isValidUrl, calculateTotalAmount } from "../helpers/onramp.helper";
 import axios from "axios";
 
 const contractAddress = constants.onRamp!;
-const { OnRamp } = constants;
+const { OnRamp, onRampSelectFields, Token } = constants;
 
 // Get all tokens with optional filtering
 export const get = async (accessToken: string) => {
   try {
-    const response = await bloc.get(
-      accessToken,
-      StratoPaths.state.replace(":contractAddress", contractAddress)
+    // Fetch OnRamp data
+    const { data: onRampData } = await cirrus.get(accessToken, `/${OnRamp}`, {
+      params: {
+        select: onRampSelectFields.join(","),
+        "listings.value.id": "gt.0",
+        address: `eq.${contractAddress}`,
+      },
+    });
+
+    if (!onRampData?.length) throw new Error("OnRamp data not found");
+
+    const onRamp = onRampData[0];
+    const {
+      listings,
+      paymentProviders,
+      approvedTokens,
+      listingProviders,
+      priceOracle,
+    } = onRamp;
+
+    // Build token price map
+    const prices = Object.fromEntries(
+      (priceOracle?.prices || [])
+        .filter((p: any) => p.token)
+        .map((p: any) => [p.token, p])
     );
 
-    if (!response?.data) {
-      throw new Error("Empty response from bloc for OnRamp state");
-    }
+    // Extract approved token addresses
+    const approvedAddresses = approvedTokens
+      .filter((t: any) => t.value)
+      .map((t: any) => t.token);
 
-    const ramp: {
-      priceOracle: string;
-      listings: Record<string, { token: string }>;
-      [key: string]: any;
-    } = response.data;
-
-    const { priceOracle } = ramp;
-    const listings = ramp.listings || {};
-    const approvedTokens = ramp.approvedTokens || {};
-    const listingProviders = ramp.listingProviders || {};
-    const paymentProviders = ramp.paymentProviders || {};
-
-    const oracleResponse = await bloc.get(
-      accessToken,
-      StratoPaths.state.replace(":contractAddress", priceOracle)
-    );
-
-    const oracleValues = oracleResponse?.data?.prices || {};
-
-    const approvedAddresses = Object.keys(approvedTokens);
-
-    let tokenInfoMap: Record<string, { name: string; symbol: string }> = {};
+    // Fetch token metadata
+    let tokenInfoMap: Record<string, { _name: string; _symbol: string }> = {};
     try {
-      const tokenResponse = await cirrus.get(
-        accessToken,
-        "BlockApps-Mercata-ERC20",
-        {
-          params: {
-            address: "in.(" + approvedAddresses.join(",") + ")",
-            select: "address,_name,_symbol",
-          },
-        }
-      );
-
-      tokenInfoMap = tokenResponse.data.reduce(
-        (map: Record<string, { name: string; symbol: string }>, t: any) => {
-          map[t.address] = {
-            name: t._name,
-            symbol: t._symbol,
-          };
-          return map;
+      const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          address: `in.(${approvedAddresses.join(",")})`,
+          select: "address,_name,_symbol",
         },
-        {}
+      });
+
+      tokenInfoMap = Object.fromEntries(
+        tokenData.map((t: any) => [
+          t.address,
+          { _name: t._name, _symbol: t._symbol },
+        ])
       );
-    } catch (error) {
-      console.error("Error fetching token info:", error);
+    } catch (err) {
+      console.error("Error fetching token info:", err);
     }
 
-    // Build enhanced listings
-    const enhancedListings: Record<string, any> = {};
-    for (const [id, listing] of Object.entries(listings)) {
-      const providerAddresses = listingProviders[id]
-        ? Object.keys(listingProviders[id]).filter(
-            (key) => listingProviders[id][key] === true
-          )
-        : [];
+    // Normalize payment providers into map
+    const paymentProviderMap = Object.fromEntries(
+      paymentProviders
+        .flatMap((p: any) =>
+          Array.isArray(p.PaymentProviderInfo)
+            ? p.PaymentProviderInfo
+            : [p.PaymentProviderInfo]
+        )
+        .filter((info: any) => info.providerAddress)
+        .map((info: any) => [info.providerAddress, info])
+    );
 
-      const providers = providerAddresses
-        .map((address) => {
-          const provider = paymentProviders.find(
-            (p: { providerAddress: string }) => p.providerAddress === address
-          );
-          return provider;
-        })
-        .filter((name) => name !== null);
+    // Enhance listings
+    const enhancedListings = listings.map((listing: any) => {
+      const { key: id, ListingInfo: info } = listing;
 
-      enhancedListings[id] = {
-        ...listing,
-        tokenName: tokenInfoMap[listing.token]?.name || null,
-        tokenSymbol: tokenInfoMap[listing.token]?.symbol || null,
-        tokenOracleValue: oracleValues[listing.token] || null,
-        paymentProviders: providers || [],
+      const providers = listingProviders
+        .filter((p: any) => p.value)
+        .map((p: any) => paymentProviderMap[p.paymentProvider])
+        .filter(Boolean);
+
+      const tokenMeta = tokenInfoMap[info.token] || {
+        _name: null,
+        _symbol: null,
       };
-    }
 
-    // Build enhanced approvedTokens
-    const enhancedApprovedTokens: Record<
-      string,
-      { tokenName: string; tokenSymbol: string }
-    > = {};
-    for (const [addr, _] of Object.entries(approvedTokens)) {
-      enhancedApprovedTokens[addr] = {
-        tokenName: tokenInfoMap[addr]?.name || "",
-        tokenSymbol: tokenInfoMap[addr]?.symbol || "",
+      return {
+        key: id,
+        ...info,
+        _name: tokenMeta._name,
+        _symbol: tokenMeta._symbol,
+        tokenOracleValue: prices[info.token] || null,
+        paymentProviders: providers,
       };
-    }
+    });
+
+    // Enrich approvedTokens in-place
+    approvedTokens.forEach((entry: any) => {
+      const meta = tokenInfoMap[entry.token];
+      entry._name = meta?._name || null;
+      entry._symbol = meta?._symbol || null;
+    });
 
     return {
-      ...ramp,
+      ...onRamp,
       listings: enhancedListings,
-      approvedTokens: enhancedApprovedTokens,
+      approvedTokens,
+      priceOracle: undefined,
     };
   } catch (error) {
     console.error("Error fetching lending pools:", error);
@@ -186,55 +186,50 @@ export async function lock(
     );
   }
 
-  // 2. Get contract state
-  let listings, oracle, paymentProvider, endpoint;
-  try {
-    const stateResp = await bloc.get(
-      accessToken,
-      StratoPaths.state.replace(":contractAddress", contractAddress)
-    );
+  // 2. Get updated onRamp state (enriched listings)
+  let listings: any[], paymentProviders: any[];
 
-    const ramp = stateResp?.data;
-    if (!ramp?.listings?.[listingId]) {
-      throw new Error(`Order ${listingId} not found`);
-    }
+  try {
+    const ramp = await get(accessToken);
 
     listings = ramp.listings;
-    oracle = ramp.oracle;
-    paymentProvider = ramp.paymentProviders.find(
-      (provider: { providerAddress: string }) =>
-        provider.providerAddress === paymentProviderAddress
+    paymentProviders = (ramp.paymentProviders || []).filter(
+      (p: any) =>
+        typeof p.PaymentProviderInfo === "object" &&
+        !Array.isArray(p.PaymentProviderInfo)
     );
 
-    if (!paymentProvider) {
+    const paymentProviderInfo = paymentProviders
+      .map((p: any) => p.PaymentProviderInfo)
+      .find((info: any) => info.providerAddress === paymentProviderAddress);
+
+    if (!paymentProviderInfo) {
       throw new Error("Payment provider not found");
     }
 
-    endpoint = paymentProvider.endpoint;
-  } catch (error) {
-    console.error("Error fetching contract state:", error);
-    return {
-      sessionId: "",
-      url: `${baseUrl}/onramp/cancel?listingId=${listingId}`,
-    };
-  }
+    const listing = listings.find((l) => String(l.key) === String(listingId));
+    if (!listing) {
+      throw new Error(`Listing ${listingId} not found`);
+    }
 
-  // 3. Handle payment
-  try {
+    const { tokenOracleValue, marginBps } = listing;
+    const endpoint = paymentProviderInfo.endpoint;
+
+    // 3. Execute payment
     if (!isValidUrl(endpoint)) {
-      const listing = listings[listingId];
-      const price = oracle?.prices?.[listing.token];
-      if (!price) throw new Error(`Price not found for token ${listing.token}`);
+      if (!tokenOracleValue?.price) {
+        throw new Error(`Missing tokenOracleValue for listing ${listingId}`);
+      }
 
       const totalAmount = calculateTotalAmount(
         amount,
-        price,
-        listing.marginBps
+        tokenOracleValue.price,
+        marginBps
       );
+
       const providerTx = buildFunctionTx({
         contractName: "",
-        contractAddress:
-          paymentProvider.providerAddress ?? paymentProviderAddress,
+        contractAddress: paymentProviderInfo.providerAddress,
         method: endpoint,
         args: {
           listingId,
@@ -273,10 +268,13 @@ export async function lock(
     }
   } catch (error) {
     console.error("Payment handling failed:", error);
-    return {
-      sessionId: "",
-      url: `${baseUrl}/onramp/cancel?listingId=${listingId}`,
-    };
+    await unlockTokens(accessToken, listingId).catch((unlockError) => {
+      console.error(
+        "Failed to unlock tokens after payment error:",
+        unlockError
+      );
+    });
+    throw new Error(`Payment processing failed`);
   }
 }
 

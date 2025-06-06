@@ -5,8 +5,7 @@ import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getInputPrice } from "../helpers/swapping.helper";
 import { approveAsset } from "../helpers/tokens.helper";
-import { getPool as getLendingPool } from "./lending.service";
-import { getTokens } from "./tokens.service";
+import { getPool as getLendingRegistry } from "./lending.service";
 
 const { poolSelectFields, Pool, PoolFactory, PriceOracle } = constants;
 
@@ -20,6 +19,16 @@ export const getPools = async (
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ),
     select: rawParams.select || poolSelectFields.join(","),
+    ...(rawParams.select
+      ? {}
+      : {
+          "lpToken.balances.value": "gt.0",
+          "lpToken.balances.key": `eq.${address}`,
+          "tokenA.balances.value": "gt.0",
+          "tokenA.balances.key": `eq.${address}`,
+          "tokenB.balances.value": "gt.0",
+          "tokenB.balances.key": `eq.${address}`,
+        }),
     root: `eq.${constants.baseCodeCollection}`,
   };
 
@@ -27,36 +36,19 @@ export const getPools = async (
     params,
   });
 
-  const tokenAddresses = [
-    ...new Set(
-      poolData.flatMap((pool: any) =>
-        [pool.tokenA, pool.tokenB].filter(Boolean)
-      )
-    ),
-  ];
+  const lendingInfo = await getLendingRegistry(accessToken, {
+    select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+  });
 
-  if (!tokenAddresses.length) return poolData;
-
-  const [tokenMetadata, lendingInfo] = await Promise.all([
-    getTokens(accessToken, {
-      address: `in.(${tokenAddresses.join(",")})`,
-      ["balances.key"]: `eq.${address}`,
-    }),
-    getLendingPool(accessToken, {
-      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
-    }),
-  ]);
-  const tokenMap = new Map(tokenMetadata.map((t: any) => [t.address, t]));
   const rawPrices = lendingInfo.oracle?.prices || [];
   const priceMap = new Map<string, number>(
     rawPrices.map((p: any) => [p.key, p.value])
   );
   return poolData.map((pool: any) => ({
     ...pool,
-    tokenAPrice: priceMap.get(pool.tokenA) || 0,
-    tokenBPrice: priceMap.get(pool.tokenB) || 0,
-    tokenA: tokenMap.get(pool.tokenA) || pool.tokenA,
-    tokenB: tokenMap.get(pool.tokenB) || pool.tokenB,
+    tokenAPrice: priceMap.get(pool.tokenA.address) || "0",
+    tokenBPrice: priceMap.get(pool.tokenB.address) || "0",
+    lpTokenPrice: priceMap.get(pool.lpToken.address) || "0",
   }));
 };
 
@@ -153,10 +145,10 @@ export const removeLiquidity = async (
     // calculate tokenA and tokenB amounts
     const tokenA_amount =
       (BigInt(pool.tokenABalance) * BigInt(body.amount || "0")) /
-      BigInt(pool._totalSupply);
+      BigInt(pool.lpToken._totalSupply);
     const tokenB_amount =
       (BigInt(pool.tokenBBalance) * BigInt(body.amount || "0")) /
-      BigInt(pool._totalSupply);
+      BigInt(pool.lpToken._totalSupply);
     // Apply 1% slippage tolerance
     const slippageFactor = BigInt(99); // 99%
     const min_tokenA_amount = (
