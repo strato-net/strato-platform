@@ -13,7 +13,7 @@ import Data.Text (Text)
 import Data.Text.Encoding
 import Text.RawString.QQ
 
--- | Inserts the 0xDEC1DE contract into the genesis block with the BlockApps root cert as owner
+-- | Inserts the 0xDEC1DE and contract 0xDEC1DEFF into the genesis block with the BlockApps root cert as owner
 insertDecideContract :: GenesisInfo -> GenesisInfo
 insertDecideContract gi =
   gi
@@ -42,16 +42,14 @@ interface GetImplContract {
 }
 
 contract record Decider {
-    GetImplContract deciderStateContract = GetImplContract(address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010));
+    GetImplContract deciderStateContract = GetImplContract(address(0xDEC1DEFF));
     string functionName = "PayFees";
     constructor() {
     }
 
     function decide() returns (bool) {
-        
         address payFeesImplContract = deciderStateContract.getImplContract();
         payFeesImplContract.delegatecall(functionName);
-      
         return true;
     }
 }|]
