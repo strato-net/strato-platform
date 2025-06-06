@@ -19,7 +19,6 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action (Action (..), ActionData (..), CallType (..), DataDiff (..))
 import Control.DeepSeq
-import Control.Monad
 import Data.Aeson
 import qualified Data.Aeson as JSON
 import Data.Binary
@@ -102,7 +101,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionMappings = _actionDataMappings,
             actionArrays = _actionDataArrays,
             actionType = t,
-            actionSrc = join $ fmap (M.lookup "src") _metadata
+            actionSrc = _src
           }
 
 formatAction :: AggregateAction -> Text

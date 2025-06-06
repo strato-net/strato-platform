@@ -274,7 +274,6 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
                         storageDiff
                         abstrs maps arrs
                         [A.Create]),
-                  A._metadata = Nothing,
                   A._src = join $ fmap (Map.lookup "src") theMetadata,
                   A._name = join $ fmap (Map.lookup "name") theMetadata,
                   A._events = S.empty,

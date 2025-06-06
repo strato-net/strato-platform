@@ -405,7 +405,6 @@ startingAction maybeCode env' =
       _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _metadata = Env.metadata env',
       _src =
         case maybeCode of
           Just (Code theCode) ->
