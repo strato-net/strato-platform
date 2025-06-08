@@ -1153,8 +1153,8 @@ insertCollectionTableQuery rows =
 
           valueTuples =
             map
-              ( \(r, _, kvs) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ r)) baseFields ++ map snd kvs ++ ["NULL"]
+              ( \(row, _, kvs) ->
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseFields ++ map snd kvs ++ ["NULL"]
               )
               group
 
