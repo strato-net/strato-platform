@@ -98,6 +98,7 @@ import           Text.RawString.QQ
 import           Text.Tools
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import qualified Data.Text.Encoding as TE
+import           Debug.Trace
 
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -1112,6 +1113,7 @@ insertCollectionTableQuery rows =
   where
     prepareRow m =
       let val = collectionDataValue m
+          _ = trace ("[insertCollectionTableQuery] val = " ++ show val) ()
           isObject = case val of
                        V.ValueStruct _ -> True
                        _               -> False
