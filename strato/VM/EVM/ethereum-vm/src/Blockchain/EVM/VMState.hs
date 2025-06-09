@@ -118,7 +118,8 @@ startingAction Environment {..} =
       _transactionHash = envTxHash,
       _transactionSender = envSender,
       _actionData = OMap.empty,
-      _metadata = envMetadata,
+      _src = Nothing,
+      _name = Nothing,
       _events = Seq.empty,
       _delegatecalls = Seq.empty
     }

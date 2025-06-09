@@ -223,6 +223,13 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
           let storageDiff = case storage d of
                 SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                 EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
+              theMetadata =
+                getMetadata
+                ( case cp of
+                    ExternallyOwned ch' -> ch'
+                    SolidVMCode _ ch' -> ch'
+                    _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
+                )
               lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
               lookupSolidDiff _ _                 = Nothing
               mCreator' = (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing) . rlpDecode . rlpDeserialize =<< lookupSolidDiff ".:creator" storageDiff
@@ -247,7 +254,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
                   pure (abstrs', mappings, arrays, cc)
             _ -> pure (Map.empty, [], [], emptyCodeCollection)
           let cca = case ch of
-                SolidVMCode n _ -> Just $ CodeCollectionAdded (const () <$> cc) ch creator' (T.pack n) [] abstrs maps
+                SolidVMCode n _ -> Just $ CodeCollectionAdded (const () <$> cc) ch creator' (T.pack n) abstrs maps
                 _ -> Nothing
               act = Just . NewAction $ A.Action
                 { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
@@ -267,13 +274,8 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
                         storageDiff
                         abstrs maps arrs
                         [A.Create]),
-                  A._metadata =
-                    getMetadata
-                      ( case cp of
-                          ExternallyOwned ch' -> ch'
-                          SolidVMCode _ ch' -> ch'
-                          _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
-                      ),
+                  A._src = join $ fmap (Map.lookup "src") theMetadata,
+                  A._name = join $ fmap (Map.lookup "name") theMetadata,
                   A._events = S.empty,
                   A._delegatecalls = S.empty
                 }

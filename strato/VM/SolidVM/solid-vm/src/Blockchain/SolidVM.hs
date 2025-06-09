@@ -233,7 +233,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
     Code c -> pure c
     PtrToCode cp -> do
       hsh <- codePtrToSHA cp
-      fromMaybe "" . join <$> traverse getCode hsh
+      fmap DT.decodeUtf8 $ fromMaybe "" . join <$> traverse getCode hsh
 
   let env' =
         Env.Environment
@@ -242,7 +242,8 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.metadata = Just $ M.fromList [("src", either (const "") id $ DT.decodeUtf8' initCode), ("name", contractName)],
+            Env.src = Just initCode,
+            Env.name = Just contractName,
             Env.runningTests = isRunningTests
           }
   let gasInfo' =
@@ -258,7 +259,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
         maybeArgs = runParser parseArgs initialParserState "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
-    (hsh, cc) <- codeCollectionFromSource True initCode
+    (hsh, cc) <- codeCollectionFromSource True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) args False
 
@@ -326,8 +327,9 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   void . withCallInfo newAddress contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ pure ()
 
   env <- getEnv
-  let metadata = Env.metadata env
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
+  let -- metadata = Env.metadata env
+      maybeUseWallet = Nothing
+--        M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
       parentName' = bool parentName "" (useWallet && parentName == "User")
   -- set creator
@@ -404,7 +406,8 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
             Env.origin = origin',
             Env.proposer = proposer',
             Env.txHash = txHash',
-            Env.metadata = Nothing,
+            Env.src = Nothing,
+            Env.name = Nothing,
             Env.runningTests = isRunningTests
           }
 
@@ -2754,9 +2757,9 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   theEnv <- getEnv
   let origin = Env.origin theEnv
-      metadata = Env.metadata theEnv
+      -- metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      maybeUseWallet = Nothing -- M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
@@ -2769,10 +2772,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                                      (SolidVMCode contractName' hsh) 
                                      (T.pack ctrName)
                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
-                                     ( case join $ fmap (M.lookup "history") (metadata) of
-                                         Nothing -> []
-                                         Just v -> (T.splitOn "," v)
-                                     )
                                      M.empty
                                      []
                                    ]
@@ -2798,9 +2797,9 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< flip expToVar Nothing) constructorArgs
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   theEnv <- getEnv
-  let metadata = Env.metadata theEnv
+  let -- metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      maybeUseWallet = Nothing -- M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, originAddress, ctrName) <- getCreator creator
   execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
@@ -2812,10 +2811,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                                       (SolidVMCode contractName' hsh) 
                                       (T.pack ctrName) 
                                       (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
-                                      ( case join $ fmap (M.lookup "history") (metadata) of
-                                          Nothing -> []
-                                          Just v -> (T.splitOn "," v)
-                                      )
                                       M.empty
                                       []
                                    ]

@@ -78,7 +78,7 @@ createAccount blockNumber accountDiffs =
     codeRef account diff =
       CodeRef
         { codeRefCodeHash = hash $ code' account diff,
-          codeRefCode = code' account diff
+          codeRefCode = decodeUtf8 $ code' account diff
         }
     addrRef account diff =
       AddressStateRef

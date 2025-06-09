@@ -192,8 +192,8 @@ sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEven
 sendOutEvent (OutAction act) = do
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
-        case ( join $ fmap (M.lookup "src") $ a ^. Action.metadata,
-               join $ fmap (M.lookup "name") $ a ^. Action.metadata,
+        case ( a ^. Action.src,
+               a ^. Action.name,
                OMap.assocs $ a ^. Action.actionData
              ) of
           (Just c, Just n, actionDatas) ->
@@ -215,10 +215,6 @@ sendOutEvent (OutAction act) = do
                       codePtr = cp,
                       creator = cn,
                       application = n,
-                      historyList =
-                        case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
-                          Nothing -> []
-                          Just v -> T.splitOn "," v,
                       abstracts = abstracts',
                       recordMappings = []
                     }

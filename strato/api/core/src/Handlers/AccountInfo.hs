@@ -26,13 +26,11 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString as B
 import Data.List
 import Data.Maybe
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
@@ -293,11 +291,11 @@ codeServer cHash =
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . decodeUtf8
-   in fmap getSourceMap <$> getCodeByteStringFromPostgres cHash
+  let getSourceMap = deserializeSourceMap
+   in fmap getSourceMap <$> getCodeFromPostgres' cHash
 
-getCodeByteStringFromPostgres :: HasSQL m => Keccak256 -> m (Maybe B.ByteString)
-getCodeByteStringFromPostgres cHash =
+getCodeFromPostgres' :: HasSQL m => Keccak256 -> m (Maybe Text)
+getCodeFromPostgres' cHash =
   let getBS = codeRefCode . E.entityVal
    in fmap (listToMaybe . map getBS) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do

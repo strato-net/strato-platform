@@ -100,7 +100,6 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
@@ -405,12 +404,13 @@ startingAction maybeCode env' =
       _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _metadata =
+      _src =
         case maybeCode of
           Just (Code theCode) ->
-            Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
-          Just (PtrToCode _) -> Env.metadata env'
-          Nothing -> Env.metadata env',
+            Just theCode
+          Just (PtrToCode _) -> Env.src env'
+          Nothing -> Env.src env',
+      _name = Env.name env',
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
