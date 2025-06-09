@@ -1,7 +1,7 @@
 "use client";
 
 // context/UserContext.tsx
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 
@@ -21,32 +21,39 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const checkAuthenticationStatus = async () => {
+  const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
-      setLoading(true);
+      if (initialCheck) setLoading(true); // Only show loader on first load
       const authenticated = await isAuthenticated();
-      
+
       if (authenticated !== isLoggedIn) {
         setIsLoggedIn(authenticated);
       }
-      
+
       // If authenticated and we don't have user data, try to get it
-      if (authenticated && !userAddress) {
-        try {
-          const response = await api.get('/users/me');
-          localStorage.setItem("user", JSON.stringify(response.data));
-          setUserAddress(response.data.userAddress);
-        } catch (error) {
-          // If we can't fetch user details but auth check passed, 
-          // still consider user as authenticated
+      if (authenticated) {
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser || !userAddress) {
+          try {
+            const response = await api.get('/users/me');
+            const newUserAddress = response.data.userAddress;
+            if (newUserAddress !== userAddress) {
+              localStorage.setItem("user", JSON.stringify(response.data));
+              setUserAddress(newUserAddress);
+            }
+          } catch (error) {
+            // If we can't fetch user details but auth check passed, 
+            // still consider user as authenticated
+          }
         }
-      } else if (!authenticated && userAddress) {
-        // Clear user data if not authenticated
-        localStorage.removeItem("user");
-        setUserAddress(null);
+      } else {
+        if (userAddress) {
+          localStorage.removeItem("user");
+          setUserAddress(null);
+        }
       }
     } catch (error) {
-      setIsLoggedIn(false);
+      if (isLoggedIn) setIsLoggedIn(false);
     } finally {
       setLoading(false);
     }
@@ -57,18 +64,27 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    checkAuthenticationStatus();
-    
+    checkAuthenticationStatus(true);
+
     // Check authentication status periodically
     const interval = setInterval(() => {
-      checkAuthenticationStatus();
+      checkAuthenticationStatus(false);
     }, 30000); // Check every 30 seconds
-    
+
     return () => clearInterval(interval);
   }, []);
 
+  const contextValue = useMemo(() => ({
+    userAddress,
+    setUserAddress,
+    isLoggedIn,
+    logout,
+    refreshAuth,
+    loading,
+  }), [userAddress, isLoggedIn, loading]);
+
   return (
-    <UserContext.Provider value={{ userAddress, setUserAddress, isLoggedIn, logout, refreshAuth, loading }}>
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );
