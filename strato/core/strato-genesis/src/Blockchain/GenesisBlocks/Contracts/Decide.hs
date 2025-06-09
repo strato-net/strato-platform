@@ -7,6 +7,8 @@ module Blockchain.GenesisBlocks.Contracts.Decide
 where
 
 import Blockchain.Data.GenesisInfo
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Data.Text (Text)
