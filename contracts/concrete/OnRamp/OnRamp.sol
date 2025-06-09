@@ -212,6 +212,9 @@ contract record OnRamp {
             IERC20(listing.token).transfer(msg.sender, delta);
         }
 
+        listing.id = listing.id;
+        listing.token = listing.token;
+        listing.seller = listing.seller;
         listing.amount = amount;
         listing.marginBps = marginBps;
 
@@ -256,6 +259,10 @@ contract record OnRamp {
         );
         lockedAmounts[listingId] += amount;
         listing.amount -= amount;
+        listing.id = listing.id;
+        listing.token = listing.token;
+        listing.seller = listing.seller;
+        listing.marginBps = listing.marginBps;
     }
 
     function unlockTokens(uint256 listingId) external {
@@ -263,6 +270,10 @@ contract record OnRamp {
         require(userLock.amount > 0, "No lock to unlock");
 
         listings[listingId].amount += userLock.amount;
+        listings[listingId].id = listings[listingId].id;
+        listings[listingId].token = listings[listingId].token;
+        listings[listingId].seller = listings[listingId].seller;
+        listings[listingId].marginBps = listings[listingId].marginBps;
         lockedAmounts[listingId] -= userLock.amount;
         locks[listingId][msg.sender] = Lock(0, 0);
     }
@@ -271,6 +282,10 @@ contract record OnRamp {
         require(block.timestamp > locks[listingId][buyer].timestamp + LOCK_EXPIRY, "Not expired");
 
         listings[listingId].amount += locks[listingId][buyer].amount;
+        listings[listingId].id = listings[listingId].id;
+        listings[listingId].token = listings[listingId].token;
+        listings[listingId].seller = listings[listingId].seller;
+        listings[listingId].marginBps = listings[listingId].marginBps;
         lockedAmounts[listingId] -= locks[listingId][buyer].amount;
         locks[listingId][buyer] = Lock(0, 0);
     }
@@ -281,6 +296,10 @@ contract record OnRamp {
         require(buyerLock.amount > 0, "No lock to unlock");
 
         listings[listingId].amount += buyerLock.amount;
+        listings[listingId].id = listings[listingId].id;
+        listings[listingId].token = listings[listingId].token;
+        listings[listingId].seller = listings[listingId].seller;
+        listings[listingId].marginBps = listings[listingId].marginBps;
         lockedAmounts[listingId] -= buyerLock.amount;
         locks[listingId][buyer] = Lock(0, 0);
     }
