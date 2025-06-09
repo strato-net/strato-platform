@@ -98,7 +98,6 @@ import           Text.RawString.QQ
 import           Text.Tools
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import qualified Data.Text.Encoding as TE
-import           Debug.Trace (trace)
 
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -1113,7 +1112,6 @@ insertCollectionTableQuery rows =
   where
     prepareRow m =
       let val = collectionDataValue m
-          _ = trace ("[insertCollectionTableQuery] val = " ++ show val) ()
           isObject = case val of
                        V.ValueStruct _ -> True
                        _               -> False
@@ -1707,7 +1705,7 @@ valueToSQLText' :: Bool -> Value -> Maybe Text
 valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText' _ (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
 valueToSQLText' _ (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
-valueToSQLText' z (SimpleValue (ValueAddress (Address 0))) = if z then Just "NULL" else Just "0000000000000000000000000000000000000000"
+valueToSQLText' z (SimpleValue (ValueAddress (Address 0))) = if z then Just "NULL" else Just $ wrapSingleQuotes $ escapeQuotes $ "0000000000000000000000000000000000000000"
 valueToSQLText' z (SimpleValue (ValueAddress (Address addr))) =
   if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
