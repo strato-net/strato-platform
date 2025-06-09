@@ -1,5 +1,5 @@
 import React from 'react';
-import BridgeTransactionsModal from '../components/dashboard/BridgeTransactionsModal';
+import BridgeTransactionsComponent from '../components/dashboard/BridgeTransactionsPage';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +19,7 @@ const BridgeTransactionsPage = () => {
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
-      <BridgeTransactionsModal isOpen={true} onClose={() => {}} />
+      <BridgeTransactionsComponent isOpen={true} onClose={() => {}} />
     </div>
   );
 };

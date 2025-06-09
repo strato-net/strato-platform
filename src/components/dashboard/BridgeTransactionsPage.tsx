@@ -3,7 +3,7 @@ import { ArrowLeftRight, Clock, CheckCircle2, AlertCircle, ExternalLink, Loader2
 import axios from 'axios';
 import { Tabs } from 'antd';
 import 'antd/dist/reset.css';
-import './BridgeTransactionsModal.css';
+import './BridgeTransactionsPage.css';
 import { Button } from "@/components/ui/button";
 import { FrownOutlined } from '@ant-design/icons';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,9 +17,11 @@ interface BridgeTransaction {
   amount: string;
   withdrawId?: string;
   ethTxHash?: string;
+  txHash?: string;
+  token?: string;
 }
 
-interface BridgeTransactionsModalProps {
+interface BridgeTransactionsPageProps {
   isOpen: boolean;
   onClose: () => void;
 }
@@ -27,15 +29,15 @@ const SAFE_ADDRESS = import.meta.env.VITE_SAFE_ADDRESS;
 
 type TransactionType = 'DepositRecorded' | 'WithdrawalInitiated';
 type WithdrawalStatus = 'WithdrawalInitiated' | 'WithdrawalPendingApproval' | 'WithdrawalCompleted';
-type DepositStatus = 'PendingDeposit' | 'ConfirmedDeposit';
+type DepositStatus = 'DepositInitiated' | 'DepositCompleted';
 
 const ITEMS_PER_PAGE = 10;
 
-const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalProps) => {
+const BridgeTransactionsPage = ({ isOpen, onClose }: BridgeTransactionsPageProps) => {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
   const [transactionType, setTransactionType] = useState<TransactionType>('DepositRecorded');
   const [withdrawalStatus, setWithdrawalStatus] = useState<WithdrawalStatus>('WithdrawalInitiated');
-  const [depositStatus, setDepositStatus] = useState<DepositStatus>('PendingDeposit');
+  const [depositStatus, setDepositStatus] = useState<DepositStatus>('DepositInitiated');
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -83,9 +85,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
         let response;
         if (transactionType === 'WithdrawalInitiated') {
           // For withdrawal transactions
-          const endpoint = withdrawalStatus.toLowerCase();
-          // response = await axios.get(`/api/withdrawalStatus/${endpoint}`);
-          response = await axios.get(`/api/withdrawalStatus`);
+          response = await axios.get(`/api/withdrawalStatus/${withdrawalStatus}`);
 
           
           // Transform withdrawal data
@@ -95,14 +95,18 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
             block_timestamp: item.block_timestamp,
             from: 'STRATO',
             to: 'Ethereum',
-            amount: '-',
+            amount: item.amount ? (Number(item.amount) / 1e18).toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 20 }) : '-',
+            txHash: item.txHash,
+            token: item.token,
             key: item.key
           })) : [];
           
+          // Sort by timestamp in descending order (most recent first)
+          transformedData.sort((a, b) => new Date(b.block_timestamp).getTime() - new Date(a.block_timestamp).getTime());
           setTransactions(transformedData);
         } else {
           // For deposit transactions
-          response = await axios.get(`/api/depositStatus`);
+          response = await axios.get(`/api/depositStatus/${depositStatus}`);
           
           // Access the nested data array
           const depositData = response.data?.data?.data || [];
@@ -113,10 +117,13 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
             block_timestamp: item.block_timestamp,
             from: 'Ethereum',
             to: 'STRATO',
-            amount: '-',
+            amount: (Number(item.amount) / 1e18).toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 20 }),
+            txHash: item.txHash,
+            token: item.token,
             key: item.key
           })) : [];
-          
+          // Sort by timestamp in descending order (most recent first)
+          transformedData.sort((a, b) => new Date(b.block_timestamp).getTime() - new Date(a.block_timestamp).getTime());
           setTransactions(transformedData);
         }
       } catch (error) {
@@ -134,31 +141,8 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
     setCurrentPage(1);
   }, [transactionType, withdrawalStatus, depositStatus]);
 
-  const formatAmount = (amount: string) => {
-    const numAmount = Number(amount) / 1e18; // Convert from wei to ETH
-    // Convert scientific notation to decimal format
-    const decimalAmount = numAmount.toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 20 });
-    return `${decimalAmount} ETH`;
-  };
 
-  const getChainLabel = (address: string) => {
-    return address.toLowerCase() === SAFE_ADDRESS?.toLowerCase() ? 'STRATO' : 'Ethereum';
-  };
-
-  const getFromChain = (tx: BridgeTransaction) => {
-    if (transactionType === 'WithdrawalInitiated') {
-      return 'STRATO';
-    }
-    return getChainLabel(tx.to || '');
-  };
-
-  const getToChain = (tx: BridgeTransaction) => {
-    if (transactionType === 'WithdrawalInitiated') {
-      return getChainLabel(tx.ethRecipient || '');
-    }
-    return 'STRATO';
-  };
-
+  
   // Calculate pagination
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -171,12 +155,12 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
 
   const depositItems = [
     {
-      key: 'PendingDeposit',
+      key: 'DepositInitiated',
       label: 'Initiated',
     },
     {
-      key: 'ConfirmedDeposit',
-      label: 'Confirme Deposit',
+      key: 'DepositCompleted',
+      label: 'Completed',
     },
   ];
 
@@ -216,7 +200,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                 <ArrowLeftRight className="h-6 w-6 text-blue-600" />
                 <h1 className="text-2xl font-semibold text-gray-900">Bridge Transactions</h1>
               </div>
-              <div className="w-[400px] bg-white/90 p-1.5 pb-4 rounded-xl border border-gray-200 shadow-sm">
+              <div className="w-[400px] bg-white/90 p-1.5  rounded-xl border border-gray-200 shadow-sm">
                 <Tabs
                   activeKey={transactionType}
                   items={mainItems}
@@ -235,7 +219,7 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
 
             {transactionType === 'DepositRecorded' && (
               <div className="mb-6">
-                <div className="w-[400px] bg-white/90 p-1.5 pb-4 rounded-xl border border-gray-200 shadow-sm">
+                <div className="w-[400px] bg-white/90 p-1.5  rounded-xl border border-gray-200 shadow-sm">
                   <Tabs
                     activeKey={depositStatus}
                     items={depositItems}
@@ -275,20 +259,24 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
 
             <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50/80 border-b">
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">#</th>
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">From</th>
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">To</th>
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Amount</th>
-                      {withdrawalStatus === 'WithdrawalPendingApproval' && (
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Status</th>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
+                      {((transactionType === 'DepositRecorded' && depositStatus === 'DepositInitiated') || 
+                        (transactionType === 'WithdrawalInitiated' && withdrawalStatus === 'WithdrawalInitiated')) && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address</th>
                       )}
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">Time</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Hash</th>
+                      {transactionType === 'WithdrawalInitiated' && withdrawalStatus === 'WithdrawalPendingApproval' && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      )}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="bg-white divide-y divide-gray-200">
                     {isLoading ? (
                       <tr>
                         <td colSpan={5} className="py-8">
@@ -309,23 +297,47 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
                       </tr>
                     ) : (
                       currentTransactions.map((tx, index) => (
-                        <tr key={tx.transaction_hash} className="hover:bg-gray-50/50">
-                          <td className="py-3 px-4 text-sm text-gray-500">{startIndex + index + 1}</td>
-                          <td className="py-3 px-4 text-sm">{tx.from}</td>
-                          <td className="py-3 px-4 text-sm">{tx.to}</td>
-                          <td className="py-3 px-4 text-sm font-medium">{tx.amount}</td>
-                          {withdrawalStatus === 'WithdrawalPendingApproval' && (
-                            <td className="py-3 px-4">
-                              <div 
-                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-1 rounded transition-colors"
-                                onClick={() => handlePendingClick(tx)}
-                              >
-                                <Clock className="h-4 w-4 text-yellow-500" />
-                                <span className="text-sm">Pending</span>
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{tx.from}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{tx.to}</td>
+                          {((transactionType === 'DepositRecorded' && depositStatus === 'DepositInitiated') || 
+                            (transactionType === 'WithdrawalInitiated' && withdrawalStatus === 'WithdrawalInitiated')) && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="group relative">
+                                <span className="cursor-pointer">
+                                  {tx.token ? `${tx.token.slice(0, 6)}...${tx.token.slice(-4)}` : '-'}
+                                </span>
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                  {tx.token || '-'}
+                                </div>
                               </div>
                             </td>
                           )}
-                          <td className="py-3 px-4 text-sm text-gray-500">{formatDate(tx.block_timestamp)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.amount}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div className="group relative">
+                              <span className="cursor-pointer">
+                                {tx.txHash ? `${tx.txHash.slice(0, 6)}...${tx.txHash.slice(-4)}` : '-'}
+                              </span>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                {tx.txHash || '-'}
+                              </div>
+                            </div>
+                          </td>
+                          {transactionType === 'WithdrawalInitiated' && withdrawalStatus === 'WithdrawalPendingApproval' && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <span 
+                                onClick={() => handlePendingClick(tx)}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 cursor-pointer hover:bg-yellow-200 transition-colors"
+                              >
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pending Approval
+                              </span>
+                            </td>
+                          )}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(tx.block_timestamp)}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -370,4 +382,4 @@ const BridgeTransactionsModal = ({ isOpen, onClose }: BridgeTransactionsModalPro
   );
 };
 
-export default BridgeTransactionsModal; 
+export default BridgeTransactionsPage; 
