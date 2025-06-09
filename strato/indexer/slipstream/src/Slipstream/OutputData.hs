@@ -98,7 +98,7 @@ import           Text.RawString.QQ
 import           Text.Tools
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import qualified Data.Text.Encoding as TE
-import           Debug.Trace
+import           Debug.Trace (trace)
 
 
 newtype First b a = First {unFirst :: (a, b)}
