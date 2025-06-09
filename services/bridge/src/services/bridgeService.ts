@@ -1,17 +1,14 @@
 import { config } from "../config";
-import { getUserToken } from "../auth";
 import BridgeContractCall from "../utils/bridgeContractCall";
 import TokenContractCall from "../utils/tokenContractCall";
 import sendEmail from "./emailService";
 import safeTransactionGenerator, { checkEthTransaction } from "./safeService";
-import { fetchCirrusData } from "./cirrusService";
+import { fetchDepositInitiated, fetchDepositCompletedStatus, fetchWithdrawalStatus, fetchDepositInitiatedStatus, fetchWithdrawalInitiatedStatus } from "./cirrusService";
 
 const checkDepositStatus = async (txHash: string): Promise<any | null> => {
   const strippedHash = txHash.toLowerCase().replace(/^0x/, '');
-  const data = await fetchCirrusData('MercataEthBridge-depositStatus');
-
-  if (!Array.isArray(data)) return null;
-  return data.find((item: any) => item.key?.toLowerCase() === strippedHash) || null;
+  const data = await fetchDepositInitiated(strippedHash);
+  return data[0];
 };
 
 export const stratoTokenBalance = async (
@@ -91,6 +88,7 @@ export const confirmBridgeIn = async (tx: any) => {
 
   // Check deposit status from Mercata endpoint
   const depositStatus = await checkDepositStatus(tx.hash);
+
   
   if (!depositStatus) {
     return null;
@@ -99,12 +97,11 @@ export const confirmBridgeIn = async (tx: any) => {
   try {
     const bridgeContract = new BridgeContractCall();
     await bridgeContract.confirmDeposit({
-      txHash: depositStatus.key.toString().replace("0x", ""),
-      token: config.bridge.tokenAddress.toLowerCase().replace("0x", ""),
-      // TODO: get the amount from the deposit status
+      txHash: depositStatus.txHash.toString().replace("0x", ""),
+      token: depositStatus.token.toLowerCase().replace("0x", ""),
       to: config.safe.address.toLowerCase().replace("0x", ""),
-      amount: '1000000000'.toString(),
-      mercataUser: depositStatus.transaction_sender.toLowerCase().replace("0x", ""),
+      amount: depositStatus.amount.toString(),
+      mercataUser: depositStatus.mercataUser.toLowerCase().replace("0x", ""),
     });
   } catch (error) {
     return null;
@@ -127,10 +124,18 @@ export const confirmBridgeOut = async (tx: any) => {
   });
 }
 
-export const userDepositStatus = async () => {
-  return await fetchCirrusData('MercataEthBridge-depositStatus');
+export const userDepositStatus = async (status: string) => {
+  if(status === 'DepositInitiated') {
+    return await fetchDepositInitiatedStatus(status);
+  } else if(status === 'DepositCompleted') {
+    return await fetchDepositCompletedStatus();
+  }
 }
 
-export const userWithdrawalStatus = async () => {
-  return await fetchCirrusData('MercataEthBridge-withdrawStatus');
+export const userWithdrawalStatus = async (status: string) => {
+  if(status === 'WithdrawalInitiated') {
+    return await fetchWithdrawalInitiatedStatus(status);
+  } else if(status === 'WithdrawalCompleted' ||  status === 'WithdrawalPendingApproval') {
+    return await fetchWithdrawalStatus(status);
+  }
 }

@@ -73,8 +73,6 @@ export const getUserToken = async (): Promise<string> => {
     
     // Cache the new token
     CACHED_DATA[cacheKey] = { token, expiresAt };
-    logger.info(" Token cached successfully");
-    
     return token;
   } catch (error: any) {
     throw new Error(`Failed to fetch user OAuth token: ${error?.message || 'Unknown error'}`);

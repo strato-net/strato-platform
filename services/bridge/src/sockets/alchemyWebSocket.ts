@@ -33,7 +33,6 @@ export class AlchemyWebSocket {
           hashesOnly: false,
         },
         async (tx) => {
-          console.log("tx", tx);
           try {
             // Only process if the transaction is going TO the safe address
             if (tx.transaction.input === '0x') {

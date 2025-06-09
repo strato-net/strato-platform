@@ -1,15 +1,19 @@
 # Mercata Bridge Service
-
-This service handles the bridging of assets between Ethereum and STRATO networks using a Safe multisig wallet for transaction approval.
+The Mercata Bridge Service is responsible for seamlessly bridging assets between the Ethereum Sepolia network and the STRATO Mercata testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using Alchemy WebSocket connections.
 
 ## Features
-
-- Monitors bridge contract events on both networks
-- Handles withdrawal and deposit events
-- Proposes transactions to Safe multisig for approval
-- Executes approved transactions
-- Automatic reconnection on WebSocket disconnection
-- Comprehensive logging
+* Detects deposit/withdrawal events on both Ethereum and STRATO
+* Proposes transactions to Safe multisig for security and approval
+* Executes actions after Safe approval
+* Syncs transaction states across chains to ensure consistency
+* Fetches balances and transaction history for display in frontend interfaces
+* Real-time monitoring of Ethereum and STRATO bridge contracts
+* Event-based handling of deposit and withdraw actions
+* Proposing transactions to Safe multisig for pending/confirm updates
+* Fetching balances of bridged tokens
+* Retrieving transaction histories
+* Automatic reconnection for resilient WebSocket communication
+* Secure and contextual logging using Winston
 
 ## Prerequisites
 
@@ -35,14 +39,24 @@ cp .env.example .env
 ## Configuration
 
 Update the following environment variables in `.env`:
+Key	                           Description
 
-- `ETH_RPC_URL`: Ethereum RPC endpoint
-- `STRATO_RPC_URL`: STRATO RPC endpoint
-- `STRATO_WS_URL`: STRATO WebSocket endpoint
-- `ETH_BRIDGE_ADDRESS`: Ethereum bridge contract address
-- `STRATO_BRIDGE_ADDRESS`: STRATO bridge contract address
-- `SAFE_ADDRESS`: Safe multisig wallet address
-- `SAFE_SERVICE_URL`: Safe Transaction Service URL
+- ALCHEMY_API_KEY                 	WebSocket API key for Ethereum
+- ALCHEMY_NETWORK                 	Ethereum network name (e.g. ETH_SEPOLIA)
+- ETHEREUM_RPC_URL              	RPC endpoint for Ethereum
+- NODE_URL	RPC                     endpoint for STRATO
+- SAFE_ADDRESS	                  Address of the Safe multisig wallet
+- SAFE_OWNER_PRIVATE_KEY        	Private key of Safe proposer
+- SAFE_OWNER_ADDRESS	            Address of Safe owner submitting the proposal
+- BRIDGE_ADDRESS	                  STRATO bridge contract address
+- BRIDGE_TOKEN_ADDRESS           	Token address on STRATO
+- CLIENT_ID, CLIENT_SECRET      	OAuth credentials for STRATO login
+- OPENID_DISCOVERY_URL	            STRATO OpenID metadata URL
+- TRANSACTION_APPROVER_EMAILS   Comma-separated list of emails for transaction alerts
+- SENDGRID_API_KEY	               SendGrid API key for sending emails
+
+
+
 
 ## Usage
 
@@ -65,24 +79,41 @@ npm start
 
 ## Architecture
 
-The service consists of several key components:
+1. Event Monitoring Layer
+- Uses Alchemy WebSockets to subscribe to Deposit events on Ethereum
+- Uses STRATO WebSockets to detect Withdraw events
+- Automatically reconnects if socket drops
 
-1. **BridgeContract**: Handles interactions with the bridge smart contracts on both networks
-2. **SafeService**: Manages Safe multisig transaction proposals and execution
-3. **BridgeService**: Coordinates between contracts and services, handles event monitoring
+2. Bridge Logic Deposits (ETH → STRATO):
+- Detects DepositInitiated on Ethereum
+- Checks if already processed
+- If not, triggers recordDeposit on STRATO
+- Withdrawals (STRATO → ETH):
+- Detects WithdrawInitiated on STRATO
+- Proposes a transaction to Safe for marking withdrawal
+- Waits for approvals and executes via Safe SDK
+
+3. Safe Integration Uses Safe SDK to:
+- Create transactions (markWithdrawalPending, confirmWithdrawal)
+- Submit them for multisig approval
+- Execute after approval
+
+4. Data Fetching Fetches:
+- Token balances on STRATO
+- Transaction history for audit/debugging
 
 ### Event Flow
 
-1. **Withdrawal Initiated**:
-   - Service detects withdrawal event on STRATO
-   - Proposes transaction to Safe to mark withdrawal as pending
-   - Waits for Safe approval
-   - Executes approved transaction
+Deposit Flow:
+* Alchemy detects a deposit on Ethereum
+* Service checks if it’s already processed on STRATO
+* If not processed → sends a recordDeposit() transaction on STRATO
 
-2. **Deposit Recorded**:
-   - Service detects deposit event on Ethereum
-   - Checks if deposit is already processed
-   - Records deposit on STRATO if not processed
+Withdrawal Flow:
+* STRATO detects a withdrawal
+* Creates a transaction to mark it as pending on Ethereum via Safe
+* Submits for Safe approval
+* After enough signatures → executes the transaction
 
 ## Error Handling
 

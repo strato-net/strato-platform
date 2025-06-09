@@ -41,8 +41,5 @@ export const contractCall = async (
       maxBodyLength: 50 * 1024 * 1024,
     }
   );
-
-  console.log("response", response.data);
-
   return response.data[0];
 };

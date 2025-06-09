@@ -69,7 +69,7 @@ class BridgeController {
 
       // Get user address from token
       const userAddress = await getUserAddressFromToken(accessToken);
-      console.log("userAddress", userAddress);
+    
       
 
       const balanceData = await stratoTokenBalance(userAddress, tokenAddress);
@@ -91,7 +91,8 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const depositStatus = await userDepositStatus();
+      const { status } = req.params;
+      const depositStatus = await userDepositStatus(status);
 
       res.json({
         success: true,
@@ -109,7 +110,8 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const withdrawalStatus = await userWithdrawalStatus();
+      const { status } = req.params;
+      const withdrawalStatus = await userWithdrawalStatus(status);
 
       res.json({
         success: true,
