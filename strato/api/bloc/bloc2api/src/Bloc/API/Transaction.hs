@@ -27,7 +27,6 @@ import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing
-import qualified Data.ByteString as B
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -142,7 +141,7 @@ instance ToSample PostBlocTransactionRawRequest where
         (Gas 2190000)
         Nothing
         (Wei 4)
-        (Code (B.singleton 7))
+        (Code "contract test{}")
         (21 :: Word256)
         (42 :: Word256)
         Nothing
@@ -164,7 +163,7 @@ instance ToSchema PostBlocTransactionRawRequest where
           (Gas 2190000)
           Nothing
           (Wei 4)
-          (Code (B.singleton 7))
+          (Code "contract test{}")
           (21 :: Word256)
           (42 :: Word256)
           Nothing

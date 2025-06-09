@@ -233,7 +233,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
     Code c -> pure c
     PtrToCode cp -> do
       hsh <- codePtrToSHA cp
-      fromMaybe "" . join <$> traverse getCode hsh
+      fmap DT.decodeUtf8 $ fromMaybe "" . join <$> traverse getCode hsh
 
   let env' =
         Env.Environment
@@ -242,7 +242,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.src = Just $ either (const "") id $ DT.decodeUtf8' initCode,
+            Env.src = Just initCode,
             Env.name = Just contractName,
             Env.runningTests = isRunningTests
           }
@@ -259,7 +259,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
         maybeArgs = runParser parseArgs initialParserState "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
-    (hsh, cc) <- codeCollectionFromSource True initCode
+    (hsh, cc) <- codeCollectionFromSource True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) args False
 

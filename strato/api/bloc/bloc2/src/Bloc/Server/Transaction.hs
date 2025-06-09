@@ -174,7 +174,7 @@ postBlocTransactionBody (Just jwt) (PostBlocTransactionRequest mAddr txList txPa
                       []
                       "mercata"
                       (fromMaybe emptyTxParams params)
-                      (Just $ Code ByteString.empty)
+                      (Just $ Code "")
               signAndPrepare jwt addr header
           )
           txsWithParams
@@ -227,7 +227,7 @@ postBlocTransactionBody (Just jwt) (PostBlocTransactionRequest mAddr txList txPa
                 (fromMaybe emptyTxParams params)
                 (case cPtr of
                   Just cp -> Just cp
-                  Nothing -> (Just $ Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                  Nothing -> (Just $ Code $ serializeSourceMap src)
                 )
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     FUNCTION -> do
@@ -261,7 +261,8 @@ postBlocTransactionBody (Just jwt) (PostBlocTransactionRequest mAddr txList txPa
               argsAsSource
               "mercata"
               (fromMaybe emptyTxParams _methodcallTxParams)
-              (Just $ Code $ sel <> argsBin)
+              Nothing
+--              (Just $ Code $ sel <> argsBin)
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
   where
     hash' = transactionHash . rawTX2TX . rtPrimeToRt
@@ -313,7 +314,7 @@ postBlocTransactionUnsigned (Just jwt) (PostBlocTransactionRequest mAddr txList 
                     []
                     "mercata"
                     (fromMaybe emptyTxParams params)
-                    (Just $ Code ByteString.empty)
+                    (Just $ Code "")
             prepareUnsignedRawTx "" [] header
         )
         txsWithParams
@@ -364,7 +365,7 @@ postBlocTransactionUnsigned (Just jwt) (PostBlocTransactionRequest mAddr txList 
                 (fromMaybe emptyTxParams params)
                 (case cPtr of
                   Just cp -> Just cp
-                  Nothing -> (Just $ Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                  Nothing -> (Just $ Code $ serializeSourceMap src)
                 )
     FUNCTION -> do
       p <- fromFunction tx
@@ -398,7 +399,8 @@ postBlocTransactionUnsigned (Just jwt) (PostBlocTransactionRequest mAddr txList 
               argsAsSource
               "mercata"
               (fromMaybe emptyTxParams _methodcallTxParams)
-              (Just $ Code $ sel <> argsBin)
+              Nothing
+--              (Just $ Code $ sel <> argsBin)
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
@@ -785,7 +787,7 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
         []
         "mercata"
         params
-        (Just $ Code ByteString.empty)
+        (Just $ Code "")
   txHash <- postTransaction (Just txSizeLimit) tx
   getResultAndRespond [txHash] resolve
 
@@ -828,7 +830,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         params
         (case ptr2Code of
           Just ptr -> Just ptr
-          Nothing -> (Just $ Code $ Text.encodeUtf8 $ serializeSourceMap src)
+          Nothing -> (Just $ Code $ serializeSourceMap src)
         )
         -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
   $logDebugLS "postUsersContractSolidVM'/tx" tx
@@ -879,7 +881,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             (fromMaybe emptyTxParams params)
             (case cPtr of
               Just cp -> Just cp
-              Nothing -> (Just $ Code $ Text.encodeUtf8 $ serializeSourceMap src)
+              Nothing -> (Just $ Code $ serializeSourceMap src)
             )
       return (name, tx)
   let txs = map snd namesTxs
@@ -913,7 +915,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
                   []
                   "mercata"
                   (fromMaybe emptyTxParams params)
-                  (Just $ Code ByteString.empty)
+                  (Just $ Code "")
           signAndPrepare jwtToken fromAddr header
       )
       txsWithParams
@@ -966,7 +968,8 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
               argsAsSource
               "mercata"
               (fromMaybe emptyTxParams _methodcallTxParams)
-              (Just $ Code $ sel <> argsBin)
+              Nothing
+--              (Just $ Code $ sel <> argsBin)
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx, methodcallMethodName)
       let finalTxs = fst <$> txsFuncNames

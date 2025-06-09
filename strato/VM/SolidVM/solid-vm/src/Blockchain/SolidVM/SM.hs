@@ -100,7 +100,6 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
@@ -408,7 +407,7 @@ startingAction maybeCode env' =
       _src =
         case maybeCode of
           Just (Code theCode) ->
-            Just $ T.pack $ UTF8.toString theCode
+            Just theCode
           Just (PtrToCode _) -> Env.src env'
           Nothing -> Env.src env',
       _name = Env.name env',

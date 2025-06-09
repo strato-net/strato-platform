@@ -378,7 +378,7 @@ rethrowEx _ = return ()
 --Adds a contract to the 0xfeedbeef chain
 runArgsWithSenderBeef :: Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ T.pack bs
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -419,7 +419,7 @@ runArgsWithSenderBeef acc args bs = do
 --Adds contract to the "main chain"
 runArgsWithSender :: Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ T.pack bs
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -461,7 +461,7 @@ runArgsWithSender acc args bs = do
 
 runArgsWithOrigin :: Address -> Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ T.pack bs
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
@@ -567,7 +567,7 @@ runArgsBeef = runArgsWithSenderBeef sender
 
 runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ T.pack bs
       isRCC = False
       blockData =
         BlockHeader
@@ -627,7 +627,7 @@ runCall funcName callArgs bs = do
 -- compare the returned value (but got) with expected value (expected) in the test case
 runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
 runCall' funcName callArgs bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ T.pack bs
       isRCC = False
       blockData =
         BlockHeader

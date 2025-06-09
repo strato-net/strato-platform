@@ -29,6 +29,7 @@ import Control.Monad.Trans.Except
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
+import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
 import HFlags
@@ -87,7 +88,7 @@ main = do
           1000000000000000000 --gas limit
           ""
           []
-          (Code pushLarges)
+          (Code $ Text.decodeUtf8 pushLarges)
           ""
           secretKey
 

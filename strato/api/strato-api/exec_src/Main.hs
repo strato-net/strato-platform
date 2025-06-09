@@ -49,6 +49,7 @@ import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
 import Data.Swagger hiding (Http, delete)
+import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -106,7 +107,7 @@ instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceM
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = Account.getCodeByteStringFromPostgres k
+  lookup _ k = fmap (fmap Text.encodeUtf8) $ Account.getCodeFromPostgres' k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
