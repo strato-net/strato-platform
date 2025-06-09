@@ -267,7 +267,6 @@ mercataEthBridge :: AccountInfo
 mercataEthBridge = SolidVMContractWithStorage mercataEthBridgeAddress 0 (CodeAtAccount mercataAddress "MercataEthBridge") $ createdByBlockApps mercataAddress ++
   [ (".owner", BAccount $ unspecifiedChain blockappsAddress)
   , (".relayer", BAccount $ unspecifiedChain blockappsAddress)
-  , (".nextWithdrawId", BInteger 1)
   ]
 
 onRamp :: AccountInfo
