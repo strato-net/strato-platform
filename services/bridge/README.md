@@ -26,12 +26,15 @@ The Mercata Bridge Service is responsible for seamlessly bridging assets between
 ## Installation
 
 1. Clone the repository
-2. Install dependencies:
+
+2. cd services/bridge
+
+3. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Copy the example environment file and update the values:
+4. Copy the example environment file and update the values:
 ```bash
 cp .env.example .env
 ```
