@@ -17,7 +17,8 @@ module Blockchain.Stream.Action (
   transactionHash,
   transactionSender,
   actionData,
-  metadata,
+  src,
+  name,
   events,
   delegatecalls,
 
@@ -84,7 +85,6 @@ import SolidVM.Model.Storable hiding (toList)
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary.Generic
 import Test.QuickCheck.Instances ()
-import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
 
@@ -386,7 +386,8 @@ data Action = Action
     _transactionHash :: Keccak256,
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
-    _metadata :: Maybe (Map Text Text),
+    _src :: Maybe Text,
+    _name :: Maybe Text,
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }
@@ -416,8 +417,11 @@ instance Format Action where
       ++ "actionData:\n"
       ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ OMap.assocs _actionData)
       ++ "\n"
-      ++ "actionMetadata: "
-      ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 30 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _metadata)
+      ++ "src: "
+      ++ format _src
+      ++ "\n"
+      ++ "name: "
+      ++ format _name
       ++ "\n"
       ++ "actionEvents: "
       ++ unlines (map show $ toList _events)
@@ -451,7 +455,8 @@ instance ToJSON Action where
         "transactionHash" .= _transactionHash,
         "sender" .= _transactionSender,
         "data" .= _actionData,
-        "metadata" .= _metadata,
+        "src" .= _src,
+        "name" .= _name,
         "events" .= _events,
         "delegatecalls" .= _delegatecalls
       ]
@@ -465,7 +470,8 @@ instance FromJSON Action where
       <*> (o .: "transactionHash")
       <*> (o .: "sender")
       <*> (o .: "data")
-      <*> (o .: "metadata")
+      <*> (o .: "src")
+      <*> (o .: "name")
       <*> (o .: "events")
       <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))
   parseJSON o = fail $ "parseJSON Action: Expected object, got: " ++ show o

@@ -128,38 +128,33 @@ postBlocTransactionResultsExternal = client (Proxy @PostBlocTransactionResultsEx
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
-  Maybe ChainId ->
   Maybe Bool ->
   Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
+  ClientM [BlocTransactionResult]
 postBlocTransactionParallel = client (Proxy @PostBlocTransactionParallel)
 
 postBlocTransactionParallelExternal ::
   Maybe Text ->
-  Maybe ChainId ->
   Maybe Bool ->
   Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
+  ClientM [BlocTransactionResult]
 postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
 
 postBlocTransactionBody ::
-  Maybe ChainId ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionBodyResult]
 postBlocTransactionBody = client (Proxy @PostBlocTransactionBody)
 
 postBlocTransactionUnsigned ::
-  Maybe ChainId ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)
 
 postBlocTransaction ::
-  Maybe ChainId ->
   Maybe Bool ->
   Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
+  ClientM [BlocTransactionResult]
 postBlocTransaction = client (Proxy @PostBlocTransaction)

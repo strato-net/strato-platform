@@ -658,8 +658,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
 extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
 extractCodeCollectionAddedMessages a =
-  case ( join $ fmap (M.lookup "src") $ a ^. Action.metadata,
-         join $ fmap (M.lookup "name") $ a ^. Action.metadata,
+  case ( a ^. Action.src,
+         a ^. Action.name,
          O.assocs $ a ^. Action.actionData
        ) of
     (Just c, Just n, actionDatas) ->
@@ -681,10 +681,6 @@ extractCodeCollectionAddedMessages a =
                 codePtr = cp,
                 creator = cn,
                 application = n,
-                historyList =
-                  case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
-                    Nothing -> []
-                    Just v -> T.splitOn "," v,
                 abstracts = abstracts',
                 recordMappings = []
               }
@@ -834,8 +830,8 @@ completeDiff ::
   Keccak256 ->
   Integer ->
   ConduitT a VmOutEvent m ()
-completeDiff src dst hsh num = withCurrentBlockHash hsh $ do
-  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src, "to", format dst]
+completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
+  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src', "to", format dst]
   runConduit $
-    SD.stateDiff Nothing num hsh src dst
+    SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)

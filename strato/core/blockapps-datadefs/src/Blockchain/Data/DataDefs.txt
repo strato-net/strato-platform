@@ -79,7 +79,7 @@ AddressStateRef
 
 CodeRef
     codeHash Keccak256
-    code BS.ByteString
+    code Text
     UniqueCodeHash codeHash
     deriving Eq Read Show
 

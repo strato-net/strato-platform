@@ -34,7 +34,7 @@ library:
   - debugger
   - dlist
   - ethereum-rlp
-  - ethereum-vm
+#  - ethereum-vm
   - extra
   - format
   - lens
@@ -90,7 +90,7 @@ tests:
       - bytestring
       - common-log
       - containers
-      - ethereum-vm
+      #- ethereum-vm
       - hflags
       - hspec
       - hspec-expectations-lifted
@@ -113,7 +113,7 @@ benchmarks:
       - containers
       - criterion
       - deepseq
-      - ethereum-vm
+      #- ethereum-vm
       - strato-model
       - vector
 
@@ -125,4 +125,4 @@ benchmarks:
     dependencies:
       - bytestring
       - criterion
-      - ethereum-vm
+      #- ethereum-vm

@@ -84,13 +84,11 @@ postSendToMultisig (PostSendToMultisigArgs funcName amt) = liftIO $ do
                             { functionpayloadContractAddress = 0x1234567890,
                               functionpayloadMethod = funcName,
                               functionpayloadArgs = M.fromList [("_txid", ArgString addrs'), ("_amount", ArgInt (round $ amt * 100000000))],
-                              functionpayloadValue = Nothing,
                               functionpayloadTxParams = Nothing,
-                              functionpayloadChainid = Nothing,
                               functionpayloadMetadata = Just $ M.fromList [("VM", "SolidVM")]
                             }
                           pbtr = PostBlocTransactionRequest Nothing [payload] Nothing Nothing
-                      result <- runClientM (postBlocTransaction Nothing (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
+                      result <- runClientM (postBlocTransaction (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
                       pure . T.pack $ show result
     else do
       mgr <- newManager defaultManagerSettings -- tlsManagerSettings
@@ -98,13 +96,11 @@ postSendToMultisig (PostSendToMultisigArgs funcName amt) = liftIO $ do
             { functionpayloadContractAddress = 0x1234567890,
               functionpayloadMethod = funcName,
               functionpayloadArgs = M.fromList [("_txid", ArgString . T.pack $ "dummy" ++ show amt), ("_amount", ArgInt (round $ amt * 100000000))],
-              functionpayloadValue = Nothing,
               functionpayloadTxParams = Nothing,
-              functionpayloadChainid = Nothing,
               functionpayloadMetadata = Just $ M.fromList [("VM", "SolidVM")]
             }
           pbtr = PostBlocTransactionRequest Nothing [payload] Nothing Nothing
-      result <- runClientM (postBlocTransaction Nothing (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
+      result <- runClientM (postBlocTransaction (Just False) True pbtr) (mkClientEnv mgr blocBaseUrl)
       pure . T.pack $ show result
   -- callBitcoinRPC (Proxy @GetNewAddress) HNil >>= \case
   --   Left e -> throwIO . BackendException $ T.pack e

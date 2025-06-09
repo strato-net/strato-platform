@@ -183,7 +183,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
-withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
+withSourceFirst = Down . any (isJust . actionSrc) . snd
 
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
 parseActions events' =
@@ -248,11 +248,11 @@ processTheMessages messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cr, ap, hl, abs', rm) | VME.CodeCollectionAdded cc cp cr ap hl abs' rm <- messages]
+      creates = [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
+  fkeys' <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -262,9 +262,7 @@ processTheMessages messages = do
             -- We will then create a table for each of these collections and add a foreign key to the main table
 
             let collectionNamesAndTypes = getCollectionsFromContract c
-                historyTableNames = map (historyTableName cr ap) hl
             $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
-            $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
             let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
             $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''

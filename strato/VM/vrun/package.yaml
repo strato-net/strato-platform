@@ -28,6 +28,7 @@ dependencies:
 - merkle-patricia-db
 - prometheus-client
 - strato-model
+- text
 - time
 - transformers
 - vm-runner

@@ -3,42 +3,42 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-import BlockApps.Logging
+--import BlockApps.Logging
 import Blockchain.BlockChain (compactDiffs)
-import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
-import Blockchain.DB.CodeDB
-import Blockchain.Data.AddressStateDB
-import qualified Blockchain.Data.Block as BDB
-import Blockchain.Data.ExecResults
+--import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
+--import Blockchain.DB.CodeDB
+--import Blockchain.Data.AddressStateDB
+--import qualified Blockchain.Data.Block as BDB
+--import Blockchain.Data.ExecResults
 import Blockchain.Database.MerklePatricia as MP
-import Blockchain.EVM
-import qualified Blockchain.EVM.MutableStack as MS
-import Blockchain.EVM.Opcodes
-import Blockchain.Strato.Model.Code
+--import Blockchain.EVM
+--import qualified Blockchain.EVM.MutableStack as MS
+--import Blockchain.EVM.Opcodes
+--import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.VMContext
+--import Blockchain.VMContext
 import Blockchain.VMOptions ()
 import Blockchain.Wiring ()
 import Control.Monad
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.IO.Class
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.Maybe
-import qualified Data.Set as S
+--import qualified Control.Monad.Change.Alter as A
+--import Control.Monad.IO.Class
+--import qualified Data.ByteString as B
+--import qualified Data.ByteString.Base16 as B16
+--import qualified Data.ByteString.Char8 as BC
+--import Data.Maybe
+--import qualified Data.Set as S
 import Executable.EVMFlags ()
 import HFlags
-import qualified LabeledError
+--import qualified LabeledError
 import Test.Hspec
-import qualified Test.Hspec.Expectations.Lifted as L
+--import qualified Test.Hspec.Expectations.Lifted as L
 import Test.Hspec.Runner
 import Prelude hiding (print)
 
-{-# NOINLINE exampleCode #-}
-exampleCode :: B.ByteString
-exampleCode = B.pack $ [0 .. 255]
+-- {-# NOINLINE exampleCode #-}
+--exampleCode :: B.ByteString
+--exampleCode = B.pack $ [0 .. 255]
 
 main :: IO ()
 main = do
@@ -50,6 +50,7 @@ main = do
 
 spec :: Spec
 spec = do
+  {-
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
       (execResults, _) <- runNoLoggingT $
@@ -135,7 +136,7 @@ spec = do
                     B.replicate 17 0x0
                   ]
               )
-
+-}
   describe "BatchedDiffs" $ do
     let toRoot = MP.StateRoot . word256ToBytes
         base = toRoot 0
@@ -166,6 +167,7 @@ spec = do
                      (toRoot 20, toRoot 30, unsafeCreateKeccak256FromWord256 30, 30)
                    ]
 
+{-
   describe "Mutable Stack" $ do
     it "can push elements" $ do
       s <- MS.empty :: IO (MS.MutableStack Int)
@@ -265,3 +267,4 @@ spec = do
         fastExtractQuad exampleCode 1 32 `shouldBe` defaultExtract exampleCode 1 32
         fastExtractQuad exampleCode 2 32 `shouldBe` defaultExtract exampleCode 2 32
         fastExtractQuad exampleCode 64 32 `shouldBe` defaultExtract exampleCode 64 32
+-}

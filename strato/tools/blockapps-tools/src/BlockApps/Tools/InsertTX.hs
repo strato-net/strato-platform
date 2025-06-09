@@ -11,7 +11,6 @@ import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad
 import qualified Data.Binary as BN
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Time.Clock
 import qualified Database.Persist.Postgresql as SQL
@@ -27,5 +26,5 @@ insertTX = do
   Just prvKey <- retrievePrvKey $ "config" </> "priv"
   theTime <- getCurrentTime
   db <- runNoLoggingT $ createPostgresqlPool connStr 20
-  tx <- createContractCreationTX 0 1000000 "" [] (Code $ B.pack [0x60, 0, 0x56]) "" prvKey
+  tx <- createContractCreationTX 0 1000000 "" [] (Code "conract test{}") "" prvKey
   flip runSqlPool db $ void $ SQL.insert (txAndTime2RawTX Direct tx (-1) theTime)

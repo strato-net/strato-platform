@@ -20,7 +20,6 @@ module Core.API
   , module Handlers.AccountInfo
   , module Handlers.BlkLast
   , module Handlers.Block
-  , module Handlers.Faucet
   , module Handlers.Metadata
   , module Handlers.Stats
   , module Handlers.Storage
@@ -34,7 +33,6 @@ import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Sequencer.Event (IngestEvent)
 import           Blockchain.Strato.Discovery.Data.Peer (ActivePeers)
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Options
 import           Blockchain.Strato.Model.Secp256k1
@@ -48,8 +46,6 @@ import           Handlers.BlkLast                  hiding (API, server)
 import qualified Handlers.BlkLast                  as BlkLast
 import           Handlers.Block                    hiding (API, server)
 import qualified Handlers.Block                    as Block
-import           Handlers.Faucet                   hiding (API, server)
-import qualified Handlers.Faucet                   as Faucet
 import qualified Handlers.IdentityServerCallback   as Identity
 import           Handlers.Metadata                 hiding (API, server)
 import qualified Handlers.Metadata                 as Metadata
@@ -74,7 +70,6 @@ type CoreAPI =
            :<|> Account.CodeAPI
            :<|> BlkLast.API
            :<|> Block.API
-           :<|> Faucet.API
            :<|> Identity.API
            :<|> Metadata.API
            :<|> Peers.API
@@ -98,7 +93,6 @@ type MonadCoreAPI m =
     TxLast.GetLastTransactions m,
     HasVault m,
     Selectable Account.AccountsFilterParams [AddressStateRef] m,
-    Selectable Address Integer m,
     Selectable Block.BlocksFilterParams [Block] m,
     Selectable Keccak256 SourceMap m,
     Selectable Keccak256 [TransactionResult] m,
@@ -113,7 +107,6 @@ coreApiServer =
     :<|> Account.codeServer
     :<|> BlkLast.server
     :<|> Block.server
-    :<|> Faucet.server
     :<|> Identity.server
     :<|> Metadata.server
     :<|> Peers.server

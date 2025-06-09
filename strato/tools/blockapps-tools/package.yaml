@@ -45,6 +45,7 @@ library:
     - strato-conf
     - strato-model
     - strato-redis-blockdb
+    - text
     - time
     - transformers
     - vm-tools

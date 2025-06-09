@@ -1111,61 +1111,114 @@ insertIndexTableQuery cs =
 
 insertCollectionTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertCollectionTableQuery [] = []
-insertCollectionTableQuery ms =
-  concat $
-    let ms' = (\m -> (m, fmap (fromMaybe "NULL" . valueToSQLText' False) <$> ((keyColumnNames $ collectionDataKeys m) ++ [("value", collectionDataValue m)]))) <$> ms
-     in flip map (map snd $ partitionWith (length . snd) ms') $ \case
-          [] -> []
-          collections@((x, list) : _) ->
-            let tableName =
-                  collectionTableName
-                    (creator x)
-                    (application x)
-                    (contractname x)
-                    (collectionname x)
-                onConflictCols = T.intercalate ", " $ "address" : (fst <$> keyColumnNames (collectionDataKeys x))
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey"]
-                baseVals =
-                  [ tshow . address,
-                    T.pack . keccak256ToHex . blockHash,
-                    tshow . blockTimestamp,
-                    tshow . blockNumber,
-                    T.pack . keccak256ToHex . transactionHash,
-                    tshow . transactionSender,
-                    creator,
-                    root,
-                    contractname,
-                    collectionname,
-                    collectiontype
+insertCollectionTableQuery rows =
+  concatMap renderInsert groupedRows
+  where
+    prepareRow m =
+      let val = collectionDataValue m
+          isObject = case val of
+                       V.ValueStruct _ -> True
+                       _               -> False
+          keyValuePairs =
+            fmap (fromMaybe "NULL" . valueToSQLText' False)
+              <$> (keyColumnNames (collectionDataKeys m) ++ [("value", val)])
+       in (m, isObject, keyValuePairs)
+
+    preparedRows = map prepareRow rows
+
+    groupedRows =
+      map snd $
+        partitionWith (\(_, isObj, pairs) -> (length pairs, isObj)) preparedRows
+
+    renderInsert [] = []
+    renderInsert group@((x, isMerge, rowList) : _) =
+      let tblName = collectionTableName (creator x) (application x) (contractname x) (collectionname x)
+          tblText = tableNameToDoubleQuoteText tblName
+
+          onConflictCols = T.intercalate ", " $ "address" : map fst (keyColumnNames $ collectionDataKeys x)
+
+          columns =
+            wrapAndEscapeDouble . map escapeQuotes $
+              baseMappingTableColumns ++ map fst (fillFirstEmptyEntries rowList) ++ ["value_fkey"]
+
+          baseFields =
+            [ tshow . address,
+              T.pack . keccak256ToHex . blockHash,
+              tshow . blockTimestamp,
+              tshow . blockNumber,
+              T.pack . keccak256ToHex . transactionHash,
+              tshow . transactionSender,
+              creator,
+              root,
+              contractname,
+              collectionname,
+              collectiontype
+            ]
+
+          valueTuples =
+            map
+              ( \(row, _, kvs) ->
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseFields ++ map snd kvs ++ ["NULL"]
+              )
+              group
+
+          insertValues = csv valueTuples
+
+          valueUpdateSQL =
+            if isMerge
+              then
+                T.concat
+                  [ "value = CASE WHEN excluded.value IS NOT NULL AND ",
+                    tblText,
+                    ".value IS NOT NULL ",
+                    "AND pg_typeof(excluded.value) = 'jsonb'::regtype ",
+                    "AND pg_typeof(",
+                    tblText,
+                    ".value) = 'jsonb'::regtype ",
+                    "AND jsonb_typeof(excluded.value) = 'object' ",
+                    "AND jsonb_typeof(",
+                    tblText,
+                    ".value) = 'object' ",
+                    "THEN ",
+                    tblText,
+                    ".value || excluded.value ",
+                    "WHEN excluded.value IS NOT NULL THEN excluded.value ",
+                    "ELSE ",
+                    tblText,
+                    ".value END"
                   ]
-                vals = flip map collections $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]
-                valsForSQL = vals
-                inserts = csv valsForSQL
-             in (: []) $
-                  T.concat
-                    [ "INSERT INTO ",
-                      tableNameToDoubleQuoteText tableName,
-                      " ",
-                      keySt,
-                      "\n  VALUES ",
-                      inserts,
-                      "\n ON CONFLICT (",
-                      onConflictCols,
-                      ") DO UPDATE SET",
-                      [r|
-    address = excluded.address,
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    collectionname = excluded.collectionname,
-    collectiontype = excluded.collectiontype,
-    value = excluded.value|],
-                      ";"
-                    ]
+              else
+                T.concat
+                  ["value = COALESCE(excluded.value, ", tblText, ".value)"]
+
+          updateSet =
+            T.intercalate
+              ",\n  "
+              [ "address = excluded.address",
+                "block_hash = excluded.block_hash",
+                "block_timestamp = excluded.block_timestamp",
+                "block_number = excluded.block_number",
+                "transaction_hash = excluded.transaction_hash",
+                "transaction_sender = excluded.transaction_sender",
+                "contract_name = excluded.contract_name",
+                "collectionname = excluded.collectionname",
+                "collectiontype = excluded.collectiontype",
+                valueUpdateSQL
+              ]
+       in [ T.concat
+              [ "INSERT INTO ",
+                tblText,
+                " ",
+                columns,
+                "\n  VALUES ",
+                insertValues,
+                "\n ON CONFLICT (",
+                onConflictCols,
+                ") DO UPDATE SET\n  ",
+                updateSet,
+                ";"
+              ]
+          ]
 
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertEventArrayTableQuery [] = []

@@ -11,20 +11,16 @@ import Control.DeepSeq
 import Control.Lens.Operators
 import Data.Aeson
 import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import Data.Data
 import Data.Swagger
-import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text (Text)
 import Database.Persist.TH
 import GHC.Generics
-import qualified LabeledError
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 data Code
-  = Code {codeBytes :: B.ByteString}
+  = Code {codeBytes :: Text}
   | PtrToCode {ptrToCode :: CodePtr}
   deriving (Show, Eq, Read, Ord, Generic, Data)
 
@@ -50,22 +46,16 @@ instance ToSchema Code where
         (Just "Code")
         ( mempty
             & type_ ?~ SwaggerString
-            & example ?~ toJSON (Code (B.singleton 1))
+            & example ?~ toJSON (Code "contract test{}")
             & description ?~ "Code Bytestring"
         )
 
 instance ToJSON Code where
-  toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes
+  toJSON (Code theText) = String theText
   toJSON (PtrToCode codePtr) = toJSON codePtr
 
 instance FromJSON Code where
-  parseJSON (String text) = return . Code . LabeledError.b16Decode "FromJSON<Code>" . encodeUtf8 . drop0x $ text
-    where
-      drop0x :: T.Text -> T.Text
-      drop0x t =
-        if "0x" `T.isPrefixOf` t
-          then T.drop 2 t
-          else t
+  parseJSON (String text) = return $ Code text
   parseJSON x = PtrToCode <$> parseJSON x
 
 data PrecompiledCode
