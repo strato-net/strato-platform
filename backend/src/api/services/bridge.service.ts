@@ -21,7 +21,6 @@ const BRIDGE_API_BASE_URL = process.env.BRIDGE_API_BASE_URL || 'http://localhost
 export class BridgeService {
   public async bridgeIn(params: BridgeInParams): Promise<any> {
     try {
-      console.log("params",params);
       // Make API call to bridge service
       const response = await axios.post(
         `${BRIDGE_API_BASE_URL}/api/bridge/bridgeIn`,
@@ -51,8 +50,6 @@ export class BridgeService {
 
   public async bridgeOut(params: BridgeOutParams): Promise<any> {
     try {
-      console.log(params);
-
       const response = await axios.post(
         `${BRIDGE_API_BASE_URL}/api/bridge/bridgeOut`,
         {
@@ -67,7 +64,7 @@ export class BridgeService {
           }
         }
       );
-      console.log("response",response.data);
+      // console.log("response",response.data);
 
       return response.data;
     } catch (error: any) {
@@ -109,17 +106,17 @@ export class BridgeService {
 
   public async getUserDepositStatus(params: {
     accessToken: string;
+    status: string;
   }): Promise<any> {
     try {
       const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/userDepositStatus`,
+        `${BRIDGE_API_BASE_URL}/api/bridge/userDepositStatus/${params.status}`,
         {
           headers: {
             'Authorization': `Bearer ${params.accessToken}`
           }
         }
       );
-      console.log('Bridge Service Response:', response.data);
       return response.data;
     } catch (error: any) {
       console.log("Error in get user deposit Status:", error.message);
@@ -130,10 +127,11 @@ export class BridgeService {
 
   public async getUserWithdrawalStatus(params: {
     accessToken: string;
+    status: string;
   }): Promise<any> {
     try {
       const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/userWithdrawalStatus`,
+        `${BRIDGE_API_BASE_URL}/api/bridge/userWithdrawalStatus/${params.status}`,
         {
           headers: {
             'Authorization': `Bearer ${params.accessToken}`

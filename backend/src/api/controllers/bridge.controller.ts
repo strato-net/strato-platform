@@ -91,9 +91,11 @@ export class BridgeController {
   ) => {
     try {
       const { accessToken } = req;
+      const { status } = req.params;
 
       const result = await this.bridgeService.getUserDepositStatus({
-        accessToken
+        accessToken,
+        status
       });
 
       res.json({
@@ -113,9 +115,11 @@ export class BridgeController {
   ) => {
     try {
       const { accessToken } = req;
+      const { status } = req.params;
 
       const result = await this.bridgeService.getUserWithdrawalStatus({
-        accessToken
+        accessToken,
+        status  
       });
 
       res.json({
