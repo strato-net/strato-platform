@@ -117,7 +117,7 @@ const BridgeTransactionsPage = ({ isOpen, onClose }: BridgeTransactionsPageProps
             block_timestamp: item.block_timestamp,
             from: 'Ethereum',
             to: 'STRATO',
-            amount: (Number(item.amount) / 1e18).toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 20 }),
+            amount: item.amount ? (Number(item.amount) / 1e18).toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 20 }) : '-',
             txHash: item.txHash,
             token: item.token,
             key: item.key
