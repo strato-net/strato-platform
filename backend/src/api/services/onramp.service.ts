@@ -18,7 +18,7 @@ export const get = async (accessToken: string) => {
     const { data: onRampData } = await cirrus.get(accessToken, `/${OnRamp}`, {
       params: {
         select: onRampSelectFields.join(","),
-        "listings.value.id": "gt.0",
+        "listings.value->>id": "gt.0",
         address: `eq.${contractAddress}`,
       },
     });

@@ -135,10 +135,6 @@ contract record LendingPool is Ownable {
             loan.amount = totalOwed - amount;
             loan.active = true;
         }
-        loan.user = loan.user;
-        loan.asset = loan.asset;
-        loan.collateralAsset = loan.collateralAsset;
-        loan.collateralAmount = loan.collateralAmount;
         loan.lastUpdated = block.timestamp;
 
         emit Repaid(msg.sender, loan.asset, amount);
@@ -173,12 +169,8 @@ contract record LendingPool is Ownable {
         CollateralVault(_collateralVault()).removeCollateral(borrower, loan.collateralAsset, seizeAmount);
 
         loan.amount = 0;
-        loan.user = loan.user;
-        loan.asset = loan.asset;
         loan.lastUpdated = block.timestamp;
         loan.active = false;
-        loan.collateralAsset = loan.collateralAsset;
-        loan.collateralAmount = loan.collateralAmount;
 
         emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
     }
