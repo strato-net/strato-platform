@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { SwappableToken } from '@/interface';
-import api from '@/lib/axios';
+import {api} from '@/lib/axios';
 
 type SwapContextType = {
   swappableTokens: SwappableToken[];

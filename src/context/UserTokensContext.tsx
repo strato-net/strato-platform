@@ -1,38 +1,74 @@
 // src/context/UserTokensContext.tsx
-import React, { createContext, useContext, useEffect, useState } from "react";
-import axios from "@/lib/axios"; // assuming your axios instance is set up here
+import React, { createContext, useContext, useState, useMemo } from "react";
+import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
+import isEqual from "lodash.isequal";
 
 type UserTokensContextType = {
   tokens: Token[];
   loading: boolean;
   error: string | null;
-  fetchTokens: (userAddress: string) => Promise<void>;
+  fetchTokens: (userAddress: string, signal?: AbortSignal) => Promise<void>;
 };
 
-const UserTokensContext = createContext<UserTokensContextType | undefined>(undefined);
+const UserTokensContext = createContext<UserTokensContextType | undefined>(
+  undefined
+);
 
-export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTokens = async (userAddress: string) => {
+  const fetchTokens = async (userAddress: string, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`/tokens/table/balance?key=eq.${userAddress}`);
-      setTokens(response.data);
+      const response = await api.get(
+        `/tokens/balance?key=eq.${userAddress}`,
+        { signal }
+      );
+      // Only update state if not aborted and data has actually changed
+      if (signal?.aborted) return;
+      setTokens((prevTokens) => {
+        if (isEqual(prevTokens, response.data)) {
+          return prevTokens;
+        }
+        return response.data;
+      });
     } catch (err: any) {
+      if (
+        axios.isCancel?.(err) ||
+        err?.name === "CanceledError" ||
+        err?.code === "ERR_CANCELED" ||
+        err?.message === "canceled"
+      ) {
+        // Request was aborted, don't update state
+        return;
+      }
       console.error("Failed to fetch tokens:", err);
       setError("Failed to fetch token data");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   };
 
+  const contextValue = useMemo(
+    () => ({
+      tokens,
+      loading,
+      error,
+      fetchTokens,
+    }),
+    [tokens, loading, error, fetchTokens]
+  );
+
   return (
-    <UserTokensContext.Provider value={{ tokens, loading, error, fetchTokens }}>
+    <UserTokensContext.Provider value={contextValue}>
       {children}
     </UserTokensContext.Provider>
   );

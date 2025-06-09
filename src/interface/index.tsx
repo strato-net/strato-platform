@@ -10,8 +10,17 @@ export interface Token {
   contract_name: string;
   collectionname: string;
   collectiontype: string;
+  token?: {
+    _name: string;
+    _symbol: string;
+    address?: string;
+  },
+  balance?: string;
   key: string;
   value: string;
+  price?: string;
+  _name?: string;
+  _symbol?: string;
   "BlockApps-Mercata-ERC20"?: {
     data: {
       token: string;
@@ -44,6 +53,13 @@ export interface DepositableToken {
   liquidity: string;
   ltv?: string
 }
+
+export interface WithdrawableToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  value?: string;
+}
 export interface SwappableToken {
   address: string;
   _name: string;
@@ -55,7 +71,7 @@ export interface SwappableToken {
   }[];
 };
 
-export interface Loan {
+export interface LoanData {
   active: boolean;
   amount: string;
   asset: string;
@@ -68,4 +84,9 @@ export interface Loan {
   collateralName: string;
   collateralSymbol: string;
   interest: string;
+}
+
+export interface Loan {
+  key: string;
+  loan: LoanData;
 }

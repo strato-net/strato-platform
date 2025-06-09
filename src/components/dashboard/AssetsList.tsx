@@ -72,55 +72,73 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
                   </div>
                 </td>
               </tr>
-              : tokens.slice(0, 5).map((asset, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="ml-3">
-                        <p className="font-medium text-gray-900">
-                          {asset["BlockApps-Mercata-ERC20"]?._name || ""}
-                        </p>
-                        <p className="text-gray-500 text-xs">
-                          {asset["BlockApps-Mercata-ERC20"]?._symbol || ""}
-                        </p>
+              : tokens.length > 0 ? (
+                tokens.slice(0, 5).map((asset, index) => (
+                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="ml-3">
+                          <p className="font-medium text-gray-900">
+                            {asset?.token?._name || ""}
+                          </p>
+                          <p className="text-gray-500 text-xs">
+                            {asset?.token?._symbol || ""}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 whitespace-nowrap text-right">
-                    <p className="font-medium text-gray-900">
-                      {asset?.["price"] || "-"}
-                    </p>
-                  </td>
-                  <td className="py-4 px-4 whitespace-nowrap text-right">
-                    <div
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${asset?.["change"] >= 0
-                        ? "bg-green-50 text-green-600"
-                        : "bg-red-50 text-red-600"
-                        }`}
-                    >
-                      {asset?.["change"] !== undefined
-                        ? `${asset?.["change"] >= 0 ? "+" : ""}${asset?.["change"]
-                        }%`
-                        : "-"}
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 whitespace-nowrap text-right">
-                    <p className="font-medium text-gray-900">
-                      {asset?.["amount"] || "-"}
-                    </p>
-                  </td>
-                  <td className="py-4 px-4 whitespace-nowrap text-right">
-                    <p className="font-medium text-gray-900">
-                      {parseFloat(
-                        formatUnits(asset?.value || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 4,
-                      })}
-                    </p>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <p className="font-medium text-gray-900">
+                        {asset?.["price"] || "-"}
+                      </p>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <div
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${asset?.["change"] >= 0
+                          ? "bg-green-50 text-green-600"
+                          : "bg-red-50 text-red-600"
+                          }`}
+                      >
+                        {asset?.["change"] !== undefined
+                          ? `${asset?.["change"] >= 0 ? "+" : ""}${asset?.["change"]
+                          }%`
+                          : "-"}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <p className="font-medium text-gray-900">
+                        {asset?.["amount"] || "-"}
+                      </p>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap text-right">
+                      <p className="font-medium text-gray-900">
+                        {parseFloat(
+                          formatUnits(
+                            BigInt(
+                              (typeof asset?.balance === "number"
+                                ? asset.balance.toLocaleString("fullwide", { useGrouping: false })
+                                : asset?.balance?.toString() || "0")
+                            ),
+                            18
+                          )
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 4,
+                        })}
+                      </p>
+                    </td>
+                  </tr>
+                ))) :
+                (
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td colSpan={5} className="py-4 px-4 whitespace-nowrap w-full">
+                      <div className="w-full flex justify-center items-center h-16">
+                        <div>No data to show</div>
+                      </div>
+                    </td>
+                  </tr>
+                )
+            }
           </tbody>
         </table>
       </div>
