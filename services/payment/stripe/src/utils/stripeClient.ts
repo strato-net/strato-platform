@@ -28,7 +28,7 @@ export async function createCheckoutSession({
           currency: "usd",
           product_data: {
             name: `Token Purchase - Order ${listingId}`,
-            description: `Purchase of locked tokens for order ${listingId}`,
+            description: `Purchase of tokens for order ${listingId}`,
           },
           unit_amount: amount,
         },
