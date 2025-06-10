@@ -94,11 +94,13 @@ export const get = async (accessToken: string) => {
 
       return {
         key: id,
-        ...info,
-        _name: tokenMeta._name,
-        _symbol: tokenMeta._symbol,
-        tokenOracleValue: prices[info.token] || null,
-        paymentProviders: providers,
+        ListingInfo: {
+          ...info,
+          _name: tokenMeta._name,
+          _symbol: tokenMeta._symbol,
+          tokenOracleValue: prices[info.token] || null,
+          paymentProviders: providers,
+        },
       };
     });
 
