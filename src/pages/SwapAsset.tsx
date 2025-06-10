@@ -81,7 +81,7 @@ const SwapAsset = () => {
       const inputValue = value === "" ? "0" : value;
 
       const parsedValue = parseUnits(inputValue, decimals);
-      const fromBalance = parseUnits(fromAsset?.balance?.toLocaleString("fullwide", { useGrouping: false }) || "0", decimals);
+      const fromBalance = parseUnits(fromAsset?.balance?.toString() || "0", decimals);
 
       if (isFromInput) {
         setFromAmount(value);
