@@ -16,6 +16,24 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard } from "lucide-react";
 
+interface PaymentProvider {
+  name: string;
+  providerAddress: string;
+}
+
+interface ListingInfo {
+  id: string;
+  _name: string;
+  _symbol: string;
+  token: string;
+  amount: string;
+  paymentProviders: PaymentProvider[];
+}
+
+interface Listing {
+  ListingInfo: ListingInfo;
+}
+
 interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,50 +45,54 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [selectedToken, setSelectedToken] = useState<any>(null);
-  const [availablePaymentProviders, setAvailablePaymentProviders] = useState<
-    { name: string; address: string }[]
-  >([]);
-  const [selectedProvider, setSelectedProvider] = useState<{
-    name: string;
-    address: string;
-  } | null>(null);
+  const [selectedListing, setSelectedListing] = useState<ListingInfo | null>(null);
+  const [availablePaymentProviders, setAvailablePaymentProviders] = useState<PaymentProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProvider | null>(null);
   const { userAddress } = useUser();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data } = await axios.get("/api/onramp");
-        const listings = data?.listings;
-        if (listings) {
-          const arr = Object.values(listings).map((listing: any) => ({
-            _name: listing.tokenName,
-            _symbol: listing.tokenSymbol,
-            address: listing.token,
-            ...listing,
-          }));
-          const usdstToken = arr.find((token: any) => token._name === "USDST");
-          if (usdstToken) {
-            setSelectedToken(usdstToken);
-            const providers = (usdstToken.paymentProviders || [])
-              .filter(
-                (p: any) =>
-                  p &&
-                  typeof p.providerAddress === "string" &&
-                  typeof p.name === "string"
-              )
-              .map((p: any) => ({ name: p.name, address: p.providerAddress }));
-            setAvailablePaymentProviders(providers);
-            setSelectedProvider(providers[0] || null);
-          }
+        const { data } = await axios.get<{ listings: Listing[] }>("/api/onramp");
+        const listings = data?.listings || [];
+        
+        // Find USDST listing
+        const usdstListing = listings.find(
+          (listing) => listing.ListingInfo._name === "USDST"
+        );
+
+        if (usdstListing) {
+          const listingInfo = usdstListing.ListingInfo;
+          setSelectedListing(listingInfo);
+
+          // Process payment providers
+          const providers = (listingInfo.paymentProviders || [])
+            .filter(
+              (p): p is PaymentProvider =>
+                p &&
+                typeof p.providerAddress === "string" &&
+                typeof p.name === "string"
+            )
+            .map((p) => ({ 
+              name: p.name, 
+              providerAddress: p.providerAddress 
+            }));
+
+          setAvailablePaymentProviders(providers);
+          setSelectedProvider(providers[0] || null);
         }
       } catch (error) {
         console.error("Error while getting listings:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch available listings. Please try again.",
+          variant: "destructive",
+        });
       }
     };
 
     if (isOpen) fetchData();
-  }, [isOpen]);
+  }, [isOpen, toast]);
 
   const handleDeposit = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -82,10 +104,10 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
       return;
     }
 
-    if (!selectedToken || !selectedProvider) {
+    if (!selectedListing || !selectedProvider) {
       toast({
-        title: "No Token or Provider",
-        description: "Payment provider or token not available.",
+        title: "No Listing or Provider",
+        description: "Payment provider or listing not available.",
         variant: "destructive",
       });
       return;
@@ -94,9 +116,9 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
     setLoading(true);
     try {
       const payload = {
-        listingId: selectedToken?.id,
+        listingId: selectedListing.id,
         amount: ethers.parseUnits(amount, 18).toString(),
-        paymentProviderAddress: selectedProvider?.address,
+        paymentProviderAddress: selectedProvider.providerAddress,
       };
 
       const headers = {
@@ -127,8 +149,8 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
     }
   };
 
-  const exceedsMax = selectedToken?.amount
-    ? Number(amount) > Number(ethers.formatUnits(selectedToken.amount, 18)) ||
+  const exceedsMax = selectedListing?.amount
+    ? Number(amount) > Number(ethers.formatUnits(selectedListing.amount, 18)) ||
       Number(amount) < 0.5
     : false;
 
@@ -153,13 +175,13 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
                 onChange={(e) => setAmount(e.target.value)}
                 className="pl-8"
               />
-              {selectedToken?.amount && (
+              {selectedListing?.amount && (
                 <p
                   className={`text-xs mt-1 ${
                     exceedsMax ? "text-red-500" : "text-gray-500"
                   }`}
                 >
-                  Max available: {ethers.formatUnits(selectedToken.amount, 18)}{" "}
+                  Max available: {ethers.formatUnits(selectedListing.amount, 18)}{" "}
                   USDST — Min: 0.5 USDST
                 </p>
               )}
@@ -172,14 +194,14 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
               <div className="flex flex-col gap-2 ml-1">
                 {availablePaymentProviders.map((provider) => (
                   <label
-                    key={provider.address}
+                    key={provider.providerAddress}
                     className="flex items-center gap-2 cursor-pointer"
                   >
                     <input
                       type="radio"
                       name="paymentProvider"
-                      value={provider.address}
-                      checked={selectedProvider?.address === provider.address}
+                      value={provider.providerAddress}
+                      checked={selectedProvider?.providerAddress === provider.providerAddress}
                       onChange={() => setSelectedProvider(provider)}
                       className="accent-blue-600"
                     />
