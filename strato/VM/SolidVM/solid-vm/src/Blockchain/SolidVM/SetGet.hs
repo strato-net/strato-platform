@@ -234,7 +234,12 @@ getBool p = do
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference a@(AccountPath addr path))) = do
-  xType <- getXabiValueType a
+  xType <- getXabiValueType a >>= \case
+    SVMType.UnknownLabel s _ -> getTypeOfName s >>= \case
+      StructTypo {} -> pure $ SVMType.Struct Nothing s
+      ContractTypo {} -> pure $ SVMType.Contract s
+      EnumTypo ns -> pure $ SVMType.Enum Nothing s $ Just ns
+    t'' -> pure t''
   case xType of
     SVMType.Array {} -> do
       let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
@@ -243,6 +248,13 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       unless (len <= 0) . for_ [0 .. (len - 1)] $ \i -> do
         let elemPath = a `apSnoc` MS.ArrayIndex i
         deleteVar . Constant $ SReference elemPath
+    SVMType.Struct _ structName -> do
+      (ctract, _, cc) <- getCodeAndCollection addr
+      case M.lookup structName $ CC._structs ctract of
+        Just fields -> for_ fields $ \(fieldName, _, _) -> deleteVar (Constant . SReference $ a `apSnoc` MS.Field (UTF8.fromString fieldName))
+        Nothing -> case M.lookup structName $ CC._flStructs cc of
+          Just fields -> for_ fields $ \(fieldName, _, _) -> deleteVar (Constant . SReference $ a `apSnoc` MS.Field (UTF8.fromString fieldName))
+          Nothing -> pure ()
     _ -> do
       -- TODO: handle other types
       ro <- readOnly <$> getCurrentCallInfo
