@@ -118,9 +118,7 @@ contract record OnRamp {
             paymentProviderIndex[last.providerAddress] = actualIndex + 1;
         }
 
-        paymentProviders[lastIndex].name = "";
-        paymentProviders[lastIndex].providerAddress = address(0);
-        paymentProviders[lastIndex].endpoint = "";
+        paymentProviders[lastIndex] = PaymentProviderInfo(address(0), "", "");
         paymentProviders.length = lastIndex;
         delete paymentProviderIndex[provider];
 

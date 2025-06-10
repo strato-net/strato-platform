@@ -4,8 +4,9 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import { getPool as getLendingRegistry } from "./lending.service";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle } = constants;
 
 const TokenFaucet = "TokenFaucet";
 
@@ -64,13 +65,28 @@ export const getBalance = async (
     const response = await cirrus.get(accessToken, "/" + Token + "-_balances", {
       params: { ...params, key: "eq." + address },
     });
+
     if (response.status !== 200) {
       throw new Error(`Error fetching balance: ${response.statusText}`);
     }
+
     if (!response.data) {
       throw new Error("Balance data is empty");
     }
-    return response.data;
+
+    const lendingInfo = await getLendingRegistry(accessToken, {
+      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+    });
+  
+    const rawPrices = lendingInfo.oracle?.prices || [];
+    const priceMap = new Map<string, number>(
+      rawPrices.map((p: any) => [p.key, p.value])
+    );
+
+    return response.data.map((token: any) => ({
+      ...token,
+      price: priceMap.get(token.address) || "0",
+    }));
   } catch (error) {
     console.error("Error fetching balance:", error);
     throw error;
