@@ -24,12 +24,11 @@ router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
 
-router.get("/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
-router.get("/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
-router.get("/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
-router.get("/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
-router.get("/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
-
+router.get("/swap/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
+router.get("/swap/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
+router.get("/swap/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
+router.get("/swap/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
+router.get("/swap/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);
 router.post("/swap/", authHandler.authorizeRequest(), SwappingController.create);
@@ -37,12 +36,11 @@ router.post("/swap/addLiquidity", authHandler.authorizeRequest(), SwappingContro
 router.post("/swap/removeLiquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
 router.post("/swap/swap", authHandler.authorizeRequest(), SwappingController.swap);
 
-router.get("/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
-router.get("/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
-router.get("/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
-router.post("/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
-
 router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
+router.get("/lend/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
+router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
+router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
+router.post("/lend/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
 router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.getLoan);
 router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
