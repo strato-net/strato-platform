@@ -18,7 +18,7 @@ const BA_TEST_ADDRESS = "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce";
 async function initialize() {
   // First mint some initial USDST for gas
   console.log("Minting initial USDST for gas...");
-  await callListAndWait([
+  const initialMintResult = await callListAndWait([
     {
       contract: { address: USDST_ADDRESS, name: "ERC20" },
       method: "mint",
@@ -28,6 +28,10 @@ async function initialize() {
       },
     },
   ]);
+
+  if (initialMintResult[0].status !== "Success") {
+    throw new Error(`Initial USDST mint failed with status: ${initialMintResult[0].status}. Transaction hash: ${initialMintResult[0].hash}`);
+  }
   console.log("Initial USDST minted successfully");
 
   let poolAddr;
