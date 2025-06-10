@@ -23,7 +23,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>('/swappableTokens');
+      const res = await api.get<SwappableToken[]>('/swap/swappableTokens');
       setSwappableTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch swappable tokens');
@@ -38,7 +38,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>(`/swappableTokenPairs/${tokenAddress}`);
+      const res = await api.get<SwappableToken[]>(`/swap/swappableTokenPairs/${tokenAddress}`);
       setPairableTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch pairable tokens');

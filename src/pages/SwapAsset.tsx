@@ -191,7 +191,7 @@ const SwapAsset = () => {
   const getPoolByTokenPair = async (tokenA: string, tokenB: string) => {
     try {
       const res = await api.get(
-        `/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
+        `/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
       );
       setPool(res.data[0]);
       return res.data[0];

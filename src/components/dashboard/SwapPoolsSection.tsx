@@ -72,7 +72,7 @@ const SwapPoolsSection = () => {
     const fetchUserPools = async () => {
       try {
         setLoading(true)
-        const res = await api.get(`/lpToken/`);
+        const res = await api.get(`/swap/lpToken/`);
         const tempPools = res.data;
         const enrichedPools = tempPools.map(
           (pool: { data: { tokenA: string; tokenB: string } }) => {
