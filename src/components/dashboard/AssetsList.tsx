@@ -89,12 +89,12 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-right">
                       <p className="font-medium text-gray-900">
-                        {asset?.["price"] ? 
-                          parseFloat(formatUnits(BigInt(asset.price), 18)).toLocaleString(undefined, {
+                        {!asset?.["price"] ? "-" : 
+                          `$${parseFloat(formatUnits(BigInt(asset.price), 18)).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
-                          })
-                          : "-"}
+                          })}`
+                        }
                       </p>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-right">
@@ -112,27 +112,24 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-right">
                       <p className="font-medium text-gray-900">
-                        {parseFloat(
-                          formatUnits(
-                            BigInt(asset?.balance?.toString() || "0"),
-                            18
-                          )
-                        ).toLocaleString(undefined, {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 4,
-                        })}
+                        {!asset?.balance ? "-" :
+                          parseFloat(formatUnits(BigInt(asset.balance), 18)).toLocaleString(undefined, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 4,
+                          })
+                        }
                       </p>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-right">
                       <p className="font-medium text-gray-900">
-                        {asset?.["price"] && asset?.balance ? 
-                          (parseFloat(formatUnits(BigInt(asset.price), 18)) * 
-                           parseFloat(formatUnits(BigInt(asset.balance.toString() || "0"), 18))
+                        {!asset?.["price"] || !asset?.balance ? "-" :
+                          `$${(parseFloat(formatUnits(BigInt(asset.price), 18)) * 
+                           parseFloat(formatUnits(BigInt(asset.balance), 18))
                           ).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
-                          })
-                          : "-"}
+                          })}`
+                        }
                       </p>
                     </td>
                   </tr>
