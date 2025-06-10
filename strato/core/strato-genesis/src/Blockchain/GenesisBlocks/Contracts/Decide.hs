@@ -62,7 +62,7 @@ contract record Decider {
     function decide() returns (bool) {
       GetImplContract deciderStateContract = GetImplContract(address(0xDEC1DEFF));
       address payFeesImplContract = deciderStateContract.getImplContract();
-      payFeesImplContract.delegatecall("PayFees");
+      payFeesImplContract.delegatecall("payFees");
       return true;
     }
 }|]
@@ -74,15 +74,11 @@ abstract contract ERC20_Template {
   function transfer(address _to, uint _amount) public;
 }
 
-interface PayFees {
-    function payFees() external;
-}
-
 interface GetImplContract {
     function getImplContract() public view returns (address);
 }
 
-contract record DeciderState is PayFees, GetImplContract {
+contract record DeciderState is GetImplContract {
     address public owner;
     address public currentFeeContract = address(this);
 
@@ -105,12 +101,12 @@ contract record DeciderState is PayFees, GetImplContract {
         return currentFeeContract;
     }
 
-    function updatePayFeeContract(PayFees _newFeeContract) external onlyOwner {
-        require(address(_newFeeContract) != address(0), "Cannot set contract address to zero address");
-        currentFeeContract = address(_newFeeContract);
+    function updatePayFeeContract(address _newFeeContract) external onlyOwner {
+        require(_newFeeContract != address(0), "Cannot set contract address to zero address");
+        currentFeeContract = _newFeeContract;
     }
 
-    function payFees() override external {
+    function payFees() external {
         uint oneDollar = 1e18;
         address USDST = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
         address validatorPool = address(0x1234);
