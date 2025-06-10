@@ -55,7 +55,7 @@ export const LendingProvider = ({
   const fetchDepositTokens = async (signal?: AbortSignal) => {
     setLoadingDepositTokens(true);
     try {
-      const res = await api.get<DepositableToken[]>("/depositableTokens", {
+      const res = await api.get<DepositableToken[]>("/lend/depositableTokens", {
         signal,
       });
       if (res.data) {
@@ -81,7 +81,7 @@ export const LendingProvider = ({
   const fetchWithdrawableTokens = async (signal?: AbortSignal) => {
     setLoadingWithdrawableTokens(true);
     try {
-      const res = await api.get<WithdrawableToken[]>("/withdrawableTokens", {
+      const res = await api.get<WithdrawableToken[]>("/lend/withdrawableTokens", {
         signal,
       });
       if (res.data) {
@@ -103,7 +103,7 @@ export const LendingProvider = ({
   const fetchLoans = async (signal?: AbortSignal) => {
     setLoadingLoans(true);
     try {
-      const res = await api.get("/loans", { signal });
+      const res = await api.get("/lend/loans", { signal });
 
       const loanEntries: Loan[] = Array.isArray(res.data)
         ? res.data
