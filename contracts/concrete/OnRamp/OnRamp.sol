@@ -120,7 +120,7 @@ contract record OnRamp {
 
         paymentProviders[lastIndex] = PaymentProviderInfo(address(0), "", "");
         paymentProviders.length = lastIndex;
-        paymentProviderIndex[provider] = 0;
+        delete paymentProviderIndex[provider];
 
         emit PaymentProviderRemoved(provider);
     }
