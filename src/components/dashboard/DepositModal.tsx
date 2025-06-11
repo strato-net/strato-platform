@@ -126,7 +126,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
       };
 
       const { data } = await axios.post<{ url: string }>(
-        "/api/onramp/lock",
+        "/api/onramp/buy",
         payload,
         { headers }
       );
