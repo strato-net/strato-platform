@@ -9,6 +9,7 @@ type SwapContextType = {
   error: string | null;
   refetchSwappableTokens: () => void;
   fetchPairableTokens: (tokenAddress: string) => void;
+  createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -47,6 +48,20 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const createPool = useCallback(async (data: { tokenA: string; tokenB: string }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post('/swap', data);
+      console.log('Pool created:', res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to create pool');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSwappableTokens();
   }, [fetchSwappableTokens]);
@@ -60,6 +75,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         error,
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,
+        createPool
       }}
     >
       {children}

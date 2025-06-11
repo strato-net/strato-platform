@@ -1,10 +1,9 @@
-// src/context/LendingContext.tsx
-
 import React, {
   createContext,
   useContext,
   useState,
   useMemo,
+  useEffect,
 } from "react";
 import isEqual from "lodash.isequal";
 
@@ -26,6 +25,7 @@ type LendingContextType = {
   withdrawableTokens: WithdrawableToken[];
   refreshWithdrawableTokens: (signal?: AbortSignal) => void;
   loadingWithdrawableTokens: boolean;
+  setPrice: (payload: { token: string; price: string }) => Promise<void>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -35,21 +35,14 @@ export const LendingProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [depositableTokens, setDepositableTokens] = useState<
-    DepositableToken[]
-  >([]);
+  const [depositableTokens, setDepositableTokens] = useState<DepositableToken[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loadingDepositTokens, setLoadingDepositTokens] = useState(true);
   const [loadingLoans, setLoadingLoans] = useState(true);
-  const [errorDepositTokens, setErrorDepositTokens] = useState<string | null>(
-    null
-  );
+  const [errorDepositTokens, setErrorDepositTokens] = useState<string | null>(null);
 
-  const [withdrawableTokens, setWithdrawableTokens] = useState<
-    WithdrawableToken[]
-  >([]);
-  const [loadingWithdrawableTokens, setLoadingWithdrawableTokens] =
-    useState(true);
+  const [withdrawableTokens, setWithdrawableTokens] = useState<WithdrawableToken[]>([]);
+  const [loadingWithdrawableTokens, setLoadingWithdrawableTokens] = useState(true);
 
   const fetchDepositTokens = async (signal?: AbortSignal) => {
     setLoadingDepositTokens(true);
@@ -58,20 +51,13 @@ export const LendingProvider = ({
         signal,
       });
       if (res.data) {
-        setDepositableTokens((prev) =>
-          isEqual(prev, res.data) ? prev : res.data
-        );
+        setDepositableTokens((prev) => (isEqual(prev, res.data) ? prev : res.data));
       }
       setErrorDepositTokens(null);
     } catch (err: any) {
-      if (err.name === "CanceledError" || err.name === "AbortError") {
-        // Request was aborted, do not update state
-        return;
-      }
+      if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Error fetching depositable tokens:", err);
-      setErrorDepositTokens(
-        err.message || "Failed to load depositable tokens."
-      );
+      setErrorDepositTokens(err.message || "Failed to load depositable tokens.");
     } finally {
       setLoadingDepositTokens(false);
     }
@@ -84,15 +70,10 @@ export const LendingProvider = ({
         signal,
       });
       if (res.data) {
-        setWithdrawableTokens((prev) =>
-          isEqual(prev, res.data) ? prev : res.data
-        );
+        setWithdrawableTokens((prev) => (isEqual(prev, res.data) ? prev : res.data));
       }
     } catch (err: any) {
-      if (err.name === "CanceledError" || err.name === "AbortError") {
-        // Request was aborted, do not update state
-        return;
-      }
+      if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
       setLoadingWithdrawableTokens(false);
@@ -107,7 +88,6 @@ export const LendingProvider = ({
       const loanEntries: Loan[] = Array.isArray(res.data)
         ? res.data
         : Object.values((res.data as LoanData)?.loans || {});
-
       setLoans(loanEntries);
     } catch (err: any) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
@@ -118,6 +98,24 @@ export const LendingProvider = ({
     }
   };
 
+  const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
+    try {
+      await api.post("/lend/setPrice", payload);
+    } catch (err: any) {
+      console.error("Failed to set price:", err);
+      throw err;
+    }
+  };
+
+  const initialize = () => {
+    fetchDepositTokens();
+    fetchLoans();
+    fetchWithdrawableTokens();
+  };
+
+  useEffect(() => {
+    initialize();
+  }, []);
 
   const contextValue = useMemo(
     () => ({
@@ -131,6 +129,7 @@ export const LendingProvider = ({
       withdrawableTokens,
       refreshWithdrawableTokens: fetchWithdrawableTokens,
       loadingWithdrawableTokens,
+      setPrice,
     }),
     [
       depositableTokens,

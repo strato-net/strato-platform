@@ -42,6 +42,17 @@ export interface Token {
   };
 };
 
+export interface CreateTokenValues {
+  name: string;
+  description: string;
+  symbol: string;
+  images: string[];
+  files: string[];
+  fileNames: string[];
+  initialSupply: string;
+  customDecimals: number;
+};
+
 export interface DepositableToken {
   address: string;
   _name: string;
@@ -89,4 +100,56 @@ export interface LoanData {
 export interface Loan {
   key: string;
   loan: LoanData;
+}
+
+export interface PriceFormValues {
+  tokenAddress: string;
+  price: string;
+};
+
+/*-------- Pool Values --------*/
+
+export interface PoolFormValues {
+  tokenA: string;
+  tokenB: string;
+  // initialLiquidityA: string;
+  // initialLiquidityB: string;
+  // poolName?: string;
+}
+
+/*-------- OnRamp Values --------*/
+
+export interface OnRampListing {
+  id: number;
+  token: string;
+  seller: string;
+  amount: string;
+  marginBps: number;
+}
+
+export interface OnRampLock {
+  amount: string;
+  timestamp: number;
+}
+
+export interface OnRampPaymentProvider {
+  providerAddress: string;
+  name: string;
+  endpoint: string;
+}
+
+export interface OnRampToken {
+  token: string;
+  [key: string]: any;
+}
+
+export interface OnRampContextType {
+  token: OnRampToken | null;
+  loading: boolean;
+  error: string | null;
+  
+  get: () => Promise<any>;
+  sell: (body: any) => Promise<any>;
+  lock: (body: any) => Promise<{ url: string }>;
+  unlockTokens: (listingId: string) => Promise<any>;
 }
