@@ -6,7 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import isEqual from "lodash.isequal";
-
+import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
 import { DepositableToken, Loan, WithdrawableToken } from "@/interface";
 
@@ -99,8 +99,9 @@ export const LendingProvider = ({
   };
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
+    const weiPrice = parseUnits(payload.price, 18);
     try {
-      await api.post("/lend/setPrice", payload);
+      await api.post("/lend/setPrice", {...payload, price: weiPrice.toString() });
     } catch (err: any) {
       console.error("Failed to set price:", err);
       throw err;
