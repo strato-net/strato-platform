@@ -12,7 +12,6 @@ console.log('Transaction proposed:', success);
 */
 
 
-
 import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
@@ -23,6 +22,9 @@ import { Interface } from "ethers";
 const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
+
+const showTestnet = process.env.SHOW_TESTNET === "true";
+const chainId = showTestnet ? 11155111n : 1n;
 
 interface SafeTransactionState {
   safeTxHash?: string;
@@ -90,7 +92,7 @@ async function* safeTransactionGenerator(
   yield { step: "generate", hash: state.safeTxHash };
 
   // Propose transaction
-  state.apiKit = new SafeApiKit({ chainId: 11155111n });
+  state.apiKit = new SafeApiKit({ chainId });
 
   const signature = await state.protocolKit.signHash(state.safeTxHash);
 
@@ -108,7 +110,7 @@ async function* safeTransactionGenerator(
 export const checkEthTransaction = async (transactionHash: string) => {
   console.log("checkEthTransaction  bridgeOut flow called.....", transactionHash);
   const apiKit = new SafeApiKit({
-    chainId: 11155111n,
+    chainId,
   });
 
   // check transaction in every 5 seconds 5 times return when found else return null
