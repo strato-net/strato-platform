@@ -1,7 +1,28 @@
+// Example usage:
+/*
+const generator = safeTransactionGenerator(amount, tokenAddress, userAddress);
+
+// First call - generate hash
+const { hash } = await generator.next();
+console.log('Generated hash:', hash);
+
+// Second call - propose transaction
+const { success } = await generator.next();
+console.log('Transaction proposed:', success);
+*/
+
+
+
 import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { config } from "../config";
+import { Interface } from "ethers";
+
+// Minimal ERC20 ABI
+const ERC20_ABI = [
+  "function transfer(address to, uint256 amount) public returns (bool)",
+];
 
 interface SafeTransactionState {
   safeTxHash?: string;
@@ -9,9 +30,13 @@ interface SafeTransactionState {
   apiKit?: SafeApiKit;
 }
 
+type TxType = "eth" | "erc20";
+
 async function* safeTransactionGenerator(
   amount: string,
-  toAddress: string
+  toAddress: string,
+  type: TxType,
+  tokenAddress?: string // required for erc20
 ): AsyncGenerator<{
   step: "generate" | "propose";
   hash?: string;
@@ -26,15 +51,33 @@ async function* safeTransactionGenerator(
     safeAddress: config.safe.address || "",
   });
 
-  // Step 1: Generate transaction hash
-  // already converted to wei in backend service
-  // const valueInWei = ethers.parseEther(amount);
-  const safeTransactionData: MetaTransactionData = {
-    to: toAddress,
-    value: amount.toString(),
-    data: "0x",
-    operation: OperationType.Call,
-  };
+  // Generate transaction data based on type
+  let safeTransactionData: MetaTransactionData;
+
+  if (type === "eth") {
+    console.log("eth transfer called. in safe service....", amount, toAddress);
+    safeTransactionData = {
+      to: toAddress,
+      value: amount.toString(), // already in wei
+      data: "0x",
+      operation: OperationType.Call,
+    };
+  } else if (type === "erc20" && tokenAddress) {
+    const iface = new Interface(ERC20_ABI);
+    const data = iface.encodeFunctionData("transfer", [
+      toAddress,
+      amount.toString(), // in wei
+    ]);
+
+    safeTransactionData = {
+      to: tokenAddress,
+      value: "0", // ETH value is 0 for ERC20 transfer
+      data,
+      operation: OperationType.Call,
+    };
+  } else {
+    throw new Error("Invalid transaction type or missing tokenAddress");
+  }
 
   const safeTransaction = await state.protocolKit.createTransaction({
     transactions: [safeTransactionData],
@@ -46,10 +89,8 @@ async function* safeTransactionGenerator(
 
   yield { step: "generate", hash: state.safeTxHash };
 
-  // Step 2: Propose transaction
-  state.apiKit = new SafeApiKit({
-    chainId: 11155111n,
-  });
+  // Propose transaction
+  state.apiKit = new SafeApiKit({ chainId: 11155111n });
 
   const signature = await state.protocolKit.signHash(state.safeTxHash);
 
@@ -65,6 +106,7 @@ async function* safeTransactionGenerator(
 }
 
 export const checkEthTransaction = async (transactionHash: string) => {
+  console.log("checkEthTransaction  bridgeOut flow called.....", transactionHash);
   const apiKit = new SafeApiKit({
     chainId: 11155111n,
   });
@@ -98,5 +140,17 @@ console.log('Generated hash:', hash);
 const { success } = await generator.next();
 console.log('Transaction proposed:', success);
 */
+
+
+// For ETH Transfer:
+// const gen = safeTransactionGenerator("100000000000000000", "0xRecipient", "eth");
+
+// For ERC20 Transfer:
+// const gen = safeTransactionGenerator(
+//   "1000000000000000000", // 1 token with 18 decimals
+//   "0xRecipient",
+//   "erc20",
+//   "0xTokenAddress"
+// );
 
 export default safeTransactionGenerator;

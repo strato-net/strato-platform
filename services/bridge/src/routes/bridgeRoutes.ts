@@ -8,5 +8,6 @@ router.post('/bridgeOut', BridgeController.bridgeOut);
 router.post('/stratoTokenBalance', BridgeController.stratoTokenBalance);
 router.get('/userDepositStatus/:status', BridgeController.userDepositStatus);
 router.get('/userWithdrawalStatus/:status', BridgeController.userWithdrawalStatus);
+router.get('/bridgeNetworkTokens/:type', BridgeController.getBridgeInNetworks);
 
 export default router; 

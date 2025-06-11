@@ -1,8 +1,13 @@
 import { Request, Response, NextFunction } from "express";
+import BigNumber from "bignumber.js";
 import logger from "../utils/logger";
 import { getUserAddressFromToken } from "../utils";
-import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus } from "../services/bridgeService";
-import { config } from "../config";
+import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus, getBridgeInNetworks } from "../services/bridgeService";
+import { config, TESTNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_STRATO_TOKENS, TESTNET_STRATO_TOKENS } from "../config";
+
+// Define the type for token addresses
+const ETH_STRATO_TOKEN_MAPPING = process.env.SHOW_TESTNET === 'true' ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING;
+const STRATO_TOKENS = process.env.SHOW_TESTNET === 'true' ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
 
 class BridgeController {
   static async bridgeIn(
@@ -11,15 +16,25 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-
       const { accessToken, fromAddress, amount, tokenAddress, ethHash } = req.body;
 
-      const userAddress = await getUserAddressFromToken(accessToken);
+      console.log("req.body",req.body);
 
+      const userAddress = await getUserAddressFromToken(accessToken);
       const toAddress = config.safe.address || '';
 
-      const bridgeInResponse = await bridgeIn(ethHash, tokenAddress, fromAddress, amount, toAddress, userAddress);
-
+      // Map the tokenAddress to its corresponding address
+      const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
+      const decimals = STRATO_TOKENS.find((tokenObj: { tokenAddress: any; }) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
+      const bridgeInResponse = await bridgeIn(
+        ethHash, 
+        stratoTokenAddress, 
+        fromAddress, 
+        new BigNumber(amount).multipliedBy(10 ** decimals).toString(), 
+        toAddress, 
+        userAddress
+      );
+      
       res.json({
         success: true,
         bridgeInResponse,
@@ -36,15 +51,19 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
+      console.log("bridgeOut called.....",req.body);
       const { accessToken, amount, tokenAddress, toAddress } = req.body;
 
       const userAddress = await getUserAddressFromToken(accessToken);
 
+      const decimals = STRATO_TOKENS.find((tokenObj: { tokenAddress: any; }) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
+
       const fromAddress = config.safe.address || '';
+      
       const bridgeOutResponse = await bridgeOut(
         tokenAddress,
         fromAddress,
-        amount,
+        new BigNumber(amount).multipliedBy(10 ** decimals).toString(),
         toAddress,
         userAddress
       );
@@ -54,7 +73,7 @@ class BridgeController {
         bridgeOutResponse,
       });
     } catch (error: any) {
-      logger.error("Error in bridgeOut:", error?.message);
+      logger.error("Error in bridgeOut:", error);
       next(error);
     }
   }
@@ -66,20 +85,30 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { tokenAddress, accessToken } = req.body;
+      if(!tokenAddress){
+       console.log("Token address is required");    
+      }
 
       // Get user address from token
       const userAddress = await getUserAddressFromToken(accessToken);
-    
-      
 
+      console.log("tokenAddress",tokenAddress);
+      console.log("userAddress",userAddress);
+    
       const balanceData = await stratoTokenBalance(userAddress, tokenAddress);
+
+      const decimals = STRATO_TOKENS.find((tokenObj: { tokenAddress: any; }) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
+      console.log("decimals",decimals);
+      console.log("balanceData.balance",balanceData.balance);
+      const balance = new BigNumber(balanceData.balance).div(10**decimals);
+      console.log("balanceData",balanceData);
 
       res.json({
         success: true,
-        data: balanceData,
+        data: { balance },
       });
     } catch (error: any) {
-      logger.error("Error in stratoToBalance:", error?.message);
+      logger.error("Error in stratoToBalance:", error.message);
       next(error);
     }
   }
@@ -92,7 +121,14 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { status } = req.params;
-      const depositStatus = await userDepositStatus(status);
+      const { limit, orderBy, orderDirection, pageNo } = req.query;
+      const depositStatus = await userDepositStatus(
+        status,
+        limit ? parseInt(limit as string) : undefined,
+        orderBy as string,
+        orderDirection as string,
+        pageNo as string
+      );
 
       res.json({
         success: true,
@@ -111,7 +147,8 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { status } = req.params;
-      const withdrawalStatus = await userWithdrawalStatus(status);
+      const { limit, orderBy, orderDirection, pageNo } = req.query;
+      const withdrawalStatus = await userWithdrawalStatus(status, limit ? parseInt(limit as string) : undefined, orderBy as string, orderDirection as string, pageNo as string);
 
       res.json({
         success: true,
@@ -119,6 +156,25 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching deposit status:", error?.message);
+      next(error);
+    }
+  }
+
+  static async getBridgeInNetworks(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { type } = req.params;
+      const bridgeInNetworks = await getBridgeInNetworks(type);
+
+      res.json({
+        success: true,
+        data: bridgeInNetworks,
+      });
+    } catch (error: any) {
+      logger.error("Error in fetching bridge in networks:", error?.message);
       next(error);
     }
   }
