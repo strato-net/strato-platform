@@ -34,11 +34,6 @@ const BridgePage = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
   const [showTestnet] = useState(import.meta.env.VITE_SHOW_TESTNET === "true");
 
-  const handleTransactionComplete = (hash: string) => {
-    // Handle transaction completion
-    console.log('Transaction completed:', hash);
-  };
-
   const copyToClipboard = async () => {
     if (address) {
       await navigator.clipboard.writeText(address);
@@ -148,12 +143,10 @@ const BridgePage = () => {
                   {activeTab === 'bridgeIn' ? (
                     <BridgeIn 
                       showTestnet={showTestnet}
-                      onTransactionComplete={handleTransactionComplete}
                     />
                   ) : (
                     <BridgeOut 
                       showTestnet={showTestnet}
-                      onTransactionComplete={handleTransactionComplete}
                     />
                   )}
                 </div>

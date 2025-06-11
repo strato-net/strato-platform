@@ -24,7 +24,6 @@ interface Token {
 
 interface BridgeOutProps {
   showTestnet: boolean;
-  onTransactionComplete: (hash: string) => void;
 }
 
 const BRIDGE_API = {
@@ -66,7 +65,7 @@ const BRIDGE_API = {
   },
 };
 
-const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, onTransactionComplete }) => {
+const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
 
@@ -197,13 +196,12 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, onTransactionComplet
 
     try {
       const response = await BRIDGE_API.bridgeOut({
-        amount: amount.toString(),
+        amount: amount,
         toAddress: address,
         tokenAddress: fromToken.tokenAddress,
       });
 
       if (response?.data?.success && response?.data?.bridgeOutResponse?.status === "Success") {
-        onTransactionComplete(response.data.bridgeOutResponse.hash);
         toast({
           title: "Transaction Proposed Successfully",
           description: "Your transaction has been proposed and is waiting for approval",
