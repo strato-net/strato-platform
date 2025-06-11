@@ -36,10 +36,10 @@ export const TESTNET_TOKENS = [
     symbol: "SepoliaETH",
     name: "Sepolia Ether",
   },
-  // {
-  //   symbol: "USDC",
-  //   name: "USD Coin",
-  // },
+  {
+    symbol: "USDC",
+    name: "USD Coin",
+  },
 ];
 
 export const MAINNET_TOKENS = [

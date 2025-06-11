@@ -3,23 +3,31 @@ import BridgeTransactionsComponent from '../components/dashboard/BridgeTransacti
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
 
 const BridgeTransactionsPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="fixed top-4 left-4 z-50">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)}
-          className="rounded-full hover:bg-gray-100 w-10 h-10 border border-gray-200 shadow-sm"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+    <div className="flex h-screen bg-gray-50">
+      <DashboardSidebar />
+      <div className="flex-1 flex flex-col ml-64">
+        <DashboardHeader title="Bridge Transactions" />
+        <div className="flex-1 p-8">
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              className="absolute -left-4 top-0 rounded-full hover:bg-gray-100 w-10 h-10 border border-gray-200 shadow-sm"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <BridgeTransactionsComponent isOpen={true} onClose={() => {}} />
+          </div>
+        </div>
       </div>
-      <BridgeTransactionsComponent isOpen={true} onClose={() => {}} />
     </div>
   );
 };
