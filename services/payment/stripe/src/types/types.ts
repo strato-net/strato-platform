@@ -46,4 +46,34 @@ export interface FunctionInput {
   method: string;
   args: TxPayloadArgs;
 }
+
+// ---------------- OnRamp Types ----------------
+export interface PurchaseLock {
+  timestamp: number;
+  sessionId?: string;
+  listingId: string;
+  amount: string;
+}
+
+export interface Listing {
+  token: string;
+  marginBps: number;
+  amount: string;
+}
+
+export interface RampData {
+  listings: Record<string, Listing>;
+  oracle?: { prices: Record<string, string> };
+}
+
+// ---------------- Checkout Session Types ----------------
+export interface CheckoutSessionParams {
+  listingId: string;
+  amount: number;
+  tokenAmount: string;
+  tokenAddress: string;
+  buyerAddress: string;
+  baseUrl: string;
+}
+
 export type TxInput = DeployInput | FunctionInput;

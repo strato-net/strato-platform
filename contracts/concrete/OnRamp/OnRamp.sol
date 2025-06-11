@@ -2,7 +2,7 @@ import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
 
 contract record OnRamp {
-    event TokenWhitelisted(address token);
+    event TokenWhitelisted(address token, bool whitelist);
     event SellerApproved(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
@@ -19,11 +19,6 @@ contract record OnRamp {
         address seller;
         uint256 amount;
         uint256 marginBps; // e.g. 500 = +5%
-    }
-
-    struct Lock {
-        uint256 amount;
-        uint256 timestamp;
     }
 
     struct PaymentProviderInfo {
@@ -48,11 +43,6 @@ contract record OnRamp {
     mapping(uint256 => Listing) public record listings;
     mapping(address => uint256) public record activeListingFor;
     mapping(uint256 => mapping(address => bool)) public record listingProviders; // listingId => provider => bool
-
-    // Lock management
-    uint256 public LOCK_EXPIRY = 1800; // 30 minutes in seconds
-    mapping(uint256 => mapping(address => Lock)) public record locks; // listingId => buyer => lock
-    mapping(uint256 => uint256) public record lockedAmounts; // listingId => total locked amount
 
     // Constructor
     constructor(address _oracle, address _admin) {
@@ -91,7 +81,7 @@ contract record OnRamp {
         } else {
             require(admins[admin], "Not admin");
             require(adminCount > 1, "Cannot remove last admin");
-            admins[admin] = false;
+            delete admins[admin];
             emit AdminRemoved(admin);
             adminCount--;
         }
@@ -126,25 +116,13 @@ contract record OnRamp {
     }
 
     function setApprovedToken(address token, bool whitelist) external onlyAdmin {
-        if (whitelist) {
-            require(!approvedTokens[token], "Already whitelisted");
-
-            approvedTokens[token] = true;
-
-            emit TokenWhitelisted(token);
-        } else {
-            require(approvedTokens[token], "Not whitelisted");
-            approvedTokens[token] = false;
-        }
+        approvedTokens[token] = whitelist;
+        emit TokenWhitelisted(token, whitelist);
     }
 
     function setApprovedSeller(address seller, bool approved) external onlyAdmin {
         approvedSellers[seller] = approved;
         emit SellerApproved(seller, approved);
-    }
-
-    function setLockExpiry(uint256 newExpiry) external onlyAdmin {
-        LOCK_EXPIRY = newExpiry;
     }
 
     function setPriceOracle(address newOracle) external onlyAdmin {
@@ -190,7 +168,7 @@ contract record OnRamp {
         require(listing.id != 0, "Closed");
         // Clear all providers via global list
         for (uint i = 0; i < paymentProviders.length; i++) {
-            listingProviders[listingId][paymentProviders[i].providerAddress] = false;
+            delete listingProviders[listingId][paymentProviders[i].providerAddress];
         }
         require(providerAddresses.length > 0, "No providers specified");
         for (uint j = 0; j < providerAddresses.length; j++) {
@@ -220,93 +198,40 @@ contract record OnRamp {
         Listing listing = listings[listingId];
         require(msg.sender == listing.seller, "Not seller");
         require(listing.id != 0, "Already closed");
-        require(lockedAmounts[listingId] == 0, "Active locks exist");
+
         // Clear all providers via global list
         for (uint i = 0; i < paymentProviders.length; i++) {
-            listingProviders[listingId][paymentProviders[i].providerAddress] = false;
+            delete listingProviders[listingId][paymentProviders[i].providerAddress];
         }
 
         uint256 remaining = listing.amount;
         IERC20(listing.token).transfer(msg.sender, remaining);
         
-        activeListingFor[listing.token] = 0;
-        listing.id = 0;
-        listing.marginBps = 0;
-        listing.seller = address(0);
-        listing.token = address(0);
-        listing.amount = 0;
+        delete activeListingFor[listing.token];
+        delete listings[listingId];
 
         emit ListingCancelled(listingId);
     }
 
-    function lockTokens(uint256 listingId, uint256 amount) external {
-        Listing listing = listings[listingId];
-        require(listing.id != 0, "Closed");
-        require(amount > 0 && amount <= listing.amount, "Invalid amount");
-        require(listing.amount >= amount, "Not enough available tokens");
-
-        Lock l = locks[listingId][msg.sender];
-        require(l.amount == 0, "Already locked");
-
-        locks[listingId][msg.sender] = Lock(
-            amount,
-            block.timestamp
-        );
-        lockedAmounts[listingId] += amount;
-        listing.amount -= amount;
-    }
-
-    function unlockTokens(uint256 listingId) external {
-        Lock userLock = locks[listingId][msg.sender];
-        require(userLock.amount > 0, "No lock to unlock");
-
-        listings[listingId].amount += userLock.amount;
-        lockedAmounts[listingId] -= userLock.amount;
-        locks[listingId][msg.sender] = Lock(0, 0);
-    }
-
-    function expireLock(uint256 listingId, address buyer) external {
-        require(block.timestamp > locks[listingId][buyer].timestamp + LOCK_EXPIRY, "Not expired");
-
-        listings[listingId].amount += locks[listingId][buyer].amount;
-        lockedAmounts[listingId] -= locks[listingId][buyer].amount;
-        locks[listingId][buyer] = Lock(0, 0);
-    }
-
-    function providerUnlockTokens(uint256 listingId, address buyer) external {
+    function fulfillListing(uint256 listingId, address buyer, uint256 amount) external {
         require(listingProviders[listingId][msg.sender], "Not allowed provider for this listing");
-        Lock buyerLock = locks[listingId][buyer];
-        require(buyerLock.amount > 0, "No lock to unlock");
-
-        listings[listingId].amount += buyerLock.amount;
-        lockedAmounts[listingId] -= buyerLock.amount;
-        locks[listingId][buyer] = Lock(0, 0);
-    }
-
-    function fulfillListing(uint256 listingId, address buyer) external {
-        require(listingProviders[listingId][msg.sender], "Not allowed provider for this listing");
-        uint256 lockedAmount = locks[listingId][buyer].amount;
-        require(lockedAmount > 0, "No lock to fulfill");
+        require(amount > 0, "Invalid amount");
         require(listings[listingId].id != 0, "Closed");
+        require(listings[listingId].amount >= amount, "Not enough available tokens");
 
-        IERC20(listings[listingId].token).transfer(buyer, lockedAmount);
+        IERC20(listings[listingId].token).transfer(buyer, amount);
+        listings[listingId].amount -= amount;
 
-        uint256 totalFiat = calculatePrice(listings[listingId].token, lockedAmount, listings[listingId].marginBps);
-        emit ListingFulfilled(listingId, buyer, lockedAmount, totalFiat);
+        uint256 totalFiat = calculatePrice(listings[listingId].token, amount, listings[listingId].marginBps);
+        emit ListingFulfilled(listingId, buyer, amount, totalFiat);
 
         if (listings[listingId].amount == 0) {
-            activeListingFor[listings[listingId].token] = 0;
-            listings[listingId].id = 0;
-            listings[listingId].marginBps = 0;
-            listings[listingId].seller = address(0);
-            listings[listingId].token = address(0);
+            delete activeListingFor[listings[listingId].token];
+            delete listings[listingId];
             for (uint i = 0; i < paymentProviders.length; i++) {
-                listingProviders[listingId][paymentProviders[i].providerAddress] = false;
+                delete listingProviders[listingId][paymentProviders[i].providerAddress];
             }
         }
-
-        lockedAmounts[listingId] -= lockedAmount;
-        locks[listingId][buyer] = Lock(0, 0);
     }
 
     function calculatePrice(address token, uint256 amount, uint256 marginBps) public view returns (uint256) {

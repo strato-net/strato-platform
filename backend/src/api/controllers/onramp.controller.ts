@@ -1,14 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { get, sell, lock, unlockTokens } from "../services/onramp.service";
-// import {
-//   validateAddressArgs,
-//   validateCreateTokensArgs,
-//   validateTransferItemArgs,
-//   validateApproveArgs,
-//   validateTransferFromArgs,
-//   validateQueryParams
-// } from "../validators/tokens.validator";
+import { get, sell, buy } from "../services/onramp.service";
 
 class OnRampController {
   static async get(
@@ -41,7 +33,7 @@ class OnRampController {
     }
   }
 
-  static async onRampLock(
+  static async onRampBuy(
     req: Request,
     res: Response,
     next: NextFunction
@@ -49,25 +41,8 @@ class OnRampController {
     try {
       const { accessToken, address,  body } = req;
 
-      const result = await lock(accessToken, address, body);
+      const result = await buy(accessToken, address, body);
       res.status(RestStatus.OK).json({ url: result.url });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async unlockTokens(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body } = req;
-
-      const { listingId } = body;
-
-      const result = await unlockTokens(accessToken, listingId);
-      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

@@ -4,8 +4,8 @@ import { fetchOpenIdTokenEndpoint } from "../utils/authHelper";
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
-if (!process.env.NETWORK || !["prod", "testnet", "testnet2"].includes(process.env.NETWORK)) {
-  console.warn("NETWORK env var is not defined or is not a valid value (prod|testnet|testnet2) - using the 'testnet2' preset by default.");
+if (!process.env.ONRAMP) {
+  throw new Error("ONRAMP is not defined");
 }
 
 export let openIdTokenEndpoint: string | undefined;
@@ -21,3 +21,4 @@ export const clientId = process.env.CLIENT_ID;
 export const nodeUrl = process.env.NODE_URL;
 export const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 export const stripeWebhookKey = process.env.STRIPE_WEBHOOK_SECRET || "";
+export const onRamp = process.env.ONRAMP;

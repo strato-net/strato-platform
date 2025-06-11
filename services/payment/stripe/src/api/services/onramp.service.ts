@@ -5,13 +5,13 @@ import { StratoPaths, constants } from "../../config/constants";
 import { createCheckoutSession } from "../../utils/stripeClient";
 import { Stripe } from "stripe";
 import { getServiceToken } from "../../utils/authHelper";
+import { RampData } from "../../types/types";
+import { canLockAmount, addLock, removeLock, calculatePaymentAmount } from "../helpers/onramp.helper";
 
 const contractAddress = constants.onRamp!;
-
 const OnRamp = "OnRamp";
 
-// Get all tokens with optional filtering
-export const get = async (accessToken: string) => {
+export const get = async (accessToken: string): Promise<RampData> => {
   try {
     const response = await bloc.get(
       accessToken,
@@ -23,90 +23,82 @@ export const get = async (accessToken: string) => {
       accessToken,
       StratoPaths.state.replace(":contractAddress", ramp.priceOracle)
     );
-    const oracle = oracleResponse.data;
 
-    return { ...ramp, oracle };
+    return { listings: ramp.listings, oracle: oracleResponse.data };
   } catch (error) {
-    console.error("Error fetching lending pools:", error);
+    console.error("Error fetching ramp data:", error);
     throw error;
   }
 };
 
-export async function lock(
+export async function checkout(
   listingId: string,
   buyerAddress: string,
+  amount: string,
   baseUrl: string
 ): Promise<{ sessionId: string; url: string }> {
+  if (!listingId || !buyerAddress || !baseUrl) {
+    throw new Error('Missing required parameters');
+  }
+
   try {
     const token = await getServiceToken();
     const ramp = await get(token);
-
-    if (
-      !ramp?.locks?.[listingId]?.[buyerAddress] ||
-      !ramp?.listings?.[listingId]
-    ) {
-      throw new Error(`Order ${listingId} not found`);
+    
+    const listing = ramp.listings[listingId];
+    if (!listing) {
+      throw new Error(`Listing ${listingId} not found`);
     }
 
-    const { token: tokenAddress, marginBps } = ramp.listings[listingId];
-    const amount = ramp.locks[listingId][buyerAddress].amount;
+    if (!canLockAmount(listingId, amount, listing.amount)) {
+      throw new Error(`Amount ${amount} is currently being processed by another user`);
+    }
 
-    const price = ramp?.oracle?.prices?.[tokenAddress];
+    const price = ramp.oracle?.prices[listing.token];
     if (!price) {
-      throw new Error(`Price not found for token ${tokenAddress}`);
+      throw new Error(`Price not found for token ${listing.token}`);
     }
 
-    const amountBigInt = BigInt(amount);
-    const priceBigInt = BigInt(price);
-    const divisor = BigInt(10 ** 34);
-    const marginMultiplier = BigInt(10000 + Number(marginBps));
-    const marginDivisor = BigInt(10000);
-    // Add a small adjustment before division
-    const rawAmount =
-      (amountBigInt * priceBigInt * marginMultiplier +
-        (divisor * marginDivisor) / 2n) /
-      (divisor * marginDivisor);
-    const totalAmount = Math.max(Number(rawAmount.toString()), 50);
-
+    const totalAmount = calculatePaymentAmount(amount, price, listing.marginBps);
     const { sessionId, url } = await createCheckoutSession({
       listingId,
       amount: totalAmount,
-      tokenAddress,
+      tokenAmount: amount,
+      tokenAddress: listing.token,
       buyerAddress,
       baseUrl
     });
+
+    addLock(listingId, amount, sessionId);
     return { sessionId, url };
   } catch (error) {
-    console.error("Error in lock function:", error);
+    removeLock(listingId, amount);
     throw error;
   }
 }
 
-export async function handleStripeWebhook(
-  session: Stripe.Checkout.Session
-): Promise<void> {
+export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
   const listingId = session.metadata?.listingId;
   const buyerAddress = session.metadata?.buyerAddress;
-  if (!listingId) {
-    console.error("Missing listingId in session metadata");
+  const amount = session.metadata?.amount;
+  const tokenAmount = session.metadata?.tokenAmount;
+  const stripeSessionId = session.id;
+  
+  if (!listingId || !buyerAddress || !amount || !tokenAmount) {
+    console.error("Missing required metadata in session");
+    removeLock(listingId || '', tokenAmount || '', stripeSessionId);
     return;
   }
-  if (!buyerAddress) {
-    console.error("Missing buyerAddress in session metadata");
-    return;
-  }
-
-  const tx = buildFunctionTx({
-    contractName: OnRamp,
-    contractAddress,
-    method: "fulfillListing",
-    args: { listingId, buyer: buyerAddress },
-  });
 
   try {
     const token = await getServiceToken();
     const { status, hash } = await postAndWaitForTx(token, () =>
-      strato.post(token, StratoPaths.transactionParallel, tx)
+      strato.post(token, StratoPaths.transactionParallel, buildFunctionTx({
+        contractName: OnRamp,
+        contractAddress,
+        method: "fulfillListing",
+        args: { listingId, buyer: buyerAddress, amount: tokenAmount },
+      }))
     );
 
     if (status === "Success") {
@@ -116,5 +108,7 @@ export async function handleStripeWebhook(
     }
   } catch (err) {
     console.error("Error confirming order on-chain:", err);
+  } finally {
+    removeLock(listingId, tokenAmount, stripeSessionId);
   }
 }

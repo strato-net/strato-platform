@@ -18,7 +18,7 @@ The following environment variables are required to run the Stripe payment servi
 
 - `STRIPE_WEBHOOK_SECRET`: Secret used to verify incoming webhooks from Stripe  
 
-- `NETWORK` : Network name (prod|testnet|testnet2) to load the corresponding preset of contract addresses
+- `ONRAMP`: On Ramp contract address to use as part of the server
 
 ## Running the App
 
@@ -53,7 +53,7 @@ CLIENT_SECRET=client-secret-here
 NODE_URL=https://node5.mercata-testnet.blockapps.net/
 STRIPE_SECRET_KEY=sk_test_key_here
 STRIPE_WEBHOOK_SECRET=whsec_key_here
-NETWORK=testnet
+ONRAMP=0x1009
 ```
 - Run:
 ```bash

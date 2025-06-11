@@ -47,8 +47,7 @@ router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController
 
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
-router.post("/onramp/lock", authHandler.authorizeRequest(), OnRampController.onRampLock);
-router.post("/onramp/unlock", authHandler.authorizeRequest(), OnRampController.unlockTokens);
+router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
 
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {

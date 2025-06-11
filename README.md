@@ -40,8 +40,11 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
   OAUTH_CLIENT_ID=localhost \
   OAUTH_CLIENT_SECRET=client-secret-here \
   NODE_URL=https://node5.mercata-testnet.blockapps.net \
-  NETWORK=testnet \
   BASE_URL=http://localhost \
+  BASE_CODE_COLLECTION=0x1000 \
+  POOL_FACTORY=0x100a \
+  LENDING_POOL=0x1005 \
+  ONRAMP=0x1009 \
   npm run dev
 ```
 - `NETWORK` options are: `testnet|prod`.
