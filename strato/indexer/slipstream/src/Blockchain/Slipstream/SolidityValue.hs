@@ -75,18 +75,8 @@ instance FromJSON SolidityValue where
       else fail "Failed to parse SolidityBytes"
   parseJSON _ = fail "Failed to parse solidity value"
 
-valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue v =
-  case (valueToSolidityValue' v) of
-    Just sv -> sv
-    Nothing -> case v of
-      -- This would be better handled by Value synthesis, but it seems difficult
-      -- to distinguish the length of a nested array and an unaggregated sentinel.
-      ValueArraySentinel len -> SolidityArray $ replicate len $ SolidityValueAsString "0"
-      _ -> error $ "internal error: unanticpated problem with value construction: " ++ show v
-
-valueToSolidityValue' :: Value -> Maybe SolidityValue
-valueToSolidityValue' = \case
+valueToSolidityValue :: Value -> Maybe SolidityValue
+valueToSolidityValue = \case
   SimpleValue (ValueBool x) -> Just $ SolidityBool x
   SimpleValue (ValueInt _ _ v) -> Just $ SolidityNum $ toInteger v
   SimpleValue (ValueString s) -> Just $ SolidityValueAsString s
@@ -108,13 +98,13 @@ valueToSolidityValue' = \case
             ++ ") returns ("
             ++ intercalate "," (map (formatType . snd) returnTypes)
             ++ ")"
-  ValueArrayFixed _ values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ values
-  ValueArrayDynamic values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ unsparse values
+  ValueArrayFixed _ values -> Just . SolidityArray . mapMaybe valueToSolidityValue $ values
+  ValueArrayDynamic values -> Just . SolidityArray . mapMaybe valueToSolidityValue $ unsparse values
   -- TODO(tim): What if struct declaration order is needed here?
-  ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue' namedItems
+  ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue namedItems
   ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)
   ValueArraySentinel {} -> Nothing
-  ValueVariadic values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ values
+  ValueVariadic values -> Just . SolidityArray . mapMaybe valueToSolidityValue $ values
   where
     convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
-    convertBoth (sv, v) = (simpleValueToText sv,) <$> valueToSolidityValue' v
+    convertBoth (sv, v) = (simpleValueToText sv,) <$> valueToSolidityValue v

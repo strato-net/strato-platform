@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MonoLocalBinds  #-}
 {-# LANGUAGE BlockArguments #-}
@@ -424,17 +425,21 @@ createForeignIndexesForJoins foreignKey = do
       srcColumns = csv $ wrapDoubleQuotes <$> columnNames foreignKey
       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
       targetColumns = csv $ wrapDoubleQuotes <$> foreignColumnNames foreignKey
-      fkNameSrcToTarget = tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
-      fkNameHash = T.pack . take 8 . formatKeccak256WithoutColor . hash $ encodeUtf8 fkNameSrcToTarget
-      fkName = textToDoubleQuoteText $ tableShortName (tableName foreignKey) <> "_" <> tableShortName (foreignTableName foreignKey) <> "_" <> fkNameHash
-      -- fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
+      fkNameSrcToTarget = T.intercalate "_"
+        [ tableNameToText (tableName foreignKey)
+        , T.intercalate "_" $ columnNames foreignKey
+        , tableNameToText (foreignTableName foreignKey)
+        , T.intercalate "_" $ foreignColumnNames foreignKey
+        , "fk"
+        ]
+      fkNameHash = T.pack . take 40 . formatKeccak256WithoutColor . hash $ encodeUtf8 fkNameSrcToTarget
       logMessage = 
         "createForeignIndexesForJoins srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
         ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
   $logInfoS "createForeignIndexesForJoins" logMessage
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
-          <> " ADD CONSTRAINT " <> fkName <> " FOREIGN KEY (" 
+          <> " ADD CONSTRAINT " <> wrapDoubleQuotes fkNameHash <> " FOREIGN KEY (" 
           <> srcColumns <> ") REFERENCES " <> targetTable <> " (" <> targetColumns <> ");"
 
 notifyPostgREST ::
@@ -1119,12 +1124,12 @@ insertCollectionTableQuery rows =
           isObject = case val of
                        V.ValueStruct _ -> True
                        _               -> False
-          keyValuePairs =
-            fmap (fromMaybe "NULL" . valueToSQLText' False)
-              <$> (keyColumnNames (collectionDataKeys m) ++ [("value", val)])
-       in (m, isObject, keyValuePairs)
+          mKeyValuePairs =
+            traverse (traverse $ valueToSQLText' False)
+              (keyColumnNames (collectionDataKeys m) ++ [("value", val)])
+       in (\kvps -> (m, isObject, kvps)) <$> mKeyValuePairs
 
-    preparedRows = map prepareRow rows
+    preparedRows = mapMaybe prepareRow rows
 
     groupedRows =
       map snd $
@@ -1732,9 +1737,9 @@ valueToSQLText' _ (ValueFunction _ _ _) = Nothing
 valueToSQLText' _ (ValueMapping _) = Nothing
 valueToSQLText' _ (ValueArrayFixed _ _) = Nothing
 valueToSQLText' _ (ValueArrayDynamic _) = Nothing
-valueToSQLText' _ struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
+valueToSQLText' _ struct@(ValueStruct _) = wrapSingleQuotes . solidityValueToText <$> valueToSolidityValue struct
 
-valueToSQLText' _ x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
+valueToSQLText' _ x = wrapSingleQuotes . solidityValueToText <$> valueToSolidityValue x
 
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText = valueToSQLText' True

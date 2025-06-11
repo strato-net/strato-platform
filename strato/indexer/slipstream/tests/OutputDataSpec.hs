@@ -125,10 +125,6 @@ createDummyCodeCollection contract = CodeCollection
 
 spec :: Spec
 spec = do
-  it "should be able to process array sentinels" $ do
-    valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
-      `shouldBe` SolidityArray [SolidityNum 0, SolidityNum 0]
-
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = case readHex "ADDRESS" of
