@@ -26,7 +26,7 @@ export class BridgeService {
         `${BRIDGE_API_BASE_URL}/api/bridge/bridgeIn`,
         {
           fromAddress: params.fromAddress,
-          amount: new BigNumber(params.amount).multipliedBy(10**18).toString(),
+          amount: params.amount,
           tokenAddress: params.tokenAddress,
           accessToken: params.accessToken,
           ethHash: params.ethHash || ''
@@ -53,7 +53,7 @@ export class BridgeService {
       const response = await axios.post(
         `${BRIDGE_API_BASE_URL}/api/bridge/bridgeOut`,
         {
-          amount: new BigNumber(params.amount).multipliedBy(10**18).toString(),
+          amount: params.amount,
           toAddress: params.toAddress,
           tokenAddress: params.tokenAddress,
           accessToken: params.accessToken
@@ -93,7 +93,7 @@ export class BridgeService {
       );
 
       // divide balance by 10^18
-      const balance = new BigNumber(response.data.data.balance).div(10**18);
+      const balance = response.data.data.balance;
       return {
         balance: balance.toString(),
       };
@@ -107,6 +107,10 @@ export class BridgeService {
   public async getUserDepositStatus(params: {
     accessToken: string;
     status: string;
+    limit?: number;
+    orderBy?: string;
+    orderDirection?: string;
+    pageNo?: string;
   }): Promise<any> {
     try {
       const response = await axios.get(
@@ -114,6 +118,12 @@ export class BridgeService {
         {
           headers: {
             'Authorization': `Bearer ${params.accessToken}`
+          },
+          params: {
+            limit: params.limit,
+            orderBy: params.orderBy,
+            orderDirection: params.orderDirection,
+            pageNo: params.pageNo
           }
         }
       );
@@ -128,10 +138,40 @@ export class BridgeService {
   public async getUserWithdrawalStatus(params: {
     accessToken: string;
     status: string;
+    limit?: number;
+    orderBy?: string;
+    orderDirection?: string;
+    pageNo?: string;
   }): Promise<any> {
     try {
       const response = await axios.get(
         `${BRIDGE_API_BASE_URL}/api/bridge/userWithdrawalStatus/${params.status}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${params.accessToken}`
+          },
+          params: {
+            limit: params.limit,
+            orderBy: params.orderBy,
+            orderDirection: params.orderDirection,
+            pageNo: params.pageNo
+          }
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.log("Error in get user withdrawal Status:", error.message);
+      throw error;
+    }
+  }
+  
+  public async getBridgeInNetworks(params: {
+    accessToken: string;
+    type: string;
+  }): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeNetworkTokens/${params.type}`,
         {
           headers: {
             'Authorization': `Bearer ${params.accessToken}`
@@ -140,10 +180,9 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      return null;
+      console.log("Error in getBridgeInNetworks:", error.message);
       throw error;
     }
   }
-  
 
 }

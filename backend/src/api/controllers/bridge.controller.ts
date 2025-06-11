@@ -92,10 +92,15 @@ export class BridgeController {
     try {
       const { accessToken } = req;
       const { status } = req.params;
+      const { limit, orderBy, orderDirection, pageNo } = req.query;
 
       const result = await this.bridgeService.getUserDepositStatus({
         accessToken,
-        status
+        status,
+        limit: limit ? parseInt(limit as string) : undefined,
+        orderBy: orderBy as string,
+        orderDirection: orderDirection as string,
+        pageNo: pageNo as string
       });
 
       res.json({
@@ -112,14 +117,20 @@ export class BridgeController {
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
+    
   ) => {
     try {
       const { accessToken } = req;
       const { status } = req.params;
+      const { limit, orderBy, orderDirection, pageNo } = req.query;
 
       const result = await this.bridgeService.getUserWithdrawalStatus({
         accessToken,
-        status  
+        status,
+        limit: limit ? parseInt(limit as string) : undefined,
+        orderBy: orderBy as string,
+        orderDirection: orderDirection as string,
+        pageNo: pageNo as string
       });
 
       res.json({
@@ -131,4 +142,26 @@ export class BridgeController {
     }
   };
 
+  public getBridgeInNetworks = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { accessToken } = req;
+      const { type } = req.params;
+
+      const result = await this.bridgeService.getBridgeInNetworks({
+        accessToken,
+        type
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  };
 }
