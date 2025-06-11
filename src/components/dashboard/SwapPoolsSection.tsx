@@ -77,14 +77,14 @@ const SwapPoolsSection = () => {
         const enrichedPools = tempPools.map(
           (pool: { data: { tokenA: string; tokenB: string } }) => {
             const tokenAInfo =
-              tokens && tokens.find((t) => t.address === pool.data.tokenA);
+              tokens && tokens.find((t) => t.address === pool.tokenA?.address);
             const tokenBInfo =
-              tokens && tokens.find((t) => t.address === pool.data.tokenB);
+              tokens && tokens.find((t) => t.address === pool.tokenB?.address);
 
             return {
               ...pool,
-              _name: `${tokenAInfo?.['BlockApps-Mercata-ERC20']?._name}/${tokenBInfo?.['BlockApps-Mercata-ERC20']?._name}`,
-              _symbol: `${tokenAInfo?.['BlockApps-Mercata-ERC20']?._symbol}/${tokenBInfo?.['BlockApps-Mercata-ERC20']?._symbol}`,
+              _name: `${tokenAInfo?.token?._name}/${tokenBInfo?.token?._name}`,
+              _symbol: `${tokenAInfo?.token?._symbol}/${tokenBInfo?.token?._symbol}`,
             };
           }
         );
@@ -97,6 +97,8 @@ const SwapPoolsSection = () => {
     };
     fetchUserPools();
   }, [tokens]);
+  console.log(pools, "pools>");
+  
 
   const handleOpenDepositModal = async (pool: any) => {
     setSelectedPool(pool);
@@ -104,8 +106,8 @@ const SwapPoolsSection = () => {
     console.log(pool, "data");
 
     try {
-      getTokenBalance(pool?.data?.tokenA, true)
-      getTokenBalance(pool?.data?.tokenB)
+      getTokenBalance(pool?.tokenA?.address, true)
+      getTokenBalance(pool?.tokenB?.address)
     } catch (error) {
       console.error("Failed to fetch token ratios", error);
     }
@@ -170,7 +172,7 @@ const SwapPoolsSection = () => {
   const handleWithdrawSubmit = async () => {
     try {
       setWithdrawLoading(true)
-      const value = BigInt(selectedPool?.value || "0");
+      const value = BigInt(selectedPool?.lpToken?.balances[0]?.balance || "0");
       const percent = parseFloat(withdrawPercent ? withdrawPercent : "0");
 
       const percentScaled = BigInt(Math.round(percent * 100));
@@ -207,13 +209,13 @@ const SwapPoolsSection = () => {
 
     try {
       const res = await api.get(
-        `/tokens/table/balance?key=eq.${userAddress}&address=eq.${address}`,
+        `/tokens/balance?key=eq.${userAddress}&address=eq.${address}`,
       );
       console.log(res?.data[0]?.value, "token response");
       if (firstToken) {
-        setTokenABalance(res?.data[0]?.value || 0);
+        setTokenABalance(res?.data[0]?.balance || 0);
       } else {
-        setTokenBBalance(res?.data[0]?.value || 0);
+        setTokenBBalance(res?.data[0]?.balance || 0);
       }
     } catch (err) {
       console.log(err);
@@ -237,11 +239,11 @@ const SwapPoolsSection = () => {
     token: 'token1' | 'token2'
   ) => {
     const floatVal = parseFloat(value);
-
+    
     if (token === 'token1') {
       setToken1Amount(value);
-      if (!isNaN(floatVal) && selectedPool?.data?.aToBRatio) {
-        setToken2Amount((floatVal * selectedPool.data.aToBRatio).toString());
+      if (!isNaN(floatVal) && selectedPool?.aToBRatio) {
+        setToken2Amount((floatVal * selectedPool?.aToBRatio).toString());
       } else {
         setToken2Amount('');
       }
@@ -249,13 +251,16 @@ const SwapPoolsSection = () => {
 
     if (token === 'token2') {
       setToken2Amount(value);
-      if (!isNaN(floatVal) && selectedPool?.data?.bToARatio) {
-        setToken1Amount((floatVal * selectedPool.data.bToARatio).toString());
+      if (!isNaN(floatVal) && selectedPool?.bToARatio) {
+        setToken1Amount((floatVal * selectedPool?.bToARatio).toString());
       } else {
         setToken1Amount('');
       }
     }
   };
+
+  console.log(pools, selectedPool, "???");
+  
 
   return (
     <div>
@@ -302,7 +307,7 @@ const SwapPoolsSection = () => {
                       <div>
                         <h3 className="font-medium">{pool?._name}</h3>
                         <div className="flex items-center text-xs text-gray-500 mt-1">
-                          <span>Liquidity: {pool?._totalSupply}</span>
+                          <span>Liquidity: {formatUnits(pool?.lpToken?._totalSupply.toString(),18)}</span>
                         </div>
                       </div>
                     </div>
@@ -377,7 +382,7 @@ const SwapPoolsSection = () => {
                 </div>
                 <div>
                   <span className="text-sm text-gray-500">
-                    Balance: {formatUnits(tokenABalance || 0, 18)}
+                    Balance: {formatUnits(tokenABalance.toLocaleString('fullwide', { useGrouping: false }) || 0, 18)}
                   </span>
                   <Button
                     type="button"
@@ -419,7 +424,7 @@ const SwapPoolsSection = () => {
                 </div>
                 <div>
                   <span className="text-sm text-gray-500">
-                    Balance: {formatUnits(tokenBBalance || 0, 18)}
+                    Balance: {formatUnits(tokenBBalance.toLocaleString('fullwide', { useGrouping: false }) || 0, 18)}
                   </span>
                   <Button
                     type="button"
@@ -438,7 +443,7 @@ const SwapPoolsSection = () => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500">Exchange rate</span>
                 <span className="font-medium">
-                  {selectedPool && `1 ${selectedPool?._name?.split('/')[0]} = ${selectedPool?.data?.aToBRatio} ${selectedPool?._name?.split('/')[1]}`}
+                  {selectedPool && `1 ${selectedPool?._name?.split('/')[0]} = ${selectedPool?.aToBRatio} ${selectedPool?._name?.split('/')[1]}`}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm mt-1">
@@ -507,14 +512,14 @@ const SwapPoolsSection = () => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500">{selectedPool?._name.split('/')[0]} position</span>
                 <span className="font-medium">
-                  {(Number((BigInt(selectedPool?.value || "0") * BigInt(selectedPool?.data?.tokenABalance || "0")) / BigInt(selectedPool?._totalSupply || "1")) / 1e18).toFixed(10)}
+                  {(Number((BigInt(selectedPool?.lpToken?.balances[0]?.balance || "0") * BigInt(selectedPool?.tokenABalance || "0")) / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
 
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm mt-1">
                 <span className="text-gray-500">{selectedPool?._name.split('/')[1]} position</span>
                 <span className="font-medium">
-                  {(Number((BigInt(selectedPool?.value || "0") * BigInt(selectedPool?.data?.tokenBBalance || "0")) / BigInt(selectedPool?._totalSupply || "1")) / 1e18).toFixed(10)}
+                  {(Number((BigInt(selectedPool?.lpToken?.balances[0]?.balance || "0") * BigInt(selectedPool?.tokenBBalance || "0")) / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
                 </span>
               </div>
               {selectedPool && withdrawPercent && (
@@ -526,10 +531,10 @@ const SwapPoolsSection = () => {
                     {(
                       Number(
                         (
-                          (BigInt(selectedPool?.value || "0") *
-                            BigInt(selectedPool?.data?.tokenABalance || "0") *
+                          (BigInt(selectedPool?.lpToken?.balances[0]?.balance || "0") *
+                            BigInt(selectedPool?.tokenABalance || "0") *
                             (BigInt(10000) - BigInt((withdrawPercent * 100 || 0)))) /
-                          (BigInt(selectedPool?._totalSupply || "1") * BigInt(10000))
+                          (BigInt(selectedPool?.lpToken?._totalSupply || "1") * BigInt(10000))
                         )
                       ) / 1e18
                     ).toFixed(10)}
@@ -545,10 +550,10 @@ const SwapPoolsSection = () => {
                     {(
                       Number(
                         (
-                          (BigInt(selectedPool?.value || "0") *
-                            BigInt(selectedPool?.data?.tokenBBalance || "0") *
+                          (BigInt(selectedPool?.lpToken?.balances[0]?.balance || "0") *
+                            BigInt(selectedPool?.tokenBBalance || "0") *
                             (BigInt(10000) - BigInt((withdrawPercent || 0) * 100))) /
-                          (BigInt(selectedPool?._totalSupply || "1") * BigInt(10000))
+                          (BigInt(selectedPool?.lpToken?._totalSupply || "1") * BigInt(10000))
                         )
                       ) / 1e18
                     ).toFixed(10)}

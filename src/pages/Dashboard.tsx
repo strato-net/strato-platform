@@ -51,31 +51,31 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <AssetSummary
               title="Total Balance"
-              value="$4,327.39"
-              change={2.5}
+              value="N/A"
+              change={0}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
 
             <AssetSummary
               title="CATA Rewards"
-              value="287.53 CATA"
-              change={12.3}
+              value="N/A"
+              change={0}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />
 
             <AssetSummary
               title="Portfolio Growth"
-              value="8.4%"
-              change={3.7}
+              value="N/A"
+              change={0}
               icon={<ChartBar className="text-white" size={18} />}
               color="bg-green-500"
             />
 
             <AssetSummary
               title="Borrowing"
-              value="$1,250.00"
+              value="N/A"
               change={0}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"

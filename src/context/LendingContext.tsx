@@ -3,7 +3,6 @@
 import React, {
   createContext,
   useContext,
-  useEffect,
   useState,
   useMemo,
 } from "react";
@@ -119,15 +118,6 @@ export const LendingProvider = ({
     }
   };
 
-  const initialize = () => {
-    fetchDepositTokens();
-    fetchLoans();
-    fetchWithdrawableTokens();
-  };
-
-  useEffect(() => {
-    initialize();
-  }, []);
 
   const contextValue = useMemo(
     () => ({

@@ -83,6 +83,11 @@ const Borrow = () => {
     loadingLoans,
   } = useLendingContext();
 
+  useEffect(()=>{
+    refreshDepositTokens()
+    refreshLoans()
+  },[])
+
   useEffect(() => {
     if (!depositableTokens || depositableTokens.length === 0) return;
 
