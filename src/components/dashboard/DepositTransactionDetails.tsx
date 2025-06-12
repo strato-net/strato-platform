@@ -25,6 +25,9 @@ interface DepositTransaction {
   key?: string;
   depositStatus?: string;
   tokenSymbol?: string;
+  ethTokenName?: string;
+  ethTokenSymbol?: string;
+  ethTokenAddress?: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -70,7 +73,7 @@ const DepositTransactionDetails = () => {
 
       try {
         const response = await axios.get(
-          `/api/depositStatus/${depositStatus}`,
+          `/api/bridge/depositStatus/${depositStatus}`,
           {
             params: {
               limit: ITEMS_PER_PAGE,
@@ -91,17 +94,21 @@ const DepositTransactionDetails = () => {
               from: item.from,
               to: item.to,
               tokenSymbol: item.tokenSymbol,
+              ethTokenSymbol: item.ethTokenSymbol,
+              ethTokenAddress: item.ethTokenAddress,
               amount: item.amount
-          ? (Number(item.amount) / (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)).toLocaleString("fullwide", {
-              useGrouping: false,
-              maximumFractionDigits: 20,
-            })
-          : "-",
+                ? (
+                    Number(item.amount) /
+                    (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)
+                  ).toLocaleString("fullwide", {
+                    useGrouping: false,
+                    maximumFractionDigits: 20,
+                  })
+                : "-",
               txHash: item.txHash,
               token: item.token,
               key: item.key,
               depositStatus: item.depositStatus,
-            
             }))
           : [];
         setTransactions(transformedData);
@@ -167,10 +174,16 @@ const DepositTransactionDetails = () => {
                 To (Strato)
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Token
+                Token (Ethereum)
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Token Address
+                Token Address(Ethereum)
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Token (STRATO)
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Token Address(STRATO)
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Amount
@@ -219,7 +232,13 @@ const DepositTransactionDetails = () => {
                     {renderTruncatedAddress(tx.to)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {tx.tokenSymbol || '-'}
+                    {tx.ethTokenSymbol || "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {renderTruncatedAddress(tx.ethTokenAddress)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {tx.tokenSymbol || "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {renderTruncatedAddress(tx.token)}

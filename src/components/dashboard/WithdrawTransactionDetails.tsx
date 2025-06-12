@@ -18,6 +18,8 @@ interface WithdrawTransaction {
   key?: string;
   withdrawalStatus?: string;
   tokenSymbol?: string;
+  ethTokenSymbol?: string;
+  ethTokenAddress?: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -62,7 +64,7 @@ const WithdrawTransactionDetails = () => {
       setIsLoading(true);
       
       try {
-        const response = await axios.get(`/api/withdrawalStatus/${withdrawalStatus}`, {
+        const response = await axios.get(`/api/bridge/withdrawalStatus/${withdrawalStatus}`, {
           params: {
             limit: ITEMS_PER_PAGE,
             pageNo: currentPage,
@@ -79,6 +81,8 @@ const WithdrawTransactionDetails = () => {
           block_timestamp: item.block_timestamp,
           from: item.from,
           to: item.to,
+          ethTokenSymbol: item.ethTokenSymbol,
+          ethTokenAddress: item.ethTokenAddress,
           amount: item.amount
           ? (Number(item.amount) / (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)).toLocaleString("fullwide", {
               useGrouping: false,
@@ -145,8 +149,10 @@ const WithdrawTransactionDetails = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From (Strato)</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To (Ethereum)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (Ethereum)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address(Ethereum)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (STRATO)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address(STRATO)</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Hash</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -180,6 +186,12 @@ const WithdrawTransactionDetails = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {renderTruncatedAddress(tx.to)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {tx.ethTokenSymbol || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {renderTruncatedAddress(tx.ethTokenAddress)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {tx.tokenSymbol || '-'}

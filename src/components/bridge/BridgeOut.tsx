@@ -20,6 +20,8 @@ interface Token {
   decimals: number;
   icon: string;
   chainId: number;
+  exchangeTokenSymbol?: string;
+  exchangeTokenName?: string;
 }
 
 interface BridgeOutProps {
@@ -74,31 +76,33 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   const [stratoBalance, setStratoBalance] = useState<string>("0");
   const [isLoading, setIsLoading] = useState(false);
   const [isStratoLoading, setIsStratoLoading] = useState(false);
-  const [networkTokens, setNetworkTokens] = useState<Token[]>([]);
+  const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
   const [amountError, setAmountError] = useState<string>("");
   const [balanceError, setBalanceError] = useState<string>("");
   const [fromChain, setFromChain] = useState<string>("STRATO");
-  const [toChain, setToChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
+  const [toChain, setToChain] = useState<string>(
+    showTestnet ? "Sepolia" : "Ethereum"
+  );
 
   // Fetch network tokens
   useEffect(() => {
-    const fetchNetworkTokens = async () => {
+    const fetchBridgeOutTokens = async () => {
       try {
-        const response = await fetch(`/api/bridgeNetworkTokens/bridgeOut`);
+        const response = await fetch(`/api/bridge/bridgeOutTokens`);
         const responseData = await response.json();
-        const tokens = responseData.data.data.networkTokens;
-        setNetworkTokens(tokens);
-        
+        const tokens = responseData.data.data.bridgeOutTokens;
+        setBridgeOutTokens(tokens);
+
         if (!fromToken && tokens.length > 0) {
           setFromToken(tokens[0]);
         }
       } catch (error) {
-        console.error('Error fetching network tokens:', error);
-        setNetworkTokens([]);
+        console.error("Error fetching network tokens:", error);
+        setBridgeOutTokens([]);
       }
     };
 
-    fetchNetworkTokens();
+    fetchBridgeOutTokens();
   }, []);
 
   // Fetch Strato balance
@@ -114,8 +118,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
             throw new Error("Invalid token address");
           }
 
-          const formattedTokenAddress = fromToken.tokenAddress.startsWith('0x') 
-            ? fromToken.tokenAddress 
+          const formattedTokenAddress = fromToken.tokenAddress.startsWith("0x")
+            ? fromToken.tokenAddress
             : `0x${fromToken.tokenAddress}`;
 
           const balanceData = await BRIDGE_API.getBalance({
@@ -161,7 +165,9 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
 
     if (numericAmount > numericBalance) {
       setAmountError(
-        `Insufficient balance. Maximum amount: ${Number(stratoBalance).toFixed(18)} ${fromToken?.symbol}`
+        `Insufficient balance. Maximum amount: ${Number(stratoBalance).toFixed(
+          18
+        )} ${fromToken?.symbol}`
       );
       return false;
     }
@@ -201,10 +207,14 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         tokenAddress: fromToken.tokenAddress,
       });
 
-      if (response?.data?.success && response?.data?.bridgeOutResponse?.status === "Success") {
+      if (
+        response?.data?.success &&
+        response?.data?.bridgeOutResponse?.status === "Success"
+      ) {
         toast({
           title: "Transaction Proposed Successfully",
-          description: "Your transaction has been proposed and is waiting for approval",
+          description:
+            "Your transaction has been proposed and is waiting for approval",
         });
       } else {
         throw new Error("Failed to initiate transfer");
@@ -226,40 +236,22 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="from">From Network</Label>
-          <Select
+          <Input
+            id="from-chain"
             value={fromChain}
-            onValueChange={(value) => setFromChain(value)}
-          >
-            <SelectTrigger id="from-chain">
-              <SelectValue placeholder="Select network">
-                {fromChain || "Select network"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="STRATO">STRATO</SelectItem>
-            </SelectContent>
-          </Select>
+            disabled
+            className="bg-gray-50"
+          />
         </div>
 
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="to">To Network</Label>
-          <Select
+          <Input
+            id="to-chain"
             value={toChain}
-            onValueChange={(value) => setToChain(value)}
-          >
-            <SelectTrigger id="to-chain">
-              <SelectValue placeholder="Select network">
-                {toChain || "Select network"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {showTestnet ? (
-                <SelectItem value="Sepolia">Sepolia</SelectItem>
-              ) : (
-                <SelectItem value="Ethereum">Ethereum</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+            disabled
+            className="bg-gray-50"
+          />
         </div>
       </div>
 
@@ -268,7 +260,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         <Select
           value={fromToken?.symbol || ""}
           onValueChange={(value) => {
-            const token = networkTokens.find((t) => t.symbol === value);
+            const token = bridgeOutTokens.find((t) => t.symbol === value);
             if (token) {
               setFromToken(token);
             }
@@ -282,7 +274,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {networkTokens.map((token) => (
+            {bridgeOutTokens.map((token) => (
               <SelectItem key={token.symbol} value={token.symbol}>
                 {token.name} ({token.symbol})
               </SelectItem>
@@ -306,37 +298,56 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
           onChange={handleAmountChange}
           disabled={isStratoLoading || !stratoBalance}
         />
-        {amountError && (
-          <p className="text-sm text-red-500">{amountError}</p>
-        )}
+        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         <div className="flex items-center gap-2 mt-1">
           {isStratoLoading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">
-                Fetching balance...
-              </p>
+              <p className="text-sm text-gray-500">Fetching balance...</p>
             </div>
           ) : balanceError ? (
-            <p className="text-sm text-red-500">
-              {balanceError}
-            </p>
+            <p className="text-sm text-red-500">{balanceError}</p>
           ) : (
             stratoBalance && (
-              <p className="text-sm text-gray-500">
-                Balance: {stratoBalance} {fromToken?.symbol}
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-500">
+                  Balance: {stratoBalance} {fromToken?.symbol}
+                </p>
+                {fromToken?.exchangeTokenSymbol && (
+                  <div className="text-sm">
+                    <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
+                      You will receive {amount ? `${amount} ` : ''}{fromToken?.exchangeTokenName} ({fromToken?.exchangeTokenSymbol}) on {toChain} network
+                    </p>
+                  </div>
+                )}
+              </div>
             )
           )}
         </div>
       </div>
 
+      <div className="bg-gray-50 p-4 rounded-md space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Bridge Fee:</span>
+          <span>0.1%</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Estimated Time:</span>
+          <span>2-5 minutes</span>
+        </div>
+      </div>
+
+      <div className="text-sm text-gray-500">
+        <p>• Bridge assets between Ethereum and STRATO networks</p>
+        <p>• Small bridge fee applies</p>
+        <p>• Transaction time varies by network congestion</p>
+        <p>• STRATO to Ethereum transfers require approval</p>
+      </div>
+
       <div className="flex justify-end gap-4">
         <Button
           onClick={handleBridgeOut}
-          disabled={Boolean(
-            isLoading || !amount || !fromToken || !isConnected
-          )}
+          disabled={Boolean(isLoading || !amount || !fromToken || !isConnected)}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Bridge Assets"}
@@ -346,4 +357,4 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   );
 };
 
-export default BridgeOut; 
+export default BridgeOut;
