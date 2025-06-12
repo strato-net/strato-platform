@@ -104,8 +104,11 @@ onRampAddress = 0x1009
 poolFactoryAddress :: Address
 poolFactoryAddress = 0x100a
 
+tokenFactoryAddress :: Address
+tokenFactoryAddress = 0x100b
+
 baseContractAddresses :: [Address]
-baseContractAddresses = [mercataAddress..poolFactoryAddress]
+baseContractAddresses = [mercataAddress..tokenFactoryAddress]
 
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
@@ -159,6 +162,7 @@ genesisBlock  =
             , mercataEthBridge
             , onRamp
             , poolFactory
+            , tokenFactory
             ],
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
@@ -238,6 +242,7 @@ rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount m
 priceOracle :: AccountInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
   (".prices<a:" <> addrBS usdstAddress <> ">", BInteger 1000000000000000000)
+  : (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
   : ownedByBlockApps mercataAddress
   ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
     (".prices<a:" <> addrBS assetRootAddress <> ">", BInteger . round $ lastUpdatedOraclePrice * (10.0 ** (fromInteger $ 18 + getDecimals (GA.decimals a) (GA.name a))))
@@ -271,6 +276,7 @@ lendingPool :: AccountInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   , (".poolConfigurator", BAccount $ unspecifiedChain poolConfiguratorAddress)
+  , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
   , (".assetInterestRate<a:" <> addrBS 0x0 <> ">", BInteger 5)
   , (".assetCollateralRatio<a:" <> addrBS 0x0 <> ">", BInteger 150)
   , (".assetLiquidationBonus<a:" <> addrBS 0x0 <> ">", BInteger 105)
@@ -320,13 +326,19 @@ onRamp :: AccountInfo
 onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddress "OnRamp") $ createdByBlockApps mercataAddress ++
   [ (".admins<a:" <> addrBS blockappsAddress <> ">", BBool True)
   , (".adminCount", BInteger 1)
+  , (".listingIdCounter", BInteger 0)
   , (".LOCK_EXPIRY", BInteger 1800)
   , (".nextListingId", BInteger 1)
   , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
+  , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
   ]
 
 poolFactory :: AccountInfo
-poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mercataAddress "PoolFactory") $ ownedByBlockApps mercataAddress
+poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mercataAddress "PoolFactory") $
+  (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress) : ownedByBlockApps mercataAddress
+
+tokenFactory :: AccountInfo
+tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount mercataAddress "TokenFactory") $ ownedByBlockApps mercataAddress
 
 certStrings :: [String]
 certStrings =
