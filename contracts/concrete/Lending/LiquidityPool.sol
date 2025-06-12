@@ -46,6 +46,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         string key = _key(onBehalfOf, asset);
         require(amount > 0, "Amount must be greater than 0");
         require(onBehalfOf != address(0), "Invalid user address");
+        require(Token(asset).status() == TokenStatus.ACTIVE, "Token not active");
         require(IERC20(asset).transferFrom(onBehalfOf, address(this), amount), "Transfer failed");
         deposited[key].amount += amount;
         deposited[key].user = onBehalfOf;

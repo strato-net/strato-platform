@@ -2,7 +2,6 @@ import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
 
 contract record OnRamp {
-    event TokenWhitelisted(address token, bool whitelist);
     event SellerApproved(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
@@ -31,7 +30,6 @@ contract record OnRamp {
     uint256 public adminCount;
     mapping(address => bool) public record admins;
     mapping(address => bool) public record approvedSellers;
-    mapping(address => bool) public record approvedTokens;
     PaymentProviderInfo[] public record paymentProviders;
     mapping(address => uint) public record paymentProviderIndex;
 
@@ -64,7 +62,7 @@ contract record OnRamp {
         _;
     }
     modifier onlyApprovedToken(address token) {
-        require(approvedTokens[token], "Token not allowed");
+        require(Token(token).status() == TokenStatus.ACTIVE, "Token not active");
         _;
     }
     function isPaymentProvider(address provider) public view returns (bool) {
@@ -113,11 +111,6 @@ contract record OnRamp {
         delete paymentProviderIndex[provider];
 
         emit PaymentProviderRemoved(provider);
-    }
-
-    function setApprovedToken(address token, bool whitelist) external onlyAdmin {
-        approvedTokens[token] = whitelist;
-        emit TokenWhitelisted(token, whitelist);
     }
 
     function setApprovedSeller(address seller, bool approved) external onlyAdmin {

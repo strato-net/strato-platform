@@ -15,6 +15,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
     function setAssetPrice(address asset, uint256 price) external onlyOwner {
         require(price > 0, "Invalid price");
+        require(Token(asset).status() == TokenStatus.ACTIVE, "Token not active");
         prices[asset] = price;
         emit PriceUpdated(asset, price);
     }

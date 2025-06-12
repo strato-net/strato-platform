@@ -17,8 +17,8 @@ import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PoolFactory is Ownable {
-    event NewPool(address indexed tokenA, address indexed tokenB, address pool);
-    event PoolMigrated(address indexed tokenA, address indexed tokenB, address pool);
+    event NewPool(address tokenA, address tokenB, address pool);
+    event PoolMigrated(address tokenA, address tokenB, address pool);
 
     mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
@@ -34,6 +34,7 @@ contract record PoolFactory is Ownable {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
+        require(Token(tokenA).status() == TokenStatus.ACTIVE && Token(tokenB).status() == TokenStatus.ACTIVE, "Token not active");
         
         // deploy new pool
         pool = address(new Pool(tokenA, tokenB, tokenFactory));
