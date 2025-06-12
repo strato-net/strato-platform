@@ -32,12 +32,12 @@ export const get = async (accessToken: string): Promise<RampData> => {
 };
 
 export async function checkout(
-  listingId: string,
+  token: string,
   buyerAddress: string,
   amount: string,
   baseUrl: string
 ): Promise<{ sessionId: string; url: string }> {
-  if (!listingId || !buyerAddress || !baseUrl) {
+  if (!token || !buyerAddress || !baseUrl) {
     throw new Error('Missing required parameters');
   }
 
@@ -45,12 +45,12 @@ export async function checkout(
     const token = await getServiceToken();
     const ramp = await get(token);
     
-    const listing = ramp.listings[listingId];
+    const listing = ramp.listings[token];
     if (!listing) {
-      throw new Error(`Listing ${listingId} not found`);
+      throw new Error(`Listing ${token} not found`);
     }
 
-    if (!canLockAmount(listingId, amount, listing.amount)) {
+    if (!canLockAmount(token, amount, listing.amount)) {
       throw new Error(`Amount ${amount} is currently being processed by another user`);
     }
 
@@ -61,7 +61,7 @@ export async function checkout(
 
     const totalAmount = calculatePaymentAmount(amount, price, listing.marginBps);
     const { sessionId, url } = await createCheckoutSession({
-      listingId,
+      token,
       amount: totalAmount,
       tokenAmount: amount,
       tokenAddress: listing.token,
@@ -69,24 +69,24 @@ export async function checkout(
       baseUrl
     });
 
-    addLock(listingId, amount, sessionId);
+    addLock(token, amount, sessionId);
     return { sessionId, url };
   } catch (error) {
-    removeLock(listingId, amount);
+    removeLock(token, amount);
     throw error;
   }
 }
 
 export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
-  const listingId = session.metadata?.listingId;
+  const token = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
   const stripeSessionId = session.id;
   
-  if (!listingId || !buyerAddress || !amount || !tokenAmount) {
+  if (!token || !buyerAddress || !amount || !tokenAmount) {
     console.error("Missing required metadata in session");
-    removeLock(listingId || '', tokenAmount || '', stripeSessionId);
+    removeLock(token || '', tokenAmount || '', stripeSessionId);
     return;
   }
 
@@ -97,18 +97,18 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
         contractName: OnRamp,
         contractAddress,
         method: "fulfillListing",
-        args: { listingId, buyer: buyerAddress, amount: tokenAmount },
+        args: { token, buyer: buyerAddress, amount: tokenAmount },
       }))
     );
 
     if (status === "Success") {
-      console.log(`Order ${listingId} confirmed on-chain: ${hash}`);
+      console.log(`Order ${token} confirmed on-chain: ${hash}`);
     } else {
       console.error(`On-chain confirmation failed (${status}): ${hash}`);
     }
   } catch (err) {
     console.error("Error confirming order on-chain:", err);
   } finally {
-    removeLock(listingId, tokenAmount, stripeSessionId);
+    removeLock(token, tokenAmount, stripeSessionId);
   }
 }

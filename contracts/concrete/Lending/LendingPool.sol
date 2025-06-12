@@ -39,17 +39,24 @@ contract record LendingPool is Ownable {
     mapping(address => uint256) public record assetLiquidationBonus;
 
     LendingRegistry public registry;
+    TokenFactory public tokenFactory;
     address public poolConfigurator;
 
-    constructor(address _registry, address _poolConfigurator, address initialOwner) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner, address _tokenFactory) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
         poolConfigurator = _poolConfigurator;
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     modifier onlyPoolConfigurator() {
         require(msg.sender == poolConfigurator, "Caller is not PoolConfigurator");
+        _;
+    }
+
+    modifier onlyTokenFactory(address token) {
+        require(tokenFactory.isTokenActive(token), "Token not active");
         _;
     }
     
@@ -73,7 +80,7 @@ contract record LendingPool is Ownable {
         return keccak256(string(user), string(asset), string(block.timestamp));
     }
 
-    function depositLiquidity(address asset, uint256 amount) {
+    function depositLiquidity(address asset, uint256 amount) onlyTokenFactory(asset) {
         LiquidityPool(_liquidityPool()).deposit(asset, amount, msg.sender);
         emit Deposited(msg.sender, asset, amount);
     }
@@ -83,7 +90,7 @@ contract record LendingPool is Ownable {
         emit Withdrawn(msg.sender, asset, amount);
     }
 
-    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) public {
+    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) public onlyTokenFactory(asset) onlyTokenFactory(collateralAsset) {
         string loanId = _loanKey(msg.sender, asset);
         uint256 assetPrice = PriceOracle(_priceOracle()).getAssetPrice(asset);
         require(assetPrice > 0, "Asset price not set");
@@ -188,6 +195,10 @@ contract record LendingPool is Ownable {
     function setLiquidationBonus(address asset, uint256 newBonus)  onlyPoolConfigurator{
         require(newBonus >= 100, "Bonus too low");
         assetLiquidationBonus[asset] = newBonus;
+    }
+
+    function setTokenFactory(address _tokenFactory) onlyPoolConfigurator {
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     function getAvailableLiquidity(address asset)  view  returns (uint256) {

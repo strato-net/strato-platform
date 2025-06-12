@@ -2,10 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getTokens,
-  getFaucetAddresses,
   getBalance,
   createToken,
-  faucetTokens,
   transferToken,
   approveToken,
   transferFromToken,
@@ -57,21 +55,6 @@ class TokensController {
     }
   }
 
-  static async getFaucets(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken } = req;
-
-      const faucets = await getFaucetAddresses(accessToken);
-      res.status(RestStatus.OK).json(faucets);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   static async getBalance(
     req: Request,
     res: Response,
@@ -105,19 +88,6 @@ class TokensController {
       validateCreateTokensArgs(args);
 
       const result = await createToken(accessToken, args);
-      res.status(RestStatus.OK).json(result);
-      return next();
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async faucet(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { accessToken, body } = req;
-      validateAddressArgs(body);
-
-      const result = await faucetTokens(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {

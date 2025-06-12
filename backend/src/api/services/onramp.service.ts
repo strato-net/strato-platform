@@ -27,9 +27,7 @@ export const get = async (accessToken: string) => {
     const onRamp = onRampData[0];
     const {
       listings,
-      paymentProviders,
       approvedTokens,
-      listingProviders,
       priceOracle,
     } = onRamp;
 
@@ -65,26 +63,9 @@ export const get = async (accessToken: string) => {
       console.error("Error fetching token info:", err);
     }
 
-    // Normalize payment providers into map
-    const paymentProviderMap = Object.fromEntries(
-      paymentProviders
-        .flatMap((p: any) =>
-          Array.isArray(p.PaymentProviderInfo)
-            ? p.PaymentProviderInfo
-            : [p.PaymentProviderInfo]
-        )
-        .filter((info: any) => info.providerAddress)
-        .map((info: any) => [info.providerAddress, info])
-    );
-
     // Enhance listings
     const enhancedListings = listings.map((listing: any) => {
       const { key: id, ListingInfo: info } = listing;
-
-      const providers = listingProviders
-        .filter((p: any) => p.value)
-        .map((p: any) => paymentProviderMap[p.paymentProvider])
-        .filter(Boolean);
 
       const tokenMeta = tokenInfoMap[info.token] || {
         _name: null,
@@ -98,7 +79,6 @@ export const get = async (accessToken: string) => {
           _name: tokenMeta._name,
           _symbol: tokenMeta._symbol,
           tokenOracleValue: prices[info.token] || null,
-          paymentProviders: providers,
         },
       };
     });
@@ -164,32 +144,29 @@ export async function buy(
   accessToken: string,
   buyerAddress: string,
   {
-    listingId,
+    token,
     amount,
     paymentProviderAddress,
-  }: { listingId: string; amount: string; paymentProviderAddress: string }
+  }: { token: string; amount: string; paymentProviderAddress: string }
 ): Promise<{ sessionId: string; url: string }> {
   try {
     const ramp = await get(accessToken);
     
     // Validate listing
-    const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(listingId));
+    const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(token));
     if (!listing) {
-      throw new Error(`Listing ${listingId} not found`);
+      throw new Error(`Listing ${token} not found`);
     }
 
     // Validate and get payment provider
-    const paymentProvider = ramp.paymentProviders
-      .filter((p: { PaymentProviderInfo: any }) => typeof p.PaymentProviderInfo === "object" && !Array.isArray(p.PaymentProviderInfo))
-      .map((p: { PaymentProviderInfo: any }) => p.PaymentProviderInfo)
-      .find((info: { providerAddress: string }) => info.providerAddress === paymentProviderAddress);
+    const paymentProvider = listing.providers.find((p: { provider: string }) => p.provider === paymentProviderAddress);
     if (!paymentProvider) {
       throw new Error("Payment provider not found");
     }
 
     // Process payment
     const { data } = await axios.post(paymentProvider.endpoint, {
-      listingId,
+      token,
       buyerAddress,
       amount,
       baseUrl,

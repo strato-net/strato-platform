@@ -8,8 +8,6 @@ import { getPool as getLendingRegistry } from "./lending.service";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, baseCodeCollection } = constants;
 
-const TokenFaucet = "TokenFaucet";
-
 // Get all tokens
 export const getTokens = async (
   accessToken: string,
@@ -198,62 +196,6 @@ export const transferFromToken = async (
     return { status, hash };
   } catch (error) {
     console.error("Error in transferFrom:", error);
-    throw error;
-  }
-};
-
-// Get tokens from faucet
-export const faucetTokens = async (
-  accessToken: string,
-  body: Record<string, string | undefined>
-) => {
-  try {
-    const tx = buildFunctionTx({
-      contractName: TokenFaucet,
-      contractAddress: body.address || "",
-      method: "faucet",
-      args: {},
-    });
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return {
-      status,
-      hash,
-    };
-  } catch (error) {
-    console.error("Unknown error:", error);
-    throw error;
-  }
-};
-
-// Get all faucet contract addresses
-export const getFaucetAddresses = async (accessToken: string) => {
-  try {
-    const response = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-${TokenFaucet}`,
-      {
-        params: {
-          isActive: "eq.true",
-          select: "address",
-        },
-      }
-    );
-
-    if (response.status !== 200) {
-      throw new Error(`Error fetching faucets: ${response.statusText}`);
-    }
-
-    if (!response.data) {
-      throw new Error("Faucets data is empty");
-    }
-
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching faucets:", error);
     throw error;
   }
 };
