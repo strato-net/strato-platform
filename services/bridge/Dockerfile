@@ -39,4 +39,4 @@ ENV NODE_ENV=production
 
 ENV PORT=3003
 
-CMD ["node", "dist/app.js"] 
+CMD ["node", "dist/index.js"] 
