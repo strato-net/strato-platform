@@ -84,16 +84,6 @@ contract record OnRamp {
         return paymentProviders[provider].exists;
     }
 
-    function isProviderForListing(address token, address provider) public view returns (bool) {
-        address[] providers = listings[token].providers;
-        for (uint i = 0; i < providers.length; i++) {
-            if (providers[i] == provider) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     function setAdmin(address admin, bool enabled) external onlyAdmin {
         if (enabled) {
             require(!admins[admin], "Already admin");
@@ -244,11 +234,13 @@ contract record OnRamp {
     }
 
     function _validateProviders(address[] providerAddresses) internal view {
+        mapping(address => bool) seen;
+
         for (uint i = 0; i < providerAddresses.length; i++) {
-            require(isPaymentProvider(providerAddresses[i]), "Provider not allowed");
-            for (uint j = i + 1; j < providerAddresses.length; j++) {
-                require(providerAddresses[i] != providerAddresses[j], "Duplicate provider");
-            }
+            address provider = providerAddresses[i];
+            require(isPaymentProvider(provider), "Provider not allowed");
+            require(!seen[provider], "Duplicate provider");
+            seen[provider] = true;
         }
     }
 }
