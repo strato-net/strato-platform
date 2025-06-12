@@ -164,18 +164,18 @@ export async function buy(
   accessToken: string,
   buyerAddress: string,
   {
-    listingId,
+    token,
     amount,
     paymentProviderAddress,
-  }: { listingId: string; amount: string; paymentProviderAddress: string }
+  }: { token: string; amount: string; paymentProviderAddress: string }
 ): Promise<{ sessionId: string; url: string }> {
   try {
     const ramp = await get(accessToken);
     
     // Validate listing
-    const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(listingId));
+    const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(token));
     if (!listing) {
-      throw new Error(`Listing ${listingId} not found`);
+      throw new Error(`Listing ${token} not found`);
     }
 
     // Validate and get payment provider
@@ -189,7 +189,7 @@ export async function buy(
 
     // Process payment
     const { data } = await axios.post(paymentProvider.endpoint, {
-      listingId,
+      token,
       buyerAddress,
       amount,
       baseUrl,

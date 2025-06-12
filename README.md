@@ -88,8 +88,11 @@ sudo \
   OAUTH_CLIENT_ID=client-id-here \
   OAUTH_CLIENT_SECRET=client-secret-here \
   NODE_URL=https://node5.mercata.blockapps.net \
-  NETWORK=testnet \
   ssl=true \
   BASE_URL=host-url-here \
+  BASE_CODE_COLLECTION=0x1000 \
+  POOL_FACTORY=0x100a \
+  LENDING_POOL=0x1005 \
+  ONRAMP=0x1009 \
   docker compose up -d --build
 ```

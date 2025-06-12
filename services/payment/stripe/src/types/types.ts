@@ -51,7 +51,7 @@ export interface FunctionInput {
 export interface PurchaseLock {
   timestamp: number;
   sessionId?: string;
-  listingId: string;
+  token: string;
   amount: string;
 }
 
@@ -68,7 +68,7 @@ export interface RampData {
 
 // ---------------- Checkout Session Types ----------------
 export interface CheckoutSessionParams {
-  listingId: string;
+  token: string;
   amount: number;
   tokenAmount: string;
   tokenAddress: string;

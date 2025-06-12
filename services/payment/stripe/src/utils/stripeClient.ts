@@ -6,7 +6,7 @@ import { CheckoutSessionParams } from "../types/types";
 export const stripe = new Stripe(stripeSecretKey || "");
 
 export async function createCheckoutSession({
-  listingId,
+  token,
   amount,
   tokenAmount,
   tokenAddress,
@@ -21,8 +21,8 @@ export async function createCheckoutSession({
         price_data: {
           currency: "usd",
           product_data: {
-            name: `Token Purchase - Order ${listingId}`,
-            description: `Purchase of tokens for order ${listingId}`,
+            name: `Token Purchase - ${token}`,
+            description: `Purchase of tokens for order ${token}`,
           },
           unit_amount: amount,
         },
@@ -31,7 +31,7 @@ export async function createCheckoutSession({
     ],
     mode: "payment",
     metadata: {
-      listingId,
+      token,
       tokenAddress,
       buyerAddress,
       amount: amount.toString(),
