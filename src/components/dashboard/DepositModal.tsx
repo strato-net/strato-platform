@@ -116,7 +116,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
     setLoading(true);
     try {
       const payload = {
-        listingId: selectedListing.id,
+        token: selectedListing.token,
         amount: ethers.parseUnits(amount, 18).toString(),
         paymentProviderAddress: selectedProvider.providerAddress,
       };
