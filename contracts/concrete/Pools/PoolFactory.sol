@@ -18,13 +18,16 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PoolFactory is Ownable {
     event NewPool(address indexed tokenA, address indexed tokenB, address pool);
+    event PoolMigrated(address indexed tokenA, address indexed tokenB, address pool);
 
     mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
+    address public tokenFactory;
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
-
-    event PoolMigrated(address indexed tokenA, address indexed tokenB, address pool);
+    constructor(address initialOwner, address _tokenFactory) Ownable(initialOwner) {
+        require(_tokenFactory != address(0), "Zero token factory address");
+        tokenFactory = _tokenFactory;
+    }
 
     /// @notice Create a new pool for tokenA/tokenB
     function createPool(address tokenA, address tokenB) external returns (address pool) {
@@ -33,7 +36,7 @@ contract record PoolFactory is Ownable {
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
         
         // deploy new pool
-        pool = address(new Pool(tokenA, tokenB));
+        pool = address(new Pool(tokenA, tokenB, tokenFactory));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions

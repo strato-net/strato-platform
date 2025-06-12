@@ -4,6 +4,7 @@ import "../abstract/ERC20/ERC20.sol";
 
 //Generic token
 import "Tokens/Token.sol";
+import "Tokens/TokenFactory.sol";
 import "Tokens/TokenFaucet.sol";
 //import "Tokens/Metadata/TokenMetadata.sol";
 //import "Tokens/TokenAccess.sol";
@@ -44,6 +45,7 @@ contract Mercata {
     MercataEthBridge public mercataEthBridge;
     OnRamp public onRamp;
     PoolFactory public poolFactory;
+    TokenFactory public tokenFactory;
 
     constructor() public {
 
@@ -64,7 +66,9 @@ contract Mercata {
         Ownable(poolConfigurator).transferOwnership(msg.sender);
         
 
-        poolFactory = new PoolFactory(msg.sender);
+
+        tokenFactory = new TokenFactory(msg.sender);
+        poolFactory = new PoolFactory(msg.sender, address(tokenFactory));
         mercataEthBridge = new MercataEthBridge(msg.sender);
         onRamp = new OnRamp(address(priceOracle), msg.sender);
     }
