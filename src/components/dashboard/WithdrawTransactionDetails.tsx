@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Clock, CheckCircle2, AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
-import { Tooltip, message, Pagination } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
-import { Button } from "@/components/ui/button";
-import { FrownOutlined } from '@ant-design/icons';
+import { message, Table } from 'antd';
+import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
 import { formatDistanceToNow } from 'date-fns';
 
 interface WithdrawTransaction {
@@ -140,116 +138,140 @@ const WithdrawTransactionDetails = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalCount);
 
+  const columns = [
+    {
+      title: 'From (STRATO)',
+      dataIndex: 'from',
+      key: 'from',
+      render: (text: string) => renderTruncatedAddress(text),
+      width: 100,
+    },
+    {
+      title: 'To (ETH)',
+      dataIndex: 'to',
+      key: 'to',
+      render: (text: string) => renderTruncatedAddress(text),
+      width: 100,
+    },
+    {
+      title: 'Token (ETH)',
+      dataIndex: 'ethTokenSymbol',
+      key: 'ethTokenSymbol',
+      render: (text: string, record: WithdrawTransaction) => (
+        <div className="flex flex-col gap-1">
+          <span>{text || '-'}</span>
+          {record.ethTokenAddress && (
+            <span className="text-xs text-gray-500">
+              {renderTruncatedAddress(record.ethTokenAddress)}
+            </span>
+          )}
+        </div>
+      ),
+      width: 150,
+    },
+    {
+      title: 'Token (STRATO)',
+      dataIndex: 'tokenSymbol',
+      key: 'tokenSymbol',
+      render: (text: string, record: WithdrawTransaction) => (
+        <div className="flex flex-col gap-1">
+          <span>{text || '-'}</span>
+          {record.token && (
+            <span className="text-xs text-gray-500">
+              {renderTruncatedAddress(record.token)}
+            </span>
+          )}
+        </div>
+      ),
+      width: 150,
+    },
+    {
+      title: 'Amount',
+      dataIndex: 'amount',
+      key: 'amount',
+      width: 80,
+    },
+    {
+      title: 'Tx Hash',
+      dataIndex: 'txHash',
+      key: 'txHash',
+      render: (text: string) => renderTruncatedAddress(text),
+      width: 100,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'withdrawalStatus',
+      key: 'withdrawalStatus',
+      render: (status: string) => {
+        if (status === "1") {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <Clock className="h-3 w-3 mr-1" />
+              Initiated
+            </span>
+          );
+        } else if (status === "2") {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Approval Pending
+            </span>
+          );
+        } else if (status === "3") {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Completed
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Unknown
+          </span>
+        );
+      },
+      width: 80,
+    },
+    {
+      title: 'Time',
+      dataIndex: 'block_timestamp',
+      key: 'block_timestamp',
+      render: (text: string) => formatDate(text),
+      width: 200,
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-        <div className="overflow-x-auto">
-          <table className="min-w-[1200px] divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From (Strato)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To (Ethereum)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (Ethereum)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address(Ethereum)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (STRATO)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address(STRATO)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Hash</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} className="py-8">
-                    <div className="flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                      <span className="ml-2 text-gray-500">Loading transactions...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : !Array.isArray(transactions) || transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-500">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <FrownOutlined style={{ fontSize: 48, color: '#bdbdbd' }} />
-                      <span className="text-lg font-semibold text-gray-400">Sorry, no data found</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                transactions.map((tx, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {renderTruncatedAddress(tx.from)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {renderTruncatedAddress(tx.to)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tx.ethTokenSymbol || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {renderTruncatedAddress(tx.ethTokenAddress)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {tx.tokenSymbol || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {renderTruncatedAddress(tx.token)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.amount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {renderTruncatedAddress(tx.txHash)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tx.withdrawalStatus === "1" ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Initiated
-                        </span>
-                      ) : tx.withdrawalStatus === "2" ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Approval Pending
-                        </span>
-                      ) : tx.withdrawalStatus === "3" ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Completed
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Unknown
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(tx.block_timestamp)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination */}
-        <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200">
-        <Pagination
-          current={currentPage}
-          total={totalCount}
-          pageSize={ITEMS_PER_PAGE}
-          onChange={(page) => setCurrentPage(page)}
-          showSizeChanger={false}
-          showTotal={(total, range) =>
-            `${range[0]}-${range[1]} of ${total} items`
-          }
-          disabled={isLoading}
+        <Table
+          columns={columns}
+          dataSource={transactions}
+          loading={isLoading}
+          pagination={{
+            current: currentPage,
+            total: totalCount,
+            pageSize: ITEMS_PER_PAGE,
+            onChange: (page) => setCurrentPage(page),
+            showSizeChanger: false,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          }}
+          locale={{
+            emptyText: (
+              <div className="py-12 text-center text-gray-500">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <FrownOutlined style={{ fontSize: 48, color: "#bdbdbd" }} />
+                  <span className="text-lg font-semibold text-gray-400">
+                    Sorry, no data found
+                  </span>
+                </div>
+              </div>
+            ),
+          }}
+          rowKey={(record) => record.transaction_hash}
         />
-      </div>
       </div>
     </div>
   );

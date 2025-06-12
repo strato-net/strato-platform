@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Modal } from "antd";
 import {
   Select,
   SelectContent,
@@ -70,6 +71,7 @@ const BRIDGE_API = {
 const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [fromToken, setFromToken] = useState<Token | null>(null);
   const [amount, setAmount] = useState("");
@@ -184,7 +186,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     }
   };
 
-  const handleBridgeOut = async () => {
+  const showConfirmModal = () => {
     if (!fromToken?.tokenAddress || !address) {
       toast({
         title: "Error",
@@ -193,7 +195,15 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       });
       return;
     }
+    setIsModalOpen(true);
+  };
 
+  const handleModalCancel = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleBridgeOut = async () => {
+    setIsModalOpen(false);
     setIsLoading(true);
     toast({
       title: "Preparing transaction...",
@@ -346,13 +356,39 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
 
       <div className="flex justify-end gap-4">
         <Button
-          onClick={handleBridgeOut}
+          onClick={showConfirmModal}
           disabled={Boolean(isLoading || !amount || !fromToken || !isConnected)}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Bridge Assets"}
         </Button>
       </div>
+
+      <Modal
+        title="Confirm Bridge Transaction"
+        open={isModalOpen}
+        onOk={handleBridgeOut}
+        onCancel={handleModalCancel}
+        okText="Yes, Bridge Assets"
+        cancelText="Cancel"
+      >
+        <div className="space-y-4">
+          <p>Are you sure you want to bridge your assets?</p>
+          <div className="bg-gray-50 p-4 rounded-md">
+            <p className="font-medium">Transaction Details:</p>
+            <div className="mt-2 space-y-2">
+              <p>From: {fromChain}</p>
+              <p>To: {toChain}</p>
+              <p>Amount: {amount} {fromToken?.symbol}</p>
+              {fromToken?.exchangeTokenSymbol && (
+                <p className="text-blue-600">
+                  You will receive {amount} {fromToken?.exchangeTokenName} ({fromToken?.exchangeTokenSymbol}) on {toChain} network
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
