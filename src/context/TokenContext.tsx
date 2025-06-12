@@ -16,7 +16,6 @@ type TokenContextType = {
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   createToken: (token: CreateTokenValues) => Promise<void>;
-  faucetToken: (address: string) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
   transferFromToken: (payload: { address: string; from: string; to: string; value: string }) => Promise<void>;
@@ -79,19 +78,6 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const faucetToken = useCallback(async (address: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await api.post('/tokens/faucet', { address });
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to faucet token');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const transferToken = useCallback(async (payload: { address: string; to: string; value: string }) => {
     setLoading(true);
     setError(null);
@@ -144,7 +130,6 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getAllTokens,
         getToken,
         createToken,
-        faucetToken,
         transferToken,
         approveToken,
         transferFromToken,
