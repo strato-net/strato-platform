@@ -8,10 +8,8 @@ contract record OnRamp {
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
     event ListingCancelled(uint256 listingId);
     event ListingFulfilled(uint256 listingId, address buyer, uint256 amount, uint256 totalFiat);
-    event AdminAdded(address admin);
-    event AdminRemoved(address admin);
-    event PaymentProviderAdded(address provider);
-    event PaymentProviderRemoved(address provider);
+    event AdminAdded(address admin, bool enabled);
+    event PaymentProviderAdded(address provider, bool enabled);
 
     struct Listing {
         uint256 id;
@@ -19,37 +17,36 @@ contract record OnRamp {
         address seller;
         uint256 amount;
         uint256 marginBps; // e.g. 500 = +5%
+        address[] providers;
     }
 
     struct PaymentProviderInfo {
         address providerAddress;
         string  name;
         string  endpoint;
+        bool    exists;
     }
 
     // Approval management
     uint256 public adminCount;
+    uint256 public listingIdCounter;
     mapping(address => bool) public record admins;
     mapping(address => bool) public record approvedSellers;
     mapping(address => bool) public record approvedTokens;
-    PaymentProviderInfo[] public record paymentProviders;
-    mapping(address => uint) public record paymentProviderIndex;
+    mapping(address => PaymentProviderInfo) public record paymentProviders;
 
     // Price oracle
     PriceOracle public priceOracle;
 
     // Listing management
-    uint256 public nextListingId = 1;
-    mapping(uint256 => Listing) public record listings;
-    mapping(address => uint256) public record activeListingFor;
-    mapping(uint256 => mapping(address => bool)) public record listingProviders; // listingId => provider => bool
+    mapping(address => Listing) public record listings;
 
     // Constructor
     constructor(address _oracle, address _admin) {
         require(_admin != address(0), "Invalid admin");
         require(_oracle != address(0), "Invalid oracle");
         admins[_admin] = true;
-        emit AdminAdded(_admin);
+        emit AdminAdded(_admin, true);
         adminCount = 1;
         priceOracle = PriceOracle(_oracle);
     }
@@ -67,52 +64,70 @@ contract record OnRamp {
         require(approvedTokens[token], "Token not allowed");
         _;
     }
+
+    modifier onlyProvider(address token) {
+        require(listings[token].seller != address(0), "Closed");
+
+        bool found = false;
+        address[] providers = listings[token].providers;
+        for (uint i = 0; i < providers.length; i++) {
+            if (providers[i] == msg.sender) {
+                found = true;
+                break;
+            }
+        }
+        require(found, "Not a provider");
+        _;
+    }
+    
     function isPaymentProvider(address provider) public view returns (bool) {
-        return paymentProviderIndex[provider] != 0;
+        return paymentProviders[provider].exists;
     }
 
-    // Setter functions
+    function isProviderForListing(address token, address provider) public view returns (bool) {
+        address[] providers = listings[token].providers;
+        for (uint i = 0; i < providers.length; i++) {
+            if (providers[i] == provider) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function setAdmin(address admin, bool enabled) external onlyAdmin {
         if (enabled) {
             require(!admins[admin], "Already admin");
             admins[admin] = true;
-            emit AdminAdded(admin);
+            emit AdminAdded(admin, true);
             adminCount++;
         } else {
             require(admins[admin], "Not admin");
             require(adminCount > 1, "Cannot remove last admin");
             delete admins[admin];
-            emit AdminRemoved(admin);
+            emit AdminAdded(admin, false);
             adminCount--;
         }
     }
 
     function addPaymentProvider(address provider, string name, string endpoint) external onlyAdmin {
-        require(paymentProviderIndex[provider] == 0, "Already payment provider");
-        paymentProviders.push(PaymentProviderInfo(provider, name, endpoint));
-        paymentProviderIndex[provider] = paymentProviders.length; // 1-based indexing
-        emit PaymentProviderAdded(provider);
+        require(!isPaymentProvider(provider), "Already exists");
+        require(provider != address(0), "Invalid provider");
+
+        paymentProviders[provider] = PaymentProviderInfo(
+            provider,
+            name,
+            endpoint,
+            true
+        );
+
+        emit PaymentProviderAdded(provider, true);
     }
 
     function removePaymentProvider(address provider) external onlyAdmin {
-        uint index = paymentProviderIndex[provider];
-        require(index != 0, "Not payment provider");
-        uint actualIndex = index - 1;
-        uint lastIndex = paymentProviders.length - 1;
+        require(paymentProviders[provider].exists, "Not a provider");
 
-        if (actualIndex != lastIndex) {
-            PaymentProviderInfo last = paymentProviders[lastIndex];
-            paymentProviders[actualIndex].endpoint = last.endpoint;
-            paymentProviders[actualIndex].name = last.name;
-            paymentProviders[actualIndex].providerAddress = last.providerAddress;
-            paymentProviderIndex[last.providerAddress] = actualIndex + 1;
-        }
-
-        paymentProviders[lastIndex] = PaymentProviderInfo(address(0), "", "");
-        paymentProviders.length = lastIndex;
-        delete paymentProviderIndex[provider];
-
-        emit PaymentProviderRemoved(provider);
+        delete paymentProviders[provider];
+        emit PaymentProviderAdded(provider, false);
     }
 
     function setApprovedToken(address token, bool whitelist) external onlyAdmin {
@@ -137,48 +152,39 @@ contract record OnRamp {
         require(marginBps >= 0, "Margin less than 0");
         require(providerAddresses.length > 0, "No providers specified");
 
-        uint256 existing = activeListingFor[token];
-        require(existing == 0, "Active listing exists");
+        require(listings[token].seller == address(0), "Active listing exists");
+
+        _validateProviders(providerAddresses);
 
         IERC20(token).transferFrom(msg.sender, address(this), amount);
 
-        listings[nextListingId] = Listing(
-            nextListingId,
+        listingIdCounter++;
+        uint256 listingId = listingIdCounter;
+
+        listings[token] = Listing(
+            listingId,
             token,
             msg.sender,
             amount,
-            marginBps
+            marginBps,
+            providerAddresses
         );
 
-        activeListingFor[token] = nextListingId;
-        emit ListingCreated(nextListingId, msg.sender, token, amount, marginBps);
-
-        for (uint i = 0; i < providerAddresses.length; i++) {
-            address provider = providerAddresses[i];
-            require(isPaymentProvider(provider), "Provider not allowed");
-            listingProviders[nextListingId][provider] = true;
-        }
-
-        nextListingId++;
+        emit ListingCreated(listingId, msg.sender, token, amount, marginBps);
     }
 
-    function updateListing(uint256 listingId, uint256 amount, uint256 marginBps, address[] providerAddresses) external {
-        Listing listing = listings[listingId];
-        require(msg.sender == listing.seller, "Not seller");
-        require(listing.id != 0, "Closed");
-        // Clear all providers via global list
-        for (uint i = 0; i < paymentProviders.length; i++) {
-            delete listingProviders[listingId][paymentProviders[i].providerAddress];
-        }
+    function updateListing(address token, uint256 amount, uint256 marginBps, address[] providerAddresses) external {
+        require(listings[token].seller != address(0), "Closed");
+        require(msg.sender == listings[token].seller, "Not seller");
         require(providerAddresses.length > 0, "No providers specified");
-        for (uint j = 0; j < providerAddresses.length; j++) {
-            address p = providerAddresses[j];
-            require(isPaymentProvider(p), "Provider not allowed");
-            listingProviders[listingId][p] = true;
-        }
         require(amount > 0, "Zero amount");
         require(marginBps >= 0, "Margin less than 0");
 
+        _validateProviders(providerAddresses);
+
+        Listing listing = listings[token];
+
+        // Handle token amount changes
         if (amount > listing.amount) {
             uint256 delta = amount - listing.amount;
             require(IERC20(listing.token).balanceOf(msg.sender) >= delta, "Insufficient token balance to increase listing");
@@ -190,47 +196,36 @@ contract record OnRamp {
 
         listing.amount = amount;
         listing.marginBps = marginBps;
+        listing.providers = providerAddresses;
 
-        emit ListingUpdated(listingId, amount, marginBps);
+        emit ListingUpdated(listing.id, amount, marginBps);
     }
 
-    function cancelListing(uint256 listingId) external {
-        Listing listing = listings[listingId];
-        require(msg.sender == listing.seller, "Not seller");
-        require(listing.id != 0, "Already closed");
+    function cancelListing(address token) external {
+        require(listings[token].seller != address(0), "Already closed");
+        require(msg.sender == listings[token].seller, "Not seller");
 
-        // Clear all providers via global list
-        for (uint i = 0; i < paymentProviders.length; i++) {
-            delete listingProviders[listingId][paymentProviders[i].providerAddress];
-        }
-
+        Listing listing = listings[token];
         uint256 remaining = listing.amount;
         IERC20(listing.token).transfer(msg.sender, remaining);
         
-        delete activeListingFor[listing.token];
-        delete listings[listingId];
+        delete listings[token];
 
-        emit ListingCancelled(listingId);
+        emit ListingCancelled(listing.id);
     }
 
-    function fulfillListing(uint256 listingId, address buyer, uint256 amount) external {
-        require(listingProviders[listingId][msg.sender], "Not allowed provider for this listing");
+    function fulfillListing(address token, address buyer, uint256 amount) external onlyProvider(token) {
         require(amount > 0, "Invalid amount");
-        require(listings[listingId].id != 0, "Closed");
-        require(listings[listingId].amount >= amount, "Not enough available tokens");
+        require(listings[token].amount >= amount, "Not enough available tokens");
 
-        IERC20(listings[listingId].token).transfer(buyer, amount);
-        listings[listingId].amount -= amount;
+        IERC20(listings[token].token).transfer(buyer, amount);
+        listings[token].amount -= amount;
 
-        uint256 totalFiat = calculatePrice(listings[listingId].token, amount, listings[listingId].marginBps);
-        emit ListingFulfilled(listingId, buyer, amount, totalFiat);
+        uint256 totalFiat = calculatePrice(listings[token].token, amount, listings[token].marginBps);
+        emit ListingFulfilled(listings[token].id, buyer, amount, totalFiat);
 
-        if (listings[listingId].amount == 0) {
-            delete activeListingFor[listings[listingId].token];
-            delete listings[listingId];
-            for (uint i = 0; i < paymentProviders.length; i++) {
-                delete listingProviders[listingId][paymentProviders[i].providerAddress];
-            }
+        if (listings[token].amount == 0) {
+            delete listings[token];
         }
     }
 
@@ -241,11 +236,19 @@ contract record OnRamp {
     }
 
     function rescueTokens(address token) external onlyAdmin {
-        uint256 listingId = activeListingFor[token];
-        require(listingId != 0, "No active listing for token");
-        Listing listing = listings[listingId];
+        require(listings[token].seller != address(0), "No active listing for token");
+        Listing listing = listings[token];
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "No tokens to rescue");
         IERC20(token).transfer(listing.seller, balance);
+    }
+
+    function _validateProviders(address[] providerAddresses) internal view {
+        for (uint i = 0; i < providerAddresses.length; i++) {
+            require(isPaymentProvider(providerAddresses[i]), "Provider not allowed");
+            for (uint j = i + 1; j < providerAddresses.length; j++) {
+                require(providerAddresses[i] != providerAddresses[j], "Duplicate provider");
+            }
+        }
     }
 }
