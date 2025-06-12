@@ -27,7 +27,7 @@ interface ListingInfo {
   _symbol: string;
   token: string;
   amount: string;
-  paymentProviders: PaymentProvider[];
+  providers: PaymentProvider[];
 }
 
 interface Listing {
@@ -66,7 +66,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
           setSelectedListing(listingInfo);
 
           // Process payment providers
-          const providers = (listingInfo.paymentProviders || [])
+          const providers = (listingInfo.providers || [])
             .filter(
               (p): p is PaymentProvider =>
                 p &&
@@ -116,7 +116,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
     setLoading(true);
     try {
       const payload = {
-        listingId: selectedListing.id,
+        token: selectedListing.token,
         amount: ethers.parseUnits(amount, 18).toString(),
         paymentProviderAddress: selectedProvider.providerAddress,
       };
