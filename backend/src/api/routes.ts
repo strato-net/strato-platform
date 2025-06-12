@@ -14,12 +14,10 @@ const router = Router();
 
 router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
-router.get("/tokens/faucets", authHandler.authorizeRequest(true), TokensController.getFaucets);
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
-router.post("/tokens/faucet", authHandler.authorizeRequest(), TokensController.faucet);
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
