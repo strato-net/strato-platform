@@ -59,12 +59,4 @@ contract record PoolFactory is Ownable {
         allPools.push(pool);
         emit PoolMigrated(tokenA, tokenB, pool);
     }
-
-    function getPool(address tokenA, address tokenB) external view returns (address pool) {
-        return pools[tokenA][tokenB];
-    }
-
-    function allPoolsLength() external view returns (uint256) {
-        return allPools.length;
-    }
 }
