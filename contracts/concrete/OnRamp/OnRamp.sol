@@ -2,14 +2,14 @@ import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
 
 contract record OnRamp {
-    event TokenWhitelisted(address token, bool whitelist);
-    event SellerApproved(address seller, bool approved);
+    event TokenWhitelistUpdated(address token, bool whitelist);
+    event SellerApprovalUpdated(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
-    event ListingCancelled(uint256 listingId);
+    event ListingCanceled(uint256 listingId);
     event ListingFulfilled(uint256 listingId, address buyer, uint256 amount, uint256 totalFiat);
-    event AdminAdded(address admin, bool enabled);
-    event PaymentProviderAdded(address provider, bool enabled);
+    event AdminStatusUpdated(address admin, bool enabled);
+    event PaymentProviderStatusUpdated(address provider, bool enabled);
 
     struct Listing {
         uint256 id;
@@ -46,7 +46,7 @@ contract record OnRamp {
         require(_admin != address(0), "Invalid admin");
         require(_oracle != address(0), "Invalid oracle");
         admins[_admin] = true;
-        emit AdminAdded(_admin, true);
+        emit AdminStatusUpdated(_admin, true);
         adminCount = 1;
         priceOracle = PriceOracle(_oracle);
     }
@@ -88,13 +88,13 @@ contract record OnRamp {
         if (enabled) {
             require(!admins[admin], "Already admin");
             admins[admin] = true;
-            emit AdminAdded(admin, true);
+            emit AdminStatusUpdated(admin, true);
             adminCount++;
         } else {
             require(admins[admin], "Not admin");
             require(adminCount > 1, "Cannot remove last admin");
             delete admins[admin];
-            emit AdminAdded(admin, false);
+            emit AdminStatusUpdated(admin, false);
             adminCount--;
         }
     }
@@ -110,24 +110,24 @@ contract record OnRamp {
             true
         );
 
-        emit PaymentProviderAdded(provider, true);
+        emit PaymentProviderStatusUpdated(provider, true);
     }
 
     function removePaymentProvider(address provider) external onlyAdmin {
         require(paymentProviders[provider].exists, "Not a provider");
 
         delete paymentProviders[provider];
-        emit PaymentProviderAdded(provider, false);
+        emit PaymentProviderStatusUpdated(provider, false);
     }
 
     function setApprovedToken(address token, bool whitelist) external onlyAdmin {
         approvedTokens[token] = whitelist;
-        emit TokenWhitelisted(token, whitelist);
+        emit TokenWhitelistUpdated(token, whitelist);
     }
 
     function setApprovedSeller(address seller, bool approved) external onlyAdmin {
         approvedSellers[seller] = approved;
-        emit SellerApproved(seller, approved);
+        emit SellerApprovalUpdated(seller, approved);
     }
 
     function setPriceOracle(address newOracle) external onlyAdmin {
@@ -201,7 +201,7 @@ contract record OnRamp {
         
         delete listings[token];
 
-        emit ListingCancelled(listing.id);
+        emit ListingCanceled(listing.id);
     }
 
     function fulfillListing(address token, address buyer, uint256 amount) external onlyProvider(token) {
