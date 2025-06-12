@@ -56,9 +56,10 @@ router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampControll
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(true), bridgeController.bridgeIn);
 router.post("/bridge/bridgeOut", authHandler.authorizeRequest(true), bridgeController.bridgeOut);
 router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(true), bridgeController.getBalance);
-router.get("/depositStatus/:status", authHandler.authorizeRequest(true), bridgeController.userDepositStatus);
-router.get("/withdrawalStatus/:status", authHandler.authorizeRequest(true), bridgeController.userWithdrawalStatus);
-router.get("/bridgeNetworkTokens/:type", authHandler.authorizeRequest(true), bridgeController.getBridgeInNetworks);
+router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(true), bridgeController.getBridgeInTokens);
+router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(true), bridgeController.getBridgeOutTokens);
+router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(true), bridgeController.userDepositStatus);
+router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(true), bridgeController.userWithdrawalStatus);
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import BigNumber from "bignumber.js";
 import logger from "../utils/logger";
 import { getUserAddressFromToken } from "../utils";
-import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus, getBridgeInNetworks } from "../services/bridgeService";
+import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus, getBridgeInTokens, getBridgeOutTokens } from "../services/bridgeService";
 import { config, TESTNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_STRATO_TOKENS, TESTNET_STRATO_TOKENS } from "../config";
 
 // Define the type for token addresses
@@ -113,6 +113,40 @@ class BridgeController {
     }
   }
 
+  static async getBridgeInTokens(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const bridgeInTokens = await getBridgeInTokens();
+
+      res.json({
+        success: true,
+        data: bridgeInTokens,
+      });
+    } catch (error: any) {
+      logger.error("Error in fetching bridge in networks:", error?.message);
+      next(error);
+    }
+  }
+
+  static async getBridgeOutTokens(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const bridgeOutTokens = await getBridgeOutTokens();
+      res.json({
+        success: true,
+        data: bridgeOutTokens,
+      });
+    } catch (error: any) {
+      logger.error("Error in fetching bridge out networks:", error?.message);
+      next(error);
+    }
+  }
 
   static async userDepositStatus(
     req: Request,
@@ -156,25 +190,6 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching deposit status:", error?.message);
-      next(error);
-    }
-  }
-
-  static async getBridgeInNetworks(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { type } = req.params;
-      const bridgeInNetworks = await getBridgeInNetworks(type);
-
-      res.json({
-        success: true,
-        data: bridgeInNetworks,
-      });
-    } catch (error: any) {
-      logger.error("Error in fetching bridge in networks:", error?.message);
       next(error);
     }
   }

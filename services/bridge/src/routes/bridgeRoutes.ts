@@ -6,8 +6,9 @@ const router = Router();
 router.post('/bridgeIn', BridgeController.bridgeIn);
 router.post('/bridgeOut', BridgeController.bridgeOut);
 router.post('/stratoTokenBalance', BridgeController.stratoTokenBalance);
+router.get('/bridgeInTokens', BridgeController.getBridgeInTokens);
+router.get('/bridgeOutTokens', BridgeController.getBridgeOutTokens);
 router.get('/userDepositStatus/:status', BridgeController.userDepositStatus);
 router.get('/userWithdrawalStatus/:status', BridgeController.userWithdrawalStatus);
-router.get('/bridgeNetworkTokens/:type', BridgeController.getBridgeInNetworks);
 
 export default router; 

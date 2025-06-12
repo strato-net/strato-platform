@@ -1,5 +1,7 @@
 import {
   config,
+  getExchangeTokenInfoBridgeIn,
+  getExchangeTokenInfoBridgeOut,
   MAINNET_ERC20_TOKEN_CONTRACTS,
   MAINNET_ETH_STRATO_TOKEN_MAPPING,
   TESTNET_ERC20_TOKEN_CONTRACTS,
@@ -238,27 +240,41 @@ export const userWithdrawalStatus = async (
   );
 };
 
-export const getBridgeInNetworks = async (bridgeType: string) => {
-  if (bridgeType === "bridgeIn") {
-    if (showTestnet) {
-      return {
-        networkTokens: TESTNET_ETH_TOKENS,
-      };
-    } else {
-      return {
-        networkTokens: MAINNET_ETH_TOKENS,
-      };
-    }
-  } else if (bridgeType === "bridgeOut") {
-    if (showTestnet) {
-      return {
-        networkTokens: TESTNET_STRATO_TOKENS,
-      };
-    } else {
-      return {
-        networkTokens: MAINNET_STRATO_TOKENS,
-      };
-    }
-  }
-  return null;
+
+
+
+export const getBridgeInTokens = async () => {
+  const bridgeInTokens = showTestnet ? TESTNET_ETH_TOKENS : MAINNET_ETH_TOKENS;
+
+  const enrichedTokens = bridgeInTokens.map((token) => {
+    const { exchangeTokenName, exchangeTokenSymbol } = getExchangeTokenInfoBridgeIn(
+      token.tokenAddress,
+      showTestnet,
+    );
+    return {
+      ...token,
+      exchangeTokenName,
+      exchangeTokenSymbol,
+    };
+  });
+
+  return { bridgeInTokens: enrichedTokens };
+};
+
+export const getBridgeOutTokens = async () => {
+  const bridgeOutTokens = showTestnet ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
+
+  const enrichedTokens = bridgeOutTokens.map((token) => {
+    const { exchangeTokenName, exchangeTokenSymbol } = getExchangeTokenInfoBridgeOut(
+      token.tokenAddress,
+      showTestnet,
+    );
+    return {
+      ...token,
+      exchangeTokenName,
+      exchangeTokenSymbol,
+    };
+  });
+
+  return { bridgeOutTokens: enrichedTokens };
 };

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getUserToken } from '../auth';
 import { getUserAddressFromToken } from '../utils';
-import { TESTNET_STRATO_TOKENS } from '../config';
+import { getExchangeTokenInfoBridgeOut, TESTNET_STRATO_TOKENS } from '../config';
 
 const NODE_URL = process.env.NODE_URL;
 
@@ -23,12 +23,9 @@ export const fetchDepositInitiatedStatus = async (
     const limitParam = limit ? `&limit=${limit}` : '';
     const offsetParam = (pageNo && limit) ? `&offset=${(Number(pageNo) - 1) * Number(limit)}` : '';
     const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
+    const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
 
-    const cirrusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
-
-    console.log("userAddress in deposit status", userAddress);
-    console.log("fetching deposit status Cirrus URL:", cirrusUrl);
-
+    const cirrusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?${selectFields}&mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
     const response = await axios.get(cirrusUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -41,37 +38,44 @@ export const fetchDepositInitiatedStatus = async (
 
     const depositData = response.data;
 
-    const enrichedData = await Promise.all(
-      depositData.map(async (item: any) => {
-        const normalizedToken = normalizeAddress(item.token || '');
+    // Collect all txHashes
+    const txHashes = depositData.map((item: any) => item.txHash).filter(Boolean);
+    const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
 
-        const matchedToken = TESTNET_STRATO_TOKENS.find(
-          (token) => normalizeAddress(token.tokenAddress) === normalizedToken
-        );
+    const depositStatusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge-depositStatus?key=in.(${txHashList})&select=key,value`;
 
-        let depositStatus = null;
-        try {
-          const statusResponse = await axios.get(
-            `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge-depositStatus?key=eq.${item.txHash}`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`
-              }
-            }
-          );
-          depositStatus = statusResponse.data?.[0]?.value || null;
-        } catch (error: any) {
-          console.error("Error fetching status for txHash:", item.txHash, ":", error.message);
-        }
+    const depositStatusResponse = await axios.get(depositStatusUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
 
-        return {
-          ...item,
-          depositStatus,
-          tokenSymbol: matchedToken?.symbol || null,
-          tokenDecimal: matchedToken?.decimals ?? null
-        };
-      })
-    );
+    const statusMap = new Map<string, string>();
+    if (Array.isArray(depositStatusResponse.data)) {
+      depositStatusResponse.data.forEach((entry: any) => {
+        if (entry?.key) statusMap.set(entry.key, entry.value);
+      });
+    }
+
+    const enrichedData = depositData.map((item: any) => {
+      const normalizedToken = normalizeAddress(item.token || '');
+
+      const getEthTokenInfo = '0x' + item.token || '';
+      const { exchangeTokenName, exchangeTokenSymbol ,exchangeTokenAddress} = getExchangeTokenInfoBridgeOut(getEthTokenInfo, true);
+
+      const matchedToken = TESTNET_STRATO_TOKENS.find(
+        (token) => normalizeAddress(token.tokenAddress) === normalizedToken
+      );
+      return {
+        ...item,
+        depositStatus: statusMap.get(item.txHash) || null,
+        tokenSymbol: matchedToken?.symbol || null,
+        tokenDecimal: matchedToken?.decimals ?? null,
+        ethTokenName: exchangeTokenName,
+        ethTokenSymbol: exchangeTokenSymbol,
+        ethTokenAddress: exchangeTokenAddress
+      };
+    });
 
     const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?mercataUser=eq.${userAddress}&select=count`;
     const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
@@ -95,8 +99,6 @@ export const fetchDepositInitiatedStatus = async (
 };
 
 
-
-
 export const fetchWithdrawalInitiatedStatus = async (
   status: string,
   limit?: number,
@@ -109,16 +111,12 @@ export const fetchWithdrawalInitiatedStatus = async (
   if (!accessToken) return null;
 
   try {
-    // Build pagination params
     const limitParam = limit ? `&limit=${limit}` : '';
     const offsetParam = (pageNo && limit) ? `&offset=${(Number(pageNo) - 1) * Number(limit)}` : '';
     const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
+    const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
 
-    const cirrusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
-
-    console.log("userAddress in withdrawal status:", userAddress);
-    console.log("fetching withdrawal status Cirrus URL:", cirrusUrl);
-
+    const cirrusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?${selectFields}&mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
     const response = await axios.get(cirrusUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -131,43 +129,47 @@ export const fetchWithdrawalInitiatedStatus = async (
 
     const withdrawalData = response.data;
 
-    // Enrich with withdrawalStatus and tokenSymbol
-    const enrichedData = await Promise.all(
-      withdrawalData.map(async (item: any) => {
-        const normalizedToken = normalizeAddress(item.token || '');
+    // Collect all txHashes
+    const txHashes = withdrawalData.map((item: any) => item.txHash).filter(Boolean);
+    const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
 
-        // Find token symbol from config
-        const matchedToken = TESTNET_STRATO_TOKENS.find(
-          (token:any) => normalizeAddress(token.tokenAddress) === normalizedToken
-        );
+    const withdrawalStatusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge-withdrawStatus?key=in.(${txHashList})&select=key,value`;
 
-        let withdrawalStatus = null;
-        try {
-          const statusResponse = await axios.get(
-            `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge-withdrawStatus?key=eq.${item.txHash}`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`
-              }
-            }
-          );
-          withdrawalStatus = statusResponse.data?.[0]?.value || null;
-        } catch (error: any) {
-          console.error("Error fetching status for txHash:", item.txHash, ":", error.message);
-        }
+    const withdrawalStatusResponse = await axios.get(withdrawalStatusUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
 
-        return {
-          ...item,
-          withdrawalStatus,
-          tokenSymbol: matchedToken?.symbol || null,
-          tokenDecimal: matchedToken?.decimals ?? null
-        };
-      })
-    );
+    const statusMap = new Map<string, string>();
+    if (Array.isArray(withdrawalStatusResponse.data)) {
+      withdrawalStatusResponse.data.forEach((entry: any) => {
+        if (entry?.key) statusMap.set(entry.key, entry.value);
+      });
+    }
 
-    // Fetch total count
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.WithdrawalInitiated?mercataUser=eq.${userAddress}&select=count`;
+    const enrichedData = withdrawalData.map((item: any) => {
+      const normalizedToken = normalizeAddress(item.token || '');
 
+      const getEthTokenInfo = '0x' + item.token || '';
+      const { exchangeTokenName, exchangeTokenSymbol, exchangeTokenAddress } = getExchangeTokenInfoBridgeOut(getEthTokenInfo, true);
+
+      const matchedToken = TESTNET_STRATO_TOKENS.find(
+        (token) => normalizeAddress(token.tokenAddress) === normalizedToken
+      );
+
+      return {
+        ...item,
+        withdrawalStatus: statusMap.get(item.txHash) || null,
+        tokenSymbol: matchedToken?.symbol || null,
+        tokenDecimal: matchedToken?.decimals ?? null,
+        ethTokenName: exchangeTokenName,
+        ethTokenSymbol: exchangeTokenSymbol,
+        ethTokenAddress: exchangeTokenAddress
+      };
+    });
+
+    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?mercataUser=eq.${userAddress}&select=count`;
     const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -187,9 +189,6 @@ export const fetchWithdrawalInitiatedStatus = async (
     return null;
   }
 };
-
-
-
 
 
 export const fetchDepositInitiated = async (txHash: string): Promise<any | null> => {

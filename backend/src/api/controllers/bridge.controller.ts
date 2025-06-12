@@ -84,6 +84,48 @@ export class BridgeController {
     }
   };
 
+  public getBridgeInTokens = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { accessToken } = req;
+      const { type } = req.params;
+
+      const result = await this.bridgeService.getBridgeInTokens({
+        accessToken,
+        type
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  };
+
+  public getBridgeOutTokens = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { accessToken } = req;
+      const result = await this.bridgeService.getBridgeOutTokens({
+        accessToken,
+      });
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
   public userDepositStatus = async (
     req: AuthenticatedRequest,
     res: Response,
@@ -131,29 +173,6 @@ export class BridgeController {
         orderBy: orderBy as string,
         orderDirection: orderDirection as string,
         pageNo: pageNo as string
-      });
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
-
-  public getBridgeInNetworks = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken } = req;
-      const { type } = req.params;
-
-      const result = await this.bridgeService.getBridgeInNetworks({
-        accessToken,
-        type
       });
 
       res.json({

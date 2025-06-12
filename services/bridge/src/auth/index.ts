@@ -1,6 +1,6 @@
 import { config } from '../config';
 import OAuthUtil from './oauth';
-import logger from '../utils/logger';
+
 
 // OAuth configuration
 if (!config.auth.clientId) {

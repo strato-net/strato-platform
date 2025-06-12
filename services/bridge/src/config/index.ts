@@ -100,14 +100,14 @@ export const MAINNET_ETH_TOKENS = [
 
 export const TESTNET_STRATO_TOKENS = [
   {
-    name: "Strato Ether",
+    name: "STRATO Ether",
     symbol: "ETHST",
     tokenAddress: "0xb7ee7c1169e8f3bea76825e9d3e70cadc9e18226" , // Native token address
     decimals: 18,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
   {
-    name: "Strato USDC",
+    name: "STRATO USDC",
     symbol: "USDCST",
     tokenAddress: "0x78ee9906568e1663298159b59fa92faa632a2a6d",
     decimals: 6,
@@ -149,3 +149,48 @@ export const TESTNET_ERC20_TOKEN_CONTRACTS = [
 export const MAINNET_ERC20_TOKEN_CONTRACTS = [
   '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
 ];
+
+export const getExchangeTokenInfoBridgeIn = (
+  tokenAddress: string,
+  showTestnet: boolean
+) => {
+  const map = Object.fromEntries(
+    Object.entries(
+      showTestnet ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING
+    ).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()])
+  );
+  console.log("map in getExchangeTokenInfoBridgeIn", map);
+  const stratoTokenAddress = map[tokenAddress.toLowerCase()];
+  console.log("stratoTokenAddress in getExchangeTokenInfoBridgeIn", stratoTokenAddress);
+  const tokens = showTestnet ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
+  console.log("tokens in getExchangeTokenInfoBridgeIn", tokens);
+  const token = tokens.find(t => t.tokenAddress.toLowerCase() === stratoTokenAddress);
+  // console.log("token in getExchangeTokenInfoBridgeIn", token);
+  return {
+    exchangeTokenName: token?.name || '',
+    exchangeTokenSymbol: token?.symbol || ''
+  };
+};
+
+
+export const getExchangeTokenInfoBridgeOut = (
+  tokenAddress: string,
+  showTestnet: boolean
+) => {
+  const map = Object.fromEntries(
+    Object.entries(
+      showTestnet ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING
+    ).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()])
+  );
+
+  const reverseMap = Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
+  const ethTokenAddress = reverseMap[tokenAddress.toLowerCase()];
+  const tokens = showTestnet ? TESTNET_ETH_TOKENS : MAINNET_ETH_TOKENS;
+
+  const token = tokens.find(t => t.tokenAddress.toLowerCase() === ethTokenAddress);
+  return {
+    exchangeTokenName: token?.name || '',
+    exchangeTokenSymbol: token?.symbol || '',
+    exchangeTokenAddress: token?.tokenAddress || ''
+  };
+};

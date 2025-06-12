@@ -165,13 +165,13 @@ export class BridgeService {
     }
   }
   
-  public async getBridgeInNetworks(params: {
+  public async getBridgeInTokens(params: {
     accessToken: string;
     type: string;
   }): Promise<any> {
     try {
       const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeNetworkTokens/${params.type}`,
+        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeInTokens`,
         {
           headers: {
             'Authorization': `Bearer ${params.accessToken}`
@@ -181,6 +181,25 @@ export class BridgeService {
       return response.data;
     } catch (error: any) {
       console.log("Error in getBridgeInNetworks:", error.message);
+      throw error;
+    }
+  }
+
+  public async getBridgeOutTokens(params: {
+    accessToken: string;
+  }): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeOutTokens`,
+        {
+          headers: {
+            'Authorization': `Bearer ${params.accessToken}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.log("Error in getBridgeOutTokens:", error.message);
       throw error;
     }
   }
