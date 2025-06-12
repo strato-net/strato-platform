@@ -8,8 +8,6 @@ import { getPool as getLendingRegistry } from "./lending.service";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, baseCodeCollection } = constants;
 
-const TokenFaucet = "TokenFaucet";
-
 // Get all tokens
 export const getTokens = async (
   accessToken: string,

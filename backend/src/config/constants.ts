@@ -30,22 +30,23 @@ export const constants = (() => {
     `balances:${Token}-_balances(user:key,balance:value)`,
     `minters:${Token}-minters(user:key,value)`,
     `burners:${Token}-burners(user:key,value)`,
+    `status:${Token}-status(value)`,
   ];
   const tokenBalanceSelectFields = [
     "address",
     "user:key",
     "balance:value",
-    `token:${Token}(_name,_symbol,_owner,customDecimals,description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
+    `token:${Token}(_name,_symbol,_owner,customDecimals,description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
   ];
   const poolSelectFields = [
     "address",
     "aToBRatio",
     "bToARatio",
-    `tokenA:tokenA_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
+    `tokenA:tokenA_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
     "tokenABalance",
-    `tokenB:tokenB_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
+    `tokenB:tokenB_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
     "tokenBBalance",
-    `lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals,balances:${Token}-_balances(user:key,balance:value))`,
+    `lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals,balances:${Token}-_balances(user:key,balance:value),status:${Token}-status(value))`,
   ];
   const registrySelectFields = [
     "lendingPool: lendingPool_fkey(" +
@@ -72,8 +73,6 @@ export const constants = (() => {
     `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value))`,
     `listings:${OnRamp}-listings(key,ListingInfo:value)`,
     `paymentProviders:${OnRamp}-paymentProviders(key,PaymentProviderInfo:value)`,
-    `approvedTokens:${OnRamp}-approvedTokens(token:key,value)`,
-    `listingProviders:${OnRamp}-listingProviders(paymentProvider:key2,value)`,
   ];
   return {
     baseCodeCollection,
