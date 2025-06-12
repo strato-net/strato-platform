@@ -22,11 +22,11 @@ contract record PoolFactory is Ownable {
 
     mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
-    address public tokenFactory;
+    TokenFactory public tokenFactory;
 
     constructor(address initialOwner, address _tokenFactory) Ownable(initialOwner) {
         require(_tokenFactory != address(0), "Zero token factory address");
-        tokenFactory = _tokenFactory;
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     /// @notice Create a new pool for tokenA/tokenB
@@ -34,10 +34,10 @@ contract record PoolFactory is Ownable {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
-        require(Token(tokenA).status() == TokenStatus.ACTIVE && Token(tokenB).status() == TokenStatus.ACTIVE, "Token not active");
+        require(tokenFactory.isTokenActive(tokenA) && tokenFactory.isTokenActive(tokenB), "Token not active");
         
         // deploy new pool
-        pool = address(new Pool(tokenA, tokenB, tokenFactory));
+        pool = address(new Pool(tokenA, tokenB, address(tokenFactory)));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions

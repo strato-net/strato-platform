@@ -34,7 +34,6 @@ contract record CollateralVault is IERC20, Ownable {
 
     function addCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         require(amount > 0, "Invalid amount");
-        require(Token(asset).status() == TokenStatus.ACTIVE, "Token not active");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
 
         string key = _key(borrower, asset);

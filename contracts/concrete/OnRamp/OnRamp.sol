@@ -32,6 +32,7 @@ contract record OnRamp {
     mapping(address => bool) public record approvedSellers;
     PaymentProviderInfo[] public record paymentProviders;
     mapping(address => uint) public record paymentProviderIndex;
+    TokenFactory public tokenFactory;
 
     // Price oracle
     PriceOracle public priceOracle;
@@ -43,13 +44,14 @@ contract record OnRamp {
     mapping(uint256 => mapping(address => bool)) public record listingProviders; // listingId => provider => bool
 
     // Constructor
-    constructor(address _oracle, address _admin) {
+    constructor(address _oracle, address _admin, address _tokenFactory) {
         require(_admin != address(0), "Invalid admin");
         require(_oracle != address(0), "Invalid oracle");
         admins[_admin] = true;
         emit AdminAdded(_admin);
         adminCount = 1;
         priceOracle = PriceOracle(_oracle);
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     // Modifiers
@@ -62,7 +64,7 @@ contract record OnRamp {
         _;
     }
     modifier onlyApprovedToken(address token) {
-        require(Token(token).status() == TokenStatus.ACTIVE, "Token not active");
+        require(tokenFactory.isTokenActive(token), "Token not active");
         _;
     }
     function isPaymentProvider(address provider) public view returns (bool) {
