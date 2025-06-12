@@ -25,7 +25,6 @@ import Text.RawString.QQ
 import BlockApps.Logging
 import qualified Blockchain.Slipstream.Events as SE
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.SolidityValue
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
