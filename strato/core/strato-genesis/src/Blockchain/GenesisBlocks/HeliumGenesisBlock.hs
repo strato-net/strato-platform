@@ -242,7 +242,7 @@ rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount m
 priceOracle :: AccountInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
   (".prices<a:" <> addrBS usdstAddress <> ">", BInteger 1000000000000000000)
-  : (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
+  : (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   : ownedByBlockApps mercataAddress
   ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
     (".prices<a:" <> addrBS assetRootAddress <> ">", BInteger . round $ lastUpdatedOraclePrice * (10.0 ** (fromInteger $ 18 + getDecimals (GA.decimals a) (GA.name a))))
@@ -276,7 +276,7 @@ lendingPool :: AccountInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   , (".poolConfigurator", BAccount $ unspecifiedChain poolConfiguratorAddress)
-  , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
+  , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".assetInterestRate<a:" <> addrBS 0x0 <> ">", BInteger 5)
   , (".assetCollateralRatio<a:" <> addrBS 0x0 <> ">", BInteger 150)
   , (".assetLiquidationBonus<a:" <> addrBS 0x0 <> ">", BInteger 105)
@@ -330,12 +330,12 @@ onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddres
   , (".LOCK_EXPIRY", BInteger 1800)
   , (".nextListingId", BInteger 1)
   , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
-  , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
+  , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   ]
 
 poolFactory :: AccountInfo
 poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mercataAddress "PoolFactory") $
-  (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress) : ownedByBlockApps mercataAddress
+  (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress) : ownedByBlockApps mercataAddress
 
 tokenFactory :: AccountInfo
 tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount mercataAddress "TokenFactory") $ ownedByBlockApps mercataAddress
