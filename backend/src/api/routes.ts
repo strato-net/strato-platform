@@ -46,9 +46,9 @@ router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.g
 router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
 
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
-router.post("/onramp/sell", authHandler.authorizeRequest(true), OnRampController.onRampSell);
-router.post("/onramp/lock", authHandler.authorizeRequest(true), OnRampController.onRampLock);
-router.post("/onramp/unlock", authHandler.authorizeRequest(true), OnRampController.unlockTokens);
+router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
+router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
+
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(true), bridgeController.bridgeIn);
 router.post("/bridge/bridgeOut", authHandler.authorizeRequest(true), bridgeController.bridgeOut);
 router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(true), bridgeController.getBalance);
@@ -56,8 +56,7 @@ router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(true), bridgeC
 router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(true), bridgeController.getBridgeOutTokens);
 router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(true), bridgeController.userDepositStatus);
 router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(true), bridgeController.userWithdrawalStatus);
-router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
-router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
+
 
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
