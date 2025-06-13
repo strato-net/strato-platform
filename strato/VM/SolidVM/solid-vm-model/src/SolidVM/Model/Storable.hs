@@ -89,6 +89,7 @@ basicParse input =
         ("false", \[] -> Just $ BBool False),
         ("true", \[] -> Just $ BBool True),
         ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAccount $ read accountString),
+        ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
         ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
         ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
@@ -101,6 +102,7 @@ textToBasicValue v =
          <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
          <|> (BInteger <$> readMaybe (T.unpack v))
          <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
+         <|> (case T.split (=='.') v of [a,b,c] -> BEnumVal (textToLabel a) (textToLabel b) <$> readMaybe (T.unpack c); _ -> Nothing)
    in if isDefault v' then BDefault else v'
 
 isDefault :: BasicValue -> Bool
@@ -121,7 +123,7 @@ instance Format BasicValue where
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
-  format (BEnumVal n1 n2 _) = labelToString n1 ++ "." ++ labelToString n2
+  format (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
   format (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
@@ -133,7 +135,7 @@ formatBasicValueForSQL (BDecimal v) = T.pack $ show v
 formatBasicValueForSQL (BBool True) = "true"
 formatBasicValueForSQL (BBool False) = "false"
 formatBasicValueForSQL (BAccount a) = T.pack $ show a
-formatBasicValueForSQL (BEnumVal n1 n2 _) = labelToText n1 <> "." <> labelToText n2
+formatBasicValueForSQL (BEnumVal n1 n2 w) = labelToText n1 <> "." <> labelToText n2 <> "." <> T.pack (show w)
 formatBasicValueForSQL (BContract _ a) = T.pack $ show a
 formatBasicValueForSQL BMappingSentinel = "<MappingSentinel>"
 formatBasicValueForSQL BDefault = ""

@@ -27,6 +27,7 @@ import qualified Data.Aeson                                      as JSON
 import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
+import           Data.List                                       (find)
 import qualified Data.Map.Strict                                 as M
 import           Data.Maybe                                      (mapMaybe)
 import           Data.Text                                       (Text)
@@ -229,10 +230,12 @@ assetToAccountInfos GA.Asset{..} =
           , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".admin", BAccount $ unspecifiedChain blockappsAddress)
+          , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
+            ++ [(maybe (".status", BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
             ++ accountBalances
             ++ contractBalances
 

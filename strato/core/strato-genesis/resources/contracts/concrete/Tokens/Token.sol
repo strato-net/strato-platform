@@ -1,4 +1,4 @@
-enum TokenStatus { INACTIVE, ACTIVE, PENDING }
+enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
 contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     uint8 public customDecimals;
