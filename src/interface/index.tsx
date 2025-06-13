@@ -10,8 +10,17 @@ export interface Token {
   contract_name: string;
   collectionname: string;
   collectiontype: string;
+  token?: {
+    _name: string;
+    _symbol: string;
+    address?: string;
+  },
+  balance?: string;
   key: string;
   value: string;
+  price?: string;
+  _name?: string;
+  _symbol?: string;
   "BlockApps-Mercata-ERC20"?: {
     data: {
       token: string;
@@ -33,6 +42,17 @@ export interface Token {
   };
 };
 
+export interface CreateTokenValues {
+  name: string;
+  description: string;
+  symbol: string;
+  images: string[];
+  files: string[];
+  fileNames: string[];
+  initialSupply: string;
+  customDecimals: number;
+};
+
 export interface DepositableToken {
   address: string;
   _name: string;
@@ -43,6 +63,13 @@ export interface DepositableToken {
   price: string;
   liquidity: string;
   ltv?: string
+}
+
+export interface WithdrawableToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  value?: string;
 }
 export interface SwappableToken {
   address: string;
@@ -55,7 +82,7 @@ export interface SwappableToken {
   }[];
 };
 
-export interface Loan {
+export interface LoanData {
   active: boolean;
   amount: string;
   asset: string;
@@ -68,4 +95,61 @@ export interface Loan {
   collateralName: string;
   collateralSymbol: string;
   interest: string;
+}
+
+export interface Loan {
+  key: string;
+  loan: LoanData;
+}
+
+export interface PriceFormValues {
+  tokenAddress: string;
+  price: string;
+};
+
+/*-------- Pool Values --------*/
+
+export interface PoolFormValues {
+  tokenA: string;
+  tokenB: string;
+  // initialLiquidityA: string;
+  // initialLiquidityB: string;
+  // poolName?: string;
+}
+
+/*-------- OnRamp Values --------*/
+
+export interface OnRampListing {
+  id: number;
+  token: string;
+  seller: string;
+  amount: string;
+  marginBps: number;
+}
+
+export interface OnRampLock {
+  amount: string;
+  timestamp: number;
+}
+
+export interface OnRampPaymentProvider {
+  providerAddress: string;
+  name: string;
+  endpoint: string;
+}
+
+export interface OnRampToken {
+  token: string;
+  [key: string]: any;
+}
+
+export interface OnRampContextType {
+  token: OnRampToken | null;
+  loading: boolean;
+  error: string | null;
+  
+  get: () => Promise<any>;
+  sell: (body: any) => Promise<any>;
+  lock: (body: any) => Promise<{ url: string }>;
+  unlockTokens: (listingId: string) => Promise<any>;
 }

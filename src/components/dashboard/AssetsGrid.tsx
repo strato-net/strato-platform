@@ -1,40 +1,35 @@
 
+import { Token } from '@/interface';
 import AssetCard from './AssetCard';
 
-interface Asset {
-  id: string;
-  name: string;
-  symbol: string;
-  price: string;
-  priceUSDT?: string;
-  deposit: string; 
-  image: string;
-  description: string;
-  color: string;
-  logoText: string;
-}
 
 interface AssetsGridProps {
-  assets: Asset[];
+  assets: Token[];
+  loading: boolean;
 }
 
-const AssetsGrid = ({ assets }: AssetsGridProps) => {
+const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {assets.map((asset) => (
-        <AssetCard
-          key={asset.id}
-          id={asset.id}
-          name={asset.name}
-          symbol={asset.symbol}
-          price={asset.price}
-          deposit={asset.deposit}
-          image={asset.image}
-          color={asset.color}
-          logoText={asset.logoText}
-        />
-      ))}
-    </div>
+    loading ?
+      <div className="flex justify-center items-center h-12">
+        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+      </div>
+      :
+      assets.length === 0 ?
+        <div className='w-full flex justify-center items-center'>No data to show</div>
+        :
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {assets.map((asset, id) => (
+            <AssetCard
+              key={id}
+              id={asset?.token?.address}
+              name={asset?.token?._name}
+              symbol={asset?.token?._symbol}
+              price={asset?.price || "0"}
+              deposit={asset?.balance}
+            />
+          ))}
+        </div>
   );
 };
 

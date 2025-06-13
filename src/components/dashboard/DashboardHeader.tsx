@@ -41,7 +41,7 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
           <div className="flex flex-col items-end mr-3">
             <span className="text-sm font-medium">{username}</span>
             <div className="flex items-center">
-              <span className="text-xs text-gray-500">{truncateAddress(userAddress)}</span>
+              <span className="text-xs text-gray-500">{userAddress ? truncateAddress(userAddress) : "N/A"}</span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 

@@ -3,7 +3,7 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import api from "@/lib/axios";
+import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
@@ -30,13 +30,23 @@ const Transfer = () => {
   const [wrongAmount, setWrongAmount] = useState(false);
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
 
-  const maxAmount = fromAsset ? Number(formatUnits(fromAsset.value, 18)) : 0;
+  const maxAmount = fromAsset ? Number(formatUnits(BigInt(fromAsset.balance.toLocaleString('fullwide', { useGrouping: false })), 18)) : 0;
+
+  const fetchUserTokens = async () => {
+    try {
+      const res = await api.get(`/tokens/balance?key=eq.${userAddress}&value=gt.0`);
+      setTokens(res.data);
+      return res.data;
+    } catch (err) {
+      console.error("Failed to fetch tokens:", err);
+      return [];
+    }
+  };
 
   useEffect(() => {
-    api
-      .get(`/tokens/table/balance?key=eq.${userAddress}&value=gt.0`)
-      .then((res) => setTokens(res.data))
-      .catch(console.error);
+    if (userAddress) {
+      fetchUserTokens();
+    }
   }, [userAddress]);
 
   const handleTransfer = async () => {
@@ -51,12 +61,17 @@ const Transfer = () => {
       toast({
         title: "Success",
         description: `Transferred ${fromAmount} ${
-          fromAsset["BlockApps-Mercata-ERC20"]?._symbol ||
-          fromAsset["BlockApps-Mercata-ERC20"]?._name
-        } to ${recipient}`,
+          fromAsset?.token?._symbol ||
+          fromAsset?.token?._name
+          } to ${recipient}`,
       });
       setFromAmount("");
       setRecipient("");
+      const updatedTokens = await fetchUserTokens();
+      const updatedToken = updatedTokens.find(t => t.address === fromAsset?.address);
+      if (updatedToken) {
+        setFromAsset(updatedToken); // triggers re-render with updated balance
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -91,15 +106,15 @@ const Transfer = () => {
                   >
                     <span>
                       {fromAsset
-                        ? fromAsset["BlockApps-Mercata-ERC20"]?._symbol ||
-                          fromAsset["BlockApps-Mercata-ERC20"]?._name
+                        ? fromAsset?.token?._symbol ||
+                        fromAsset?.token?._name
                         : "Select Token"}
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col max-h-72 overflow-y-auto">
                     {tokens.length > 0 ? (
                       tokens.map((token) => (
                         <Button
@@ -112,8 +127,8 @@ const Transfer = () => {
                             setTokenPopoverOpen(false);
                           }}
                         >
-                          {token["BlockApps-Mercata-ERC20"]?._symbol ||
-                            fromAsset["BlockApps-Mercata-ERC20"]?._name}
+                          {token?.token?._symbol ||
+                            fromAsset?.token?._name}
                         </Button>
                       ))
                     ) : (
@@ -144,9 +159,9 @@ const Transfer = () => {
                 Amount
                 {fromAsset
                   ? ` (Max: ${maxAmount.toLocaleString(undefined, {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 4,
-                    })})`
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 4,
+                  })})`
                   : ""}
               </label>
               <input
@@ -159,9 +174,8 @@ const Transfer = () => {
                   setWrongAmount(num <= 0 || num > maxAmount);
                 }}
                 placeholder="0.00"
-                className={`w-full p-2 border rounded ${
-                  wrongAmount ? "border-red-500" : ""
-                }`}
+                className={`w-full p-2 border rounded ${wrongAmount ? "border-red-500" : ""
+                  }`}
               />
               {wrongAmount && (
                 <p className="text-red-600 text-sm">

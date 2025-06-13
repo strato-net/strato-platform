@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { SwappableToken } from "@/interface";
-import api from "@/lib/axios";
+import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
@@ -69,7 +69,7 @@ const SwapAsset = () => {
       !toAsset ||
       !fromAsset.address ||
       !toAsset.address ||
-      !pool?.data
+      !pool
     ) {
       if (isFromInput) setFromAmount(value);
       else setToAmount(value);
@@ -81,7 +81,7 @@ const SwapAsset = () => {
       const inputValue = value === "" ? "0" : value;
 
       const parsedValue = parseUnits(inputValue, decimals);
-      const fromBalance = parseUnits(fromAsset.balance || "0", decimals);
+      const fromBalance = parseUnits(fromAsset?.balance?.toString() || "0", decimals);
 
       if (isFromInput) {
         setFromAmount(value);
@@ -89,9 +89,9 @@ const SwapAsset = () => {
         setWrongAmount(parsedValue > fromBalance);
 
         const ratio =
-          pool.data.tokenA === fromAsset.address
-            ? pool.data.aToBRatio
-            : pool.data.bToARatio;
+          pool?.tokenA?.address === fromAsset.address
+            ? pool?.aToBRatio
+            : pool?.bToARatio;
 
         const result =
           (parsedValue * BigInt(Math.floor((ratio || 0) * 1e6))) / BigInt(1e6);
@@ -102,9 +102,9 @@ const SwapAsset = () => {
         setToAmount(value);
 
         const ratio =
-          pool.data.tokenA === toAsset.address
-            ? pool.data.aToBRatio
-            : pool.data.bToARatio;
+          pool?.tokenA?.address === toAsset.address
+            ? pool?.aToBRatio
+            : pool?.bToARatio;
 
         const result =
           (parsedValue * BigInt(Math.floor((ratio || 0) * 1e6))) / BigInt(1e6);
@@ -123,7 +123,7 @@ const SwapAsset = () => {
       setSwapLoading(true);
       // Replace this with your actual pool address logic if different
       const method =
-        pool.data.tokenA === fromAsset.address
+        pool?.tokenA?.address === fromAsset.address
           ? "tokenAToTokenB"
           : "tokenBToTokenA";
 
@@ -132,7 +132,7 @@ const SwapAsset = () => {
         method: method,
         amount: parseUnits(fromAmount || "0", 18).toString(),
         min_tokens: parseUnits(
-          (parseFloat(toAmount || "0") * 0.99).toString(),
+          ((parseFloat(toAmount || "0") * 0.99).toFixed(18)).toString(),
           18
         ).toString(),
       });
@@ -149,7 +149,7 @@ const SwapAsset = () => {
       getTokenBalance(toAsset)
     } catch (error) {
       console.error("Swap error:", error);
-       toast({
+      toast({
         title: "Error",
         description: "Swap failed. Please try again.",
         variant: "destructive",
@@ -168,10 +168,10 @@ const SwapAsset = () => {
 
       // Fetch balance
       const res = await api.get(
-        `/tokens/table/balance?key=eq.${userAddress}&address=eq.${asset?.address}`
+        `/tokens/balance?key=eq.${userAddress}&address=eq.${asset?.address}`
       );
 
-      const balance = res?.data?.[0]?.value || "0";
+      const balance = res?.data?.[0]?.balance || "0";
 
       // Update asset with balance
       setAsset((prev) => ({ ...prev, ...asset, balance }));
@@ -191,7 +191,7 @@ const SwapAsset = () => {
   const getPoolByTokenPair = async (tokenA: string, tokenB: string) => {
     try {
       const res = await api.get(
-        `/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
+        `/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`
       );
       setPool(res.data[0]);
       return res.data[0];
@@ -204,10 +204,10 @@ const SwapAsset = () => {
     if (!pool || !fromAsset || !toAsset) return;
 
     const rate =
-      pool?.data?.tokenA === fromAsset?.address
-        ? pool?.data?.aToBRatio
-        : pool?.data?.bToARatio;
-    setExchangeRate(Number(rate) || 0);
+      pool?.tokenA?.address === fromAsset?.address
+        ? pool?.aToBRatio
+        : pool?.bToARatio;
+    setExchangeRate(Number(rate) || 0);    
   }, [pool, fromAsset, toAsset]);
 
   return (
@@ -233,7 +233,14 @@ const SwapAsset = () => {
                       <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
                     ) : (
                       `${Number(
-                        formatUnits(fromAsset?.balance || 0, 18)
+                        formatUnits(
+                          BigInt(
+                            (fromAsset?.balance || 0).toLocaleString("fullwide", {
+                              useGrouping: false,
+                            })
+                          ),
+                          18
+                        )
                       ).toLocaleString(undefined, {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 4,
@@ -322,7 +329,13 @@ const SwapAsset = () => {
                       <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
                     ) : (
                       `${Number(
-                        formatUnits(toAsset?.balance || 0, 18)
+                        formatUnits(
+                          BigInt(
+                            (toAsset?.balance || 0).toLocaleString("fullwide", {
+                              useGrouping: false,
+                            })
+                          ),
+                          18)
                       ).toLocaleString(undefined, {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 4,

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { SwappableToken } from '@/interface';
-import api from '@/lib/axios';
+import {api} from '@/lib/axios';
 
 type SwapContextType = {
   swappableTokens: SwappableToken[];
@@ -9,6 +9,7 @@ type SwapContextType = {
   error: string | null;
   refetchSwappableTokens: () => void;
   fetchPairableTokens: (tokenAddress: string) => void;
+  createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -23,7 +24,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>('/swappableTokens');
+      const res = await api.get<SwappableToken[]>('/swap/swappableTokens');
       setSwappableTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch swappable tokens');
@@ -38,10 +39,24 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>(`/swappableTokenPairs/${tokenAddress}`);
+      const res = await api.get<SwappableToken[]>(`/swap/swappableTokenPairs/${tokenAddress}`);
       setPairableTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch pairable tokens');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createPool = useCallback(async (data: { tokenA: string; tokenB: string }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post('/swap', data);
+      console.log('Pool created:', res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to create pool');
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -60,6 +75,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         error,
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,
+        createPool
       }}
     >
       {children}

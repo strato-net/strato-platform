@@ -21,17 +21,37 @@ interface BorrowAssetModalProps {
   onBorrow: (amount: number) => void;
 }
 
-const formatUsdValue = (value: any) =>
-  parseFloat(formatUnits(value || 0, 18)).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+const formatUsdValue = (value: any) => {
+  try {
+    let raw: string;
+
+    if (typeof value === "number" || (typeof value === "string" && value.includes("e"))) {
+      raw = BigInt(Number(value)).toString(); // safely convert e-notation
+    } else {
+      raw = value?.toString() || "0";
+    }
+
+    return parseFloat(formatUnits(raw, 18)).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    return "0.00";
+  }
+};
 
 const formatTokenBalance = (value: any) =>
   parseFloat(formatUnits(value || 0, 18)).toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 4,
   });
+
+const safeBigNumberish = (input: any): string => {
+  if (typeof input === "number" || (typeof input === "string" && input.includes("e"))) {
+    return BigInt(Number(input)).toString();
+  }
+  return input?.toString() || "0";
+};
 
 const BorrowAssetModal = ({
   borrowLoading,
@@ -44,8 +64,18 @@ const BorrowAssetModal = ({
   // Calculate "Available to borrow" and max borrowable using formatted numbers (price * value / (collateralRatio / 100))
   let calculatedBorrowable = 0;
   try {
-    const price = parseFloat(formatUnits(asset?.price || "0", 18));
-    const value = parseFloat(formatUnits(asset?.value || "0", 18));
+    const price = parseFloat(formatUnits(
+      typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
+        ? BigInt(Number(asset.price)).toString()
+        : asset?.price?.toString() || "0",
+      18
+    ));
+    const value = parseFloat(formatUnits(
+      typeof asset?.value === "number" || (typeof asset?.value === "string" && asset.value.includes("e"))
+        ? BigInt(Number(asset.value)).toString()
+        : asset?.value?.toString() || "0",
+      18
+    ));
     const ratio = Number(asset?.collateralRatio || "0") / 100;
     calculatedBorrowable = ratio === 0 ? 0 : (price * value) / ratio;
   } catch (e) {
@@ -84,7 +114,7 @@ const BorrowAssetModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div
@@ -116,8 +146,8 @@ const BorrowAssetModal = ({
                 <div className="text-xs text-gray-500">
                   Total ≈ $
                   {(
-                    parseFloat(formatUnits(asset?.price || 0, 18)) *
-                    parseFloat(formatUnits(asset?.value || 0, 18))
+                    parseFloat(formatUnits(safeBigNumberish(asset?.price), 18)) *
+                    parseFloat(formatUnits(safeBigNumberish(asset?.value), 18))
                   ).toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -172,11 +202,11 @@ const BorrowAssetModal = ({
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                     riskLevel < 30
-                      ? "bg-green-50 text-green-700"
-                      : riskLevel < 70
+                    ? "bg-green-50 text-green-700"
+                    : riskLevel < 70
                       ? "bg-yellow-50 text-yellow-700"
                       : "bg-red-50 text-red-700"
-                  }`}
+                    }`}
                 >
                   {getRiskText()}
                 </span>

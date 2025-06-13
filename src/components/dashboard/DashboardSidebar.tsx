@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send } from 'lucide-react';
+import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 
 const DashboardSidebar = () => {
@@ -15,6 +15,7 @@ const DashboardSidebar = () => {
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
+    { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
   ];
 
   return (
