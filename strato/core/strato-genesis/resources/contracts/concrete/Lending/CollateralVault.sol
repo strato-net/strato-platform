@@ -47,8 +47,6 @@ contract record CollateralVault is IERC20, Ownable {
         string key = _key(borrower, asset);
         require(collaterals[key].amount >= amount, "Insufficient collateral");
         
-        collaterals[key].user = collaterals[key].user;
-        collaterals[key].asset = collaterals[key].asset;
         collaterals[key].amount -= amount;
         require(IERC20(asset).transfer(borrower, amount), "Transfer failed");
 

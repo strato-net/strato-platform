@@ -1,5 +1,16 @@
-contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess{
+enum TokenStatus { INACTIVE, ACTIVE, PENDING }
+
+contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     uint8 public customDecimals;
+    TokenStatus public status;
+    address public tokenFactory;
+    
+    event StatusChanged(TokenStatus oldStatus, TokenStatus newStatus);
+    
+    modifier onlyTokenFactory() {
+        require(msg.sender == tokenFactory, "Token: caller is not token factory");
+        _;
+    }
     
     constructor(
         string _name,
@@ -9,10 +20,22 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess{
         string[] _fileNames,
         string _symbol,
         uint256 _initialSupply,
-        uint8 _customDecimals
-    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(msg.sender) Ownable(msg.sender){
+        uint8 _customDecimals,
+        address _tokenCreator
+    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(_tokenCreator) Ownable(_tokenCreator) {
         customDecimals = _customDecimals;
-        mint(msg.sender, _initialSupply);
+        status = TokenStatus.PENDING;
+        tokenFactory = msg.sender;
+        mint(_tokenCreator, _initialSupply);
+    }
+
+    function setStatus(TokenStatus newStatus) external onlyTokenFactory {
+        emit StatusChanged(status, newStatus);
+        status = newStatus;
+    }
+
+    function setTokenFactory(address _tokenFactory) external onlyTokenFactory {
+        tokenFactory = _tokenFactory;
     }
 
     function mint(address to, uint256 amount) public {
@@ -47,5 +70,4 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess{
     function decimals() public view virtual override returns (uint8) {
         return customDecimals;
     }
-
 }
