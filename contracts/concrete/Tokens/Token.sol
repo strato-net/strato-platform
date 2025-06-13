@@ -31,7 +31,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         customDecimals = _customDecimals;
         status = TokenStatus.PENDING;
         tokenFactory = TokenFactory(msg.sender);
-        mint(_tokenCreator, _initialSupply);
+        _mint(_tokenCreator, _initialSupply);
     }
 
     function setStatus(uint newStatus) external onlyTokenFactory {
@@ -46,7 +46,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 
-    function mint(address to, uint256 amount) public {
+    function mint(address to, uint256 amount) external {
         require(
             TokenAccess(this).isMinter(msg.sender), 
             "Token: Caller is not a minter"
@@ -54,7 +54,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         _mint(to, amount);
     }
 
-    function burn(address from, uint256 amount) public {
+    function burn(address from, uint256 amount) external {
         require(
             TokenAccess(this).isBurner(msg.sender),
             "Token: Caller is not a burner"
@@ -67,15 +67,15 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         string[] _images,
         string[] _files,
         string[] _fileNames
-    ) public onlyOwner {
+    ) external onlyOwner {
         _setMetadata(_description, _images, _files, _fileNames);
     }
 
-    function setAttribute(string key, string value) public onlyOwner {
+    function setAttribute(string key, string value) external onlyOwner {
         _setAttribute(key, value);
     }
     
-    function decimals() public view virtual override returns (uint8) {
+    function decimals() external view virtual override returns (uint8) {
         return customDecimals;
     }
 }
