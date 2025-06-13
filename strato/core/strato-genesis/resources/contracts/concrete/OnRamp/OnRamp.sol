@@ -1,3 +1,6 @@
+import "./../abstract/ERC20/IERC20.sol";
+import "../Lending/PriceOracle.sol";
+
 contract record OnRamp {
     event SellerApprovalUpdated(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);

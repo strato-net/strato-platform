@@ -1,3 +1,7 @@
+import "./LendingRegistry.sol";
+import "./LendingPool.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+
 /**
  * @title PoolConfigurator
  * @notice Governance contract responsible for updating addresses in the LendingRegistry

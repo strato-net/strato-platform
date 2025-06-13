@@ -1,3 +1,11 @@
+import "./LendingRegistry.sol";
+import "./PoolConfigurator.sol";
+import "./CollateralVault.sol";
+import "./RateStrategy.sol";
+import "./LiquidityPool.sol";
+import "./PriceOracle.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+
 /**
  * @title LendingPool
  * @notice Core lending logic contract managing deposits, borrows, repayments, and liquidations.

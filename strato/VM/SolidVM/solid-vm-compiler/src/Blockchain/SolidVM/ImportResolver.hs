@@ -226,7 +226,7 @@ resolvePath fileName (StringLiteral a path') =
   let path = T.pack path'
       fileDir = tail . reverse $ T.splitOn "/" fileName
       pathDir = T.splitOn "/" path
-   in maybe (throwE $ "Could not resolve path: " <> path) (pure . lit' a) $ resolvePath' fileDir pathDir
+   in maybe (StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
 resolvePath _ expr = pure expr
 
 resolvePath' :: [Text] -> [Text] -> Maybe Text
