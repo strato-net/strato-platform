@@ -52,4 +52,9 @@ contract record PoolConfigurator is Ownable {
     function setLiquidationBonus(address asset, uint256 newBonus) external onlyOwner {
         registry.lendingPool().setLiquidationBonus(asset, newBonus);
     }
+
+    // Token Factory
+    function setTokenFactory(address _tokenFactory) external onlyOwner {
+        registry.lendingPool().setTokenFactory(_tokenFactory);
+    }
 }
