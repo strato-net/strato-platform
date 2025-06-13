@@ -101,6 +101,8 @@ pipeline {
               echo "No changes in backend/ui/nginx/docker-compose.yml — skipping build."
             }
 
+            // TODO: always build, remove the diff dixscovery compared to develop
+            
             def stripeChanged = sh(
               script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- services/payment/stripe || echo changed",
               returnStdout: true
@@ -118,6 +120,14 @@ pipeline {
             } else {
               echo "No changes in stripe — skipping build."
             }
+            
+            // Bridge service build
+            def bridgeRepo = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/bridge"
+            def bridgeTag = "${bridgeRepo}:${GIT_SHA}"
+            sh """
+              docker build -t ${bridgeTag} services/bridge
+              docker push ${bridgeTag}
+            """
           }
         }
       }
