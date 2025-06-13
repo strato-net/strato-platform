@@ -39,8 +39,7 @@ contract record TokenFactory is Ownable {
         return tokenAddress;
     }
     
-    function setTokenStatus(address token, TokenStatus newStatus) external onlyOwner {
-        TokenStatus oldStatus = Token(token).status();
+    function setTokenStatus(address token, uint newStatus) external onlyOwner {
         Token(token).setStatus(newStatus);
     }
 
