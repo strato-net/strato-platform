@@ -7,7 +7,7 @@ import OnRampController from "./controllers/onramp.controller";
 const router = Router();
 
 
-router.post("/checkout", OnRampController.onRampLock);
+router.post("/checkout", OnRampController.checkout);
 
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {

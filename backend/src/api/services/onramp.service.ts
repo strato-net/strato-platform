@@ -1,11 +1,10 @@
-import { strato, bloc, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { baseUrl } from "../../config/config";
 import { approveAsset } from "../helpers/tokens.helper";
-import { isValidUrl, calculateTotalAmount } from "../helpers/onramp.helper";
 import axios from "axios";
 
 const contractAddress = constants.onRamp!;
@@ -18,7 +17,7 @@ export const get = async (accessToken: string) => {
     const { data: onRampData } = await cirrus.get(accessToken, `/${OnRamp}`, {
       params: {
         select: onRampSelectFields.join(","),
-        "listings.value.id": "gt.0",
+        "listings.value->>id": "gt.0",
         address: `eq.${contractAddress}`,
       },
     });
@@ -28,9 +27,7 @@ export const get = async (accessToken: string) => {
     const onRamp = onRampData[0];
     const {
       listings,
-      paymentProviders,
       approvedTokens,
-      listingProviders,
       priceOracle,
     } = onRamp;
 
@@ -66,26 +63,9 @@ export const get = async (accessToken: string) => {
       console.error("Error fetching token info:", err);
     }
 
-    // Normalize payment providers into map
-    const paymentProviderMap = Object.fromEntries(
-      paymentProviders
-        .flatMap((p: any) =>
-          Array.isArray(p.PaymentProviderInfo)
-            ? p.PaymentProviderInfo
-            : [p.PaymentProviderInfo]
-        )
-        .filter((info: any) => info.providerAddress)
-        .map((info: any) => [info.providerAddress, info])
-    );
-
     // Enhance listings
     const enhancedListings = listings.map((listing: any) => {
       const { key: id, ListingInfo: info } = listing;
-
-      const providers = listingProviders
-        .filter((p: any) => p.value)
-        .map((p: any) => paymentProviderMap[p.paymentProvider])
-        .filter(Boolean);
 
       const tokenMeta = tokenInfoMap[info.token] || {
         _name: null,
@@ -94,11 +74,12 @@ export const get = async (accessToken: string) => {
 
       return {
         key: id,
-        ...info,
-        _name: tokenMeta._name,
-        _symbol: tokenMeta._symbol,
-        tokenOracleValue: prices[info.token] || null,
-        paymentProviders: providers,
+        ListingInfo: {
+          ...info,
+          _name: tokenMeta._name,
+          _symbol: tokenMeta._symbol,
+          tokenOracleValue: prices[info.token] || null,
+        },
       };
     });
 
@@ -159,146 +140,48 @@ export const sell = async (
   }
 };
 
-export async function lock(
+export async function buy(
   accessToken: string,
   buyerAddress: string,
   {
-    listingId,
+    token,
     amount,
     paymentProviderAddress,
-  }: { listingId: string; amount: string; paymentProviderAddress: string }
+  }: { token: string; amount: string; paymentProviderAddress: string }
 ): Promise<{ sessionId: string; url: string }> {
-  // 1. Lock tokens on the blockchain
-  const lockTx = buildFunctionTx({
-    contractName: extractContractName(OnRamp),
-    contractAddress,
-    method: "lockTokens",
-    args: { listingId, amount },
-  });
-
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, lockTx)
-  );
-
-  if (status !== "Success") {
-    throw new Error(
-      `Blockchain transaction failed: Status=${status}, TxHash=${hash}`
-    );
-  }
-
-  // 2. Get updated onRamp state (enriched listings)
-  let listings: any[], paymentProviders: any[];
-
   try {
     const ramp = await get(accessToken);
+    
+    // Validate listing
+    const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(token));
+    if (!listing) {
+      throw new Error(`Listing ${token} not found`);
+    }
 
-    listings = ramp.listings;
-    paymentProviders = (ramp.paymentProviders || []).filter(
-      (p: any) =>
-        typeof p.PaymentProviderInfo === "object" &&
-        !Array.isArray(p.PaymentProviderInfo)
-    );
-
-    const paymentProviderInfo = paymentProviders
-      .map((p: any) => p.PaymentProviderInfo)
-      .find((info: any) => info.providerAddress === paymentProviderAddress);
-
-    if (!paymentProviderInfo) {
+    // Validate and get payment provider
+    const paymentProvider = listing.providers.find((p: { provider: string }) => p.provider === paymentProviderAddress);
+    if (!paymentProvider) {
       throw new Error("Payment provider not found");
     }
 
-    const listing = listings.find((l) => String(l.key) === String(listingId));
-    if (!listing) {
-      throw new Error(`Listing ${listingId} not found`);
-    }
-
-    const { tokenOracleValue, marginBps } = listing;
-    const endpoint = paymentProviderInfo.endpoint;
-
-    // 3. Execute payment
-    if (!isValidUrl(endpoint)) {
-      if (!tokenOracleValue?.price) {
-        throw new Error(`Missing tokenOracleValue for listing ${listingId}`);
-      }
-
-      const totalAmount = calculateTotalAmount(
-        amount,
-        tokenOracleValue.price,
-        marginBps
-      );
-
-      const providerTx = buildFunctionTx({
-        contractName: "",
-        contractAddress: paymentProviderInfo.providerAddress,
-        method: endpoint,
-        args: {
-          listingId,
-          amount: totalAmount,
-          buyer: buyerAddress,
-        },
-      });
-
-      const providerResult = await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, providerTx)
-      );
-
-      if (providerResult.status !== "Success") {
-        throw new Error(
-          `Payment transaction failed: Status=${providerResult.status}, TxHash=${providerResult.hash}`
-        );
-      }
-
-      return {
-        sessionId: providerResult.hash,
-        url: "/",
-      };
-    } else {
-      const { data } = await axios.post(endpoint, {
-        listingId,
-        buyerAddress,
-        baseUrl,
-      });
-
-      if (!data?.sessionId || !data?.url) {
-        console.error("Provider checkout failed:", data);
-        throw new Error("Invalid provider session response");
-      }
-
-      return { sessionId: data.sessionId, url: data.url };
-    }
-  } catch (error) {
-    console.error("Payment handling failed:", error);
-    await unlockTokens(accessToken, listingId).catch((unlockError) => {
-      console.error(
-        "Failed to unlock tokens after payment error:",
-        unlockError
-      );
-    });
-    throw new Error(`Payment processing failed`);
-  }
-}
-
-export async function unlockTokens(
-  accessToken: string,
-  listingId: string
-): Promise<{ status: string; hash: string }> {
-  try {
-    const tx = buildFunctionTx({
-      contractName: extractContractName(OnRamp),
-      contractAddress,
-      method: "unlockTokens",
-      args: { listingId },
+    // Process payment
+    const { data } = await axios.post(paymentProvider.endpoint, {
+      token,
+      buyerAddress,
+      amount,
+      baseUrl,
     });
 
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
+    if (!data?.sessionId || !data?.url) {
+      throw new Error("Invalid provider session response");
+    }
 
     return {
-      status,
-      hash,
+      sessionId: data.sessionId,
+      url: data.url,
     };
   } catch (error) {
-    throw error;
+    console.error("Payment processing failed:", error);
+    throw new Error("Failed to process payment. Please try again.");
   }
 }

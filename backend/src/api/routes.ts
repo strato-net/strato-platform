@@ -16,22 +16,19 @@ const bridgeController = new BridgeController();
 
 router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
-router.get("/tokens/faucets", authHandler.authorizeRequest(true), TokensController.getFaucets);
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
-router.post("/tokens/faucet", authHandler.authorizeRequest(), TokensController.faucet);
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
 
-router.get("/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
-router.get("/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
-router.get("/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
-router.get("/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
-router.get("/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
-
+router.get("/swap/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
+router.get("/swap/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
+router.get("/swap/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
+router.get("/swap/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
+router.get("/swap/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);
 router.post("/swap/", authHandler.authorizeRequest(), SwappingController.create);
@@ -39,12 +36,11 @@ router.post("/swap/addLiquidity", authHandler.authorizeRequest(), SwappingContro
 router.post("/swap/removeLiquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
 router.post("/swap/swap", authHandler.authorizeRequest(), SwappingController.swap);
 
-router.get("/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
-router.get("/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
-router.get("/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
-router.post("/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
-
 router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
+router.get("/lend/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
+router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
+router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
+router.post("/lend/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
 router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.getLoan);
 router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
@@ -60,6 +56,9 @@ router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(true), bridgeC
 router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(true), bridgeController.getBridgeOutTokens);
 router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(true), bridgeController.userDepositStatus);
 router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(true), bridgeController.userWithdrawalStatus);
+router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
+router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
+
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({

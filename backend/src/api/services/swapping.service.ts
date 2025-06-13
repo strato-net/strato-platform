@@ -23,11 +23,11 @@ export const getPools = async (
       ? {}
       : {
           "lpToken.balances.value": "gt.0",
-          "lpToken.balances.key": `eq.${address}`,
+          ...(address ? { "lpToken.balances.key": `eq.${address}` } : {}),
           "tokenA.balances.value": "gt.0",
-          "tokenA.balances.key": `eq.${address}`,
+          ...(address ? { "tokenA.balances.key": `eq.${address}` } : {}),
           "tokenB.balances.value": "gt.0",
-          "tokenB.balances.key": `eq.${address}`,
+          ...(address ? { "tokenB.balances.key": `eq.${address}` } : {}),
         }),
     root: `eq.${constants.baseCodeCollection}`,
   };
@@ -46,9 +46,9 @@ export const getPools = async (
   );
   return poolData.map((pool: any) => ({
     ...pool,
-    tokenAPrice: priceMap.get(pool.tokenA.address) || "0",
-    tokenBPrice: priceMap.get(pool.tokenB.address) || "0",
-    lpTokenPrice: priceMap.get(pool.lpToken.address) || "0",
+    ...(pool.tokenA?.address && { tokenAPrice: priceMap.get(pool.tokenA.address) || "0" }),
+    ...(pool.tokenB?.address && { tokenBPrice: priceMap.get(pool.tokenB.address) || "0" }),
+    ...(pool.lpToken?.address && { lpTokenPrice: priceMap.get(pool.lpToken.address) || "0" })
   }));
 };
 

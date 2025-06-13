@@ -160,18 +160,20 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
-      const pools = await getPools(accessToken, undefined, {
-        select: "tokenA,tokenB",
+      const { accessToken, address } = req;
+      const pools = await getPools(accessToken, address);
+
+      const tokenMap = new Map();
+      
+      pools.forEach((pool: any) => {
+        [pool.tokenA, pool.tokenB].forEach((token: any) => {
+          if (!tokenMap.has(token.address)) {
+            tokenMap.set(token.address, token);
+          }
+        });
       });
 
-      const uniqueTokens = [
-        ...new Set(
-          pools
-            .flatMap((pool: any) => [pool.tokenA, pool.tokenB])
-            .filter(Boolean)
-        ),
-      ];
+      const uniqueTokens = Array.from(tokenMap.values());
 
       res.status(RestStatus.OK).json(uniqueTokens);
     } catch (error) {
@@ -185,27 +187,30 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params } = req;
+      const { accessToken, params, address } = req;
       validateAddressArgs(params);
 
-      const poolA = await getPools(accessToken, undefined, {
+      const poolA = await getPools(accessToken, address, {
         tokenA: "eq." + params.address,
-        select: "tokenB",
       });
 
-      const poolB = await getPools(accessToken, undefined, {
+      const poolB = await getPools(accessToken, address, {
         tokenB: "eq." + params.address,
-        select: "tokenA",
       });
 
-      const uniqueTokenPairs = [
-        ...new Set(
-          [
-            ...poolA.map((pool: any) => pool.tokenB),
-            ...poolB.map((pool: any) => pool.tokenA),
-          ].filter(Boolean)
-        ),
-      ];
+      const tokens = [
+        ...poolA.map((pool: any) => pool.tokenB),
+        ...poolB.map((pool: any) => pool.tokenA),
+      ].filter(Boolean);
+
+      const tokenMap = new Map();
+      tokens.forEach((token: any) => {
+        if (!tokenMap.has(token.address)) {
+          tokenMap.set(token.address, token);
+        }
+      });
+
+      const uniqueTokenPairs = Array.from(tokenMap.values());
 
       res.status(RestStatus.OK).json(uniqueTokenPairs);
     } catch (error) {

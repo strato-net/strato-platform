@@ -1,20 +1,14 @@
 import Stripe from "stripe";
 import { stripeSecretKey } from "../config/config";
+import { CheckoutSessionParams } from "../types/types";
 
 // Initialize Stripe client using secret key from env and specify API version
 export const stripe = new Stripe(stripeSecretKey || "");
 
-interface CheckoutSessionParams {
-  listingId: string;
-  amount: number;
-  tokenAddress: string;
-  buyerAddress: string;
-  baseUrl: string;
-}
-
 export async function createCheckoutSession({
-  listingId,
+  token,
   amount,
+  tokenAmount,
   tokenAddress,
   buyerAddress,
   baseUrl,
@@ -27,8 +21,8 @@ export async function createCheckoutSession({
         price_data: {
           currency: "usd",
           product_data: {
-            name: `Token Purchase - Order ${listingId}`,
-            description: `Purchase of locked tokens for order ${listingId}`,
+            name: `Token Purchase - ${token}`,
+            description: `Purchase of tokens for order ${token}`,
           },
           unit_amount: amount,
         },
@@ -37,13 +31,14 @@ export async function createCheckoutSession({
     ],
     mode: "payment",
     metadata: {
-      listingId,
+      token,
       tokenAddress,
       buyerAddress,
       amount: amount.toString(),
+      tokenAmount,
     },
-    success_url: `${baseUrl}/dashboard?listingId=${listingId}&success=true`,
-    cancel_url: `${baseUrl}/dashboard?listingId=${listingId}&success=false`,
+    success_url: `${baseUrl}/dashboard?success=true`,
+    cancel_url: `${baseUrl}/dashboard?success=false`,
     expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 minutes
   });
 

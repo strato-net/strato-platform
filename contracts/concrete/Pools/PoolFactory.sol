@@ -17,23 +17,27 @@ import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PoolFactory is Ownable {
-    event NewPool(address indexed tokenA, address indexed tokenB, address pool);
+    event NewPool(address tokenA, address tokenB, address pool);
+    event PoolMigrated(address tokenA, address tokenB, address pool);
 
     mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
+    TokenFactory public tokenFactory;
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
-
-    event PoolMigrated(address indexed tokenA, address indexed tokenB, address pool);
+    constructor(address initialOwner, address _tokenFactory) Ownable(initialOwner) {
+        require(_tokenFactory != address(0), "Zero token factory address");
+        tokenFactory = TokenFactory(_tokenFactory);
+    }
 
     /// @notice Create a new pool for tokenA/tokenB
     function createPool(address tokenA, address tokenB) external returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
+        require(tokenFactory.isTokenActive(tokenA) && tokenFactory.isTokenActive(tokenB), "Token not active");
         
         // deploy new pool
-        pool = address(new Pool(tokenA, tokenB));
+        pool = address(new Pool(tokenA, tokenB, address(tokenFactory)));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions
@@ -55,13 +59,5 @@ contract record PoolFactory is Ownable {
 
         allPools.push(pool);
         emit PoolMigrated(tokenA, tokenB, pool);
-    }
-
-    function getPool(address tokenA, address tokenB) external view returns (address pool) {
-        return pools[tokenA][tokenB];
-    }
-
-    function allPoolsLength() external view returns (uint256) {
-        return allPools.length;
     }
 }

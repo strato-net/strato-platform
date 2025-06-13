@@ -1,3 +1,5 @@
+import { baseCodeCollection, lendingPool, onRamp, poolFactory } from "./config";
+
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
   key = "/key",
@@ -28,22 +30,23 @@ export const constants = (() => {
     `balances:${Token}-_balances(user:key,balance:value)`,
     `minters:${Token}-minters(user:key,value)`,
     `burners:${Token}-burners(user:key,value)`,
+    `status:${Token}-status(value)`,
   ];
   const tokenBalanceSelectFields = [
     "address",
     "user:key",
     "balance:value",
-    `token:${Token}(_name,_symbol,_owner,customDecimals,description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
+    `token:${Token}(_name,_symbol,_owner,customDecimals,description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
   ];
   const poolSelectFields = [
     "address",
     "aToBRatio",
     "bToARatio",
-    `tokenA:tokenA_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
+    `tokenA:tokenA_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
     "tokenABalance",
-    `tokenB:tokenB_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value))`,
+    `tokenB:tokenB_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
     "tokenBBalance",
-    `lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals,balances:${Token}-_balances(user:key,balance:value))`,
+    `lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals,balances:${Token}-_balances(user:key,balance:value),status:${Token}-status(value))`,
   ];
   const registrySelectFields = [
     "lendingPool: lendingPool_fkey(" +
@@ -70,41 +73,12 @@ export const constants = (() => {
     `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value))`,
     `listings:${OnRamp}-listings(key,ListingInfo:value)`,
     `paymentProviders:${OnRamp}-paymentProviders(key,PaymentProviderInfo:value)`,
-    `approvedTokens:${OnRamp}-approvedTokens(token:key,value)`,
-    `listingProviders:${OnRamp}-listingProviders(paymentProvider:key2,value)`,
   ];
-
-  const configs = {
-    prod: {
-      baseCodeCollection: "TBD",
-      poolFactory: "TBD",
-      lendingPool: "TBD",
-      onRamp: "TBD",
-    },
-    testnet: {
-      baseCodeCollection: "0000000000000000000000000000000000001000",
-      poolFactory: "000000000000000000000000000000000000100a",
-      lendingPool: "0000000000000000000000000000000000001005",
-      onRamp: "0000000000000000000000000000000000001009",
-    },
-    testnet2: {
-      baseCodeCollection: "bb58dffe06470c5dbf179e9aafd00d097c7e77cf",
-      poolFactory: "928d15e694d9be8b097b8d0e10f1ebe4afa440d1",
-      lendingPool: "96b7b8a3868699971abe853daef3c2ede04f6c2b",
-      onRamp: "5f0f4f4bdde0ed657c189351685cfbd5b0d62a50",
-    },
-  };
-  type Network = keyof typeof configs;
-  const envNetwork = process.env["NETWORK"];
-  const network: Network =
-    envNetwork === "prod" ||
-    envNetwork === "testnet" ||
-    envNetwork === "testnet2"
-      ? envNetwork
-      : "testnet2";
-  const selected = configs[network];
   return {
-    ...selected,
+    baseCodeCollection,
+    poolFactory,
+    lendingPool,
+    onRamp,
     Token,
     LendingPool,
     LiquidityPool,
