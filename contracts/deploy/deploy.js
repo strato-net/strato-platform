@@ -57,6 +57,7 @@ async function main() {
     console.log(`Mercata ETH Bridge: ${deployedContract.managers.mercataEthBridge}`);
     console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
     console.log(`Pool Factory: ${deployedContract.managers.poolFactory}`);
+    console.log(`Token Factory: ${deployedContract.managers.tokenFactory}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
