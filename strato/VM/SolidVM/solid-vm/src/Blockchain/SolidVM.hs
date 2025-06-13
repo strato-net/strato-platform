@@ -99,7 +99,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
 import Data.Time.Clock.POSIX
 import Data.Traversable
-import Data.Typeable
 import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
@@ -1691,23 +1690,23 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) _ = do
           if (fromIntegral i) >= length theVector
             then indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
             else return $ theVector V.! fromIntegral i
-        (SMap _ theMap, _) -> case theMap M.!? theIndex of
+        (SMap valType theMap, _) -> case theMap M.!? theIndex of
           Just v -> return v
-          Nothing -> do
-            let theType = typeOf theIndex
-            let typeArray = [(typeOf ("test" :: [Char])), (typeOf (1 :: Integer)), (typeOf (True :: Bool)), (typeOf ((SInteger 2) :: Value))]
-            let typeNum = theType `elemIndex` typeArray
-            case typeNum of
-              Just 0 -> return $ Constant $ SString ""
-              Just 1 -> return $ Constant $ SInteger 0
-              Just 2 -> return $ Constant $ SBool False
-              Just 3 -> do
-                case theIndex of
-                  (SInteger _) -> return $ Constant $ SInteger 0
-                  (SString _) -> return $ Constant $ SString ""
-                  (SBool _) -> return $ Constant $ SBool False
-                  _ -> internalError "Type of Mapping not allowed" (show theType)
-              _ -> internalError "Type of Mapping not found" (show theType)
+          Nothing -> case valType of
+            SVMType.Int{} -> pure $ Constant $ SInteger 0
+            SVMType.String{} -> pure $ Constant $ SString ""
+            SVMType.Bytes{} -> pure $ Constant $ SString ""
+            SVMType.Decimal -> pure $ Constant $ SDecimal 0.0
+            SVMType.Bool -> pure $ Constant $ SBool False
+            SVMType.Address p -> pure $ Constant $ SAccount (unspecifiedChain 0x0) p
+            SVMType.Account p -> pure $ Constant $ SAccount (unspecifiedChain 0x0) p
+            SVMType.Struct _ n -> pure $ Constant $ SStruct n M.empty
+            SVMType.Enum _ t (Just (n:_)) -> pure $ Constant $ SEnumVal t n 0
+            SVMType.Enum _ t _ -> pure $ Constant $ SEnumVal t "" 0
+            SVMType.Array t _ -> pure $ Constant $ SArray t mempty
+            SVMType.Contract n -> pure $ Constant $ SContractItem (unspecifiedChain 0x0) n
+            SVMType.Mapping _ _ t -> pure $ Constant $ SMap t M.empty
+            _ -> internalError "Type of Mapping not allowed" (show valType)
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
