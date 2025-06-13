@@ -231,7 +231,7 @@ assetToAccountInfos GA.Asset{..} =
           , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".admin", BAccount $ unspecifiedChain blockappsAddress)
-          , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
+          , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)

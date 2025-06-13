@@ -161,7 +161,7 @@ resolveFile ::
   EndoM (ExceptT Text m) (S.Set Text, ImportMapF a)
 resolveFile getCCFromHash expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
-    then throwE . T.concat $ "Circular reference identified: " : S.toList seen
+    then pure (seen, resolved)
     else case expr of
       AccountLiteral _ acct -> do
         lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
@@ -226,7 +226,7 @@ resolvePath fileName (StringLiteral a path') =
   let path = T.pack path'
       fileDir = tail . reverse $ T.splitOn "/" fileName
       pathDir = T.splitOn "/" path
-   in maybe (StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
+   in maybe (pure $ StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
 resolvePath _ expr = pure expr
 
 resolvePath' :: [Text] -> [Text] -> Maybe Text
