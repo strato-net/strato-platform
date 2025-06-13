@@ -71,7 +71,7 @@ withTestName = fmap . fmap . (,) . formatTestName
 success :: Applicative f => SourceAnnotation a -> f FuzzerResult
 success ctx = pure . FuzzerSuccess $ "Test succeeded" <$ ctx
 
-runFuzzer :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath String m) =>
+runFuzzer :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
   (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
   SourceMap ->

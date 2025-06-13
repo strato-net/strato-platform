@@ -1,3 +1,6 @@
+import "../../abstract/ERC20/access/Ownable.sol";
+import "./LendingRegistry.sol";
+
 /**
  * @title CollateralVault
  * @notice Holds and tracks collateral for active loans; enforces collateralization requirements.

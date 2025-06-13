@@ -142,7 +142,7 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m
   insert _ = genericInsertCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   delete _ = genericDeleteCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
  
-instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath String (ReaderT SetupDBs m) where
+instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String String) (ReaderT SetupDBs m) where
   select _ _ = pure Nothing
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where

@@ -27,9 +27,9 @@ import UnliftIO
 newtype Cli a = Cli { runCli :: IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadUnliftIO, MonadThrow, MonadCatch)
 
-instance {-# OVERLAPPING #-} A.Selectable FilePath String Cli where
+instance {-# OVERLAPPING #-} A.Selectable FilePath (Either String String) Cli where
   select _ filePath =
-    catch (Just <$> liftIO (readFile filePath)) (\(_ :: SomeException) -> pure Nothing)
+    Just <$> catch (Right <$> liftIO (readFile filePath)) (\(_ :: SomeException) -> pure . Left $ "Could not find file by name of " <> filePath)
 
 main :: IO ()
 main = do

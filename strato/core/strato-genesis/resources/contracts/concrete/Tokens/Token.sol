@@ -1,14 +1,19 @@
-enum TokenStatus { INACTIVE, ACTIVE, PENDING }
+import "../../abstract/ERC20/access/Ownable.sol";
+import "./TokenMetadata.sol";
+import "./TokenAccess.sol";
+import "../../abstract/ERC20.sol";
+
+enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
 contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     uint8 public customDecimals;
     TokenStatus public status;
-    address public tokenFactory;
+    TokenFactory public tokenFactory;
     
     event StatusChanged(TokenStatus oldStatus, TokenStatus newStatus);
     
     modifier onlyTokenFactory() {
-        require(msg.sender == tokenFactory, "Token: caller is not token factory");
+        require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
         _;
     }
     
@@ -25,17 +30,20 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(_tokenCreator) Ownable(_tokenCreator) {
         customDecimals = _customDecimals;
         status = TokenStatus.PENDING;
-        tokenFactory = msg.sender;
+        tokenFactory = TokenFactory(msg.sender);
         mint(_tokenCreator, _initialSupply);
     }
 
-    function setStatus(TokenStatus newStatus) external onlyTokenFactory {
-        emit StatusChanged(status, newStatus);
-        status = newStatus;
+    function setStatus(uint newStatus) external onlyTokenFactory {
+        require(newStatus != uint(status), "Token: New status is the same as the current status");
+        require(newStatus != uint(TokenStatus.NULL), "Token: New status is NULL");
+        TokenStatus _newStatus = TokenStatus(newStatus);
+        emit StatusChanged(status, _newStatus);
+        status = _newStatus;
     }
 
     function setTokenFactory(address _tokenFactory) external onlyTokenFactory {
-        tokenFactory = _tokenFactory;
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     function mint(address to, uint256 amount) public {

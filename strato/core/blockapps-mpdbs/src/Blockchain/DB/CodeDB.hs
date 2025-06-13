@@ -52,7 +52,7 @@ newtype CodeDB = CodeDB {unCodeDB :: DB.DB}
 instance NFData CodeDB where
   rnf (CodeDB a) = a `seq` ()
 
-type HasCodeDB m = ((Keccak256 `A.Alters` DBCode) m, A.Selectable FilePath String m)
+type HasCodeDB m = ((Keccak256 `A.Alters` DBCode) m, A.Selectable FilePath (Either String String) m)
 
 type DBCode = B.ByteString
 
@@ -99,10 +99,10 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (ReaderT CodeDB m) where
   insert _ = genericInsertCodeDB ask
   delete _ = genericDeleteCodeDB ask
 
-instance {-# OVERLAPPING #-} A.Selectable FilePath String Identity where
+instance {-# OVERLAPPING #-} A.Selectable FilePath (Either String String) Identity where
   select _ _ = pure Nothing
 
-instance {-# OVERLAPPING #-} A.Selectable FilePath String IO where
+instance {-# OVERLAPPING #-} A.Selectable FilePath (Either String String) IO where
   select _ _ = pure Nothing
 
 addCode :: HasCodeDB m => B.ByteString -> m Keccak256

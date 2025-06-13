@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+import "../Tokens/Token.sol";
+import "../Tokens/TokenFactory.sol";
+
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
 contract record Pool {

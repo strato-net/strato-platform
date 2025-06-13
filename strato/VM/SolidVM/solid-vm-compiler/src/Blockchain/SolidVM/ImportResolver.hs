@@ -143,7 +143,7 @@ type ImportMapF a = Map Text (ImportUnitF a)
 
 resolveImports ::
   ( A.Selectable Address AddressState m,
-    A.Selectable FilePath String m,
+    A.Selectable FilePath (Either String String) m,
     Show a,
     Ord a,
     Default a
@@ -161,7 +161,7 @@ resolveImports getCCFromHash getNamedSUnits m = do
 
 resolveFile ::
   ( A.Selectable Address AddressState m,
-    A.Selectable FilePath String m,
+    A.Selectable FilePath (Either String String) m,
     Show a,
     Ord a,
     Default a
@@ -172,7 +172,7 @@ resolveFile ::
   EndoM (ExceptT Text m) (S.Set Text, ImportMapF a)
 resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
-    then throwE $ "Circular reference identified: " <> T.intercalate ", " (S.toList seen)
+    then pure (seen, resolved)
     else case expr of
       AccountLiteral _ acct -> do
         lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
@@ -187,9 +187,10 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
       StringLiteral _ fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of
-              Nothing -> A.select (A.Proxy @String) (T.unpack fileName) >>= \case
-                Nothing -> throwE $ "Could not find file by name of " <> fileName
-                Just contents -> case getNamedSUnits fileName (T.pack contents) of
+              Nothing -> A.select (A.Proxy @(Either String String)) (T.unpack fileName) >>= \case
+                Nothing -> pure (seen, resolved)
+                Just (Left e) -> throwE $ T.pack e
+                Just (Right contents) -> case getNamedSUnits fileName (T.pack contents) of
                   Nothing -> throwE $ "Could not resolve source units of imported file: " <> fileName
                   Just l ->
                     let resolved' = M.insert fileName (Left l) resolved
@@ -229,7 +230,7 @@ fileUnitsToCodeCollection (FileUnits ps us) =
 
 doResolve ::
   ( A.Selectable Address AddressState m,
-    A.Selectable FilePath String m,
+    A.Selectable FilePath (Either String String) m,
     Show a,
     Ord a,
     Default a
@@ -251,7 +252,7 @@ resolvePath fileName (StringLiteral a path') =
                   [] -> []
                   (_:xs) -> xs
       pathDir = T.splitOn "/" path
-   in maybe (throwE $ "Could not resolve path: " <> path) (pure . lit' a) $ resolvePath' fileDir pathDir
+   in maybe (pure $ StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
 resolvePath _ expr = pure expr
 
 resolvePath' :: [Text] -> [Text] -> Maybe Text
