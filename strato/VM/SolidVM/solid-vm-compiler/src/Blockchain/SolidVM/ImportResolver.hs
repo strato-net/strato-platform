@@ -176,13 +176,12 @@ resolveFile getCCFromHash expr (seen, resolved) =
       StringLiteral _ fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of
-              Nothing -> throwE $ "Could not find file by name of " <> fileName
-              Just (Right _) -> pure (seen, resolved)
               Just (Left l) ->
                 let eResolved' = snd <$> foldrM (doResolve getCCFromHash fileName) (S.insert fileName seen, resolved) (l ^. ufuImports)
                  in fmap (seen,) . flip fmap eResolved' . flip M.adjust fileName $ \case
                       Left u -> Right . FileUnits (u ^. ufuPragmas) $ M.singleton Nothing (u ^. ufuUnits)
                       Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
+              _ -> pure (seen, resolved)
       _ -> throwE . T.pack $ "Unsupported expression in import: " ++ unparseExpression expr
 
 codeCollectionToFileUnits :: Maybe Address -> CodeCollectionF a -> FileUnitsF a
