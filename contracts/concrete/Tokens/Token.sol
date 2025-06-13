@@ -3,7 +3,7 @@ import "./TokenMetadata.sol";
 import "./TokenAccess.sol";
 import "../../abstract/ERC20.sol";
 
-enum TokenStatus { INACTIVE, ACTIVE, PENDING }
+enum TokenStatus { NULL, PENDING, LEGACY, ACTIVE }
 
 contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     uint8 public customDecimals;
