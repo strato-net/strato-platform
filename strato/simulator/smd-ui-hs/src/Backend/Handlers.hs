@@ -31,9 +31,11 @@ import Servant.Client
 getBlockSummaries :: Handler [BitcoinBlockSummary]
 getBlockSummaries = liftIO $ do
   -- Get latest 5 blocks
-  Right tip <- callBitcoinRPC (Proxy @GetBlockCount) HNil
-  blockHashes <- mapM (\h -> callBitcoinRPC (Proxy @GetBlockHash) (HEnd $ tip - h)) [(0 :: Integer)..4]
-  catMaybes . map (either (const Nothing) Just) <$> mapM (\case Right bh -> callBitcoinRPC (Proxy @GetBlock) (HEnd bh); _ -> pure $ Left "hash error") blockHashes
+  callBitcoinRPC (Proxy @GetBlockCount) HNil >>= \case
+    Left _ -> pure []
+    Right tip -> do
+      blockHashes <- mapM (\h -> callBitcoinRPC (Proxy @GetBlockHash) (HEnd $ tip - h)) [(0 :: Integer)..4]
+      catMaybes . map (either (const Nothing) Just) <$> mapM (\case Right bh -> callBitcoinRPC (Proxy @GetBlock) (HEnd bh); _ -> pure $ Left "hash error") blockHashes
 
 getGlobalUtxos :: Handler [UtxoSummary]
 getGlobalUtxos = getWalletUtxos  -- for now, same as above (can be filtered later)
