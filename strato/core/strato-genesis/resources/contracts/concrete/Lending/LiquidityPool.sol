@@ -1,3 +1,6 @@
+import "./LendingRegistry.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+
 /**
  * @title LiquidityPool
  * @notice Manages token liquidity for lending and borrowing, including ERC20 token transfers.

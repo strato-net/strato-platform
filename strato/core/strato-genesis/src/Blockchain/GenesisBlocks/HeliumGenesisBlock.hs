@@ -198,7 +198,8 @@ assetToAccountInfos GA.Asset{..} =
         (\case
           (GA.Balance _ o c q)
             | root == usdstAddress &&  c == "mercata_usdst" ->
-                [(liquidityPoolAddress, correctQuantity decimals name q)]
+                [(liquidityPoolAddress, correctQuantity decimals name q),
+                 (blockappsAddress, correctQuantity decimals name q)]
             | root == goldstRoot ->
                 let goldstBalance = correctQuantity decimals name q
                     goldOzBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldOunceRoot assetMap
@@ -230,12 +231,12 @@ assetToAccountInfos GA.Asset{..} =
           , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".admin", BAccount $ unspecifiedChain blockappsAddress)
-          , (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
+          , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe (".status", BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
+            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
             ++ accountBalances
             ++ contractBalances
 
