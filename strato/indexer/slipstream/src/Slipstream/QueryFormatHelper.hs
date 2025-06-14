@@ -7,7 +7,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
 import qualified Data.Text as T
---import Slipstream.Data.Globals (TableName (..))
+
+-- import Slipstream.Data.Globals (TableName (..))
 
 -- TODO: Refactor this type before someone external sees it
 data TableName
@@ -45,11 +46,17 @@ data TableName
         atApplication :: T.Text,
         atContractName :: T.Text
       }
+  | CollectionHistoryTableName -- junius
+      { mtCreator :: T.Text,
+        mtApplication :: T.Text,
+        mtContractName :: T.Text,
+        mtCollectionName :: T.Text
+      }
   deriving (Show, Eq, Ord)
 
 type TableColumns = [T.Text]
 
-tshow :: Show a => a -> T.Text
+tshow :: (Show a) => a -> T.Text
 tshow = T.pack . show
 
 csv :: [T.Text] -> T.Text
@@ -140,6 +147,14 @@ tableNameToText (AbstractTableName c a n) =
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
+-- junius
+tableNameToText (CollectionHistoryTableName c a n m) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndCollection = n <> "-" <> m
+   in "history@" <> prefix <> contractAndCollection
 
 tableShortName :: TableName -> T.Text
 tableShortName (IndexTableName _ _ n) = n
@@ -148,6 +163,7 @@ tableShortName (HistoryTableName _ _ n) = "history@" <> n
 tableShortName (EventTableName _ _ n e) = n <> "-" <> e
 tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
 tableShortName (AbstractTableName _ _ n) = n
+tableShortName (CollectionHistoryTableName _ _ n m) = "history@" <> n <> "-" <> m
 
 -- TODO: delete once marketplace uses new separator format everywhere
 oldTableNameToText :: TableName -> T.Text
@@ -174,7 +190,7 @@ oldTableNameToDoubleQuoteText :: TableName -> T.Text
 oldTableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . oldTableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
-textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
+textToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes
 
 removeSingleQuotes :: T.Text -> T.Text
 removeSingleQuotes inputText =
