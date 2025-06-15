@@ -1,4 +1,4 @@
-import "./../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
 
 contract record OnRamp {

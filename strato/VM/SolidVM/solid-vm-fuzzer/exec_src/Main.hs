@@ -35,9 +35,12 @@ main :: IO ()
 main = do
   _ <- $initHFlags "solid-vm-cli"
   case arguments of
-    [] -> putStrLn "No input files given"
+    [] -> putStrLn "No arguments given" >> help
+    ["--help"] -> help
+    [_] -> putStrLn "No input files given"
     (mode:files) -> runOp mode . SourceMap =<< traverse addFile files
-  where addFile file = do
+  where help = putStrLn "Usage: solid-vm-cli (parse|compile|test) filename [filenames]"
+        addFile file = do
           contents <- readFile file
           pure (T.pack file, T.pack contents)
         runOp mode srcMap = case mode of
@@ -50,9 +53,10 @@ main = do
                       FuzzerFailure _ (SourceAnnotation _ _ (testName, msg)) -> do
                         putStrLn . T.unpack $ "❌ " <> testName <> " failed: " <> msg
                     )
-          _ -> runCli (compile srcMap) >>= \case
+          "compile" -> runCli (compile srcMap) >>= \case
             Right _ -> pure ()
             Left xs -> putStrLn "Compilation errors:" >> traverse_ print xs
+          _ -> putStrLn $ "Unknown mode: " ++ mode
         parse = fmap concat
               . traverse (uncurry parseSourceWithAnnotations)
               . unSourceMap
