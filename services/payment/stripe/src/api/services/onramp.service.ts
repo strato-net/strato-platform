@@ -42,8 +42,8 @@ export async function checkout(
   }
 
   try {
-    const token = await getServiceToken();
-    const ramp = await get(token);
+    const accessToken = await getServiceToken();
+    const ramp = await get(accessToken);
     
     const listing = ramp.listings[token];
     if (!listing) {
@@ -91,9 +91,9 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   }
 
   try {
-    const token = await getServiceToken();
-    const { status, hash } = await postAndWaitForTx(token, () =>
-      strato.post(token, StratoPaths.transactionParallel, buildFunctionTx({
+    const accessToken = await getServiceToken();
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
         contractName: OnRamp,
         contractAddress,
         method: "fulfillListing",

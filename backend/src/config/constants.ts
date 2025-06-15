@@ -9,44 +9,46 @@ export enum StratoPaths {
 }
 
 export const constants = (() => {
-  const Token = "BlockApps-Mercata-Token";
-  const LendingPool = "BlockApps-Mercata-LendingPool";
-  const LiquidityPool = "BlockApps-Mercata-LiquidityPool";
-  const CollateralVault = "BlockApps-Mercata-CollateralVault";
-  const PriceOracle = "BlockApps-Mercata-PriceOracle";
-  const PoolFactory = "BlockApps-Mercata-PoolFactory";
-  const Pool = "BlockApps-Mercata-Pool";
-  const OnRamp = "BlockApps-Mercata-OnRamp";
-  const LendingRegistry = "BlockApps-Mercata-LendingRegistry";
+  const CONTRACT_PREFIX = "BlockApps-Mercata-";
+  const Token = `${CONTRACT_PREFIX}Token`;
+  const LendingPool = `${CONTRACT_PREFIX}LendingPool`;
+  const LiquidityPool = `${CONTRACT_PREFIX}LiquidityPool`;
+  const CollateralVault = `${CONTRACT_PREFIX}CollateralVault`;
+  const PriceOracle = `${CONTRACT_PREFIX}PriceOracle`;
+  const PoolFactory = `${CONTRACT_PREFIX}PoolFactory`;
+  const Pool = `${CONTRACT_PREFIX}Pool`;
+  const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
+  const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const tokenSelectFields = [
     "address",
     "_name",
     "_symbol",
     "_owner",
+    "_totalSupply",
     "customDecimals",
     "description",
+    "status",
     `images:${Token}-images(value)`,
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value)`,
     `minters:${Token}-minters(user:key,value)`,
     `burners:${Token}-burners(user:key,value)`,
-    `status:${Token}-status(value)`,
   ];
   const tokenBalanceSelectFields = [
     "address",
     "user:key",
     "balance:value",
-    `token:${Token}(_name,_symbol,_owner,customDecimals,description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
+    `token:${Token}(${tokenSelectFields.join(',')})`,
   ];
   const poolSelectFields = [
     "address",
-    "aToBRatio",
+    "aToBRatio", 
     "bToARatio",
-    `tokenA:tokenA_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
+    `tokenA:tokenA_fkey(${tokenSelectFields.join(',')})`,
     "tokenABalance",
-    `tokenB:tokenB_fkey(address,_name,_symbol,_owner,customDecimals,balances:${Token}-_balances(user:key,balance:value),description,images:${Token}-images(value),attributes:${Token}-attributes(key,value),minters:${Token}-minters(user:key,value),burners:${Token}-burners(user:key,value),status:${Token}-status(value))`,
+    `tokenB:tokenB_fkey(${tokenSelectFields.join(',')})`,
     "tokenBBalance",
-    `lpToken:lpToken_fkey(address,_name,_symbol,_totalSupply,customDecimals,balances:${Token}-_balances(user:key,balance:value),status:${Token}-status(value))`,
+    `lpToken:lpToken_fkey(${tokenSelectFields.join(',')})`,
   ];
   const registrySelectFields = [
     "lendingPool: lendingPool_fkey(" +

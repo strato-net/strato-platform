@@ -127,7 +127,7 @@ if (require.main === module) {
         method: "transfer",
         args: {
           to: PAYMENT_PROVIDER_ADDRESS,
-          amount: MAX_TOKEN_A_AMOUNT + DECIMALS,
+          value: MAX_TOKEN_A_AMOUNT + DECIMALS,
         },
       },
       {
@@ -137,14 +137,6 @@ if (require.main === module) {
           provider: PAYMENT_PROVIDER_ADDRESS,
           name: PAYMENT_PROVIDER_NAME,
           endpoint: PAYMENT_PROVIDER_ENDPOINT,
-        },
-      },
-      {
-        contract: { address: onRampAddress, name: "OnRamp" },
-        method: "setApprovedToken",
-        args: {
-          token: USDST_ADDRESS,
-          whitelist: true,
         },
       },
       {

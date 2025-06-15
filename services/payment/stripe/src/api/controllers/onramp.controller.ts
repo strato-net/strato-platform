@@ -9,9 +9,9 @@ class OnRampController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { listingId, buyerAddress, baseUrl, amount } = req.body;
+      const { token, buyerAddress, baseUrl, amount } = req.body;
 
-      const result = await checkout(listingId, buyerAddress, amount, baseUrl);
+      const result = await checkout(token, buyerAddress, amount, baseUrl);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
