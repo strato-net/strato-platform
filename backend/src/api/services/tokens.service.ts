@@ -50,18 +50,22 @@ export const getBalance = async (
 ) => {
   try {
     // Filter out undefined
-    let params = Object.fromEntries(
-      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ) as Record<string, string>;
+    let params = {
+      ...Object.fromEntries(
+        Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+      ),
+      key: `eq.${address}`,
+      select: rawParams.select || tokenBalanceSelectFields.join(","),
+      ...(rawParams.select
+        ? {}
+        : {
+            value: "gt.0",
+            "token.balances.key": `eq.${address}`
+          }),
+    };
 
-    // use tokenBalanceSelectFields if no select is provided
-    if (!params.select) {
-      params.select = tokenBalanceSelectFields.join(",");
-    }
-
-    // Add user address to params
     const response = await cirrus.get(accessToken, "/" + Token + "-_balances", {
-      params: { ...params, key: "eq." + address },
+      params,
     });
 
     if (response.status !== 200) {

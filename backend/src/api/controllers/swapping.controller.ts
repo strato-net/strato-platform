@@ -25,10 +25,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params } = req;
+      const { accessToken, params, address } = req;
       validateAddressArgs(params);
 
-      const token = await getPools(accessToken, undefined, {
+      const token = await getPools(accessToken, address, {
         address: "eq." + params.address,
       });
       res.status(RestStatus.OK).json(token);

@@ -27,8 +27,8 @@ export const get = async (accessToken: string) => {
     const onRamp = onRampData[0];
     const {
       listings,
-      approvedTokens,
       priceOracle,
+      paymentProviders,
     } = onRamp;
 
     // Build token price map
@@ -38,17 +38,20 @@ export const get = async (accessToken: string) => {
         .map((p: any) => [p.token, p])
     );
 
-    // Extract approved token addresses
-    const approvedAddresses = approvedTokens
-      .filter((t: any) => t.value)
-      .map((t: any) => t.token);
+    // Build payment provider map
+    const providerMap = Object.fromEntries(
+      (paymentProviders || []).map((p: any) => [
+        p.key,
+        p.PaymentProviderInfo
+      ])
+    );
 
     // Fetch token metadata
     let tokenInfoMap: Record<string, { _name: string; _symbol: string }> = {};
     try {
       const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
         params: {
-          address: `in.(${approvedAddresses.join(",")})`,
+          status: "eq.2",
           select: "address,_name,_symbol",
         },
       });
@@ -72,6 +75,11 @@ export const get = async (accessToken: string) => {
         _symbol: null,
       };
 
+      // Map provider addresses to their full info
+      const providers = info.providers
+        .map((providerAddress: string) => providerMap[providerAddress])
+        .filter(Boolean);
+
       return {
         key: id,
         ListingInfo: {
@@ -79,21 +87,19 @@ export const get = async (accessToken: string) => {
           _name: tokenMeta._name,
           _symbol: tokenMeta._symbol,
           tokenOracleValue: prices[info.token] || null,
+          providers,
         },
       };
-    });
-
-    // Enrich approvedTokens in-place
-    approvedTokens.forEach((entry: any) => {
-      const meta = tokenInfoMap[entry.token];
-      entry._name = meta?._name || null;
-      entry._symbol = meta?._symbol || null;
     });
 
     return {
       ...onRamp,
       listings: enhancedListings,
-      approvedTokens,
+      approvedTokens: Object.entries(tokenInfoMap).map(([token, info]) => ({
+        token,
+        _name: info._name,
+        _symbol: info._symbol,
+      })),
       priceOracle: undefined,
     };
   } catch (error) {
@@ -159,7 +165,9 @@ export async function buy(
     }
 
     // Validate and get payment provider
-    const paymentProvider = listing.providers.find((p: { provider: string }) => p.provider === paymentProviderAddress);
+    const paymentProvider = listing.ListingInfo.providers.find(
+      (p: { providerAddress: string }) => p.providerAddress === paymentProviderAddress
+    );
     if (!paymentProvider) {
       throw new Error("Payment provider not found");
     }

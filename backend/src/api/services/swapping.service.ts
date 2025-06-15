@@ -23,11 +23,11 @@ export const getPools = async (
       ? {}
       : {
           "lpToken.balances.value": "gt.0",
-          ...(address ? { "lpToken.balances.key": `eq.${address}` } : {}),
+          "lpToken.balances.key": `eq.${address}`,
           "tokenA.balances.value": "gt.0",
-          ...(address ? { "tokenA.balances.key": `eq.${address}` } : {}),
+          "tokenA.balances.key": `eq.${address}`,
           "tokenB.balances.value": "gt.0",
-          ...(address ? { "tokenB.balances.key": `eq.${address}` } : {}),
+          "tokenB.balances.key": `eq.${address}`,
         }),
     root: `eq.${constants.baseCodeCollection}`,
   };
