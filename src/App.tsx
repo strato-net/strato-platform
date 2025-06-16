@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { BridgeProvider } from "@/lib/bridge/BridgeContext";
 import { WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
-import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { connectorsForWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
@@ -29,16 +29,37 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
 import { OnRampProvider } from "./context/OnRampContext";
+import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 
 const queryClient = new QueryClient();
 
+const projectId = 'YOUR_PROJECT_ID';    //project_id required for v2wallet connect 
+const appName = 'Mercata'; 
+
+const chains = [mainnet, polygon, sepolia] as const;
+const transports = {
+  [mainnet.id]: http(),
+  [polygon.id]: http(),
+  [sepolia.id]: http(),
+};
+                                       
+const connectors = connectorsForWallets(
+  [
+    {                           
+      groupName: 'Recommended',
+      wallets: [
+        metaMaskWallet,
+      ],
+    }
+  ],
+  { projectId, appName }
+);
+
 const config = createConfig({
-  chains: [mainnet, polygon, sepolia],
-  transports: {
-    [mainnet.id]: http(),
-    [polygon.id]: http(),
-    [sepolia.id]: http(),
-  },
+  connectors,
+  chains,
+  transports,
+  ssr: true,
 });
 
 const App = () => (
