@@ -48,7 +48,16 @@ pipeline {
             // Build Docker images
             sh "docker compose build"
             
-            // Update image tags with registry-specific ones
+            // Tag images with registry-specific names
+            sh """
+              grep -E 'image: mercata-.*:latest' docker-compose.yml | sed 's/.*mercata-\\([^:]*\\):.*/\\1/' | while read service; do
+                echo "Tagging mercata-\$service:latest"
+                docker tag mercata-\$service:latest registry-aws.blockapps.net:5000/blockapps/mercata-\$service:${env.GIT_SHA}
+                docker tag mercata-\$service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/\$service:${env.GIT_SHA}
+              done
+            """
+            
+            // Update image tags in docker-compose.yml with registry-specific names
             sh """
               cp docker-compose.yml docker-compose.ecr.yml
               sed -i 's|image: mercata-\\([^:]*\\):.*|image: registry-aws.blockapps.net:5000/blockapps/mercata-\\1:${env.GIT_SHA}|g' docker-compose.yml
@@ -95,7 +104,7 @@ pipeline {
             // Build and Push Bridge Service
             def bridgeRepo = "registry-aws.blockapps.net:5000/blockapps/mercata-bridge"
             def bridgeRepoECR = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/bridge"
-            sh "docker build -t stripe:latest services/bridge"
+            sh "docker build -t bridge:latest services/bridge"
             sh """
               docker tag bridge:latest ${bridgeRepo}:${env.GIT_SHA}
               docker tag bridge:latest ${bridgeRepoECR}:${env.GIT_SHA}
@@ -111,24 +120,20 @@ pipeline {
   }
 
   post {
-    always {
-      sh 'docker system prune -fa || true'
-    }
-    
+
     success {
       slackSend (
           color: 'good',
           message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
       )
     }
-    
+
     failure {
       slackSend (
           color: 'danger',
           message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
       )
-      
-      
+
       script {
         if (env.BRANCH_NAME == 'develop') {
           slackSend(
