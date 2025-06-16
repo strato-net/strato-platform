@@ -21,6 +21,9 @@ if (!process.env.NODE_URL) {
 if (!process.env.BASE_CODE_COLLECTION) {
   throw new Error("BASE_CODE_COLLECTION is not defined");
 }
+if (!process.env.TOKEN_FACTORY) {
+  throw new Error("TOKEN_FACTORY is not defined");
+}
 if (!process.env.POOL_FACTORY) {
   throw new Error("POOL_FACTORY is not defined");
 }
@@ -44,5 +47,6 @@ export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
 export const baseCodeCollection = process.env.BASE_CODE_COLLECTION;
 export const poolFactory = process.env.POOL_FACTORY;
+export const tokenFactory = process.env.TOKEN_FACTORY;
 export const lendingPool = process.env.LENDING_POOL;
 export const onRamp = process.env.ONRAMP;

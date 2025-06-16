@@ -6,7 +6,7 @@ import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, baseCodeCollection } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory } = constants;
 
 // Get all tokens
 export const getTokens = async (
@@ -100,9 +100,10 @@ export const createToken = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildDeployTx({
-      contractName: extractContractName(Token),
-      source: `import <${baseCodeCollection}>;`,
+    const tx = buildFunctionTx({
+      contractName: extractContractName(TokenFactory),
+      contractAddress: tokenFactory,
+      method: "createToken",
       args: usc(body),
     });
 
