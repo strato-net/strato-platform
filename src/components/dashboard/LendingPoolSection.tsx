@@ -7,7 +7,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Token, WithdrawableToken } from "@/interface";
+import { WithdrawableToken } from "@/interface";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress } from "@/lib/contants";
@@ -58,6 +58,8 @@ const LendingPoolSection = () => {
       );
       if (depositedToken) {
         setDepositedUsdstToken(depositedToken);
+      } else {
+        setDepositedUsdstToken(null);
       }
     }
   }, [tokens, withdrawableTokens, usdstAddress]);
@@ -95,10 +97,9 @@ const LendingPoolSection = () => {
       setIsProcessing(true);
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
       const amountWei = parseUnits(amount, 18).toString();
-      await api.post("/lend/manageLiquidity", {
+      await api.post("/lend/" + (type === "deposit" ? "depositLiquidity" : "withdrawLiquidity"), {
         asset: usdstAddress,
         amount: amountWei,
-        method: type === "deposit" ? "depositLiquidity" : "withdrawLiquidity",
       });
 
       toast({
