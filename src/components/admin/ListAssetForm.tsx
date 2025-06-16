@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Token } from "@/interface";
 import { Loader2, Info, ShoppingCart } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,13 +97,11 @@ const ListAssetForm = () => {
       }
 
       const selectedToken = approvedTokens.find((t) => t.token === data.tokenAddress);
-      
-      // Convert amount to wei (18 decimals) for blockchain
-      const amountInWei = (BigInt(Math.floor(parseFloat(data.amount) * 1e18))).toString();
-      
+    
+
       const response = await sell({
         token: data.tokenAddress,
-        amount: amountInWei,
+        amount: data.amount,
         marginBps: parseInt(data.marginBps).toString(),
         providerAddresses: data.selectedProviders,
       });

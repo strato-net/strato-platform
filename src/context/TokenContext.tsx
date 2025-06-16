@@ -19,6 +19,7 @@ type TokenContextType = {
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
   transferFromToken: (payload: { address: string; from: string; to: string; value: string }) => Promise<void>;
+  setTokenStatus: (payload: { address: string; status: number }) => Promise<void>;
 };
 
 const TokenContext = createContext<TokenContextType | undefined>(undefined);
@@ -117,6 +118,19 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const setTokenStatus = useCallback(async (payload: { address: string; status: number }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await api.post('/tokens/setStatus', payload);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to set token status');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     getAllTokens();
   }, [getAllTokens]);
@@ -133,6 +147,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         transferToken,
         approveToken,
         transferFromToken,
+        setTokenStatus,
       }}
     >
       {children}

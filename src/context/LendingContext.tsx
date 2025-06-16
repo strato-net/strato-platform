@@ -104,7 +104,7 @@ export const LendingProvider = ({
   };
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
-    const weiPrice = parseUnits(payload.price, 18);
+    const weiPrice = parseUnits(payload.price, 18).toString() ;
     try {
       await api.post("/oracle/setPrice", {...payload, price: weiPrice.toString() });
     } catch (err: any) {

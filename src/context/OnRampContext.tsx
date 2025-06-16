@@ -4,6 +4,7 @@ import {api} from "@/lib/axios";
 import { 
   OnRampContextType 
 } from "@/interface";
+import { parseUnits } from "ethers";
 
 const OnRampContext = createContext<OnRampContextType | undefined>(undefined);
 
@@ -22,9 +23,10 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const sell = async (body: any): Promise<any> => {
+  const sell = async (payload: any): Promise<any> => {
     try {
-      const res = await api.post("/onramp/sell", body);
+    const weiAmount = parseUnits(payload.amount, 18).toString() ;
+      const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
       return res.data;
     } catch (err) {
       console.error("OnRamp sell failed:", err);
