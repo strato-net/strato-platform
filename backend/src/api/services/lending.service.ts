@@ -4,6 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
+import { FunctionInput } from "../../types/types";
 
 const {
   registrySelectFields,
@@ -54,34 +55,35 @@ export const manageLiquidity = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const lendingPool = body.method === "depositLiquidity" 
-      ? await getPool(accessToken, { select: "liquidityPool" })
-      : null;
+    const tx: FunctionInput[] = [];
 
-    if (!lendingPool?.liquidityPool) {
-      throw new Error("Liquidity pool address not found");
+    if (body.method === "depositLiquidity") {
+      const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
+      if (liquidityPool) {
+        tx.push({
+          contractName: extractContractName(Token),
+          contractAddress: body.asset || "",
+          method: "approve",
+          args: {
+            spender: liquidityPool,
+            value: body.amount || "",
+          },
+        });
+      }
     }
 
-    const tx = buildFunctionTx([
-      ...(lendingPool.liquidityPool ? [{
-        contractName: extractContractName(Token),
-        contractAddress: body.asset || "",
-        method: "approve",
-        args: { spender: lendingPool.liquidityPool, value: body.amount || "" },
-      }] : []),
-      {
-        contractName: extractContractName(LendingPool),
-        contractAddress: constants.lendingPool,
-        method: body.method || "",
-        args: {
-          asset: body.asset,
-          amount: body.amount,
-        },
-      }
-    ]);
+    tx.push({
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: body.method || "",
+      args: {
+        asset: body.asset,
+        amount: body.amount,
+      },
+    });
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
     );
 
     return { status, hash };
