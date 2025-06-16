@@ -7,7 +7,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Token, WithdrawableToken } from "@/interface";
+import { WithdrawableToken } from "@/interface";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress } from "@/lib/contants";
@@ -22,7 +22,6 @@ const LendingPoolSection = () => {
   } = useLendingContext();
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
-  const [usdstToken, setUsdstToken] = useState<Token | null>(null);
   const [usdstAvailableBalance, setUsdstAvailableBalance] =
     useState<string>("0");
   const [depositedUsdstToken, setDepositedUsdstToken] =
@@ -48,22 +47,22 @@ const LendingPoolSection = () => {
 
   // 2. Update component-local state when context changes
   useEffect(() => {
-    const usdst = tokens.find(
-      (token) => token?.address === usdstAddress
-    );
-
-    if (usdst) {
-      setUsdstToken(usdst);
-      setUsdstAvailableBalance(formatUnits(usdst?.balance?.toLocaleString('fullwide', { useGrouping: false }), 18));
+    if (withdrawableTokens) {
+      const usdst = tokens.find(
+        (token) => token?.address === usdstAddress
+      );
+      setUsdstAvailableBalance(formatUnits(BigInt(usdst?.balance ?? "0"), 18));
 
       const depositedToken = withdrawableTokens.find(
-        (token) => token._symbol === "USDST" && token.address === usdst.address
+        (token) => token._symbol === "USDST" && token.address === usdstAddress
       );
       if (depositedToken) {
         setDepositedUsdstToken(depositedToken);
+      } else {
+        setDepositedUsdstToken(null);
       }
     }
-  }, [tokens, withdrawableTokens]);
+  }, [tokens, withdrawableTokens, usdstAddress]);
 
   const isDepositAmountValid = () => {
     if (!depositAmount) return false;
@@ -98,10 +97,9 @@ const LendingPoolSection = () => {
       setIsProcessing(true);
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
       const amountWei = parseUnits(amount, 18).toString();
-      await api.post("/lend/manageLiquidity", {
-        asset: usdstToken?.address,
+      await api.post("/lend/" + (type === "deposit" ? "depositLiquidity" : "withdrawLiquidity"), {
+        asset: usdstAddress,
         amount: amountWei,
-        method: type === "deposit" ? "depositLiquidity" : "withdrawLiquidity",
       });
 
       toast({
@@ -121,8 +119,7 @@ const LendingPoolSection = () => {
     } catch (error: any) {
       toast({
         title: type === "deposit" ? "Deposit Error" : "Withdrawal Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."
-          }`,
+        description: `Something went wrong - ${error?.message || "Please try again later."}`,
         variant: "destructive",
       });
     } finally {
@@ -205,7 +202,7 @@ const LendingPoolSection = () => {
                       </span>
                     ) : (
                       Number(usdstAvailableBalance).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
+                        minimumFractionDigits: 2,
                         maximumFractionDigits: 4,
                       })
                     )}{" "}
@@ -255,7 +252,7 @@ const LendingPoolSection = () => {
                         minimumFractionDigits: 1,
                         maximumFractionDigits: 4,
                       })
-                      : "0.0000"}{" "}
+                      : "0.00"}{" "}
                     USDST
                   </div>
                 </div>

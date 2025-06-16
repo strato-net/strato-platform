@@ -126,7 +126,7 @@ const Borrow = () => {
       const amountInWei = parseUnits(amount.toString(), 18).toString();
       const collateralInWei = parseUnits(collateralAmount, 18).toString();
 
-      await api.post("/lend/getLoan", {
+      await api.post("/lend/borrow", {
         asset: borrowAsset?.address,
         amount: amountInWei,
         collateralAsset: asset?.address,
