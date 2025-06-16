@@ -46,7 +46,7 @@ data TableName
         atApplication :: T.Text,
         atContractName :: T.Text
       }
-  | CollectionHistoryTableName -- junius
+  | CollectionHistoryTableName
       { mtCreator :: T.Text,
         mtApplication :: T.Text,
         mtContractName :: T.Text,
@@ -147,7 +147,6 @@ tableNameToText (AbstractTableName c a n) =
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
--- junius
 tableNameToText (CollectionHistoryTableName c a n m) =
   let prefix
         | T.null c = ""

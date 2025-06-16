@@ -78,7 +78,6 @@ diffNull (Action.SolidVMDiff m) = Map.null m
 data BatchedInserts = BatchedInserts
   { indexInsert :: (E.ProcessedContract, [T.Text]),
     abstractInserts :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)],
-    -- insert history data junius, get the snapshot.
     historyInserts :: [E.ProcessedContract],
     collectionInserts :: [ProcessedCollectionRow]
   }
@@ -251,7 +250,6 @@ duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateF
     duplicateForSingle :: ProcessedCollectionRow -> [ProcessedCollectionRow]
     duplicateForSingle row = row : [row {creator = c, application = a, contractname = n} | (c, a, n) <- parentz]
 
--- key handler junius
 processTheMessages ::
   ( MonadLogger m,
     HasSQL m
@@ -291,13 +289,11 @@ processTheMessages env conn messages = do
         multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
         -- Create collection tables
-        -- junius 2 create the collection tables for the contract for specific column
         deferredForeignKeysForCollections <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
 
         deferredForeignKeys <- case (_contractType c) of
           AbstractType -> do
             abstractfkeys <- createExpandAbstractTable c nameParts abstracts' cc
-            -- junius 1 createExpandHistoryTable for new contracts, we should extend it with valid_to
             createExpandHistoryTable True c cc nameParts
             $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
             return abstractfkeys
@@ -367,8 +363,6 @@ processTheMessages env conn messages = do
                 cont = error "internal error: contract should be unused for SolidVM"
             $logInfoLS "Contract name is: " $ T.pack $ show name
             indexContract <- rowToInsert abiid row cont
-            -- junius need put the snapshot of values after indexContracct
-            -- indexContractHistory = indexContract ++ snapshot
             let fkeysForThisContract = getContractsFromPC indexContract
             let mapNames = actionMappings row -- recorded mappings
                 arrNames = actionArrays row -- all
@@ -397,7 +391,6 @@ processTheMessages env conn messages = do
             let pCollections = processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) -- get all collection rows to insert
             pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
             recordAction row
-            -- insert data here for four different tables junius
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
 
       pure results
@@ -412,7 +405,6 @@ processTheMessages env conn messages = do
   outputDataDedup conn $ do
     forM_ insertsByCodeHash $ \ins -> do
       insertIndexTable $ indexInsert ins
-      -- inserting the abstract tables, including the history junius
       insertAbstractTable (abstractInserts ins) -- not historic
       unless ((length (collectionInserts ins) < 1)) $ insertCollectionTable $ collectionInserts ins
 

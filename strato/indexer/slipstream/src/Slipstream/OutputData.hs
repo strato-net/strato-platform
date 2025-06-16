@@ -308,7 +308,6 @@ baseAbstractColumns =
     "data"
   ]
 
--- junius
 maximumBlockNumber :: Text
 maximumBlockNumber = "9999999999" -- 2^63 - 1, the maximum value for a bigint in PostgreSQL
 
@@ -355,7 +354,6 @@ eventCollectionTableName creator a n e m =
   let (c', a', n') = constructTableNameParameters creator a n
    in EventCollectionTableName c' a' n' e m
 
--- junius
 collectionHistoryTableName :: Text -> Text -> Text -> Text -> TableName
 collectionHistoryTableName creator a n m =
   let (c', a', n') = constructTableNameParameters creator a n
@@ -646,7 +644,6 @@ createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType)
         _ -> []
   return $ fkeys1 ++ fkeys2
 
--- junius
 createCollectionHistoryTable ::
   (OutputM m) =>
   (Text, Text, Text) ->
@@ -655,16 +652,9 @@ createCollectionHistoryTable ::
   (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () Text m ()
 createCollectionHistoryTable (creator, a, n) c cc (collectionName, keyTypes, valueType) = do
-  -- let tableName = collectionHistoryTableName creator a n collectionName
   let keySqlTypes = fromMaybe "text" . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       valueSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc valueType
   yield $ createCollectionHistoryTableQuery creator a n collectionName keySqlTypes valueSqlType
-
--- let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
---     fkeys2 = case valueType of
---       (SVMType.UnknownLabel contractNameForFkey _) -> getDeferredForeignKeysForCollectionType tableName creator a (T.pack $ contractNameForFkey)
---       _ -> []
--- return $ fkeys1 ++ fkeys2
 
 createEventArrayTable ::
   (OutputM m) =>
@@ -983,8 +973,6 @@ eventBaseColumnsQuery =
     "event_index int"
   ]
 
--- junius
-
 historyValidToColumn :: Text
 historyValidToColumn = T.pack "valid_to"
 
@@ -1005,7 +993,6 @@ createIndexTableQuery (creator, a, n) cols =
 keyColumnNames :: [a] -> [(Text, a)]
 keyColumnNames = map (\(i, t) -> ("key" <> (if i == 1 then "" else T.pack $ show i), t)) . zip [(1 :: Int) ..]
 
--- junius, keep the function as the same as previous one, make sure column names are the same
 keyColumnNamesWithoutType :: [a] -> [Text]
 keyColumnNamesWithoutType = map (\(i, _t) -> "key" <> (if i == 1 then "" else T.pack $ show i)) . zip [(1 :: Int) ..]
 
@@ -1081,7 +1068,6 @@ createHistoryTableQuery isAbstract (creator, a, n) cols =
           " (",
           csv $
             (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
-              -- junius
               ++ historyValidToColumnQuery
               ++ cols,
           ");\n\n",
@@ -1135,7 +1121,6 @@ createHistoryTableQuery isAbstract (creator, a, n) cols =
           "();"
         ]
 
--- junius
 createCollectionHistoryTableQuery :: Text -> Text -> Text -> Text -> [Text] -> Text -> Text
 createCollectionHistoryTableQuery creator a n collectionName keyTypes valueType =
   let collectionHistoryTableName' = collectionHistoryTableName creator a n collectionName
@@ -1158,7 +1143,6 @@ createCollectionHistoryTableQuery creator a n collectionName keyTypes valueType 
               ++ [ "value " <> valueType,
                    "value_fkey text"
                  ]
-              -- junius
               ++ historyValidToColumnQuery,
           ");\n\n",
           -- Create or replace the function for handling insert and update triggers
@@ -1173,7 +1157,7 @@ createCollectionHistoryTableQuery creator a n collectionName keyTypes valueType 
           "        RAISE NOTICE 'Inserting into history table ",
           tableNameToText collectionHistoryTableName',
           " for address: %', NEW.address;\n",
-          -- junius update last valid_to
+          -- Update last valid_to
           "UPDATE ",
           tableNameToDoubleQuoteText collectionHistoryTableName',
           " SET ",
@@ -1197,7 +1181,7 @@ createCollectionHistoryTableQuery creator a n collectionName keyTypes valueType 
           "        RAISE NOTICE 'Updating history table ",
           tableNameToText collectionHistoryTableName',
           " for address: %', NEW.address;\n",
-          -- junius update last valid_to
+          -- Update last valid_to
           "UPDATE ",
           tableNameToDoubleQuoteText collectionHistoryTableName',
           " SET ",
