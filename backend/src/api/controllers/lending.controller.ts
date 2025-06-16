@@ -2,9 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPool,
-  manageLiquidity,
-  getLoan,
-  repayLoan,
+  depositLiquidity,
+  withdrawLiquidity,
+  borrow,
+  repay,
   getDepositableTokens,
   getWithdrawableTokens,
   getLoans,
@@ -31,7 +32,7 @@ class LendingController {
     }
   }
 
-  static async manageLiquidity(
+  static async depositLiquidity(
     req: Request,
     res: Response,
     next: NextFunction
@@ -40,7 +41,7 @@ class LendingController {
       const { accessToken, body } = req;
       validateManageLiquidityArgs(body);
 
-      const result = await manageLiquidity(accessToken, body);
+      const result = await depositLiquidity(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -48,7 +49,24 @@ class LendingController {
     }
   }
 
-  static async getLoan(
+  static async withdrawLiquidity(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateManageLiquidityArgs(body);
+
+      const result = await withdrawLiquidity(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async borrow(
     req: Request,
     res: Response,
     next: NextFunction
@@ -57,7 +75,7 @@ class LendingController {
       const { accessToken, body } = req;
       validateGetLoanArgs(body);
 
-      const result = await getLoan(accessToken, body);
+      const result = await borrow(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -65,7 +83,7 @@ class LendingController {
     }
   }
 
-  static async repayLoan(
+  static async repay(
     req: Request,
     res: Response,
     next: NextFunction
@@ -74,7 +92,7 @@ class LendingController {
       const { accessToken, body } = req;
       validateRepayLoanArgs(body);
 
-      const result = await repayLoan(accessToken, body);
+      const result = await repay(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

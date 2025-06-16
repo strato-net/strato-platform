@@ -50,37 +50,36 @@ export const getPool = async (
   return poolData;
 };
 
-export const manageLiquidity = async (
+export const depositLiquidity = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx: FunctionInput[] = [];
-
-    if (body.method === "depositLiquidity") {
-      const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
-      if (liquidityPool) {
-        tx.push({
-          contractName: extractContractName(Token),
-          contractAddress: body.asset || "",
-          method: "approve",
-          args: {
-            spender: liquidityPool,
-            value: body.amount || "",
-          },
-        });
-      }
+    const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
+    if (!liquidityPool) {
+      throw new Error("Liquidity pool address not found");
     }
 
-    tx.push({
-      contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: body.method || "",
-      args: {
-        asset: body.asset,
-        amount: body.amount,
+    const tx: FunctionInput[] = [
+      {
+        contractName: extractContractName(Token),
+        contractAddress: body.asset || "",
+        method: "approve",
+        args: {
+          spender: liquidityPool,
+          value: body.amount || "",
+        },
       },
-    });
+      {
+        contractName: extractContractName(LendingPool),
+        contractAddress: constants.lendingPool,
+        method: "depositLiquidity",
+        args: {
+          asset: body.asset,
+          amount: body.amount,
+        },
+      }
+    ];
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
@@ -88,12 +87,38 @@ export const manageLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error(`Error managing liquidity (${body.method}):`, error);
+    console.error("Error depositing liquidity:", error);
     throw error;
   }
 };
 
-export const getLoan = async (
+export const withdrawLiquidity = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const tx: FunctionInput[] = [{
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: "withdrawLiquidity",
+      args: {
+        asset: body.asset,
+        amount: body.amount,
+      },
+    }];
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    );
+
+    return { status, hash };
+  } catch (error) {
+    console.error("Error withdrawing liquidity:", error);
+    throw error;
+  }
+};
+
+export const borrow = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
@@ -137,7 +162,7 @@ export const getLoan = async (
   }
 };
 
-export const repayLoan = async (
+export const repay = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
