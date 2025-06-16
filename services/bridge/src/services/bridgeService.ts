@@ -213,14 +213,16 @@ export const userDepositStatus = async (
   limit?: number,
   orderBy?: string,
   orderDirection?: string,
-  pageNo?: string
+  pageNo?: string,
+  userAddress?: string
 ) => {
   return await fetchDepositInitiatedStatus(
     status,
     limit,
     orderBy,
     orderDirection,
-    pageNo
+    pageNo,
+    userAddress
   );
 };
 
@@ -229,19 +231,18 @@ export const userWithdrawalStatus = async (
   limit?: number,
   orderBy?: string,
   orderDirection?: string,
-  pageNo?: string
+  pageNo?: string,
+  userAddress?: string
 ) => {
   return await fetchWithdrawalInitiatedStatus(
     status,
     limit,
     orderBy,
     orderDirection,
-    pageNo
+    pageNo,
+    userAddress
   );
 };
-
-
-
 
 export const getBridgeInTokens = async () => {
   const bridgeInTokens = showTestnet ? TESTNET_ETH_TOKENS : MAINNET_ETH_TOKENS;

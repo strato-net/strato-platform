@@ -5,36 +5,46 @@ import { getUserAddressFromToken } from "../utils";
 import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus, getBridgeInTokens, getBridgeOutTokens } from "../services/bridgeService";
 import { config, TESTNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_STRATO_TOKENS, TESTNET_STRATO_TOKENS } from "../config";
 
+interface CustomRequest extends Request {
+  user?: {
+    userAddress: string;
+  };
+}
+
+
 // Define the type for token addresses
 const ETH_STRATO_TOKEN_MAPPING = process.env.SHOW_TESTNET === 'true' ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING;
 const STRATO_TOKENS = process.env.SHOW_TESTNET === 'true' ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
 
 class BridgeController {
   static async bridgeIn(
-    req: Request,
+    req: CustomRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, fromAddress, amount, tokenAddress, ethHash } = req.body;
+      const { fromAddress, amount, tokenAddress, ethHash } = req.body;
+  
+      const { userAddress } = req.user || {};
+      if (!userAddress) {
+        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+        return;
+      }
 
-      console.log("req.body",req.body);
-
-      const userAddress = await getUserAddressFromToken(accessToken);
       const toAddress = config.safe.address || '';
-
-      // Map the tokenAddress to its corresponding address
+  
       const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
-      const decimals = STRATO_TOKENS.find((tokenObj: { tokenAddress: any; }) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
+      const decimals = STRATO_TOKENS.find((tokenObj) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
+  
       const bridgeInResponse = await bridgeIn(
-        ethHash, 
-        stratoTokenAddress, 
-        fromAddress, 
-        new BigNumber(amount).multipliedBy(10 ** decimals).toString(), 
-        toAddress, 
+        ethHash,
+        stratoTokenAddress,
+        fromAddress,
+        new BigNumber(amount).multipliedBy(10 ** decimals).toString(),
+        toAddress,
         userAddress
       );
-      
+  
       res.json({
         success: true,
         bridgeInResponse,
@@ -44,17 +54,22 @@ class BridgeController {
       next(error);
     }
   }
+  
 
   static async bridgeOut(
-    req: Request,
+    req: CustomRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       console.log("bridgeOut called.....",req.body);
-      const { accessToken, amount, tokenAddress, toAddress } = req.body;
+      const {  amount, tokenAddress, toAddress } = req.body;
 
-      const userAddress = await getUserAddressFromToken(accessToken);
+        const { userAddress } = req.user || {};
+      if (!userAddress) {
+        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+        return;
+      }
 
       const decimals = STRATO_TOKENS.find((tokenObj: { tokenAddress: any; }) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
 
@@ -79,21 +94,22 @@ class BridgeController {
   }
 
   static async stratoTokenBalance(
-    req: Request,
+    req: CustomRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { tokenAddress, accessToken } = req.body;
-      if(!tokenAddress){
-       console.log("Token address is required");    
-      }
 
-      // Get user address from token
-      const userAddress = await getUserAddressFromToken(accessToken);
+      const { tokenAddress } = req.body;
+      const { userAddress } = req.user || {};
+      if (!userAddress) {
+        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+        return;
+      }
 
       console.log("tokenAddress",tokenAddress);
       console.log("userAddress",userAddress);
+
     
       const balanceData = await stratoTokenBalance(userAddress, tokenAddress);
 
@@ -149,19 +165,26 @@ class BridgeController {
   }
 
   static async userDepositStatus(
-    req: Request,
+    req: CustomRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const { status } = req.params;
       const { limit, orderBy, orderDirection, pageNo } = req.query;
+      const { userAddress } = req.user || {};
+      if (!userAddress) {
+        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+        return;
+      }
+
       const depositStatus = await userDepositStatus(
         status,
         limit ? parseInt(limit as string) : undefined,
         orderBy as string,
         orderDirection as string,
-        pageNo as string
+        pageNo as string,
+        userAddress
       );
 
       res.json({
@@ -175,14 +198,19 @@ class BridgeController {
   }
 
   static async userWithdrawalStatus(
-    req: Request,
+    req: CustomRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const { status } = req.params;
       const { limit, orderBy, orderDirection, pageNo } = req.query;
-      const withdrawalStatus = await userWithdrawalStatus(status, limit ? parseInt(limit as string) : undefined, orderBy as string, orderDirection as string, pageNo as string);
+      const { userAddress } = req.user || {};
+      if (!userAddress) {
+        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+        return;
+      }
+      const withdrawalStatus = await userWithdrawalStatus(status, limit ? parseInt(limit as string) : undefined, orderBy as string, orderDirection as string, pageNo as string, userAddress);
 
       res.json({
         success: true,

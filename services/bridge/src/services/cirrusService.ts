@@ -13,10 +13,10 @@ export const fetchDepositInitiatedStatus = async (
   limit?: number,
   orderBy?: string,
   orderDirection?: string,
-  pageNo?: string
+  pageNo?: string,
+  userAddress?: string
 ): Promise<any | null> => {
   const accessToken = await getUserToken();
-  const userAddress = await getUserAddressFromToken(accessToken);
   if (!accessToken) return null;
 
   try {
@@ -104,10 +104,10 @@ export const fetchWithdrawalInitiatedStatus = async (
   limit?: number,
   orderBy?: string,
   orderDirection?: string,
-  pageNo?: string
+  pageNo?: string,
+  userAddress?: string
 ): Promise<any | null> => {
   const accessToken = await getUserToken();
-  const userAddress = await getUserAddressFromToken(accessToken);
   if (!accessToken) return null;
 
   try {

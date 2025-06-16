@@ -42,5 +42,4 @@ export const contractCall = async (
     }
   );
   return response.data[0];
-  
 };

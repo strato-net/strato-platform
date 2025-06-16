@@ -16,37 +16,37 @@ interface BridgeOutParams {
   accessToken: string;
 }
 
-const BRIDGE_API_BASE_URL = process.env.BRIDGE_API_BASE_URL || 'http://localhost:3002';
+const BRIDGE_API_BASE_URL = process.env.BRIDGE_API_BASE_URL || 'http://localhost:3003';
 
 export class BridgeService {
   public async bridgeIn(params: BridgeInParams): Promise<any> {
     try {
-      // Make API call to bridge service
       const response = await axios.post(
         `${BRIDGE_API_BASE_URL}/api/bridge/bridgeIn`,
         {
           fromAddress: params.fromAddress,
           amount: params.amount,
           tokenAddress: params.tokenAddress,
-          accessToken: params.accessToken,
           ethHash: params.ethHash || ''
         },
         {
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${params.accessToken}`
           }
         }
       );
-
+  
       return {
         status: response.data.status,
         hash: response.data.hash,
       };
     } catch (error: any) {
-      console.log("error",error.message);
+      console.log("error", error.message);
       throw error;
     }
   }
+  
 
   public async bridgeOut(params: BridgeOutParams): Promise<any> {
     try {
@@ -56,11 +56,11 @@ export class BridgeService {
           amount: params.amount,
           toAddress: params.toAddress,
           tokenAddress: params.tokenAddress,
-          accessToken: params.accessToken
         },
         {
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${params.accessToken}`
           }
         }
       );
@@ -83,11 +83,11 @@ export class BridgeService {
         `${BRIDGE_API_BASE_URL}/api/bridge/stratoTokenBalance`,
         {
           tokenAddress: params.tokenAddress,
-          accessToken: params.accessToken
         },
         {
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${params.accessToken}`
           }
         }
       );
