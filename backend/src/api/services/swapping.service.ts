@@ -4,10 +4,9 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getInputPrice } from "../helpers/swapping.helper";
-import { approveAsset } from "../helpers/tokens.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 
-const { poolSelectFields, Pool, PoolFactory, PriceOracle } = constants;
+const { poolSelectFields, Pool, PoolFactory, Token, PriceOracle } = constants;
 
 export const getPools = async (
   accessToken: string,
@@ -92,38 +91,35 @@ export const addLiquidity = async (
     }
     const pool = pools[0];
 
-    await approveAsset(
-      accessToken,
-      pool.tokenAAddress || "",
-      body.address || "",
-      body.max_tokenA_amount || ""
-    );
-
-    await approveAsset(
-      accessToken,
-      pool.tokenBAddress || "",
-      body.address || "",
-      body.tokenB_amount || ""
-    );
-
-    const tx = buildFunctionTx({
-      contractName: extractContractName(Pool),
-      contractAddress: body.address || "",
-      method: "addLiquidity",
-      args: {
-        tokenB_amount: body.tokenB_amount,
-        max_tokenA_amount: body.max_tokenA_amount,
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: pool.tokenAAddress || "",
+        method: "approve",
+        args: { spender: body.address || "", value: body.max_tokenA_amount || "" },
       },
-    });
+      {
+        contractName: extractContractName(Token),
+        contractAddress: pool.tokenBAddress || "",
+        method: "approve",
+        args: { spender: body.address || "", value: body.tokenB_amount || "" },
+      },
+      {
+        contractName: extractContractName(Pool),
+        contractAddress: body.address || "",
+        method: "addLiquidity",
+        args: {
+          tokenB_amount: body.tokenB_amount,
+          max_tokenA_amount: body.max_tokenA_amount,
+        },
+      }
+    ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
     console.error("Error adding liquidity:", error);
     throw error;
@@ -202,33 +198,31 @@ export const swap = async (
 
     const token = isTokenAToTokenB ? pool.tokenAAddress : pool.tokenBAddress;
 
-    await approveAsset(
-      accessToken,
-      token || "",
-      body.address || "",
-      body.amount || ""
-    );
-
-    const tx = buildFunctionTx({
-      contractName: extractContractName(Pool),
-      contractAddress: body.address || "",
-      method: body.method || "",
-      args: {
-        [isTokenAToTokenB ? "tokenA_sold" : "tokenB_sold"]: body.amount,
-        [isTokenAToTokenB ? "min_tokenB" : "min_tokens"]: body.min_tokens,
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: token || "",
+        method: "approve",
+        args: { spender: body.address || "", value: body.amount || "" },
       },
-    });
+      {
+        contractName: extractContractName(Pool),
+        contractAddress: body.address || "",
+        method: body.method || "",
+        args: {
+          [isTokenAToTokenB ? "tokenA_sold" : "tokenB_sold"]: body.amount,
+          [isTokenAToTokenB ? "min_tokenB" : "min_tokens"]: body.min_tokens,
+        },
+      }
+    ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
-    console.error("Error swapping:", error);
+    console.error("Error swapping tokens:", error);
     throw error;
   }
 };
