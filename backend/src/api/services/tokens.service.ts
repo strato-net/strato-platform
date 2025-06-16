@@ -204,3 +204,29 @@ export const transferFromToken = async (
     throw error;
   }
 };
+
+export const setTokenStatus = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  try {
+    const tx = buildFunctionTx({
+      contractName: extractContractName(TokenFactory),
+      contractAddress: tokenFactory,
+      method: "setTokenStatus",
+      args: {
+        token: body.address,
+        newStatus: body.status,
+      },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    console.error("Error setting token status:", error);
+    throw error;
+  }
+};

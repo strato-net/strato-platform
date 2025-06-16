@@ -22,6 +22,7 @@ router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create)
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
+router.post("/tokens/setStatus", authHandler.authorizeRequest(), TokensController.setStatus);
 
 router.get("/swap/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
 router.get("/swap/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
