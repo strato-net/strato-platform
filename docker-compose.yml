@@ -12,6 +12,7 @@ services:
       - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
       - POOL_FACTORY=${POOL_FACTORY}
       - LENDING_POOL=${LENDING_POOL}
+      - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ONRAMP=${ONRAMP}
     restart: unless-stopped
     logging:
