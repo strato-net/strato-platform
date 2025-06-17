@@ -39,19 +39,33 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           try {
             const response = await api.get('/users/me');
             const newUserAddress = response.data.userAddress;
+            const serverIsAdmin = response.data.isAdmin;
             if (newUserAddress !== userAddress) {
               localStorage.setItem("user", JSON.stringify(response.data));
               setUserAddress(newUserAddress);
             }
+            if (serverIsAdmin !== isAdmin) {
+              setIsAdmin(serverIsAdmin);
+            }
           } catch (error) {
             // If we can't fetch user details but auth check passed, 
             // still consider user as authenticated
+          }
+        } else {
+          // Use stored user data if available
+          const userData = JSON.parse(storedUser);
+          if (userData.userAddress !== userAddress) {
+            setUserAddress(userData.userAddress);
+          }
+          if (userData.isAdmin !== undefined && userData.isAdmin !== isAdmin) {
+            setIsAdmin(userData.isAdmin);
           }
         }
       } else {
         if (userAddress) {
           localStorage.removeItem("user");
           setUserAddress(null);
+          setIsAdmin(false);
         }
       }
     } catch (error) {
@@ -61,17 +75,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-const checkAdminStatus = async () => {
-  if (userAddress) {
-    const adminAddresses = import.meta.env.VITE_ADMIN_ADDRESSES?.split(',') || [];
-    const isAdmin = adminAddresses.includes(userAddress);
-    setIsAdmin(isAdmin);
-  }
-};
 
   const refreshAuth = () => {
     checkAuthenticationStatus();
-    checkAdminStatus();
   };
 
   useEffect(() => {
@@ -85,10 +91,6 @@ const checkAdminStatus = async () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Check admin status whenever userAddress changes
-  useEffect(() => {
-    checkAdminStatus();
-  }, [userAddress]);
 
   const contextValue = useMemo(() => ({
     userAddress,
