@@ -53,15 +53,13 @@ router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get)
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
 router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
 
-router.post("/bridge/bridgeIn", authHandler.authorizeRequest(true), bridgeController.bridgeIn);
-router.post("/bridge/bridgeOut", authHandler.authorizeRequest(true), bridgeController.bridgeOut);
-router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(true), bridgeController.getBalance);
-router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(true), bridgeController.getBridgeInTokens);
-router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(true), bridgeController.getBridgeOutTokens);
-router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(true), bridgeController.userDepositStatus);
-router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(true), bridgeController.userWithdrawalStatus);
-
-
+router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
+router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
+router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(), bridgeController.getBalance);
+router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(), bridgeController.getBridgeInTokens);
+router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(), bridgeController.getBridgeOutTokens);
+router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(), bridgeController.userDepositStatus);
+router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(), bridgeController.userWithdrawalStatus);
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({

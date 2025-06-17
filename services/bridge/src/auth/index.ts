@@ -34,8 +34,26 @@ const CACHED_DATA: {
 
 const TOKEN_LIFETIME_RESERVE_SECONDS = 120; // Reserve 2 minutes for token expiration check
 
+// Add singleton pattern for OAuth initialization
+let oauthInitialized = false;
+let oauthInstance: any = null;
 
-export const getUserToken = async (): Promise<string> => {
+export const initOpenIdConfig = async () => {
+  // If already initialized, return immediately
+  if (oauthInitialized) {
+    return;
+  }
+
+  try {
+    oauthInstance = await OAuthUtil.init(oauthConfig);
+    oauthInitialized = true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+export const getBAUserToken = async (): Promise<string> => {
   if (!config.auth.baUsername) {
     throw new Error('BA_USERNAME is not configured');
   }
@@ -54,15 +72,16 @@ export const getUserToken = async (): Promise<string> => {
   }
 
   try {
-    // Initialize OAuth only if no valid cached token is available
-    const oauth = await OAuthUtil.init(oauthConfig);
+    if (!oauthInstance) {
+      throw new Error('OAuth not initialized. Call initOpenIdConfig first');
+    }
 
     if (!config.auth.baPassword) {
       throw new Error('BA_PASSWORD is not configured');
     }
 
     // Fetch a new token using Resource Owner Password Credentials
-    const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
+    const tokenObj = await oauthInstance.getAccessTokenByResourceOwnerCredential(
       config.auth.baUsername,
       config.auth.baPassword
     );

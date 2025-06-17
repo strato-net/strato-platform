@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getUserToken } from "../auth";
+import { getBAUserToken } from "../auth";
 
 export const contractCall = async (
   contractName: string,
@@ -7,7 +7,7 @@ export const contractCall = async (
   method: string,
   args: any,
 ) => {
-  const accessToken = await getUserToken();
+  const accessToken = await getBAUserToken();
 
   const txPayload = {
     txs: [

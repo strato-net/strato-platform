@@ -31,7 +31,7 @@ class OAuthUtil {
   private openIdDiscoveryUrl: string;
   private scope: string;
   private tokenField: string;
-  private tokenEndpoint: string = '';
+  private tokenEndpoint: string = "";
   private oauth2: any;
 
   constructor(config: OAuthConfig) {
@@ -43,94 +43,89 @@ class OAuthUtil {
   }
 
   /**
-   * Initialize OAuth configuration by fetching OpenID configuration
-   */
-  private async getOpenIdConfig() {
-    try {
-      const response = await axios.get(this.openIdDiscoveryUrl);
-      const config = response.data;
-      this.tokenEndpoint = config.token_endpoint;
-      
-      // Initialize OAuth2 client
-      const credentials = {
-        client: {
-          id: this.clientId,
-          secret: this.clientSecret
-        },
-        auth: {
-          tokenHost: new URL(this.tokenEndpoint).origin,
-          tokenPath: new URL(this.tokenEndpoint).pathname
-        }
-      };
-
-      // @ts-ignore - ResourceOwnerPassword exists at runtime but not in types
-      this.oauth2 = new simpleOauth2.ResourceOwnerPassword(credentials);
-      
-    } catch (error: any) {
-      console.error('❌ OpenID Configuration Error:', {
-        error: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status
-      });
-      throw new Error(`Failed to fetch OpenID configuration: ${error?.message || 'Unknown error'}`);
-    }
-  }
-
-  /**
    * Initialize OAuth utility
    */
   static async init(config: OAuthConfig): Promise<OAuthUtil> {
     try {
       const oauth = new OAuthUtil(config);
-      await oauth.getOpenIdConfig();
+
+      // Fetch OpenID configuration
+      const response = await axios.get(oauth.openIdDiscoveryUrl);
+      const openIdConfig = response.data;
+      oauth.tokenEndpoint = openIdConfig.token_endpoint;
+
+      // Initialize OAuth2 client
+      const credentials = {
+        client: {
+          id: oauth.clientId,
+          secret: oauth.clientSecret,
+        },
+        auth: {
+          tokenHost: new URL(oauth.tokenEndpoint).origin,
+          tokenPath: new URL(oauth.tokenEndpoint).pathname,
+        },
+      };
+
+      // @ts-ignore - ResourceOwnerPassword exists at runtime but not in types
+      oauth.oauth2 = new simpleOauth2.ResourceOwnerPassword(credentials);
+
       return oauth;
     } catch (error: any) {
-      console.error('❌ OAuth Initialization Error:', {
+      console.error("❌ OAuth Initialization Error:", {
         error: error?.message,
-        stack: error?.stack
+        response: error?.response?.data,
+        status: error?.response?.status,
+        stack: error?.stack,
       });
-      throw new Error(`Failed to initialize OAuth: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to initialize OAuth: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
   /**
    * Get access token using resource owner credentials
    */
-  async getAccessTokenByResourceOwnerCredential(username: string, password: string): Promise<TokenResponse> {
+  async getAccessTokenByResourceOwnerCredential(
+    username: string,
+    password: string
+  ): Promise<TokenResponse> {
     try {
       const tokenParams = {
         username,
         password,
-        scope: this.scope
+        scope: this.scope,
       };
 
       const result = await this.oauth2.getToken(tokenParams);
-      
+
       // Ensure all numeric values are properly converted
       const tokenData = {
         ...result.token,
         expires_in: Number(result.token.expires_in) || 0,
         refresh_expires_in: Number(result.token.refresh_expires_in) || 0,
-        expires_at: (Date.now() / 1000) + (Number(result.token.expires_in) || 0)
+        expires_at: Date.now() / 1000 + (Number(result.token.expires_in) || 0),
       };
 
       return {
-        token: tokenData
+        token: tokenData,
       };
     } catch (error: any) {
-      console.error('❌ Token Request Error:', {
+      console.error("❌ Token Request Error:", {
         error: error?.message,
         response: error?.response?.data,
         status: error?.response?.status,
         config: {
           tokenEndpoint: this.tokenEndpoint,
           scope: this.scope,
-          clientId: this.clientId
-        }
+          clientId: this.clientId,
+        },
       });
-      throw new Error(`Failed to get access token: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to get access token: ${error?.message || "Unknown error"}`
+      );
     }
   }
 }
 
-export default OAuthUtil; 
+export default OAuthUtil;

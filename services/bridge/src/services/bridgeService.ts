@@ -208,6 +208,16 @@ export const confirmBridgeOut = async (tx: any) => {
   });
 };
 
+export const confirmBridgeOutSafePolling = async (tx: any) => {
+  console.log("confirmBridgeOutSafePolling tx.safeTxHash", tx.safeTxHash);
+  const safeTxHash = tx.safeTxHash.toString().replace("0x", "");
+
+  const bridgeContract = new BridgeContractCall();
+  await bridgeContract.confirmWithdrawal({
+    txHash: safeTxHash,
+  });
+};
+
 export const userDepositStatus = async (
   status: string,
   limit?: number,

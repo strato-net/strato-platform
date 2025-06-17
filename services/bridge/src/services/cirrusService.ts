@@ -1,6 +1,5 @@
 import axios from 'axios';
-import { getUserToken } from '../auth';
-import { getUserAddressFromToken } from '../utils';
+import { getBAUserToken } from '../auth';
 import { getExchangeTokenInfoBridgeOut, TESTNET_STRATO_TOKENS } from '../config';
 
 const NODE_URL = process.env.NODE_URL;
@@ -16,7 +15,7 @@ export const fetchDepositInitiatedStatus = async (
   pageNo?: string,
   userAddress?: string
 ): Promise<any | null> => {
-  const accessToken = await getUserToken();
+  const accessToken = await getBAUserToken();
   if (!accessToken) return null;
 
   try {
@@ -107,7 +106,7 @@ export const fetchWithdrawalInitiatedStatus = async (
   pageNo?: string,
   userAddress?: string
 ): Promise<any | null> => {
-  const accessToken = await getUserToken();
+  const accessToken = await getBAUserToken();
   if (!accessToken) return null;
 
   try {
@@ -192,7 +191,7 @@ export const fetchWithdrawalInitiatedStatus = async (
 
 
 export const fetchDepositInitiated = async (txHash: string): Promise<any | null> => {
-  const accessToken = await getUserToken();
+  const accessToken = await getBAUserToken();
 
   if (!accessToken) return null;
   try {
@@ -207,3 +206,6 @@ export const fetchDepositInitiated = async (txHash: string): Promise<any | null>
     return null;
   }
 }; 
+
+
+
