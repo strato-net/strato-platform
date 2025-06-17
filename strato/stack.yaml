@@ -125,16 +125,10 @@ extra-deps:
 - git: https://github.com/dustinnorwood/streaming-commons
   commit: cc6bca3d93a7bd427c5c7c982af508d7d27df184
 
-#- ghcjs-base-0.8.0.3@sha256:a23db54f318e1698d0a52dd590e4f2aed7c150ceb7f56199f642d9996e719234,6928 # uncomment for GHCJS
-#- ghcjs-dom-javascript-0.9.9.3@sha256:04491fac02630350a0b779b8b1e0442dba332e8242196a325f94574c857f39c1,83306 # uncomment for GHCJS
-
-
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
-# arch: aarch64 # uncomment for MacOS and GHC
-#arch: javascript # uncomment for GHCJS
-#compiler: ghc-9.12.2 # uncomment for GHCJS
+# arch: aarch64 # uncomment for MacOS
 
 flags:
   blockapps-secp256k1-haskell:
