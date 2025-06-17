@@ -68,7 +68,7 @@ contract Mercata {
         Ownable(poolConfigurator).transferOwnership(msg.sender);
         
         poolFactory = new PoolFactory(msg.sender, address(tokenFactory));
-        mercataEthBridge = new MercataEthBridge(msg.sender);
+        mercataEthBridge = new MercataEthBridge(msg.sender,address(tokenFactory));
         onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory));
     }
 }
