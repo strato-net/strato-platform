@@ -46,6 +46,7 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
   LENDING_POOL=0x1005 \
   ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
+  ADMIN_ADDRESS="" \
   npm run dev
 ```
 - `NETWORK` options are: `testnet|prod`.

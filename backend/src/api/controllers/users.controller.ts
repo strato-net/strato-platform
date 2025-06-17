@@ -13,7 +13,8 @@ class UsersController {
       if (!userAddress) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "User not found" });
       } else {
-        res.status(RestStatus.OK).json({ userAddress });
+        const isAdmin = userAddress === process.env.ADMIN_ADDRESS;
+        res.status(RestStatus.OK).json({ userAddress, isAdmin });
       }
 
       next();
