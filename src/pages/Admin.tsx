@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft } from 'lucide-react';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
 import ListAssetForm from '@/components/admin/ListAssetForm';
+import SetTokenStatusForm from '@/components/admin/SetTokenStatusForm';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ const Admin = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-4xl">
+          <TabsList className="grid grid-cols-5 w-full max-w-5xl">
             <TabsTrigger value="tokens" className="flex items-center space-x-2">
               <Coins className="h-4 w-4" />
               <span>Create Tokens</span>
@@ -58,6 +59,10 @@ const Admin = () => {
             <TabsTrigger value="pricing" className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4" />
               <span>Set Prices</span>
+            </TabsTrigger>
+            <TabsTrigger value="status" className="flex items-center space-x-2">
+              <ToggleLeft className="h-4 w-4" />
+              <span>Token Status</span>
             </TabsTrigger>
             <TabsTrigger value="listing" className="flex items-center space-x-2">
               <Settings className="h-4 w-4" />
@@ -103,6 +108,20 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <SetAssetPriceForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="status" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Set Token Status</CardTitle>
+                <CardDescription>
+                  Update token status (PENDING, ACTIVE, LEGACY)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SetTokenStatusForm />
               </CardContent>
             </Card>
           </TabsContent>

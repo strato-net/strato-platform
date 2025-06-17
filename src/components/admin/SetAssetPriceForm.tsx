@@ -5,12 +5,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PriceFormValues, Token } from '@/interface';
+import { PriceFormValues } from '@/interface';
 import { Loader2, Info, DollarSign} from 'lucide-react';
-import {api} from '@/lib/axios';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLendingContext } from '@/context/LendingContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useUser } from '@/context/UserContext';
@@ -18,7 +16,6 @@ import { useUser } from '@/context/UserContext';
 
 const SetAssetPriceForm = () => {
   const [loading, setLoading] = useState(false);
-  const [tokensWithPrices, setTokensWithPrices] = useState<any[]>([]);
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
@@ -34,26 +31,10 @@ const SetAssetPriceForm = () => {
   const selectedToken = Array.isArray(tokens) ? tokens.find(t => t.address === form.watch('tokenAddress')) : null;
 
   useEffect(() => {
-    fetchTokensWithPrices();
     if (userAddress) {
       fetchTokens(userAddress);
     }
   }, [userAddress]);
-
-  const fetchTokensWithPrices = async () => {
-    try {
-      const response = await api.get('/admin/tokens/prices');
-      const tokenData = Array.isArray(response.data) ? response.data : [];
-      setTokensWithPrices(tokenData);
-      
-      if (!Array.isArray(response.data)) {
-        console.error('Expected array of token prices but got:', response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching token prices:', error);
-      setTokensWithPrices([]);
-    }
-  };
 
   const onSubmit = async (data: PriceFormValues) => {
     setLoading(true);
@@ -65,13 +46,15 @@ const SetAssetPriceForm = () => {
 
       await setPrice(payload);
 
+      console.log('Setting price with payload:', payload);
+      console.log('Selected token:', selectedToken);
+
       toast({
         title: 'Price Updated Successfully',
-        description: `Price for ${selectedToken?._symbol} has been set to $${data.price}`,
+        description: `Price for ${selectedToken?.token?._symbol} has been set to $${data.price}`,
       });
 
       form.reset();
-      fetchTokensWithPrices(); // Refresh prices
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
       toast({
@@ -189,18 +172,6 @@ const SetAssetPriceForm = () => {
           </div>
         </form>
       </Form>
-
-      {/* Price History Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Price Updates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-gray-500 text-center py-4">
-            Price history will be displayed here once available
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

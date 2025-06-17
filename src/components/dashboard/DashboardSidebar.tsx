@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const navigate = useNavigate();
-  const { logout } = useUser();
+  const { logout, isAdmin } = useUser();
 
-  const navItems = [
+  const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
     { icon: <Wallet size={20} />, label: 'Assets', path: '/dashboard/assets' },
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
@@ -17,6 +16,8 @@ const DashboardSidebar = () => {
     { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
   ];
+
+  const navItems = allNavItems.filter(item => item.label !== 'Admin' || isAdmin);
 
   return (
     <div 

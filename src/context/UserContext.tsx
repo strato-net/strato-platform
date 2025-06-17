@@ -9,6 +9,7 @@ interface UserContextType {
   userAddress: string | null;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
+  isAdmin: boolean;
   logout: () => void;
   refreshAuth: () => void;
   loading: boolean;
@@ -19,6 +20,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
@@ -59,8 +61,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+const checkAdminStatus = async () => {
+  if (userAddress) {
+    const adminAddresses = import.meta.env.VITE_ADMIN_ADDRESSES?.split(',') || [];
+    const isAdmin = adminAddresses.includes(userAddress);
+    setIsAdmin(isAdmin);
+  }
+};
+
   const refreshAuth = () => {
     checkAuthenticationStatus();
+    checkAdminStatus();
   };
 
   useEffect(() => {
@@ -74,14 +85,20 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Check admin status whenever userAddress changes
+  useEffect(() => {
+    checkAdminStatus();
+  }, [userAddress]);
+
   const contextValue = useMemo(() => ({
     userAddress,
     setUserAddress,
     isLoggedIn,
+    isAdmin,
     logout,
     refreshAuth,
     loading,
-  }), [userAddress, isLoggedIn, loading]);
+  }), [userAddress, isLoggedIn, isAdmin, loading]);
 
   return (
     <UserContext.Provider value={contextValue}>
