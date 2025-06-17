@@ -1,3 +1,6 @@
+import "./LendingRegistry.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+
 /**
  * @title LiquidityPool
  * @notice Manages token liquidity for lending and borrowing, including ERC20 token transfers.
@@ -58,8 +61,6 @@
         string key = _key(to, asset);
         require(deposited[key].amount >= amount, "Insufficient balance");
         deposited[key].amount -= amount;
-        deposited[key].user = deposited[key].user;
-        deposited[key].asset = deposited[key].asset;
         totalLiquidity[asset] -= amount;
         require(IERC20(asset).transfer(to, amount), "Withdraw failed");
         emit Withdrawn(to, asset, amount);
@@ -87,8 +88,6 @@
         require(borrowed[key].amount > 0, "No outstanding debt");
         uint256 repayAmount = amount > totalOwed ? totalOwed : amount;
         borrowed[key].amount -= repayAmount;
-        borrowed[key].user = borrowed[key].user;
-        borrowed[key].asset = borrowed[key].asset;
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Repay failed");
         totalLiquidity[asset] += repayAmount;
         emit Repaid(borrower, asset, repayAmount);

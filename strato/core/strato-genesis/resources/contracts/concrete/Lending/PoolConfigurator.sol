@@ -1,3 +1,7 @@
+import "./LendingRegistry.sol";
+import "./LendingPool.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+
 /**
  * @title PoolConfigurator
  * @notice Governance contract responsible for updating addresses in the LendingRegistry
@@ -51,5 +55,10 @@ contract record PoolConfigurator is Ownable {
 
     function setLiquidationBonus(address asset, uint256 newBonus) external onlyOwner {
         registry.lendingPool().setLiquidationBonus(asset, newBonus);
+    }
+
+    // Token Factory
+    function setTokenFactory(address _tokenFactory) external onlyOwner {
+        registry.lendingPool().setTokenFactory(_tokenFactory);
     }
 }

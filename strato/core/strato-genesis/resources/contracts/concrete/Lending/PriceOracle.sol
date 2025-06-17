@@ -1,3 +1,5 @@
+import "../../abstract/ERC20/access/Ownable.sol";
+
 /**
  * @title PriceOracle
  * @notice Provides asset price feeds used for loan value and collateral validation.
@@ -5,14 +7,18 @@
  */
  
  contract record PriceOracle is Ownable {
-   constructor(address initialOwner) Ownable(initialOwner) {      
-    } 
-     event PriceUpdated(address indexed asset, uint256 price);
+    event PriceUpdated(address asset, uint256 price);
 
     mapping(address => uint256) public record prices;
+    TokenFactory public tokenFactory;
+
+   constructor(address initialOwner, address _tokenFactory) Ownable(initialOwner) {      
+        tokenFactory = TokenFactory(_tokenFactory);
+    } 
 
     function setAssetPrice(address asset, uint256 price) external onlyOwner {
         require(price > 0, "Invalid price");
+        require(tokenFactory.isTokenActive(asset), "Token not active");
         prices[asset] = price;
         emit PriceUpdated(asset, price);
     }
@@ -21,6 +27,10 @@
         uint256 price = prices[asset];
         require(price > 0, "Price not set");
         return price;
+    }
+
+    function setTokenFactory(address _tokenFactory) external onlyOwner {
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
 }

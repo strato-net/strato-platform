@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
+import "../Tokens/Token.sol";
+import "../Tokens/TokenFactory.sol";
+
 //Removed deadlineCheck for now
 //Removed slippage protection as it is pbft
- contract record Pool {
+contract record Pool {
     
     // Events
     event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
@@ -12,6 +15,7 @@
     Token public tokenA;
     Token public tokenB;
     Token public lpToken;
+    TokenFactory public tokenFactory;
 
     bool private locked;   
     
@@ -30,11 +34,30 @@
 
     constructor(
         address tokenAAddr, 
-        address tokenBAddr
+        address tokenBAddr,
+        address _tokenFactory
     ) {
-        lpToken = new Token(ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token", "", [], [], [], ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP", 0, 18);
+        require(_tokenFactory != address(0), "Zero token factory address");
+        tokenFactory = TokenFactory(_tokenFactory);
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
+        
+        // Create LP token through token factory
+        string lpName = ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token";
+        string lpSymbol = ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP";
+        
+        address lpTokenAddress = tokenFactory.createToken(
+            lpName,
+            "Liquidity Provider Token",
+            [],
+            [],
+            [],
+            lpSymbol,
+            0,
+            18
+        );
+        
+        lpToken = Token(lpTokenAddress);
     }
 
     function updateStateVars() internal {
@@ -86,7 +109,6 @@
 
             return initial_liquidity;
         }
-
     }
 
     function removeLiquidity(

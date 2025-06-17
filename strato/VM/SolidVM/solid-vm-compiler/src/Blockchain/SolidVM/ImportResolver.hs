@@ -161,7 +161,7 @@ resolveFile ::
   EndoM (ExceptT Text m) (S.Set Text, ImportMapF a)
 resolveFile getCCFromHash expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
-    then throwE . T.concat $ "Circular reference identified: " : S.toList seen
+    then pure (seen, resolved)
     else case expr of
       AccountLiteral _ acct -> do
         lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
@@ -176,13 +176,12 @@ resolveFile getCCFromHash expr (seen, resolved) =
       StringLiteral _ fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of
-              Nothing -> throwE $ "Could not find file by name of " <> fileName
-              Just (Right _) -> pure (seen, resolved)
               Just (Left l) ->
                 let eResolved' = snd <$> foldrM (doResolve getCCFromHash fileName) (S.insert fileName seen, resolved) (l ^. ufuImports)
                  in fmap (seen,) . flip fmap eResolved' . flip M.adjust fileName $ \case
                       Left u -> Right . FileUnits (u ^. ufuPragmas) $ M.singleton Nothing (u ^. ufuUnits)
                       Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
+              _ -> pure (seen, resolved)
       _ -> throwE . T.pack $ "Unsupported expression in import: " ++ unparseExpression expr
 
 codeCollectionToFileUnits :: Maybe Address -> CodeCollectionF a -> FileUnitsF a
@@ -227,7 +226,7 @@ resolvePath fileName (StringLiteral a path') =
   let path = T.pack path'
       fileDir = tail . reverse $ T.splitOn "/" fileName
       pathDir = T.splitOn "/" path
-   in maybe (throwE $ "Could not resolve path: " <> path) (pure . lit' a) $ resolvePath' fileDir pathDir
+   in maybe (pure $ StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
 resolvePath _ expr = pure expr
 
 resolvePath' :: [Text] -> [Text] -> Maybe Text

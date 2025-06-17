@@ -1,3 +1,10 @@
+import "../../abstract/ERC20/access/Ownable.sol";
+import "./LendingPool.sol";
+import "./LiquidityPool.sol";
+import "./CollateralVault.sol";
+import "./RateStrategy.sol";
+import "./PriceOracle.sol";
+
 /**
  * @title LendingRegistry
  * @notice Central registry contract storing addresses of core lending protocol components.
