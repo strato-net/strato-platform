@@ -81,7 +81,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
-import Control.Lens ((%~))
+import Control.Lens ((.~), (%~))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -104,7 +104,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
-import SolidVM.Model.CodeCollection (FunctionCallType(..), invalidPragmasUsed)
+import SolidVM.Model.CodeCollection (FunctionCallType(..), emptyCodeCollection, invalidPragmasUsed)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -422,8 +422,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  feeResult <- payFees b availableGas tAddr t proposer
-  let attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
+  feeResult' <- payFees b availableGas tAddr t proposer
+  let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
+      attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
 
   if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
     then do
