@@ -45,6 +45,7 @@ interface TokenInputProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   label: string;
+  onFocus: () => void;
 }
 
 interface SwapState {
@@ -62,6 +63,7 @@ interface SwapState {
   toBalanceLoading: boolean;
   swapLoading: boolean;
   slippage: number;
+  editingField: 'from' | 'to' | null;
 }
 
 // Format amount for display
@@ -137,7 +139,8 @@ const TokenInput = ({
   tokens,
   isOpen,
   onOpenChange,
-  label
+  label,
+  onFocus
 }: TokenInputProps) => (
   <div className="bg-gray-50 p-4 rounded-lg">
     <div className="flex justify-between mb-2">
@@ -157,6 +160,7 @@ const TokenInput = ({
               onChange(value);
             }
           }}
+          onFocus={onFocus}
           placeholder="0.00"
           inputMode="decimal"
           className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none${
@@ -252,7 +256,8 @@ const SwapAsset = () => {
     fromBalanceLoading: false,
     toBalanceLoading: false,
     swapLoading: false,
-    slippage: 4
+    slippage: 4,
+    editingField: null
   });
 
   const [autoSlippage, setAutoSlippage] = useState(true);
@@ -330,7 +335,7 @@ const SwapAsset = () => {
           signal: swapPollAbortRef.current.signal,
         });
         const result = BigInt(swapAmount || "0");
-        if (isMounted && currentRequest === requestId) {
+        if (isMounted && currentRequest === requestId && (state.editingField === 'from' || state.editingField === null)) {
           setState(prev => ({
             ...prev,
             toAmount: formatUnits(result, decimals)
@@ -349,7 +354,7 @@ const SwapAsset = () => {
       requestId++;
       if (swapPollAbortRef.current) swapPollAbortRef.current.abort();
     };
-  }, [state.pool, state.fromAsset, state.toAsset, state.fromAmount, calculateSwap]);
+  }, [state.pool, state.fromAsset, state.toAsset, state.fromAmount, calculateSwap, state.editingField]);
 
   const handleSwapAssets = () => {
     setState(prev => ({
@@ -402,10 +407,12 @@ const SwapAsset = () => {
       const parsedValue = parseUnits(inputAmount || "0", decimals);
       const inputBalance = BigInt(inputAsset.balance?.toString() || "0");
 
-      setState(prev => ({
-        ...prev,
-        wrongAmount: parsedValue > inputBalance
-      }));
+      if (isFromInput) {
+        setState(prev => ({
+          ...prev,
+          wrongAmount: parsedValue > inputBalance
+        }));
+      }
 
       const direction = state.pool.tokenA?.address === inputAsset.address ? false : true;
       const swapAmount = await calculateSwap({
@@ -417,10 +424,15 @@ const SwapAsset = () => {
 
       const result = BigInt(swapAmount || "0");
       
-      setState(prev => ({
-        ...prev,
-        [`${isFromInput ? 'to' : 'from'}Amount`]: formatUnits(result, decimals)
-      }));
+      setState(prev => {
+        if ((isFromInput && prev.editingField === 'from') || (!isFromInput && prev.editingField === 'to')) {
+          return {
+            ...prev,
+            [`${isFromInput ? 'to' : 'from'}Amount`]: formatUnits(result, decimals)
+          };
+        }
+        return prev;
+      });
     } catch (err: any) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       console.error("Conversion error:", err);
@@ -432,7 +444,8 @@ const SwapAsset = () => {
 
     setState(prev => ({
       ...prev,
-      [`${isFromInput ? 'from' : 'to'}Amount`]: value
+      [`${isFromInput ? 'from' : 'to'}Amount`]: value,
+      editingField: isFromInput ? 'from' : 'to'
     }));
 
     if (!state.pool || isZero || value === "") {
@@ -521,6 +534,7 @@ const SwapAsset = () => {
                 isOpen={state.fromPopoverOpen}
                 onOpenChange={(open) => setState(prev => ({ ...prev, fromPopoverOpen: open }))}
                 label="From"
+                onFocus={() => setState(prev => ({ ...prev, editingField: 'from' }))}
               />
 
               <div className="flex justify-center">
@@ -540,12 +554,13 @@ const SwapAsset = () => {
                 asset={state.toAsset}
                 balance={state.toAsset?.balance || 0}
                 isLoading={state.toBalanceLoading}
-                wrongAmount={state.wrongAmount}
+                wrongAmount={false}
                 onSelect={(asset) => getTokenBalance(asset, false)}
                 tokens={pairableTokens}
                 isOpen={state.toPopoverOpen}
                 onOpenChange={(open) => setState(prev => ({ ...prev, toPopoverOpen: open }))}
                 label="To"
+                onFocus={() => setState(prev => ({ ...prev, editingField: 'to' }))}
               />
 
               <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
