@@ -1,0 +1,81 @@
+{
+  "feeds": [
+    {
+      "name": "ETH-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "0xETHAssetAddress",
+      "cron": "*/5 * * * *",
+      "apiParams": {
+        "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      },
+      "minPrice": 100000000,
+      "maxPrice": 1000000000000
+    },
+    {
+      "name": "WBTC-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "0xWBTCAssetAddress",
+      "cron": "*/5 * * * *",
+      "apiParams": {
+        "tokenAddress": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+      },
+      "minPrice": 1000000000,
+      "maxPrice": 10000000000000
+    },
+    {
+      "name": "USDC-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "0xUSDCAssetAddress",
+      "cron": "*/10 * * * *",
+      "apiParams": {
+        "tokenAddress": "0xA0b86a33E6441b8435b662763C0E2c6C8c8c8c8c"
+      },
+      "minPrice": 90000000,
+      "maxPrice": 110000000
+    },
+    {
+      "name": "USDT-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "0xUSDTAssetAddress",
+      "cron": "*/10 * * * *",
+      "apiParams": {
+        "tokenAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      },
+      "minPrice": 90000000,
+      "maxPrice": 110000000
+    },
+    {
+      "name": "PAXG-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "0xPAXGAssetAddress",
+      "cron": "*/15 * * * *",
+      "apiParams": {
+        "tokenAddress": "0x45804880De22913dAFE09f4980848ECE6EcbAf78"
+      },
+      "minPrice": 180000000000,
+      "maxPrice": 250000000000
+    },
+    {
+      "name": "XAU-USD",
+      "source": "Metals.dev",
+      "targetAssetAddress": "0xGoldAssetAddress",
+      "cron": "30 9,15 * * *",
+      "apiParams": {
+        "symbol": "XAU"
+      },
+      "minPrice": 180000000000,
+      "maxPrice": 300000000000
+    },
+    {
+      "name": "XAG-USD",
+      "source": "Metals.dev",
+      "targetAssetAddress": "0xSilverAssetAddress",
+      "cron": "30 9,15 * * *",
+      "apiParams": {
+        "symbol": "XAG"
+      },
+      "minPrice": 2000000000,
+      "maxPrice": 5000000000
+    }
+  ]
+} 

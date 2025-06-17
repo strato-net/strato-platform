@@ -1,0 +1,23 @@
+{
+  "Alchemy": {
+    "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/latest?network=eth-mainnet&addresses[]=${tokenAddress}",
+    "apiKeyEnvVar": "ALCHEMY_API_KEY",
+    "parsePath": "prices[0].price.value",
+    "feedTimestampPath": "prices[0].timestamp"
+  },
+  "Metals.dev": {
+    "urlTemplate": "https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&symbol=${symbol}",
+    "apiKeyEnvVar": "METALS_API_KEY",
+    "parsePath": "meta.rate",
+    "feedTimestampPath": "meta.timestamp"
+  },
+  "LBMA": {
+    "urlTemplate": "https://api.lbma.org.uk/json/lbma-${metal}",
+    "parsePath": "0.usd",
+    "feedTimestampPath": "0.date"
+  },
+  "CoinGecko": {
+    "urlTemplate": "https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&precision=full",
+    "parsePath": "${coinId}.usd"
+  }
+} 
