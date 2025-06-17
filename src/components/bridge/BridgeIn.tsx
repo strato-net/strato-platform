@@ -349,7 +349,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
         toast({
           title: "Transaction Successful",
-          description: `Successfully bridged ${amount} ${selectedToken?.symbol}`,
+          description: `Successfully transferred ${amount} ${selectedToken?.symbol}`,
         });
       }
     } catch (error: any) {
