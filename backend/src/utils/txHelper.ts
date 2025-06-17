@@ -31,37 +31,34 @@ export const postAndWaitForTx = async (
   timeout: number = 60000
 ): Promise<{ status: string; hash: string }> => {
   const response = await stratoPostFn();
-
+  
   if (response.status !== 200) {
     throw new Error(`Strato error: ${response.statusText}`);
   }
 
-  if (!response.data || !Array.isArray(response.data)) {
-    throw new Error("Strato response data is empty or invalid");
+  const results = response.data;
+  if (!Array.isArray(results) || !results.length) {
+    throw new Error("Invalid or empty transaction results");
   }
 
-  const result = response.data[0];
-  if (!result || !result.hash) {
-    throw new Error("Missing transaction result or hash");
-  }
+  const txHashes = results.map(result => {
+    if (!result?.hash) throw new Error("Invalid transaction result");
+    return result.hash;
+  });
 
-  const txHash = result.hash;
-
-  const predicate = (results: any[]) =>
-    results.every((r) => r.status !== "Pending");
-
-  const action = async () => {
-    const res = await bloc.post(accessToken, StratoPaths.result, [txHash]);
-    return res.data;
-  };
-
-  const finalResult = await until(predicate, action, timeout);
-
-  const statusInfo = finalResult[0];
+  const finalResults = await until(
+    (results: any[]) => {
+      const failedTx = results.find(r => r?.status === "Failure");
+      if (failedTx) throw new Error("Transaction failed");
+      return results.every(r => r?.status !== "Pending");
+    },
+    async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
+    timeout
+  );
 
   return {
-    status: statusInfo.status,
-    hash: statusInfo.hash,
+    status: finalResults[0].status,
+    hash: finalResults[0].hash
   };
 };
 
