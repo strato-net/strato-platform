@@ -41,17 +41,24 @@ contract record MercataEthBridge {
    // ────────────────── configuration ──────────────────
     address public owner;       // STRATO admin key
     address public relayer;     // off‑chain relayer key
+    address public tokenFactory; //token factory to identify active tokens
 
     uint256 public minAmount = 0 ether; // dust guard
 
     // ──────────────────── state ─────────────────────────
-    //mapping(uint256 => bool) public processed; // ethTxHash(uint256) → minted?
-
     enum WithdrawState { NONE, INITIATED, PENDING_APPROVAL, COMPLETED }
     mapping(string => WithdrawState) public record withdrawStatus; 
 
     enum DepositState { NONE, INITIATED, COMPLETED }
     mapping(string => DepositState) public record depositStatus; 
+
+    struct DepositBatch {
+    string txHash;
+    address token;
+    address to;
+    uint256 amount;
+    address mercataUser;
+    }   
 
     // ─────────────────── events ─────────────────────────
     event DepositInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
@@ -68,10 +75,17 @@ contract record MercataEthBridge {
     modifier onlyRelayer() { require(msg.sender == relayer, "NOT_RELAYER"); _; }
 
     // ───────────────── constructor ─────────────────────
-    constructor(address _relayer) {
+    constructor(address _relayer, address _tokenfactory) {
         require(_relayer != address(0), "ZERO_RELAYER");
+        require(_tokenfactory != address(0), "ZERO_TOKENFACTORY");
+        tokenFactory = _tokenfactory;
         owner   = _relayer;
         relayer = _relayer;
+     }
+
+    function setTokenFactory(address _factory) external onlyOwner {
+        require(_factory != address(0), "ZERO_ADDR");
+        tokenFactory = _factory;
     }
 
     // ───────────── admin / config ops ──────────────────
@@ -106,10 +120,23 @@ contract record MercataEthBridge {
 
     function confirmDeposit(string calldata txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
+        require(TokenFactory(tokenFactory).isTokenActive(token), "INACTIVE_TOKEN");
 
         Token(token).mint(mercataUser, amount);
         depositStatus[txHash] = DepositState.COMPLETED;
         emit DepositCompleted(txHash);
+    }
+
+    function batchConfirmDeposits(DepositBatch[] calldata deposits) external onlyRelayer {
+    for (uint256 i = 0; i < deposits.length; i++) {
+        DepositBatch calldata d = deposits[i];
+        require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
+        require(TokenFactory(tokenFactory).isTokenActive(d.token), "INACTIVE_TOKEN");
+
+        Token(d.token).mint(d.mercataUser, d.amount);
+        depositStatus[d.txHash] = DepositState.COMPLETED;
+        emit DepositCompleted(d.txHash);
+        }
     }
      
     // ────────── STRATO → Ethereum (burn) ──────────────
@@ -118,6 +145,7 @@ contract record MercataEthBridge {
     // token = wrapped token
     function withdraw(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
+        require(TokenFactory(tokenFactory).isTokenActive(token), "INACTIVE_TOKEN");
         require(amount >= minAmount, "BELOW_MIN");
 
         Token(token).burn(mercataUser, amount);
@@ -136,6 +164,14 @@ contract record MercataEthBridge {
         require(withdrawStatus[txHash] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
         withdrawStatus[txHash] = WithdrawState.COMPLETED;
         emit WithdrawalCompleted(txHash);
-    }    
+    } 
+
+    function batchConfirmWithdrawals(string[] calldata txHashes) external onlyRelayer {
+        for (uint256 i = 0; i < txHashes.length; i++) {
+            require(withdrawStatus[txHashes[i]] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
+            withdrawStatus[txHashes[i]] = WithdrawState.COMPLETED;
+            emit WithdrawalCompleted(txHashes[i]);
+        }   
+    }   
 
 }

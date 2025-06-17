@@ -4,10 +4,9 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import { getPool as getLendingRegistry } from "./lending.service";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token } = constants;
-
-const TokenFaucet = "TokenFaucet";
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory } = constants;
 
 // Get all tokens
 export const getTokens = async (
@@ -51,26 +50,45 @@ export const getBalance = async (
 ) => {
   try {
     // Filter out undefined
-    let params = Object.fromEntries(
-      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ) as Record<string, string>;
+    let params = {
+      ...Object.fromEntries(
+        Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+      ),
+      key: `eq.${address}`,
+      select: rawParams.select || tokenBalanceSelectFields.join(","),
+      ...(rawParams.select
+        ? {}
+        : {
+            value: "gt.0",
+            "token.balances.key": `eq.${address}`
+          }),
+    };
 
-    // use tokenBalanceSelectFields if no select is provided
-    if (!params.select) {
-      params.select = tokenBalanceSelectFields.join(",");
-    }
-
-    // Add user address to params
     const response = await cirrus.get(accessToken, "/" + Token + "-_balances", {
-      params: { ...params, key: "eq." + address },
+      params,
     });
+
     if (response.status !== 200) {
       throw new Error(`Error fetching balance: ${response.statusText}`);
     }
+
     if (!response.data) {
       throw new Error("Balance data is empty");
     }
-    return response.data;
+
+    const lendingInfo = await getLendingRegistry(accessToken, {
+      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+    });
+  
+    const rawPrices = lendingInfo.oracle?.prices || [];
+    const priceMap = new Map<string, number>(
+      rawPrices.map((p: any) => [p.key, p.value])
+    );
+
+    return response.data.map((token: any) => ({
+      ...token,
+      price: priceMap.get(token.address) || "0",
+    }));
   } catch (error) {
     console.error("Error fetching balance:", error);
     throw error;
@@ -82,9 +100,10 @@ export const createToken = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildDeployTx({
-      contractName: extractContractName(Token),
-      source: `import <${process.env.BASE_CODE_COLLECTION}>;`,
+    const tx = buildFunctionTx({
+      contractName: extractContractName(TokenFactory),
+      contractAddress: tokenFactory,
+      method: "createToken",
       args: usc(body),
     });
 
@@ -186,58 +205,28 @@ export const transferFromToken = async (
   }
 };
 
-// Get tokens from faucet
-export const faucetTokens = async (
+export const setTokenStatus = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  body: Record<string, string | number>
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: TokenFaucet,
-      contractAddress: body.address || "",
-      method: "faucet",
-      args: {},
+      contractName: extractContractName(TokenFactory),
+      contractAddress: tokenFactory,
+      method: "setTokenStatus",
+      args: {
+        token: body.address,
+        newStatus: body.status,
+      },
     });
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
-    console.error("Unknown error:", error);
-    throw error;
-  }
-};
-
-// Get all faucet contract addresses
-export const getFaucetAddresses = async (accessToken: string) => {
-  try {
-    const response = await cirrus.get(
-      accessToken,
-      `/BlockApps-Mercata-${TokenFaucet}`,
-      {
-        params: {
-          isActive: "eq.true",
-          select: "address",
-        },
-      }
-    );
-
-    if (response.status !== 200) {
-      throw new Error(`Error fetching faucets: ${response.statusText}`);
-    }
-
-    if (!response.data) {
-      throw new Error("Faucets data is empty");
-    }
-
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching faucets:", error);
+    console.error("Error setting token status:", error);
     throw error;
   }
 };

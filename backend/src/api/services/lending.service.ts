@@ -2,9 +2,9 @@ import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
-import { approveAsset } from "../helpers/tokens.helper";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
+import { FunctionInput } from "../../types/types";
 
 const {
   registrySelectFields,
@@ -12,6 +12,7 @@ const {
   LendingPool,
   LendingRegistry,
   PriceOracle,
+  Token,
 } = constants;
 
 export const getPool = async (
@@ -49,50 +50,75 @@ export const getPool = async (
   return poolData;
 };
 
-export const manageLiquidity = async (
+export const depositLiquidity = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    if (body.method === "depositLiquidity") {
-      const lendingPool = await getPool(accessToken, {
-        select: "liquidityPool",
-      });
-      const liquidityPool = lendingPool.liquidityPool;
-
-      await approveAsset(
-        accessToken,
-        body.asset || "",
-        liquidityPool,
-        body.amount || ""
-      );
+    const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
+    if (!liquidityPool) {
+      throw new Error("Liquidity pool address not found");
     }
 
-    const tx = buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: body.method || "",
-      args: {
-        asset: body.asset,
-        amount: body.amount,
+    const tx: FunctionInput[] = [
+      {
+        contractName: extractContractName(Token),
+        contractAddress: body.asset || "",
+        method: "approve",
+        args: {
+          spender: liquidityPool,
+          value: body.amount || "",
+        },
       },
-    });
+      {
+        contractName: extractContractName(LendingPool),
+        contractAddress: constants.lendingPool,
+        method: "depositLiquidity",
+        args: {
+          asset: body.asset,
+          amount: body.amount,
+        },
+      }
+    ];
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
-    console.error(`Error managing liquidity (${body.method}):`, error);
+    console.error("Error depositing liquidity:", error);
     throw error;
   }
 };
 
-export const getLoan = async (
+export const withdrawLiquidity = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const tx: FunctionInput[] = [{
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: "withdrawLiquidity",
+      args: {
+        asset: body.asset,
+        amount: body.amount,
+      },
+    }];
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    );
+
+    return { status, hash };
+  } catch (error) {
+    console.error("Error withdrawing liquidity:", error);
+    throw error;
+  }
+};
+
+export const borrow = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
@@ -100,42 +126,43 @@ export const getLoan = async (
     const lendingPool = await getPool(accessToken, {
       select: "collateralVault",
     });
-    const collateralVault = lendingPool.collateralVault;
 
-    await approveAsset(
-      accessToken,
-      body.collateralAsset || "",
-      collateralVault,
-      body.collateralAmount || ""
-    );
+    if (!lendingPool.collateralVault) {
+      throw new Error("Collateral vault address not found");
+    }
 
-    const tx = buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: "getLoan",
-      args: {
-        asset: body.asset,
-        amount: body.amount,
-        collateralAsset: body.collateralAsset,
-        collateralAmount: body.collateralAmount,
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: body.collateralAsset || "",
+        method: "approve",
+        args: { spender: lendingPool.collateralVault, value: body.collateralAmount || "" },
       },
-    });
+      {
+        contractName: extractContractName(LendingPool),
+        contractAddress: constants.lendingPool,
+        method: "getLoan",
+        args: {
+          asset: body.asset,
+          amount: body.amount,
+          collateralAsset: body.collateralAsset,
+          collateralAmount: body.collateralAmount,
+        },
+      }
+    ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
     console.error("Error getting loan:", error);
     throw error;
   }
 };
 
-export const repayLoan = async (
+export const repay = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
@@ -143,33 +170,34 @@ export const repayLoan = async (
     const lendingPool = await getPool(accessToken, {
       select: "liquidityPool",
     });
-    const liquidityPool = lendingPool.liquidityPool;
 
-    await approveAsset(
-      accessToken,
-      body.asset || "",
-      liquidityPool,
-      body.amount || ""
-    );
+    if (!lendingPool?.liquidityPool) {
+      throw new Error("Liquidity pool address not found");
+    }
 
-    const tx = buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: "repayLoan",
-      args: {
-        loanId: body.loanId,
-        amount: body.amount,
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: body.asset || "",
+        method: "approve",
+        args: { spender: lendingPool.liquidityPool, value: body.amount || "" },
       },
-    });
+      {
+        contractName: extractContractName(LendingPool),
+        contractAddress: constants.lendingPool,
+        method: "repayLoan",
+        args: {
+          asset: body.asset,
+          amount: body.amount,
+        },
+      }
+    ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
     console.error("Error repaying loan:", error);
     throw error;

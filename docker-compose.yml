@@ -9,7 +9,12 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=${NODE_URL}
       - BASE_URL=${BASE_URL}
-      - NETWORK=${NETWORK}
+      - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
+      - POOL_FACTORY=${POOL_FACTORY}
+      - LENDING_POOL=${LENDING_POOL}
+      - TOKEN_FACTORY=${TOKEN_FACTORY}
+      - ONRAMP=${ONRAMP}
+      - ADMIN_ADDRESS=${ADMIN_ADDRESS}
     restart: unless-stopped
     logging:
       driver: "json-file"

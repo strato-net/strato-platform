@@ -123,20 +123,20 @@ if (require.main === module) {
       },
       // === On-ramp setup: add payment provider, whitelist token, approve seller ===
       {
+        contract: { address: USDST_ADDRESS, name: "ERC20" },
+        method: "transfer",
+        args: {
+          to: PAYMENT_PROVIDER_ADDRESS,
+          value: MAX_TOKEN_A_AMOUNT + DECIMALS,
+        },
+      },
+      {
         contract: { address: onRampAddress, name: "OnRamp" },
         method: "addPaymentProvider",
         args: {
           provider: PAYMENT_PROVIDER_ADDRESS,
           name: PAYMENT_PROVIDER_NAME,
           endpoint: PAYMENT_PROVIDER_ENDPOINT,
-        },
-      },
-      {
-        contract: { address: onRampAddress, name: "OnRamp" },
-        method: "setApprovedToken",
-        args: {
-          token: USDST_ADDRESS,
-          whitelist: true,
         },
       },
       {

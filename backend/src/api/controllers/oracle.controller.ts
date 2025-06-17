@@ -1,17 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { checkout } from "../services/onramp.service";
+import {
+  setPrice,
+} from "../services/oracle.service";
 
-class OnRampController {
-  static async checkout(
+class OracleController {
+  static async setPrice(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { token, buyerAddress, baseUrl, amount } = req.body;
-
-      const result = await checkout(token, buyerAddress, amount, baseUrl);
+      const { accessToken, body } = req;
+      const result = await setPrice(accessToken, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -19,4 +20,4 @@ class OnRampController {
   }
 }
 
-export default OnRampController;
+export default OracleController;
