@@ -10,6 +10,19 @@ type SwapContextType = {
   refetchSwappableTokens: () => void;
   fetchPairableTokens: (tokenAddress: string) => void;
   createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
+  calculateSwap: (params: {
+    poolAddress: string;
+    direction: boolean;
+    amount: string;
+    signal?: AbortSignal;
+  }) => Promise<string>;
+  getPoolByTokenPair: (tokenA: string, tokenB: string) => Promise<any>;
+  swap: (data: {
+    address: string;
+    method: "tokenAToTokenB" | "tokenBToTokenA";
+    amount: string;
+    min_tokens: string;
+  }) => Promise<any>;
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -52,13 +65,59 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post('/swap', data);
-      console.log('Pool created:', res.data);
+      await api.post('/swap', data);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to create pool');
       throw err;
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const calculateSwap = useCallback(async ({
+    poolAddress,
+    direction,
+    amount,
+    signal
+  }: {
+    poolAddress: string;
+    direction: boolean;
+    amount: string;
+    signal?: AbortSignal;
+  }) => {
+    try {
+      const { data } = await api.get(
+        `/swap/calculateSwap?address=${poolAddress}&direction=${direction}&amount=${amount}`,
+        { signal }
+      );
+      return data;
+    } catch (err: any) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap');
+    }
+  }, []);
+
+  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string) => {
+    try {
+      const res = await api.get(`/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`);
+      return res.data?.[0] || null;
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to get pool');
+      return null;
+    }
+  }, []);
+
+  const swap = useCallback(async (data: {
+    address: string;
+    method: "tokenAToTokenB" | "tokenBToTokenA";
+    amount: string;
+    min_tokens: string;
+  }) => {
+    try {
+      const res = await api.post("/swap/swap", data);
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || err.message || "Swap transaction failed");
     }
   }, []);
 
@@ -75,7 +134,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         error,
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,
-        createPool
+        createPool,
+        calculateSwap,
+        getPoolByTokenPair,
+        swap,
       }}
     >
       {children}
