@@ -55,7 +55,6 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
 ```
 cd ../../ui/
 npm i
-VITE_ADMIN_ADDRESSES='' \
 npm run dev
 ```
 
