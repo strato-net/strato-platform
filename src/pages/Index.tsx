@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 import FeaturedAssets from '../components/FeaturedAssets';
 import HowItWorks from '../components/HowItWorks';
+import MERCATALOGO from '@/assets/mercata.png';
 
 const Index = () => {
   useEffect(() => {
@@ -22,11 +23,8 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <div className="w-8 h-8 relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-strato-blue to-strato-purple rounded-md"></div>
-                  <div className="absolute inset-[2px] bg-strato-dark rounded-md"></div>
-                </div>
-                <span className="ml-2 text-lg font-bold">STRATO<span className="text-strato-blue">mercata</span></span>
+                <img src={MERCATALOGO} alt="STRATO Mercata" className="h-10 mr-3" />
+                <span className="sr-only">STRATO Mercata</span>
               </div>
               <p className="text-gray-400 text-sm">
                 Where Stability Meets Opportunity. Easily earn on vaulted gold, silver & crypto.
@@ -57,7 +55,7 @@ const Index = () => {
           
           <div className="mt-12 pt-8 border-t border-gray-800 text-sm text-gray-400">
             <div className="flex flex-col md:flex-row justify-between">
-              <p>&copy; 2025 STRATO Mercata. All rights reserved.</p>
+              <p>&copy; 2025 BlockApps Inc. All rights reserved.</p>
               <div className="flex space-x-6 mt-4 md:mt-0">
                 <a href="#" className="hover:text-white">Terms of Service</a>
                 <a href="#" className="hover:text-white">Privacy Policy</a>

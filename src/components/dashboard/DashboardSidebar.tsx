@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import MERCATALOGO from '@/assets/mercata.png';
+import MERCATAICON from '@/assets/icon.png';
 
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -25,28 +27,37 @@ const DashboardSidebar = () => {
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
-        <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
-          {collapsed ? (
+      <div className="border-b border-sidebar-border">
+        {!collapsed && (
+          <div className="p-4 flex items-center justify-between">
             <img 
-              src="/lovable-uploads/de952550-4201-4e43-99f4-72cdcf272c55.png" 
-              alt="STRATO mercata" 
-              className="h-8" 
-            />
-          ) : (
-            <img 
-              src="/lovable-uploads/de952550-4201-4e43-99f4-72cdcf272c55.png" 
+              src={MERCATALOGO} 
               alt="STRATO mercata" 
               className="h-12" 
             />
-          )}
-        </div>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className={`rounded-md p-1 hover:bg-sidebar-accent text-sidebar-foreground ${collapsed ? 'mx-auto' : ''}`}
-        >
-          {collapsed ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
-        </button>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="rounded-md p-1 hover:bg-sidebar-accent text-sidebar-foreground"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          </div>
+        )}
+        {collapsed && (
+          <div className="p-4 flex flex-col items-center space-y-2">
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="rounded-md p-1 hover:bg-sidebar-accent text-sidebar-foreground"
+            >
+              <ArrowRight size={16} />
+            </button>
+            <img 
+              src={MERCATAICON} 
+              alt="STRATO mercata" 
+              className="h-8" 
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col flex-1 overflow-y-auto py-4">
