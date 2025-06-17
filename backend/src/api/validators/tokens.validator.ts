@@ -41,6 +41,14 @@ const transferFromArgsSchema = Joi.object({
   value: Joi.string().pattern(/^\d+$/).required(),
 });
 
+const setStatusArgsSchema = Joi.object({
+  address: Joi.string().required(),
+  status: Joi.number().integer().min(1).max(3).required().messages({
+    'number.min': 'Status must be 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)',
+    'number.max': 'Status must be 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)',
+  }),
+});
+
 const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
 
 // Validator functions
@@ -84,5 +92,12 @@ export function validateTransferFromArgs(args: any) {
   const { error } = transferFromArgsSchema.validate(args);
   if (error) {
     throw new Error("TransferFrom Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSetStatusArgs(args: any) {
+  const { error } = setStatusArgsSchema.validate(args);
+  if (error) {
+    throw new Error("SetStatus Argument Validation Error: " + error.message);
   }
 }

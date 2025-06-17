@@ -22,19 +22,23 @@ export function buildDeployTx({
   };
 }
 
-export function buildFunctionTx({
-  contractName,
-  contractAddress,
-  method,
-  args,
-}: FunctionInput): BuiltTx {
-  const tx = {
+export function buildFunctionTx(
+  inputs: FunctionInput | FunctionInput[]
+): BuiltTx {
+  const inputArray = Array.isArray(inputs) ? inputs : [inputs];
+  
+  const txs = inputArray.map(input => ({
     type: "FUNCTION" as const,
-    payload: { contractName, contractAddress, method, args },
-  };
+    payload: {
+      contractName: input.contractName,
+      contractAddress: input.contractAddress,
+      method: input.method,
+      args: input.args,
+    },
+  }));
 
   return {
-    txs: [tx],
+    txs,
     txParams: DEFAULT_GAS_PARAMS,
   };
 }

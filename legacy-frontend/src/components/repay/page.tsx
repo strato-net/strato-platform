@@ -70,7 +70,7 @@ export const RenderRepay = ({ dashboardRef }: ChildComponentProps) => {
         try {
             setRepayLoading(true);
             const amountInWei = ethers.parseUnits(amount, 18).toString();
-            const response = await axios.post("api/lend/repayLoan", {
+            const response = await axios.post("api/lend/repay", {
                 loanId: loan?.loanId,
                 amount: amountInWei,
                 asset: loan?.asset,

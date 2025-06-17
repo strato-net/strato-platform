@@ -1,4 +1,4 @@
-import { baseCodeCollection, lendingPool, onRamp, poolFactory } from "./config";
+import { baseCodeCollection, lendingPool, onRamp, poolFactory, tokenFactory } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -11,6 +11,7 @@ export enum StratoPaths {
 export const constants = (() => {
   const CONTRACT_PREFIX = "BlockApps-Mercata-";
   const Token = `${CONTRACT_PREFIX}Token`;
+  const TokenFactory = `${CONTRACT_PREFIX}TokenFactory`;
   const LendingPool = `${CONTRACT_PREFIX}LendingPool`;
   const LiquidityPool = `${CONTRACT_PREFIX}LiquidityPool`;
   const CollateralVault = `${CONTRACT_PREFIX}CollateralVault`;
@@ -81,7 +82,9 @@ export const constants = (() => {
     poolFactory,
     lendingPool,
     onRamp,
+    tokenFactory,
     Token,
+    TokenFactory,
     LendingPool,
     LiquidityPool,
     CollateralVault,

@@ -10,6 +10,7 @@ import LendingController from "./controllers/lending.controller";
 import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
 import { BridgeController } from "./controllers/bridge.controller";
+import OracleController from "./controllers/oracle.controller";
 
 const router = Router();
 const bridgeController = new BridgeController();
@@ -23,6 +24,7 @@ router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create)
 router.post("/tokens/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 router.post("/tokens/approve", authHandler.authorizeRequest(), TokensController.approve);
 router.post("/tokens/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
+router.post("/tokens/setStatus", authHandler.authorizeRequest(), TokensController.setStatus);
 
 router.get("/swap/swappableTokens/", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
 router.get("/swap/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
@@ -40,10 +42,12 @@ router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.get("/lend/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
 router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
 router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
-router.post("/lend/setPrice", authHandler.authorizeRequest(), LendingController.setPrice);
-router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
-router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.getLoan);
-router.post("/lend/repayLoan", authHandler.authorizeRequest(), LendingController.repayLoan);
+router.post("/lend/depositLiquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
+router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
+router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
+router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
+
+router.post("/oracle/setPrice", authHandler.authorizeRequest(), OracleController.setPrice);
 
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);

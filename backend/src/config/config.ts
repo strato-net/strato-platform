@@ -30,6 +30,9 @@ if (!process.env.LENDING_POOL) {
 if (!process.env.ONRAMP) {
   throw new Error("ONRAMP is not defined");
 }
+if (!process.env.TOKEN_FACTORY) {
+  throw new Error("TOKEN_FACTORY is not defined");
+}
 
 export let openIdTokenEndpoint: string | undefined;
 /**
@@ -46,3 +49,4 @@ export const baseCodeCollection = process.env.BASE_CODE_COLLECTION;
 export const poolFactory = process.env.POOL_FACTORY;
 export const lendingPool = process.env.LENDING_POOL;
 export const onRamp = process.env.ONRAMP;
+export const tokenFactory = process.env.TOKEN_FACTORY;

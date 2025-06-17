@@ -4,7 +4,6 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { baseUrl } from "../../config/config";
-import { approveAsset } from "../helpers/tokens.helper";
 import axios from "axios";
 
 const contractAddress = constants.onRamp!;
@@ -119,27 +118,32 @@ export const sell = async (
 ) => {
   try {
     const { token, amount, marginBps, providerAddresses } = body;
-    await approveAsset(accessToken, token || "", contractAddress, amount || "");
-    const tx = buildFunctionTx({
-      contractName: extractContractName(OnRamp),
-      contractAddress,
-      method: "createListing",
-      args: {
-        token,
-        amount,
-        marginBps,
-        providerAddresses,
+
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: token || "",
+        method: "approve",
+        args: { spender: contractAddress, value: amount || "" },
       },
-    });
+      {
+        contractName: extractContractName(OnRamp),
+        contractAddress,
+        method: "createListing",
+        args: {
+          token,
+          amount,
+          marginBps,
+          providerAddresses,
+        },
+      }
+    ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
 
-    return {
-      status,
-      hash,
-    };
+    return { status, hash };
   } catch (error) {
     console.error("Error selling tokens:", error);
     throw error;

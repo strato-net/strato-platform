@@ -7,6 +7,7 @@ import {
   transferToken,
   approveToken,
   transferFromToken,
+  setTokenStatus,
 } from "../services/tokens.service";
 import {
   validateAddressArgs,
@@ -15,6 +16,7 @@ import {
   validateApproveArgs,
   validateTransferFromArgs,
   validateQueryParams,
+  validateSetStatusArgs,
 } from "../validators/tokens.validator";
 
 class TokensController {
@@ -127,6 +129,19 @@ class TokensController {
       validateTransferFromArgs(body);
 
       const result = await transferFromToken(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async setStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, body } = req;
+      validateSetStatusArgs(body);
+
+      const result = await setTokenStatus(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {

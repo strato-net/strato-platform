@@ -1,9 +1,6 @@
 import Joi from "@hapi/joi";
 
 const manageLiquiditySchema = Joi.object({
-  method: Joi.string()
-    .valid("depositLiquidity", "withdrawLiquidity")
-    .required(),
   asset: Joi.string().required(),
   amount: Joi.string().required(),
 });
