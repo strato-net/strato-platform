@@ -7,7 +7,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
 import qualified Data.Text as T
---import Slipstream.Data.Globals (TableName (..))
+
+-- import Slipstream.Data.Globals (TableName (..))
 
 -- TODO: Refactor this type before someone external sees it
 data TableName
@@ -49,7 +50,7 @@ data TableName
 
 type TableColumns = [T.Text]
 
-tshow :: Show a => a -> T.Text
+tshow :: (Show a) => a -> T.Text
 tshow = T.pack . show
 
 csv :: [T.Text] -> T.Text
@@ -174,7 +175,7 @@ oldTableNameToDoubleQuoteText :: TableName -> T.Text
 oldTableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . oldTableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
-textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
+textToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes
 
 removeSingleQuotes :: T.Text -> T.Text
 removeSingleQuotes inputText =
