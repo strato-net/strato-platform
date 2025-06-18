@@ -54,7 +54,7 @@ contract Mercata {
         collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
         liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
         rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(msg.sender, address(tokenFactory)); 
+        priceOracle = new PriceOracle(msg.sender); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory));
            
