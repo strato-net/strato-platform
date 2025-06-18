@@ -66,14 +66,6 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Portfolio Growth"
-              value="N/A"
-              change={0}
-              icon={<ChartBar className="text-white" size={18} />}
-              color="bg-green-500"
-            />
-
-            <AssetSummary
               title="Borrowing"
               value="N/A"
               change={0}

@@ -26,6 +26,17 @@ type LendingContextType = {
   refreshWithdrawableTokens: (signal?: AbortSignal) => void;
   loadingWithdrawableTokens: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  borrowAsset: (args: {
+    asset: string;
+    amount: string;
+    collateralAsset: string;
+    collateralAmount: string;
+  }) => Promise<any>;
+  repayLoan: (args: {
+    loanId: string;
+    amount: string;
+    asset: string;
+  }) => Promise<any>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -94,24 +105,74 @@ export const LendingProvider = ({
         ? res.data
         : Object.values((res.data as LoanData)?.loans || {});
       setLoans(loanEntries);
+      return loanEntries;
     } catch (err: any) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch loans:", err);
       setLoans([]);
+      return [];
     } finally {
       setLoadingLoans(false);
     }
   };
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
-    const weiPrice = parseUnits(payload.price, 18).toString() ;
+    const weiPrice = parseUnits(payload.price, 18).toString();
     try {
-      await api.post("/oracle/setPrice", {...payload, price: weiPrice.toString() });
+      await api.post("/oracle/setPrice", { ...payload, price: weiPrice.toString() });
     } catch (err: any) {
       console.error("Failed to set price:", err);
       throw err;
     }
   };
+
+  const borrowAsset = async ({
+    asset,
+    amount,
+    collateralAsset,
+    collateralAmount,
+  }: {
+    asset: string;
+    amount: string;
+    collateralAsset: string;
+    collateralAmount: string;
+  }) => {
+    try {
+      const res = await api.post("/lend/borrow", {
+        asset,
+        amount,
+        collateralAsset,
+        collateralAmount,
+      });
+      return res;
+    } catch (err: any) {
+      console.error("Borrow failed:", err);
+      throw err;
+    }
+  };
+
+  const repayLoan = async ({
+    loanId,
+    amount,
+    asset,
+  }: {
+    loanId: string;
+    amount: string;
+    asset: string;
+  }) => {
+    try {
+      const res = await api.post("/lend/repay", {
+        loanId,
+        amount,
+        asset,
+      });
+      return res;
+    } catch (err: any) {
+      console.error("Repay failed:", err);
+      throw err;
+    }
+  };
+
 
   const initialize = () => {
     fetchDepositTokens();
@@ -136,6 +197,8 @@ export const LendingProvider = ({
       refreshWithdrawableTokens: fetchWithdrawableTokens,
       loadingWithdrawableTokens,
       setPrice,
+      borrowAsset,
+      repayLoan,
     }),
     [
       depositableTokens,

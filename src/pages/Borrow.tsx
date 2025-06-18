@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
 
@@ -24,6 +24,8 @@ import {
 
 import { DepositableToken, Loan } from "@/interface";
 import { usdstAddress } from "@/lib/contants";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -72,6 +74,12 @@ const Borrow = () => {
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [tokens, setTokens] = useState<DepositableToken[] | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
+  const [repayAmount, setRepayAmount] = useState('')
+  const [showRepayModal, setShowRepayModal] = useState(false)
+  const [repayLoading, setRepayLoading] = useState(false);
+  const [loan, setLoan] = useState<any | null>(null);
+  const [loanList, setLoanList] = useState<any[]>([]);
+  const [wrongAmount, setWrongAmount] = useState(false);
 
   const { toast } = useToast();
   const {
@@ -81,12 +89,14 @@ const Borrow = () => {
     loans,
     refreshLoans,
     loadingLoans,
+    borrowAsset: borrowAssetFn,
+    repayLoan: repayLoanFn,
   } = useLendingContext();
 
-  useEffect(()=>{
+  useEffect(() => {
     refreshDepositTokens()
     refreshLoans()
-  },[])
+  }, [])
 
   useEffect(() => {
     if (!depositableTokens || depositableTokens.length === 0) return;
@@ -126,10 +136,10 @@ const Borrow = () => {
       const amountInWei = parseUnits(amount.toString(), 18).toString();
       const collateralInWei = parseUnits(collateralAmount, 18).toString();
 
-      await api.post("/lend/borrow", {
-        asset: borrowAsset?.address,
+      await borrowAssetFn({
+        asset: borrowAsset?.address!,
         amount: amountInWei,
-        collateralAsset: asset?.address,
+        collateralAsset: asset?.address!,
         collateralAmount: collateralInWei,
       });
 
@@ -141,23 +151,96 @@ const Borrow = () => {
 
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      refreshDepositTokens();
-      refreshLoans();
+      await refreshDepositTokens();      
+      await fetchLoans();
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
       toast({
         title: "Borrow Error",
-        description: `Something went wrong - ${
-          error?.message || "Please try again later."
+        description: `Something went wrong - ${error?.message || "Please try again later."
           }`,
         variant: "destructive",
       });
     }
   };
 
-  const activeLoans = loans.filter((loan: Loan) => loan?.loan?.active);
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^\d*\.?\d*$/.test(value)) {
+      setRepayAmount(value);
+      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount, 18))
+    }
+  };
+
+  const fetchLoans = useCallback(async () => {
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+    const addr = userData.userAddress;
+    try {
+      const userLoans = Object.entries(loans)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
+        .filter((loan: any) => loan?.loan?.user === addr && loan?.loan?.active === true);
+      // Enrich each loan with token symbol, name, and human-readable balance
+
+      const enrichedLoans = await Promise.all(
+        userLoans.map(async (loan: any) => {
+          const balanceHuman = formatUnits(
+            BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0),
+            18
+          );
+          return {
+            ...loan,
+            _name: loan.assetName,
+            _symbol: loan?.assetSymbol || "",
+            balanceHuman,
+          };
+        })
+      );
+      setLoanList(enrichedLoans);
+    } catch (e) {
+      console.error("Error fetching loans:", e);
+    }
+  }, []);
+
+useEffect(() => {
+    if (Object.keys(loans || {}).length > 0) {
+      fetchLoans();
+  }
+  }, [loans, fetchLoans]);
+
+  const repayLoan = async () => {
+    try {
+      setRepayLoading(true);
+      const amountInWei = parseUnits(repayAmount, 18).toString();
+      const response = await repayLoanFn({
+        loanId: loan?.key,
+        amount: amountInWei,
+        asset: loan?.loan?.asset,
+      });
+      console.log(response, "repay loan response");
+      setRepayLoading(false);
+      setShowRepayModal(false)
+      api["success"]({
+        message: "Success",
+        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
+      });
+      await refreshLoans();
+      await fetchLoans();
+    } catch (error) {
+      api["error"]({
+        message: "Error",
+        description: `Repay Error - ${error}`,
+      });
+      setRepayLoading(false);
+      console.error("Error repaying loan:", error);
+    } finally {
+      setRepayAmount("");
+      setRepayLoading(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -258,6 +341,7 @@ const Borrow = () => {
                     <TableHead>Amount</TableHead>
                     <TableHead>Collateral</TableHead>
                     <TableHead>Accrued Interest</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -267,8 +351,8 @@ const Borrow = () => {
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
-                  ) : activeLoans?.length > 0 ? (
-                    activeLoans?.map((loan, loanIndex) => (
+                  ) : loanList?.length > 0 ? (
+                    loanList?.map((loan, loanIndex) => (
                       <TableRow key={loanIndex}>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -289,6 +373,16 @@ const Borrow = () => {
                           {loan?.loan.collateralName || loan?.loan.collateralAsset} {formatEther(loan?.loan?.collateralAmount || 0)}
                         </TableCell>
                         <TableCell>{formatEther(loan?.loan?.interest || 0)}</TableCell>
+                        <TableCell>
+                          <Button
+                            onClick={() => {
+                              setLoan(loan)
+                              setShowRepayModal(true)
+                            }}
+                          >
+                            Repay
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) :
@@ -317,6 +411,67 @@ const Borrow = () => {
           onBorrow={(amount) => executeBorrow(selectedAsset, amount)}
         />
       )}
+      <Dialog open={showRepayModal} onOpenChange={setShowRepayModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Repay Loan</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-4">
+            {/* First Token */}
+            <div className="rounded-lg border p-3">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-gray-500">Amount</span>
+              </div>
+              <div className="flex items-center">
+                <Input
+                  placeholder="0"
+                  className="border-none text-xl font-medium p-0 pl-2 h-auto focus-visible:ring-0"
+                  value={repayAmount}
+                  onChange={handleAmountChange}
+                />
+              </div>
+              {wrongAmount && (
+                <p className="text-red-600 text-sm mt-1">
+                  Insufficient balance
+                </p>
+              )}
+            </div>
+          </div>
+          {loan && (
+            <div className="mt-2 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800 mb-1">
+                <span className="font-medium">Principal:</span> {formatUnits(loan?.loan?.amount || 0, 18)} {loan?.loan?._symbol}
+              </p>
+              <p className="text-sm text-blue-800 mb-1">
+                <span className="font-medium">Interest:</span> {formatUnits(loan?.loan?.interest || 0, 18)} {loan?.loan?._symbol}
+              </p>
+              <p className="text-sm font-medium text-blue-900">
+                Total outstanding: {loan?.balanceHuman} {loan?.loan?._symbol}
+              </p>
+            </div>
+          )}
+
+          <div className="pt-2">
+            <Button
+              onClick={repayLoan}
+              disabled={
+                repayLoading ||
+                !repayAmount ||
+                isNaN(Number(repayAmount)) ||
+                Number(repayAmount) <= 0 ||
+                Number(repayAmount) > Number(loan?.balanceHuman || 0)
+              }
+              type="submit"
+              className="w-full bg-strato-purple hover:bg-strato-purple/90"
+            >
+              {repayLoading && <div className="flex justify-center items-center h-12">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+              </div>}
+              {repayLoading ? "Repaying..." : "Confirm Repay"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

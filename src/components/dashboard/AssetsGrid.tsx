@@ -22,7 +22,7 @@ const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
           {assets.map((asset, id) => (
             <AssetCard
               key={id}
-              id={asset?.token?.address}
+              id={asset?.address}
               name={asset?.token?._name}
               symbol={asset?.token?._symbol}
               price={asset?.price || "0"}

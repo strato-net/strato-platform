@@ -37,7 +37,7 @@ const AssetCard = ({ id, name, symbol, price, deposit }: AssetCardProps) => {
         <div className="space-y-2 mb-4">
           <div className="flex justify-between">
             <span className="text-sm text-gray-500">Price</span>
-            <span className="font-medium">{price}</span>
+              <span className="font-medium">{formatUnits(price.toLocaleString('fullwide', { useGrouping: false }),18)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-sm text-gray-500">Asset Deposits</span>

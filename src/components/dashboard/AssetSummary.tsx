@@ -47,13 +47,7 @@ const AssetSummary = ({ title, value, change, icon, color }: AssetSummaryProps) 
         >
           {icon}
         </div>
-      </div>
-      
-      <div className="mt-4 pt-3 border-t border-gray-100">
-        <a href="#" className="text-xs flex items-center text-blue-500 hover:text-blue-600 font-medium">
-          View Details <ArrowUpRight size={12} className="ml-1" />
-        </a>
-      </div>
+      </div>      
     </div>
   );
 };
