@@ -31,9 +31,11 @@ contract record LendingPool is Ownable {
         bool active;
         address collateralAsset;
         uint256 collateralAmount;
-      }
+    }
 
-    mapping(string => LoanInfo) public record loans;
+    uint256 public nextLoanId = 1;
+    mapping(uint256 => LoanInfo) public loans;
+    mapping(address => uint256[]) public userLoans; // For easy lookup
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;
     mapping(address => uint256) public record assetLiquidationBonus;
@@ -90,8 +92,7 @@ contract record LendingPool is Ownable {
         emit Withdrawn(msg.sender, asset, amount);
     }
 
-    function getLoan(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) public onlyTokenFactory(asset) onlyTokenFactory(collateralAsset) {
-        string loanId = _loanKey(msg.sender, asset);
+    function borrow(address asset, uint256 amount, address collateralAsset, uint256 collateralAmount) public onlyTokenFactory(asset) onlyTokenFactory(collateralAsset) returns (uint256 loanId) {
         uint256 assetPrice = PriceOracle(_priceOracle()).getAssetPrice(asset);
         require(assetPrice > 0, "Asset price not set");
         uint256 collateralPrice = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
@@ -107,6 +108,7 @@ contract record LendingPool is Ownable {
         CollateralVault(_collateralVault()).addCollateral(msg.sender, collateralAsset, collateralAmount);
         LiquidityPool(_liquidityPool()).borrow(asset, amount, msg.sender);
 
+        loanId = nextLoanId++;
         loans[loanId] = LoanInfo(
             msg.sender,
             asset,
@@ -116,12 +118,13 @@ contract record LendingPool is Ownable {
             collateralAsset,
             collateralAmount
         );
+        userLoans[msg.sender].push(loanId);
 
         emit Borrowed(msg.sender, asset, amount, collateralAsset, collateralAmount);
     }
 
-    function repayLoan(string loanId, uint256 amount) public {
-        LoanInfo loan = loans[loanId];
+    function repayLoan(uint256 loanId, uint256 amount) public {
+        LoanInfo storage loan = loans[loanId];
         require(loan.active, "Loan inactive");
         require(amount > 0, "Invalid repayment");
 
@@ -131,7 +134,7 @@ contract record LendingPool is Ownable {
             loan.lastUpdated
         );
         uint256 totalOwed = loan.amount + interest;
-     
+    
         LiquidityPool(_liquidityPool()).repay(loan.asset, amount, totalOwed, msg.sender);
 
         if (amount >= totalOwed) {
@@ -147,39 +150,50 @@ contract record LendingPool is Ownable {
         emit Repaid(msg.sender, loan.asset, amount);
     }
 
-    function liquidate(string loanId, address borrower) public onlyOwner {
-        LoanInfo loan = loans[loanId];
+    // Permissionless liquidation (no onlyOwner)
+    function liquidate(uint256 loanId) external {
+        LoanInfo storage loan = loans[loanId];
         require(loan.active, "Loan inactive");
+        require(msg.sender != loan.user, "Cannot liquidate own loan");
 
         uint256 interest = RateStrategy(_rateStrategy()).calculateInterest(
             loan.amount,
-            assetInterestRate[loan.collateralAsset],
+            assetInterestRate[loan.asset],
             loan.lastUpdated
         );
         uint256 totalOwed = loan.amount + interest;
 
-        uint256 assetPrice = PriceOracle(_priceOracle()).getAssetPrice(loan.collateralAsset);
+        uint256 loanAssetPrice = PriceOracle(_priceOracle()).getAssetPrice(loan.asset);
         uint256 collateralPrice = PriceOracle(_priceOracle()).getAssetPrice(loan.collateralAsset);
 
-        uint256 loanValue = (totalOwed * assetPrice) / 1e18;
-        uint256 userCollateral = CollateralVault(_collateralVault()).getCollateral(borrower, loan.collateralAsset);
+        uint256 loanValue = (totalOwed * loanAssetPrice) / 1e18;
+        uint256 userCollateral = CollateralVault(_collateralVault()).getCollateral(loan.user, loan.collateralAsset);
         uint256 collateralValue = (userCollateral * collateralPrice) / 1e18;
 
         uint256 ratio = assetCollateralRatio[loan.collateralAsset];
         require(ratio > 0 && collateralValue * 100 < loanValue * ratio, "Healthy loan");
 
-        LiquidityPool(_liquidityPool()).repay(loan.collateralAsset, totalOwed, totalOwed, msg.sender);
-        uint256 bonus = assetLiquidationBonus[loan.collateralAsset];
-        uint256 seizeAmount = (totalOwed * bonus * 1e18) / (collateralPrice * 100);
+        // Aave/Morpho formula: up to 50% of debt can be repaid in one liquidation
+        uint256 closeFactor = 50; // 50%
+        uint256 repayAmount = totalOwed * closeFactor / 100;
+        if (repayAmount > totalOwed) {
+            repayAmount = totalOwed;
+        }
+        uint256 liquidationBonus = assetLiquidationBonus[loan.collateralAsset];
+        if (liquidationBonus == 0) liquidationBonus = 105; // 5% bonus
+        uint256 seizeAmount = (repayAmount * liquidationBonus * loanAssetPrice) / (collateralPrice * 100);
 
         require(userCollateral >= seizeAmount, "Insufficient collateral");
-        CollateralVault(_collateralVault()).removeCollateral(borrower, loan.collateralAsset, seizeAmount);
+        LiquidityPool(_liquidityPool()).repay(loan.asset, repayAmount, totalOwed, msg.sender);
+        CollateralVault(_collateralVault()).removeCollateral(loan.user, loan.collateralAsset, seizeAmount);
 
-        loan.amount = 0;
+        loan.amount = totalOwed - repayAmount;
+        if (loan.amount == 0) {
+            loan.active = false;
+        }
         loan.lastUpdated = block.timestamp;
-        loan.active = false;
 
-        emit Liquidated(borrower, loan.collateralAsset, totalOwed, loan.collateralAsset, seizeAmount);
+        emit Liquidated(loan.user, loan.asset, repayAmount, loan.collateralAsset, seizeAmount);
     }
 
      function setInterestRate(address asset, uint256 newRate) onlyPoolConfigurator{

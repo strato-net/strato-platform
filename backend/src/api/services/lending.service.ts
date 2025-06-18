@@ -380,3 +380,194 @@ export const setPrice = async (
     throw error;
   }
 };
+
+// ------------------ Price queries ------------------
+export const getPrice = async (
+  accessToken: string,
+  asset?: string
+) => {
+  const registry = await getPool(accessToken, { select: "priceOracle" });
+
+  const prices: { asset: string; price: string }[] = registry.priceOracle
+    ? registry.priceOracle.prices || []
+    : [];
+
+  if (asset) {
+    const entry = prices.find(
+      (p) => p.asset.toLowerCase() === asset.toLowerCase()
+    );
+    if (!entry) {
+      throw new Error(`Price not found for asset ${asset}`);
+    }
+    return entry;
+  }
+
+  return prices;
+};
+
+// ---------------- Liquidation services ----------------
+
+/** Build quick lookup maps needed for HF calculation */
+const buildMaps = (registry: any) => {
+  const priceMap = new Map<string, bigint>(
+    (registry.oracle.prices || []).map((p: any) => [p.asset, toBig(p.price)])
+  );
+  const ratioMap = new Map<string, number>(
+    (registry.lendingPool.collateralRatio || []).map((r: any) => [r.asset, r.ratio])
+  );
+  return { priceMap, ratioMap };
+};
+
+const calculateHealthFactor = (
+  loan: any,
+  priceMap: Map<string, bigint>,
+  ratioMap: Map<string, number>
+) => {
+  const loanPrice = priceMap.get(loan.asset) || 0n;
+  const collPrice = priceMap.get(loan.collateralAsset) || 0n;
+  const loanValue = (toBig(loan.amount) * loanPrice) / 10n ** 18n;
+  const collValue = (toBig(loan.collateralAmount) * collPrice) / 10n ** 18n;
+  const ratio = BigInt(ratioMap.get(loan.collateralAsset) || 0);
+  if (ratio === 0n || loanValue === 0n) return Infinity;
+  const hfNumerator = collValue * 100n;
+  const hfDenominator = loanValue * ratio;
+  return Number((hfNumerator * 10000n) / hfDenominator) / 10000; // 4 decimal precision
+};
+
+export const listLiquidatableLoans = async (accessToken: string) => {
+  const registry = await getPool(accessToken);
+  const { priceMap, ratioMap } = buildMaps(registry);
+
+  const loans = (registry.lendingPool.loans || []) as any[];
+
+  // Fetch token metadata for unique addresses
+  const tokenAddresses = [
+    ...new Set(
+      loans.flatMap((e) => [e.LoanInfo.asset, e.LoanInfo.collateralAsset])
+    ),
+  ];
+  const tokenMap = new Map(
+    (
+      await getTokens(accessToken, {
+        address: `in.(${tokenAddresses.join(',')})`,
+      })
+    ).map((t: any) => [t.address, t])
+  );
+
+  return loans
+    .filter((e) => e.LoanInfo?.active)
+    .map((e) => {
+      const hf = calculateHealthFactor(e.LoanInfo, priceMap, ratioMap);
+      const loan = e.LoanInfo;
+      const assetToken = tokenMap.get(loan.asset) as any;
+      const collToken = tokenMap.get(loan.collateralAsset) as any;
+      return {
+        id: e.key,
+        healthFactor: hf,
+        assetSymbol: assetToken?._symbol || '',
+        collateralSymbol: collToken?._symbol || '',
+        ...loan,
+      };
+    })
+    .filter((l) => l.healthFactor < 1);
+};
+
+export const listNearUnhealthyLoans = async (
+  accessToken: string,
+  margin: number
+) => {
+  const registry = await getPool(accessToken);
+  const { priceMap, ratioMap } = buildMaps(registry);
+  const upper = 1 + margin;
+  const loans = (registry.lendingPool.loans || []) as any[];
+
+  const tokenAddresses = [
+    ...new Set(
+      loans.flatMap((e) => [e.LoanInfo.asset, e.LoanInfo.collateralAsset])
+    ),
+  ];
+  const tokenMap = new Map(
+    (
+      await getTokens(accessToken, {
+        address: `in.(${tokenAddresses.join(',')})`,
+      })
+    ).map((t: any) => [t.address, t])
+  );
+
+  return loans
+    .filter((e) => e.LoanInfo?.active)
+    .map((e) => {
+      const hf = calculateHealthFactor(e.LoanInfo, priceMap, ratioMap);
+      const loan = e.LoanInfo;
+      const assetToken = tokenMap.get(loan.asset) as any;
+      const collToken = tokenMap.get(loan.collateralAsset) as any;
+      return {
+        id: e.key,
+        healthFactor: hf,
+        assetSymbol: assetToken?._symbol || '',
+        collateralSymbol: collToken?._symbol || '',
+        ...loan,
+      };
+    })
+    .filter((l) => l.healthFactor >= 1 && l.healthFactor < upper);
+};
+
+export const getLoanByIdDirect = async (
+  accessToken: string,
+  id: string
+) => {
+  const registry = await getPool(accessToken);
+  const found = (registry.lendingPool.loans || []).find((e: any) => e.key === id);
+  if (!found) return null;
+  return found.LoanInfo;
+};
+
+export const executeLiquidation = async (
+  accessToken: string,
+  loanId: string
+) => {
+  // Fetch loan info so we know which asset must be repaid and how much to approve.
+  const registry = await getPool(accessToken);
+  const liquidityPoolAddr = registry.liquidityPool;
+  const found = (registry.lendingPool.loans || []).find((e: any) => e.key === loanId);
+  if (!found) {
+    throw new Error(`Loan ${loanId} not found`);
+  }
+  const loan = found.LoanInfo;
+
+  // Approve the LiquidityPool to pull up to the full outstanding amount.
+  const maxApprove = (BigInt(loan.amount) * 2n).toString();
+
+  const tx = buildFunctionTx([{
+    contractName: extractContractName(LendingPool),
+    contractAddress: loan.asset,
+    method: "approve",
+    args: { spender: liquidityPoolAddr, value: maxApprove },
+  }, {
+    contractName: extractContractName(LendingPool),
+    contractAddress: constants.lendingPool,
+    method: "liquidate",
+    args: { loanId },
+  }]);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const getLoanWithHealthFactor = async (
+  accessToken: string,
+  id: string
+) => {
+  const registry = await getPool(accessToken);
+  const found = (registry.lendingPool.loans || []).find((e: any) => e.key === id);
+  if (!found) return null;
+  const loan = found.LoanInfo;
+  const { priceMap, ratioMap } = buildMaps(registry);
+  const healthFactor = calculateHealthFactor(loan, priceMap, ratioMap);
+  return { id, healthFactor, ...loan };
+};
+
+const toBig = (v: string | number | bigint) => BigInt(v);

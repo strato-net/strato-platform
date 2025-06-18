@@ -67,6 +67,10 @@ async function uploadDappContract(token, options) {
       name: contractName,
       source,
       args: {}, // No constructor arguments needed
+      txParams: {
+        gasPrice: config.gasPrice,
+        gasLimit: config.gasLimit,
+      },
     };
 
     // Options for deployment
