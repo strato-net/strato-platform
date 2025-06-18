@@ -76,7 +76,7 @@ Each feed defines:
 - **targetAssetAddress**: Blockchain asset address to update
 - **cron**: Cron expression for update schedule
 - **apiParams**: Parameters passed to the API source
-- **minPrice/maxPrice**: Price validation bounds (in 8-decimal format)
+
 
 ```json
 {
@@ -88,9 +88,7 @@ Each feed defines:
       "cron": "*/5 * * * *",
       "apiParams": {
         "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-      },
-      "minPrice": 100000000,
-      "maxPrice": 1000000000000
+      }
     }
   ]
 }
@@ -107,10 +105,19 @@ Each source defines:
 ```json
 {
   "Alchemy": {
-    "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/latest?network=eth-mainnet&addresses[]=${tokenAddress}",
+    "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "parsePath": "prices[0].price.value",
-    "feedTimestampPath": "prices[0].timestamp"
+    "method": "POST",
+    "requestBody": {
+      "addresses": [
+        {
+          "network": "eth-mainnet",
+          "address": "${tokenAddress}"
+        }
+      ]
+    },
+    "parsePath": "data[0].prices[0].value",
+    "feedTimestampPath": "data[0].prices[0].lastUpdatedAt"
   }
 }
 ```
@@ -129,31 +136,17 @@ Each source defines:
    # Edit .env with your configuration
    ```
 
-3. **Validate Configuration**
+3. **Start the Service**
    ```bash
-   npm run validate
-   ```
-
-4. **Start the Service**
-   ```bash
-   npm start
+   cd services/oracle
+   node src/index.js
    ```
 
 ## 🎯 Usage
 
-### Development Mode
+### Start the Service
 ```bash
-npm run dev
-```
-
-### Validate Configuration
-```bash
-npm run validate
-```
-
-### Production Deployment
-```bash
-npm start
+node src/index.js
 ```
 
 ## 📊 Supported Price Sources
@@ -204,9 +197,7 @@ Edit `src/config/feeds.json`:
   "cron": "*/10 * * * *",
   "apiParams": {
     "symbol": "NEWTOKEN"
-  },
-  "minPrice": 1000000,
-  "maxPrice": 100000000000
+  }
 }
 ```
 
@@ -217,8 +208,9 @@ NEW_API_KEY=your_new_api_key_here
 ```
 
 ### 4. Restart Service
+Stop the current service (Ctrl+C) and restart:
 ```bash
-npm restart
+node src/index.js
 ```
 
 ## 🔐 OAuth2 Authentication
@@ -259,8 +251,8 @@ The service provides comprehensive logging:
    ```
 
 2. **Price Validation Errors**
-   - Check `minPrice` and `maxPrice` bounds in feeds.json
    - Ensure prices are in 8-decimal format
+   - Check API response parsing paths in sources.json
 
 3. **STRATO Transaction Failures**
    - Verify `PRICE_ORACLE_ADDRESS` is correct
