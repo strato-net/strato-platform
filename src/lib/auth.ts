@@ -16,24 +16,6 @@ export const isAuthenticated = async (): Promise<boolean> => {
   }
 };
 
-// Synchronous version for immediate checks (fallback)
-export const isAuthenticatedSync = (): boolean => {
-  // Check if mercata_session cookie exists in document.cookie (fallback for non-HttpOnly)
-  return document.cookie
-    .split(';')
-    .some(cookie => cookie.trim().startsWith('mercata_session='));
-};
-
-export const checkAuthAndRedirect = async (): Promise<boolean> => {
-  const authenticated = await isAuthenticated();
-  if (!authenticated) {
-    // Redirect to login page if not authenticated
-    window.location.href = '/login';
-    return false;
-  }
-  return true;
-};
-
 // Logout function that redirects to external logout endpoint
 export const logout = (): void => {
   window.location.href = '/auth/logout';
