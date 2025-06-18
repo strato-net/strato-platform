@@ -1067,10 +1067,11 @@ createHistoryTableQuery isAbstract (creator, a, n) cols =
           tableNameToDoubleQuoteText historyTableName',
           " (",
           csv $
-            (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
-              ++ historyValidToColumnQuery
+            bool baseColumnsQuery abstractBaseColumnsQuery isAbstract
               ++ cols,
-          ");\n\n",
+          ++
+            historyValidToColumnQuery
+              ");\n\n",
           -- Create or replace the function for handling insert and update triggers
           "CREATE OR REPLACE FUNCTION ",
           triggerFunctionName,
