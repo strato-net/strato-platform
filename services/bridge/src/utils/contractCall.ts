@@ -41,5 +41,64 @@ export const contractCall = async (
       maxBodyLength: 50 * 1024 * 1024,
     }
   );
-  return response.data[0];
+
+  if (response.status !== 200) {
+    throw new Error(`Strato error: ${response.statusText}`);
+  }
+
+  if (!response.data || !Array.isArray(response.data)) {
+    throw new Error("Strato response data is empty or invalid");
+  }
+
+  const result = response.data[0];
+  if (!result || !result.hash) {
+    throw new Error("Missing transaction result or hash");
+  }
+
+  const txHash = result.hash;
+
+  const predicate = (results: any[]) =>
+    results.every((r) => r.status !== "Pending");
+
+  const action = async () => {
+    const res = await axios.post(`${process.env.NODE_URL}/bloc/v2.2/transactions/results`, [txHash], {
+      headers: {
+        accept: "application/json;charset=utf-8",
+        "content-type": "application/json;charset=utf-8",
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    console.log("🚀 res", res.data);
+        
+    return res.data;
+  };
+
+  const finalResult = await until(predicate, action);
+
+  return finalResult[0];
+};
+
+export const until = async (
+  predicate: (res: any) => boolean,
+  action: () => Promise<any>,
+  timeout = 60000, // default to 1 minute
+  interval = 5000 // check every 5 seconds
+): Promise<any> => {
+  const start = Date.now();
+
+  while (true) {
+    const result = await action();
+
+    if (predicate(result)) {
+      return result;
+    }
+
+    if (Date.now() - start >= timeout) {
+      console.warn("Timeout reached before predicate was satisfied.");
+      return result;
+    }
+
+    await new Promise((res) => setTimeout(res, interval));
+  }
 };

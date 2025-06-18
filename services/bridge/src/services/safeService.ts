@@ -130,6 +130,42 @@ export const checkEthTransaction = async (transactionHash: string) => {
   return null;
 };
 
+export const checkEthTransactionBatch = async (txList: any[]): Promise<{ txHash: string }[]> => {
+  console.log("checkEthTransactionBatch called .......", txList);
+  const confirmed: { txHash: string }[] = [];
+  const apiKit = new SafeApiKit({ chainId });
+
+  for (const tx of txList) {
+    const transactionHash = tx.hash.replace("0x", "");
+    console.log("🔍 Checking transaction:", transactionHash);
+
+    let transaction = null;
+
+    for (let i = 0; i < 5; i++) {
+      const allTxs: any = await apiKit.getAllTransactions(config.safe.address || "", { limit: 100 });
+
+      transaction = allTxs.results.find(
+        (safeTx: any) => transactionHash === safeTx.transactionHash
+      );
+
+      if (transaction) break;
+
+      await new Promise(resolve => setTimeout(resolve, 5000)); // wait 5 sec
+    }
+
+    if (transaction?.safeTxHash) {
+      const safeTxHash = transaction.safeTxHash.toString().replace(/^0x/, "");
+      confirmed.push({ txHash: safeTxHash });
+      console.log("✅ Confirmed:", safeTxHash);
+    } else {
+      console.warn("⚠️ Not confirmed:", transactionHash);
+    }
+  }
+
+  return confirmed;
+};
+
+
 // Example usage:
 /*
 const generator = safeTransactionGenerator(amount, tokenAddress, userAddress);

@@ -54,7 +54,7 @@ class BridgeController {
       next(error);
     }
   }
-  
+
 
   static async bridgeOut(
     req: CustomRequest,

@@ -10,10 +10,13 @@ import {
 import BridgeContractCall from "../utils/bridgeContractCall";
 import TokenContractCall from "../utils/tokenContractCall";
 import sendEmail from "./emailService";
-import safeTransactionGenerator, { checkEthTransaction } from "./safeService";
+import safeTransactionGenerator, {
+  checkEthTransaction,
+} from "./safeService";
 import {
   fetchDepositInitiated,
   fetchDepositInitiatedStatus,
+  fetchDepositInitiatedTransactions,
   fetchWithdrawalInitiatedStatus,
 } from "./cirrusService";
 import {
@@ -102,14 +105,14 @@ export const bridgeOut = async (
     ? TESTNET_ERC20_TOKEN_CONTRACTS
     : MAINNET_ERC20_TOKEN_CONTRACTS;
 
-    const tokenMapping = isTestnet
-      ? TESTNET_ETH_STRATO_TOKEN_MAPPING
-      : MAINNET_ETH_STRATO_TOKEN_MAPPING;
-  
-    const ethTokenAddress: any =
-      Object.entries(tokenMapping).find(
-        ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
-      )?.[0] || null;
+  const tokenMapping = isTestnet
+    ? TESTNET_ETH_STRATO_TOKEN_MAPPING
+    : MAINNET_ETH_STRATO_TOKEN_MAPPING;
+
+  const ethTokenAddress: any =
+    Object.entries(tokenMapping).find(
+      ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
+    )?.[0] || null;
 
   const isERC20 = tokenContract.find((token: any) => token === ethTokenAddress);
 
@@ -150,6 +153,27 @@ export const bridgeOut = async (
   sendEmail(hash.toString());
 
   return markPendindResponse;
+};
+
+export const confirmBridgeinSafePolling = async (txList: any[]) => {
+  if (!config.safe?.address) return;
+
+  const txBatch = txList.map((tx) => tx.result.transactionHash);
+  console.log("txBatch....", txBatch);
+
+  const depositStatus = await fetchDepositInitiatedTransactions(txBatch);
+
+  console.log("depositStatus....", depositStatus);
+
+  // depositedInitiated in query
+  try {
+    const bridgeContract = new BridgeContractCall();
+    await bridgeContract.batchConfirmDeposits({
+      deposits: depositStatus,
+    });
+  } catch (error) {
+    console.error("Error in confirmDeposit for tx:", error);
+  }
 };
 
 // get the possible data from alchemy and verify in this call
@@ -208,13 +232,11 @@ export const confirmBridgeOut = async (tx: any) => {
   });
 };
 
-export const confirmBridgeOutSafePolling = async (tx: any) => {
-  console.log("confirmBridgeOutSafePolling tx.safeTxHash", tx.safeTxHash);
-  const safeTxHash = tx.safeTxHash.toString().replace("0x", "");
-
+export const confirmBridgeOutSafePolling = async (txs: string[]) => {
+  console.log("confirmBridgeOutSafePolling ", txs);
   const bridgeContract = new BridgeContractCall();
-  await bridgeContract.confirmWithdrawal({
-    txHash: safeTxHash,
+  await bridgeContract.batchConfirmWithdrawals({
+    txHashes: txs,
   });
 };
 
@@ -258,10 +280,8 @@ export const getBridgeInTokens = async () => {
   const bridgeInTokens = showTestnet ? TESTNET_ETH_TOKENS : MAINNET_ETH_TOKENS;
 
   const enrichedTokens = bridgeInTokens.map((token) => {
-    const { exchangeTokenName, exchangeTokenSymbol } = getExchangeTokenInfoBridgeIn(
-      token.tokenAddress,
-      showTestnet,
-    );
+    const { exchangeTokenName, exchangeTokenSymbol } =
+      getExchangeTokenInfoBridgeIn(token.tokenAddress, showTestnet);
     return {
       ...token,
       exchangeTokenName,
@@ -273,13 +293,13 @@ export const getBridgeInTokens = async () => {
 };
 
 export const getBridgeOutTokens = async () => {
-  const bridgeOutTokens = showTestnet ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
+  const bridgeOutTokens = showTestnet
+    ? TESTNET_STRATO_TOKENS
+    : MAINNET_STRATO_TOKENS;
 
   const enrichedTokens = bridgeOutTokens.map((token) => {
-    const { exchangeTokenName, exchangeTokenSymbol } = getExchangeTokenInfoBridgeOut(
-      token.tokenAddress,
-      showTestnet,
-    );
+    const { exchangeTokenName, exchangeTokenSymbol } =
+      getExchangeTokenInfoBridgeOut(token.tokenAddress, showTestnet);
     return {
       ...token,
       exchangeTokenName,

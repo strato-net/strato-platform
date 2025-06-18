@@ -4,6 +4,7 @@ import { contractCall } from "./contractCall";
 const bridgeContractName = 'MercataEthBridge';
 const bridgeContractAddress = config.bridge.address || '';
 
+
 class BridgeContractCall {
   async deposit(args: any) {
     console.log("deposit contract called")
@@ -38,6 +39,24 @@ class BridgeContractCall {
     const confirmWithdrawalResponse = await contractCall(bridgeContractName, bridgeContractAddress, "confirmWithdrawal", args);
     console.log("confirmWithdrawal contract Response",confirmWithdrawalResponse);
     return confirmWithdrawalResponse;
+  }
+
+  async batchConfirmWithdrawals(args: any) {
+    console.log("batchConfirmWithdrawals contract called......")
+    const batchConfirmWithdrawalsResponse = await contractCall(bridgeContractName, bridgeContractAddress, "batchConfirmWithdrawals", args);
+    console.log("batchConfirmWithdrawals contract Response",batchConfirmWithdrawalsResponse);
+    return batchConfirmWithdrawalsResponse;
+  } 
+
+  async batchConfirmDeposits(args: any) {  
+    const response = await contractCall(
+      bridgeContractName,
+      bridgeContractAddress,
+      "batchConfirmDeposits",
+      args 
+    );
+  
+    return response;
   }
 }
 

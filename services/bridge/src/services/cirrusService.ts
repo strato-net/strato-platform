@@ -1,8 +1,11 @@
 import axios from 'axios';
 import { getBAUserToken } from '../auth';
-import { getExchangeTokenInfoBridgeOut, TESTNET_STRATO_TOKENS } from '../config';
+import { config, getExchangeTokenInfoBridgeOut, TESTNET_STRATO_TOKENS } from '../config';
 
 const NODE_URL = process.env.NODE_URL;
+
+ const MERCATA_URL = "BlockApps-Mercata-MercataEthBridge" ;
+//  const MERCATA_URL = "MercataEthBridge" ;
 
 // Helper to normalize Ethereum address (lowercase + remove '0x' prefix)
 const normalizeAddress = (address: string) => address?.replace(/^0x/i, '').toLowerCase();
@@ -24,7 +27,7 @@ export const fetchDepositInitiatedStatus = async (
     const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
     const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
 
-    const cirrusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?${selectFields}&mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
+    const cirrusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?${selectFields}&mercataUser=eq.${userAddress}&address=eq.${config.bridge.address}${limitParam}${offsetParam}${orderByParam}`;
     const response = await axios.get(cirrusUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -40,8 +43,9 @@ export const fetchDepositInitiatedStatus = async (
     // Collect all txHashes
     const txHashes = depositData.map((item: any) => item.txHash).filter(Boolean);
     const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
+    console.log("depositstatus url",`${NODE_URL}/cirrus/search/${MERCATA_URL}-depositStatus?key=in.(${txHashList})&select=key,value`);
 
-    const depositStatusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge-depositStatus?key=in.(${txHashList})&select=key,value`;
+    const depositStatusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}-depositStatus?key=in.(${txHashList})&select=key,value`;
 
     const depositStatusResponse = await axios.get(depositStatusUrl, {
       headers: {
@@ -76,7 +80,7 @@ export const fetchDepositInitiatedStatus = async (
       };
     });
 
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?mercataUser=eq.${userAddress}&select=count`;
+    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&select=count`;
     const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -115,7 +119,7 @@ export const fetchWithdrawalInitiatedStatus = async (
     const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
     const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
 
-    const cirrusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?${selectFields}&mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
+    const cirrusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?${selectFields}&mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
     const response = await axios.get(cirrusUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -132,7 +136,7 @@ export const fetchWithdrawalInitiatedStatus = async (
     const txHashes = withdrawalData.map((item: any) => item.txHash).filter(Boolean);
     const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
 
-    const withdrawalStatusUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge-withdrawStatus?key=in.(${txHashList})&select=key,value`;
+    const withdrawalStatusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}-withdrawStatus?key=in.(${txHashList})&select=key,value`;
 
     const withdrawalStatusResponse = await axios.get(withdrawalStatusUrl, {
       headers: {
@@ -168,7 +172,7 @@ export const fetchWithdrawalInitiatedStatus = async (
       };
     });
 
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.${status}?mercataUser=eq.${userAddress}&select=count`;
+    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&select=count`;
     const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -195,8 +199,8 @@ export const fetchDepositInitiated = async (txHash: string): Promise<any | null>
 
   if (!accessToken) return null;
   try {
-    console.log("fetching deposit initiated url ",`${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.DepositInitiated?txHash=eq.${txHash}`)
-    const depositInitiatedResponse = await axios.get(`${NODE_URL}/cirrus/search/BlockApps-Mercata-MercataEthBridge.DepositInitiated?txHash=eq.${txHash}`, {
+    console.log("fetching deposit initiated url ",`${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=eq.${txHash}`)
+    const depositInitiatedResponse = await axios.get(`${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=eq.${txHash}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`
       }
@@ -206,6 +210,39 @@ export const fetchDepositInitiated = async (txHash: string): Promise<any | null>
     return null;
   }
 }; 
+export const fetchDepositInitiatedTransactions= async (
+  transactionHashes: string[]
+): Promise<any[]> => {
+  console.log("🔍 Fetching DepositInitiated transactions for provided hashes...");
 
+  const accessToken = await getBAUserToken();
+  if (!accessToken || transactionHashes.length === 0) return [];
 
+  const queryFields = 'select=txHash,token,amount,to,mercataUser';
+
+  // Normalize and strip '0x' prefix from hashes
+  const normalizedHashes = transactionHashes.map((hash) =>
+    hash.replace(/^0x/, "")
+  );
+
+  const hashQueryParam = normalizedHashes.join(',');
+  const endpoint = `${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=in.(${hashQueryParam})&${queryFields}`;
+  console.log("endpoint....", endpoint);
+
+  try {
+    const response = await axios.get(endpoint, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+
+    console.warn("⚠️ Unexpected response format:", response.data);
+    return [];
+  } catch (error: any) {
+    console.error("❌ Error fetching DepositInitiated transactions:", error.message);
+    return [];
+  }
+};
 
