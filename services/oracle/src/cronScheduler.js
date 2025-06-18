@@ -1,12 +1,25 @@
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
 const { fetchGenericPrice } = require('./adapters/genericRestAdapter');
 const { pushAssetPrices } = require('./utils/oraclePusher');
 const { logFeedUpdate, logError, logInfo } = require('./utils/logger');
-const feedsConfig = require('./config/feeds.json');
-const sourcesConfig = require('./config/sources.json');
+
+// Load configurations dynamically to avoid Node.js caching
+function loadConfig() {
+    const feedsPath = path.join(__dirname, 'config', 'feeds.json');
+    const sourcesPath = path.join(__dirname, 'config', 'sources.json');
+    
+    const feedsConfig = JSON.parse(fs.readFileSync(feedsPath, 'utf8'));
+    const sourcesConfig = JSON.parse(fs.readFileSync(sourcesPath, 'utf8'));
+    
+    return { feedsConfig, sourcesConfig };
+}
 
 function startCronScheduler() {
     console.log(`=== Starting Oracle Service (Cron Mode, Batch Push) ===`);
+    
+    const { feedsConfig, sourcesConfig } = loadConfig();
     logInfo('CronScheduler', `Loaded ${feedsConfig.feeds.length} feeds from configuration`);
 
     for (const feed of feedsConfig.feeds) {
@@ -28,25 +41,19 @@ function startCronScheduler() {
             try {
                 logInfo('CronScheduler', `Starting update for ${feed.name}`);
                 
-                const { price, feedTimestamp } = await fetchGenericPrice(feed, sourceConfig);
-
-                // Validate against min/max
-                const minPrice = feed.minPrice || 1e6; // Default $0.01
-                const maxPrice = feed.maxPrice || 1e12 * 1e8; // Default $10T
-
-                if (price < minPrice) {
-                    throw new Error(`Price below minPrice: ${price} < ${minPrice}`);
-                }
-                if (price > maxPrice) {
-                    throw new Error(`Price exceeds maxPrice: ${price} > ${maxPrice}`);
-                }
+                // Reload configurations fresh for each execution
+                const { feedsConfig: freshFeedsConfig, sourcesConfig: freshSourcesConfig } = loadConfig();
+                const freshFeed = freshFeedsConfig.feeds.find(f => f.name === feed.name);
+                const freshSourceConfig = freshSourcesConfig[freshFeed.source];
+                
+                const { price, feedTimestamp } = await fetchGenericPrice(freshFeed, freshSourceConfig);
 
                 // Push to blockchain
-                const result = await pushAssetPrices([feed.targetAssetAddress], [price]);
+                const result = await pushAssetPrices([freshFeed.targetAssetAddress], [price]);
 
                 // Log success
-                logFeedUpdate(feed.name, price, feedTimestamp, result.blockNumber);
-                logInfo('CronScheduler', `Successfully updated ${feed.name} in block ${result.blockNumber}`);
+                logFeedUpdate(freshFeed.name, price, feedTimestamp, result.txHash);
+                logInfo('CronScheduler', `Successfully updated ${freshFeed.name} with TX ${result.txHash}`);
 
             } catch (err) {
                 logError('CronScheduler', new Error(`Error updating ${feed.name}: ${err.message}`));

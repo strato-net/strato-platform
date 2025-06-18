@@ -8,9 +8,11 @@ async function main() {
         // Validate required environment variables
         const requiredEnvVars = [
             'STRATO_NODE_URL',
-            'OAUTH_URL',
+            'OAUTH_DISCOVERY_URL',
             'CLIENT_ID',
             'CLIENT_SECRET',
+            'USERNAME',
+            'PASSWORD',
             'PRICE_ORACLE_ADDRESS',
             'ALCHEMY_API_KEY'
         ];
