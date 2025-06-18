@@ -8,7 +8,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
  
  contract record PriceOracle is Ownable {
     // Asset price storage (price in 8-decimal format: 1e8 = $1.00)
-    mapping(address => uint256) public record assetPrices;
+    mapping(address => uint256) public record prices;
     mapping(address => uint256) public record lastUpdated;
     
     // Authorized oracle addresses
@@ -16,7 +16,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
     
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
-    event BatchPricesUpdated(address[] assets, uint256[] prices, uint256 timestamp);
+    event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
     event OracleAuthorized(address indexed oracle);
     event OracleRevoked(address indexed oracle);
     
@@ -38,7 +38,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         require(asset != address(0), "Invalid asset address");
         require(price > 0, "Price must be greater than 0");
         
-        assetPrices[asset] = price;
+        prices[asset] = price;
         lastUpdated[asset] = block.timestamp;
         
         emit PriceUpdated(asset, price, block.timestamp);
@@ -47,19 +47,19 @@ import "../../abstract/ERC20/access/Ownable.sol";
     /**
      * @dev Set prices for multiple assets in batch (main function for oracle service)
      */
-    function setAssetPrices(address[] calldata assets, uint256[] calldata prices) external onlyAuthorizedOracle {
-        require(assets.length == prices.length, "Arrays length mismatch");
+    function setAssetPrices(address[] calldata assets, uint256[] calldata priceValues) external onlyAuthorizedOracle {
+        require(assets.length == priceValues.length, "Arrays length mismatch");
         require(assets.length > 0, "Empty arrays");
         
         for (uint256 i = 0; i < assets.length; i++) {
             require(assets[i] != address(0), "Invalid asset address");
-            require(prices[i] > 0, "Price must be greater than 0");
+            require(priceValues[i] > 0, "Price must be greater than 0");
             
-            assetPrices[assets[i]] = prices[i];
+            prices[assets[i]] = priceValues[i];
             lastUpdated[assets[i]] = block.timestamp;
         }
         
-        emit BatchPricesUpdated(assets, prices, block.timestamp);
+        emit BatchPricesUpdated(assets, priceValues, block.timestamp);
     }
     
     /**
@@ -67,7 +67,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
      */
     function getAssetPrice(address asset) external view returns (uint256) {
         require(asset != address(0), "Invalid asset address");
-        uint256 price = assetPrices[asset];
+        uint256 price = prices[asset];
         require(price > 0, "Price not available");
         return price;
     }
@@ -77,7 +77,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
      */
     function getAssetPriceWithTimestamp(address asset) external view returns (uint256 price, uint256 timestamp) {
         require(asset != address(0), "Invalid asset address");
-        price = assetPrices[asset];
+        price = prices[asset];
         require(price > 0, "Price not available");
         timestamp = lastUpdated[asset];
         return (price, timestamp);
@@ -87,7 +87,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
      * @dev Check if price is fresh (updated within specified time)
      */
     function isPriceFresh(address asset, uint256 maxAge) external view returns (bool) {
-        if (assetPrices[asset] == 0) return false;
+        if (prices[asset] == 0) return false;
         return (block.timestamp - lastUpdated[asset]) <= maxAge;
     }
     

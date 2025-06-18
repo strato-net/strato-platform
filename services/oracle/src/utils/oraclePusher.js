@@ -182,8 +182,8 @@ async function getAssetPrice(assetAddress) {
             }
         );
 
-        if (response.data && response.data.assetPrices && response.data.assetPrices[assetAddress]) {
-            return response.data.assetPrices[assetAddress].toString();
+        if (response.data && response.data.prices && response.data.prices[assetAddress]) {
+            return response.data.prices[assetAddress].toString();
         } else {
             throw new Error(`No price found for asset: ${assetAddress}`);
         }
