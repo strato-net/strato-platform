@@ -187,7 +187,7 @@ export const repay = async (
         contractAddress: constants.lendingPool,
         method: "repayLoan",
         args: {
-          asset: body.asset,
+          loanId: body.loanId,
           amount: body.amount,
         },
       }
