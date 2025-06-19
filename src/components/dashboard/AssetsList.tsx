@@ -2,9 +2,8 @@ import React, { useState } from "react";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "../ui/button";
 import DepositModal from "./DepositModal";
-import BridgeModal from "./BridgeModal";
 import DepositOptionsModal from "./DepositOptionsModal";
-import { Token } from "@/interface";
+import { Token } from "../../interface";
 import { formatUnits } from "ethers";
 
 interface AssetsProps {
@@ -15,16 +14,32 @@ interface AssetsProps {
 const AssetsList = ({ loading, tokens }: AssetsProps) => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
     if (option === "credit-card") {
       setIsDepositModalOpen(true);
-    } else {
-      setIsBridgeModalOpen(true);
     }
   };
+
+  const getTokenName = (token: Token) => {
+    return token["BlockApps-Mercata-ERC20"]?._name || "";
+  };
+
+  const getTokenSymbol = (token: Token) => {
+    return token["BlockApps-Mercata-ERC20"]?._symbol || "";
+  };
+
+  const getTokenValue = (token: Token) => {
+    return token.value || "-";
+  };
+
+  const getTokenTotalSupply = (token: Token) => {
+    return token["BlockApps-Mercata-ERC20"]?._totalSupply || "-";
+  };
+
+  // Ensure tokens is an array and has items
+  const validTokens = Array.isArray(tokens) ? tokens : [];
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
@@ -162,15 +177,9 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
         onClose={() => setIsOptionsModalOpen(false)}
         onSelectOption={handleOptionSelect}
       />
-
       <DepositModal
         isOpen={isDepositModalOpen}
         onClose={() => setIsDepositModalOpen(false)}
-      />
-
-      <BridgeModal
-        isOpen={isBridgeModalOpen}
-        onClose={() => setIsBridgeModalOpen(false)}
       />
     </div>
   );

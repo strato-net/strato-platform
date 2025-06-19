@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { CreditCard, ArrowLeftRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface DepositOptionsModalProps {
   isOpen: boolean;
@@ -9,6 +10,13 @@ interface DepositOptionsModalProps {
 }
 
 const DepositOptionsModal = ({ isOpen, onClose, onSelectOption }: DepositOptionsModalProps) => {
+  const navigate = useNavigate();
+
+  const handleBridgeClick = () => {
+    onClose();
+    navigate('/dashboard/bridge');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -36,7 +44,7 @@ const DepositOptionsModal = ({ isOpen, onClose, onSelectOption }: DepositOptions
           <Button
             variant="outline"
             className="h-auto p-6 flex flex-col items-center gap-3 hover:bg-gray-50"
-            onClick={() => onSelectOption('bridge')}
+            onClick={handleBridgeClick}
           >
             <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
               <ArrowLeftRight className="h-6 w-6 text-purple-600" />

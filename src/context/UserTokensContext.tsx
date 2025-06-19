@@ -50,6 +50,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       console.error("Failed to fetch tokens:", err);
       setError("Failed to fetch token data");
+      setTokens([]); // Reset to empty array on error
     } finally {
       if (!signal?.aborted) {
         setLoading(false);
