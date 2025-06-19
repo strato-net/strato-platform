@@ -36,11 +36,7 @@ services:
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - ssl=${ssl:-false}
-    build:
-      context: ./nginx
-      # Uncomment if having issues pulling the openresty module from a repo at build time
-      #extra_hosts:
-      #  - "openresty.org=3.125.51.27"
+    build: ./nginx
     image: mercata-nginx:latest
     ports:
       - 80:80

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Environment and secrets
+.env*
+
+# Build outputs (since we build inside Docker)
+dist
+
+# Logs
+*.log
+logs
+
+# Git
+.git
+
+# Common IDE/OS files
+.vscode
+.idea
+.DS_Store
+
+# Documentation and tests
+README.md
+*.test.*
+*.spec.*
+*.puml

@@ -19,10 +19,9 @@ pipeline {
             } catch (Exception e) {
               buildUser = "github"
             }
-            def nodeUsed = env.NODE_NAME ?: 'unknown'
-            currentBuild.description = "${nodeUsed} // ${buildUser}"
             env.GIT_SHA = env.GIT_COMMIT.take(7)
-            echo "🔧 Using Git SHA: ${env.GIT_SHA}"
+            currentBuild.description = "${env.NODE_NAME} | ${env.GIT_SHA} | ${buildUser}"
+            echo "Using Git SHA: ${env.GIT_SHA}"
           }
         }
 
@@ -34,7 +33,7 @@ pipeline {
       }
     }
 
-    stage('Build and Push Docker Images') {
+    stage('Build and Push') {
       steps {
         withCredentials([
           usernamePassword(credentialsId: 'aws-ecr-write-access-account', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
@@ -42,141 +41,105 @@ pipeline {
           usernamePassword(credentialsId: 'docker-aws-registry-login', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWD')
         ]) {
           script {
-            def GIT_SHA = env.GIT_SHA
-            def baseBranch = env.CHANGE_TARGET ?: 'develop'
-            def headBranch = env.CHANGE_BRANCH ?: 'HEAD'
-
-            // Set GitHub remote and fetch, for identifying the diffs
-            sh """
-              git remote set-url origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/mercata.git
-              git fetch origin ${baseBranch} --quiet
-              ${env.CHANGE_BRANCH ? "git fetch origin ${env.CHANGE_BRANCH} --quiet" : ""}
-            """
 
             // Update submodules
             sh "git submodule update --recursive --init"
-
-            // Login to AWS ECR
+            
+            // Build Docker images
+            sh "docker compose build"
+            
+            // Tag images with registry-specific names
             sh """
-              AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
-              AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
-              AWS_DEFAULT_REGION=${AWS_REGION} \
-              aws ecr get-login-password --region ${AWS_REGION} | \
-              docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+              grep -E 'image: mercata-.*:latest' docker-compose.yml | sed 's/.*mercata-\\([^:]*\\):.*/\\1/' | while read service; do
+                echo "Tagging mercata-\$service:latest"
+                docker tag mercata-\$service:latest registry-aws.blockapps.net:5000/blockapps/mercata-\$service:${env.GIT_SHA}
+                docker tag mercata-\$service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/\$service:${env.GIT_SHA}
+              done
             """
-
-            // Login to BlockApps registry (port 5000)
+            
+            // Update image tags in docker-compose.yml with registry-specific names
+            sh """
+              cp docker-compose.yml docker-compose.ecr.yml
+              sed -i 's|image: mercata-\\([^:]*\\):.*|image: registry-aws.blockapps.net:5000/blockapps/mercata-\\1:${env.GIT_SHA}|g' docker-compose.yml
+              sed -i 's|image: mercata-\\([^:]*\\):.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/\\1:${env.GIT_SHA}|g' docker-compose.ecr.yml
+            """
+            
+            // Login to docker registries
             sh """
               echo "${DOCKER_PASSWD}" | docker login -u "${DOCKER_USER}" --password-stdin registry-aws.blockapps.net:5000
+              AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+                AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+                AWS_DEFAULT_REGION=${AWS_REGION} \
+                aws ecr get-login-password --region ${AWS_REGION} |  docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
             """
+            
+            // Push app images
+            sh """
+              docker compose -f docker-compose.yml push
+              docker compose -f docker-compose.ecr.yml push
+            """
+            
+            // Remove build context from docker-compose files
+            sh """
+              sed -i '/^[[:space:]]*build:/d' docker-compose.yml
+              sed -i '/^[[:space:]]*build:/d' docker-compose.ecr.yml
+            """
+            
+            archiveArtifacts artifacts: 'docker-compose*.yml', fingerprint: true
+            
+            // Build Stripe
+            def stripeRepo = "registry-aws.blockapps.net:5000/blockapps/mercata-stripe"
+            def stripeRepoECR = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/bridge"
+            sh "docker build -t stripe:latest services/payment/stripe"
+            sh """
+              docker tag stripe:latest ${stripeRepo}:${env.GIT_SHA}
+              docker tag stripe:latest ${stripeRepoECR}:${env.GIT_SHA}
+              docker push ${stripeRepo}:${env.GIT_SHA}
+              docker push ${stripeRepoECR}:${env.GIT_SHA}
+            """
+            writeFile file: 'docker-image-stripe.txt', text: "${stripeRepo}:${env.GIT_SHA}\n${stripeRepoECR}:${env.GIT_SHA}"
+            archiveArtifacts artifacts: 'docker-image-stripe.txt', fingerprint: true
+            
 
-            def composeChanged = sh(
-              script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- backend ui nginx docker-compose.yml || echo changed",
-              returnStdout: true
-            ).trim()
-
-            if (composeChanged == "changed") {
-              echo "Changes detected in backend/ui/nginx — rebuilding with docker-compose..."
-              sh "docker compose build"
-
-              def composeImages = [
-                backend: "mercata-backend",
-                ui: "mercata-ui",
-                nginx: "mercata-nginx"
-              ]
-
-              for (service in composeImages.keySet()) {
-                def localImage = composeImages[service]
-                def ecrTag = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${service}:${GIT_SHA}"
-                def internalTag = "registry-aws.blockapps.net:5000/blockapps/mercata-${service}:${GIT_SHA}"
-
-                sh "docker tag ${localImage} ${ecrTag}"
-                sh "docker push ${ecrTag}"
-
-                sh "docker tag ${localImage} ${internalTag}"
-                sh "docker push ${internalTag}"
-              }
-
-            } else {
-              echo "No changes in backend/ui/nginx/docker-compose.yml — skipping build."
-            }
-
-            def stripeChanged = sh(
-              script: "git diff --quiet origin/${baseBranch} origin/${headBranch} -- services/payment/stripe || echo changed",
-              returnStdout: true
-            ).trim()
-
-            if (stripeChanged == "changed") {
-              def stripeRepo = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/stripe"
-              def stripeTag = "${stripeRepo}:${GIT_SHA}"
-
-              echo "Changes detected in stripe. Building and pushing image ${stripeTag}..."
-              sh """
-                docker build -t ${stripeTag} services/payment/stripe
-                docker push ${stripeTag}
-              """
-            } else {
-              echo "No changes in stripe — skipping build."
-            }
+            // Build and Push Bridge Service
+            def bridgeRepo = "registry-aws.blockapps.net:5000/blockapps/mercata-bridge"
+            def bridgeRepoECR = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/bridge"
+            sh "docker build -t bridge:latest services/bridge"
+            sh """
+              docker tag bridge:latest ${bridgeRepo}:${env.GIT_SHA}
+              docker tag bridge:latest ${bridgeRepoECR}:${env.GIT_SHA}
+              docker push ${bridgeRepo}:${env.GIT_SHA}
+              docker push ${bridgeRepoECR}:${env.GIT_SHA}
+            """
+            writeFile file: 'docker-image-bridge.txt', text: "${bridgeRepo}:${env.GIT_SHA}\n${bridgeRepoECR}:${env.GIT_SHA}"
+            archiveArtifacts artifacts: 'docker-image-bridge.txt', fingerprint: true
           }
-        }
-      }
-    }
-
-    stage('Generate docker-compose files') {
-      steps {
-        script {
-          def gitSha = env.GIT_SHA
-          def services = ['backend', 'ui', 'nginx']
-
-          def originalCompose = readFile('docker-compose.yml')
-          def ecrCompose = originalCompose
-          def internalCompose = originalCompose
-
-          services.each { svc ->
-            def ecrImage = "image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/${svc}:${gitSha}"
-            def internalImage = "image: registry-aws.blockapps.net:5000/blockapps/mercata-${svc}:${gitSha}"
-
-            ecrCompose = ecrCompose.replaceAll(/image: mercata-${svc}(:latest)?/, ecrImage)
-            internalCompose = internalCompose.replaceAll(/image: mercata-${svc}(:latest)?/, internalImage)
-          }
-
-          writeFile file: 'docker-compose.ecr.yml', text: ecrCompose
-          writeFile file: 'docker-compose.yml', text: internalCompose
-
-          echo "📦 Generated docker-compose.yml (internal registry)"
-          echo "📦 Generated docker-compose.ecr.yml (ECR)"
-
-          archiveArtifacts artifacts: 'docker-compose*.yml', fingerprint: true
         }
       }
     }
   }
 
   post {
-    always {
-      sh 'docker system prune -fa || true'
-    }
 
     success {
       slackSend (
-        color: 'good',
-        message: "Mercata build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' on *${env.NODE_USED ?: 'unknown'}* (Git SHA: `${env.GIT_SHA}`) → ${env.BUILD_URL}"
+          color: 'good',
+          message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
       )
     }
 
     failure {
       slackSend (
-        color: 'danger',
-        message: "Mercata build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' on *${env.NODE_USED ?: 'unknown'}* → ${env.BUILD_URL}"
+          color: 'danger',
+          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
       )
 
       script {
-        if (env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'main') {
-          slackSend (
-            channel: '#engineering',
-            color: 'danger',
-            message: "*High Priority*: Build failed on *${env.BRANCH_NAME}*!\nJob: '${env.JOB_NAME} [${env.BUILD_NUMBER}]'\nNode: ${env.NODE_USED ?: 'unknown'}\nURL: ${env.BUILD_URL}"
+        if (env.BRANCH_NAME == 'develop') {
+          slackSend(
+              channel: '#engineering',
+              color: 'danger',
+              message: "MERCATA Develop branch build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
           )
         }
       }

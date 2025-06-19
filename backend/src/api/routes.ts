@@ -9,9 +9,11 @@ import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
 import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
+import { BridgeController } from "./controllers/bridge.controller";
 import OracleController from "./controllers/oracle.controller";
 
 const router = Router();
+const bridgeController = new BridgeController();
 
 router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
@@ -50,6 +52,14 @@ router.post("/oracle/setPrice", authHandler.authorizeRequest(), OracleController
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
 router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
+
+router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
+router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
+router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(), bridgeController.getBalance);
+router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(), bridgeController.getBridgeInTokens);
+router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(), bridgeController.getBridgeOutTokens);
+router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(), bridgeController.userDepositStatus);
+router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(), bridgeController.userWithdrawalStatus);
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({
