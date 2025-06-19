@@ -56,10 +56,6 @@ pipeline {
           sh "echo ${env.RELEASE_VERSION} > VERSION"
           sh 'rm -rf .docker-work'
           sh 'REPO=public make all'
-          dir ('blockapps-rest') {
-            sh 'yarn install --pure-lockfile'
-            sh 'yarn build'
-          }
         }
       }
     }
