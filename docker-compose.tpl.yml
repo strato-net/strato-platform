@@ -33,6 +33,7 @@ services:
       - LENDING_POOL=${LENDING_POOL}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ONRAMP=${ONRAMP}
+      - ADMIN_ADDRESS=${ADMIN_ADDRESS}
     restart: unless-stopped
     logging:
       driver: "json-file"

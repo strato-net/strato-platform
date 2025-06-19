@@ -96,6 +96,13 @@ pipeline {
                 VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 useCustomGenesis=false \\
+                ADMIN_ADDRESS=1b7dc206ef2fe3aab27404b88c36470ccf16c0ce \\
+                BASE_CODE_COLLECTION=0000000000000000000000000000000000001000 \\
+                POOL_FACTORY=000000000000000000000000000000000000100a \\
+                TOKEN_FACTORY=000000000000000000000000000000000000100b \\
+                LENDING_POOL=0000000000000000000000000000000000001005 \\
+                ONRAMP=0000000000000000000000000000000000001009 \\
+                BASE_URL=http://\$(</host) \\
                 ./strato --single
             """
           }
