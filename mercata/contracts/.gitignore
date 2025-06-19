@@ -1,0 +1,12 @@
+# Dependency directories
+/node_modules
+
+# dotenv environment variables file
+.env
+
+# Google secrets file
+secrets.json
+
+# logs
+/deploy/deployment-logs
+r.log
