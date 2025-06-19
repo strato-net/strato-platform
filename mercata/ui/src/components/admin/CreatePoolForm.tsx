@@ -13,7 +13,7 @@ import { useTokenContext } from '@/context/TokenContext';
 
 const CreatePoolForm = () => {
   const { createPool, loading: swapLoading } = useSwapContext();
-  const { tokens, getAllTokens, loading: tokenLoading } = useTokenContext();
+  const { activeTokens, getActiveTokens, loading: tokenLoading } = useTokenContext();
   const { toast } = useToast();
   
   const loading = swapLoading || tokenLoading;
@@ -29,8 +29,8 @@ const CreatePoolForm = () => {
   });
 
   useEffect(() => {
-    getAllTokens();
-  }, [getAllTokens]);
+    getActiveTokens();
+  }, [getActiveTokens]);
 
   const onSubmit = async (data: PoolFormValues) => {
     if (data.tokenA === data.tokenB) {
@@ -67,6 +67,8 @@ const CreatePoolForm = () => {
     }
   };
 
+  console.log('Active Tokens:', activeTokens);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -85,9 +87,9 @@ const CreatePoolForm = () => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {tokens && tokens.map((token) => (
+                    {activeTokens && activeTokens.map((token) => (
                       <SelectItem key={token.address} value={token.address}>
-                        {token?._symbol} - {token?._name}
+                        {token?._symbol} - {token?._name} ({token.address})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -114,9 +116,9 @@ const CreatePoolForm = () => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {tokens.map((token) => (
+                    {activeTokens.map((token) => (
                       <SelectItem key={token.address} value={token.address}>
-                        {token?._symbol} - {token?._name}
+                        {token?._symbol} - {token?._name} ({token.address})
                       </SelectItem>
                     ))}
                   </SelectContent>
