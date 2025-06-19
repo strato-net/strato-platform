@@ -43,8 +43,8 @@ services:
     depends_on:
       - nginx
       - mercata-backend
-    build: ./ui
-    image: mercata-ui:latest
+    build: ./mercata/ui
+    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
     restart: unless-stopped
     logging:
       driver: "json-file"
