@@ -67,7 +67,7 @@ const BorrowingSection = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Average Interest Rate</span>
-                <span className="font-semibold">3.2% APR</span>
+                <span className="font-semibold">3.2% APY</span>
               </div>
             </div>
           </div>
