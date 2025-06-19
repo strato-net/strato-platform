@@ -10,11 +10,18 @@ import {
   getWithdrawableTokens,
   getLoans,
   setPrice,
+  getPrice as getPriceService,
+  listLiquidatableLoans,
+  listNearUnhealthyLoans,
+  getLoanWithHealthFactor,
+  executeLiquidation as executeLiquidationService,
 } from "../services/lending.service";
 import {
   validateManageLiquidityArgs,
   validateGetLoanArgs,
   validateRepayLoanArgs,
+  validateLoanIdParam,
+  validateMarginQuery,
 } from "../validators/lending.validator";
 
 class LendingController {
@@ -154,6 +161,100 @@ class LendingController {
       const { accessToken, body } = req;
       const result = await setPrice(accessToken, body);
       res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /oracle/price
+  static async getPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const asset = typeof query.asset === "string" ? query.asset : undefined;
+
+      const result = await getPriceService(accessToken, asset);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // -------- Liquidation & loan extras ---------
+
+  static async listLiquidatable(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken } = req;
+      const loans = await listLiquidatableLoans(accessToken);
+      res.status(RestStatus.OK).json(loans);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listNearUnhealthy(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, query } = req;
+      // Validate and parse margin query (optional, default 0.2)
+      validateMarginQuery(query);
+      const marginRaw = typeof query.margin === "string" ? parseFloat(query.margin) : undefined;
+      const margin = !isNaN(Number(marginRaw)) ? Number(marginRaw) : 0.2; // default 20%
+
+      const loans = await listNearUnhealthyLoans(accessToken, margin);
+      res.status(RestStatus.OK).json(loans);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getLiquidatable(req: Request, res: Response, next: NextFunction) {
+    try {
+      validateLoanIdParam(req.params);
+      const { accessToken } = req;
+      const id = req.params.id;
+
+      const loan = await getLoanWithHealthFactor(accessToken, id);
+      if (!loan) {
+        res.status(RestStatus.NOT_FOUND).json({ error: "Loan not found" });
+        return;
+      }
+
+      res.status(RestStatus.OK).json(loan);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async executeLiquidation(req: Request, res: Response, next: NextFunction) {
+    try {
+      validateLoanIdParam(req.params);
+      const { accessToken } = req;
+      const id = req.params.id;
+
+      const result = await executeLiquidationService(accessToken, id);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getLoanById(req: Request, res: Response, next: NextFunction) {
+    try {
+      validateLoanIdParam(req.params);
+      const { accessToken } = req;
+      const id = req.params.id;
+
+      const loan = await getLoanWithHealthFactor(accessToken, id);
+      if (!loan) {
+        res.status(RestStatus.NOT_FOUND).json({ error: "Loan not found" });
+        return;
+      }
+
+      res.status(RestStatus.OK).json(loan);
     } catch (error) {
       next(error);
     }

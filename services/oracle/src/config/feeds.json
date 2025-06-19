@@ -1,0 +1,20 @@
+{
+  "feeds": [
+    {
+      "name": "ETH-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "3a928dfa06b73468a304af3c039c720651b50024",
+      "cron": "*/2 * * * *",
+      "apiParams": {
+        "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      }
+    },
+    {
+      "name": "XAU-USD",
+      "source": "Metals.dev",
+      "targetAssetAddress": "e05f6618b3fae1c7587fe61301131ca28efb774a",
+      "cron": "*/2 * * * *",
+      "apiParams": {}
+    }
+  ]
+} 
