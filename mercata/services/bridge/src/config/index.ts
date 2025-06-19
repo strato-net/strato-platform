@@ -1,5 +1,8 @@
 import dotenv from 'dotenv';
 import logger from '../utils/logger';
+import fetch from "node-fetch";
+import jwksRsa from "jwks-rsa";
+// import jwkToPem from "jwk-to-pem";
 
 dotenv.config();
 
@@ -16,7 +19,7 @@ export const config = {
     baPassword: process.env.BA_PASSWORD,
     clientSecret: process.env.CLIENT_SECRET,
     clientId: process.env.CLIENT_ID,
-    openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
+    openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL ,
   },
   alchemy: {
     apiKey: process.env.ALCHEMY_API_KEY,
@@ -102,14 +105,14 @@ export const TESTNET_STRATO_TOKENS = [
   {
     name: "STRATO Ether",
     symbol: "ETHST",
-    tokenAddress: "0x2851a163e5be0df44e1f27c8a3bf8148bad439a1" , // Native token address
+    tokenAddress: "0xdb9498038129fdc78e39ba54c5e8124809e22415" , // Native token address
     decimals: 18,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
   {
     name: "STRATO USDC",
     symbol: "USDCST",
-    tokenAddress: "0x2267ffcba11d03893c1e65cbd765574715ef98fb",
+    tokenAddress: "0x910913cf0c0aaf50b14ebea5773be55f15c0c739",
     decimals: 6,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
   }
@@ -133,8 +136,8 @@ export const MAINNET_STRATO_TOKENS = [
 ];
 
 export const TESTNET_ETH_STRATO_TOKEN_MAPPING = {
-  '0x0000000000000000000000000000000000000000': '0x2851a163e5be0df44e1f27c8a3bf8148bad439a1', // ETH
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x2267ffcba11d03893c1e65cbd765574715ef98fb' // USDC
+  '0x0000000000000000000000000000000000000000': '0xdb9498038129fdc78e39ba54c5e8124809e22415', // ETH
+  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x910913cf0c0aaf50b14ebea5773be55f15c0c739' // USDC
 }
 
 export const MAINNET_ETH_STRATO_TOKEN_MAPPING = {
@@ -193,4 +196,83 @@ export const getExchangeTokenInfoBridgeOut = (
     exchangeTokenSymbol: token?.symbol || '',
     exchangeTokenAddress: token?.tokenAddress || ''
   };
+};
+
+
+
+let issuer: string;
+let jwksClient: jwksRsa.JwksClient;
+let keyCache: Map<string, string> = new Map(); // Cache for all JWKS keys
+let isInitialized = false;
+
+export const initializeOAuth = async () => {
+  if (isInitialized) {
+    console.log("✅ OAuth config already initialized");
+    return;
+  }
+
+  if (!config.auth.openIdDiscoveryUrl) {
+    throw new Error("OpenID discovery URL not configured");
+  }
+
+  try {
+    console.log("🔍 Fetching OpenID configuration from:", config.auth.openIdDiscoveryUrl);
+    const response = await fetch(config.auth.openIdDiscoveryUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch OpenID configuration: ${response.status} ${response.statusText}`);
+    }
+    
+    const discovery = await response.json();
+
+    if (!discovery.jwks_uri || !discovery.issuer) {
+      throw new Error("Invalid OpenID configuration - missing jwks_uri or issuer");
+    }
+
+    issuer = discovery.issuer;
+    console.log("✅ Issuer configured:", issuer);
+
+    // Pre-fetch and cache all JWKS keys
+    console.log("🔑 Fetching and caching all JWKS keys...");
+    const jwksResponse = await fetch(discovery.jwks_uri);
+    if (!jwksResponse.ok) {
+      throw new Error(`Failed to fetch JWKS: ${jwksResponse.status} ${jwksResponse.statusText}`);
+    }
+    
+    const jwks = await jwksResponse.json();
+    if (!jwks.keys || !Array.isArray(jwks.keys)) {
+      throw new Error("Invalid JWKS response - missing keys array");
+    }
+
+    // Cache all keys by their key ID
+    for (const key of jwks.keys) {
+      if (key.kid && key.n && key.e) {
+        // Convert JWK to PEM format
+        const jwkToPem = require('jwk-to-pem');
+        try {
+          const pem = jwkToPem(key);
+          keyCache.set(key.kid, pem);
+          console.log(`✅ Cached key: ${key.kid}`);
+        } catch (error) {
+          console.warn(`⚠️ Failed to convert key ${key.kid} to PEM:`, error);
+        }
+      }
+    }
+
+    console.log(`✅ Cached ${keyCache.size} JWKS keys`);
+
+    isInitialized = true;
+    console.log("✅ OAuth config initialized successfully with pre-cached keys");
+  } catch (error) {
+    console.error("❌ Failed to initialize OAuth config:", error);
+    throw error;
+  }
+};
+
+export const getOAuthConfig = () => {
+  if (!isInitialized) {
+    throw new Error("OAuth not initialized. Call initializeOAuth() first");
+  }
+
+  return { issuer, keyCache };
 };
