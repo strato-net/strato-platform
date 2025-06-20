@@ -13,10 +13,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
     </div>
   </div>
   <div className=\\"col-sm-5 smd-pad-4\\">
-    <div className=\\"pt-input-group pt-dark pt-large\\">
-      <span className=\\"pt-icon pt-icon-search\\" />
-      <input className=\\"pt-input\\" type=\\"search\\" value=\\"\\" onChange={[Function: onChange]} placeholder=\\"Search anything on Mercata\\" onKeyDown={[Function]} dir=\\"auto\\" />
-    </div>
+    <div className=\\"pt-input-group pt-dark pt-large\\" />
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
     <div>
@@ -63,10 +60,7 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
     </div>
   </div>
   <div className=\\"col-sm-5 smd-pad-4\\">
-    <div className=\\"pt-input-group pt-dark pt-large\\">
-      <span className=\\"pt-icon pt-icon-search\\" />
-      <input className=\\"pt-input\\" type=\\"search\\" value=\\"\\" onChange={[Function: onChange]} placeholder=\\"Search anything on Mercata\\" onKeyDown={[Function]} dir=\\"auto\\" />
-    </div>
+    <div className=\\"pt-input-group pt-dark pt-large\\" />
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
     <div>
