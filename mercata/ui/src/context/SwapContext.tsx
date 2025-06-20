@@ -16,6 +16,12 @@ type SwapContextType = {
     amount: string;
     signal?: AbortSignal;
   }) => Promise<string>;
+  calculateSwapReverse: (params: {
+    poolAddress: string;
+    direction: boolean;
+    amount: string;
+    signal?: AbortSignal;
+  }) => Promise<string>;
   getPoolByTokenPair: (tokenA: string, tokenB: string) => Promise<any>;
   getPoolByAddress: (address: string) => Promise<any>;
   swap: (data: {
@@ -105,6 +111,29 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
       throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap');
+    }
+  }, []);
+
+  const calculateSwapReverse = useCallback(async ({
+    poolAddress,
+    direction,
+    amount,
+    signal
+  }: {
+    poolAddress: string;
+    direction: boolean;
+    amount: string;
+    signal?: AbortSignal;
+  }) => {
+    try {
+      const { data } = await api.get(
+        `/swap/calculateSwapReverse?address=${poolAddress}&direction=${direction}&amount=${amount}`,
+        { signal }
+      );
+      return data;
+    } catch (err: any) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap reverse');
     }
   }, []);
 
@@ -206,6 +235,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         fetchPairableTokens,
         createPool,
         calculateSwap,
+        calculateSwapReverse,
         getPoolByTokenPair,
         getPoolByAddress,
         swap,

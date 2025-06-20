@@ -344,7 +344,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 
 // Main Component
 const SwapAsset = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, calculateSwapReverse } = useSwapContext();
   const { userAddress } = useUser();
   const { toast } = useToast();
 
@@ -521,39 +521,54 @@ const SwapAsset = () => {
   const calculateSwapAmount = async (inputAmount: string, isFromInput: boolean) => {
     if (swapInputAbortRef.current) swapInputAbortRef.current.abort();
     swapInputAbortRef.current = new AbortController();
-
+  
     const inputAsset = isFromInput ? fromAsset : toAsset;
     const outputAsset = isFromInput ? toAsset : fromAsset;
-
+  
     if (!inputAsset?.address || !outputAsset?.address || !pool) return;
-
+  
     try {
       const parsedValue = parseUnits(inputAmount || "0", DECIMALS);
-      const inputBalance = BigInt(inputAsset.balance?.toString() || "0");
       
-      let direction: boolean;
       if (isFromInput) {
+        // Forward calculation: input -> output
+        const inputBalance = BigInt(inputAsset.balance?.toString() || "0");
         setWrongAmount(parsedValue > inputBalance);
-        direction = pool.tokenA?.address === inputAsset.address ? false : true;
+        
+        const direction = pool.tokenA?.address === inputAsset.address ? false : true;
         lastCalculatedFromRef.current = inputAmount;
-      } else {
-        direction = pool.tokenA?.address === outputAsset.address ? true : false;
-      }
-
-      const swapAmount = await calculateSwap({
-        poolAddress: pool.address,
-        direction,
-        amount: parsedValue.toString(),
-        signal: swapInputAbortRef.current.signal,
-      });
-
-      const result = formatUnits(BigInt(swapAmount || "0"), DECIMALS);
-      
-      if ((isFromInput && editingField === 'from') || (!isFromInput && editingField === 'to')) {
-        if (isFromInput) {
+        
+        const swapAmount = await calculateSwap({
+          poolAddress: pool.address,
+          direction,
+          amount: parsedValue.toString(),
+          signal: swapInputAbortRef.current.signal,
+        });
+        
+        const result = formatUnits(BigInt(swapAmount || "0"), DECIMALS);
+        if (editingField === 'from') {
           setToAmount(result);
-        } else {
+        }
+      } else {
+        // Reverse calculation: output -> input
+        const direction = pool.tokenA?.address === outputAsset.address ? false : true;
+        
+        const requiredInput = await calculateSwapReverse({
+          poolAddress: pool.address,
+          direction,
+          amount: parsedValue.toString(),
+          signal: swapInputAbortRef.current.signal,
+        });
+        
+        const result = formatUnits(BigInt(requiredInput || "0"), DECIMALS);
+        if (editingField === 'to') {
           setFromAmount(result);
+          lastCalculatedFromRef.current = result;
+          
+          // Check if the calculated input amount exceeds balance
+          const fromBalance = BigInt(fromAsset?.balance?.toString() || "0");
+          const calculatedInput = BigInt(requiredInput || "0");
+          setWrongAmount(calculatedInput > fromBalance);
         }
       }
     } catch (err: any) {
