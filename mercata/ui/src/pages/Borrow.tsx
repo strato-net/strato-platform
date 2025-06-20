@@ -202,7 +202,7 @@ const Borrow = () => {
     } catch (e) {
       console.error("Error fetching loans:", e);
     }
-  }, []);
+  }, [loans]);
 
 useEffect(() => {
     if (Object.keys(loans || {}).length > 0) {
@@ -219,24 +219,34 @@ useEffect(() => {
         amount: amountInWei,
         asset: loan?.loan?.asset,
       });
-      console.log(response, "repay loan response");
-      setRepayLoading(false);
-      setShowRepayModal(false)
-      api["success"]({
-        message: "Success",
-        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
+
+      console.log("Repay Response:", loan);
+      
+      toast({
+        title: "Success",
+        description: `Successfully Repaid $${repayAmount} USDST`,
+        variant: "success",
       });
-      await refreshLoans();
-      await fetchLoans();
-    } catch (error) {
-      api["error"]({
-        message: "Error",
-        description: `Repay Error - ${error}`,
-      });
-      setRepayLoading(false);
-      console.error("Error repaying loan:", error);
-    } finally {
+      
+      // Close modal and reset state immediately for better UX
+      setShowRepayModal(false);
       setRepayAmount("");
+      setLoan(null);
+      setRepayLoading(false);
+      
+      // Refresh both loans and deposit tokens as repayment affects both
+      await Promise.all([
+        refreshLoans(),
+        refreshDepositTokens()
+      ]);
+      
+    } catch (error) {
+      console.error("Error repaying loan:", error);
+      toast({
+        title: "Error",
+        description: `Repay Error - ${error}`,
+        variant: "destructive",
+      });
       setRepayLoading(false);
     }
   };
@@ -256,7 +266,7 @@ useEffect(() => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Borrow Against Your Assets</CardTitle>
+              <CardTitle>Borrow</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -266,13 +276,14 @@ useEffect(() => {
                     <TableHead>Balance</TableHead>
                     <TableHead>Collateral Ratio</TableHead>
                     <TableHead>USDST Available to Borrow</TableHead>
+                    <TableHead>Borrow Fee</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingDepositTokens ? (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
@@ -304,6 +315,11 @@ useEffect(() => {
                         </TableCell>
                         <TableCell>{formatMaxBorrowable(asset)}</TableCell>
                         <TableCell>
+                          {borrowAsset?.interestRate
+                            ? `${parseFloat(borrowAsset.interestRate).toFixed(2)}%`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             size="sm"
                             onClick={() => handleBorrow(asset)}
@@ -317,7 +333,7 @@ useEffect(() => {
                     ))
                   ) :
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={7}>
                         <div className="w-full flex justify-center items-center mt-4">
                           No data to show
                         </div>
@@ -329,9 +345,9 @@ useEffect(() => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Your loans</CardTitle>
+              <CardTitle>My Loans</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -341,7 +357,7 @@ useEffect(() => {
                     <TableHead>Amount</TableHead>
                     <TableHead>Collateral</TableHead>
                     <TableHead>Accrued Interest</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -412,64 +428,139 @@ useEffect(() => {
         />
       )}
       <Dialog open={showRepayModal} onOpenChange={setShowRepayModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Repay Loan</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
+                US
+              </div>
+              Repay USDST Loan
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-4">
-            {/* First Token */}
-            <div className="rounded-lg border p-3">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Amount</span>
-              </div>
-              <div className="flex items-center">
-                <Input
-                  placeholder="0"
-                  className="border-none text-xl font-medium p-0 pl-2 h-auto focus-visible:ring-0"
-                  value={repayAmount}
-                  onChange={handleAmountChange}
-                />
-              </div>
-              {wrongAmount && (
-                <p className="text-red-600 text-sm mt-1">
-                  Insufficient balance
-                </p>
-              )}
-            </div>
-          </div>
+          
           {loan && (
-            <div className="mt-2 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 mb-1">
-                <span className="font-medium">Principal:</span> {formatUnits(loan?.loan?.amount || 0, 18)} {loan?.loan?._symbol}
-              </p>
-              <p className="text-sm text-blue-800 mb-1">
-                <span className="font-medium">Interest:</span> {formatUnits(loan?.loan?.interest || 0, 18)} {loan?.loan?._symbol}
-              </p>
-              <p className="text-sm font-medium text-blue-900">
-                Total outstanding: {loan?.balanceHuman} {loan?.loan?._symbol}
-              </p>
-            </div>
-          )}
+            <>
+              <div className="space-y-2 py-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Original Loan Amount</span>
+                  <span className="font-medium">${formatUnits(loan?.loan?.amount || 0, 18)}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Accrued Interest</span>
+                  <span className="font-medium">${formatUnits(loan?.loan?.interest || 0, 18)}</span>
+                </div>
+                
+                <div className="flex justify-between items-center font-bold pt-2 border-t">
+                  <span>Total Amount Due</span>
+                  <span className="text-lg">${loan?.balanceHuman}</span>
+                </div>
+              </div>
 
-          <div className="pt-2">
-            <Button
-              onClick={repayLoan}
-              disabled={
-                repayLoading ||
-                !repayAmount ||
-                isNaN(Number(repayAmount)) ||
-                Number(repayAmount) <= 0 ||
-                Number(repayAmount) > Number(loan?.balanceHuman || 0)
-              }
-              type="submit"
-              className="w-full bg-strato-purple hover:bg-strato-purple/90"
-            >
-              {repayLoading && <div className="flex justify-center items-center h-12">
-                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-              </div>}
-              {repayLoading ? "Repaying..." : "Confirm Repay"}
-            </Button>
-          </div>
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Repay Amount (USDST)</label>
+                <div className="relative">
+                  <Input
+                    placeholder={loan?.balanceHuman}
+                    className=""
+                    value={repayAmount}
+                    onChange={handleAmountChange}
+                  />
+                  {wrongAmount && (
+                    <p className="text-red-600 text-sm mt-1">
+                      Insufficient balance
+                    </p>
+                  )}
+                </div>
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Min: $0.01</span>
+                  <span>Max: ${loan?.balanceHuman}</span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.1).toFixed(2))}
+                    className="flex-1"
+                  >
+                    10%
+                  </Button>
+                  <Button
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.25).toFixed(2))}
+                    className="flex-1"
+                  >
+                    25%
+                  </Button>
+                  <Button
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.5).toFixed(2))}
+                    className="flex-1"
+                  >
+                    50%
+                  </Button>
+                  <Button
+                    variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRepayAmount(loan?.balanceHuman)}
+                    className="flex-1"
+                  >
+                    100%
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-3 border-t">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Payment Amount</span>
+                  <span className="font-medium">${repayAmount || "0.00"}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Remaining Balance</span>
+                  <span className="font-medium">
+                    ${repayAmount ? (parseFloat(loan?.balanceHuman) - parseFloat(repayAmount)).toFixed(2) : loan?.balanceHuman}
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
+                <p className="text-gray-600">
+                  Repaying your loan will reduce your debt and may free up collateral. Full repayment will close the loan and unlock all collateral.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRepayModal(false)}
+                  className="mr-2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={repayLoan}
+                  disabled={
+                    repayLoading ||
+                    !repayAmount ||
+                    isNaN(Number(repayAmount)) ||
+                    Number(repayAmount) <= 0 ||
+                    Number(repayAmount) > Number(loan?.balanceHuman || 0)
+                  }
+                  className="px-6"
+                >
+                  {repayLoading ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                  ) : (
+                    `Repay $${repayAmount || "0.00"}`
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
