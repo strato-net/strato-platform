@@ -9,6 +9,7 @@ import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
 import ListAssetForm from '@/components/admin/ListAssetForm';
 import SetTokenStatusForm from '@/components/admin/SetTokenStatusForm';
+import AllTokensTable from '@/components/admin/AllTokensTable';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -124,6 +125,8 @@ const Admin = () => {
                 <SetTokenStatusForm />
               </CardContent>
             </Card>
+            
+            <AllTokensTable />
           </TabsContent>
 
           <TabsContent value="listing" className="space-y-6">
