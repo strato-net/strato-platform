@@ -479,23 +479,15 @@ useEffect(() => {
                 
                 <div className="flex gap-2">
                   <Button
-                    variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount(loan?.balanceHuman)}
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.1).toFixed(2))}
                     className="flex-1"
                   >
-                    100%
+                    10%
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.5).toFixed(2))}
-                    className="flex-1"
-                  >
-                    50%
-                  </Button>
-                  <Button
-                    variant="outline"
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2) ? "default" : "outline"}
                     size="sm"
                     onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.25).toFixed(2))}
                     className="flex-1"
@@ -503,12 +495,20 @@ useEffect(() => {
                     25%
                   </Button>
                   <Button
-                    variant="outline"
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.1).toFixed(2))}
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.5).toFixed(2))}
                     className="flex-1"
                   >
-                    10%
+                    50%
+                  </Button>
+                  <Button
+                    variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRepayAmount(loan?.balanceHuman)}
+                    className="flex-1"
+                  >
+                    100%
                   </Button>
                 </div>
               </div>
