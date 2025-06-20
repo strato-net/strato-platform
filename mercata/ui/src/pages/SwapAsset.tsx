@@ -103,6 +103,7 @@ interface TokenInputProps {
   balance: string | number;
   isLoading: boolean;
   wrongAmount: boolean;
+  insufficientPoolBalance: boolean;
   onSelect: (asset: SwappableToken) => void;
   tokens: SwappableToken[];
   isOpen: boolean;
@@ -121,6 +122,7 @@ const TokenInput = ({
   balance,
   isLoading,
   wrongAmount,
+  insufficientPoolBalance,
   onSelect,
   tokens,
   isOpen,
@@ -155,6 +157,9 @@ const TokenInput = ({
         : "0";
   };
 
+  const poolBalance = getPoolBalance();
+  const hasNoLiquidity = BigInt(poolBalance) === 0n;
+
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
       <div className="flex justify-between mb-2">
@@ -182,7 +187,13 @@ const TokenInput = ({
             }`}
           />
           {wrongAmount && (
-            <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+            <p className="text-red-600 text-sm mt-1">Insufficient user balance</p>
+          )}
+          {insufficientPoolBalance && hasNoLiquidity && (
+            <p className="text-red-600 text-sm mt-1">No liquidity in pool</p>
+          )}
+          {insufficientPoolBalance && !hasNoLiquidity && (
+            <p className="text-orange-600 text-sm mt-1">Amount exceeds pool balance</p>
           )}
           {isUsdstMaxIssue && (
             <p className="text-yellow-600 text-sm mt-1">
@@ -206,7 +217,7 @@ const TokenInput = ({
       {pool && asset && (
         <div className="mt-2 flex justify-end">
           <span className="text-sm text-gray-500">
-            Pool Balance: {formatBalance(getPoolBalance(), asset._symbol || "")}
+            Pool Balance: {formatBalance(poolBalance, asset._symbol || "")}
           </span>
         </div>
       )}
@@ -355,6 +366,7 @@ const SwapAsset = () => {
   const [fromAmount, setFromAmount] = useState("");
   const [toAmount, setToAmount] = useState("");
   const [wrongAmount, setWrongAmount] = useState(false);
+  const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
   const [pool, setPool] = useState<any>(null);
@@ -369,7 +381,6 @@ const SwapAsset = () => {
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
-  const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastCalculatedFromRef = useRef<string>("");
 
   // Initial setup
@@ -389,86 +400,98 @@ const SwapAsset = () => {
     }
   }, [fromAsset?.address, fetchPairableTokens]);
 
-  // Fetch pool when token pair changes
+  // Combined effect: fetch pool, update rate, and poll for updates
   useEffect(() => {
-    const fetchPool = async () => {
-      if (!fromAsset?.address || !toAsset?.address) return;
+    if (!fromAsset?.address || !toAsset?.address) return;
+
+    let isMounted = true;
+    let pollInterval: NodeJS.Timeout | null = null;
+    let currentRequestId = 0;
+    let abortController: AbortController | null = null;
+
+    const fetchAndUpdatePool = async () => {
+      const requestId = ++currentRequestId;
+      
+      // Abort previous request if still pending
+      if (abortController) {
+        abortController.abort();
+      }
+      abortController = new AbortController();
       
       try {
-        const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address);
+        const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address, abortController.signal);
+        
+        // Check if this is still the current request
+        if (!isMounted || requestId !== currentRequestId) return;
+
         if (poolData) {
           setPool(poolData);
-        } else {
-          setPool(null);
-          setToAsset(undefined);
-          setToAmount("");
-        }
-      } catch (error) {
-        console.error("Error fetching pool:", error);
-        setPool(null);
-        setToAsset(undefined);
-        setToAmount("");
-      }
-    };
-    
-    fetchPool();
-  }, [fromAsset?.address, toAsset?.address, getPoolByTokenPair]);
-
-  // Update exchange rate when pool changes
-  useEffect(() => {
-    if (!pool || !fromAsset || !toAsset) return;
-    
-    const rate = pool.tokenA?.address === fromAsset.address
-      ? pool.aToBRatio
-      : pool.bToARatio;
-    
-    setExchangeRate(rate || "0");
-  }, [pool, fromAsset, toAsset]);
-
-  // Poll pool data for updates
-  useEffect(() => {
-    if (!pool?.address) return;
-
-    const pollPool = async () => {
-      try {
-        const updatedPool = await getPoolByTokenPair(fromAsset?.address || "", toAsset?.address || "");
-        if (updatedPool) {
-          setPool(updatedPool);
           
-          // Recalculate if not actively editing
+          // Update exchange rate immediately
+          const rate = poolData.tokenA?.address === fromAsset.address
+            ? poolData.aToBRatio
+            : poolData.bToARatio;
+          setExchangeRate(rate || "0");
+          
+          // Recalculate if not actively editing and we have a preserved amount
           if (fromAmount && fromAmount === lastCalculatedFromRef.current && editingField === null) {
             const parsedValue = parseUnits(fromAmount, DECIMALS);
-            const direction = updatedPool.tokenA?.address === fromAsset?.address ? false : true;
+            const direction = poolData.tokenA?.address === fromAsset.address ? false : true;
             
             const swapAmount = await calculateSwap({
-              poolAddress: updatedPool.address,
+              poolAddress: poolData.address,
               direction,
               amount: parsedValue.toString(),
+              signal: abortController.signal,
             });
             
             setToAmount(formatUnits(BigInt(swapAmount || "0"), DECIMALS));
           }
+        } else {
+          setPool(null);
+          setToAsset(undefined);
+          setToAmount("");
+          setExchangeRate("0");
         }
-      } catch (error) {
-        console.error('Error polling pool:', error);
+      } catch (error: any) {
+        // Don't handle aborted requests as errors
+        if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
+        
+        // Only handle errors for the current request
+        if (isMounted && requestId === currentRequestId) {
+          console.error("Error fetching pool:", error);
+          setPool(null);
+          setToAsset(undefined);
+          setToAmount("");
+          setExchangeRate("0");
+        }
       }
     };
 
-    pollPool();
-    poolPollIntervalRef.current = setInterval(pollPool, POLL_INTERVAL);
+    // Initial fetch
+    fetchAndUpdatePool();
+    
+    // Set up polling
+    pollInterval = setInterval(fetchAndUpdatePool, POLL_INTERVAL);
 
+    // Cleanup
     return () => {
-      if (poolPollIntervalRef.current) {
-        clearInterval(poolPollIntervalRef.current);
+      isMounted = false;
+      currentRequestId++; // Invalidate any pending requests
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      if (abortController) {
+        abortController.abort();
       }
     };
-  }, [pool?.address, fromAsset?.address, toAsset?.address, fromAmount, editingField, getPoolByTokenPair, calculateSwap]);
+  }, [fromAsset?.address, toAsset?.address, fromAmount, editingField, getPoolByTokenPair, calculateSwap]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (poolPollIntervalRef.current) {
-        clearInterval(poolPollIntervalRef.current);
+      if (swapInputAbortRef.current) {
+        swapInputAbortRef.current.abort();
       }
     };
   }, []);
@@ -521,12 +544,36 @@ const SwapAsset = () => {
   const calculateSwapAmount = async (inputAmount: string, isFromInput: boolean) => {
     if (swapInputAbortRef.current) swapInputAbortRef.current.abort();
     swapInputAbortRef.current = new AbortController();
-  
+
     const inputAsset = isFromInput ? fromAsset : toAsset;
     const outputAsset = isFromInput ? toAsset : fromAsset;
-  
+
     if (!inputAsset?.address || !outputAsset?.address || !pool) return;
-  
+
+    // Check if pool has liquidity
+    const inputPoolBalance = pool.tokenA?.address === inputAsset.address 
+      ? pool.tokenABalance || "0"
+      : pool.tokenB?.address === inputAsset.address 
+        ? pool.tokenBBalance || "0"
+        : "0";
+    
+    const outputPoolBalance = pool.tokenA?.address === outputAsset.address 
+      ? pool.tokenABalance || "0"
+      : pool.tokenB?.address === outputAsset.address 
+        ? pool.tokenBBalance || "0"
+        : "0";
+
+    // If either pool balance is 0, no liquidity available
+    if (BigInt(inputPoolBalance) === 0n || BigInt(outputPoolBalance) === 0n) {
+      if (isFromInput) {
+        setToAmount("");
+      } else {
+        setFromAmount("");
+      }
+      setInsufficientPoolBalance(true);
+      return;
+    }
+
     try {
       const parsedValue = parseUnits(inputAmount || "0", DECIMALS);
       
@@ -534,6 +581,10 @@ const SwapAsset = () => {
         // Forward calculation: input -> output
         const inputBalance = BigInt(inputAsset.balance?.toString() || "0");
         setWrongAmount(parsedValue > inputBalance);
+        
+        // Check pool balance
+        const poolBalanceBigInt = BigInt(inputPoolBalance);
+        setInsufficientPoolBalance(parsedValue > poolBalanceBigInt && parsedValue <= inputBalance);
         
         const direction = pool.tokenA?.address === inputAsset.address ? false : true;
         lastCalculatedFromRef.current = inputAmount;
@@ -569,6 +620,10 @@ const SwapAsset = () => {
           const fromBalance = BigInt(fromAsset?.balance?.toString() || "0");
           const calculatedInput = BigInt(requiredInput || "0");
           setWrongAmount(calculatedInput > fromBalance);
+          
+          // Check pool balance
+          const poolBalanceBigInt = BigInt(inputPoolBalance);
+          setInsufficientPoolBalance(calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
         }
       }
     } catch (err: any) {
@@ -580,11 +635,15 @@ const SwapAsset = () => {
   const handleAmountChange = async (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
     isFromInput ? setFromAmount(value) : setToAmount(value);
+    
+    // Reset validation states
+    setWrongAmount(false);
+    setInsufficientPoolBalance(false);
+    
     if (pool && value && Number(value) !== 0) {
       await calculateSwapAmount(value, isFromInput);
     } else {
       isFromInput ? setToAmount('') : setFromAmount('');
-      setWrongAmount(false);
     }
   };
 
@@ -700,7 +759,7 @@ const SwapAsset = () => {
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
     
     // Basic validations
-    if (!fromAmount || !toAmount || !fromAsset || !toAsset || wrongAmount) {
+    if (!fromAmount || !toAmount || !fromAsset || !toAsset || wrongAmount || insufficientPoolBalance) {
       return true;
     }
     
@@ -738,6 +797,7 @@ const SwapAsset = () => {
                 balance={fromAsset?.balance || 0}
                 isLoading={fromBalanceLoading}
                 wrongAmount={wrongAmount}
+                insufficientPoolBalance={insufficientPoolBalance}
                 onSelect={(asset) => getTokenBalance(asset, true)}
                 tokens={swappableTokens}
                 isOpen={fromPopoverOpen}
@@ -767,6 +827,7 @@ const SwapAsset = () => {
                 balance={toAsset?.balance || 0}
                 isLoading={toBalanceLoading}
                 wrongAmount={false}
+                insufficientPoolBalance={false}
                 onSelect={(asset) => getTokenBalance(asset, false)}
                 tokens={pairableTokens}
                 isOpen={toPopoverOpen}

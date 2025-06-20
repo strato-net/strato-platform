@@ -22,7 +22,7 @@ type SwapContextType = {
     amount: string;
     signal?: AbortSignal;
   }) => Promise<string>;
-  getPoolByTokenPair: (tokenA: string, tokenB: string) => Promise<any>;
+  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
   getPoolByAddress: (address: string) => Promise<any>;
   swap: (data: {
     address: string;
@@ -137,11 +137,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string) => {
+  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
     try {
-      const res = await api.get(`/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`);
+      const res = await api.get(`/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`, { signal });
       return res.data?.[0] || null;
     } catch (err: any) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
       setError(err.response?.data?.message || err.message || 'Failed to get pool');
       return null;
     }
