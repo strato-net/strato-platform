@@ -33,10 +33,6 @@ pipeline {
         dir ('strato-worktree') {
           sh 'rm -rf .docker-work'
           sh 'REPO=private make all'
-          dir ('blockapps-rest') {
-            sh 'yarn install --pure-lockfile'
-            sh 'yarn build'
-          }
         }
       }
     }
@@ -78,6 +74,13 @@ pipeline {
                 VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 useCustomGenesis=false \\
+                ADMIN_ADDRESS=1b7dc206ef2fe3aab27404b88c36470ccf16c0ce \\
+                BASE_CODE_COLLECTION=0000000000000000000000000000000000001000 \\
+                POOL_FACTORY=000000000000000000000000000000000000100a \\
+                TOKEN_FACTORY=000000000000000000000000000000000000100b \\
+                LENDING_POOL=0000000000000000000000000000000000001005 \\
+                ONRAMP=0000000000000000000000000000000000001009 \\
+                BASE_URL=http://\$(</host) \\
                 ./strato --single
             """
           }
@@ -324,29 +327,6 @@ pipeline {
 //                  -e DEBUG_LOG=false \
 //                  strato-api-tests
 //              """
-//            }
-//          }
-//        }
-
-//        stage('BA-Rest Tests') {
-//          steps{
-//            sh '''#!/bin/bash -le
-//              set -x
-//              echo "Running ba-rest E2E tests"
-//              cd strato-worktree/blockapps-rest
-//              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
-//              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
-//            '''
-//          }
-//        }
-
-//        stage('Integration tests') {
-//          steps{
-//            dir ('strato-worktree/tests') {
-//              sh 'rm -rf node_modules'
-//              sh 'npm ci'
-//              sh 'npm run test'
-//              //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
 //            }
 //          }
 //        }

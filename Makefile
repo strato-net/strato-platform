@@ -33,11 +33,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks mercata-backend mercata-ui
 
 apex:
 	@echo Now building apex...
@@ -58,6 +58,16 @@ prometheus:
 smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
+
+mercata-backend:
+	@echo Now building mercata-backend...
+	docker build -t ${REPO_URL}mercata-backend:${VERSION} ./mercata/backend
+	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
+    	
+mercata-ui:
+	@echo Now building mercata-ui...
+	docker build -t ${REPO_URL}mercata-ui:${VERSION} ./mercata/ui
+	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
 
 # marketplace-backend:
 # 	@echo Now building marketplace-backend...

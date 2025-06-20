@@ -424,8 +424,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  feeResult <- payFees b availableGas tAddr t proposer
-  let attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
+  feeResult' <- payFees b availableGas tAddr t proposer
+  let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
+      attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
 
   if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
     then do

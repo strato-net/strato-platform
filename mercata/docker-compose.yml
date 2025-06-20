@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    image: mercata-backend:latest
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - NODE_URL=${NODE_URL}
+      - BASE_URL=${BASE_URL}
+      - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
+      - POOL_FACTORY=${POOL_FACTORY}
+      - LENDING_POOL=${LENDING_POOL}
+      - TOKEN_FACTORY=${TOKEN_FACTORY}
+      - ONRAMP=${ONRAMP}
+      - ADMIN_ADDRESS=${ADMIN_ADDRESS}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  ui:
+    build: ./ui
+    image: mercata-ui:latest
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - ssl=${ssl:-false}
+    build: ./nginx
+    image: mercata-nginx:latest
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

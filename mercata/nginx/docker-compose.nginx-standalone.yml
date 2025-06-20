@@ -1,0 +1,26 @@
+version: "3"
+services:
+  nginx:
+    environment:
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - ssl=${ssl:-false}
+    - DOCKERIZED_APP=false
+    - HOST_IP=${HOST_IP}
+    build:
+      context: .
+      extra_hosts:
+      - "openresty.org=3.125.51.27"
+    image: mercata-nginx
+    ports:
+    - 80:80
+    - 443:443
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
