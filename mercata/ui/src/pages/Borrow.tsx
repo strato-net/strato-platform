@@ -5,6 +5,7 @@ import { PiggyBank } from "lucide-react";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
+import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -78,7 +79,6 @@ const Borrow = () => {
   const [showRepayModal, setShowRepayModal] = useState(false)
   const [repayLoading, setRepayLoading] = useState(false);
   const [loan, setLoan] = useState<any | null>(null);
-  const [loanList, setLoanList] = useState<any[]>([]);
   const [wrongAmount, setWrongAmount] = useState(false);
 
   const { toast } = useToast();
@@ -86,17 +86,22 @@ const Borrow = () => {
     depositableTokens,
     refreshDepositTokens,
     loadingDepositTokens,
-    loans,
-    refreshLoans,
-    loadingLoans,
     borrowAsset: borrowAssetFn,
     repayLoan: repayLoanFn,
   } = useLendingContext();
 
+  const { 
+    availableBorrowingPower, 
+    currentBorrowed, 
+    averageInterestRate, 
+    loanList,
+    refreshLendingData,
+    loading: lendingLoading
+  } = useLendingMetrics();
+
   useEffect(() => {
-    refreshDepositTokens()
-    refreshLoans()
-  }, [])
+    refreshLendingData();
+  }, []);
 
   useEffect(() => {
     if (!depositableTokens || depositableTokens.length === 0) return;
@@ -151,8 +156,7 @@ const Borrow = () => {
 
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      await refreshDepositTokens();      
-      await fetchLoans();
+      await refreshLendingData();
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
@@ -170,45 +174,9 @@ const Borrow = () => {
     const value = e.target.value;
     if (/^\d*\.?\d*$/.test(value)) {
       setRepayAmount(value);
-      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount, 18))
+      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount))
     }
   };
-
-  const fetchLoans = useCallback(async () => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
-    const addr = userData.userAddress;
-    try {
-      const userLoans = Object.entries(loans)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-        .filter((loan: any) => loan?.loan?.user === addr && loan?.loan?.active === true);
-      // Enrich each loan with token symbol, name, and human-readable balance
-
-      const enrichedLoans = await Promise.all(
-        userLoans.map(async (loan: any) => {
-          const balanceHuman = formatUnits(
-            BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0),
-            18
-          );
-          return {
-            ...loan,
-            _name: loan.assetName,
-            _symbol: loan?.assetSymbol || "",
-            balanceHuman,
-          };
-        })
-      );
-      setLoanList(enrichedLoans);
-    } catch (e) {
-      console.error("Error fetching loans:", e);
-    }
-  }, []);
-
-useEffect(() => {
-    if (Object.keys(loans || {}).length > 0) {
-      fetchLoans();
-  }
-  }, [loans, fetchLoans]);
 
   const repayLoan = async () => {
     try {
@@ -226,8 +194,7 @@ useEffect(() => {
         message: "Success",
         description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
       });
-      await refreshLoans();
-      await fetchLoans();
+      await refreshLendingData();
     } catch (error) {
       api["error"]({
         message: "Error",
@@ -251,9 +218,12 @@ useEffect(() => {
 
         <main className="p-6">
           <div className="mb-8">
-            <BorrowingSection />
+            <BorrowingSection 
+              availableBorrowingPower={availableBorrowingPower}
+              currentBorrowed={currentBorrowed}
+              averageInterestRate={averageInterestRate}
+            />
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Borrow Against Your Assets</CardTitle>
@@ -345,9 +315,9 @@ useEffect(() => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loadingLoans ? (
+                  {lendingLoading ? (
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={5}>
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
