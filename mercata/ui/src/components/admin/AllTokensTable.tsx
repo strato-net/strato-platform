@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTokenContext } from '@/context/TokenContext';
+import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, Filter } from 'lucide-react';
 
 const getStatusLabel = (status?: string | number) => {
@@ -28,11 +29,43 @@ const getStatusLabel = (status?: string | number) => {
 
 const AllTokensTable = () => {
   const { tokens, loading, error, getAllTokens } = useTokenContext();
+  const { getLend } = useLendingContext();
   const [statusFilter, setStatusFilter] = useState<string>('2');
+  const [lendData, setLendData] = useState<any>(null);
+  const [lendLoading, setLendLoading] = useState(false);
+
+  const fetchLendData = async () => {
+    try {
+      setLendLoading(true);
+      const data = await getLend();
+      setLendData(data);
+    } catch (error) {
+      console.error('Error fetching lend data:', error);
+    } finally {
+      setLendLoading(false);
+    }
+  };
 
   useEffect(() => {
     getAllTokens();
+    fetchLendData();
   }, [getAllTokens]);
+
+  const getCollateralRatio = (address: string) => {
+    if (!lendData?.lendingPool?.collateralRatio) return '-';
+    const collateralData = lendData.lendingPool.collateralRatio.find(
+      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+    );
+    return collateralData ? `${collateralData.ratio}%` : '-';
+  };
+
+  const getInterestRate = (address: string) => {
+    if (!lendData?.lendingPool?.interestRate) return '-';
+    const interestData = lendData.lendingPool.interestRate.find(
+      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+    );
+    return interestData ? `${interestData.rate}%` : '-';
+  };
 
   const filteredTokens = tokens.filter(token => {
     if (statusFilter === 'all') return true;
@@ -46,7 +79,7 @@ const AllTokensTable = () => {
 
   console.log('Rendering AllTokensTable', tokens);
 
-  if (loading) {
+  if (loading || lendLoading) {
     return (
       <Card>
         <CardHeader>
@@ -126,6 +159,8 @@ const AllTokensTable = () => {
                   <TableHead className="w-[200px]">Name</TableHead>
                   <TableHead className="w-[140px]">Address</TableHead>
                   <TableHead className="w-[80px]">Status</TableHead>
+                  <TableHead className="w-[120px]">Collateral Ratio</TableHead>
+                  <TableHead className="w-[100px]">Interest</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -150,6 +185,12 @@ const AllTokensTable = () => {
                         <Badge variant={status.variant} className="text-xs">
                           {status.label}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[120px]">
+                        {getCollateralRatio(address)}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[100px]">
+                        {getInterestRate(address)}
                       </TableCell>
                     </TableRow>
                   );

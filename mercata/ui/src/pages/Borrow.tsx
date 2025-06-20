@@ -36,6 +36,46 @@ const formatTokenAmount = (value: any) =>
     maximumFractionDigits: 2,
   });
 
+const formatCurrency = (value: string | number) => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return "0.00";
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const formatInputValue = (value: string) => {
+  // Remove all non-digit and non-decimal characters
+  const cleanValue = value.replace(/[^\d.]/g, '');
+  
+  // Handle multiple decimal points
+  const parts = cleanValue.split('.');
+  if (parts.length > 2) {
+    return parts[0] + '.' + parts.slice(1).join('');
+  }
+  
+  // If there's a decimal part, limit to 2 decimal places
+  if (parts.length === 2) {
+    return parts[0] + '.' + parts[1].slice(0, 2);
+  }
+  
+  return cleanValue;
+};
+
+const addCommasToInput = (value: string) => {
+  if (!value) return '';
+  
+  const parts = value.split('.');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  if (parts.length === 2) {
+    return integerPart + '.' + parts[1];
+  }
+  
+  return integerPart;
+};
+
 const formatMaxBorrowable = (asset: DepositableToken) => {
   try {
     const price = parseFloat(formatUnits(
@@ -72,6 +112,7 @@ const Borrow = () => {
   const [tokens, setTokens] = useState<DepositableToken[] | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [repayAmount, setRepayAmount] = useState('')
+  const [displayAmount, setDisplayAmount] = useState('')
   const [showRepayModal, setShowRepayModal] = useState(false)
   const [repayLoading, setRepayLoading] = useState(false);
   const [loan, setLoan] = useState<any | null>(null);
@@ -164,11 +205,13 @@ const Borrow = () => {
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value)) {
-      setRepayAmount(value);
-      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount, 18))
-    }
+    const inputValue = e.target.value;
+    const cleanValue = formatInputValue(inputValue);
+    const formattedValue = addCommasToInput(cleanValue);
+    
+    setDisplayAmount(formattedValue);
+    setRepayAmount(cleanValue);
+    setWrongAmount(parseUnits(cleanValue === "" ? "0" : cleanValue, 18) > BigInt(loan?.loan?.amount, 18))
   };
 
   const fetchLoans = useCallback(async () => {
@@ -219,13 +262,14 @@ useEffect(() => {
       
       toast({
         title: "Success",
-        description: `Successfully Repaid $${repayAmount} USDST`,
+        description: `Successfully Repaid $${formatCurrency(repayAmount)} USDST`,
         variant: "success",
       });
       
       // Close modal and reset state immediately for better UX
       setShowRepayModal(false);
       setRepayAmount("");
+      setDisplayAmount("");
       setLoan(null);
       setRepayLoading(false);
       
@@ -438,27 +482,31 @@ useEffect(() => {
               <div className="space-y-2 py-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">Original Loan Amount</span>
-                  <span className="font-medium">${formatUnits(loan?.loan?.amount || 0, 18)}</span>
+                  <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.amount || 0, 18))}</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">Accrued Interest</span>
-                  <span className="font-medium">${formatUnits(loan?.loan?.interest || 0, 18)}</span>
+                  <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.interest || 0, 18))}</span>
                 </div>
                 
                 <div className="flex justify-between items-center font-bold pt-2 border-t">
                   <span>Total Amount Due</span>
-                  <span className="text-lg">${loan?.balanceHuman}</span>
+                  <span className="text-lg">${formatCurrency(loan?.balanceHuman)}</span>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <label className="text-sm font-medium">Repay Amount (USDST)</label>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Min: $0.01</span>
+                  <span>Max: ${formatCurrency(loan?.balanceHuman)}</span>
+                </div>
                 <div className="relative">
                   <Input
-                    placeholder={loan?.balanceHuman}
+                    placeholder={formatCurrency(loan?.balanceHuman)}
                     className=""
-                    value={repayAmount}
+                    value={displayAmount}
                     onChange={handleAmountChange}
                   />
                   {wrongAmount && (
@@ -467,16 +515,16 @@ useEffect(() => {
                     </p>
                   )}
                 </div>
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Min: $0.01</span>
-                  <span>Max: ${loan?.balanceHuman}</span>
-                </div>
                 
                 <div className="flex gap-2">
                   <Button
                     variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.1).toFixed(2))}
+                    onClick={() => {
+                      const amount = (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2);
+                      setRepayAmount(amount);
+                      setDisplayAmount(addCommasToInput(amount));
+                    }}
                     className="flex-1"
                   >
                     10%
@@ -484,7 +532,11 @@ useEffect(() => {
                   <Button
                     variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.25).toFixed(2))}
+                    onClick={() => {
+                      const amount = (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2);
+                      setRepayAmount(amount);
+                      setDisplayAmount(addCommasToInput(amount));
+                    }}
                     className="flex-1"
                   >
                     25%
@@ -492,7 +544,11 @@ useEffect(() => {
                   <Button
                     variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.5).toFixed(2))}
+                    onClick={() => {
+                      const amount = (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2);
+                      setRepayAmount(amount);
+                      setDisplayAmount(addCommasToInput(amount));
+                    }}
                     className="flex-1"
                   >
                     50%
@@ -500,7 +556,10 @@ useEffect(() => {
                   <Button
                     variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount(loan?.balanceHuman)}
+                    onClick={() => {
+                      setRepayAmount(loan?.balanceHuman);
+                      setDisplayAmount(addCommasToInput(loan?.balanceHuman));
+                    }}
                     className="flex-1"
                   >
                     100%
@@ -511,13 +570,21 @@ useEffect(() => {
               <div className="space-y-2 pt-3 border-t">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">Payment Amount</span>
-                  <span className="font-medium">${repayAmount || "0.00"}</span>
+                  <span className="font-medium">
+                    {repayAmount ? 
+                      (parseFloat(repayAmount) < 0 ? 
+                        `-$${formatCurrency(Math.abs(parseFloat(repayAmount)))}` : 
+                        `$${formatCurrency(repayAmount)}`
+                      ) : 
+                      "$0.00"
+                    }
+                  </span>
                 </div>
                 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">Remaining Balance</span>
                   <span className="font-medium">
-                    ${repayAmount ? (parseFloat(loan?.balanceHuman) - parseFloat(repayAmount)).toFixed(2) : loan?.balanceHuman}
+                    ${repayAmount ? formatCurrency((parseFloat(loan?.balanceHuman) - parseFloat(repayAmount))) : formatCurrency(loan?.balanceHuman)}
                   </span>
                 </div>
               </div>
@@ -531,7 +598,11 @@ useEffect(() => {
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setShowRepayModal(false)}
+                  onClick={() => {
+                    setShowRepayModal(false);
+                    setRepayAmount("");
+                    setDisplayAmount("");
+                  }}
                   className="mr-2"
                 >
                   Cancel
@@ -550,7 +621,7 @@ useEffect(() => {
                   {repayLoading ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
                   ) : (
-                    `Repay $${repayAmount || "0.00"}`
+                    `Repay $${repayAmount ? formatCurrency(repayAmount) : "0.00"}`
                   )}
                 </Button>
               </div>
