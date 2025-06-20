@@ -187,11 +187,6 @@ popAllPending s@BaggerState {pending = p} = (popped, s {pending = M.empty})
   where
     popped = concatMap toList $ M.elems p
 
-purgeFromQueued :: OutputTx -> BaggerState -> BaggerState
-purgeFromQueued OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {queued = q} = s {queued = newATL}
-  where
-    newATL = purgeFromATL sender (TD.transactionNonce tx) q
-
 purgeFromPending :: OutputTx -> BaggerState -> BaggerState
 purgeFromPending OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {pending = p} = s {pending = newATL}
   where
