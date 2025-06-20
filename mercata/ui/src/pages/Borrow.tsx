@@ -1,11 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
-
-import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
-
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
@@ -219,12 +216,10 @@ useEffect(() => {
         amount: amountInWei,
         asset: loan?.loan?.asset,
       });
-      console.log(response, "repay loan response");
       
-      // Show success message
       toast({
         title: "Success",
-        description: `Successfully Repaid $${repayAmount} ${loan?._symbol}`,
+        description: `Successfully Repaid $${repayAmount} USDST`,
         variant: "success",
       });
       
@@ -479,23 +474,15 @@ useEffect(() => {
                 
                 <div className="flex gap-2">
                   <Button
-                    variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount(loan?.balanceHuman)}
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.1).toFixed(2))}
                     className="flex-1"
                   >
-                    100%
+                    10%
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.5).toFixed(2))}
-                    className="flex-1"
-                  >
-                    50%
-                  </Button>
-                  <Button
-                    variant="outline"
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2) ? "default" : "outline"}
                     size="sm"
                     onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.25).toFixed(2))}
                     className="flex-1"
@@ -503,12 +490,20 @@ useEffect(() => {
                     25%
                   </Button>
                   <Button
-                    variant="outline"
+                    variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.1).toFixed(2))}
+                    onClick={() => setRepayAmount((parseFloat(loan?.balanceHuman) * 0.5).toFixed(2))}
                     className="flex-1"
                   >
-                    10%
+                    50%
+                  </Button>
+                  <Button
+                    variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRepayAmount(loan?.balanceHuman)}
+                    className="flex-1"
+                  >
+                    100%
                   </Button>
                 </div>
               </div>

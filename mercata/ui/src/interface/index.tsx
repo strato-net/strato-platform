@@ -14,7 +14,14 @@ export interface Token {
     _name: string;
     _symbol: string;
     address?: string;
+    images?: any;
+    _owner?: string;
+    description?: string;
   },
+  available?: boolean;
+  provider?: string;
+  vaulter?: string;
+  color?: string;
   balance?: string;
   key: string;
   value: string;

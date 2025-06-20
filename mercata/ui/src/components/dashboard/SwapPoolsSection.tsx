@@ -457,6 +457,10 @@ const SwapPoolsSection = () => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500">APY</div>
+                      <div className="font-medium">-</div>
+                    </div>
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
@@ -622,6 +626,10 @@ const SwapPoolsSection = () => {
 
             <div className="rounded-lg bg-gray-50 p-3">
               <div className="flex justify-between items-center text-sm text-gray-500">
+                <span>APY</span>
+                <span className="font-medium">-</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
                 <span>Current pool ratio</span>
                 <span className="font-medium">
                   {selectedPool && `1 ${selectedPool._name?.split('/')[0]} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool._name?.split('/')[1]}`}
