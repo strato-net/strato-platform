@@ -578,34 +578,71 @@ const SwapAsset = () => {
   };
 
   const handleAmountChange = async (isFromInput: boolean, value: string) => {
-    if (isFromInput) {
-      setFromAmount(value);
-      setEditingField('from');
+    setEditingField(isFromInput ? 'from' : 'to');
+    isFromInput ? setFromAmount(value) : setToAmount(value);
+    if (pool && value && Number(value) !== 0) {
+      await calculateSwapAmount(value, isFromInput);
     } else {
-      setToAmount(value);
-      setEditingField('to');
-    }
-
-    if (!pool || Number(value) === 0 || value === "") {
-      if (isFromInput) {
-        setToAmount("");
-      } else {
-        setFromAmount("");
-      }
+      isFromInput ? setToAmount('') : setFromAmount('');
       setWrongAmount(false);
-      return;
     }
-
-    await calculateSwapAmount(value, isFromInput);
   };
 
   const handleSwapAssets = () => {
-    setFromAsset(toAsset);
-    setToAsset(fromAsset);
-    setFromAmount(toAmount);
-    setToAmount(fromAmount);
-    setEditingField(null);
-    lastCalculatedFromRef.current = toAmount;
+    const prevFromAsset = fromAsset;
+    const prevToAsset = toAsset;
+    const prevFromAmount = fromAmount;
+    const prevToAmount = toAmount;
+
+    let newEditingField: 'from' | 'to' | null = null;
+    let preservedAmount = "";
+
+    if (editingField === 'from') {
+      newEditingField = 'to';
+      preservedAmount = prevFromAmount;
+      setFromAmount(prevToAmount);
+      setToAmount(prevFromAmount);
+    } else if (editingField === 'to') {
+      newEditingField = 'from';
+      preservedAmount = prevToAmount;
+      setFromAmount(prevToAmount);
+      setToAmount(prevFromAmount);
+    } else {
+      setFromAmount(prevToAmount);
+      setToAmount(prevFromAmount);
+    }
+
+    setFromAsset(prevToAsset);
+    setToAsset(prevFromAsset);
+    setEditingField(newEditingField);
+    lastCalculatedFromRef.current = preservedAmount;
+
+    setTimeout(async () => {
+      if (!pool || !newEditingField || !preservedAmount || Number(preservedAmount) === 0) return;
+
+      const parsed = parseUnits(preservedAmount, DECIMALS);
+      const direction = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? false : true;
+
+      try {
+        if (newEditingField === 'from') {
+          const swapAmount = await calculateSwap({
+            poolAddress: pool.address,
+            direction: !direction,
+            amount: parsed.toString(),
+          });
+          setToAmount(formatUnits(BigInt(swapAmount || "0"), DECIMALS));
+        } else {
+          const requiredInput = await calculateSwapReverse({
+            poolAddress: pool.address,
+            direction,
+            amount: parsed.toString(),
+          });
+          setFromAmount(formatUnits(BigInt(requiredInput || "0"), DECIMALS));
+        }
+      } catch (err) {
+        console.error("Swap recalculation error after swapping assets:", err);
+      }
+    }, 0);
   };
 
   const handleSwap = async () => {
