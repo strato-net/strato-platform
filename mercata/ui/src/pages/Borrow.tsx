@@ -219,12 +219,12 @@ useEffect(() => {
         amount: amountInWei,
         asset: loan?.loan?.asset,
       });
-      console.log(response, "repay loan response");
+
+      console.log("Repay Response:", loan);
       
-      // Show success message
       toast({
         title: "Success",
-        description: `Successfully Repaid $${repayAmount} ${loan?._symbol}`,
+        description: `Successfully Repaid $${repayAmount} USDST`,
         variant: "success",
       });
       
