@@ -6,7 +6,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { DepositableToken } from "@/interface";
@@ -86,7 +86,8 @@ const BorrowAssetModal = ({
     maximumFractionDigits: 2,
   });
   const maxBorrowAmount = calculatedBorrowable;
-  const [borrowAmount, setBorrowAmount] = useState(maxBorrowAmount / 2);
+  const [borrowAmount, setBorrowAmount] = useState(0);
+  const [borrowAmountInput, setBorrowAmountInput] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
 
   // Calculate risk level based on borrowed amount (0-100)
@@ -110,6 +111,17 @@ const BorrowAssetModal = ({
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^\d*\.?\d*$/.test(value)) {
+      setBorrowAmountInput(value);
+      const numValue = parseFloat(value) || 0;
+      if (numValue <= maxBorrowAmount) {
+        setBorrowAmount(numValue);
+      }
+    }
   };
 
   return (
@@ -166,32 +178,22 @@ const BorrowAssetModal = ({
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-medium">Borrow Amount</label>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm text-gray-500">$0.00</span>
-              <span className="text-sm text-gray-500">
-                $
-                {maxBorrowAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+            <label className="text-sm font-medium">Borrow Amount (USDST)</label>
+            <div className="relative">
+              <Input
+                placeholder="0.00"
+                className="pr-8"
+                value={borrowAmountInput}
+                onChange={handleAmountChange}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
             </div>
-            <Slider
-              value={[borrowAmount]}
-              max={maxBorrowAmount}
-              step={0.01}
-              onValueChange={(value) => setBorrowAmount(value[0])}
-            />
-            <div className="flex justify-between">
-              <span>Selected amount:</span>
-              <span className="font-semibold">
-                $
-                {borrowAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Min: $0.01</span>
+              <span>Max: ${maxBorrowAmount.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</span>
             </div>
           </div>
 
