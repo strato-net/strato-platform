@@ -202,7 +202,7 @@ const Borrow = () => {
     } catch (e) {
       console.error("Error fetching loans:", e);
     }
-  }, []);
+  }, [loans]);
 
 useEffect(() => {
     if (Object.keys(loans || {}).length > 0) {
@@ -220,23 +220,33 @@ useEffect(() => {
         asset: loan?.loan?.asset,
       });
       console.log(response, "repay loan response");
-      setRepayLoading(false);
-      setShowRepayModal(false)
-      api["success"]({
-        message: "Success",
-        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: `Successfully Repaid $${repayAmount} ${loan?._symbol}`,
+        variant: "success",
       });
-      await refreshLoans();
-      await fetchLoans();
-    } catch (error) {
-      api["error"]({
-        message: "Error",
-        description: `Repay Error - ${error}`,
-      });
-      setRepayLoading(false);
-      console.error("Error repaying loan:", error);
-    } finally {
+      
+      // Close modal and reset state immediately for better UX
+      setShowRepayModal(false);
       setRepayAmount("");
+      setLoan(null);
+      setRepayLoading(false);
+      
+      // Refresh both loans and deposit tokens as repayment affects both
+      await Promise.all([
+        refreshLoans(),
+        refreshDepositTokens()
+      ]);
+      
+    } catch (error) {
+      console.error("Error repaying loan:", error);
+      toast({
+        title: "Error",
+        description: `Repay Error - ${error}`,
+        variant: "destructive",
+      });
       setRepayLoading(false);
     }
   };
