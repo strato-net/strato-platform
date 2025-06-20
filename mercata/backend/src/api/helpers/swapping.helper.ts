@@ -3,13 +3,13 @@ export const getInputPrice = (
   inputReserve: bigint,
   outputReserve: bigint
 ): string => {
-  if (inputAmount <= 0n || inputReserve <= 0n || outputReserve <= 0n) {
+  if (inputAmount <= BigInt(0) || inputReserve <= BigInt(0) || outputReserve <= BigInt(0)) {
     throw new Error("Invalid amounts or reserves");
   }
 
-  const inputAmountWithFee = inputAmount * 1000n;
+  const inputAmountWithFee = inputAmount * BigInt(1000);
   const numerator = inputAmountWithFee * outputReserve;
-  const denominator = inputReserve * 1000n + inputAmountWithFee;
+  const denominator = inputReserve * BigInt(1000) + inputAmountWithFee;
 
   return String(numerator / denominator);
 };
