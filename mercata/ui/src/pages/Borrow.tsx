@@ -266,7 +266,7 @@ useEffect(() => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Borrow Against Your Assets</CardTitle>
+              <CardTitle>Borrow</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -276,13 +276,14 @@ useEffect(() => {
                     <TableHead>Balance</TableHead>
                     <TableHead>Collateral Ratio</TableHead>
                     <TableHead>USDST Available to Borrow</TableHead>
+                    <TableHead>Borrow Fee</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingDepositTokens ? (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
@@ -314,6 +315,11 @@ useEffect(() => {
                         </TableCell>
                         <TableCell>{formatMaxBorrowable(asset)}</TableCell>
                         <TableCell>
+                          {borrowAsset?.interestRate
+                            ? `${parseFloat(borrowAsset.interestRate).toFixed(2)}%`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             size="sm"
                             onClick={() => handleBorrow(asset)}
@@ -327,7 +333,7 @@ useEffect(() => {
                     ))
                   ) :
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={7}>
                         <div className="w-full flex justify-center items-center mt-4">
                           No data to show
                         </div>
