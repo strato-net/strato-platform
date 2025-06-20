@@ -28,7 +28,7 @@ const getStatusLabel = (status?: string | number) => {
 
 const AllTokensTable = () => {
   const { tokens, loading, error, getAllTokens } = useTokenContext();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('2');
 
   useEffect(() => {
     getAllTokens();
