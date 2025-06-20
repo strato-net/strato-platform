@@ -37,6 +37,12 @@ export const getPool = async (
     lendingPool: `eq.${lendingPool}`,
   };
 
+  // DEBUG: log the exact query params being sent to Cirrus (no secrets exposed)
+  console.log("[LendingService.getPool] Querying Cirrus", {
+    endpoint: `/${LendingRegistry}`,
+    params,
+  });
+
   const {
     data: [poolData],
   } = await cirrus.get(accessToken, `/${LendingRegistry}`, { params });
@@ -141,7 +147,7 @@ export const borrow = async (
       {
         contractName: extractContractName(LendingPool),
         contractAddress: constants.lendingPool,
-        method: "getLoan",
+        method: "borrow",
         args: {
           asset: body.asset,
           amount: body.amount,
@@ -297,12 +303,41 @@ export const getLoans = async (
     (entry: any) => entry.LoanInfo.user.toLowerCase() === address.toLowerCase()
   );
 
-  if (!userLoans.length) return [];
+  // If no LoanInfo records (due to mapping not indexed), fall back to LiquidityPool.borrowed
+  let combinedLoans = userLoans;
 
-  // Collect all unique token addresses used in user loans
+  if (combinedLoans.length === 0 && registry.liquidityPool?.borrowed) {
+    const borrowedArr = registry.liquidityPool.borrowed as any[];
+    const userCollaterals = (registry.collateralVault?.collaterals || [])
+      .filter((c: any) => c.Collateral?.user?.toLowerCase() === address.toLowerCase())
+      .map((c: any) => c.Collateral);
+
+    combinedLoans = borrowedArr
+      .filter((b: any) =>
+        b.Borrow?.user?.toLowerCase() === address.toLowerCase()
+      )
+      .map((b: any) => ({
+        key: b.key,
+        // fabricate LoanInfo-like object for consistent UI rendering
+        LoanInfo: {
+          user: b.Borrow.user,
+          asset: b.Borrow.asset,
+          amount: b.Borrow.amount,
+          // If user has exactly one collateral entry, attach it
+          collateralAsset: userCollaterals.length === 1 ? userCollaterals[0].asset : "",
+          collateralAmount: userCollaterals.length === 1 ? userCollaterals[0].amount : "0",
+          lastUpdated: Math.floor(Date.now() / 1000),
+          active: true,
+        },
+      }));
+  }
+
+  if (!combinedLoans.length) return [];
+
+  // Collect all unique token addresses used in combined loans
   const tokenAddresses = [
     ...new Set(
-      userLoans.flatMap((entry: any) => [
+      combinedLoans.flatMap((entry: any) => [
         entry.LoanInfo.asset,
         entry.LoanInfo.collateralAsset,
       ])
@@ -322,7 +357,7 @@ export const getLoans = async (
   const divisor = BigInt(365 * 24 * 60 * 100); // Interest annualization factor
 
   // Return structured array of enriched loan objects
-  return userLoans.map((entry: any) => {
+  return combinedLoans.map((entry: any) => {
     const loan = entry.LoanInfo;
     const key = entry.key;
 
@@ -337,12 +372,14 @@ export const getLoans = async (
         assetSymbol: assetToken?._symbol || "",
         collateralName: collateralToken?._name || "",
         collateralSymbol: collateralToken?._symbol || "",
-        interest: (
-          (BigInt(loan.amount) *
-            BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
-            BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
-          divisor
-        ).toString(),
+        interest: loan.lastUpdated
+          ? (
+              (BigInt(loan.amount) *
+                BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
+                BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
+              divisor
+            ).toString()
+          : "0",
       },
     };
   });
@@ -353,13 +390,16 @@ export const setPrice = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const registry = await getPool(accessToken, {
-      select: "priceOracle",
-    });
-    const priceOracle = registry.priceOracle;
+    const registry = await getPool(accessToken);
+    const priceOracleAddr = typeof registry.oracle === "string"
+      ? registry.oracle
+      : registry.oracle?.address || "";
+    if (!priceOracleAddr) {
+      throw new Error("Price oracle address not found");
+    }
     const tx = buildFunctionTx({
       contractName: extractContractName(PriceOracle),
-      contractAddress: priceOracle,
+      contractAddress: priceOracleAddr,
       method: "setAssetPrice",
       args: {
         asset: body.token,
@@ -386,10 +426,11 @@ export const getPrice = async (
   accessToken: string,
   asset?: string
 ) => {
-  const registry = await getPool(accessToken, { select: "priceOracle" });
+  // Fetch full registry so nested oracle.prices are included
+  const registry = await getPool(accessToken);
 
-  const prices: { asset: string; price: string }[] = registry.priceOracle
-    ? registry.priceOracle.prices || []
+  const prices: { asset: string; price: string }[] = registry.oracle
+    ? registry.oracle.prices || []
     : [];
 
   if (asset) {
@@ -550,11 +591,17 @@ export const executeLiquidation = async (
     args: { loanId },
   }]);
 
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
+  try {
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
 
-  return { status, hash };
+    return { status, hash };
+  } catch (error: any) {
+    // Surface Strato's response for easier debugging
+    console.error("[executeLiquidation] Strato 400 response", error?.response?.data || error);
+    throw error;
+  }
 };
 
 export const getLoanWithHealthFactor = async (

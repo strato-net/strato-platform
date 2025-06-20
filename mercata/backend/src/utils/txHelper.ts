@@ -49,7 +49,15 @@ export const postAndWaitForTx = async (
   const finalResults = await until(
     (results: any[]) => {
       const failedTx = results.find(r => r?.status === "Failure");
-      if (failedTx) throw new Error("Transaction failed");
+      if (failedTx) {
+        console.error("[TxHelper] Transaction failed", {
+          hash: failedTx.hash,
+          vmError: failedTx.vmError || failedTx.VmError,
+          revertOutput: failedTx.revertOutput,
+          message: failedTx.message,
+        });
+        throw new Error("Transaction failed");
+      }
       return results.every(r => r?.status !== "Pending");
     },
     async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,

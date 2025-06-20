@@ -44,8 +44,10 @@ router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingC
 router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
 router.post("/lend/depositLiquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
 router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
-router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
+router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.borrow);
 router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
+router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
+router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
 
 router.post("/oracle/setPrice", authHandler.authorizeRequest(), OracleController.setPrice);
 
@@ -102,5 +104,8 @@ router.get(
   authHandler.authorizeRequest(true),
   (req, res, next) => LendingController.getLoanById(req, res, next)
 );
+
+router.get("/depositableTokens", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
+router.get("/withdrawableTokens", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
 
 export default router;
