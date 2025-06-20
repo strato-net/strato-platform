@@ -158,7 +158,6 @@ const TokenInput = ({
   };
 
   const poolBalance = getPoolBalance();
-  const hasNoLiquidity = BigInt(poolBalance) === 0n;
 
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
@@ -189,10 +188,7 @@ const TokenInput = ({
           {wrongAmount && (
             <p className="text-red-600 text-sm mt-1">Insufficient user balance</p>
           )}
-          {insufficientPoolBalance && hasNoLiquidity && (
-            <p className="text-red-600 text-sm mt-1">No liquidity in pool</p>
-          )}
-          {insufficientPoolBalance && !hasNoLiquidity && (
+          {insufficientPoolBalance && (
             <p className="text-orange-600 text-sm mt-1">Amount exceeds pool balance</p>
           )}
           {isUsdstMaxIssue && (
