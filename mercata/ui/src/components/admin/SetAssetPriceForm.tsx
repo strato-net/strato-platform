@@ -10,15 +10,13 @@ import { Loader2, Info, DollarSign} from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
-import { useUserTokens } from '@/context/UserTokensContext';
-import { useUser } from '@/context/UserContext';
+import { useTokenContext } from '@/context/TokenContext';
 
 
 const SetAssetPriceForm = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { userAddress } = useUser();
-  const { tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { activeTokens, getActiveTokens, loading: tokensLoading } = useTokenContext();
   const { setPrice } = useLendingContext();
   
   const form = useForm<PriceFormValues>({
@@ -28,13 +26,11 @@ const SetAssetPriceForm = () => {
     },
   });
 
-  const selectedToken = Array.isArray(tokens) ? tokens.find(t => t.address === form.watch('tokenAddress')) : null;
+  const selectedToken = Array.isArray(activeTokens) ? activeTokens.find(t => t.address === form.watch('tokenAddress')) : null;
 
   useEffect(() => {
-    if (userAddress) {
-      fetchTokens(userAddress);
-    }
-  }, [userAddress]);
+    getActiveTokens();
+  }, [getActiveTokens]);
 
   const onSubmit = async (data: PriceFormValues) => {
     setLoading(true);
@@ -51,7 +47,7 @@ const SetAssetPriceForm = () => {
 
       toast({
         title: 'Price Updated Successfully',
-        description: `Price for ${selectedToken?.token?._symbol} has been set to $${data.price}`,
+        description: `Price for ${selectedToken?._symbol} has been set to $${data.price}`,
       });
 
       form.reset();
@@ -86,11 +82,11 @@ const SetAssetPriceForm = () => {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {Array.isArray(tokens) && tokens.map((token) => {
+                      {Array.isArray(activeTokens) && activeTokens.map((token) => {
                         return (
                           <SelectItem key={token.address} value={token.address}>
                             <div className="flex items-center justify-between w-full">
-                              <span>{token.token._symbol} - {token.token._name}</span>
+                              <span>{token._symbol} - {token._name} ({token.address})</span>
                             </div>
                           </SelectItem>
                         );
