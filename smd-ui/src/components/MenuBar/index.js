@@ -229,7 +229,7 @@ class MenuBar extends Component {
         {/* <div className="pt-navbar-group pt-align-left"> */}
         <div className="col-sm-5 smd-pad-4">
           <div className="pt-input-group pt-dark pt-large">
-            <span className="pt-icon pt-icon-search"></span>
+            {/* <span className="pt-icon pt-icon-search"></span>
             <input
               className="pt-input"
               type="search"
@@ -238,7 +238,7 @@ class MenuBar extends Component {
               placeholder="Search anything on Mercata"
               onKeyDown={this.handleKeyDown}
               dir="auto"
-            />
+            /> */}
             {/* <input type="submit"></input> */}
           </div>
         </div>

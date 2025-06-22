@@ -2,6 +2,8 @@ require('dotenv').config();
 const { startCronScheduler } = require('./cronScheduler');
 const { logInfo, logError } = require('./utils/logger');
 const { oauthClient } = require('./utils/oauth');
+const express = require('express');
+const packageJson = require('../package.json');
 
 async function main() {
     try {
@@ -59,6 +61,14 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
     logError('UnhandledRejection', new Error(`Unhandled Rejection at: ${promise}, reason: ${reason}`));
     process.exit(1);
+});
+
+// Start health check server
+const app = express();
+const PORT = process.env.HEALTH_PORT || 3000;
+app.get('/health', (req, res) => res.status(200).json({ status: 'OK', version: packageJson.version }));
+app.listen(PORT, () => {
+    logInfo('HealthCheck', `/health endpoint listening on port ${PORT}`);
 });
 
 // Start the service

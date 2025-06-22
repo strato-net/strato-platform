@@ -2,8 +2,6 @@
 #strato-getting-started-min-version:4.4.0
 version: "3"
 volumes:
-#   marketplacedata:
-#    driver: local
   pgdata:
     driver: local
   prometheusdata:
