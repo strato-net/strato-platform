@@ -18,7 +18,7 @@ class OnRampController {
     }
   }
 
-  static async onRampSell(
+  static async sell(
     req: Request,
     res: Response,
     next: NextFunction
@@ -33,7 +33,7 @@ class OnRampController {
     }
   }
 
-  static async onRampBuy(
+  static async buy(
     req: Request,
     res: Response,
     next: NextFunction
