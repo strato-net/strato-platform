@@ -87,10 +87,11 @@ const SetAssetPriceForm = () => {
                     </FormControl>
                     <SelectContent>
                       {Array.isArray(tokens) && tokens.map((token) => {
+                        const addr = token.address || (token as any).token?.address || "";
                         return (
                           <SelectItem key={token.address} value={token.address}>
                             <div className="flex items-center justify-between w-full">
-                              <span title={token.address}>{token.token._symbol} ({token.address.slice(0,6)}…{token.address.slice(-4)})</span>
+                              <span className="whitespace-nowrap" title={addr}>{token.token._symbol} ({addr.slice(0,6)}…{addr.slice(-4)})</span>
                             </div>
                           </SelectItem>
                         );
@@ -100,6 +101,20 @@ const SetAssetPriceForm = () => {
                   <FormDescription>
                     Choose the token to update pricing for
                   </FormDescription>
+                  {selectedToken && (
+                    <div className="text-base font-medium text-gray-700 mt-1">
+                      Current price: $
+                      {(() => {
+                        try {
+                          return parseFloat(
+                            (Number(selectedToken.price) / 1e18).toString()
+                          ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+                        } catch {
+                          return "-";
+                        }
+                      })()}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
