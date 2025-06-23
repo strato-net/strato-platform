@@ -25,41 +25,66 @@ export const until = async (
   }
 };
 
+// Helper function to extract error message from SString format
+const extractErrorMessage = (errorData: string): string => {
+  const sStringMatch = errorData.match(/SString "([^"]+)"/);
+  if (sStringMatch) {
+    return sStringMatch[1];
+  }
+  // If no SString format found, return the original error message
+  return errorData;
+};
+
 export const postAndWaitForTx = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
   timeout: number = 60000
 ): Promise<{ status: string; hash: string }> => {
-  const response = await stratoPostFn();
-  
-  if (response.status !== 200) {
-    throw new Error(`Strato error: ${response.statusText}`);
+  try {
+    const response = await stratoPostFn();
+    
+    if (response.status !== 200) {
+      throw new Error(`Strato error: ${response.statusText}`);
+    }
+
+    const results = response.data;
+    if (!Array.isArray(results) || !results.length) {
+      throw new Error("Invalid or empty transaction results");
+    }
+
+    const txHashes = results.map(result => {
+      if (!result?.hash) throw new Error("Invalid transaction result");
+      return result.hash;
+    });
+
+    const finalResults = await until(
+      (results: any[]) => {
+        const failedTx = results.find(r => r?.status === "Failure");
+        if (failedTx) {
+          // Extract the actual error message from the failed transaction
+          const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
+          const extractedMessage = extractErrorMessage(errorMessage);
+          throw new Error(extractedMessage);
+        }
+        return results.every(r => r?.status !== "Pending");
+      },
+      async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
+      timeout
+    );
+
+    return {
+      status: finalResults[0].status,
+      hash: finalResults[0].hash
+    };
+  } catch (error: any) {
+    // Check if this is an Axios error with response data
+    if (error.response?.data && typeof error.response.data === 'string') {
+      const extractedMessage = extractErrorMessage(error.response.data);
+      throw new Error(extractedMessage);
+    }
+    // Re-throw the original error if it doesn't match the expected format
+    throw error;
   }
-
-  const results = response.data;
-  if (!Array.isArray(results) || !results.length) {
-    throw new Error("Invalid or empty transaction results");
-  }
-
-  const txHashes = results.map(result => {
-    if (!result?.hash) throw new Error("Invalid transaction result");
-    return result.hash;
-  });
-
-  const finalResults = await until(
-    (results: any[]) => {
-      const failedTx = results.find(r => r?.status === "Failure");
-      if (failedTx) throw new Error("Transaction failed");
-      return results.every(r => r?.status !== "Pending");
-    },
-    async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
-    timeout
-  );
-
-  return {
-    status: finalResults[0].status,
-    hash: finalResults[0].hash
-  };
 };
 
 export const waitOnCirrus = async (

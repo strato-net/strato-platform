@@ -62,7 +62,7 @@ export const get = async (accessToken: string) => {
         ])
       );
     } catch (err) {
-      console.error("Error fetching token info:", err);
+      console.log("Error fetching token info:", err);
     }
 
     // Enhance listings
@@ -102,7 +102,6 @@ export const get = async (accessToken: string) => {
       priceOracle: undefined,
     };
   } catch (error) {
-    console.error("Error fetching lending pools:", error);
     throw error;
   }
 };
@@ -145,7 +144,6 @@ export const sell = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error selling tokens:", error);
     throw error;
   }
 };
@@ -193,7 +191,6 @@ export async function buy(
       url: data.url,
     };
   } catch (error) {
-    console.error("Payment processing failed:", error);
     throw new Error("Failed to process payment. Please try again.");
   }
 }

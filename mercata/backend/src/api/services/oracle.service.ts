@@ -37,7 +37,6 @@ export const setPrice = async (
       hash,
     };
   } catch (error) {
-    console.error("Error setting price:", error);
     throw error;
   }
 };
