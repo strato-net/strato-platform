@@ -87,7 +87,6 @@ export const depositLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error depositing liquidity:", error);
     throw error;
   }
 };
@@ -113,7 +112,6 @@ export const withdrawLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error withdrawing liquidity:", error);
     throw error;
   }
 };
@@ -157,7 +155,6 @@ export const borrow = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error getting loan:", error);
     throw error;
   }
 };
@@ -199,7 +196,6 @@ export const repay = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error repaying loan:", error);
     throw error;
   }
 };
@@ -376,7 +372,6 @@ export const setPrice = async (
       hash,
     };
   } catch (error) {
-    console.error("Error setting price:", error);
     throw error;
   }
 };
