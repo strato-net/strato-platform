@@ -196,12 +196,14 @@ export const repay = async (
     // interestRate is stored as array of {asset, rate}
     const rateArray = lendingPoolInfo.lendingPool.interestRate || [];
     const rateObj = rateArray.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
-    const rate = rateObj ? Number(rateObj.rate) : 0; // annualised %
-    const duration = Math.max(0, now - Number(loan.lastUpdated));
-    const bufferSeconds = 600; // 10-min safety buffer so tx fully closes the loan
+    const rateNum = rateObj ? Number(rateObj.rate) : 0; // may be decimal percentage like 0.5
+    const rateScaled = Math.round(rateNum * 100); // scale to integer (percent *100) for 2-decimal precision
+    const durationSec = Math.max(0, now - Number(loan.lastUpdated));
+    const bufferSec = 600; // 10-min buffer
+    const hoursElapsed = BigInt(Math.floor((durationSec + bufferSec) / 3600)); // whole hours, ensures at least one hour after buffer
     const interest =
-      (BigInt(loan.amount) * BigInt(rate) * BigInt(duration + bufferSeconds)) /
-      BigInt(365 * 24 * 60 * 100);
+      (BigInt(loan.amount) * BigInt(rateScaled) * hoursElapsed) /
+      BigInt(8760 * 100 * 100); // extra *100 due to scaling
     const totalOwed = (BigInt(loan.amount) + interest).toString();
 
     // Use caller-supplied amount if it equals/exceeds total owed; otherwise bump to full repay.
@@ -257,10 +259,11 @@ export const getDepositableTokens = async (
       ({ asset, price }: { asset: string; price: string }) => [asset, price]
     )
   );
-  const interestRateMap = new Map(
-    (registry.lendingPool.interestRate || []).map(
-      ({ asset, rate }: { asset: string; rate: number }) => [asset, rate]
-    )
+  const interestRateMap = new Map<string, number>(
+    (registry.lendingPool.interestRate || []).map((entry: any) => {
+      const assetAddr = (entry?.asset || "").toLowerCase();
+      return [assetAddr, Number(entry?.rate || 0)];
+    })
   );
   const liquidityMap = new Map(
     (registry.liquidityPool.totalLiquidity || []).map(
@@ -330,6 +333,14 @@ export const getLoans = async (
 ): Promise<{ key: string; loan: any }[]> => {
   const registry = await getPool(accessToken);
 
+  // Build quick lookup map for interest rates (percent per annum)
+  const interestRateMap = new Map<string, number>(
+    (registry.lendingPool.interestRate || []).map((entry: any) => {
+      const assetAddr = (entry?.asset || "").toLowerCase();
+      return [assetAddr, Number(entry?.rate || 0)];
+    })
+  );
+
   // Filter user-specific loans
   const userLoans = (registry.lendingPool.loans || []).filter(
     (entry: any) => entry.LoanInfo.user.toLowerCase() === address.toLowerCase()
@@ -359,7 +370,7 @@ export const getLoans = async (
   );
 
   const now = Math.floor(Date.now() / 1000);
-  const divisor = BigInt(365 * 24 * 60 * 100); // Interest annualization factor
+  // const divisor = BigInt(365 * 24 * 60 * 100); // no longer used with hourly interest
 
   // Return structured array of enriched loan objects
   return combinedLoans.map((entry: any) => {
@@ -380,9 +391,9 @@ export const getLoans = async (
         interest: loan.lastUpdated
           ? (
               (BigInt(loan.amount) *
-                BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
-                BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
-              divisor
+                BigInt(interestRateMap.get(loan.asset.toLowerCase()) || 0) *
+                BigInt(Math.floor((Math.max(0, now - Number(loan.lastUpdated))) / 3600))) /
+              BigInt(8760 * 100)
             ).toString()
           : "0",
       },

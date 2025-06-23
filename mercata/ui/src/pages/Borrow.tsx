@@ -39,7 +39,8 @@ const formatTokenAmount = (value: any) =>
     maximumFractionDigits: 2,
   });
 
-const formatMaxBorrowable = (asset: DepositableToken) => {
+// Collateral-only cap (does NOT account for pool liquidity)
+const collateralCap = (asset: DepositableToken) => {
   try {
     const price = parseFloat(formatUnits(
       typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
@@ -54,17 +55,11 @@ const formatMaxBorrowable = (asset: DepositableToken) => {
       18
     ));
     const ratio = Number(asset?.collateralRatio || "0") / 100;
-    if (ratio === 0) return "$0.00";
+    if (ratio === 0) return 0;
     const maxBorrowable = (price * value) / ratio;
-    return (
-      "$" +
-      maxBorrowable.toLocaleString("en-US", {
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 2,
-      })
-    );
+    return maxBorrowable;
   } catch {
-    return "$0.00";
+    return 0;
   }
 };
 
@@ -282,6 +277,26 @@ const Borrow = () => {
     }
   };
 
+  // ----- Pool liquidity (USDST) -----
+  const poolLiquidity = useMemo(() => {
+    if (!borrowAsset) return 0;
+    try {
+      return parseFloat(formatUnits(
+        typeof borrowAsset?.liquidity === "number" || (typeof borrowAsset?.liquidity === "string" && borrowAsset.liquidity.includes("e"))
+          ? BigInt(Number(borrowAsset.liquidity)).toString()
+          : borrowAsset?.liquidity?.toString() || "0",
+        18
+      ));
+    } catch {
+      return 0;
+    }
+  }, [borrowAsset]);
+
+  const formatMaxBorrowable = (asset: DepositableToken) => {
+    const maxBorrowable = collateralCap(asset);
+    const effective = Math.min(maxBorrowable, poolLiquidity);
+    return "$" + effective.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -306,6 +321,8 @@ const Borrow = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Balance</TableHead>
                     <TableHead>Collateral Ratio</TableHead>
+                    <TableHead>Pool Liquidity</TableHead>
+                    <TableHead>Max Borrow based on Collateral</TableHead>
                     <TableHead>USDST Available to Borrow</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
@@ -342,6 +359,24 @@ const Borrow = () => {
                               maximumFractionDigits: 2,
                             })
                             : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const liq = poolLiquidity;
+                            return "$" + liq.toLocaleString("en-US", {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 2,
+                            });
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const cap = collateralCap(asset);
+                            return "$" + cap.toLocaleString("en-US", {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 2,
+                            });
+                          })()}
                         </TableCell>
                         <TableCell>{formatMaxBorrowable(asset)}</TableCell>
                         <TableCell>

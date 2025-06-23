@@ -81,11 +81,14 @@ const BorrowAssetModal = ({
   } catch (e) {
     calculatedBorrowable = 0;
   }
-  const availableToBorrowFormatted = calculatedBorrowable.toLocaleString("en-US", {
+  const availableLiquidity = parseFloat(formatUnits(safeBigNumberish(borrowAsset?.liquidity), 18));
+  const effectiveMaxBorrowable = Math.min(calculatedBorrowable, availableLiquidity);
+
+  const availableToBorrowFormatted = effectiveMaxBorrowable.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  const maxBorrowAmount = calculatedBorrowable;
+  const maxBorrowAmount = effectiveMaxBorrowable;
   const [borrowAmount, setBorrowAmount] = useState(maxBorrowAmount / 2);
   const [riskLevel, setRiskLevel] = useState(0);
 
@@ -177,6 +180,11 @@ const BorrowAssetModal = ({
                 })}
               </span>
             </div>
+            {availableLiquidity < calculatedBorrowable && (
+              <div className="text-xs text-red-600 text-right">
+                Limited by pool liquidity (available: {availableLiquidity.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2})} USDST)
+              </div>
+            )}
             <Slider
               value={[borrowAmount]}
               max={maxBorrowAmount}
