@@ -73,8 +73,8 @@ mercata-ui:
 
 mercata-bridge:
 	@echo Now building mercata-bridge...
-	#docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
-	#docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}
+	docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
+	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_image_tag
 	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}" > bridge_image_tag_ecr
