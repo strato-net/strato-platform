@@ -152,7 +152,7 @@ const Borrow = () => {
       const pollLoans = async (attempt = 0) => {
         if (attempt >= 5) return;
         await refreshLoans();
-        const updatedLoans = (await fetchLoans() as unknown) as any[];
+        const updatedLoans = (await refreshLoans() as unknown) as any[];
         if (updatedLoans.length > 0) return; // at least one loan now visible
         setTimeout(() => pollLoans(attempt + 1), 2000);
       };
@@ -221,6 +221,15 @@ const Borrow = () => {
     }
   }, [loans, fetchLoans]);
 
+  const fetchLoansDirect = async () => {
+    try {
+      const res = await api.get("/lend/loans");
+      return Array.isArray(res.data) ? res.data : Object.values(res.data?.loans || {});
+    } catch {
+      return [];
+    }
+  };
+
   const repayLoan = async () => {
     try {
       setRepayLoading(true);
@@ -244,26 +253,19 @@ const Borrow = () => {
       });
       setShowRepayModal(false);
 
-      // Poll until loan disappears or becomes inactive
-      const pollAfterRepay = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans();
-        const updatedLoans = (await fetchLoans() as unknown) as any[];
-        const target = updatedLoans.find((l: any) => l.key === loan?.key);
-        if (!target || !target.loan?.active) {
-          // Loan cleared; collateral should be returned. Poll deposit tokens up to 5 times
-          const pollDeposits = async (depAttempt = 0) => {
-            if (depAttempt >= 5) return;
-            await refreshDepositTokens();
-            // give context state a chance to propagate before next check
-            setTimeout(() => pollDeposits(depAttempt + 1), 2000);
-          };
-          pollDeposits();
+      // Wait until Cirrus indexes the state change so the loan row disappears
+      const waitUntilCleared = async (attempt = 0): Promise<void> => {
+        if (attempt >= 10) return; // ~15s max
+        const latestLoans = (await fetchLoansDirect()) as any[];
+        const stillThere = latestLoans.find((l: any) => l.key === loan?.key && l.loan?.active);
+        if (!stillThere) {
+          setLoanList(latestLoans.filter((l: any)=>l.loan?.active));
+          await refreshDepositTokens();
           return;
         }
-        setTimeout(() => pollAfterRepay(attempt + 1), 2000);
+        setTimeout(() => waitUntilCleared(attempt + 1), 1500);
       };
-      pollAfterRepay();
+      waitUntilCleared();
     } catch (error) {
       api["error"]({
         message: "Error",
