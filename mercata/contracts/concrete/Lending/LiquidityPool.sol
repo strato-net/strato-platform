@@ -88,7 +88,8 @@ import "../../abstract/ERC20/access/Ownable.sol";
         require(borrowed[key].amount > 0, "No outstanding debt");
         uint256 repayAmount = amount > totalOwed ? totalOwed : amount;
         borrowed[key].amount -= repayAmount;
-        require(IERC20(asset).transferFrom(borrower, address(this), amount), "Repay failed");
+        // Transfer only the amount that will actually be credited, refunding any excess left in the user wallet
+        require(IERC20(asset).transferFrom(borrower, address(this), repayAmount), "Repay failed");
         totalLiquidity[asset] += repayAmount;
         emit Repaid(borrower, asset, repayAmount);
     }
