@@ -193,7 +193,7 @@ export const repay = async (
 
     // Calculate up-to-date interest so we can determine the exact outstanding.
     const now = Math.floor(Date.now() / 1000);
-    // interestRate is stored as array of {asset, rate}
+    const { priceMap, ratioMap } = buildMaps(lendingPoolInfo);
     const rateArray = lendingPoolInfo.lendingPool.interestRate || [];
     const rateObj = rateArray.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
     const rateNum = rateObj ? Number(rateObj.rate) : 0; // may be decimal percentage like 0.5
@@ -370,7 +370,7 @@ export const getLoans = async (
   );
 
   const now = Math.floor(Date.now() / 1000);
-  // const divisor = BigInt(365 * 24 * 60 * 100); // no longer used with hourly interest
+  const { priceMap, ratioMap } = buildMaps(registry);
 
   // Return structured array of enriched loan objects
   return combinedLoans.map((entry: any) => {
@@ -380,8 +380,11 @@ export const getLoans = async (
     const assetToken = tokenMap.get(loan.asset) as any;
     const collateralToken = tokenMap.get(loan.collateralAsset) as any;
 
+    const hf = calculateHealthFactor(loan, priceMap, ratioMap);
+
     return {
       key,
+      healthFactor: hf,
       loan: {
         ...loan,
         assetName: assetToken?._name || "",
@@ -396,6 +399,7 @@ export const getLoans = async (
               BigInt(8760 * 100)
             ).toString()
           : "0",
+        healthFactor: hf,
       },
     };
   });
@@ -467,10 +471,10 @@ export const getPrice = async (
 /** Build quick lookup maps needed for HF calculation */
 const buildMaps = (registry: any) => {
   const priceMap = new Map<string, bigint>(
-    (registry.oracle.prices || []).map((p: any) => [p.asset, toBig(p.price)])
+    (registry.oracle.prices || []).map((p: any) => [p.asset.toLowerCase(), toBig(p.price)])
   );
   const ratioMap = new Map<string, number>(
-    (registry.lendingPool.collateralRatio || []).map((r: any) => [r.asset, r.ratio])
+    (registry.lendingPool.collateralRatio || []).map((r: any) => [r.asset.toLowerCase(), r.ratio])
   );
   return { priceMap, ratioMap };
 };
@@ -480,11 +484,11 @@ const calculateHealthFactor = (
   priceMap: Map<string, bigint>,
   ratioMap: Map<string, number>
 ) => {
-  const loanPrice = priceMap.get(loan.asset) || 0n;
-  const collPrice = priceMap.get(loan.collateralAsset) || 0n;
+  const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
+  const collPrice = priceMap.get(loan.collateralAsset.toLowerCase()) || 0n;
   const loanValue = (toBig(loan.amount) * loanPrice) / 10n ** 18n;
   const collValue = (toBig(loan.collateralAmount) * collPrice) / 10n ** 18n;
-  const ratio = BigInt(ratioMap.get(loan.collateralAsset) || 0);
+  const ratio = BigInt(ratioMap.get(loan.collateralAsset.toLowerCase()) || 0);
   if (ratio === 0n || loanValue === 0n) return Infinity;
   const hfNumerator = collValue * 100n;
   const hfDenominator = loanValue * ratio;
@@ -518,12 +522,27 @@ export const listLiquidatableLoans = async (accessToken: string) => {
       const loan = e.LoanInfo;
       const assetToken = tokenMap.get(loan.asset) as any;
       const collToken = tokenMap.get(loan.collateralAsset) as any;
+
+      // compute expected profit in USD terms using current prices
+      const totalOwed = BigInt(loan.amount); // ignore interest for estimate
+      const repayAmount = (totalOwed * 50n) / 100n; // 50% close factor
+      const bonusEntry = registry.lendingPool.liquidationBonus?.find?.((b: any) => b.asset === loan.collateralAsset);
+      const bonusPct = bonusEntry ? BigInt(bonusEntry.bonus) : 105n; // default 105
+      const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
+      const collPrice = priceMap.get(loan.collateralAsset.toLowerCase()) || 0n;
+      let seizeAmount = 0n;
+      if (collPrice > 0n) {
+        seizeAmount = (repayAmount * bonusPct * loanPrice) / (collPrice * 100n);
+      }
+      const profitWei = (seizeAmount * collPrice) / 1_000000000000000000n - (repayAmount * loanPrice) / 1_000000000000000000n;
+
       return {
         id: e.key,
         healthFactor: hf,
         assetSymbol: assetToken?._symbol || '',
         collateralSymbol: collToken?._symbol || '',
         ...loan,
+        expectedProfit: profitWei.toString(),
       };
     })
     .filter((l) => l.healthFactor < 1);

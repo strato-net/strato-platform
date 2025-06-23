@@ -162,15 +162,25 @@ const Borrow = () => {
             BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0),
             18
           );
+          const hf = loan?.loan?.healthFactor ?? loan.healthFactor;
           return {
             ...loan,
             _name: loan.assetName,
             _symbol: loan?.assetSymbol || "",
             balanceHuman,
+            healthFactor: hf,
+            loan: {
+              ...loan.loan,
+              healthFactor: hf,
+            },
           };
         })
       );
       setLoanList(enrichedLoans);
+      if (typeof window !== "undefined") {
+        // @ts-ignore
+        window.__LOAN_LIST__ = enrichedLoans;
+      }
     } catch (e) {
       console.error("Error fetching loans:", e);
     }
@@ -353,7 +363,8 @@ const Borrow = () => {
                     <TableHead>Amount</TableHead>
                     <TableHead>Collateral</TableHead>
                     <TableHead>Accrued Interest</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead>Health Factor</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -385,6 +396,19 @@ const Borrow = () => {
                           {loan?.loan.collateralName || loan?.loan.collateralAsset} {formatEther(loan?.loan?.collateralAmount || 0)}
                         </TableCell>
                         <TableCell>{formatEther(loan?.loan?.interest || 0)}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const raw = loan?.loan?.healthFactor;
+                            const hfNum = raw !== undefined ? parseFloat(raw.toString()) : NaN;
+                            if (!isFinite(hfNum)) return "∞";
+                            const color = hfNum < 1
+                              ? "text-red-600"
+                              : hfNum < 1.1
+                                ? "text-yellow-600"
+                                : "text-green-600";
+                            return <span className={color}>{hfNum.toFixed(2)}</span>;
+                          })()}
+                        </TableCell>
                         <TableCell>
                           <Button
                             onClick={() => {
