@@ -90,7 +90,7 @@ const SetAssetPriceForm = () => {
                         return (
                           <SelectItem key={token.address} value={token.address}>
                             <div className="flex items-center justify-between w-full">
-                              <span>{token.token._symbol} - {token.token._name}</span>
+                              <span title={token.address}>{token.token._symbol} ({token.address.slice(0,6)}…{token.address.slice(-4)})</span>
                             </div>
                           </SelectItem>
                         );
