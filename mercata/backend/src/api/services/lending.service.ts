@@ -173,20 +173,52 @@ export const repay = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const lendingPool = await getPool(accessToken, {
-      select: "liquidityPool",
-    });
+    // Fetch liquidityPool address quickly (avoid heavy nested select)
+    const poolMeta = await getPool(accessToken, { select: "liquidityPool" });
 
-    if (!lendingPool?.liquidityPool) {
+    // Separate full fetch to access loans & rate maps
+    const lendingPoolInfo = await getPool(accessToken);
+
+    if (!poolMeta?.liquidityPool) {
       throw new Error("Liquidity pool address not found");
+    }
+
+    const loanEntry = (lendingPoolInfo.lendingPool.loans || []).find(
+      (e: any) => e.key === body.loanId
+    );
+    if (!loanEntry) {
+      throw new Error(`Loan ${body.loanId} not found`);
+    }
+    const loan = loanEntry.LoanInfo;
+
+    // Calculate up-to-date interest so we can determine the exact outstanding.
+    const now = Math.floor(Date.now() / 1000);
+    // interestRate is stored as array of {asset, rate}
+    const rateArray = lendingPoolInfo.lendingPool.interestRate || [];
+    const rateObj = rateArray.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
+    const rate = rateObj ? Number(rateObj.rate) : 0; // annualised %
+    const duration = Math.max(0, now - Number(loan.lastUpdated));
+    const bufferSeconds = 600; // 10-min safety buffer so tx fully closes the loan
+    const interest =
+      (BigInt(loan.amount) * BigInt(rate) * BigInt(duration + bufferSeconds)) /
+      BigInt(365 * 24 * 60 * 100);
+    const totalOwed = (BigInt(loan.amount) + interest).toString();
+
+    // Use caller-supplied amount if it equals/exceeds total owed; otherwise bump to full repay.
+    let repayAmount = body.amount || totalOwed;
+    if (BigInt(repayAmount) < BigInt(totalOwed)) {
+      repayAmount = totalOwed;
     }
 
     const tx = buildFunctionTx([
       {
         contractName: extractContractName(Token),
-        contractAddress: body.asset || "",
+        contractAddress: body.asset || loan.asset,
         method: "approve",
-        args: { spender: lendingPool.liquidityPool, value: body.amount || "" },
+        args: {
+          spender: poolMeta.liquidityPool,
+          value: repayAmount,
+        },
       },
       {
         contractName: extractContractName(LendingPool),
@@ -194,9 +226,9 @@ export const repay = async (
         method: "repayLoan",
         args: {
           loanId: body.loanId,
-          amount: body.amount,
+          amount: repayAmount,
         },
-      }
+      },
     ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -540,9 +572,15 @@ export const executeLiquidation = async (
   accessToken: string,
   loanId: string
 ) => {
-  // Fetch loan info so we know which asset must be repaid and how much to approve.
+  // Fetch liquidityPool address directly to avoid accidentally passing the whole object
+  const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
+  if (!liquidityPool || typeof liquidityPool !== "string") {
+    throw new Error("Liquidity pool address not found");
+  }
+  const liquidityPoolAddr = liquidityPool;
+
+  // Fetch full registry to locate the loan details
   const registry = await getPool(accessToken);
-  const liquidityPoolAddr = registry.liquidityPool;
   const found = (registry.lendingPool.loans || []).find((e: any) => e.key === loanId);
   if (!found) {
     throw new Error(`Loan ${loanId} not found`);
@@ -552,17 +590,21 @@ export const executeLiquidation = async (
   // Approve the LiquidityPool to pull up to the full outstanding amount.
   const maxApprove = (BigInt(loan.amount) * 2n).toString();
 
-  const tx = buildFunctionTx([{
-    contractName: extractContractName(LendingPool),
-    contractAddress: loan.asset,
-    method: "approve",
-    args: { spender: liquidityPoolAddr, value: maxApprove },
-  }, {
-    contractName: extractContractName(LendingPool),
-    contractAddress: constants.lendingPool,
-    method: "liquidate",
-    args: { loanId },
-  }]);
+  const tx = buildFunctionTx([
+    {
+      // First approve the debt token so LiquidityPool can pull repayment
+      contractName: extractContractName(Token),
+      contractAddress: loan.asset,
+      method: "approve",
+      args: { spender: liquidityPoolAddr, value: maxApprove },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: "liquidate",
+      args: { loanId },
+    },
+  ]);
 
   try {
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
