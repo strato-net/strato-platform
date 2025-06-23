@@ -226,6 +226,36 @@ class LendingController {
       next(error);
     }
   }
+
+  static async manageLiquidity(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      const { method, ...payload } = body as Record<string, any>;
+
+      if (method === "depositLiquidity") {
+        validateManageLiquidityArgs(payload);
+        const result = await depositLiquidity(accessToken, payload);
+        res.status(RestStatus.OK).json(result);
+        return next();
+      }
+      if (method === "withdrawLiquidity") {
+        validateManageLiquidityArgs(payload);
+        const result = await withdrawLiquidity(accessToken, payload);
+        res.status(RestStatus.OK).json(result);
+        return next();
+      }
+
+      // If method not supported
+      res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid method" });
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 
 export default LendingController;

@@ -37,6 +37,12 @@ export const getPool = async (
     lendingPool: `eq.${lendingPool}`,
   };
 
+  // DEBUG: log the exact query params being sent to Cirrus (no secrets exposed)
+  console.log("[LendingService.getPool] Querying Cirrus", {
+    endpoint: `/${LendingRegistry}`,
+    params,
+  });
+
   const {
     data: [poolData],
   } = await cirrus.get(accessToken, `/${LendingRegistry}`, { params });
@@ -139,7 +145,7 @@ export const borrow = async (
       {
         contractName: extractContractName(LendingPool),
         contractAddress: constants.lendingPool,
-        method: "getLoan",
+        method: "borrow",
         args: {
           asset: body.asset,
           amount: body.amount,
@@ -164,20 +170,54 @@ export const repay = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const lendingPool = await getPool(accessToken, {
-      select: "liquidityPool",
-    });
+    // Fetch liquidityPool address quickly (avoid heavy nested select)
+    const poolMeta = await getPool(accessToken, { select: "liquidityPool" });
 
-    if (!lendingPool?.liquidityPool) {
+    // Separate full fetch to access loans & rate maps
+    const lendingPoolInfo = await getPool(accessToken);
+
+    if (!poolMeta?.liquidityPool) {
       throw new Error("Liquidity pool address not found");
+    }
+
+    const loanEntry = (lendingPoolInfo.lendingPool.loans || []).find(
+      (e: any) => e.key === body.loanId
+    );
+    if (!loanEntry) {
+      throw new Error(`Loan ${body.loanId} not found`);
+    }
+    const loan = loanEntry.LoanInfo;
+
+    // Calculate up-to-date interest so we can determine the exact outstanding.
+    const now = Math.floor(Date.now() / 1000);
+    const { priceMap, ratioMap } = buildMaps(lendingPoolInfo);
+    const rateArray = lendingPoolInfo.lendingPool.interestRate || [];
+    const rateObj = rateArray.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
+    const rateNum = rateObj ? Number(rateObj.rate) : 0; // may be decimal percentage like 0.5
+    const rateScaled = Math.round(rateNum * 100); // scale to integer (percent *100) for 2-decimal precision
+    const durationSec = Math.max(0, now - Number(loan.lastUpdated));
+    const bufferSec = 600; // 10-min buffer
+    const hoursElapsed = BigInt(Math.floor((durationSec + bufferSec) / 3600)); // whole hours, ensures at least one hour after buffer
+    const interest =
+      (BigInt(loan.amount) * BigInt(rateScaled) * hoursElapsed) /
+      BigInt(8760 * 100 * 100); // extra *100 due to scaling
+    const totalOwed = (BigInt(loan.amount) + interest).toString();
+
+    // Use caller-supplied amount if it equals/exceeds total owed; otherwise bump to full repay.
+    let repayAmount = body.amount || totalOwed;
+    if (BigInt(repayAmount) < BigInt(totalOwed)) {
+      repayAmount = totalOwed;
     }
 
     const tx = buildFunctionTx([
       {
         contractName: extractContractName(Token),
-        contractAddress: body.asset || "",
+        contractAddress: body.asset || loan.asset,
         method: "approve",
-        args: { spender: lendingPool.liquidityPool, value: body.amount || "" },
+        args: {
+          spender: poolMeta.liquidityPool,
+          value: repayAmount,
+        },
       },
       {
         contractName: extractContractName(LendingPool),
@@ -185,9 +225,9 @@ export const repay = async (
         method: "repayLoan",
         args: {
           loanId: body.loanId,
-          amount: body.amount,
+          amount: repayAmount,
         },
-      }
+      },
     ]);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -215,10 +255,11 @@ export const getDepositableTokens = async (
       ({ asset, price }: { asset: string; price: string }) => [asset, price]
     )
   );
-  const interestRateMap = new Map(
-    (registry.lendingPool.interestRate || []).map(
-      ({ asset, rate }: { asset: string; rate: number }) => [asset, rate]
-    )
+  const interestRateMap = new Map<string, number>(
+    (registry.lendingPool.interestRate || []).map((entry: any) => {
+      const assetAddr = (entry?.asset || "").toLowerCase();
+      return [assetAddr, Number(entry?.rate || 0)];
+    })
   );
   const liquidityMap = new Map(
     (registry.liquidityPool.totalLiquidity || []).map(
@@ -288,17 +329,27 @@ export const getLoans = async (
 ): Promise<{ key: string; loan: any }[]> => {
   const registry = await getPool(accessToken);
 
+  // Build quick lookup map for interest rates (percent per annum)
+  const interestRateMap = new Map<string, number>(
+    (registry.lendingPool.interestRate || []).map((entry: any) => {
+      const assetAddr = (entry?.asset || "").toLowerCase();
+      return [assetAddr, Number(entry?.rate || 0)];
+    })
+  );
+
   // Filter user-specific loans
   const userLoans = (registry.lendingPool.loans || []).filter(
     (entry: any) => entry.LoanInfo.user.toLowerCase() === address.toLowerCase()
   );
 
-  if (!userLoans.length) return [];
+  const combinedLoans = userLoans;
 
-  // Collect all unique token addresses used in user loans
+  if (!combinedLoans.length) return [];
+
+  // Collect all unique token addresses used in loans
   const tokenAddresses = [
     ...new Set(
-      userLoans.flatMap((entry: any) => [
+      combinedLoans.flatMap((entry: any) => [
         entry.LoanInfo.asset,
         entry.LoanInfo.collateralAsset,
       ])
@@ -315,30 +366,36 @@ export const getLoans = async (
   );
 
   const now = Math.floor(Date.now() / 1000);
-  const divisor = BigInt(365 * 24 * 60 * 100); // Interest annualization factor
+  const { priceMap, ratioMap } = buildMaps(registry);
 
   // Return structured array of enriched loan objects
-  return userLoans.map((entry: any) => {
+  return combinedLoans.map((entry: any) => {
     const loan = entry.LoanInfo;
     const key = entry.key;
 
     const assetToken = tokenMap.get(loan.asset) as any;
     const collateralToken = tokenMap.get(loan.collateralAsset) as any;
 
+    const hf = calculateHealthFactor(loan, priceMap, ratioMap);
+
     return {
       key,
+      healthFactor: hf,
       loan: {
         ...loan,
         assetName: assetToken?._name || "",
         assetSymbol: assetToken?._symbol || "",
         collateralName: collateralToken?._name || "",
         collateralSymbol: collateralToken?._symbol || "",
-        interest: (
-          (BigInt(loan.amount) *
-            BigInt(registry.lendingPool.interestRate?.[loan.asset] || 0) *
-            BigInt(Math.max(0, now - Number(loan.lastUpdated)) + 300)) /
-          divisor
-        ).toString(),
+        interest: loan.lastUpdated
+          ? (
+              (BigInt(loan.amount) *
+                BigInt(interestRateMap.get(loan.asset.toLowerCase()) || 0) *
+                BigInt(Math.floor((Math.max(0, now - Number(loan.lastUpdated))) / 3600))) /
+              BigInt(8760 * 100)
+            ).toString()
+          : "0",
+        healthFactor: hf,
       },
     };
   });
@@ -349,10 +406,10 @@ export const getLoans = async (
 /** Build quick lookup maps needed for HF calculation */
 const buildMaps = (registry: any) => {
   const priceMap = new Map<string, bigint>(
-    (registry.oracle.prices || []).map((p: any) => [p.asset, toBig(p.price)])
+    (registry.oracle.prices || []).map((p: any) => [p.asset.toLowerCase(), toBig(p.price)])
   );
   const ratioMap = new Map<string, number>(
-    (registry.lendingPool.collateralRatio || []).map((r: any) => [r.asset, r.ratio])
+    (registry.lendingPool.collateralRatio || []).map((r: any) => [r.asset.toLowerCase(), r.ratio])
   );
   return { priceMap, ratioMap };
 };
@@ -362,11 +419,11 @@ const calculateHealthFactor = (
   priceMap: Map<string, bigint>,
   ratioMap: Map<string, number>
 ) => {
-  const loanPrice = priceMap.get(loan.asset) || 0n;
-  const collPrice = priceMap.get(loan.collateralAsset) || 0n;
+  const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
+  const collPrice = priceMap.get(loan.collateralAsset.toLowerCase()) || 0n;
   const loanValue = (toBig(loan.amount) * loanPrice) / 10n ** 18n;
   const collValue = (toBig(loan.collateralAmount) * collPrice) / 10n ** 18n;
-  const ratio = BigInt(ratioMap.get(loan.collateralAsset) || 0);
+  const ratio = BigInt(ratioMap.get(loan.collateralAsset.toLowerCase()) || 0);
   if (ratio === 0n || loanValue === 0n) return Infinity;
   const hfNumerator = collValue * 100n;
   const hfDenominator = loanValue * ratio;
@@ -400,12 +457,27 @@ export const listLiquidatableLoans = async (accessToken: string) => {
       const loan = e.LoanInfo;
       const assetToken = tokenMap.get(loan.asset) as any;
       const collToken = tokenMap.get(loan.collateralAsset) as any;
+
+      // compute expected profit in USD terms using current prices
+      const totalOwed = BigInt(loan.amount); // ignore interest for estimate
+      const repayAmount = (totalOwed * 50n) / 100n; // 50% close factor
+      const bonusEntry = registry.lendingPool.liquidationBonus?.find?.((b: any) => b.asset === loan.collateralAsset);
+      const bonusPct = bonusEntry ? BigInt(bonusEntry.bonus) : 105n; // default 105
+      const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
+      const collPrice = priceMap.get(loan.collateralAsset.toLowerCase()) || 0n;
+      let seizeAmount = 0n;
+      if (collPrice > 0n) {
+        seizeAmount = (repayAmount * bonusPct * loanPrice) / (collPrice * 100n);
+      }
+      const profitWei = (seizeAmount * collPrice) / 1_000000000000000000n - (repayAmount * loanPrice) / 1_000000000000000000n;
+
       return {
         id: e.key,
         healthFactor: hf,
         assetSymbol: assetToken?._symbol || '',
         collateralSymbol: collToken?._symbol || '',
         ...loan,
+        expectedProfit: profitWei.toString(),
       };
     })
     .filter((l) => l.healthFactor < 1);
@@ -465,9 +537,15 @@ export const executeLiquidation = async (
   accessToken: string,
   loanId: string
 ) => {
-  // Fetch loan info so we know which asset must be repaid and how much to approve.
+  // Fetch liquidityPool address directly to avoid accidentally passing the whole object
+  const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
+  if (!liquidityPool || typeof liquidityPool !== "string") {
+    throw new Error("Liquidity pool address not found");
+  }
+  const liquidityPoolAddr = liquidityPool;
+
+  // Fetch full registry to locate the loan details
   const registry = await getPool(accessToken);
-  const liquidityPoolAddr = registry.liquidityPool;
   const found = (registry.lendingPool.loans || []).find((e: any) => e.key === loanId);
   if (!found) {
     throw new Error(`Loan ${loanId} not found`);
@@ -477,23 +555,33 @@ export const executeLiquidation = async (
   // Approve the LiquidityPool to pull up to the full outstanding amount.
   const maxApprove = (BigInt(loan.amount) * 2n).toString();
 
-  const tx = buildFunctionTx([{
-    contractName: extractContractName(LendingPool),
-    contractAddress: loan.asset,
-    method: "approve",
-    args: { spender: liquidityPoolAddr, value: maxApprove },
-  }, {
-    contractName: extractContractName(LendingPool),
-    contractAddress: constants.lendingPool,
-    method: "liquidate",
-    args: { loanId },
-  }]);
+  const tx = buildFunctionTx([
+    {
+      // First approve the debt token so LiquidityPool can pull repayment
+      contractName: extractContractName(Token),
+      contractAddress: loan.asset,
+      method: "approve",
+      args: { spender: liquidityPoolAddr, value: maxApprove },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: "liquidate",
+      args: { loanId },
+    },
+  ]);
 
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
+  try {
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
 
-  return { status, hash };
+    return { status, hash };
+  } catch (error: any) {
+    // Surface Strato's response for easier debugging
+    console.error("[executeLiquidation] Strato 400 response", error?.response?.data || error);
+    throw error;
+  }
 };
 
 export const getLoanWithHealthFactor = async (

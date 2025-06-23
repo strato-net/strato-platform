@@ -47,8 +47,10 @@ router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.get
 router.get("/lend/loans/:id", authHandler.authorizeRequest(true), LendingController.getLoanById);
 router.post("/lend/depositLiquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
 router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
-router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
+router.post("/lend/getLoan", authHandler.authorizeRequest(), LendingController.borrow);
 router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
+router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
+router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
 
 // Liquidation routes
 router.get("/lend/liquidate", authHandler.authorizeRequest(true), LendingController.listLiquidatable);

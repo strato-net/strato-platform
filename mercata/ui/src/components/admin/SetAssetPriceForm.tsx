@@ -96,6 +96,20 @@ const SetAssetPriceForm = () => {
                   <FormDescription>
                     Choose the token to update pricing for
                   </FormDescription>
+                  {selectedToken && (
+                    <div className="text-base font-medium text-gray-700 mt-1">
+                      Current price: $
+                      {(() => {
+                        try {
+                          return parseFloat(
+                            (Number(selectedToken.price) / 1e18).toString()
+                          ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+                        } catch {
+                          return "-";
+                        }
+                      })()}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
