@@ -73,9 +73,10 @@ const Transfer = () => {
         setFromAsset(updatedToken); // triggers re-render with updated balance
       }
     } catch (error) {
+      const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
       toast({
         title: "Error",
-        description: "Transfer failed. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

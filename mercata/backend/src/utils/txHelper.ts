@@ -1,5 +1,6 @@
 import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
+import { StratoError } from "../errors";
 
 export const until = async (
   predicate: (res: any) => boolean,
@@ -44,16 +45,16 @@ export const postAndWaitForTx = async (
     const response = await stratoPostFn();
     
     if (response.status !== 200) {
-      throw new Error(`Strato error: ${response.statusText}`);
+      throw new StratoError(`Strato error: ${response.statusText}`, 500);
     }
 
     const results = response.data;
     if (!Array.isArray(results) || !results.length) {
-      throw new Error("Invalid or empty transaction results");
+      throw new StratoError("Invalid or empty transaction results", 400);
     }
 
     const txHashes = results.map(result => {
-      if (!result?.hash) throw new Error("Invalid transaction result");
+      if (!result?.hash) throw new StratoError("Invalid transaction result", 400);
       return result.hash;
     });
 
@@ -64,7 +65,8 @@ export const postAndWaitForTx = async (
           // Extract the actual error message from the failed transaction
           const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
           const extractedMessage = extractErrorMessage(errorMessage);
-          throw new Error(extractedMessage);
+          // Blockchain errors are typically client errors (400) since they're due to user input/state
+          throw new StratoError(extractedMessage, 400);
         }
         return results.every(r => r?.status !== "Pending");
       },
@@ -77,11 +79,17 @@ export const postAndWaitForTx = async (
       hash: finalResults[0].hash
     };
   } catch (error: any) {
+    // If it's already a StratoError, re-throw it
+    if (error instanceof StratoError) {
+      throw error;
+    }
+    
     // Check if this is an Axios error with response data
     if (error.response?.data && typeof error.response.data === 'string') {
       const extractedMessage = extractErrorMessage(error.response.data);
-      throw new Error(extractedMessage);
+      throw new StratoError(extractedMessage, 400);
     }
+    
     // Re-throw the original error if it doesn't match the expected format
     throw error;
   }
