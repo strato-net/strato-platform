@@ -7,6 +7,8 @@ ifeq ($(REPO),public)
 endif
 $(info REPO_URL is "${REPO_URL}" (REPO: "${REPO}"))
 REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
+# TODO: merge two REPO vars
+REPO_AWS_ECR_URL_MERCATA=406773134706.dkr.ecr.us-east-1.amazonaws.com/mercata/
 $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
@@ -33,11 +35,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks mercata-backend mercata-ui
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
 apex:
 	@echo Now building apex...
@@ -69,39 +71,37 @@ mercata-ui:
 	docker build -t ${REPO_URL}mercata-ui:${VERSION} ./mercata/ui
 	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
 
-# marketplace-backend:
-# 	@echo Now building marketplace-backend...
-# 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-backend:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-backend:${VERSION} make --directory=marketplace/backend/
+mercata-bridge:
+	@echo Now building mercata-bridge...
+	docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
+	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}
+	# TODO: #dcpush - replace with proper docker compose push flow
+	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_ba_repo_image_tag
+	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}" > bridge_ecr_repo_image_tag
 
-# marketplace-ui:
-# 	@echo Now building marketplace-ui...
-# 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
+mercata-oracle:
+	@echo Now building mercata-oracle... 
+	# TODO: Dockerize
+	@echo TODO: NO DOCKERFILE TO BUILD YET...
+	#docker build -t ${REPO_URL}mercata-oracle:${VERSION} ./mercata/services/oracle
+	#docker tag ${REPO_URL}mercata-oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}
+	# TODO: #dcpush - replace with proper docker compose push flow
+	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_ba_repo_image_tag
+	#echo "${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}" > oracle_ecr_repo_image_tag
 
-# payment-server:
-# 	@echo Now building payment server...
-# 	BASIL_DOCKER_TAG=${REPO_URL}payment-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server:${VERSION} make --directory=payment-server/
-
-# payment-server-nginx:
-# 	@echo Now building payment-server-nginx...
-# 	BASIL_DOCKER_TAG=${REPO_URL}payment-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server-nginx:${VERSION} make --directory=payment-server-nginx/
-
-# notification-server:
-# 	@echo Now building notification server...
-# 	BASIL_DOCKER_TAG=${REPO_URL}notification-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server:${VERSION} make --directory=notification-server/
-
-# notification-server-nginx:
-# 	@echo Now building notification-server-nginx...
-# 	BASIL_DOCKER_TAG=${REPO_URL}notification-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server-nginx:${VERSION} make --directory=notification-server-nginx/
+mercata-stripe:
+	@echo Now building mercata-stripe...
+	docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
+	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}
+	# TODO: #dcpush - replace with proper docker compose push flow
+	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_ba_repo_image_tag
+	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}" > stripe_ecr_repo_image_tag
 
 eks:
 	@echo Now generating eks manifest files
 	cd k8s/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' strato-platform-manifest.tpl.yaml > strato-platform-manifest.yaml
 	cd k8s/eks/vault && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-vault-deployment.tpl.yaml > eks-vault-deployment.yaml
-	#TODO: create eks manifest for identity server
-	#cd k8s/eks/identity && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-identity-deployment.tpl.yaml > eks-identity-deployment.yaml
-	#TODO: create eks manifest for highway server
-	#TODO: create eks manifest for payment server
-	#TODO: create eks manifest for notification server
+	#TODO: create eks manifests for highway server, etc...
 
 build_buildbase:
 	@echo building buildbase...
