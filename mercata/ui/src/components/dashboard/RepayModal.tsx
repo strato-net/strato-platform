@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/axios";
 import { useLendingContext } from "@/context/LendingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -55,11 +54,17 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
   }, [isOpen]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
     if (/^\d*\.?\d*$/.test(value)) {
-      setRepayAmount(value);
-      setDisplayAmount(addCommasToInput(value));
-      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount || 0))
+      const numValue = parseFloat(value || "0");
+      const maxValue = parseFloat(loan?.balanceHuman || "0");
+      
+      // Cap the input at the maximum loan balance
+      if (numValue <= maxValue || value === "") {
+        setRepayAmount(value);
+        setDisplayAmount(addCommasToInput(value));
+        setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount || 0))
+      }
     }
   };
 
@@ -90,9 +95,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
       setDisplayAmount("");
       setRepayLoading(false);
       
-      api["success"]({
-        message: "Success",
-        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
+      toast({
+        title: "Success",
+        description: `Successfully Repaid ${repayAmount} ${loan?.loan.assetSymbol}`,
+        variant: "success",
       });
       
       onRepaySuccess();
