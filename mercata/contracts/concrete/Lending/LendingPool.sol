@@ -34,7 +34,7 @@ contract record LendingPool is Ownable {
     }
 
     uint256 public nextLoanId = 1;
-    mapping(uint256 => LoanInfo) public loans;
+    mapping(uint256 => LoanInfo) public record loans;
     mapping(address => uint256[]) public userLoans; // For easy lookup
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;

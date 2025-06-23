@@ -151,8 +151,17 @@ const Borrow = () => {
 
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      await refreshDepositTokens();      
-      await fetchLoans();
+      await refreshDepositTokens();
+
+      // Poll loans until list length changes (max 5 attempts)
+      const pollLoans = async (attempt = 0) => {
+        if (attempt >= 5) return;
+        await refreshLoans();
+        const updatedLoans = (await fetchLoans() as unknown) as any[];
+        if (updatedLoans.length > 0) return; // at least one loan now visible
+        setTimeout(() => pollLoans(attempt + 1), 2000);
+      };
+      pollLoans();
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
@@ -170,7 +179,8 @@ const Borrow = () => {
     const value = e.target.value;
     if (/^\d*\.?\d*$/.test(value)) {
       setRepayAmount(value);
-      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount, 18))
+      // wrongAmount now flags when user tries to repay more than wallet balance (optional)
+      // but we no longer block over-repay; we'll clip to total owed on submit
     }
   };
 
@@ -178,12 +188,18 @@ const Borrow = () => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
     const addr = userData.userAddress;
     try {
-      const userLoans = Object.entries(loans)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-        .filter((loan: any) => loan?.loan?.user === addr && loan?.loan?.active === true);
-      // Enrich each loan with token symbol, name, and human-readable balance
+      // Handle both array and object-map shapes
+      const loanArray: any[] = Array.isArray(loans)
+        ? loans
+        : Object.entries(loans).map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }));
 
+      const addrLc = addr?.toLowerCase();
+      const userLoans = loanArray.filter(
+        (loan: any) =>
+          loan?.loan?.user?.toLowerCase() === addrLc && loan?.loan?.active === true
+      );
+
+      // Enrich each loan with token symbol, name, and human-readable balance
       const enrichedLoans = await Promise.all(
         userLoans.map(async (loan: any) => {
           const balanceHuman = formatUnits(
@@ -202,18 +218,23 @@ const Borrow = () => {
     } catch (e) {
       console.error("Error fetching loans:", e);
     }
-  }, []);
+  }, [loans]);
 
-useEffect(() => {
+  useEffect(() => {
     if (Object.keys(loans || {}).length > 0) {
       fetchLoans();
-  }
+    }
   }, [loans, fetchLoans]);
 
   const repayLoan = async () => {
     try {
       setRepayLoading(true);
-      const amountInWei = parseUnits(repayAmount, 18).toString();
+      const totalOwedWei = (BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0)).toString();
+      let amountInWei = parseUnits(repayAmount === "" ? "0" : repayAmount, 18).toString();
+      if (BigInt(amountInWei) > BigInt(totalOwedWei)) {
+        amountInWei = totalOwedWei; // clip to full repay
+      }
+
       const response = await repayLoanFn({
         loanId: loan?.key,
         amount: amountInWei,
@@ -221,13 +242,33 @@ useEffect(() => {
       });
       console.log(response, "repay loan response");
       setRepayLoading(false);
-      setShowRepayModal(false)
-      api["success"]({
-        message: "Success",
-        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
+      toast({
+        title: "Repay Submitted",
+        description: `Successfully repaid ${repayAmount} ${loan?._symbol}`,
+        variant: "success",
       });
-      await refreshLoans();
-      await fetchLoans();
+      setShowRepayModal(false);
+
+      // Poll until loan disappears or becomes inactive
+      const pollAfterRepay = async (attempt = 0) => {
+        if (attempt >= 5) return;
+        await refreshLoans();
+        const updatedLoans = (await fetchLoans() as unknown) as any[];
+        const target = updatedLoans.find((l: any) => l.key === loan?.key);
+        if (!target || !target.loan?.active) {
+          // Loan cleared; collateral should be returned. Poll deposit tokens up to 5 times
+          const pollDeposits = async (depAttempt = 0) => {
+            if (depAttempt >= 5) return;
+            await refreshDepositTokens();
+            // give context state a chance to propagate before next check
+            setTimeout(() => pollDeposits(depAttempt + 1), 2000);
+          };
+          pollDeposits();
+          return;
+        }
+        setTimeout(() => pollAfterRepay(attempt + 1), 2000);
+      };
+      pollAfterRepay();
     } catch (error) {
       api["error"]({
         message: "Error",
@@ -331,7 +372,7 @@ useEffect(() => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Your loans</CardTitle>
+              <CardTitle>My Loans</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -430,11 +471,6 @@ useEffect(() => {
                   onChange={handleAmountChange}
                 />
               </div>
-              {wrongAmount && (
-                <p className="text-red-600 text-sm mt-1">
-                  Insufficient balance
-                </p>
-              )}
             </div>
           </div>
           {loan && (
@@ -448,6 +484,13 @@ useEffect(() => {
               <p className="text-sm font-medium text-blue-900">
                 Total outstanding: {loan?.balanceHuman} {loan?.loan?._symbol}
               </p>
+              <button
+                className="mt-2 text-xs text-blue-600 underline"
+                type="button"
+                onClick={() => setRepayAmount(loan?.balanceHuman || "")}
+              >
+                Repay All
+              </button>
             </div>
           )}
 
@@ -458,8 +501,7 @@ useEffect(() => {
                 repayLoading ||
                 !repayAmount ||
                 isNaN(Number(repayAmount)) ||
-                Number(repayAmount) <= 0 ||
-                Number(repayAmount) > Number(loan?.balanceHuman || 0)
+                Number(repayAmount) <= 0
               }
               type="submit"
               className="w-full bg-strato-purple hover:bg-strato-purple/90"

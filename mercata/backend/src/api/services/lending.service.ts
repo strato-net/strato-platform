@@ -303,38 +303,11 @@ export const getLoans = async (
     (entry: any) => entry.LoanInfo.user.toLowerCase() === address.toLowerCase()
   );
 
-  // If no LoanInfo records (due to mapping not indexed), fall back to LiquidityPool.borrowed
-  let combinedLoans = userLoans;
-
-  if (combinedLoans.length === 0 && registry.liquidityPool?.borrowed) {
-    const borrowedArr = registry.liquidityPool.borrowed as any[];
-    const userCollaterals = (registry.collateralVault?.collaterals || [])
-      .filter((c: any) => c.Collateral?.user?.toLowerCase() === address.toLowerCase())
-      .map((c: any) => c.Collateral);
-
-    combinedLoans = borrowedArr
-      .filter((b: any) =>
-        b.Borrow?.user?.toLowerCase() === address.toLowerCase()
-      )
-      .map((b: any) => ({
-        key: b.key,
-        // fabricate LoanInfo-like object for consistent UI rendering
-        LoanInfo: {
-          user: b.Borrow.user,
-          asset: b.Borrow.asset,
-          amount: b.Borrow.amount,
-          // If user has exactly one collateral entry, attach it
-          collateralAsset: userCollaterals.length === 1 ? userCollaterals[0].asset : "",
-          collateralAmount: userCollaterals.length === 1 ? userCollaterals[0].amount : "0",
-          lastUpdated: Math.floor(Date.now() / 1000),
-          active: true,
-        },
-      }));
-  }
+  const combinedLoans = userLoans;
 
   if (!combinedLoans.length) return [];
 
-  // Collect all unique token addresses used in combined loans
+  // Collect all unique token addresses used in loans
   const tokenAddresses = [
     ...new Set(
       combinedLoans.flatMap((entry: any) => [
