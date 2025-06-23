@@ -44,10 +44,17 @@ router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.get("/lend/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
 router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
 router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
+router.get("/lend/loans/:id", authHandler.authorizeRequest(true), LendingController.getLoanById);
 router.post("/lend/depositLiquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
 router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
 router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
 router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
+
+// Liquidation routes
+router.get("/lend/liquidate", authHandler.authorizeRequest(true), LendingController.listLiquidatable);
+router.get("/lend/liquidate/near-unhealthy", authHandler.authorizeRequest(true), LendingController.listNearUnhealthy);
+router.get("/lend/liquidate/:id", authHandler.authorizeRequest(true), LendingController.getLiquidatable);
+router.post("/lend/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
 
 // ----- Oracle -----
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
@@ -74,34 +81,5 @@ router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   });
   return next();
 });
-
-// ----- Liquidation routes -----
-router.get(
-  "/lend/liquidate",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.listLiquidatable(req, res, next)
-);
-router.get(
-  "/lend/liquidate/near-unhealthy",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.listNearUnhealthy(req, res, next)
-);
-router.get(
-  "/lend/liquidate/:id",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.getLiquidatable(req, res, next)
-);
-router.post(
-  "/lend/liquidate/:id",
-  authHandler.authorizeRequest(),
-  (req, res, next) => LendingController.executeLiquidation(req, res, next)
-);
-
-// ----- Loan search -----
-router.get(
-  "/lend/loans/:id",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.getLoanById(req, res, next)
-);
 
 export default router;
