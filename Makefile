@@ -74,28 +74,28 @@ mercata-ui:
 mercata-bridge:
 	@echo Now building mercata-bridge...
 	docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}
+	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}" > bridge_image_tag_ecr
+	echo "${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}" > bridge_image_tag_ecr
 
 mercata-oracle:
 	@echo Now building mercata-oracle... 
 	# TODO: Dockerize
 	@echo TODO: NO DOCKERFILE TO BUILD YET...
 	#docker build -t ${REPO_URL}mercata-oracle:${VERSION} ./mercata/services/oracle
-	#docker tag ${REPO_URL}mercata-oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}
+	#docker tag ${REPO_URL}mercata-oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_image_tag
-	#echo "${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}" > oracle_image_tag_ecr
+	#echo "${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}" > oracle_image_tag_ecr
 
 mercata-stripe:
 	@echo Now building mercata-stripe...
 	docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
-	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}
+	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}" > stripe_image_tag_ecr
+	echo "${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}" > stripe_image_tag_ecr
 
 eks:
 	@echo Now generating eks manifest files
