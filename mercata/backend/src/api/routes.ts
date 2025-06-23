@@ -53,9 +53,10 @@ router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.rep
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
 router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);
 
+// ----- Onramp -----
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
-router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
-router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
+router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.buy);
+router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.sell);
 
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
 router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
