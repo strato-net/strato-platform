@@ -457,6 +457,7 @@ const Borrow = () => {
         onRepaySuccess={async () => {
           await refreshLoans();
           await fetchLoans();
+          await refreshDepositTokens();
         }}
       />
  
