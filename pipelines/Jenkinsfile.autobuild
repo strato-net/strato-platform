@@ -175,14 +175,12 @@ pipeline {
                     docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     
                     # TODO: #dcpush - replace with proper docker compose push flow
-                    cd mercata/services/bridge
-                    docker push $(<bridge_ba_repo_image_tag)
-                    docker push $(<bridge_ecr_repo_image_tag)
-                    archiveArtifacts artifacts: "bridge_ba_repo_image_tag, bridge_ecr_repo_image_tag"
-                    cd ../payment
-                    docker push $(<payment_ba_repo_image_tag)
-                    docker push $(<payment_ecr_repo_image_tag)
-                    archiveArtifacts artifacts: "payment_ba_repo_image_tag, payment_ecr_repo_image_tag"
+                    docker push $(<bridge_image_tag)
+                    docker push $(<bridge_image_tag_ecr)
+                    archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr"
+                    docker push $(<stripe_image_tag)
+                    docker push $(<stripe_image_tag_ecr)
+                    archiveArtifacts artifacts: "stripe_image_tag, stripe_image_tag_ecr"
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
                   stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'

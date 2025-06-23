@@ -73,11 +73,11 @@ mercata-ui:
 
 mercata-bridge:
 	@echo Now building mercata-bridge...
-	docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}
+	#docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
+	#docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
-	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_ba_repo_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}" > bridge_ecr_repo_image_tag
+	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_image_tag
+	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-bridge:${VERSION}" > bridge_image_tag_ecr
 
 mercata-oracle:
 	@echo Now building mercata-oracle... 
@@ -86,16 +86,16 @@ mercata-oracle:
 	#docker build -t ${REPO_URL}mercata-oracle:${VERSION} ./mercata/services/oracle
 	#docker tag ${REPO_URL}mercata-oracle:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
-	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_ba_repo_image_tag
-	#echo "${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}" > oracle_ecr_repo_image_tag
+	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_image_tag
+	#echo "${REPO_AWS_ECR_URL_MERCATA}mercata-oracle:${VERSION}" > oracle_image_tag_ecr
 
 mercata-stripe:
 	@echo Now building mercata-stripe...
 	docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
 	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
-	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_ba_repo_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}" > stripe_ecr_repo_image_tag
+	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_image_tag
+	echo "${REPO_AWS_ECR_URL_MERCATA}mercata-stripe:${VERSION}" > stripe_image_tag_ecr
 
 eks:
 	@echo Now generating eks manifest files
