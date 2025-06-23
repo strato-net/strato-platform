@@ -76,7 +76,6 @@ contract record Pool {
         uint256 total_liquidity = ERC20(lpToken).totalSupply();
         
         if (total_liquidity > 0) {
-            require(tokenB_amount > 0, "Min liquidity required");
             uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
             uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
             uint256 tokenA_amount = (tokenB_amount * tokenA_reserve / tokenB_reserve) + 1;
@@ -94,8 +93,6 @@ contract record Pool {
 
             return liquidity_minted;
         } else {
-            require(tokenB_amount >= 1000000000, "Minimum liquidity required");
-            
             uint256 tokenA_amount = max_tokenA_amount;
             uint256 initial_liquidity = tokenB_amount;
             lpToken.mint(msg.sender, initial_liquidity);
@@ -168,7 +165,11 @@ contract record Pool {
     function getCurrentTokenABRatio() public view returns (decimal) {
         decimal tokenA_reserve = decimal(ERC20(tokenA).balanceOf(address(this)));
         decimal tokenB_reserve = decimal(ERC20(tokenB).balanceOf(address(this)));
-        require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
+        
+        if (tokenA_reserve <= 0.000000000000000000 || tokenB_reserve <= 0.000000000000000000) {
+            return 0;
+        }
+        
         // Price of 1 tokenA in stablecoins (tokenB_reserve / tokenA_reserve)
         return decimal((tokenB_reserve * 1.000000000000000000 ) / tokenA_reserve) / 1.000000000000000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
@@ -177,7 +178,11 @@ contract record Pool {
     function getCurrentTokenBARatio() public view returns (decimal) {
         decimal tokenA_reserve = decimal(ERC20(tokenA).balanceOf(address(this)))* 1.000000000000000000;
         decimal tokenB_reserve = decimal(ERC20(tokenB).balanceOf(address(this)))* 1.000000000000000000;
-        require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
+        
+        if (tokenA_reserve <= 0.000000000000000000 || tokenB_reserve <= 0.000000000000000000) {
+            return 0;
+        }
+        
         // Price of 1 tokenB in tokens (tokenA_reserve / tokenB_reserve)
         return decimal((tokenA_reserve * 1.000000000000000000) / tokenB_reserve) / 1.000000000000000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
     }

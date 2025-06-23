@@ -143,7 +143,7 @@ const LendingPoolSection = () => {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Your deposit</span>
+                  <span className="text-gray-500">Your Deposit</span>
                   <span className="font-medium">
                     {loadingWithdrawableTokens ? (
                       <span className="text-gray-400 animate-pulse">
@@ -160,6 +160,10 @@ const LendingPoolSection = () => {
                       "$0.00"
                     )}
                   </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">APY</span>
+                  <span className="font-medium">-</span>
                 </div>
               </div>
             </div>

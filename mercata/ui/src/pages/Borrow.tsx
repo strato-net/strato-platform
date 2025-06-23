@@ -1,11 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
-
-import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
-
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
@@ -39,8 +36,47 @@ const formatTokenAmount = (value: any) =>
     maximumFractionDigits: 2,
   });
 
-// Collateral-only cap (does NOT account for pool liquidity)
-const collateralCap = (asset: DepositableToken) => {
+const formatCurrency = (value: string | number) => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return "0.00";
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const formatInputValue = (value: string) => {
+  // Remove all non-digit and non-decimal characters
+  const cleanValue = value.replace(/[^\d.]/g, '');
+  
+  // Handle multiple decimal points
+  const parts = cleanValue.split('.');
+  if (parts.length > 2) {
+    return parts[0] + '.' + parts.slice(1).join('');
+  }
+  
+  // If there's a decimal part, limit to 2 decimal places
+  if (parts.length === 2) {
+    return parts[0] + '.' + parts[1].slice(0, 2);
+  }
+  
+  return cleanValue;
+};
+
+const addCommasToInput = (value: string) => {
+  if (!value) return '';
+  
+  const parts = value.split('.');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  if (parts.length === 2) {
+    return integerPart + '.' + parts[1];
+  }
+  
+  return integerPart;
+};
+
+const formatMaxBorrowable = (asset: DepositableToken) => {
   try {
     const price = parseFloat(formatUnits(
       typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
@@ -70,6 +106,7 @@ const Borrow = () => {
   const [tokens, setTokens] = useState<DepositableToken[] | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [repayAmount, setRepayAmount] = useState('')
+  const [displayAmount, setDisplayAmount] = useState('')
   const [showRepayModal, setShowRepayModal] = useState(false)
   const [repayLoading, setRepayLoading] = useState(false);
   const [loan, setLoan] = useState<any | null>(null);
@@ -174,8 +211,7 @@ const Borrow = () => {
     const value = e.target.value;
     if (/^\d*\.?\d*$/.test(value)) {
       setRepayAmount(value);
-      // wrongAmount now flags when user tries to repay more than wallet balance (optional)
-      // but we no longer block over-repay; we'll clip to total owed on submit
+      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount, 18))
     }
   };
 
@@ -244,37 +280,33 @@ const Borrow = () => {
         amount: amountInWei,
         asset: loan?.loan?.asset,
       });
-      console.log(response, "repay loan response");
-      setRepayLoading(false);
+      
       toast({
-        title: "Repay Submitted",
-        description: `Successfully repaid ${repayAmount} ${loan?._symbol}`,
+        title: "Success",
+        description: `Successfully Repaid $${formatCurrency(repayAmount)} USDST`,
         variant: "success",
       });
+      
+      // Close modal and reset state immediately for better UX
       setShowRepayModal(false);
-
-      // Wait until Cirrus indexes the state change so the loan row disappears
-      const waitUntilCleared = async (attempt = 0): Promise<void> => {
-        if (attempt >= 10) return; // ~15s max
-        const latestLoans = (await fetchLoansDirect()) as any[];
-        const stillThere = latestLoans.find((l: any) => l.key === loan?.key && l.loan?.active);
-        if (!stillThere) {
-          setLoanList(latestLoans.filter((l: any)=>l.loan?.active));
-          await refreshDepositTokens();
-          return;
-        }
-        setTimeout(() => waitUntilCleared(attempt + 1), 1500);
-      };
-      waitUntilCleared();
-    } catch (error) {
-      api["error"]({
-        message: "Error",
-        description: `Repay Error - ${error}`,
-      });
-      setRepayLoading(false);
-      console.error("Error repaying loan:", error);
-    } finally {
       setRepayAmount("");
+      setDisplayAmount("");
+      setLoan(null);
+      setRepayLoading(false);
+      setShowRepayModal(false)
+      api["success"]({
+        message: "Success",
+        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
+      });
+      await refreshLoans();
+      await fetchLoans();
+    } catch (error) {
+      console.error("Error repaying loan:", error);
+      toast({
+        title: "Error",
+        description: `Repay Error - ${error}`,
+        variant: "destructive",
+      });
       setRepayLoading(false);
     }
   };
@@ -314,7 +346,7 @@ const Borrow = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Borrow Against Your Assets</CardTitle>
+              <CardTitle>Borrow</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -326,13 +358,14 @@ const Borrow = () => {
                     <TableHead>Pool Liquidity</TableHead>
                     <TableHead>Max Borrow based on Collateral</TableHead>
                     <TableHead>USDST Available to Borrow</TableHead>
+                    <TableHead>Borrow Fee</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingDepositTokens ? (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
@@ -382,6 +415,11 @@ const Borrow = () => {
                         </TableCell>
                         <TableCell>{formatMaxBorrowable(asset)}</TableCell>
                         <TableCell>
+                          {borrowAsset?.interestRate
+                            ? `${parseFloat(borrowAsset.interestRate).toFixed(2)}%`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             size="sm"
                             onClick={() => handleBorrow(asset)}
@@ -395,7 +433,7 @@ const Borrow = () => {
                     ))
                   ) :
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={7}>
                         <div className="w-full flex justify-center items-center mt-4">
                           No data to show
                         </div>
@@ -407,7 +445,7 @@ const Borrow = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="mt-6">
             <CardHeader>
               <CardTitle>My Loans</CardTitle>
             </CardHeader>
@@ -419,7 +457,7 @@ const Borrow = () => {
                     <TableHead>Amount</TableHead>
                     <TableHead>Collateral</TableHead>
                     <TableHead>Accrued Interest</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -490,15 +528,33 @@ const Borrow = () => {
         />
       )}
       <Dialog open={showRepayModal} onOpenChange={setShowRepayModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Repay Loan</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
+                US
+              </div>
+              Repay USDST Loan
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-4">
-            {/* First Token */}
-            <div className="rounded-lg border p-3">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Amount</span>
+          
+          {loan && (
+            <>
+              <div className="space-y-2 py-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Original Loan Amount</span>
+                  <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.amount || 0, 18))}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Accrued Interest</span>
+                  <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.interest || 0, 18))}</span>
+                </div>
+                
+                <div className="flex justify-between items-center font-bold pt-2 border-t">
+                  <span>Total Amount Due</span>
+                  <span className="text-lg">${formatCurrency(loan?.balanceHuman)}</span>
+                </div>
               </div>
               <div className="flex items-center">
                 <Input
@@ -508,8 +564,12 @@ const Borrow = () => {
                   onChange={handleAmountChange}
                 />
               </div>
+              {wrongAmount && (
+                <p className="text-red-600 text-sm mt-1">
+                  Insufficient balance
+                </p>
+              )}
             </div>
-          </div>
           {loan && (
             <div className="mt-2 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800 mb-1">
@@ -521,13 +581,6 @@ const Borrow = () => {
               <p className="text-sm font-medium text-blue-900">
                 Total outstanding: {loan?.balanceHuman} {loan?.loan?._symbol}
               </p>
-              <button
-                className="mt-2 text-xs text-blue-600 underline"
-                type="button"
-                onClick={() => setRepayAmount(loan?.balanceHuman || "")}
-              >
-                Repay All
-              </button>
             </div>
           )}
 
@@ -538,7 +591,8 @@ const Borrow = () => {
                 repayLoading ||
                 !repayAmount ||
                 isNaN(Number(repayAmount)) ||
-                Number(repayAmount) <= 0
+                Number(repayAmount) <= 0 ||
+                Number(repayAmount) > Number(loan?.balanceHuman || 0)
               }
               type="submit"
               className="w-full bg-strato-purple hover:bg-strato-purple/90"

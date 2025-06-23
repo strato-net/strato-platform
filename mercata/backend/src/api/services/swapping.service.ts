@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 
 const { poolSelectFields, Pool, PoolFactory, Token, PriceOracle } = constants;
@@ -256,6 +256,41 @@ export const calculateSwap = async (
     }
   } catch (error) {
     console.error("Error calculating swap:", error);
+    throw error;
+  }
+};
+
+export const calculateSwapReverse = async (
+  accessToken: string,
+  address: string,
+  direction: string,
+  amount: string
+) => {
+  try {
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + address,
+    });
+
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+    const pool = pools[0];
+    
+    if (direction === "true") {
+      return getRequiredInput(
+        BigInt(amount),
+        BigInt(pool.tokenBBalance),
+        BigInt(pool.tokenABalance)
+      );
+    } else {
+      return getRequiredInput(
+        BigInt(amount),
+        BigInt(pool.tokenABalance),
+        BigInt(pool.tokenBBalance)
+      );
+    }
+  } catch (error) {
+    console.error("Error calculating reverse swap:", error);
     throw error;
   }
 };
