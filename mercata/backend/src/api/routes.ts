@@ -18,6 +18,7 @@ const bridgeController = new BridgeController();
 router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
+router.get("/tokens/active", authHandler.authorizeRequest(true), TokensController.getActive);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
@@ -30,6 +31,7 @@ router.get("/swap/swappableTokens/", authHandler.authorizeRequest(true), Swappin
 router.get("/swap/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
 router.get("/swap/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 router.get("/swap/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
+router.get("/swap/calculateSwapReverse/", authHandler.authorizeRequest(true), SwappingController.calculateSwapReverse);
 router.get("/swap/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);

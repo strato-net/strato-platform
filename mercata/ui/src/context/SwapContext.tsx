@@ -16,7 +16,13 @@ type SwapContextType = {
     amount: string;
     signal?: AbortSignal;
   }) => Promise<string>;
-  getPoolByTokenPair: (tokenA: string, tokenB: string) => Promise<any>;
+  calculateSwapReverse: (params: {
+    poolAddress: string;
+    direction: boolean;
+    amount: string;
+    signal?: AbortSignal;
+  }) => Promise<string>;
+  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
   getPoolByAddress: (address: string) => Promise<any>;
   swap: (data: {
     address: string;
@@ -108,11 +114,35 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string) => {
+  const calculateSwapReverse = useCallback(async ({
+    poolAddress,
+    direction,
+    amount,
+    signal
+  }: {
+    poolAddress: string;
+    direction: boolean;
+    amount: string;
+    signal?: AbortSignal;
+  }) => {
     try {
-      const res = await api.get(`/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`);
+      const { data } = await api.get(
+        `/swap/calculateSwapReverse?address=${poolAddress}&direction=${direction}&amount=${amount}`,
+        { signal }
+      );
+      return data;
+    } catch (err: any) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap reverse');
+    }
+  }, []);
+
+  const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
+    try {
+      const res = await api.get(`/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`, { signal });
       return res.data?.[0] || null;
     } catch (err: any) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
       setError(err.response?.data?.message || err.message || 'Failed to get pool');
       return null;
     }
@@ -206,6 +236,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         fetchPairableTokens,
         createPool,
         calculateSwap,
+        calculateSwapReverse,
         getPoolByTokenPair,
         getPoolByAddress,
         swap,

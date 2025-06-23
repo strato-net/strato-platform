@@ -529,9 +529,6 @@ addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
 purgeFromPending :: MonadBagger m => OutputTx -> m ()
 purgeFromPending tx = updateBaggerState (B.purgeFromPending tx)
 
-purgeFromQueued :: MonadBagger m => OutputTx -> m ()
-purgeFromQueued tx = updateBaggerState (B.purgeFromQueued tx)
-
 -- | Parent gas limit -> child gas limit
 nextGasLimit :: Integer -> Integer
 nextGasLimit g = g + q - (if d == 0 then 1 else 0) where (q, d) = g `quotRem` 1024
