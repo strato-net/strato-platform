@@ -9,8 +9,6 @@ import {
   getDepositableTokens,
   getWithdrawableTokens,
   getLoans,
-  setPrice,
-  getPrice as getPriceService,
   listLiquidatableLoans,
   listNearUnhealthyLoans,
   getLoanWithHealthFactor,
@@ -146,37 +144,6 @@ class LendingController {
     try {
       const { accessToken, address } = req;
       const result = await getLoans(accessToken, address as string);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async setPrice(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body } = req;
-      const result = await setPrice(accessToken, body);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // GET /oracle/price
-  static async getPrice(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      const asset = typeof query.asset === "string" ? query.asset : undefined;
-
-      const result = await getPriceService(accessToken, asset);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

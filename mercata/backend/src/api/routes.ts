@@ -49,7 +49,9 @@ router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingCo
 router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
 router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
 
-router.post("/oracle/setPrice", authHandler.authorizeRequest(), OracleController.setPrice);
+// ----- Oracle -----
+router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
+router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);
 
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
@@ -71,10 +73,6 @@ router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   });
   return next();
 });
-
-// ----- Oracle price alias -----
-router.post("/oracle/price", authHandler.authorizeRequest(), LendingController.setPrice);
-router.get("/oracle/price", authHandler.authorizeRequest(true), LendingController.getPrice);
 
 // ----- Liquidation routes -----
 router.get(

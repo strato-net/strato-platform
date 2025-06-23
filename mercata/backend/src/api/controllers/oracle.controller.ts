@@ -2,9 +2,26 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   setPrice,
+  getPrice,
 } from "../services/oracle.service";
 
 class OracleController {
+  static async getPrice(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const asset = typeof query.asset === "string" ? query.asset : undefined;
+
+      const result = await getPrice(accessToken, asset);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async setPrice(
     req: Request,
     res: Response,
