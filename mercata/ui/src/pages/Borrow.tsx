@@ -7,6 +7,7 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
+import RepayModal from "@/components/dashboard/RepayModal";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,10 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { DepositableToken, Loan } from "@/interface";
+import { DepositableToken } from "@/interface";
 import { usdstAddress } from "@/lib/contants";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -36,68 +35,6 @@ const formatTokenAmount = (value: any) =>
     maximumFractionDigits: 2,
   });
 
-const formatCurrency = (value: string | number) => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return "0.00";
-  return num.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
-
-const formatInputValue = (value: string) => {
-  // Remove all non-digit and non-decimal characters
-  const cleanValue = value.replace(/[^\d.]/g, '');
-  
-  // Handle multiple decimal points
-  const parts = cleanValue.split('.');
-  if (parts.length > 2) {
-    return parts[0] + '.' + parts.slice(1).join('');
-  }
-  
-  // If there's a decimal part, limit to 2 decimal places
-  if (parts.length === 2) {
-    return parts[0] + '.' + parts[1].slice(0, 2);
-  }
-  
-  return cleanValue;
-};
-
-const addCommasToInput = (value: string) => {
-  if (!value) return '';
-  
-  const parts = value.split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
-  if (parts.length === 2) {
-    return integerPart + '.' + parts[1];
-  }
-  
-  return integerPart;
-};
-
-const formatMaxBorrowable = (asset: DepositableToken) => {
-  try {
-    const price = parseFloat(formatUnits(
-      typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
-        ? BigInt(Number(asset.price)).toString()
-        : asset?.price?.toString() || "0",
-      18
-    ));
-    const value = parseFloat(formatUnits(
-      typeof asset?.value === "number" || (typeof asset?.value === "string" && asset.value.includes("e"))
-        ? BigInt(Number(asset.value)).toString()
-        : asset?.value?.toString() || "0",
-      18
-    ));
-    const ratio = Number(asset?.collateralRatio || "0") / 100;
-    if (ratio === 0) return 0;
-    const maxBorrowable = (price * value) / ratio;
-    return maxBorrowable;
-  } catch {
-    return 0;
-  }
-};
 
 const Borrow = () => {
   const [selectedAsset, setSelectedAsset] = useState<DepositableToken | null>(null);
@@ -105,13 +42,9 @@ const Borrow = () => {
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [tokens, setTokens] = useState<DepositableToken[] | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
-  const [repayAmount, setRepayAmount] = useState('')
-  const [displayAmount, setDisplayAmount] = useState('')
   const [showRepayModal, setShowRepayModal] = useState(false)
-  const [repayLoading, setRepayLoading] = useState(false);
   const [loan, setLoan] = useState<any | null>(null);
   const [loanList, setLoanList] = useState<any[]>([]);
-  const [wrongAmount, setWrongAmount] = useState(false);
 
   const { toast } = useToast();
   const {
@@ -122,7 +55,6 @@ const Borrow = () => {
     refreshLoans,
     loadingLoans,
     borrowAsset: borrowAssetFn,
-    repayLoan: repayLoanFn,
   } = useLendingContext();
 
   useEffect(() => {
@@ -207,13 +139,6 @@ const Borrow = () => {
     }
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value)) {
-      setRepayAmount(value);
-      setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount, 18))
-    }
-  };
 
   const fetchLoans = useCallback(async () => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -257,59 +182,7 @@ const Borrow = () => {
     }
   }, [loans, fetchLoans]);
 
-  const fetchLoansDirect = async () => {
-    try {
-      const res = await api.get("/lend/loans");
-      return Array.isArray(res.data) ? res.data : Object.values(res.data?.loans || {});
-    } catch {
-      return [];
-    }
-  };
 
-  const repayLoan = async () => {
-    try {
-      setRepayLoading(true);
-      const totalOwedWei = (BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0)).toString();
-      let amountInWei = parseUnits(repayAmount === "" ? "0" : repayAmount, 18).toString();
-      if (BigInt(amountInWei) > BigInt(totalOwedWei)) {
-        amountInWei = totalOwedWei; // clip to full repay
-      }
-
-      const response = await repayLoanFn({
-        loanId: loan?.key,
-        amount: amountInWei,
-        asset: loan?.loan?.asset,
-      });
-      
-      toast({
-        title: "Success",
-        description: `Successfully Repaid $${formatCurrency(repayAmount)} USDST`,
-        variant: "success",
-      });
-      
-      // Close modal and reset state immediately for better UX
-      setShowRepayModal(false);
-      setRepayAmount("");
-      setDisplayAmount("");
-      setLoan(null);
-      setRepayLoading(false);
-      setShowRepayModal(false)
-      api["success"]({
-        message: "Success",
-        description: `Successfully Repaid ${repayAmount} ${loan?._symbol}`,
-      });
-      await refreshLoans();
-      await fetchLoans();
-    } catch (error) {
-      console.error("Error repaying loan:", error);
-      toast({
-        title: "Error",
-        description: `Repay Error - ${error}`,
-        variant: "destructive",
-      });
-      setRepayLoading(false);
-    }
-  };
 
   // ----- Pool liquidity (USDST) -----
   const poolLiquidity = useMemo(() => {
@@ -325,6 +198,29 @@ const Borrow = () => {
       return 0;
     }
   }, [borrowAsset]);
+
+  const collateralCap = (asset: DepositableToken) => {
+    try {
+      const price = parseFloat(formatUnits(
+        typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
+          ? BigInt(Number(asset.price)).toString()
+          : asset?.price?.toString() || "0",
+        18
+      ));
+      const value = parseFloat(formatUnits(
+        typeof asset?.value === "number" || (typeof asset?.value === "string" && asset.value.includes("e"))
+          ? BigInt(Number(asset.value)).toString()
+          : asset?.value?.toString() || "0",
+        18
+      ));
+      const ratio = Number(asset?.collateralRatio || "0") / 100;
+      if (ratio === 0) return 0;
+      const maxBorrowable = (price * value) / ratio;
+      return maxBorrowable;
+    } catch {
+      return 0;
+    }
+  };
 
   const formatMaxBorrowable = (asset: DepositableToken) => {
     const maxBorrowable = collateralCap(asset);
@@ -527,84 +423,20 @@ const Borrow = () => {
           onBorrow={(amount) => executeBorrow(selectedAsset, amount)}
         />
       )}
-      <Dialog open={showRepayModal} onOpenChange={setShowRepayModal}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
-                US
-              </div>
-              Repay USDST Loan
-            </DialogTitle>
-          </DialogHeader>
-          
-          {loan && (
-            <>
-              <div className="space-y-2 py-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Original Loan Amount</span>
-                  <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.amount || 0, 18))}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Accrued Interest</span>
-                  <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.interest || 0, 18))}</span>
-                </div>
-                
-                <div className="flex justify-between items-center font-bold pt-2 border-t">
-                  <span>Total Amount Due</span>
-                  <span className="text-lg">${formatCurrency(loan?.balanceHuman)}</span>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <Input
-                  placeholder="0"
-                  className="border-none text-xl font-medium p-0 pl-2 h-auto focus-visible:ring-0"
-                  value={repayAmount}
-                  onChange={handleAmountChange}
-                />
-              </div>
-              {wrongAmount && (
-                <p className="text-red-600 text-sm mt-1">
-                  Insufficient balance
-                </p>
-              )}
-            </div>
-          {loan && (
-            <div className="mt-2 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 mb-1">
-                <span className="font-medium">Principal:</span> {formatUnits(loan?.loan?.amount || 0, 18)} {loan?.loan?._symbol}
-              </p>
-              <p className="text-sm text-blue-800 mb-1">
-                <span className="font-medium">Interest:</span> {formatUnits(loan?.loan?.interest || 0, 18)} {loan?.loan?._symbol}
-              </p>
-              <p className="text-sm font-medium text-blue-900">
-                Total outstanding: {loan?.balanceHuman} {loan?.loan?._symbol}
-              </p>
-            </div>
-          )}
 
-          <div className="pt-2">
-            <Button
-              onClick={repayLoan}
-              disabled={
-                repayLoading ||
-                !repayAmount ||
-                isNaN(Number(repayAmount)) ||
-                Number(repayAmount) <= 0 ||
-                Number(repayAmount) > Number(loan?.balanceHuman || 0)
-              }
-              type="submit"
-              className="w-full bg-strato-purple hover:bg-strato-purple/90"
-            >
-              {repayLoading && <div className="flex justify-center items-center h-12">
-                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-              </div>}
-              {repayLoading ? "Repaying..." : "Confirm Repay"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <RepayModal
+        isOpen={showRepayModal}
+        onClose={() => {
+          setShowRepayModal(false);
+          setLoan(null);
+        }}
+        loan={loan}
+        onRepaySuccess={async () => {
+          await refreshLoans();
+          await fetchLoans();
+        }}
+      />
+ 
     </div>
   );
 };
