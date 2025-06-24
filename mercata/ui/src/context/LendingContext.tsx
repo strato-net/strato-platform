@@ -29,6 +29,7 @@ type LendingContextType = {
   setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
   setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
   setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
+  refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     asset: string;
     amount: string;
@@ -214,6 +215,18 @@ export const LendingProvider = ({
     }
   };
 
+  const refreshLendingData = async (): Promise<void> => {
+    try {
+      // Refresh all lending-related data
+      await fetchDepositTokens();
+      await fetchLoans();
+      await fetchWithdrawableTokens();
+    } catch (err: any) {
+      console.error("Failed to refresh lending data:", err);
+      throw err;
+    }
+  };
+
 
   const initialize = () => {
     fetchDepositTokens();
@@ -241,6 +254,7 @@ export const LendingProvider = ({
       setInterestRate,
       setCollateralRatio,
       setLiquidationBonus,
+      refreshLendingData,
       borrowAsset,
       repayLoan,
       getLend,

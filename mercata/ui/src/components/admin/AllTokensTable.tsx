@@ -35,7 +35,7 @@ const getStatusLabel = (status?: string | number) => {
 
 const AllTokensTable = () => {
   const { tokens, loading, error, getAllTokens } = useTokenContext();
-  const { getLend } = useLendingContext();
+  const { getLend, refreshLendingData } = useLendingContext();
   const [statusFilter, setStatusFilter] = useState<string>('2');
   const [lendData, setLendData] = useState<any>(null);
   const [lendLoading, setLendLoading] = useState(false);
@@ -56,6 +56,18 @@ const AllTokensTable = () => {
       setLendLoading(false);
     }
   }, [getLend]);
+
+  const refreshAllData = useCallback(async () => {
+    try {
+      await Promise.all([
+        getAllTokens(),
+        fetchLendData(),
+        refreshLendingData()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  }, [getAllTokens, fetchLendData, refreshLendingData]);
 
   useEffect(() => {
     getAllTokens();
@@ -279,6 +291,7 @@ const AllTokensTable = () => {
         onOpenChange={setCollateralRatioModalOpen}
         token={selectedToken}
         currentRatio={selectedToken ? getCollateralRatio(selectedToken.address) : undefined}
+        onSuccess={refreshAllData}
       />
       
       <SetInterestRateModal
@@ -286,6 +299,7 @@ const AllTokensTable = () => {
         onOpenChange={setInterestRateModalOpen}
         token={selectedToken}
         currentRate={selectedToken ? getInterestRate(selectedToken.address) : undefined}
+        onSuccess={refreshAllData}
       />
       
       <SetLiquidationBonusModal
@@ -293,6 +307,7 @@ const AllTokensTable = () => {
         onOpenChange={setLiquidationBonusModalOpen}
         token={selectedToken}
         currentBonus={selectedToken ? getLiquidationBonus(selectedToken.address) : undefined}
+        onSuccess={refreshAllData}
       />
     </Card>
   );

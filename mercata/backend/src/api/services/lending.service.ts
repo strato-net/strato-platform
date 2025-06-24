@@ -599,8 +599,6 @@ export const getLoanWithHealthFactor = async (
 
 const toBig = (v: string | number | bigint) => BigInt(v);
 
-// ---------------- Admin Configuration Services ----------------
-
 export const setInterestRate = async (
   accessToken: string,
   body: Record<string, string | number>

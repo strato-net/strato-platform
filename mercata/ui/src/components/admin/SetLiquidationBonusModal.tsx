@@ -23,9 +23,10 @@ interface SetLiquidationBonusModalProps {
     name: string;
   } | null;
   currentBonus?: string;
+  onSuccess?: () => Promise<void>;
 }
 
-const SetLiquidationBonusModal = ({ open, onOpenChange, token, currentBonus }: SetLiquidationBonusModalProps) => {
+const SetLiquidationBonusModal = ({ open, onOpenChange, token, currentBonus, onSuccess }: SetLiquidationBonusModalProps) => {
   const { toast } = useToast();
   const { setLiquidationBonus } = useLendingContext();
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,11 @@ const SetLiquidationBonusModal = ({ open, onOpenChange, token, currentBonus }: S
         title: 'Liquidation Bonus Updated Successfully',
         description: `${token.symbol} liquidation bonus has been set to ${bonusValue}%`,
       });
+
+      // Refresh data to show updated values
+      if (onSuccess) {
+        await onSuccess();
+      }
 
       form.reset();
       onOpenChange(false);

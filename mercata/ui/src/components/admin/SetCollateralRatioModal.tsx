@@ -23,9 +23,10 @@ interface SetCollateralRatioModalProps {
     name: string;
   } | null;
   currentRatio?: string;
+  onSuccess?: () => Promise<void>;
 }
 
-const SetCollateralRatioModal = ({ open, onOpenChange, token, currentRatio }: SetCollateralRatioModalProps) => {
+const SetCollateralRatioModal = ({ open, onOpenChange, token, currentRatio, onSuccess }: SetCollateralRatioModalProps) => {
   const { toast } = useToast();
   const { setCollateralRatio } = useLendingContext();
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,11 @@ const SetCollateralRatioModal = ({ open, onOpenChange, token, currentRatio }: Se
         title: 'Collateral Ratio Updated Successfully',
         description: `${token.symbol} collateral ratio has been set to ${ratioValue}%`,
       });
+
+      // Refresh data to show updated values
+      if (onSuccess) {
+        await onSuccess();
+      }
 
       form.reset();
       onOpenChange(false);

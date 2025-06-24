@@ -23,9 +23,10 @@ interface SetInterestRateModalProps {
     name: string;
   } | null;
   currentRate?: string;
+  onSuccess?: () => Promise<void>;
 }
 
-const SetInterestRateModal = ({ open, onOpenChange, token, currentRate }: SetInterestRateModalProps) => {
+const SetInterestRateModal = ({ open, onOpenChange, token, currentRate, onSuccess }: SetInterestRateModalProps) => {
   const { toast } = useToast();
   const { setInterestRate } = useLendingContext();
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,11 @@ const SetInterestRateModal = ({ open, onOpenChange, token, currentRate }: SetInt
         title: 'Interest Rate Updated Successfully',
         description: `${token.symbol} interest rate has been set to ${rateValue}%`,
       });
+
+      // Refresh data to show updated values
+      if (onSuccess) {
+        await onSuccess();
+      }
 
       form.reset();
       onOpenChange(false);

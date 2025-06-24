@@ -268,7 +268,7 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = res.locals;
+      const { accessToken } = req;
       const payload = req.body;
 
       if (!payload.asset || payload.rate === undefined) {
@@ -292,7 +292,7 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = res.locals;
+      const { accessToken } = req;
       const payload = req.body;
 
       if (!payload.asset || payload.ratio === undefined) {
@@ -316,7 +316,7 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = res.locals;
+      const { accessToken } = req;
       const payload = req.body;
 
       if (!payload.asset || payload.bonus === undefined) {
