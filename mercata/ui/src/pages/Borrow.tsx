@@ -187,9 +187,21 @@ const Borrow = () => {
   }, [loans]);
 
   useEffect(() => {
-    if (Object.keys(loans || {}).length > 0) {
-      fetchLoans();
+    const loanCount = Array.isArray(loans)
+      ? loans.length
+      : Object.keys(loans || {}).length;
+
+    if (loanCount === 0) {
+      // No active loans – clear any previous data so the table updates immediately.
+      if (loanList.length > 0) {
+        console.debug("[Loans sync] Cleared stale loan list (was", loanList.length, ")");
+      }
+      setLoanList([]);
+      return;
     }
+
+    console.debug("[Loans sync] Refreshing loans. loanCount:", loanCount);
+    fetchLoans();
   }, [loans, fetchLoans]);
 
 
