@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -39,7 +39,7 @@ const AllTokensTable = () => {
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
 
-  const fetchLendData = async () => {
+  const fetchLendData = useCallback(async () => {
     try {
       setLendLoading(true);
       const data = await getLend();
@@ -49,12 +49,12 @@ const AllTokensTable = () => {
     } finally {
       setLendLoading(false);
     }
-  };
+  }, [getLend]);
 
   useEffect(() => {
     getAllTokens();
     fetchLendData();
-  }, [getAllTokens]);
+  }, [getAllTokens, fetchLendData]);
 
   const getCollateralRatio = (address: string) => {
     if (!lendData?.lendingPool?.collateralRatio) return '-';
