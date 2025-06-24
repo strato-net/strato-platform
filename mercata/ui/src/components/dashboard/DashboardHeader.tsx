@@ -1,6 +1,5 @@
 
-import { Bell, User, Copy } from 'lucide-react';
-import { Button } from "../ui/button";
+import { Copy } from 'lucide-react';
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -30,13 +29,6 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
       <h1 className="text-xl font-bold">{title}</h1>
       
       <div className="flex items-center space-x-4">
-        <div className="relative">
-          <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-        </div>
-        
         <div className="flex items-center">
           <div className="flex flex-col items-end mr-3">
             <span className="text-sm font-medium">{username}</span>
