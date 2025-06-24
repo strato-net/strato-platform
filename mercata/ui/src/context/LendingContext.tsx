@@ -21,7 +21,7 @@ type LendingContextType = {
   loadingLoans: boolean;
   errorDepositTokens: string | null;
   refreshDepositTokens: (signal?: AbortSignal) => Promise<void>;
-  refreshLoans: (signal?: AbortSignal) => Promise<void>;
+  refreshLoans: (signal?: AbortSignal) => Promise<Loan[] | undefined>;
   withdrawableTokens: WithdrawableToken[];
   refreshWithdrawableTokens: (signal?: AbortSignal) => void;
   loadingWithdrawableTokens: boolean;
@@ -37,6 +37,7 @@ type LendingContextType = {
     amount: string;
     asset: string;
   }) => Promise<any>;
+  getLend: () => Promise<any>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -119,7 +120,7 @@ export const LendingProvider = ({
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
     const weiPrice = parseUnits(payload.price, 18).toString();
     try {
-      await api.post("/oracle/setPrice", { ...payload, price: weiPrice.toString() });
+      await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
     } catch (err: any) {
       console.error("Failed to set price:", err);
       throw err;
@@ -173,6 +174,16 @@ export const LendingProvider = ({
     }
   };
 
+  const getLend = async () => {
+    try {
+      const res = await api.get("/lend/");
+      return res.data;
+    } catch (err: any) {
+      console.error("Get lend failed:", err);
+      throw err;
+    }
+  };
+
 
   const initialize = () => {
     fetchDepositTokens();
@@ -199,6 +210,7 @@ export const LendingProvider = ({
       setPrice,
       borrowAsset,
       repayLoan,
+      getLend,
     }),
     [
       depositableTokens,

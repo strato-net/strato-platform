@@ -93,7 +93,6 @@ export const depositLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error depositing liquidity:", error);
     throw error;
   }
 };
@@ -119,7 +118,6 @@ export const withdrawLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error withdrawing liquidity:", error);
     throw error;
   }
 };
@@ -163,7 +161,6 @@ export const borrow = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error getting loan:", error);
     throw error;
   }
 };
@@ -239,7 +236,6 @@ export const repay = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error repaying loan:", error);
     throw error;
   }
 };
@@ -403,67 +399,6 @@ export const getLoans = async (
       },
     };
   });
-};
-
-export const setPrice = async (
-  accessToken: string,
-  body: Record<string, string | undefined>
-) => {
-  try {
-    const registry = await getPool(accessToken);
-    const priceOracleAddr = typeof registry.oracle === "string"
-      ? registry.oracle
-      : registry.oracle?.address || "";
-    if (!priceOracleAddr) {
-      throw new Error("Price oracle address not found");
-    }
-    const tx = buildFunctionTx({
-      contractName: extractContractName(PriceOracle),
-      contractAddress: priceOracleAddr,
-      method: "setAssetPrice",
-      args: {
-        asset: body.token,
-        price: body.price,
-      },
-    });
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return {
-      status,
-      hash,
-    };
-  } catch (error) {
-    console.error("Error setting price:", error);
-    throw error;
-  }
-};
-
-// ------------------ Price queries ------------------
-export const getPrice = async (
-  accessToken: string,
-  asset?: string
-) => {
-  // Fetch full registry so nested oracle.prices are included
-  const registry = await getPool(accessToken);
-
-  const prices: { asset: string; price: string }[] = registry.oracle
-    ? registry.oracle.prices || []
-    : [];
-
-  if (asset) {
-    const entry = prices.find(
-      (p) => p.asset.toLowerCase() === asset.toLowerCase()
-    );
-    if (!entry) {
-      throw new Error(`Price not found for asset ${asset}`);
-    }
-    return entry;
-  }
-
-  return prices;
 };
 
 // ---------------- Liquidation services ----------------

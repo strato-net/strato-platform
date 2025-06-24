@@ -1,16 +1,13 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
-
-import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
-
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
-
+import RepayModal from "@/components/dashboard/RepayModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,10 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { DepositableToken, Loan } from "@/interface";
+import { DepositableToken } from "@/interface";
 import { usdstAddress } from "@/lib/contants";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -39,29 +34,6 @@ const formatTokenAmount = (value: any) =>
     maximumFractionDigits: 2,
   });
 
-// Collateral-only cap (does NOT account for pool liquidity)
-const collateralCap = (asset: DepositableToken) => {
-  try {
-    const price = parseFloat(formatUnits(
-      typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
-        ? BigInt(Number(asset.price)).toString()
-        : asset?.price?.toString() || "0",
-      18
-    ));
-    const value = parseFloat(formatUnits(
-      typeof asset?.value === "number" || (typeof asset?.value === "string" && asset.value.includes("e"))
-        ? BigInt(Number(asset.value)).toString()
-        : asset?.value?.toString() || "0",
-      18
-    ));
-    const ratio = Number(asset?.collateralRatio || "0") / 100;
-    if (ratio === 0) return 0;
-    const maxBorrowable = (price * value) / ratio;
-    return maxBorrowable;
-  } catch {
-    return 0;
-  }
-};
 
 const Borrow = () => {
   const [selectedAsset, setSelectedAsset] = useState<DepositableToken | null>(null);
@@ -69,12 +41,9 @@ const Borrow = () => {
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [tokens, setTokens] = useState<DepositableToken[] | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
-  const [repayAmount, setRepayAmount] = useState('')
   const [showRepayModal, setShowRepayModal] = useState(false)
-  const [repayLoading, setRepayLoading] = useState(false);
   const [loan, setLoan] = useState<any | null>(null);
   const [loanList, setLoanList] = useState<any[]>([]);
-  const [wrongAmount, setWrongAmount] = useState(false);
 
   const { toast } = useToast();
   const {
@@ -85,7 +54,6 @@ const Borrow = () => {
     refreshLoans,
     loadingLoans,
     borrowAsset: borrowAssetFn,
-    repayLoan: repayLoanFn,
   } = useLendingContext();
 
   useEffect(() => {
@@ -170,14 +138,6 @@ const Borrow = () => {
     }
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value)) {
-      setRepayAmount(value);
-      // wrongAmount now flags when user tries to repay more than wallet balance (optional)
-      // but we no longer block over-repay; we'll clip to total owed on submit
-    }
-  };
 
   const fetchLoans = useCallback(async () => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -231,63 +191,7 @@ const Borrow = () => {
     }
   }, [loans, fetchLoans]);
 
-  const fetchLoansDirect = async () => {
-    try {
-      const res = await api.get("/lend/loans");
-      return Array.isArray(res.data) ? res.data : Object.values(res.data?.loans || {});
-    } catch {
-      return [];
-    }
-  };
 
-  const repayLoan = async () => {
-    try {
-      setRepayLoading(true);
-      const totalOwedWei = (BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0)).toString();
-      let amountInWei = parseUnits(repayAmount === "" ? "0" : repayAmount, 18).toString();
-      if (BigInt(amountInWei) > BigInt(totalOwedWei)) {
-        amountInWei = totalOwedWei; // clip to full repay
-      }
-
-      const response = await repayLoanFn({
-        loanId: loan?.key,
-        amount: amountInWei,
-        asset: loan?.loan?.asset,
-      });
-      console.log(response, "repay loan response");
-      setRepayLoading(false);
-      toast({
-        title: "Repay Submitted",
-        description: `Successfully repaid ${repayAmount} ${loan?._symbol}`,
-        variant: "success",
-      });
-      setShowRepayModal(false);
-
-      // Wait until Cirrus indexes the state change so the loan row disappears
-      const waitUntilCleared = async (attempt = 0): Promise<void> => {
-        if (attempt >= 10) return; // ~15s max
-        const latestLoans = (await fetchLoansDirect()) as any[];
-        const stillThere = latestLoans.find((l: any) => l.key === loan?.key && l.loan?.active);
-        if (!stillThere) {
-          setLoanList(latestLoans.filter((l: any)=>l.loan?.active));
-          await refreshDepositTokens();
-          return;
-        }
-        setTimeout(() => waitUntilCleared(attempt + 1), 1500);
-      };
-      waitUntilCleared();
-    } catch (error) {
-      api["error"]({
-        message: "Error",
-        description: `Repay Error - ${error}`,
-      });
-      setRepayLoading(false);
-      console.error("Error repaying loan:", error);
-    } finally {
-      setRepayAmount("");
-      setRepayLoading(false);
-    }
-  };
 
   // ----- Pool liquidity (USDST) -----
   const poolLiquidity = useMemo(() => {
@@ -303,6 +207,29 @@ const Borrow = () => {
       return 0;
     }
   }, [borrowAsset]);
+
+  const collateralCap = (asset: DepositableToken) => {
+    try {
+      const price = parseFloat(formatUnits(
+        typeof asset?.price === "number" || (typeof asset?.price === "string" && asset.price.includes("e"))
+          ? BigInt(Number(asset.price)).toString()
+          : asset?.price?.toString() || "0",
+        18
+      ));
+      const value = parseFloat(formatUnits(
+        typeof asset?.value === "number" || (typeof asset?.value === "string" && asset.value.includes("e"))
+          ? BigInt(Number(asset.value)).toString()
+          : asset?.value?.toString() || "0",
+        18
+      ));
+      const ratio = Number(asset?.collateralRatio || "0") / 100;
+      if (ratio === 0) return 0;
+      const maxBorrowable = (price * value) / ratio;
+      return maxBorrowable;
+    } catch {
+      return 0;
+    }
+  };
 
   const formatMaxBorrowable = (asset: DepositableToken) => {
     const maxBorrowable = collateralCap(asset);
@@ -324,7 +251,7 @@ const Borrow = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Borrow Against Your Assets</CardTitle>
+              <CardTitle>Borrow</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -336,13 +263,14 @@ const Borrow = () => {
                     <TableHead>Pool Liquidity</TableHead>
                     <TableHead>Max Borrow based on Collateral</TableHead>
                     <TableHead>USDST Available to Borrow</TableHead>
+                    <TableHead>Borrow Fee</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingDepositTokens ? (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
@@ -392,6 +320,11 @@ const Borrow = () => {
                         </TableCell>
                         <TableCell>{formatMaxBorrowable(asset)}</TableCell>
                         <TableCell>
+                          {borrowAsset?.interestRate
+                            ? `${parseFloat(borrowAsset.interestRate).toFixed(2)}%`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             size="sm"
                             onClick={() => handleBorrow(asset)}
@@ -405,7 +338,7 @@ const Borrow = () => {
                     ))
                   ) :
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={7}>
                         <div className="w-full flex justify-center items-center mt-4">
                           No data to show
                         </div>
@@ -417,7 +350,7 @@ const Borrow = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="mt-6">
             <CardHeader>
               <CardTitle>My Loans</CardTitle>
             </CardHeader>
@@ -513,68 +446,21 @@ const Borrow = () => {
           onBorrow={(amount) => executeBorrow(selectedAsset, amount)}
         />
       )}
-      <Dialog open={showRepayModal} onOpenChange={setShowRepayModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Repay Loan</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 gap-4">
-            {/* First Token */}
-            <div className="rounded-lg border p-3">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Amount</span>
-              </div>
-              <div className="flex items-center">
-                <Input
-                  placeholder="0"
-                  className="border-none text-xl font-medium p-0 pl-2 h-auto focus-visible:ring-0"
-                  value={repayAmount}
-                  onChange={handleAmountChange}
-                />
-              </div>
-            </div>
-          </div>
-          {loan && (
-            <div className="mt-2 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 mb-1">
-                <span className="font-medium">Principal:</span> {formatUnits(loan?.loan?.amount || 0, 18)} {loan?.loan?._symbol}
-              </p>
-              <p className="text-sm text-blue-800 mb-1">
-                <span className="font-medium">Interest:</span> {formatUnits(loan?.loan?.interest || 0, 18)} {loan?.loan?._symbol}
-              </p>
-              <p className="text-sm font-medium text-blue-900">
-                Total outstanding: {loan?.balanceHuman} {loan?.loan?._symbol}
-              </p>
-              <button
-                className="mt-2 text-xs text-blue-600 underline"
-                type="button"
-                onClick={() => setRepayAmount(loan?.balanceHuman || "")}
-              >
-                Repay All
-              </button>
-            </div>
-          )}
 
-          <div className="pt-2">
-            <Button
-              onClick={repayLoan}
-              disabled={
-                repayLoading ||
-                !repayAmount ||
-                isNaN(Number(repayAmount)) ||
-                Number(repayAmount) <= 0
-              }
-              type="submit"
-              className="w-full bg-strato-purple hover:bg-strato-purple/90"
-            >
-              {repayLoading && <div className="flex justify-center items-center h-12">
-                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-              </div>}
-              {repayLoading ? "Repaying..." : "Confirm Repay"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <RepayModal
+        isOpen={showRepayModal}
+        onClose={() => {
+          setShowRepayModal(false);
+          setLoan(null);
+        }}
+        loan={loan}
+        onRepaySuccess={async () => {
+          await refreshLoans();
+          await fetchLoans();
+          await refreshDepositTokens();
+        }}
+      />
+ 
     </div>
   );
 };

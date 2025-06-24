@@ -222,15 +222,15 @@ const SwapPoolsSection = () => {
       operationInProgressRef.current = true;
       setDepositLoading(true);
       
-      const maxTokenAAmount = parseUnits(
-        (parseFloat(token1Amount) * 1.02).toFixed(18),
-        18
-      );
+      const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
+      const tokenAAmount = isInitialLiquidity 
+        ? parseUnits(token1Amount, 18)
+        : parseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
       const tokenBAmount = parseUnits(token2Amount, 18);
 
       await addLiquidity({
         address: selectedPool.address,
-        max_tokenA_amount: maxTokenAAmount.toString(),
+        max_tokenA_amount: tokenAAmount.toString(),
         tokenB_amount: tokenBAmount.toString(),
       });
 
@@ -363,33 +363,35 @@ const SwapPoolsSection = () => {
     try {
       if (token === 'token1') {
         setToken1Amount(value);
-        if (value && selectedPool?.aToBRatio) {
+        if (
+          value &&
+          selectedPool?.aToBRatio &&
+          BigInt(parseUnits(selectedPool.aToBRatio, 18).toString()) > BigInt(0)
+        ) {
           const token1Wei = parseUnits(value || "0", 18);
           const ratioWei = parseUnits(selectedPool.aToBRatio, 18);
-          const token2Wei = (token1Wei * ratioWei) / BigInt(10 ** 18);
-          setToken2Amount(formatUnits(token2Wei, 18));
-        } else {
-          setToken2Amount('');
+          const token2Wei = (BigInt(token1Wei.toString()) * BigInt(ratioWei.toString())) / BigInt(10 ** 18);
+          setToken2Amount(formatUnits(token2Wei.toString(), 18));
         }
       } else {
         setToken2Amount(value);
-        if (value && selectedPool?.bToARatio) {
+        if (
+          value &&
+          selectedPool?.bToARatio &&
+          BigInt(parseUnits(selectedPool.bToARatio, 18).toString()) > BigInt(0)
+        ) {
           const token2Wei = parseUnits(value || "0", 18);
           const ratioWei = parseUnits(selectedPool.bToARatio, 18);
-          const token1Wei = (token2Wei * ratioWei) / BigInt(10 ** 18);
-          setToken1Amount(formatUnits(token1Wei, 18));
-        } else {
-          setToken1Amount('');
+          const token1Wei = (BigInt(token2Wei.toString()) * BigInt(ratioWei.toString())) / BigInt(10 ** 18);
+          setToken1Amount(formatUnits(token1Wei.toString(), 18));
         }
       }
     } catch (error) {
       console.error('Error handling input change:', error);
       if (token === 'token1') {
         setToken1Amount(value);
-        setToken2Amount('');
       } else {
         setToken2Amount(value);
-        setToken1Amount('');
       }
     }
   };
@@ -457,6 +459,10 @@ const SwapPoolsSection = () => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500">APY</div>
+                      <div className="font-medium">-</div>
+                    </div>
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
@@ -622,6 +628,10 @@ const SwapPoolsSection = () => {
 
             <div className="rounded-lg bg-gray-50 p-3">
               <div className="flex justify-between items-center text-sm text-gray-500">
+                <span>APY</span>
+                <span className="font-medium">-</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
                 <span>Current pool ratio</span>
                 <span className="font-medium">
                   {selectedPool && `1 ${selectedPool._name?.split('/')[0]} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool._name?.split('/')[1]}`}
@@ -653,7 +663,6 @@ const SwapPoolsSection = () => {
                   !token2Amount || 
                   parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") ||
                   parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") ||
-                  (BigInt(selectedPool?.lpToken._totalSupply || "0") === BigInt(0) && parseUnits(token2Amount || "0", 18) < parseUnits("1000000000", 18)) ||
                   BigInt(usdstBalance || "0") < parseUnits("0.3", 18)
                 } 
                 type="submit" 

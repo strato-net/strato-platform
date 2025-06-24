@@ -7,6 +7,7 @@ import {
   removeLiquidity,
   swap,
   calculateSwap,
+  calculateSwapReverse,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -148,6 +149,28 @@ class SwappingController {
         query.direction as string,
         query.amount as string
       );
+      res.status(RestStatus.OK).json(price);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async calculateSwapReverse(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      validateQueryParams(query);
+      
+      const price = await calculateSwapReverse(
+        accessToken,
+        query.address as string,
+        query.direction as string,
+        query.amount as string
+      );
+
       res.status(RestStatus.OK).json(price);
     } catch (error) {
       next(error);
