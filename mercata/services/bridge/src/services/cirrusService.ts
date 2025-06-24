@@ -43,8 +43,6 @@ export const fetchDepositInitiatedStatus = async (
     // Collect all txHashes
     const txHashes = depositData.map((item: any) => item.txHash).filter(Boolean);
     const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
-    console.log("depositstatus url",`${NODE_URL}/cirrus/search/${MERCATA_URL}-depositStatus?key=in.(${txHashList})&select=key,value`);
-
     const depositStatusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}-depositStatus?key=in.(${txHashList})&select=key,value`;
 
     const depositStatusResponse = await axios.get(depositStatusUrl, {
@@ -80,14 +78,14 @@ export const fetchDepositInitiatedStatus = async (
       };
     });
 
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&select=count`;
+    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&address=eq.${config.bridge.address}&select=count`;
     const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
       }
     });
 
-    console.log("totalTransactionCountResponse", totalTransactionCountResponse.data);
+
 
     return {
       success: true,
@@ -172,14 +170,12 @@ export const fetchWithdrawalInitiatedStatus = async (
       };
     });
 
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&select=count`;
+    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&&address=eq.${config.bridge.address}&select=count`;
     const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`
       }
     });
-
-    console.log("totalTransactionCountResponse (withdrawal):", totalTransactionCountResponse.data);
 
     return {
       success: true,
@@ -199,7 +195,6 @@ export const fetchDepositInitiated = async (txHash: string): Promise<any | null>
 
   if (!accessToken) return null;
   try {
-    console.log("fetching deposit initiated url ",`${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=eq.${txHash}`)
     const depositInitiatedResponse = await axios.get(`${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=eq.${txHash}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -213,7 +208,6 @@ export const fetchDepositInitiated = async (txHash: string): Promise<any | null>
 export const fetchDepositInitiatedTransactions= async (
   transactionHashes: string[]
 ): Promise<any[]> => {
-  console.log("🔍 Fetching DepositInitiated transactions for provided hashes...");
 
   const accessToken = await getBAUserToken();
   if (!accessToken || transactionHashes.length === 0) return [];
@@ -227,7 +221,6 @@ export const fetchDepositInitiatedTransactions= async (
 
   const hashQueryParam = normalizedHashes.join(',');
   const endpoint = `${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=in.(${hashQueryParam})&${queryFields}`;
-  console.log("endpoint....", endpoint);
 
   try {
     const response = await axios.get(endpoint, {
@@ -237,8 +230,6 @@ export const fetchDepositInitiatedTransactions= async (
     if (Array.isArray(response.data)) {
       return response.data;
     }
-
-    console.warn("⚠️ Unexpected response format:", response.data);
     return [];
   } catch (error: any) {
     console.error("❌ Error fetching DepositInitiated transactions:", error.message);
