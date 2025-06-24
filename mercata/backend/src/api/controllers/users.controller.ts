@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
+import { isUserAdmin } from "../services/user.service";
 
 class UsersController {
   static async me(
@@ -8,28 +9,16 @@ class UsersController {
     next: NextFunction
   ): Promise<void> {
     try {
-      // Debug: show incoming If-None-Match / caching headers
-      console.log("[/users/me] If-None-Match:", req.headers["if-none-match"]);
-      const { address: userAddress } = req;
+      const { address: userAddress, accessToken } = req;
 
-      if (!userAddress) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User not found" });
-      } else {
-        const normalize = (addr?: string) => (addr || "").trim().replace(/^0x/i, "").toLowerCase();
-        const normUser = normalize(userAddress);
-        const normAdmin = normalize(process.env.ADMIN_ADDRESS);
-        console.log("[/users/me] compare", normUser, normAdmin);
-        const isAdmin = normUser === normAdmin;
-        // Prevent caching so client always receives body (avoids 304)
-        res.set("Cache-Control", "no-store, no-cache, must-revalidate");
-        res.status(RestStatus.OK).json({ userAddress, isAdmin });
+      if (!userAddress || !accessToken) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "User not found or access token required" });
+        return;
       }
 
-      // Log final status once response is sent
-      res.on("finish", () => {
-        console.log("[/users/me] response status", res.statusCode);
-      });
-
+      const isAdmin = await isUserAdmin(accessToken, userAddress);
+      
+      res.status(RestStatus.OK).json({ userAddress, isAdmin });
       next();
     } catch (e) {
       next(e);

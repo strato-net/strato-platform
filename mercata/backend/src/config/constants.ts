@@ -20,6 +20,7 @@ export const constants = (() => {
   const Pool = `${CONTRACT_PREFIX}Pool`;
   const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
+  const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const tokenSelectFields = [
     "address",
     "_name",
@@ -93,6 +94,7 @@ export const constants = (() => {
     Pool,
     OnRamp,
     LendingRegistry,
+    AdminRegistry,
     tokenSelectFields,
     tokenBalanceSelectFields,
     poolSelectFields,
