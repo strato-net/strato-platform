@@ -4,5 +4,6 @@ declare module "express-serve-static-core" {
   interface Request {
     address: string;
     accessToken: string;
+    userName?: string;
   }
 }
