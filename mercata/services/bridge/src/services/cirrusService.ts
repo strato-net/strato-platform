@@ -119,7 +119,7 @@ export const fetchWithdrawalInitiatedStatus = async (
     const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
     const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
 
-    const cirrusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?${selectFields}&mercataUser=eq.${userAddress}${limitParam}${offsetParam}${orderByParam}`;
+    const cirrusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?${selectFields}&mercataUser=eq.${userAddress}&address=eq.${config.bridge.address}${limitParam}${offsetParam}${orderByParam}`;
     const response = await axios.get(cirrusUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`

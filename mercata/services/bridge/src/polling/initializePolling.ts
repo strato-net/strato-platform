@@ -10,5 +10,5 @@ export async function initializeAlchemyPolling() {
   console.log(`📊 Bridge-out polling interval: ${BRIDGE_OUT_POLLING_INTERVAL / 1000 / 60} minutes`);
   
   await startDepositTxPolling(BRIDGE_IN_POLLING_INTERVAL);
-  // await startWithdrawalTxPolling(BRIDGE_OUT_POLLING_INTERVAL);
+  await startWithdrawalTxPolling(BRIDGE_OUT_POLLING_INTERVAL);
 }

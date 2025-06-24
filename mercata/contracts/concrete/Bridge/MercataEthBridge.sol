@@ -120,9 +120,9 @@ contract record MercataEthBridge {
 
     function confirmDeposit(string calldata txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(tokenFactory).isTokenActive(token), "INACTIVE_TOKEN");
+        require(TokenFactory(tokenFactory).isTokenActive(address(token)), "INACTIVE_TOKEN");
 
-        Token(token).mint(mercataUser, amount);
+        Token(address(token)).mint(address(mercataUser), amount);
         depositStatus[txHash] = DepositState.COMPLETED;
         emit DepositCompleted(txHash);
     }
@@ -131,9 +131,9 @@ contract record MercataEthBridge {
     for (uint256 i = 0; i < deposits.length; i++) {
         DepositBatch calldata d = deposits[i];
         require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(tokenFactory).isTokenActive(d.token), "INACTIVE_TOKEN");
+        require(TokenFactory(tokenFactory).isTokenActive(address(d.token)), "INACTIVE_TOKEN");
 
-        Token(d.token).mint(d.mercataUser, d.amount);
+        Token(address(d.token)).mint(address(d.mercataUser), d.amount);
         depositStatus[d.txHash] = DepositState.COMPLETED;
         emit DepositCompleted(d.txHash);
         }
@@ -145,10 +145,10 @@ contract record MercataEthBridge {
     // token = wrapped token
     function withdraw(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
-        require(TokenFactory(tokenFactory).isTokenActive(token), "INACTIVE_TOKEN");
+        require(TokenFactory(tokenFactory).isTokenActive(address(token)), "INACTIVE_TOKEN");
         require(amount >= minAmount, "BELOW_MIN");
 
-        Token(token).burn(mercataUser, amount);
+        Token(address(token)).burn(address(mercataUser), amount);
         withdrawStatus[txHash] = WithdrawState.INITIATED;
 
         emit WithdrawalInitiated(txHash, from, token, amount, to, mercataUser);
