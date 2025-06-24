@@ -18,6 +18,10 @@ async function getTokenFromHeader(req: Request): Promise<string | null> {
   return null;
 }
 
+interface CustomJwtPayload extends JwtPayload {
+  preferred_username: string;
+}
+
 // ————————————————————————————————————————————————————————————————
 // AuthHandler class
 // ————————————————————————————————————————————————————————————————
@@ -37,7 +41,7 @@ class AuthHandler {
         }
 
         if (token) {
-          let payload: JwtPayload;
+          let payload: CustomJwtPayload;
           try {
             payload = jwtDecode(token);
           } catch (err) {
@@ -49,9 +53,11 @@ class AuthHandler {
 
           // fetch or create user key in Strato
           let address = await createOrGetKey(token);
+          let userName:string = payload['preferred_username']
 
           req.address = address;
           req.accessToken = token;
+          req.userName = userName;
           return next();
         } else {
           res.set('WWW-Authenticate', 'Bearer');
