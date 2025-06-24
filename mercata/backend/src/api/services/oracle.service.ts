@@ -9,6 +9,29 @@ const {
   PriceOracle,
 } = constants;
 
+export const getPrice = async (
+  accessToken: string,
+  asset?: string
+) => {
+  const registry = await getPool(accessToken, { select: "priceOracle" });
+
+  const prices: { asset: string; price: string }[] = registry.priceOracle
+    ? registry.priceOracle.prices || []
+    : [];
+
+  if (asset) {
+    const entry = prices.find(
+      (p) => p.asset.toLowerCase() === asset.toLowerCase()
+    );
+    if (!entry) {
+      throw new Error(`Price not found for asset ${asset}`);
+    }
+    return entry;
+  }
+
+  return prices;
+};
+
 export const setPrice = async (
   accessToken: string,
   body: Record<string, string | undefined>
@@ -37,7 +60,6 @@ export const setPrice = async (
       hash,
     };
   } catch (error) {
-    console.error("Error setting price:", error);
     throw error;
   }
 };

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { BigNumber } from 'bignumber.js';
 
 interface BridgeInParams {
   amount: string;
@@ -42,7 +41,6 @@ export class BridgeService {
         hash: response.data.hash,
       };
     } catch (error: any) {
-      console.log("error", error.message);
       throw error;
     }
   }
@@ -64,11 +62,9 @@ export class BridgeService {
           }
         }
       );
-      // console.log("response",response.data);
 
       return response.data;
     } catch (error: any) {
-      console.log("Error in stratoToEth:", error.message);
       throw error;
     }
   }
@@ -98,7 +94,6 @@ export class BridgeService {
         balance: balance.toString(),
       };
     } catch (error: any) {
-      console.log("Error in getBalance:", error.message);
       throw error;
     }
   }
@@ -129,7 +124,6 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      console.log("Error in get user deposit Status:", error.message);
       throw error;
     }
   }
@@ -160,7 +154,6 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      console.log("Error in get user withdrawal Status:", error.message);
       throw error;
     }
   }
@@ -180,7 +173,6 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      console.log("Error in getBridgeInNetworks:", error.message);
       throw error;
     }
   }
@@ -199,7 +191,6 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      console.log("Error in getBridgeOutTokens:", error.message);
       throw error;
     }
   }

@@ -13,6 +13,7 @@ interface LiquidationEntry {
   collateralSymbol?: string;
   collateralAmount: string;
   healthFactor: number;
+  expectedProfit?: string;
 }
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
@@ -78,7 +79,15 @@ const LiquidationsSection: React.FC = () => {
       <td className="px-4 py-2 text-sm font-medium {l.healthFactor < 1 ? 'text-red-600' : 'text-yellow-600'}">
         {(l.healthFactor * 100).toFixed(2)}%
       </td>
-      {showAction && <td className="px-4 py-2 text-sm">--</td>}
+      <td className="px-4 py-2 text-sm">
+        {l.expectedProfit ? (
+          parseFloat(l.expectedProfit) > 0 ? (
+            <span className="text-green-600">${(parseFloat(l.expectedProfit)/1e18).toFixed(2)}</span>
+          ) : (
+            <span className="text-red-600">${(parseFloat(l.expectedProfit)/1e18).toFixed(2)}</span>
+          )
+        ) : "--"}
+      </td>
       {showAction && (
         <td className="px-4 py-2">
           <Button size="sm" variant="destructive" onClick={() => handleLiquidate(l.id)}>

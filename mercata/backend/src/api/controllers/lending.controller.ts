@@ -9,8 +9,6 @@ import {
   getDepositableTokens,
   getWithdrawableTokens,
   getLoans,
-  setPrice,
-  getPrice as getPriceService,
   listLiquidatableLoans,
   listNearUnhealthyLoans,
   getLoanWithHealthFactor,
@@ -152,37 +150,6 @@ class LendingController {
     }
   }
 
-  static async setPrice(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body } = req;
-      const result = await setPrice(accessToken, body);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // GET /oracle/price
-  static async getPrice(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      const asset = typeof query.asset === "string" ? query.asset : undefined;
-
-      const result = await getPriceService(accessToken, asset);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   // -------- Liquidation & loan extras ---------
 
   static async listLiquidatable(req: Request, res: Response, next: NextFunction) {
@@ -257,6 +224,36 @@ class LendingController {
       res.status(RestStatus.OK).json(loan);
     } catch (error) {
       next(error);
+    }
+  }
+
+  static async manageLiquidity(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      const { method, ...payload } = body as Record<string, any>;
+
+      if (method === "depositLiquidity") {
+        validateManageLiquidityArgs(payload);
+        const result = await depositLiquidity(accessToken, payload);
+        res.status(RestStatus.OK).json(result);
+        return next();
+      }
+      if (method === "withdrawLiquidity") {
+        validateManageLiquidityArgs(payload);
+        const result = await withdrawLiquidity(accessToken, payload);
+        res.status(RestStatus.OK).json(result);
+        return next();
+      }
+
+      // If method not supported
+      res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid method" });
+      return next();
+    } catch (error) {
+      return next(error);
     }
   }
 }
