@@ -21,6 +21,7 @@ import {
 
 import { DepositableToken } from "@/interface";
 import { usdstAddress } from "@/lib/contants";
+import isEqual from "lodash.isequal";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -175,7 +176,7 @@ const Borrow = () => {
           };
         })
       );
-      setLoanList(enrichedLoans);
+      setLoanList(prev => (isEqual(prev, enrichedLoans) ? prev : enrichedLoans));
       if (typeof window !== "undefined") {
         // @ts-ignore
         window.__LOAN_LIST__ = enrichedLoans;
@@ -456,7 +457,6 @@ const Borrow = () => {
         loan={loan}
         onRepaySuccess={async () => {
           await refreshLoans();
-          await fetchLoans();
           await refreshDepositTokens();
         }}
       />
