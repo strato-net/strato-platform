@@ -598,3 +598,101 @@ export const getLoanWithHealthFactor = async (
 };
 
 const toBig = (v: string | number | bigint) => BigInt(v);
+
+// ---------------- Admin Configuration Services ----------------
+
+export const setInterestRate = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.asset || body.rate === undefined) {
+    throw new Error("Missing required parameters: asset and rate");
+  }
+
+  const rateValue = Number(body.rate);
+  if (isNaN(rateValue) || rateValue < 0 || rateValue > 100) {
+    throw new Error("Interest rate must be a number between 0 and 100");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: constants.poolConfigurator,
+    method: "setInterestRate",
+    args: { 
+      asset: body.asset, 
+      newRate: rateValue
+    },
+  });
+
+  console.log(`[setInterestRate] Setting interest rate for ${body.asset} to ${rateValue}%`);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const setCollateralRatio = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.asset || body.ratio === undefined) {
+    throw new Error("Missing required parameters: asset and ratio");
+  }
+
+  const ratioValue = Number(body.ratio);
+  if (isNaN(ratioValue) || ratioValue < 100 || ratioValue > 1000) {
+    throw new Error("Collateral ratio must be a number between 100 and 1000");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: constants.poolConfigurator,
+    method: "setCollateralRatio",
+    args: { 
+      asset: body.asset, 
+      newRatio: ratioValue
+    },
+  });
+
+  console.log(`[setCollateralRatio] Setting collateral ratio for ${body.asset} to ${ratioValue}%`);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const setLiquidationBonus = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.asset || body.bonus === undefined) {
+    throw new Error("Missing required parameters: asset and bonus");
+  }
+
+  const bonusValue = Number(body.bonus);
+  if (isNaN(bonusValue) || bonusValue < 100 || bonusValue > 200) {
+    throw new Error("Liquidation bonus must be a number between 100 and 200");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: constants.poolConfigurator,
+    method: "setLiquidationBonus",
+    args: { 
+      asset: body.asset, 
+      newBonus: bonusValue
+    },
+  });
+
+  console.log(`[setLiquidationBonus] Setting liquidation bonus for ${body.asset} to ${bonusValue}%`);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};

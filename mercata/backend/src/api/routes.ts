@@ -57,6 +57,11 @@ router.get("/lend/liquidate/near-unhealthy", authHandler.authorizeRequest(true),
 router.get("/lend/liquidate/:id", authHandler.authorizeRequest(true), LendingController.getLiquidatable);
 router.post("/lend/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
 
+// Admin configuration routes
+router.post("/lend/setInterestRate", authHandler.authorizeRequest(), LendingController.setInterestRate);
+router.post("/lend/setCollateralRatio", authHandler.authorizeRequest(), LendingController.setCollateralRatio);
+router.post("/lend/setLiquidationBonus", authHandler.authorizeRequest(), LendingController.setLiquidationBonus);
+
 // ----- Oracle -----
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
 router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);

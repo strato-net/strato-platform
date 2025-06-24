@@ -13,6 +13,9 @@ import {
   listNearUnhealthyLoans,
   getLoanWithHealthFactor,
   executeLiquidation as executeLiquidationService,
+  setInterestRate as setInterestRateService,
+  setCollateralRatio as setCollateralRatioService,
+  setLiquidationBonus as setLiquidationBonusService,
 } from "../services/lending.service";
 import {
   validateManageLiquidityArgs,
@@ -251,6 +254,80 @@ class LendingController {
 
       // If method not supported
       res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid method" });
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  // ---------------- Admin Configuration Methods ----------------
+
+  static async setInterestRate(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = res.locals;
+      const payload = req.body;
+
+      if (!payload.asset || payload.rate === undefined) {
+        res.status(RestStatus.BAD_REQUEST).json({ 
+          error: "Missing required parameters: asset and rate" 
+        });
+        return next();
+      }
+
+      const result = await setInterestRateService(accessToken, payload);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async setCollateralRatio(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = res.locals;
+      const payload = req.body;
+
+      if (!payload.asset || payload.ratio === undefined) {
+        res.status(RestStatus.BAD_REQUEST).json({ 
+          error: "Missing required parameters: asset and ratio" 
+        });
+        return next();
+      }
+
+      const result = await setCollateralRatioService(accessToken, payload);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async setLiquidationBonus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = res.locals;
+      const payload = req.body;
+
+      if (!payload.asset || payload.bonus === undefined) {
+        res.status(RestStatus.BAD_REQUEST).json({ 
+          error: "Missing required parameters: asset and bonus" 
+        });
+        return next();
+      }
+
+      const result = await setLiquidationBonusService(accessToken, payload);
+      res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
       return next(error);

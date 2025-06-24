@@ -26,6 +26,9 @@ type LendingContextType = {
   refreshWithdrawableTokens: (signal?: AbortSignal) => void;
   loadingWithdrawableTokens: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
+  setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
+  setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
   borrowAsset: (args: {
     asset: string;
     amount: string;
@@ -127,6 +130,33 @@ export const LendingProvider = ({
     }
   };
 
+  const setInterestRate = async (payload: { asset: string; rate: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setInterestRate", payload);
+    } catch (err: any) {
+      console.error("Failed to set interest rate:", err);
+      throw err;
+    }
+  };
+
+  const setCollateralRatio = async (payload: { asset: string; ratio: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setCollateralRatio", payload);
+    } catch (err: any) {
+      console.error("Failed to set collateral ratio:", err);
+      throw err;
+    }
+  };
+
+  const setLiquidationBonus = async (payload: { asset: string; bonus: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setLiquidationBonus", payload);
+    } catch (err: any) {
+      console.error("Failed to set liquidation bonus:", err);
+      throw err;
+    }
+  };
+
   const borrowAsset = async ({
     asset,
     amount,
@@ -208,6 +238,9 @@ export const LendingProvider = ({
       refreshWithdrawableTokens: fetchWithdrawableTokens,
       loadingWithdrawableTokens,
       setPrice,
+      setInterestRate,
+      setCollateralRatio,
+      setLiquidationBonus,
       borrowAsset,
       repayLoan,
       getLend,
