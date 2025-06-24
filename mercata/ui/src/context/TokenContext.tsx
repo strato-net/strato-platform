@@ -139,13 +139,15 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.post('/tokens/setStatus', payload);
+      // Refresh tokens to reflect the status change immediately
+      await getAllTokens();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to set token status');
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAllTokens]);
 
   useEffect(() => {
     getAllTokens();
