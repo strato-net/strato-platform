@@ -49,7 +49,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<Token[]>('/tokens/active');
+      const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
       setActiveTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch active tokens');

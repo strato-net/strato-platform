@@ -19,7 +19,6 @@ const bridgeController = new BridgeController();
 router.use("/user", userRoutes);
 
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
-router.get("/tokens/active", authHandler.authorizeRequest(true), TokensController.getActive);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);
