@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -16,9 +16,6 @@ import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, Filter, MoreVertical } from 'lucide-react';
 import SetTokenStatusModal from './SetTokenStatusForm';
-import SetCollateralRatioModal from './SetCollateralRatioModal';
-import SetInterestRateModal from './SetInterestRateModal';
-import SetLiquidationBonusModal from './SetLiquidationBonusModal';
 
 const getStatusLabel = (status?: string | number) => {
   switch (String(status)) {
@@ -35,17 +32,14 @@ const getStatusLabel = (status?: string | number) => {
 
 const AllTokensTable = () => {
   const { tokens, loading, error, getAllTokens } = useTokenContext();
-  const { getLend, refreshLendingData } = useLendingContext();
+  const { getLend } = useLendingContext();
   const [statusFilter, setStatusFilter] = useState<string>('2');
   const [lendData, setLendData] = useState<any>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
-  const [collateralRatioModalOpen, setCollateralRatioModalOpen] = useState(false);
-  const [interestRateModalOpen, setInterestRateModalOpen] = useState(false);
-  const [liquidationBonusModalOpen, setLiquidationBonusModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
 
-  const fetchLendData = useCallback(async () => {
+  const fetchLendData = async () => {
     try {
       setLendLoading(true);
       const data = await getLend();
@@ -55,24 +49,12 @@ const AllTokensTable = () => {
     } finally {
       setLendLoading(false);
     }
-  }, [getLend]);
-
-  const refreshAllData = useCallback(async () => {
-    try {
-      await Promise.all([
-        getAllTokens(),
-        fetchLendData(),
-        refreshLendingData()
-      ]);
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    }
-  }, [getAllTokens, fetchLendData, refreshLendingData]);
+  };
 
   useEffect(() => {
     getAllTokens();
     fetchLendData();
-  }, [getAllTokens, fetchLendData]);
+  }, [getAllTokens]);
 
   const getCollateralRatio = (address: string) => {
     if (!lendData?.lendingPool?.collateralRatio) return '-';
@@ -90,32 +72,9 @@ const AllTokensTable = () => {
     return interestData ? `${interestData.rate}%` : '-';
   };
 
-  const getLiquidationBonus = (address: string) => {
-    if (!lendData?.lendingPool?.liquidationBonus) return '-';
-    const bonusData = lendData.lendingPool.liquidationBonus.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return bonusData ? `${bonusData.bonus}%` : '-';
-  };
-
   const handleSetTokenStatus = (token: {address: string; symbol: string; name: string}) => {
     setSelectedToken(token);
     setStatusModalOpen(true);
-  };
-
-  const handleSetCollateralRatio = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setCollateralRatioModalOpen(true);
-  };
-
-  const handleSetInterestRate = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setInterestRateModalOpen(true);
-  };
-
-  const handleSetLiquidationBonus = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setLiquidationBonusModalOpen(true);
   };
 
   const filteredTokens = tokens.filter(token => {
@@ -212,7 +171,6 @@ const AllTokensTable = () => {
                   <TableHead className="w-[80px]">Status</TableHead>
                   <TableHead className="w-[120px]">Collateral Ratio</TableHead>
                   <TableHead className="w-[100px]">Interest</TableHead>
-                  <TableHead className="w-[120px]">Liquidation Bonus</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -245,9 +203,6 @@ const AllTokensTable = () => {
                       <TableCell className="text-sm max-w-[100px]">
                         {getInterestRate(address)}
                       </TableCell>
-                      <TableCell className="text-sm max-w-[120px]">
-                        {getLiquidationBonus(address)}
-                      </TableCell>
                       <TableCell className="max-w-[60px]">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -259,15 +214,8 @@ const AllTokensTable = () => {
                             <DropdownMenuItem onClick={() => handleSetTokenStatus({address, symbol, name})}>
                               Set Token Status
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetInterestRate({address, symbol, name})}>
-                              Set Interest Rate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetCollateralRatio({address, symbol, name})}>
-                              Set Collateral Ratio
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetLiquidationBonus({address, symbol, name})}>
-                              Set Liquidation Bonus
-                            </DropdownMenuItem>
+                            <DropdownMenuItem>Set Interest</DropdownMenuItem>
+                            <DropdownMenuItem>Set Collateralization Ratio</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -284,30 +232,6 @@ const AllTokensTable = () => {
         open={statusModalOpen}
         onOpenChange={setStatusModalOpen}
         token={selectedToken}
-      />
-      
-      <SetCollateralRatioModal
-        open={collateralRatioModalOpen}
-        onOpenChange={setCollateralRatioModalOpen}
-        token={selectedToken}
-        currentRatio={selectedToken ? getCollateralRatio(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
-      />
-      
-      <SetInterestRateModal
-        open={interestRateModalOpen}
-        onOpenChange={setInterestRateModalOpen}
-        token={selectedToken}
-        currentRate={selectedToken ? getInterestRate(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
-      />
-      
-      <SetLiquidationBonusModal
-        open={liquidationBonusModalOpen}
-        onOpenChange={setLiquidationBonusModalOpen}
-        token={selectedToken}
-        currentBonus={selectedToken ? getLiquidationBonus(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
       />
     </Card>
   );

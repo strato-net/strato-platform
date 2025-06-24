@@ -97,6 +97,10 @@ const BorrowAssetModal = ({
   const availableLiquidity = parseFloat(formatUnits(safeBigNumberish(borrowAsset?.liquidity), 18));
   const effectiveMaxBorrowable = Math.min(calculatedBorrowable, availableLiquidity);
 
+  // Risk calculations should be scaled to the maximum based on collateral (liquidation threshold),
+  // *not* the lower pool-liquidity cap.
+  const collateralMaxBorrowable = calculatedBorrowable;
+
   const availableToBorrowFormatted = effectiveMaxBorrowable.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -108,10 +112,10 @@ const BorrowAssetModal = ({
 
   // Calculate risk level based on borrowed amount (0-100)
   useEffect(() => {
-    const risk =
-      ((borrowAmount * 10 ** 18) / (maxBorrowAmount * 10 ** 18)) * 100;
+    const denom = collateralMaxBorrowable === 0 ? 1 : collateralMaxBorrowable;
+    const risk = ((borrowAmount * 10 ** 18) / (denom * 10 ** 18)) * 100;
     setRiskLevel(risk);
-  }, [borrowAmount, maxBorrowAmount]);
+  }, [borrowAmount, collateralMaxBorrowable]);
 
   const getRiskColor = () => {
     if (riskLevel < 30) return "bg-green-500";

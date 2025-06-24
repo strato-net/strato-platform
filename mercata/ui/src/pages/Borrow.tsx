@@ -21,6 +21,7 @@ import {
 
 import { DepositableToken } from "@/interface";
 import { usdstAddress } from "@/lib/contants";
+import isEqual from "lodash.isequal";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -175,7 +176,7 @@ const Borrow = () => {
           };
         })
       );
-      setLoanList(enrichedLoans);
+      setLoanList(prev => (isEqual(prev, enrichedLoans) ? prev : enrichedLoans));
       if (typeof window !== "undefined") {
         // @ts-ignore
         window.__LOAN_LIST__ = enrichedLoans;
@@ -186,9 +187,21 @@ const Borrow = () => {
   }, [loans]);
 
   useEffect(() => {
-    if (Object.keys(loans || {}).length > 0) {
-      fetchLoans();
+    const loanCount = Array.isArray(loans)
+      ? loans.length
+      : Object.keys(loans || {}).length;
+
+    if (loanCount === 0) {
+      // No active loans – clear any previous data so the table updates immediately.
+      if (loanList.length > 0) {
+        console.debug("[Loans sync] Cleared stale loan list (was", loanList.length, ")");
+      }
+      setLoanList([]);
+      return;
     }
+
+    console.debug("[Loans sync] Refreshing loans. loanCount:", loanCount);
+    fetchLoans();
   }, [loans, fetchLoans]);
 
 
@@ -456,7 +469,6 @@ const Borrow = () => {
         loan={loan}
         onRepaySuccess={async () => {
           await refreshLoans();
-          await fetchLoans();
           await refreshDepositTokens();
         }}
       />
