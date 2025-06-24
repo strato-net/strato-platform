@@ -35,7 +35,18 @@ export const getTokens = async (
       throw new Error("Tokens data is empty");
     }
 
-    return response.data;
+    // Enrich with oracle prices so UI can display current price
+    const lendingInfo = await getLendingRegistry(accessToken, {
+      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+    });
+
+    const rawPrices = lendingInfo.oracle?.prices || [];
+    const priceMap = new Map<string, number>(rawPrices.map((p: any) => [p.key, p.value]));
+
+    return (response.data as any[]).map((token) => ({
+      ...token,
+      price: priceMap.get(token.address) || "0",
+    }));
   } catch (error) {
     throw error;
   }
