@@ -132,7 +132,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
           setTokenBalance("0");
         }
 
-        if (selectedToken?.tokenAddress && address) {
+        if (selectedToken?.tokenAddress ) {
           const formattedTokenAddress = selectedToken.tokenAddress.startsWith("0x")
             ? selectedToken.tokenAddress
             : `0x${selectedToken.tokenAddress}`;
@@ -172,7 +172,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     return () => {
       mounted = false;
     };
-  }, [isConnected, address, selectedToken]);
+  }, [selectedToken]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
