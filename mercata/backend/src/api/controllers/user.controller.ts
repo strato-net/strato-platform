@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { isUserAdmin } from "../services/user.service";
 
-class UsersController {
+class UserController {
   static async me(
     req: Request,
     res: Response,
@@ -26,4 +26,4 @@ class UsersController {
   }
 }
 
-export default UsersController;
+export default UserController;

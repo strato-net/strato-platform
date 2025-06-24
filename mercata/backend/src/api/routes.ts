@@ -7,15 +7,16 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
-import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
 import { BridgeController } from "./controllers/bridge.controller";
 import OracleController from "./controllers/oracle.controller";
+import userRoutes from "./routes/user.routes";
 
 const router = Router();
 const bridgeController = new BridgeController();
 
-router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
+// User routes
+router.use("/user", userRoutes);
 
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 router.get("/tokens/active", authHandler.authorizeRequest(true), TokensController.getActive);
