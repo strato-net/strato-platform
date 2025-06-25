@@ -203,9 +203,9 @@ export const repay = async (
       BigInt(8760 * 100 * 100); // extra *100 due to scaling
     const totalOwed = (BigInt(loan.amount) + interest).toString();
 
-    // Use caller-supplied amount if it equals/exceeds total owed; otherwise bump to full repay.
+    // Allow partial repayments. If caller over-pays, clip to the exact amount owed.
     let repayAmount = body.amount || totalOwed;
-    if (BigInt(repayAmount) < BigInt(totalOwed)) {
+    if (BigInt(repayAmount) > BigInt(totalOwed)) {
       repayAmount = totalOwed;
     }
 

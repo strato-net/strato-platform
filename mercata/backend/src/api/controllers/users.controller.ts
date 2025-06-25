@@ -10,7 +10,7 @@ class UsersController {
     try {
       // Debug: show incoming If-None-Match / caching headers
       console.log("[/users/me] If-None-Match:", req.headers["if-none-match"]);
-      const { address: userAddress } = req;
+      const { address: userAddress, userName } = req;
 
       if (!userAddress) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "User not found" });
@@ -22,7 +22,7 @@ class UsersController {
         const isAdmin = normUser === normAdmin;
         // Prevent caching so client always receives body (avoids 304)
         res.set("Cache-Control", "no-store, no-cache, must-revalidate");
-        res.status(RestStatus.OK).json({ userAddress, isAdmin });
+        res.status(RestStatus.OK).json({ userAddress, isAdmin, userName });
       }
 
       // Log final status once response is sent
