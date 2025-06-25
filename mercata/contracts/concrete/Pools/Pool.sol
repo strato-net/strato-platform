@@ -2,8 +2,6 @@
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 
-//Removed deadlineCheck for now
-//Removed slippage protection as it is pbft
 contract record Pool {
     
     // Events
@@ -42,7 +40,8 @@ contract record Pool {
     constructor(
         address tokenAAddr, 
         address tokenBAddr,
-        address _tokenFactory
+        address _tokenFactory,
+        address _feeCollector
     ) {
         require(_tokenFactory != address(0), "Zero token factory address");
         tokenFactory = TokenFactory(_tokenFactory);
@@ -66,7 +65,7 @@ contract record Pool {
         
         lpToken = Token(lpTokenAddress);
 
-        feeCollector = msg.sender; // TODO: Make this a parameter
+        feeCollector = _feeCollector;
     }
 
     function _updateStateVars() internal {

@@ -37,7 +37,7 @@ contract record PoolFactory is Ownable {
         require(tokenFactory.isTokenActive(tokenA) && tokenFactory.isTokenActive(tokenB), "Token not active");
         
         // deploy new pool
-        pool = address(new Pool(tokenA, tokenB, address(tokenFactory)));
+        pool = address(new Pool(tokenA, tokenB, address(tokenFactory), msg.sender));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions
