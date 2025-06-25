@@ -1,12 +1,32 @@
 // SPDX-License-Identifier: MIT
 import "./Token.sol";
+import "../AdminRegistry/AdminRegistry.sol";
 
 contract record TokenFactory is Ownable {
     mapping(address => bool) public isFactoryToken;
+    address[] public allTokens; // Track all tokens created by this factory
+    AdminRegistry public adminRegistry;
 
     event TokenCreated(address token, address creator, string name, string symbol);
+    event AdminRegistryUpdated(address oldRegistry, address newRegistry);
+    event TokensMigrated(address indexed oldFactory, address indexed newFactory, uint256 tokenCount);
     
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner, address _adminRegistry) Ownable(initialOwner) {
+        require(_adminRegistry != address(0), "Zero admin registry address");
+        adminRegistry = AdminRegistry(_adminRegistry);
+    }
+    
+    modifier onlyAdmin() {
+        require(adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not admin");
+        _;
+    }
+    
+    function setAdminRegistry(address _adminRegistry) external onlyOwner {
+        require(_adminRegistry != address(0), "Zero admin registry address");
+        address oldRegistry = address(adminRegistry);
+        adminRegistry = AdminRegistry(_adminRegistry);
+        emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
+    }
     
     function createToken(
         string _name,
@@ -34,12 +54,13 @@ contract record TokenFactory is Ownable {
         // Register the token
         address tokenAddress = address(newToken);
         isFactoryToken[address(newToken)] = true;
+        allTokens.push(tokenAddress);
         
         emit TokenCreated(tokenAddress, msg.sender, _name, _symbol);
         return tokenAddress;
     }
     
-    function setTokenStatus(address token, uint newStatus) external onlyOwner {
+    function setTokenStatus(address token, uint newStatus) external onlyAdmin {
         Token(token).setStatus(newStatus);
     }
 
@@ -47,16 +68,18 @@ contract record TokenFactory is Ownable {
         return Token(token).status() == TokenStatus.ACTIVE && isFactoryToken[token];
     }
 
-    function migrateTokensToFactory(address newFactory, address[] tokens) external onlyOwner {
+    function migrateTokensToFactory(address newFactory, address[] tokens) external onlyAdmin {
         for (uint256 i = 0; i < tokens.length; i++) {
             address tokenAddr = tokens[i];
             Token(tokenAddr).setTokenFactory(newFactory);
         }
+        emit TokensMigrated(address(this), newFactory, tokens.length);
     }
 
-    function registerMigratedTokens(address[] tokens) external onlyOwner {
+    function registerMigratedTokens(address[] tokens) external onlyAdmin {
         for (uint256 i = 0; i < tokens.length; i++) {
             isFactoryToken[tokens[i]] = true;
+            allTokens.push(tokens[i]);
         }
     }
 }

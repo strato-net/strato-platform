@@ -1,4 +1,6 @@
 import "./Tokens/Token.sol";
+import "../AdminRegistry/AdminRegistry.sol";
+import "../Tokens/TokenFactory.sol";
 /*
  *  MercataEthBridge – STRATO ↔ Ethereum Safe bridge contract (no OpenZeppelin deps)
  *  ------------------------------------------------------------------------------
@@ -41,7 +43,7 @@ contract record MercataEthBridge {
    // ────────────────── configuration ──────────────────
     address public owner;       // STRATO admin key
     address public relayer;     // off‑chain relayer key
-    address public tokenFactory; //token factory to identify active tokens
+    AdminRegistry public adminRegistry; // admin registry for token status checks
 
     uint256 public minAmount = 0 ether; // dust guard
 
@@ -69,23 +71,26 @@ contract record MercataEthBridge {
     event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
     event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
     event MinAmountUpdated(uint256 oldVal, uint256 newVal);
+    event AdminRegistryUpdated(address oldRegistry, address newRegistry);
 
     // ─────────────────── modifiers ─────────────────────
     modifier onlyOwner()   { require(msg.sender == owner,   "NOT_OWNER");   _; }
     modifier onlyRelayer() { require(msg.sender == relayer, "NOT_RELAYER"); _; }
 
     // ───────────────── constructor ─────────────────────
-    constructor(address _relayer, address _tokenfactory) {
+    constructor(address _relayer, address _adminRegistry) {
         require(_relayer != address(0), "ZERO_RELAYER");
-        require(_tokenfactory != address(0), "ZERO_TOKENFACTORY");
-        tokenFactory = _tokenfactory;
+        require(_adminRegistry != address(0), "ZERO_ADMIN_REGISTRY");
+        adminRegistry = AdminRegistry(_adminRegistry);
         owner   = _relayer;
         relayer = _relayer;
      }
 
-    function setTokenFactory(address _factory) external onlyOwner {
-        require(_factory != address(0), "ZERO_ADDR");
-        tokenFactory = _factory;
+    function setAdminRegistry(address _adminRegistry) external onlyOwner {
+        require(_adminRegistry != address(0), "ZERO_ADDR");
+        address oldRegistry = address(adminRegistry);
+        adminRegistry = AdminRegistry(_adminRegistry);
+        emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
     }
 
     // ───────────── admin / config ops ──────────────────
@@ -120,7 +125,7 @@ contract record MercataEthBridge {
 
     function confirmDeposit(string calldata txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(tokenFactory).isTokenActive(token), "INACTIVE_TOKEN");
+        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(token), "INACTIVE_TOKEN");
 
         Token(token).mint(mercataUser, amount);
         depositStatus[txHash] = DepositState.COMPLETED;
@@ -131,7 +136,7 @@ contract record MercataEthBridge {
     for (uint256 i = 0; i < deposits.length; i++) {
         DepositBatch calldata d = deposits[i];
         require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(tokenFactory).isTokenActive(d.token), "INACTIVE_TOKEN");
+        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(d.token), "INACTIVE_TOKEN");
 
         Token(d.token).mint(d.mercataUser, d.amount);
         depositStatus[d.txHash] = DepositState.COMPLETED;
@@ -145,7 +150,7 @@ contract record MercataEthBridge {
     // token = wrapped token
     function withdraw(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
-        require(TokenFactory(tokenFactory).isTokenActive(token), "INACTIVE_TOKEN");
+        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(token), "INACTIVE_TOKEN");
         require(amount >= minAmount, "BELOW_MIN");
 
         Token(token).burn(mercataUser, amount);

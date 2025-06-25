@@ -1,5 +1,7 @@
 import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
+import "../AdminRegistry/AdminRegistry.sol";
+import "../Tokens/TokenFactory.sol";
 
 contract record OnRamp {
     event SellerApprovalUpdated(address seller, bool approved);
@@ -9,6 +11,7 @@ contract record OnRamp {
     event ListingFulfilled(uint256 listingId, address buyer, uint256 amount, uint256 totalFiat);
     event AdminStatusUpdated(address admin, bool enabled);
     event PaymentProviderStatusUpdated(address provider, bool enabled);
+    event AdminRegistryUpdated(address oldRegistry, address newRegistry);
 
     struct Listing {
         uint256 id;
@@ -32,7 +35,7 @@ contract record OnRamp {
     mapping(address => bool) public record admins;
     mapping(address => bool) public record approvedSellers;
     mapping(address => PaymentProviderInfo) public record paymentProviders;
-    TokenFactory public tokenFactory;
+    AdminRegistry public adminRegistry;
 
     // Price oracle
     PriceOracle public priceOracle;
@@ -41,14 +44,15 @@ contract record OnRamp {
     mapping(address => Listing) public record listings;
 
     // Constructor
-    constructor(address _oracle, address _admin, address _tokenFactory) {
+    constructor(address _oracle, address _admin, address _adminRegistry) {
         require(_admin != address(0), "Invalid admin");
         require(_oracle != address(0), "Invalid oracle");
+        require(_adminRegistry != address(0), "Invalid admin registry");
         admins[_admin] = true;
         emit AdminStatusUpdated(_admin, true);
         adminCount = 1;
         priceOracle = PriceOracle(_oracle);
-        tokenFactory = TokenFactory(_tokenFactory);
+        adminRegistry = AdminRegistry(_adminRegistry);
     }
 
     // Modifiers
@@ -61,7 +65,7 @@ contract record OnRamp {
         _;
     }
     modifier onlyApprovedToken(address token) {
-        require(tokenFactory.isTokenActive(token), "Token not active");
+        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(token), "Token not active");
         _;
     }
 
@@ -127,6 +131,13 @@ contract record OnRamp {
 
     function setPriceOracle(address newOracle) external onlyAdmin {
         priceOracle = PriceOracle(newOracle);
+    }
+
+    function setAdminRegistry(address newAdminRegistry) external onlyAdmin {
+        require(newAdminRegistry != address(0), "Invalid admin registry");
+        address oldAdminRegistry = address(adminRegistry);
+        adminRegistry = AdminRegistry(newAdminRegistry);
+        emit AdminRegistryUpdated(oldAdminRegistry, newAdminRegistry);
     }
 
     // Listing management functions
