@@ -24,6 +24,14 @@ contract record Pool {
 
     uint public tokenABalance;
     uint public tokenBBalance;
+
+    // All fee variables are in basis points (bps): 1% = 100 bps, 0.3% = 30 bps, 70% = 7000 bps
+    uint256 public swapFeeRate = 30; // 30 bps = 0.3%
+    uint256 public lpSharePercent = 7000; // 7000 bps = 70%
+    uint256 public protocolSharePercent = 3000; // 3000 bps = 30%
+    mapping(address => uint256) public feePerShare;
+    mapping(address => uint256) public rewardDebt;
+    address public feeCollector;
     
     modifier nonReentrant() {
         require(!locked, "REENTRANT");
@@ -58,6 +66,8 @@ contract record Pool {
         );
         
         lpToken = Token(lpTokenAddress);
+
+        feeCollector = msg.sender; // TODO: Make this a parameter
     }
 
     function updateStateVars() internal {
@@ -80,13 +90,14 @@ contract record Pool {
             uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
             uint256 tokenA_amount = (tokenB_amount * tokenA_reserve / tokenB_reserve) + 1;
             uint256 liquidity_minted = tokenB_amount * total_liquidity / tokenB_reserve;
-            
+
             require(max_tokenA_amount >= tokenA_amount, "Insufficient tokenA amount");
             lpToken.mint(msg.sender, liquidity_minted);
-            
+            rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare[address(lpToken)]) / 1e18;
+
             require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
             require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
-            
+
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
 
             updateStateVars();
@@ -96,12 +107,13 @@ contract record Pool {
             uint256 tokenA_amount = max_tokenA_amount;
             uint256 initial_liquidity = tokenB_amount;
             lpToken.mint(msg.sender, initial_liquidity);
-            
+            rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare[address(lpToken)]) / 1e18;
+
             require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
             require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
-            
+
             emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-            
+
             updateStateVars();
 
             return initial_liquidity;
@@ -122,14 +134,15 @@ contract record Pool {
         uint256 tokenA_amount = amount * tokenA_reserve / total_liquidity;
         
         require(tokenB_amount >= min_tokenB && tokenA_amount >= min_tokenA_amount, "Insufficient amounts");
-        
+
         require(ERC20(tokenB).transfer(msg.sender, tokenB_amount), "TokenB transfer failed");
         require(ERC20(tokenA).transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
-        
+
         emit RemoveLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-        
+
         lpToken.burn(msg.sender, amount);
-        
+        rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare[address(lpToken)]) / 1e18;
+
         updateStateVars();
 
         return (tokenB_amount, tokenA_amount);
@@ -195,11 +208,31 @@ contract record Pool {
         require(tokenB_sold > 0 && min_tokens > 0, "Invalid inputs");
         uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
         uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokens_bought = getInputPrice(tokenB_sold, tokenB_reserve, tokenA_reserve);
+
+        uint256 inputAmount = tokenB_sold;
+
+        // Fee is calculated in basis points: swapFeeRate in bps (e.g., 30 = 0.3%)
+        uint256 fee = (inputAmount * swapFeeRate) / 10000; // 10000 bps = 100%
+        uint256 lpFee = (fee * lpSharePercent) / 10000;
+        uint256 protocolFee = fee - lpFee;
+
+        // Update fee per share
+        uint256 totalSupply = ERC20(lpToken).totalSupply();
+        if (totalSupply > 0) {
+            feePerShare[address(lpToken)] += (lpFee * 1e18) / totalSupply;
+        }
+
+        // Send protocol fee to collector
+        require(ERC20(tokenB).transferFrom(msg.sender, feeCollector, protocolFee), "Fee transfer failed");
+
+        // Reduce swap amount by total fee
+        inputAmount -= fee;
+
+        uint256 tokens_bought = getInputPrice(inputAmount, tokenB_reserve, tokenA_reserve);
         
         require(tokens_bought >= min_tokens, "Insufficient output amount");
         
-        require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
+        require(ERC20(tokenB).transferFrom(msg.sender, address(this), inputAmount), "TokenB transfer failed");
         require(ERC20(tokenA).transfer(msg.sender, tokens_bought), "TokenA transfer failed");
         
         updateStateVars();
@@ -215,16 +248,44 @@ contract record Pool {
         require(tokenA_sold > 0 && min_tokenB > 0, "Invalid inputs");
         uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
         uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokenB_bought = getInputPrice(tokenA_sold, tokenA_reserve, tokenB_reserve);
+
+        uint256 inputAmount = tokenA_sold;
+
+        // Fee is calculated in basis points: swapFeeRate in bps (e.g., 30 = 0.3%)
+        uint256 fee = (inputAmount * swapFeeRate) / 10000; // 10000 bps = 100%
+        uint256 lpFee = (fee * lpSharePercent) / 10000;
+        uint256 protocolFee = fee - lpFee;
+
+        // Update fee per share
+        uint256 totalSupply = ERC20(lpToken).totalSupply();
+        if (totalSupply > 0) {
+            feePerShare[address(lpToken)] += (lpFee * 1e18) / totalSupply;
+        }
+
+        // Send protocol fee to collector
+        require(ERC20(tokenA).transferFrom(msg.sender, feeCollector, protocolFee), "Fee transfer failed");
+
+        // Reduce swap amount by total fee
+        inputAmount -= fee;
+
+        uint256 tokenB_bought = getInputPrice(inputAmount, tokenA_reserve, tokenB_reserve);
         
         require(tokenB_bought >= min_tokenB, "Insufficient output amount");
         
-        require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
+        require(ERC20(tokenA).transferFrom(msg.sender, address(this), inputAmount), "TokenA transfer failed");
         require(ERC20(tokenB).transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
         
         updateStateVars();
         
         emit TokenBPurchase(msg.sender, tokenA_sold, tokenB_bought);
         return tokenB_bought;
+    }
+
+    function claimFees() external {
+        uint256 accrued = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare[address(lpToken)]) / 1e18;
+        uint256 pending = accrued - rewardDebt[msg.sender];
+        rewardDebt[msg.sender] = accrued;
+
+        require(ERC20(tokenA).transfer(msg.sender, pending), "Claim transfer failed");
     }
 }
