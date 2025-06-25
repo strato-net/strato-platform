@@ -69,11 +69,26 @@ contract record Pool {
         feeCollector = msg.sender; // TODO: Make this a parameter
     }
 
-    function updateStateVars() internal {
-        aToBRatio = getCurrentTokenABRatio();
-        bToARatio = getCurrentTokenBARatio();
+    function _updateStateVars() internal {
         tokenABalance = ERC20(tokenA).balanceOf(address(this));
         tokenBBalance = ERC20(tokenB).balanceOf(address(this));
+        aToBRatio = _getCurrentTokenRatio(true);
+        bToARatio = _getCurrentTokenRatio(false);
+    }
+
+    function _getCurrentTokenRatio(bool isAToB) internal view returns (decimal) {
+        decimal tokenAReserve = decimal(tokenABalance);
+        decimal tokenBReserve = decimal(tokenBBalance);
+
+        if (tokenAReserve <= 0.000000000000000000 || tokenBReserve <= 0.000000000000000000) {
+            return 0;
+        }
+
+        if (isAToB) {
+            return decimal((tokenBReserve * 1.000000000000000000) / tokenAReserve) / 1.000000000000000000;
+        } else {
+            return decimal((tokenAReserve * 1.000000000000000000) / tokenBReserve) / 1.000000000000000000;
+        }
     }
 
     // Core functions
@@ -99,7 +114,7 @@ contract record Pool {
 
             emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
-            updateStateVars();
+            _updateStateVars();
 
             return liquidityMinted;
         } else {
@@ -113,7 +128,7 @@ contract record Pool {
 
             emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
-            updateStateVars();
+            _updateStateVars();
 
             return initialLiquidity;
         }
@@ -142,7 +157,7 @@ contract record Pool {
         lpToken.burn(msg.sender, amount);
         rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
 
-        updateStateVars();
+        _updateStateVars();
 
         return (tokenBAmount, tokenAAmount);
     }
@@ -157,32 +172,6 @@ contract record Pool {
         uint256 numerator = inputAmount * outputReserve;
         uint256 denominator = inputReserve + inputAmount;
         return numerator / denominator;
-    }
-
-    // Price view functions
-    function getCurrentTokenABRatio() public view returns (decimal) {
-        decimal tokenAReserve = decimal(ERC20(tokenA).balanceOf(address(this)));
-        decimal tokenBReserve = decimal(ERC20(tokenB).balanceOf(address(this)));
-        
-        if (tokenAReserve <= 0.000000000000000000 || tokenBReserve <= 0.000000000000000000) {
-            return 0;
-        }
-        
-        // Price of 1 tokenA in stablecoins (tokenBReserve / tokenAReserve)
-        return decimal((tokenBReserve * 1.000000000000000000 ) / tokenAReserve) / 1.000000000000000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
-    }
-
-
-    function getCurrentTokenBARatio() public view returns (decimal) {
-        decimal tokenAReserve = decimal(ERC20(tokenA).balanceOf(address(this)))* 1.000000000000000000;
-        decimal tokenBReserve = decimal(ERC20(tokenB).balanceOf(address(this)))* 1.000000000000000000;
-        
-        if (tokenAReserve <= 0.000000000000000000 || tokenBReserve <= 0.000000000000000000) {
-            return 0;
-        }
-        
-        // Price of 1 tokenB in tokens (tokenAReserve / tokenBReserve)
-        return decimal((tokenAReserve * 1.000000000000000000) / tokenBReserve) / 1.000000000000000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
     }
 
     function swap(
@@ -218,7 +207,7 @@ contract record Pool {
         require(ERC20(inputToken).transferFrom(msg.sender, address(this), netInput), "Input xfer failed");
         require(ERC20(outputToken).transfer(msg.sender, amountOut), "Output xfer failed");
 
-        updateStateVars();
+        _updateStateVars();
 
         emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
     }
