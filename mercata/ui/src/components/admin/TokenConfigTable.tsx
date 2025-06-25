@@ -20,7 +20,7 @@ import SetLiquidationBonusModal from './SetLiquidationBonusModal';
 
 const TokenConfigTable = () => {
   const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
-  const { getLend, refreshLendingData } = useLendingContext();
+  const { getLend } = useLendingContext();
   const [lendData, setLendData] = useState<any>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [collateralRatioModalOpen, setCollateralRatioModalOpen] = useState(false);
@@ -50,15 +50,14 @@ const TokenConfigTable = () => {
 
   const refreshAllData = useCallback(async () => {
     try {
-      await Promise.all([
-        fetchActiveTokens(),
-        fetchLendData(),
-        refreshLendingData()
-      ]);
+      // Small delay to prevent flickering
+      await new Promise(resolve => setTimeout(resolve, 150));
+      // Only refresh lending data since that's what contains the rates/ratios/bonuses
+      await fetchLendData();
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
-  }, [fetchActiveTokens, fetchLendData, refreshLendingData]);
+  }, [fetchLendData]);
 
   useEffect(() => {
     fetchActiveTokens();
