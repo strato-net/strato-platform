@@ -33,6 +33,9 @@ if (!process.env.ONRAMP) {
 if (!process.env.TOKEN_FACTORY) {
   throw new Error("TOKEN_FACTORY is not defined");
 }
+if (!process.env.POOL_CONFIGURATOR) {
+  throw new Error("POOL_CONFIGURATOR is not defined");
+}
 
 export let openIdTokenEndpoint: string | undefined;
 /**
@@ -50,3 +53,4 @@ export const poolFactory = process.env.POOL_FACTORY;
 export const lendingPool = process.env.LENDING_POOL;
 export const onRamp = process.env.ONRAMP;
 export const tokenFactory = process.env.TOKEN_FACTORY;
+export const poolConfigurator = process.env.POOL_CONFIGURATOR;

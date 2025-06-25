@@ -1,5 +1,5 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
-import { buildDeployTx, buildFunctionTx } from "../../utils/txBuilder";
+import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
@@ -35,9 +35,19 @@ export const getTokens = async (
       throw new Error("Tokens data is empty");
     }
 
-    return response.data;
+    // Enrich with oracle prices so UI can display current price
+    const lendingInfo = await getLendingRegistry(accessToken, {
+      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+    });
+
+    const rawPrices = lendingInfo.oracle?.prices || [];
+    const priceMap = new Map<string, number>(rawPrices.map((p: any) => [p.key, p.value]));
+
+    return (response.data as any[]).map((token) => ({
+      ...token,
+      price: priceMap.get(token.address) || "0",
+    }));
   } catch (error) {
-    console.error("Error fetching tokens:", error);
     throw error;
   }
 };
@@ -90,7 +100,6 @@ export const getBalance = async (
       price: priceMap.get(token.address) || "0",
     }));
   } catch (error) {
-    console.error("Error fetching balance:", error);
     throw error;
   }
 };
@@ -116,7 +125,6 @@ export const createToken = async (
       hash,
     };
   } catch (error) {
-    console.error("Error creating token:", error);
     throw error;
   }
 };
@@ -145,7 +153,6 @@ export const transferToken = async (
       hash,
     };
   } catch (error) {
-    console.error("Unknown error:", error);
     throw error;
   }
 };
@@ -172,7 +179,6 @@ export const approveToken = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error approving token:", error);
     throw error;
   }
 };
@@ -200,7 +206,6 @@ export const transferFromToken = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error in transferFrom:", error);
     throw error;
   }
 };
@@ -226,7 +231,6 @@ export const setTokenStatus = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error setting token status:", error);
     throw error;
   }
 };

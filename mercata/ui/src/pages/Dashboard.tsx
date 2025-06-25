@@ -50,13 +50,16 @@ const Dashboard = () => {
     let cataTotal = 0;
 
     for (let i = 0; i < tokens.length; i++) {
-      
+
       const token = tokens[i];
-      const price = parseFloat(token?.price || "0");
-      const balance = parseFloat(token?.balance || "0");
+      const rawPrice = token?.price || "0";
+      const rawBalance = token?.balance || "0";
+
+      const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
+      const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
       const name = token?._name || "";
       const symbol = token?._symbol || "";
-      
+
       const tokenValue = balance * price;
       total += tokenValue;
 
@@ -68,21 +71,13 @@ const Dashboard = () => {
     setCataBalance(cataTotal);
   }, [tokens]);
 
-  function formatBalance(value: any): string {
-    try {
-      const bigIntValue = BigInt(value); // safely convert
-      const formatted = formatUnits(bigIntValue, 18); // string
+  function formatBalance(value: number): string {
+    if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
 
-      const num = Number(formatted);
-      if (isNaN(num) || !isFinite(num)) return "0.00";
-
-      return num.toLocaleString("en-US", {
-        notation: "compact",
-        maximumFractionDigits: 2,
-      });
-    } catch (e) {
-      return "0.00"; // fallback if value can't be converted to BigInt
-    }
+    return value.toLocaleString("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    });
   }
 
   return (

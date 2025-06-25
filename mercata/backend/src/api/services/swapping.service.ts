@@ -71,7 +71,6 @@ export const createPool = async (
       hash,
     };
   } catch (error) {
-    console.error("Error creating pool:", error);
     throw error;
   }
 };
@@ -120,7 +119,6 @@ export const addLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error adding liquidity:", error);
     throw error;
   }
 };
@@ -174,7 +172,6 @@ export const removeLiquidity = async (
       hash,
     };
   } catch (error) {
-    console.error("Error removing liquidity:", error);
     throw error;
   }
 };
@@ -221,7 +218,6 @@ export const swap = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error swapping tokens:", error);
     throw error;
   }
 };
@@ -255,7 +251,6 @@ export const calculateSwap = async (
       );
     }
   } catch (error) {
-    console.error("Error calculating swap:", error);
     throw error;
   }
 };
@@ -290,7 +285,6 @@ export const calculateSwapReverse = async (
       );
     }
   } catch (error) {
-    console.error("Error calculating reverse swap:", error);
     throw error;
   }
 };

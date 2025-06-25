@@ -11,6 +11,7 @@ import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
 import { useTokenContext } from '@/context/TokenContext';
+import { formatUnits } from "ethers";
 
 
 const SetAssetPriceForm = () => {
@@ -53,9 +54,10 @@ const SetAssetPriceForm = () => {
       form.reset();
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
+      const errMsg = (axiosError.response?.data as any)?.message;
       toast({
         title: 'Error Setting Price',
-        description: axiosError.response?.data?.message || 'Failed to set price. Please try again.',
+        description: errMsg || 'Failed to set price. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -96,6 +98,33 @@ const SetAssetPriceForm = () => {
                   <FormDescription>
                     Choose the token to update pricing for
                   </FormDescription>
+                  {selectedToken && (
+                    <div className="text-base font-medium text-gray-700 mt-1">
+                      Current price: $
+                      {(() => {
+                        try {
+                          if (selectedToken.price === undefined || selectedToken.price === null) {
+                            return "-";
+                          }
+                          // Handle scientific notation or BigInt-like inputs gracefully
+                          const raw =
+                            typeof selectedToken.price === "number" ||
+                            (typeof selectedToken.price === "string" && selectedToken.price.includes("e"))
+                              ? BigInt(Number(selectedToken.price)).toString()
+                              : selectedToken.price.toString();
+
+                          const formatted = parseFloat(formatUnits(raw, 18));
+                          if (isNaN(formatted)) return "-";
+                          return formatted.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 6,
+                          });
+                        } catch {
+                          return "-";
+                        }
+                      })()}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

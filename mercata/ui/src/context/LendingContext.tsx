@@ -21,11 +21,15 @@ type LendingContextType = {
   loadingLoans: boolean;
   errorDepositTokens: string | null;
   refreshDepositTokens: (signal?: AbortSignal) => Promise<void>;
-  refreshLoans: (signal?: AbortSignal) => Promise<void>;
+  refreshLoans: (signal?: AbortSignal) => Promise<Loan[] | undefined>;
   withdrawableTokens: WithdrawableToken[];
   refreshWithdrawableTokens: (signal?: AbortSignal) => void;
   loadingWithdrawableTokens: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
+  setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
+  setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
+  refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     asset: string;
     amount: string;
@@ -37,6 +41,7 @@ type LendingContextType = {
     amount: string;
     asset: string;
   }) => Promise<any>;
+  getLend: () => Promise<any>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -119,9 +124,36 @@ export const LendingProvider = ({
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
     const weiPrice = parseUnits(payload.price, 18).toString();
     try {
-      await api.post("/oracle/setPrice", { ...payload, price: weiPrice.toString() });
+      await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
     } catch (err: any) {
       console.error("Failed to set price:", err);
+      throw err;
+    }
+  };
+
+  const setInterestRate = async (payload: { asset: string; rate: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setInterestRate", payload);
+    } catch (err: any) {
+      console.error("Failed to set interest rate:", err);
+      throw err;
+    }
+  };
+
+  const setCollateralRatio = async (payload: { asset: string; ratio: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setCollateralRatio", payload);
+    } catch (err: any) {
+      console.error("Failed to set collateral ratio:", err);
+      throw err;
+    }
+  };
+
+  const setLiquidationBonus = async (payload: { asset: string; bonus: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setLiquidationBonus", payload);
+    } catch (err: any) {
+      console.error("Failed to set liquidation bonus:", err);
       throw err;
     }
   };
@@ -173,6 +205,28 @@ export const LendingProvider = ({
     }
   };
 
+  const getLend = async () => {
+    try {
+      const res = await api.get("/lend/");
+      return res.data;
+    } catch (err: any) {
+      console.error("Get lend failed:", err);
+      throw err;
+    }
+  };
+
+  const refreshLendingData = async (): Promise<void> => {
+    try {
+      // Refresh all lending-related data
+      await fetchDepositTokens();
+      await fetchLoans();
+      await fetchWithdrawableTokens();
+    } catch (err: any) {
+      console.error("Failed to refresh lending data:", err);
+      throw err;
+    }
+  };
+
 
   const initialize = () => {
     fetchDepositTokens();
@@ -197,8 +251,13 @@ export const LendingProvider = ({
       refreshWithdrawableTokens: fetchWithdrawableTokens,
       loadingWithdrawableTokens,
       setPrice,
+      setInterestRate,
+      setCollateralRatio,
+      setLiquidationBonus,
+      refreshLendingData,
       borrowAsset,
       repayLoan,
+      getLend,
     }),
     [
       depositableTokens,
