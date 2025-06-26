@@ -135,10 +135,10 @@ contract record Pool {
 
     function removeLiquidity(
         uint256 amount, 
-        uint256 minTokenB,
+        uint256 minTokenBAmount,
         uint256 minTokenAAmount
     ) external returns (uint256, uint256) {
-        require(amount > 0 && minTokenB > 0 && minTokenAAmount > 0, "Invalid inputs");
+        require(amount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
         uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
@@ -146,7 +146,7 @@ contract record Pool {
         uint256 tokenBAmount = amount * tokenBReserve / totalLiquidity;
         uint256 tokenAAmount = amount * tokenAReserve / totalLiquidity;
         
-        require(tokenBAmount >= minTokenB && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
+        require(tokenBAmount >= minTokenBAmount && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
 
         require(ERC20(tokenB).transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
         require(ERC20(tokenA).transfer(msg.sender, tokenAAmount), "TokenA transfer failed");
