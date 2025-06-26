@@ -47,7 +47,6 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
   ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
-  ADMIN_ADDRESS="" \
   npm run dev
 ```
 - `NETWORK` options are: `testnet|prod`.
@@ -99,6 +98,5 @@ sudo \
   ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
-  ADMIN_ADDRESS="" \
   docker compose up -d --build
 ```
