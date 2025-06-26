@@ -2,19 +2,6 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import CopyButton from "../ui/copy";
-
-interface LiquidationEntry {
-  id: string;
-  user: string;
-  asset: string;
-  assetSymbol?: string;
-  amount: string;
-  collateralAsset: string;
-  collateralSymbol?: string;
-  collateralAmount: string;
-  healthFactor: number;
-  expectedProfit?: string;
-}
 import { useLiquidationContext } from "@/context/LiquidationContext";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);

@@ -2,7 +2,7 @@ import { Copy, CopyCheck } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 import { useState } from "react";
 
-const CopyButton = ({address}) => {  
+const CopyButton = ({ address }) => {
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = () => {
@@ -12,7 +12,7 @@ const CopyButton = ({address}) => {
   };
 
   return (
-    <Tooltip open={copied || undefined}>
+    address && <Tooltip open={copied || undefined}>
       <TooltipTrigger asChild>
         <button
           onClick={copyToClipboard}
