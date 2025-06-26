@@ -58,16 +58,20 @@ contract Mercata {
         Ownable(adminRegistry).transferOwnership(msg.sender);
         adminRegistry.removeAdmin(this);
         
-        // Create TokenFactory with AdminRegistry
+        // Create Factories and services with AdminRegistry
         tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
+        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
+        mercataEthBridge = new MercataEthBridge(msg.sender, address(adminRegistry), address(tokenFactory));
+        onRamp = new OnRamp(address(priceOracle), msg.sender, address(adminRegistry), address(tokenFactory));
 
+        // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
         collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
         liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(msg.sender); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(tokenFactory));
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.setLendingPool(address(lendingPool));
@@ -77,9 +81,5 @@ contract Mercata {
         poolConfigurator.setPriceOracle(address(priceOracle)); 
         poolConfigurator.setTokenFactory(address(tokenFactory));
         Ownable(poolConfigurator).transferOwnership(msg.sender);
-        
-        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
-        mercataEthBridge = new MercataEthBridge(msg.sender, address(adminRegistry), address(tokenFactory));
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(adminRegistry), address(tokenFactory));
     }
 }
