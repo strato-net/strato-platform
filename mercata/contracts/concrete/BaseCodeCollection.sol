@@ -10,7 +10,7 @@ import "Tokens/TokenFaucet.sol";
 //import "Tokens/TokenAccess.sol";
 
 //Admin Registry
-import "AdminRegistry/AdminRegistry.sol";
+import "Admin/AdminRegistry.sol";
 
 //Swap
 import "Pools/Pool.sol";
@@ -27,7 +27,7 @@ import "OnRamp/OnRamp.sol";
 //Lending
 import "Lending/CollateralVault.sol";
 import "Lending/LendingPool.sol";
-import "LendingRegistry.sol";
+import "Lending/LendingRegistry.sol";
 import "Lending/LiquidityPool.sol";
 import "Lending/PoolConfigurator.sol";
 import "Lending/PriceOracle.sol";
@@ -55,6 +55,8 @@ contract Mercata {
         // Create AdminRegistry first
         adminRegistry = new AdminRegistry(this);
         adminRegistry.addAdmin(msg.sender);
+        Ownable(adminRegistry).transferOwnership(msg.sender);
+        adminRegistry.removeAdmin(this);
         
         // Create TokenFactory with AdminRegistry
         tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
@@ -64,8 +66,8 @@ contract Mercata {
         liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(msg.sender); 
-        poolConfigurator = new PoolConfigurator(address(lendingRegistry), this, address(adminRegistry));
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender);
+        poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(tokenFactory));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.setLendingPool(address(lendingPool));
@@ -76,13 +78,8 @@ contract Mercata {
         poolConfigurator.setTokenFactory(address(tokenFactory));
         Ownable(poolConfigurator).transferOwnership(msg.sender);
         
-        // Set token factory and pool configurator in AdminRegistry for automatic updates during migration
-        adminRegistry.setTokenFactory(address(tokenFactory));
-        adminRegistry.setPoolConfigurator(address(poolConfigurator));
-        Ownable(adminRegistry).transferOwnership(msg.sender);
-        
-        poolFactory = new PoolFactory(msg.sender, address(adminRegistry));
-        mercataEthBridge = new MercataEthBridge(msg.sender, address(adminRegistry));
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(adminRegistry));
+        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
+        mercataEthBridge = new MercataEthBridge(msg.sender, address(adminRegistry), address(tokenFactory));
+        onRamp = new OnRamp(address(priceOracle), msg.sender, address(adminRegistry), address(tokenFactory));
     }
 }

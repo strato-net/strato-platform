@@ -1,5 +1,5 @@
 import "./Tokens/Token.sol";
-import "../AdminRegistry/AdminRegistry.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 /*
  *  MercataEthBridge – STRATO ↔ Ethereum Safe bridge contract (no OpenZeppelin deps)
@@ -43,7 +43,8 @@ contract record MercataEthBridge {
    // ────────────────── configuration ──────────────────
     address public owner;       // STRATO admin key
     address public relayer;     // off‑chain relayer key
-    AdminRegistry public adminRegistry; // admin registry for token status checks
+    AdminRegistry public adminRegistry; // admin registry for admin status checks
+    TokenFactory public tokenFactory; // token factory for token status checks
 
     uint256 public minAmount = 0 ether; // dust guard
 
@@ -72,20 +73,27 @@ contract record MercataEthBridge {
     event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
     event MinAmountUpdated(uint256 oldVal, uint256 newVal);
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
-
+    event TokenFactoryUpdated(address oldFactory, address newFactory);
     // ─────────────────── modifiers ─────────────────────
     modifier onlyOwner()   { require(msg.sender == owner,   "NOT_OWNER");   _; }
     modifier onlyRelayer() { require(msg.sender == relayer, "NOT_RELAYER"); _; }
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner || adminRegistry.isAdminAddress(msg.sender), "MercataEthBridge: caller is not owner or admin");
+        _;
+    }
 
     // ───────────────── constructor ─────────────────────
-    constructor(address _relayer, address _adminRegistry) {
+    constructor(address _relayer, address _adminRegistry, address _tokenFactory) {
         require(_relayer != address(0), "ZERO_RELAYER");
         require(_adminRegistry != address(0), "ZERO_ADMIN_REGISTRY");
+        require(_tokenFactory != address(0), "ZERO_TOKEN_FACTORY");
         adminRegistry = AdminRegistry(_adminRegistry);
+        tokenFactory = TokenFactory(_tokenFactory);
         owner   = _relayer;
         relayer = _relayer;
      }
 
+    // ───────────── admin / config ops ──────────────────
     function setAdminRegistry(address _adminRegistry) external onlyOwner {
         require(_adminRegistry != address(0), "ZERO_ADDR");
         address oldRegistry = address(adminRegistry);
@@ -93,7 +101,13 @@ contract record MercataEthBridge {
         emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
     }
 
-    // ───────────── admin / config ops ──────────────────
+    function setTokenFactory(address _tokenFactory) external onlyOwnerOrAdmin {
+        require(_tokenFactory != address(0), "ZERO_ADDR");
+        address oldFactory = address(tokenFactory);
+        tokenFactory = TokenFactory(_tokenFactory);
+        emit TokenFactoryUpdated(oldFactory, _tokenFactory);
+    }
+
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "ZERO_ADDR");
         emit OwnerUpdated(owner, newOwner);
@@ -125,7 +139,7 @@ contract record MercataEthBridge {
 
     function confirmDeposit(string calldata txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(token), "INACTIVE_TOKEN");
+        require(tokenFactory.isTokenActive(token), "INACTIVE_TOKEN");
 
         Token(token).mint(mercataUser, amount);
         depositStatus[txHash] = DepositState.COMPLETED;
@@ -136,7 +150,7 @@ contract record MercataEthBridge {
     for (uint256 i = 0; i < deposits.length; i++) {
         DepositBatch calldata d = deposits[i];
         require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(d.token), "INACTIVE_TOKEN");
+        require(tokenFactory.isTokenActive(d.token), "INACTIVE_TOKEN");
 
         Token(d.token).mint(d.mercataUser, d.amount);
         depositStatus[d.txHash] = DepositState.COMPLETED;
@@ -150,7 +164,7 @@ contract record MercataEthBridge {
     // token = wrapped token
     function withdraw(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
-        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(token), "INACTIVE_TOKEN");
+        require(tokenFactory.isTokenActive(token), "INACTIVE_TOKEN");
         require(amount >= minAmount, "BELOW_MIN");
 
         Token(token).burn(mercataUser, amount);

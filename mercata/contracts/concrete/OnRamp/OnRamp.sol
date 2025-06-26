@@ -1,6 +1,6 @@
 import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
-import "../AdminRegistry/AdminRegistry.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 
 contract record OnRamp {
@@ -9,9 +9,9 @@ contract record OnRamp {
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
     event ListingCanceled(uint256 listingId);
     event ListingFulfilled(uint256 listingId, address buyer, uint256 amount, uint256 totalFiat);
-    event AdminStatusUpdated(address admin, bool enabled);
     event PaymentProviderStatusUpdated(address provider, bool enabled);
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
+    event TokenFactoryUpdated(address oldFactory, address newFactory);
 
     struct Listing {
         uint256 id;
@@ -30,34 +30,31 @@ contract record OnRamp {
     }
 
     // Approval management
-    uint256 public adminCount;
     uint256 public listingIdCounter;
-    mapping(address => bool) public record admins;
     mapping(address => bool) public record approvedSellers;
     mapping(address => PaymentProviderInfo) public record paymentProviders;
+    TokenFactory public tokenFactory;
     AdminRegistry public adminRegistry;
 
     // Price oracle
     PriceOracle public priceOracle;
-
     // Listing management
     mapping(address => Listing) public record listings;
 
     // Constructor
-    constructor(address _oracle, address _admin, address _adminRegistry) {
+    constructor(address _oracle, address _admin, address _adminRegistry, address _tokenFactory) {
         require(_admin != address(0), "Invalid admin");
         require(_oracle != address(0), "Invalid oracle");
         require(_adminRegistry != address(0), "Invalid admin registry");
-        admins[_admin] = true;
-        emit AdminStatusUpdated(_admin, true);
-        adminCount = 1;
+        require(_tokenFactory != address(0), "Invalid token factory");
         priceOracle = PriceOracle(_oracle);
         adminRegistry = AdminRegistry(_adminRegistry);
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     // Modifiers
     modifier onlyAdmin() {
-        require(admins[msg.sender], "Not admin");
+        require(adminRegistry.isAdminAddress(msg.sender), "OnRamp: caller is not admin");
         _;
     }
     modifier onlyApprovedSeller() {
@@ -65,10 +62,9 @@ contract record OnRamp {
         _;
     }
     modifier onlyApprovedToken(address token) {
-        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(token), "Token not active");
+        require(tokenFactory.isTokenActive(token), "Token not active");
         _;
     }
-
     modifier onlyProvider(address token) {
         require(listings[token].seller != address(0), "Closed");
 
@@ -86,21 +82,6 @@ contract record OnRamp {
     
     function isPaymentProvider(address provider) public view returns (bool) {
         return paymentProviders[provider].exists;
-    }
-
-    function setAdmin(address admin, bool enabled) external onlyAdmin {
-        if (enabled) {
-            require(!admins[admin], "Already admin");
-            admins[admin] = true;
-            emit AdminStatusUpdated(admin, true);
-            adminCount++;
-        } else {
-            require(admins[admin], "Not admin");
-            require(adminCount > 1, "Cannot remove last admin");
-            delete admins[admin];
-            emit AdminStatusUpdated(admin, false);
-            adminCount--;
-        }
     }
 
     function addPaymentProvider(address provider, string name, string endpoint) external onlyAdmin {
@@ -138,6 +119,13 @@ contract record OnRamp {
         address oldAdminRegistry = address(adminRegistry);
         adminRegistry = AdminRegistry(newAdminRegistry);
         emit AdminRegistryUpdated(oldAdminRegistry, newAdminRegistry);
+    }
+
+    function setTokenFactory(address _tokenFactory) external onlyAdmin {
+        require(_tokenFactory != address(0), "Invalid token factory");
+        address oldFactory = address(tokenFactory);
+        tokenFactory = TokenFactory(_tokenFactory);
+        emit TokenFactoryUpdated(oldFactory, _tokenFactory);
     }
 
     // Listing management functions
