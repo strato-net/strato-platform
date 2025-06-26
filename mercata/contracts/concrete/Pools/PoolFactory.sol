@@ -54,7 +54,7 @@ contract record PoolFactory is Ownable {
     }
 
     /// @notice Create a new pool for tokenA/tokenB
-    function createPool(address tokenA, address tokenB) external onlyOwner tokensActive(tokenA, tokenB) returns (address pool) {
+    function createPool(address tokenA, address tokenB, address feeCollector) external onlyOwner tokensActive(tokenA, tokenB) returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
