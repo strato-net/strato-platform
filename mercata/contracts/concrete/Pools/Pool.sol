@@ -197,13 +197,16 @@ contract record Pool {
             feePerShare += (lpFee * 1e18) / totalSupply;
         }
 
-        // Collect protocol fee
-        require(ERC20(inputToken).transferFrom(msg.sender, feeCollector, protocolFee), "Fee xfer failed");
+        // Transfer total amount (including protocol fee) to pool
+        require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Total input transfer failed");
+        
+        // Send protocol fee to fee collector
+        require(ERC20(inputToken).approve(feeCollector, protocolFee), "Protocol fee approve failed");
+        FeeCollector(feeCollector).receiveFee(address(inputToken), protocolFee);
 
         amountOut = getInputPrice(netInput, inputReserve, outputReserve);
         require(amountOut >= minAmountOut, "Slippage check failed");
 
-        require(ERC20(inputToken).transferFrom(msg.sender, address(this), netInput), "Input xfer failed");
         require(ERC20(outputToken).transfer(msg.sender, amountOut), "Output xfer failed");
 
         _updateStateVars();
