@@ -41,13 +41,15 @@ contract record LendingPool is Ownable {
     mapping(address => uint256) public record assetLiquidationBonus;
 
     LendingRegistry public registry;
+    TokenFactory public tokenFactory;
     address public poolConfigurator;
 
-    constructor(address _registry, address _poolConfigurator, address initialOwner) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner, address _tokenFactory) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
         poolConfigurator = _poolConfigurator;
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     modifier onlyPoolConfigurator() {
@@ -56,7 +58,7 @@ contract record LendingPool is Ownable {
     }
 
     modifier onlyTokenFactory(address token) {
-        require(registry.tokenFactory().isTokenActive(token), "Token not active");
+        require(tokenFactory.isTokenActive(token), "Token not active");
         _;
     }
     
@@ -219,6 +221,10 @@ contract record LendingPool is Ownable {
     function setLiquidationBonus(address asset, uint256 newBonus)  onlyPoolConfigurator{
         require(newBonus >= 100, "Bonus too low");
         assetLiquidationBonus[asset] = newBonus;
+    }
+
+    function setTokenFactory(address _tokenFactory) onlyPoolConfigurator {
+        tokenFactory = TokenFactory(_tokenFactory);
     }
 
     function getAvailableLiquidity(address asset)  view  returns (uint256) {

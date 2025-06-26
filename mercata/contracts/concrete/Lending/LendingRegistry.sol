@@ -17,14 +17,13 @@ import "./PriceOracle.sol";
     CollateralVault public collateralVault;
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
-    TokenFactory public tokenFactory;
 
     event LendingPoolSet(address indexed newAddress);
     event LiquidityPoolSet(address indexed newAddress);
     event CollateralVaultSet(address indexed newAddress);
     event RateStrategySet(address indexed newAddress);
     event PriceOracleSet(address indexed newAddress);
-    event TokenFactorySet(address indexed newAddress);
+
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     // External setter functions, gated by onlyOwner (e.g. PoolConfigurator)
@@ -57,11 +56,5 @@ import "./PriceOracle.sol";
         require(_priceOracle != address(0), "Invalid address");
         priceOracle = PriceOracle(_priceOracle);
         emit PriceOracleSet(_priceOracle);
-    }
-
-    function setTokenFactory(address _tokenFactory) public onlyOwner {
-        require(_tokenFactory != address(0), "Invalid address");
-        tokenFactory = TokenFactory(_tokenFactory);
-        emit TokenFactorySet(_tokenFactory);
     }
 }
