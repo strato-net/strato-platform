@@ -14,19 +14,24 @@
  */
 
 import "Pool.sol";
+import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PoolFactory is Ownable {
     event NewPool(address tokenA, address tokenB, address pool);
     event PoolMigrated(address tokenA, address tokenB, address pool);
+    event FeeCollectorUpdated(address oldFeeCollector, address newFeeCollector);
 
     mapping(address => mapping(address => address)) public pools;
     address[] public allPools;
     TokenFactory public tokenFactory;
+    address public feeCollector;
 
-    constructor(address initialOwner, address _tokenFactory) Ownable(initialOwner) {
+    constructor(address initialOwner, address _tokenFactory, address _feeCollector) Ownable(initialOwner) {
         require(_tokenFactory != address(0), "Zero token factory address");
+        require(_feeCollector != address(0), "Zero fee collector address");
         tokenFactory = TokenFactory(_tokenFactory);
+        feeCollector = _feeCollector;
     }
 
     /// @notice Create a new pool for tokenA/tokenB
@@ -36,8 +41,8 @@ contract record PoolFactory is Ownable {
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
         require(tokenFactory.isTokenActive(tokenA) && tokenFactory.isTokenActive(tokenB), "Token not active");
         
-        // deploy new pool
-        pool = address(new Pool(tokenA, tokenB, address(tokenFactory), msg.sender));
+        // deploy new pool with fee collector
+        pool = address(new Pool(tokenA, tokenB, address(tokenFactory), feeCollector));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions
@@ -59,5 +64,14 @@ contract record PoolFactory is Ownable {
 
         allPools.push(pool);
         emit PoolMigrated(tokenA, tokenB, pool);
+    }
+
+    /// @notice Update the fee collector address (owner only)
+    /// @dev This only affects new pools, existing pools will continue using their original fee collector
+    function setFeeCollector(address newFeeCollector) external onlyOwner {
+        require(newFeeCollector != address(0), "Zero fee collector address");
+        address oldFeeCollector = feeCollector;
+        feeCollector = newFeeCollector;
+        emit FeeCollectorUpdated(oldFeeCollector, newFeeCollector);
     }
 }

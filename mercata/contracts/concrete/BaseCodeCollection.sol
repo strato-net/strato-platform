@@ -13,6 +13,9 @@ import "Tokens/TokenFaucet.sol";
 import "Pools/Pool.sol";
 import "Pools/PoolFactory.sol";
 
+//Admin
+import "Admin/FeeCollector.sol";
+
 //OnRamp
 import "OnRamp/OnRamp.sol";
 
@@ -46,6 +49,7 @@ contract Mercata {
     OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
+    FeeCollector public feeCollector;
 
     constructor() public {
         tokenFactory = new TokenFactory(msg.sender);
@@ -67,7 +71,8 @@ contract Mercata {
         poolConfigurator.setTokenFactory(address(tokenFactory));
         Ownable(poolConfigurator).transferOwnership(msg.sender);
         
-        poolFactory = new PoolFactory(msg.sender, address(tokenFactory));
+        feeCollector = new FeeCollector(msg.sender);
+        poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(feeCollector));
         mercataEthBridge = new MercataEthBridge(msg.sender,address(tokenFactory));
         onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory));
     }
