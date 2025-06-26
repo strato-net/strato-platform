@@ -39,9 +39,8 @@ import "../Tokens/TokenFactory.sol";
  *     • Replay protection: Enforced via `depositStatus` and `withdrawStatus` mappings keyed by `txHash`.
  */
 
-contract record MercataEthBridge {
+contract record MercataEthBridge is Ownable {
    // ────────────────── configuration ──────────────────
-    address public owner;       // STRATO admin key
     address public relayer;     // off‑chain relayer key
     AdminRegistry public adminRegistry; // admin registry for admin status checks
     TokenFactory public tokenFactory; // token factory for token status checks
@@ -69,27 +68,24 @@ contract record MercataEthBridge {
     event WithdrawalInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
     event WithdrawalPendingApproval(string indexed txHash);
     event WithdrawalCompleted(string indexed txHash);
-    event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
     event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
     event MinAmountUpdated(uint256 oldVal, uint256 newVal);
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
     event TokenFactoryUpdated(address oldFactory, address newFactory);
     // ─────────────────── modifiers ─────────────────────
-    modifier onlyOwner()   { require(msg.sender == owner,   "NOT_OWNER");   _; }
     modifier onlyRelayer() { require(msg.sender == relayer, "NOT_RELAYER"); _; }
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner || adminRegistry.isAdminAddress(msg.sender), "MercataEthBridge: caller is not owner or admin");
+        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "MercataEthBridge: caller is not owner or admin");
         _;
     }
 
     // ───────────────── constructor ─────────────────────
-    constructor(address _relayer, address _adminRegistry, address _tokenFactory) {
+    constructor(address _relayer, address _adminRegistry, address _tokenFactory) Ownable(_relayer) {
         require(_relayer != address(0), "ZERO_RELAYER");
         require(_adminRegistry != address(0), "ZERO_ADMIN_REGISTRY");
         require(_tokenFactory != address(0), "ZERO_TOKEN_FACTORY");
         adminRegistry = AdminRegistry(_adminRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
-        owner   = _relayer;
         relayer = _relayer;
      }
 
@@ -108,19 +104,13 @@ contract record MercataEthBridge {
         emit TokenFactoryUpdated(oldFactory, _tokenFactory);
     }
 
-    function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "ZERO_ADDR");
-        emit OwnerUpdated(owner, newOwner);
-        owner = newOwner;
-    }
-
-    function setRelayer(address newRelayer) external onlyOwner {
+    function setRelayer(address newRelayer) external onlyOwnerOrAdmin {
         require(newRelayer != address(0), "ZERO_ADDR");
         emit RelayerUpdated(relayer, newRelayer);
         relayer = newRelayer;
     }
 
-    function setMinAmount(uint256 newMin) external onlyOwner {
+    function setMinAmount(uint256 newMin) external onlyOwnerOrAdmin {
         emit MinAmountUpdated(minAmount, newMin);
         minAmount = newMin;
     }

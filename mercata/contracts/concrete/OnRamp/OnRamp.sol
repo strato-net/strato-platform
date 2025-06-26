@@ -3,7 +3,7 @@ import "../Lending/PriceOracle.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 
-contract record OnRamp {
+contract record OnRamp is Ownable {
     event SellerApprovalUpdated(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
@@ -42,7 +42,7 @@ contract record OnRamp {
     mapping(address => Listing) public record listings;
 
     // Constructor
-    constructor(address _oracle, address _admin, address _adminRegistry, address _tokenFactory) {
+    constructor(address _oracle, address _admin, address _adminRegistry, address _tokenFactory, address _owner) Ownable(_owner) {
         require(_admin != address(0), "Invalid admin");
         require(_oracle != address(0), "Invalid oracle");
         require(_adminRegistry != address(0), "Invalid admin registry");
@@ -53,8 +53,8 @@ contract record OnRamp {
     }
 
     // Modifiers
-    modifier onlyAdmin() {
-        require(adminRegistry.isAdminAddress(msg.sender), "OnRamp: caller is not admin");
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "OnRamp: caller is not owner or admin");
         _;
     }
     modifier onlyApprovedSeller() {
@@ -84,7 +84,7 @@ contract record OnRamp {
         return paymentProviders[provider].exists;
     }
 
-    function addPaymentProvider(address provider, string name, string endpoint) external onlyAdmin {
+    function addPaymentProvider(address provider, string name, string endpoint) external onlyOwnerOrAdmin {
         require(!isPaymentProvider(provider), "Already exists");
         require(provider != address(0), "Invalid provider");
 
@@ -98,19 +98,19 @@ contract record OnRamp {
         emit PaymentProviderStatusUpdated(provider, true);
     }
 
-    function removePaymentProvider(address provider) external onlyAdmin {
+    function removePaymentProvider(address provider) external onlyOwnerOrAdmin {
         require(paymentProviders[provider].exists, "Not a provider");
 
         delete paymentProviders[provider];
         emit PaymentProviderStatusUpdated(provider, false);
     }
 
-    function setApprovedSeller(address seller, bool approved) external onlyAdmin {
+    function setApprovedSeller(address seller, bool approved) external onlyOwnerOrAdmin {
         approvedSellers[seller] = approved;
         emit SellerApprovalUpdated(seller, approved);
     }
 
-    function setPriceOracle(address newOracle) external onlyAdmin {
+    function setPriceOracle(address newOracle) external onlyOwnerOrAdmin {
         priceOracle = PriceOracle(newOracle);
     }
 
@@ -121,7 +121,7 @@ contract record OnRamp {
         emit AdminRegistryUpdated(oldAdminRegistry, newAdminRegistry);
     }
 
-    function setTokenFactory(address _tokenFactory) external onlyAdmin {
+    function setTokenFactory(address _tokenFactory) external onlyOwnerOrAdmin {
         require(_tokenFactory != address(0), "Invalid token factory");
         address oldFactory = address(tokenFactory);
         tokenFactory = TokenFactory(_tokenFactory);
@@ -219,7 +219,7 @@ contract record OnRamp {
         return finalPrice * amount;
     }
 
-    function rescueTokens(address token) external onlyAdmin {
+    function rescueTokens(address token) external onlyOwnerOrAdmin {
         require(listings[token].seller != address(0), "No active listing for token");
         Listing listing = listings[token];
         uint256 balance = IERC20(token).balanceOf(address(this));
