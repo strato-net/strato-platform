@@ -69,13 +69,14 @@ const SetLiquidationBonusModal = ({ open, onOpenChange, token, currentBonus, onS
         description: `${token.symbol} liquidation bonus has been set to ${bonusValue}%`,
       });
 
-      // Refresh data to show updated values
-      if (onSuccess) {
-        await onSuccess();
-      }
-
+      // Close modal first to prevent flickering
       form.reset();
       onOpenChange(false);
+
+      // Refresh data in background after modal closes
+      if (onSuccess) {
+        setTimeout(() => onSuccess(), 100);
+      }
     } catch (error: unknown) {
       const axiosError = error as AxiosError<any>;
       console.error('Liquidation bonus error:', axiosError);
