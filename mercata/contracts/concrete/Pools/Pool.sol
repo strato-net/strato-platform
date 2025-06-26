@@ -134,17 +134,17 @@ contract record Pool {
     }
 
     function removeLiquidity(
-        uint256 amount, 
+        uint256 lpTokenAmount, 
         uint256 minTokenBAmount,
         uint256 minTokenAAmount
     ) external returns (uint256, uint256) {
-        require(amount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
+        require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
         uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
         uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokenBAmount = amount * tokenBReserve / totalLiquidity;
-        uint256 tokenAAmount = amount * tokenAReserve / totalLiquidity;
+        uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
+        uint256 tokenAAmount = lpTokenAmount * tokenAReserve / totalLiquidity;
         
         require(tokenBAmount >= minTokenBAmount && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
 
@@ -153,7 +153,7 @@ contract record Pool {
 
         emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
-        lpToken.burn(msg.sender, amount);
+        lpToken.burn(msg.sender, lpTokenAmount);
         rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
 
         _updateStateVars();
