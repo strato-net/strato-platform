@@ -17,16 +17,9 @@ contract record TokenFactory is Ownable {
         adminRegistry = AdminRegistry(_adminRegistry);
     }
     
-    modifier onlyAdmin() {
-        require(adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not admin");
+    modifier onlyOwnerOrAdmin() {
+        require(_checkOwner() || adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not owner or admin");
         _;
-    }
-    
-    function setAdminRegistry(address _adminRegistry) external onlyOwner {
-        require(_adminRegistry != address(0), "Zero admin registry address");
-        address oldRegistry = address(adminRegistry);
-        adminRegistry = AdminRegistry(_adminRegistry);
-        emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
     }
     
     function createToken(
@@ -38,7 +31,7 @@ contract record TokenFactory is Ownable {
         string _symbol,
         uint256 _initialSupply,
         uint8 _customDecimals
-    ) external onlyAdmin returns (address) {
+    ) external onlyOwnerOrAdmin returns (address) {
         // Create new token with msg.sender as the token creator
         Token newToken = new Token(
             _name,
@@ -60,16 +53,23 @@ contract record TokenFactory is Ownable {
         emit TokenCreated(tokenAddress, msg.sender, _name, _symbol);
         return tokenAddress;
     }
-    
-    function setTokenStatus(address token, uint newStatus) external onlyAdmin {
-        Token(token).setStatus(newStatus);
-    }
 
     function isTokenActive(address token) external view returns (bool) {
         return Token(token).status() == TokenStatus.ACTIVE && isFactoryToken[token];
     }
+    
+    function setTokenStatus(address token, uint newStatus) external onlyOwnerOrAdmin {
+        Token(token).setStatus(newStatus);
+    }
 
-    function migrateTokensToFactory(address newFactory) external onlyAdmin {
+    function setAdminRegistry(address _adminRegistry) external onlyOwner {
+        require(_adminRegistry != address(0), "Zero admin registry address");
+        address oldRegistry = address(adminRegistry);
+        adminRegistry = AdminRegistry(_adminRegistry);
+        emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
+    }
+
+    function migrateTokensToFactory(address newFactory) external onlyOwnerOrAdmin {
         for (uint256 i = 0; i < allTokens.length; i++) {
             address tokenAddr = allTokens[i];
             Token(tokenAddr).setTokenFactory(newFactory);
@@ -77,7 +77,7 @@ contract record TokenFactory is Ownable {
         emit TokensMigrated(address(this), newFactory, allTokens.length);
     }
 
-    function registerMigratedTokens(address[] tokens) external onlyAdmin {
+    function registerMigratedTokens(address[] tokens) external onlyOwnerOrAdmin {
         for (uint256 i = 0; i < tokens.length; i++) {
             isFactoryToken[tokens[i]] = true;
             allTokens.push(tokens[i]);

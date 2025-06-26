@@ -15,24 +15,29 @@
 
 import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
-import "../AdminRegistry/AdminRegistry.sol";
+import "../Admin/AdminRegistry.sol";
+import "../Tokens/TokenFactory.sol";
 
 contract record PoolFactory is Ownable {
     event NewPool(address tokenA, address tokenB, address pool);
-    event PoolsMigrated(address indexed oldFactory, address indexed newFactory, uint256 poolCount);
+    event PoolsMigrated(address oldFactory, address newFactory, uint256 poolCount);
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
+    event TokenFactoryUpdated(address oldFactory, address newFactory);
 
-    mapping(address => mapping(address => address)) public pools;
-    address[] public allPools;
+    mapping(address => mapping(address => address)) public record pools;
+    address[] public record allPools;
     AdminRegistry public adminRegistry;
+    TokenFactory public tokenFactory;
 
-    constructor(address initialOwner, address _adminRegistry) Ownable(initialOwner) {
+    constructor(address initialOwner, address _adminRegistry, address _tokenFactory) Ownable(initialOwner) {
         require(_adminRegistry != address(0), "Zero admin registry address");
+        require(_tokenFactory != address(0), "Zero token factory address");
         adminRegistry = AdminRegistry(_adminRegistry);
+        tokenFactory = TokenFactory(_tokenFactory);
     }
-    
-    modifier onlyAdmin() {
-        require(adminRegistry.isAdminAddress(msg.sender), "PoolFactory: caller is not admin");
+
+    modifier onlyOwnerOrAdmin() {
+        require(_checkOwner() || adminRegistry.isAdminAddress(msg.sender), "PoolFactory: caller is not owner or admin");
         _;
     }
     
@@ -42,7 +47,7 @@ contract record PoolFactory is Ownable {
      * @param tokenB Second token address.
      */
     modifier tokensActive(address tokenA, address tokenB) {
-        require(TokenFactory(adminRegistry.tokenFactory()).isTokenActive(tokenA) && TokenFactory(adminRegistry.tokenFactory()).isTokenActive(tokenB), "Token not active");
+        require(tokenFactory.isTokenActive(tokenA) && tokenFactory.isTokenActive(tokenB), "Token not active");
         _;
     }
 
@@ -53,14 +58,21 @@ contract record PoolFactory is Ownable {
         emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
     }
 
+    function setTokenFactory(address _tokenFactory) external onlyOwnerOrAdmin {
+        require(_tokenFactory != address(0), "Zero token factory address");
+        address oldFactory = address(tokenFactory);
+        tokenFactory = TokenFactory(_tokenFactory);
+        emit TokenFactoryUpdated(oldFactory, _tokenFactory);
+    }
+
     /// @notice Create a new pool for tokenA/tokenB
-    function createPool(address tokenA, address tokenB, address feeCollector) external onlyOwner tokensActive(tokenA, tokenB) returns (address pool) {
+    function createPool(address tokenA, address tokenB) external onlyOwnerOrAdmin tokensActive(tokenA, tokenB) returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
         
         // deploy new pool
-        pool = address(new Pool(tokenA, tokenB, adminRegistry.tokenFactory()));
+        pool = address(new Pool(tokenA, tokenB, address(tokenFactory)));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions
@@ -74,19 +86,17 @@ contract record PoolFactory is Ownable {
      * @notice Register migrated pools (external function for migration).
      * @param poolsToRegister Array of pool addresses to register.
      */
-    function registerMigratedPools(address[] poolsToRegister) external onlyAdmin {
-        for (uint256 i = 0; i < poolsToRegister.length; i++) {
-            address pool = poolsToRegister[i];
-            require(pool != address(0), "Invalid pool address");
+    function registerMigratedPools(address oldPoolFactory) external onlyOwnerOrAdmin {
+        PoolFactory oldFactory = PoolFactory(oldPoolFactory);
+        address[] oldAllPools = oldFactory.allPools();
+        
+        for (uint256 i = 0; i < oldAllPools.length; i++) {
+            address pool = oldAllPools[i];
             
             // Get tokenA and tokenB from the pool contract
             Pool poolContract = Pool(pool);
             address tokenA = address(poolContract.tokenA());
             address tokenB = address(poolContract.tokenB());
-            
-            require(tokenA != address(0) && tokenB != address(0), "Zero address");
-            require(tokenA != tokenB, "Identical addresses");
-            require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool already registered");
             
             pools[tokenA][tokenB] = pool;
             pools[tokenB][tokenA] = pool;

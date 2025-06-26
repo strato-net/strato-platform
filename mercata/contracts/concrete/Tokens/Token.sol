@@ -3,6 +3,7 @@ import "./TokenMetadata.sol";
 import "./TokenAccess.sol";
 import "../../abstract/ERC20.sol";
 import "../Admin/AdminRegistry.sol";
+import "./TokenFactory.sol";
 
 enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
