@@ -57,12 +57,6 @@ contract Mercata {
         adminRegistry.addAdmin(msg.sender);
         Ownable(adminRegistry).transferOwnership(msg.sender);
         adminRegistry.removeAdmin(this);
-        
-        // Create Factories and services with AdminRegistry
-        tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
-        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
-        mercataEthBridge = new MercataEthBridge(msg.sender, address(adminRegistry), address(tokenFactory));
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(adminRegistry), address(tokenFactory));
 
         // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
@@ -81,5 +75,11 @@ contract Mercata {
         poolConfigurator.setPriceOracle(address(priceOracle)); 
         poolConfigurator.setTokenFactory(address(tokenFactory));
         Ownable(poolConfigurator).transferOwnership(msg.sender);
+
+        // Create Factories and services with AdminRegistry
+        tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
+        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
+        mercataEthBridge = new MercataEthBridge(msg.sender, address(tokenFactory));
+        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry));
     }
 }

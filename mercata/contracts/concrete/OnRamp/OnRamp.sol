@@ -42,8 +42,7 @@ contract record OnRamp is Ownable {
     mapping(address => Listing) public record listings;
 
     // Constructor
-    constructor(address _oracle, address _admin, address _adminRegistry, address _tokenFactory, address _owner) Ownable(_owner) {
-        require(_admin != address(0), "Invalid admin");
+    constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry) Ownable(_owner) {
         require(_oracle != address(0), "Invalid oracle");
         require(_adminRegistry != address(0), "Invalid admin registry");
         require(_tokenFactory != address(0), "Invalid token factory");
@@ -114,7 +113,7 @@ contract record OnRamp is Ownable {
         priceOracle = PriceOracle(newOracle);
     }
 
-    function setAdminRegistry(address newAdminRegistry) external onlyAdmin {
+    function setAdminRegistry(address newAdminRegistry) external onlyOwner {
         require(newAdminRegistry != address(0), "Invalid admin registry");
         address oldAdminRegistry = address(adminRegistry);
         adminRegistry = AdminRegistry(newAdminRegistry);

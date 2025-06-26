@@ -42,7 +42,6 @@ import "../Tokens/TokenFactory.sol";
 contract record MercataEthBridge is Ownable {
    // ────────────────── configuration ──────────────────
     address public relayer;     // off‑chain relayer key
-    AdminRegistry public adminRegistry; // admin registry for admin status checks
     TokenFactory public tokenFactory; // token factory for token status checks
 
     uint256 public minAmount = 0 ether; // dust guard
@@ -70,47 +69,33 @@ contract record MercataEthBridge is Ownable {
     event WithdrawalCompleted(string indexed txHash);
     event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
     event MinAmountUpdated(uint256 oldVal, uint256 newVal);
-    event AdminRegistryUpdated(address oldRegistry, address newRegistry);
     event TokenFactoryUpdated(address oldFactory, address newFactory);
     // ─────────────────── modifiers ─────────────────────
     modifier onlyRelayer() { require(msg.sender == relayer, "NOT_RELAYER"); _; }
-    modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "MercataEthBridge: caller is not owner or admin");
-        _;
-    }
 
     // ───────────────── constructor ─────────────────────
-    constructor(address _relayer, address _adminRegistry, address _tokenFactory) Ownable(_relayer) {
+    constructor(address _relayer, address _tokenFactory) Ownable(_relayer) {
         require(_relayer != address(0), "ZERO_RELAYER");
-        require(_adminRegistry != address(0), "ZERO_ADMIN_REGISTRY");
         require(_tokenFactory != address(0), "ZERO_TOKEN_FACTORY");
-        adminRegistry = AdminRegistry(_adminRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
         relayer = _relayer;
      }
 
     // ───────────── admin / config ops ──────────────────
-    function setAdminRegistry(address _adminRegistry) external onlyOwner {
-        require(_adminRegistry != address(0), "ZERO_ADDR");
-        address oldRegistry = address(adminRegistry);
-        adminRegistry = AdminRegistry(_adminRegistry);
-        emit AdminRegistryUpdated(oldRegistry, _adminRegistry);
-    }
-
-    function setTokenFactory(address _tokenFactory) external onlyOwnerOrAdmin {
+    function setTokenFactory(address _tokenFactory) external onlyOwner {
         require(_tokenFactory != address(0), "ZERO_ADDR");
         address oldFactory = address(tokenFactory);
         tokenFactory = TokenFactory(_tokenFactory);
         emit TokenFactoryUpdated(oldFactory, _tokenFactory);
     }
 
-    function setRelayer(address newRelayer) external onlyOwnerOrAdmin {
+    function setRelayer(address newRelayer) external onlyOwner {
         require(newRelayer != address(0), "ZERO_ADDR");
         emit RelayerUpdated(relayer, newRelayer);
         relayer = newRelayer;
     }
 
-    function setMinAmount(uint256 newMin) external onlyOwnerOrAdmin {
+    function setMinAmount(uint256 newMin) external onlyOwner {
         emit MinAmountUpdated(minAmount, newMin);
         minAmount = newMin;
     }
