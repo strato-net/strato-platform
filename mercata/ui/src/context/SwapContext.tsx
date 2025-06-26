@@ -40,6 +40,12 @@ type SwapContextType = {
     address: string;
     amount: string;
   }) => Promise<any>;
+  fetchTokenBalances: (pool: any, userAddress: string, usdstAddress: string) => Promise<{
+    tokenABalance: string;
+    tokenBBalance: string;
+    usdstBalance: string;
+  }>;
+  enrichPools: (pools: any[]) => any[];
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -221,6 +227,33 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const fetchTokenBalances = useCallback(async (pool: any, userAddress: string, usdstAddress: string) => {
+    try {
+      const [balanceA, balanceB, balanceUsdst] = await Promise.all([
+        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${pool.tokenA.address}`),
+        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${pool.tokenB.address}`),
+        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`)
+      ]);
+      
+      return {
+        tokenABalance: balanceA?.data[0]?.balance || "0",
+        tokenBBalance: balanceB?.data[0]?.balance || "0",
+        usdstBalance: balanceUsdst?.data[0]?.balance || "0"
+      };
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch token balances');
+      throw err;
+    }
+  }, []);
+
+  const enrichPools = useCallback((pools: any[]) => {
+    return pools.map((pool: any) => ({
+      ...pool,
+      _name: `${pool.tokenA._name}/${pool.tokenB._name}`,
+      _symbol: `${pool.tokenA._symbol}/${pool.tokenB._symbol}`,
+    }));
+  }, []);
+
   useEffect(() => {
     fetchSwappableTokens();
   }, [fetchSwappableTokens]);
@@ -243,6 +276,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         fetchPools,
         addLiquidity,
         removeLiquidity,
+        fetchTokenBalances,
+        enrichPools,
       }}
     >
       {children}

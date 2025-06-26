@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import axios from "axios";
 import { message, Table } from "antd";
 import { CopyOutlined, LinkOutlined, FrownOutlined } from "@ant-design/icons";
-import { formatDistanceToNow } from "date-fns";
+import { useTransactionContext } from "@/context/TransactionContext";
 
 interface DepositTransaction {
   transaction_hash: string;
@@ -23,123 +22,60 @@ interface DepositTransaction {
 
 const ITEMS_PER_PAGE = 10;
 
-const formatDate = (dateString: string) => {
-  try {
-    const isoString = dateString.replace(" UTC", "Z");
-    const date = new Date(isoString);
-    const relativeTime = formatDistanceToNow(date, { addSuffix: true });
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    if (date < sevenDaysAgo) {
-      const indianDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
-      return indianDate.toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      });
-    }
-
-    return relativeTime;
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return dateString;
-  }
-};
-
 const DepositTransactionDetails = () => {
-  const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState("DepositInitiated");
+  const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
+
+  const {
+    loading: isLoading,
+    fetchDepositTransactions,
+    formatDate,
+    copyToClipboard,
+    renderTruncatedAddress,
+    renderTransactionHash
+  } = useTransactionContext();
 
   useEffect(() => {
-    const fetchDepositTransactions = async () => {
-      setIsLoading(true);
-
+    const loadTransactions = async () => {
       try {
-        const response = await axios.get(
-          `/api/bridge/depositStatus/${depositStatus}`,
-          {
-            params: {
-              limit: ITEMS_PER_PAGE,
-              pageNo: currentPage,
-              orderBy: "block_timestamp",
-              orderDirection: "desc",
-            },
-          }
-        );
-
-        const depositData = response.data?.data?.data.data || [];
-        // console.log("depositData", depositData);
-
-        const transformedData = Array.isArray(depositData)
-          ? depositData.map((item: any) => ({
-              transaction_hash: item.transaction_hash,
-              block_timestamp: item.block_timestamp,
-              from: item.from,
-              to: item.to,
-              tokenSymbol: item.tokenSymbol,
-              ethTokenSymbol: item.ethTokenSymbol,
-              ethTokenAddress: item.ethTokenAddress,
-              amount: item.amount
-                ? (
-                    Number(item.amount) /
-                    (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)
-                  ).toLocaleString("fullwide", {
-                    useGrouping: false,
-                    maximumFractionDigits: 20,
-                  })
-                : "-",
-              txHash: item.txHash,
-              token: item.token,
-              key: item.key,
-              depositStatus: item.depositStatus,
-            }))
-          : [];
-        setTransactions(transformedData);
-
-        // Get total count from the API response
-        setTotalCount(response.data?.data?.data?.totalCount || 0);
-        // console.log("total count", response.data?.data?.data?.totalCount);
+        const result = await fetchDepositTransactions({
+          status: depositStatus,
+          page: currentPage,
+          limit: ITEMS_PER_PAGE
+        });
+        setTransactions(result.data);
+        setTotalCount(result.totalCount);
       } catch (error) {
-        console.error("Error fetching transactions:", error);
+        console.error("Error loading transactions:", error);
         setTransactions([]);
         setTotalCount(0);
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    fetchDepositTransactions();
-  }, [currentPage, depositStatus]);
+    loadTransactions();
+  }, [currentPage, depositStatus, fetchDepositTransactions]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        message.success("Copied to clipboard");
-      })
-      .catch(() => {
-        message.error("Failed to copy");
-      });
+  const handleCopyToClipboard = async (text: string) => {
+    try {
+      await copyToClipboard(text);
+      message.success("Copied to clipboard");
+    } catch (error) {
+      message.error("Failed to copy");
+    }
   };
 
-  const renderTruncatedAddress = (address: string) => {
+  const renderTruncatedAddressWithCopy = (address: string) => {
     if (!address) return "-";
     return (
       <div className="group relative flex items-center gap-2">
         <span className="cursor-pointer">
-          {`${address.slice(0, 6)}...${address.slice(-4)}`}
+          {renderTruncatedAddress(address)}
         </span>
         <CopyOutlined
           className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
-          onClick={() => copyToClipboard(address)}
+          onClick={() => handleCopyToClipboard(address)}
         />
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
           {address}
@@ -148,17 +84,17 @@ const DepositTransactionDetails = () => {
     );
   };
 
-  const renderTransactionHash = (hash: string) => {
+  const renderTransactionHashWithLinks = (hash: string) => {
     if (!hash) return "-";
     const hashWithPrefix = hash.startsWith("0x") ? hash : `0x${hash}`;
     return (
       <div className="group relative flex items-center gap-2">
         <span className="cursor-pointer">
-          {`${hash.slice(0, 6)}...${hash.slice(-4)}`}
+          {renderTransactionHash(hash)}
         </span>
         <CopyOutlined
           className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
-          onClick={() => copyToClipboard(hash)}
+          onClick={() => handleCopyToClipboard(hash)}
         />
         <LinkOutlined
           className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
@@ -181,14 +117,14 @@ const DepositTransactionDetails = () => {
       title: "From (ETH)",
       dataIndex: "from",
       key: "from",
-      render: (text: string) => renderTruncatedAddress(text),
+      render: (text: string) => renderTruncatedAddressWithCopy(text),
       width: 100,
     },
     {
       title: "To (STRATO)",
       dataIndex: "to",
       key: "to",
-      render: (text: string) => renderTruncatedAddress(text),
+      render: (text: string) => renderTruncatedAddressWithCopy(text),
       width: 100,
     },
     {
@@ -233,7 +169,7 @@ const DepositTransactionDetails = () => {
       title: "Tx Hash",
       dataIndex: "txHash",
       key: "txHash",
-      render: (text: string) => renderTransactionHash(text),
+      render: (text: string) => renderTransactionHashWithLinks(text),
       width: 100,
     },
     {

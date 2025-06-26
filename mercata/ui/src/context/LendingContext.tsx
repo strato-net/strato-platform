@@ -42,6 +42,8 @@ type LendingContextType = {
     asset: string;
   }) => Promise<any>;
   getLend: () => Promise<any>;
+  depositLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
+  withdrawLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -215,6 +217,26 @@ export const LendingProvider = ({
     }
   };
 
+  const depositLiquidity = async (args: { asset: string; amount: string }) => {
+    try {
+      const res = await api.post("/lend/depositLiquidity", args);
+      return res;
+    } catch (err: any) {
+      console.error("Deposit liquidity failed:", err);
+      throw err;
+    }
+  };
+
+  const withdrawLiquidity = async (args: { asset: string; amount: string }) => {
+    try {
+      const res = await api.post("/lend/withdrawLiquidity", args);
+      return res;
+    } catch (err: any) {
+      console.error("Withdraw liquidity failed:", err);
+      throw err;
+    }
+  };
+
   const refreshLendingData = async (): Promise<void> => {
     try {
       // Refresh all lending-related data
@@ -258,6 +280,8 @@ export const LendingProvider = ({
       borrowAsset,
       repayLoan,
       getLend,
+      depositLiquidity,
+      withdrawLiquidity,
     }),
     [
       depositableTokens,
