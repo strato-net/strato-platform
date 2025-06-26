@@ -18,6 +18,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import CopyButton from '@/components/ui/copy';
 
 const generatePriceData = (basePrice: number, days: number = 30) => {
   const data = [];
@@ -188,6 +189,7 @@ const AssetDetail = () => {
                         {asset?.token?._owner
                           ? `${asset.token._owner.slice(0, 6)}...${asset.token._owner.slice(-4)}`
                           : 'N/A'}
+                      <CopyButton address={asset?.token?._owner} />
                       </span>
                     </div>
 
@@ -197,6 +199,7 @@ const AssetDetail = () => {
                         {asset?.address
                           ? `${asset.address.slice(0, 6)}...${asset.address.slice(-4)}`
                           : 'N/A'}
+                        <CopyButton address={asset?.address} />
                       </span>
                     </div>
 
