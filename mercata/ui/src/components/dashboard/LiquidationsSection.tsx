@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { api } from "@/lib/axios";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import CopyButton from "../ui/copy";
@@ -16,6 +15,7 @@ interface LiquidationEntry {
   healthFactor: number;
   expectedProfit?: string;
 }
+import { useLiquidationContext } from "@/context/LiquidationContext";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v: string) => {
@@ -28,36 +28,13 @@ const weiToEther = (v: string) => {
 };
 
 const LiquidationsSection: React.FC = () => {
-  const [liquidatable, setLiquidatable] = useState<LiquidationEntry[]>([]);
-  const [watchlist, setWatchlist] = useState<LiquidationEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { liquidatable, watchlist, loading, error, executeLiquidation } = useLiquidationContext();
   const { toast } = useToast();
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [liqRes, watchRes] = await Promise.all([
-        api.get<LiquidationEntry[]>("/lend/liquidate"),
-        api.get<LiquidationEntry[]>("/lend/liquidate/near-unhealthy?margin=0.2"),
-      ]);
-      setLiquidatable(liqRes.data || []);
-      setWatchlist(watchRes.data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleLiquidate = async (id: string) => {
     try {
-      await api.post(`/lend/liquidate/${id}`);
+      await executeLiquidation(id);
       toast({ title: "Liquidation submitted", variant: "success" });
-      fetchData();
     } catch (err: any) {
       toast({
         title: "Liquidation failed",
@@ -67,7 +44,7 @@ const LiquidationsSection: React.FC = () => {
     }
   };
 
-  const renderRow = (l: LiquidationEntry, showAction: boolean) => (
+  const renderRow = (l: any, showAction: boolean) => (
     <tr key={l.id} className="border-t">
       <td className="px-4 py-2 text-sm">{l.id}</td>
       <td className="px-4 py-2 text-sm">
@@ -103,6 +80,10 @@ const LiquidationsSection: React.FC = () => {
       )}
     </tr>
   );
+
+  if (error) {
+    return <div className="text-red-600">Error: {error}</div>;
+  }
 
   return (
     <div>

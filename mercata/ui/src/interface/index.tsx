@@ -156,6 +156,7 @@ export interface OnRampContextType {
   error: string | null;
   
   get: () => Promise<any>;
+  buy: (payload: any, userAddress: string) => Promise<{ url: string }>;
   sell: (body: any) => Promise<any>;
   lock: (body: any) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<any>;
