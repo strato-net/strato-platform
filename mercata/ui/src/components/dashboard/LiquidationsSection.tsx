@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import CopyButton from "../ui/copy";
 
 interface LiquidationEntry {
   id: string;
@@ -69,7 +70,12 @@ const LiquidationsSection: React.FC = () => {
   const renderRow = (l: LiquidationEntry, showAction: boolean) => (
     <tr key={l.id} className="border-t">
       <td className="px-4 py-2 text-sm">{l.id}</td>
-      <td className="px-4 py-2 text-sm">{shorten(l.user)}</td>
+      <td className="px-4 py-2 text-sm">
+        <div className="flex items-center space-x-2">
+          <span className="truncate">{shorten(l.user)}</span>
+          <CopyButton address={l?.user} />
+        </div>
+      </td>
       <td className="px-4 py-2 text-sm">
         {weiToEther(l.collateralAmount).toFixed(2)} {l.collateralSymbol || shorten(l.collateralAsset)}
       </td>
@@ -82,9 +88,9 @@ const LiquidationsSection: React.FC = () => {
       <td className="px-4 py-2 text-sm">
         {l.expectedProfit ? (
           parseFloat(l.expectedProfit) > 0 ? (
-            <span className="text-green-600">${(parseFloat(l.expectedProfit)/1e18).toFixed(2)}</span>
+            <span className="text-green-600">${(parseFloat(l.expectedProfit) / 1e18).toFixed(2)}</span>
           ) : (
-            <span className="text-red-600">${(parseFloat(l.expectedProfit)/1e18).toFixed(2)}</span>
+            <span className="text-red-600">${(parseFloat(l.expectedProfit) / 1e18).toFixed(2)}</span>
           )
         ) : "--"}
       </td>
