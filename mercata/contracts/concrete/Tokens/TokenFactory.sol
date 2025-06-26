@@ -21,6 +21,11 @@ contract record TokenFactory is Ownable {
         require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not owner or admin");
         _;
     }
+
+    modifier onlyAdmin() {
+        require(adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not admin");
+        _;
+    }
     
     function createToken(
         string _name,
@@ -58,7 +63,7 @@ contract record TokenFactory is Ownable {
         return Token(token).status() == TokenStatus.ACTIVE && isFactoryToken[token];
     }
     
-    function setTokenStatus(address token, uint newStatus) external onlyOwnerOrAdmin {
+    function setTokenStatus(address token, uint newStatus) external onlyAdmin {
         Token(token).setStatus(newStatus);
     }
 
