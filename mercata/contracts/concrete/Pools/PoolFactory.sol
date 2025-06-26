@@ -36,8 +36,8 @@ contract record PoolFactory is Ownable {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 
-    modifier onlyOwnerOrAdmin() {
-        require(_checkOwner() || adminRegistry.isAdminAddress(msg.sender), "PoolFactory: caller is not owner or admin");
+    modifier onlyOwnerOrAdmin() { 
+        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "PoolFactory: caller is not owner or admin");
         _;
     }
     

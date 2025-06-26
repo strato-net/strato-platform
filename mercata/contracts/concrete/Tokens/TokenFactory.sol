@@ -18,7 +18,7 @@ contract record TokenFactory is Ownable {
     }
     
     modifier onlyOwnerOrAdmin() {
-        require(_checkOwner() || adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not owner or admin");
+        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "TokenFactory: caller is not owner or admin");
         _;
     }
     
