@@ -24,7 +24,7 @@ import "OnRamp/OnRamp.sol";
 //Lending
 import "Lending/CollateralVault.sol";
 import "Lending/LendingPool.sol";
-import "Lending/LendingRegistry.sol";
+import "LendingRegistry.sol";
 import "Lending/LiquidityPool.sol";
 import "Lending/PoolConfigurator.sol";
 import "Lending/PriceOracle.sol";
