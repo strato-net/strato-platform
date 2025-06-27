@@ -29,8 +29,15 @@ contract record PoolFactory is Ownable {
 
     /// @notice Event emitted when the admin registry is updated
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
+
+    /// @notice Event emitted when the token factory is updated
     event TokenFactoryUpdated(address oldFactory, address newFactory);
-    event FeeCollectorUpdated(address oldFeeCollector, address newFeeCollector);
+
+    /// @notice Event emitted when fee collectors are updated for all pools
+    event FeeCollectorsBulkUpdated(address newFeeCollector, uint256 poolCount);
+
+    /// @notice Event emitted when fee parameters are bulk updated
+    event FeeParametersBulkUpdated(uint256 newSwapFeeRate, uint256 newLpSharePercent, uint256 newProtocolSharePercent, uint256 poolCount);
 
     /// @notice Mapping of tokenA/tokenB pairs to pool addresses
     mapping(address => mapping(address => address)) public record pools;
@@ -89,13 +96,45 @@ contract record PoolFactory is Ownable {
         emit TokenFactoryUpdated(oldFactory, _tokenFactory);
     }
 
-    /// @notice Update the fee collector address (owner or admin)
-    /// @dev This only affects new pools, existing pools will continue using their original fee collector
+    /// @notice Update the fee collector address for all existing pools (owner or admin)
+    /// @dev This updates both the factory's fee collector and all existing pools' fee collectors
     function setFeeCollector(address newFeeCollector) external onlyOwnerOrAdmin {
         require(newFeeCollector != address(0), "Zero fee collector address");
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
-        emit FeeCollectorUpdated(oldFeeCollector, newFeeCollector);
+        
+        // Update fee collector for all existing pools
+        for (uint256 i = 0; i < allPools.length; i++) {
+            address poolAddress = allPools[i];
+            if (poolAddress != address(0)) {
+                Pool(poolAddress).setFeeCollector(newFeeCollector);
+            }
+        }
+        
+        emit FeeCollectorsBulkUpdated(newFeeCollector, allPools.length);
+    }
+
+    /// @notice Update fee parameters for all existing pools (owner or admin)
+    /// @param newSwapFeeRate New swap fee rate in basis points
+    /// @param newLpSharePercent New LP share percentage in basis points
+    /// @param newProtocolSharePercent New protocol share percentage in basis points
+    function updateAllPoolsFeeParameters(
+        uint256 newSwapFeeRate,
+        uint256 newLpSharePercent,
+        uint256 newProtocolSharePercent
+    ) external onlyOwnerOrAdmin {
+        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
+        require(newLpSharePercent + newProtocolSharePercent == 10000, "LP and protocol shares must sum to 100%");
+        require(newLpSharePercent > 0 && newProtocolSharePercent > 0, "Both shares must be greater than 0");
+        
+        for (uint256 i = 0; i < allPools.length; i++) {
+            address poolAddress = allPools[i];
+            if (poolAddress != address(0)) {
+                Pool(poolAddress).updateFeeParameters(newSwapFeeRate, newLpSharePercent, newProtocolSharePercent);
+            }
+        }
+        
+        emit FeeParametersBulkUpdated(newSwapFeeRate, newLpSharePercent, newProtocolSharePercent, allPools.length);
     }
 
     /// @notice Create a new pool for tokenA/tokenB
@@ -104,8 +143,8 @@ contract record PoolFactory is Ownable {
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
         
-        // deploy new pool with fee collector
-        pool = address(new Pool(tokenA, tokenB, address(tokenFactory), feeCollector));
+        // deploy new pool with fee collector and admin registry
+        pool = address(new Pool(tokenA, tokenB, address(tokenFactory), feeCollector, address(adminRegistry)));
 
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions

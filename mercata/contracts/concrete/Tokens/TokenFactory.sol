@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import "./Token.sol";
 import "../Admin/AdminRegistry.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record TokenFactory is Ownable {
     mapping(address => bool) public isFactoryToken;
