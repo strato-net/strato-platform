@@ -37,12 +37,6 @@ export const getPool = async (
     lendingPool: `eq.${lendingPool}`,
   };
 
-  // DEBUG: log the exact query params being sent to Cirrus (no secrets exposed)
-  console.log("[LendingService.getPool] Querying Cirrus", {
-    endpoint: `/${LendingRegistry}`,
-    params,
-  });
-
   const {
     data: [poolData],
   } = await cirrus.get(accessToken, `/${LendingRegistry}`, { params });
@@ -203,9 +197,9 @@ export const repay = async (
       BigInt(8760 * 100 * 100); // extra *100 due to scaling
     const totalOwed = (BigInt(loan.amount) + interest).toString();
 
-    // Use caller-supplied amount if it equals/exceeds total owed; otherwise bump to full repay.
+    // Allow partial repayments. If caller over-pays, clip to the exact amount owed.
     let repayAmount = body.amount || totalOwed;
-    if (BigInt(repayAmount) < BigInt(totalOwed)) {
+    if (BigInt(repayAmount) > BigInt(totalOwed)) {
       repayAmount = totalOwed;
     }
 
@@ -578,8 +572,6 @@ export const executeLiquidation = async (
 
     return { status, hash };
   } catch (error: any) {
-    // Surface Strato's response for easier debugging
-    console.error("[executeLiquidation] Strato 400 response", error?.response?.data || error);
     throw error;
   }
 };
@@ -598,3 +590,93 @@ export const getLoanWithHealthFactor = async (
 };
 
 const toBig = (v: string | number | bigint) => BigInt(v);
+
+export const setInterestRate = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.asset || body.rate === undefined) {
+    throw new Error("Missing required parameters: asset and rate");
+  }
+
+  const rateValue = Number(body.rate);
+  if (isNaN(rateValue) || rateValue < 0 || rateValue > 100) {
+    throw new Error("Interest rate must be a number between 0 and 100");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: constants.poolConfigurator,
+    method: "setInterestRate",
+    args: { 
+      asset: body.asset, 
+      newRate: rateValue
+    },
+  });
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const setCollateralRatio = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.asset || body.ratio === undefined) {
+    throw new Error("Missing required parameters: asset and ratio");
+  }
+
+  const ratioValue = Number(body.ratio);
+  if (isNaN(ratioValue) || ratioValue < 100 || ratioValue > 1000) {
+    throw new Error("Collateral ratio must be a number between 100 and 1000");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: constants.poolConfigurator,
+    method: "setCollateralRatio",
+    args: { 
+      asset: body.asset, 
+      newRatio: ratioValue
+    },
+  });
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const setLiquidationBonus = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.asset || body.bonus === undefined) {
+    throw new Error("Missing required parameters: asset and bonus");
+  }
+
+  const bonusValue = Number(body.bonus);
+  if (isNaN(bonusValue) || bonusValue < 100 || bonusValue > 200) {
+    throw new Error("Liquidation bonus must be a number between 100 and 200");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: constants.poolConfigurator,
+    method: "setLiquidationBonus",
+    args: { 
+      asset: body.asset, 
+      newBonus: bonusValue
+    },
+  });
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};

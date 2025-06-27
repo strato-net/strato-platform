@@ -10,6 +10,7 @@ interface UserContextType {
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
   isAdmin: boolean;
+  userName: string;
   logout: () => void;
   refreshAuth: () => void;
   loading: boolean;
@@ -21,6 +22,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [userName, setUserName] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(true);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
@@ -37,9 +39,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const storedUser = localStorage.getItem("user");
         if (!storedUser || !userAddress) {
           try {
-            const response = await api.get('/users/me');
+            const response = await api.get('/user/me');
             const newUserAddress = response.data.userAddress;
             const serverIsAdmin = response.data.isAdmin;
+            const userName = response.data.userName
+            setUserName(userName)
             if (newUserAddress !== userAddress) {
               localStorage.setItem("user", JSON.stringify(response.data));
               setUserAddress(newUserAddress);
@@ -95,12 +99,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const contextValue = useMemo(() => ({
     userAddress,
     setUserAddress,
+    userName,
     isLoggedIn,
     isAdmin,
     logout,
     refreshAuth,
     loading,
-  }), [userAddress, isLoggedIn, isAdmin, loading]);
+  }), [userAddress, isLoggedIn, isAdmin, loading, userName]);
 
   return (
     <UserContext.Provider value={contextValue}>

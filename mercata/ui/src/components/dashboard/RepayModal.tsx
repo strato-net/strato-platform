@@ -18,7 +18,7 @@ const formatCurrency = (value: string | number) => {
   if (isNaN(num)) return "0.00";
   return num.toLocaleString("en-US", {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 6,
   });
 };
 
@@ -57,13 +57,14 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
     const value = e.target.value.replace(/,/g, ''); // Remove existing commas
     if (/^\d*\.?\d*$/.test(value)) {
       const numValue = parseFloat(value || "0");
-      const maxValue = parseFloat(loan?.balanceHuman || "0");
+      const maxValue = parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, ""));
       
       // Cap the input at the maximum loan balance
       if (numValue <= maxValue || value === "") {
         setRepayAmount(value);
         setDisplayAmount(addCommasToInput(value));
-        setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > BigInt(loan?.loan?.amount || 0))
+        const totalOwedWei = BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0);
+        setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > totalOwedWei);
       }
     }
   };
@@ -172,10 +173,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
           
           <div className="flex gap-2">
             <Button
-              variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2) ? "default" : "outline"}
+              variant={repayAmount === (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.1).toFixed(4) ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                const amount = (parseFloat(loan?.balanceHuman) * 0.1).toFixed(2);
+                const amount = (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.1).toFixed(4);
                 setRepayAmount(amount);
                 setDisplayAmount(addCommasToInput(amount));
               }}
@@ -184,10 +185,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
               10%
             </Button>
             <Button
-              variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2) ? "default" : "outline"}
+              variant={repayAmount === (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.25).toFixed(4) ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                const amount = (parseFloat(loan?.balanceHuman) * 0.25).toFixed(2);
+                const amount = (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.25).toFixed(4);
                 setRepayAmount(amount);
                 setDisplayAmount(addCommasToInput(amount));
               }}
@@ -196,10 +197,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
               25%
             </Button>
             <Button
-              variant={repayAmount === (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2) ? "default" : "outline"}
+              variant={repayAmount === (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.5).toFixed(4) ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                const amount = (parseFloat(loan?.balanceHuman) * 0.5).toFixed(2);
+                const amount = (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.5).toFixed(4);
                 setRepayAmount(amount);
                 setDisplayAmount(addCommasToInput(amount));
               }}
@@ -211,8 +212,8 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
               variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                setRepayAmount(loan?.balanceHuman);
-                setDisplayAmount(addCommasToInput(loan?.balanceHuman));
+                setRepayAmount((loan?.balanceHuman || "0").toString().replace(/,/g, ""));
+                setDisplayAmount(addCommasToInput((loan?.balanceHuman || "0").toString().replace(/,/g, "")));
               }}
               className="flex-1"
             >
@@ -238,7 +239,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Remaining Balance</span>
             <span className="font-medium">
-              ${repayAmount ? formatCurrency((parseFloat(loan?.balanceHuman) - parseFloat(repayAmount))) : formatCurrency(loan?.balanceHuman)}
+              ${repayAmount ? formatCurrency((parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) - parseFloat(repayAmount))) : formatCurrency(loan?.balanceHuman)}
             </span>
           </div>
         </div>
@@ -264,7 +265,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
               !repayAmount ||
               isNaN(Number(repayAmount)) ||
               Number(repayAmount) <= 0 ||
-              Number(repayAmount) > Number(loan?.balanceHuman || 0)
+              Number(repayAmount) > Number((loan?.balanceHuman || "0").toString().replace(/,/g, ""))
             }
             className="px-6"
           >

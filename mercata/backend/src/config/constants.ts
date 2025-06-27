@@ -1,4 +1,4 @@
-import { baseCodeCollection, lendingPool, onRamp, poolFactory, tokenFactory } from "./config";
+import { baseCodeCollection, lendingPool, onRamp, poolFactory, tokenFactory, adminRegistry, poolConfigurator } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -20,6 +20,9 @@ export const constants = (() => {
   const Pool = `${CONTRACT_PREFIX}Pool`;
   const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
+  const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
+  const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
+  
   const tokenSelectFields = [
     "address",
     "_name",
@@ -83,6 +86,8 @@ export const constants = (() => {
     lendingPool,
     onRamp,
     tokenFactory,
+    poolConfigurator,
+    adminRegistry,
     Token,
     TokenFactory,
     LendingPool,
@@ -93,6 +98,8 @@ export const constants = (() => {
     Pool,
     OnRamp,
     LendingRegistry,
+    PoolConfigurator,
+    AdminRegistry,
     tokenSelectFields,
     tokenBalanceSelectFields,
     poolSelectFields,

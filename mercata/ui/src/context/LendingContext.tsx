@@ -26,6 +26,10 @@ type LendingContextType = {
   refreshWithdrawableTokens: (signal?: AbortSignal) => void;
   loadingWithdrawableTokens: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
+  setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
+  setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
+  refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     asset: string;
     amount: string;
@@ -38,6 +42,8 @@ type LendingContextType = {
     asset: string;
   }) => Promise<any>;
   getLend: () => Promise<any>;
+  depositLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
+  withdrawLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -127,6 +133,33 @@ export const LendingProvider = ({
     }
   };
 
+  const setInterestRate = async (payload: { asset: string; rate: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setInterestRate", payload);
+    } catch (err: any) {
+      console.error("Failed to set interest rate:", err);
+      throw err;
+    }
+  };
+
+  const setCollateralRatio = async (payload: { asset: string; ratio: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setCollateralRatio", payload);
+    } catch (err: any) {
+      console.error("Failed to set collateral ratio:", err);
+      throw err;
+    }
+  };
+
+  const setLiquidationBonus = async (payload: { asset: string; bonus: number }): Promise<void> => {
+    try {
+      await api.post("/lend/setLiquidationBonus", payload);
+    } catch (err: any) {
+      console.error("Failed to set liquidation bonus:", err);
+      throw err;
+    }
+  };
+
   const borrowAsset = async ({
     asset,
     amount,
@@ -184,6 +217,38 @@ export const LendingProvider = ({
     }
   };
 
+  const depositLiquidity = async (args: { asset: string; amount: string }) => {
+    try {
+      const res = await api.post("/lend/depositLiquidity", args);
+      return res;
+    } catch (err: any) {
+      console.error("Deposit liquidity failed:", err);
+      throw err;
+    }
+  };
+
+  const withdrawLiquidity = async (args: { asset: string; amount: string }) => {
+    try {
+      const res = await api.post("/lend/withdrawLiquidity", args);
+      return res;
+    } catch (err: any) {
+      console.error("Withdraw liquidity failed:", err);
+      throw err;
+    }
+  };
+
+  const refreshLendingData = async (): Promise<void> => {
+    try {
+      // Refresh all lending-related data
+      await fetchDepositTokens();
+      await fetchLoans();
+      await fetchWithdrawableTokens();
+    } catch (err: any) {
+      console.error("Failed to refresh lending data:", err);
+      throw err;
+    }
+  };
+
 
   const initialize = () => {
     fetchDepositTokens();
@@ -208,9 +273,15 @@ export const LendingProvider = ({
       refreshWithdrawableTokens: fetchWithdrawableTokens,
       loadingWithdrawableTokens,
       setPrice,
+      setInterestRate,
+      setCollateralRatio,
+      setLiquidationBonus,
+      refreshLendingData,
       borrowAsset,
       repayLoan,
       getLend,
+      depositLiquidity,
+      withdrawLiquidity,
     }),
     [
       depositableTokens,

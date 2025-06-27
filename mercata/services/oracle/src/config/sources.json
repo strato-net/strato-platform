@@ -17,7 +17,7 @@
   "Metals.dev": {
     "urlTemplate": "https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&unit=toz",
     "apiKeyEnvVar": "METALS_API_KEY",
-    "parsePath": "metals.gold",
+    "parsePath": "metals.${metal}",
     "feedTimestampPath": "timestamps.metal"
   },
   "LBMA": {

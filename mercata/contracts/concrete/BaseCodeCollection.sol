@@ -9,6 +9,9 @@ import "Tokens/TokenFaucet.sol";
 //import "Tokens/Metadata/TokenMetadata.sol";
 //import "Tokens/TokenAccess.sol";
 
+//Admin Registry
+import "Admin/AdminRegistry.sol";
+
 //Swap
 import "Pools/Pool.sol";
 import "Pools/PoolFactory.sol";
@@ -24,7 +27,7 @@ import "OnRamp/OnRamp.sol";
 //Lending
 import "Lending/CollateralVault.sol";
 import "Lending/LendingPool.sol";
-import "LendingRegistry.sol";
+import "Lending/LendingRegistry.sol";
 import "Lending/LiquidityPool.sol";
 import "Lending/PoolConfigurator.sol";
 import "Lending/PriceOracle.sol";
@@ -46,10 +49,17 @@ contract Mercata {
     OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
+    AdminRegistry public adminRegistry;
 
     constructor() public {
-        tokenFactory = new TokenFactory(msg.sender);
+        // Create AdminRegistry first
+        adminRegistry = new AdminRegistry(msg.sender);
 
+        // Create Factories
+        tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
+        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
+
+        // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
         collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
         liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
@@ -66,9 +76,9 @@ contract Mercata {
         poolConfigurator.setPriceOracle(address(priceOracle)); 
         poolConfigurator.setTokenFactory(address(tokenFactory));
         Ownable(poolConfigurator).transferOwnership(msg.sender);
-        
-        poolFactory = new PoolFactory(msg.sender, address(tokenFactory));
-        mercataEthBridge = new MercataEthBridge(msg.sender,address(tokenFactory));
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory));
+
+        // Create Services
+        mercataEthBridge = new MercataEthBridge(msg.sender, address(tokenFactory));
+        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry));
     }
 }

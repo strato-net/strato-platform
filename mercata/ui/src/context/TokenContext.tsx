@@ -49,7 +49,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<Token[]>('/tokens/active');
+      const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
       setActiveTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch active tokens');
@@ -139,13 +139,15 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.post('/tokens/setStatus', payload);
+      // Refresh tokens to reflect the status change immediately
+      await getAllTokens();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to set token status');
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAllTokens]);
 
   useEffect(() => {
     getAllTokens();
