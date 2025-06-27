@@ -79,7 +79,7 @@ class SwappingController {
     const { accessToken, body } = req;
     validateAddLiquidityArgs(body);
 
-    const result = await addLiquidity(accessToken, body.poolAddress, body.tokenBAmount, body.maxTokenAAmount);
+    const result = await addLiquidity(accessToken, body);
     res.status(200).json(result);
     return next();
   }
@@ -88,7 +88,7 @@ class SwappingController {
     const { accessToken, body } = req;
     validateRemoveLiquidityArgs(body);
 
-    const result = await removeLiquidity(accessToken, body.poolAddress, body.lpTokenAmount);
+    const result = await removeLiquidity(accessToken, body);
     res.status(200).json(result);
     return next();
   }
@@ -98,7 +98,7 @@ class SwappingController {
     const { accessToken, body } = req;
     validateSwapArgs(body);
 
-    const result = await swap(accessToken, body.poolAddress, body.isAToB, body.amountIn, body.minAmountOut);
+    const result = await swap(accessToken, body);
     res.status(200).json(result);
     return next();
   }
@@ -107,23 +107,23 @@ class SwappingController {
   static async calculateSwap(req: Request, res: Response, next: NextFunction): Promise<void> {
     const { accessToken, query } = req;
     validateCalculateSwapArgs(query);
-    const { poolAddress, isAToB, amountIn, reserve } = query;
-    const isReserve = reserve === "true";
+    
+    const poolAddress = query.poolAddress as string;
+    const isAToB = query.isAToB === "true";
+    const amountIn = query.amountIn as string;
+    const reverse = query.reverse as string;
+    const isReverse = reverse === "true";
 
-    if (isReserve) {
+    if (isReverse) {
       const price = await calculateSwapReverse(
         accessToken,
-        poolAddress as string,
-        isAToB === "true",
-        amountIn as string
+        { poolAddress, isAToB, amountIn }
       );
       res.status(RestStatus.OK).json(price);
     } else {
       const price = await calculateSwap(
         accessToken,
-        poolAddress as string,
-        isAToB === "true",
-        amountIn as string
+        { poolAddress, isAToB, amountIn }
       );
       res.status(RestStatus.OK).json(price);
     }

@@ -82,11 +82,15 @@ export const createPool = async (
 
 export const addLiquidity = async (
   accessToken: string,
-  poolAddress: string,
-  tokenBAmount: string,
-  maxTokenAAmount: string,
+  params: {
+    poolAddress: string;
+    tokenBAmount: string;
+    maxTokenAAmount: string;
+  }
 ) => {
   try {
+    const { poolAddress, tokenBAmount, maxTokenAAmount } = params;
+    
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -132,10 +136,14 @@ export const addLiquidity = async (
 
 export const removeLiquidity = async (
   accessToken: string,
-  poolAddress: string,
-  lpTokenAmount: string,
+  removeLiquidityParams: {
+    poolAddress: string;
+    lpTokenAmount: string;
+  }
 ) => {
   try {
+    const { poolAddress, lpTokenAmount } = removeLiquidityParams;
+    
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
     });
@@ -186,12 +194,16 @@ export const removeLiquidity = async (
 
 export const swap = async (
   accessToken: string,
-  poolAddress: string,
-  isAToB: boolean,
-  amountIn: string,
-  minAmountOut: string,
+  swapParams: {
+    poolAddress: string;
+    isAToB: boolean;
+    amountIn: string;
+    minAmountOut: string;
+  }
 ) => {
   try {
+    const { poolAddress, isAToB, amountIn, minAmountOut } = swapParams;
+    
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -234,10 +246,14 @@ export const swap = async (
 
 export const calculateSwap = async (
   accessToken: string,
-  poolAddress: string,
-  isAToB: boolean,
-  amountIn: string,
+  calculateSwapParams: {
+    poolAddress: string;
+    isAToB: boolean;
+    amountIn: string;
+  }
 ) => {
+  const { poolAddress, isAToB, amountIn } = calculateSwapParams;
+  
   const pools = await getPools(accessToken, undefined, {
     address: "eq." + poolAddress,
     select: "tokenABalance,tokenBBalance,swapFeeRate",
@@ -259,10 +275,14 @@ export const calculateSwap = async (
 
 export const calculateSwapReverse = async (
   accessToken: string,
-  poolAddress: string,
-  isAToB: boolean,
-  amountIn: string,
+  calculateSwapReverseParams: {
+    poolAddress: string;
+    isAToB: boolean;
+    amountIn: string;
+  }
 ) => {
+  const { poolAddress, isAToB, amountIn } = calculateSwapReverseParams;
+  
   const pools = await getPools(accessToken, undefined, {
     address: "eq." + poolAddress,
     select: "tokenABalance,tokenBBalance",
