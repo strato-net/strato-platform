@@ -26,7 +26,6 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
-      - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
       - POOL_FACTORY=${POOL_FACTORY}
       - LENDING_POOL=${LENDING_POOL}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
