@@ -168,11 +168,27 @@ contract record PoolFactory is Ownable {
         emit NewPool(tokenA, tokenB, pool);
     }
     
-    /// @notice Register migrated pools (external function for migration)
+    /// @notice Transfer all pools to a new factory
+    /// @param newFactory Address of the new factory
+    function transferPoolsToFactory(address newFactory) external onlyOwnerOrAdmin {
+        for (uint256 i = 0; i < allPools.length; i++) {
+            address pool = allPools[i];
+            if (pool != address(0)) {
+                // Transfer pool ownership to new factory
+                Ownable(pool).transferOwnership(newFactory);
+            }
+        }
+        emit PoolsMigrated(address(this), newFactory, allPools.length);
+    }
+
+    /// @notice Register pools received from another factory
     /// @param poolAddresses Array of pool addresses to register
-    function registerMigratedPools(address[] poolAddresses) external onlyOwnerOrAdmin {
+    function registerPoolsFromFactory(address[] poolAddresses) external onlyOwnerOrAdmin {
         for (uint256 i = 0; i < poolAddresses.length; i++) {
             address pool = poolAddresses[i];
+            
+            // Verify the pool belongs to this factory
+            require(Ownable(pool).owner() == address(this), "Pool does not belong to this factory");
             
             // Get tokenA and tokenB from the pool contract
             Pool poolContract = Pool(pool);
