@@ -11,23 +11,27 @@ const createPoolsSchema = Joi.object({
 });
 
 const addLiquiditySchema = Joi.object({
-  address: Joi.string().required(),
-  tokenB_amount: Joi.string().required(),
-  max_tokenA_amount: Joi.string().required(),
+  poolAddress: Joi.string().required(),
+  tokenBAmount: Joi.string().required(),
+  maxTokenAAmount: Joi.string().required(),
 });
 
 const removeLiquiditySchema = Joi.object({
-  address: Joi.string().required(),
-  amount: Joi.string().required(),
-  // min_tokenB: Joi.string().required(),
-  // min_tokenA_amount: Joi.string().required(),
+  poolAddress: Joi.string().required(),
+  lpTokenAmount: Joi.string().required(),
 });
 
 const swapSchema = Joi.object({
-  address: Joi.string().required(),
-  method: Joi.string().valid("tokenAToTokenB", "tokenBToTokenA").required(),
-  amount: Joi.string().required(),
-  min_tokens: Joi.string().required(),
+  poolAddress: Joi.string().required(),
+  isAToB: Joi.boolean().required(),
+  amountIn: Joi.string().required(),
+  minAmountOut: Joi.string().required(),
+});
+
+const calculateSwapSchema = Joi.object({
+  poolAddress: Joi.string().required(),
+  isAToB: Joi.string().valid("true", "false").required(),
+  amountIn: Joi.string().required(),
 });
 
 const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
@@ -65,6 +69,13 @@ export function validateSwapArgs(args: any) {
   const { error } = swapSchema.validate(args);
   if (error) {
     throw new Error("Swap Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateCalculateSwapArgs(args: any) {
+  const { error } = calculateSwapSchema.validate(args);
+  if (error) {
+    throw new Error("Calculate Swap Argument Validation Error: " + error.message);
   }
 }
 

@@ -34,14 +34,19 @@ export const getPools = async (
     params,
   });
 
-  const lendingInfo = await getLendingRegistry(accessToken, {
+  // Fetch oracle prices
+  const { oracle: { prices } } = await getLendingRegistry(accessToken, {
     select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
   });
-
-  const rawPrices = lendingInfo.oracle?.prices || [];
-  const priceMap = new Map<string, number>(
-    rawPrices.map((p: any) => [p.key, p.value])
+  
+  const priceMap = new Map<string, string>(
+    Array.isArray(prices) 
+      ? prices
+          .map((p: any) => [p.key, p.value])
+          .filter(([key, value]) => key && typeof value === 'string') as [string, string][]
+      : []
   );
+
   return poolData.map((pool: any) => ({
     ...pool,
     ...(pool.tokenA?.address && { tokenAPrice: priceMap.get(pool.tokenA.address) || "0" }),
@@ -77,11 +82,13 @@ export const createPool = async (
 
 export const addLiquidity = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  poolAddress: string,
+  tokenBAmount: string,
+  maxTokenAAmount: string,
 ) => {
   try {
     const pools = await getPools(accessToken, undefined, {
-      address: "eq." + body.address,
+      address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
     });
     if (!pools || pools.length === 0) {
@@ -94,21 +101,21 @@ export const addLiquidity = async (
         contractName: extractContractName(Token),
         contractAddress: pool.tokenAAddress || "",
         method: "approve",
-        args: { spender: body.address || "", value: body.max_tokenA_amount || "" },
+        args: { spender: poolAddress || "", value: maxTokenAAmount || "" },
       },
       {
         contractName: extractContractName(Token),
         contractAddress: pool.tokenBAddress || "",
         method: "approve",
-        args: { spender: body.address || "", value: body.tokenB_amount || "" },
+        args: { spender: poolAddress || "", value: tokenBAmount || "" },
       },
       {
         contractName: extractContractName(Pool),
-        contractAddress: body.address || "",
+        contractAddress: poolAddress || "",
         method: "addLiquidity",
         args: {
-          tokenB_amount: body.tokenB_amount,
-          max_tokenA_amount: body.max_tokenA_amount,
+          tokenBAmount,
+          maxTokenAAmount,
         },
       }
     ]);
@@ -125,41 +132,42 @@ export const addLiquidity = async (
 
 export const removeLiquidity = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  poolAddress: string,
+  lpTokenAmount: string,
 ) => {
   try {
     const pools = await getPools(accessToken, undefined, {
-      address: "eq." + body.address,
+      address: "eq." + poolAddress,
     });
     if (!pools || pools.length === 0) {
       throw new Error("No pools found for the given address");
     }
     const pool = pools[0];
     // calculate tokenA and tokenB amounts
-    const tokenA_amount =
-      (BigInt(pool.tokenABalance) * BigInt(body.amount || "0")) /
+    const tokenAAmount =
+      (BigInt(pool.tokenABalance) * BigInt(lpTokenAmount || "0")) /
       BigInt(pool.lpToken._totalSupply);
-    const tokenB_amount =
-      (BigInt(pool.tokenBBalance) * BigInt(body.amount || "0")) /
+    const tokenBAmount =
+      (BigInt(pool.tokenBBalance) * BigInt(lpTokenAmount || "0")) /
       BigInt(pool.lpToken._totalSupply);
     // Apply 1% slippage tolerance
     const slippageFactor = BigInt(99); // 99%
-    const min_tokenA_amount = (
-      (tokenA_amount * slippageFactor) /
+    const minTokenAAmount = (
+      (tokenAAmount * slippageFactor) /
       BigInt(100)
     ).toString();
-    const min_tokenB_amount = (
-      (tokenB_amount * slippageFactor) /
+    const minTokenBAmount = (
+      (tokenBAmount * slippageFactor) /
       BigInt(100)
     ).toString();
     const tx = buildFunctionTx({
       contractName: extractContractName(Pool),
-      contractAddress: body.address || "",
+      contractAddress: poolAddress || "",
       method: "removeLiquidity",
       args: {
-        amount: body.amount,
-        min_tokenB: min_tokenB_amount,
-        min_tokenA_amount: min_tokenA_amount,
+        lpTokenAmount,
+        minTokenBAmount,
+        minTokenAAmount,
       },
     });
 
@@ -178,13 +186,14 @@ export const removeLiquidity = async (
 
 export const swap = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  poolAddress: string,
+  isAToB: boolean,
+  amountIn: string,
+  minAmountOut: string,
 ) => {
   try {
-    const isTokenAToTokenB = body.method === "tokenAToTokenB";
-
     const pools = await getPools(accessToken, undefined, {
-      address: "eq." + body.address,
+      address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
     });
     if (!pools || pools.length === 0) {
@@ -192,22 +201,23 @@ export const swap = async (
     }
     const pool = pools[0];
 
-    const token = isTokenAToTokenB ? pool.tokenAAddress : pool.tokenBAddress;
+    const token = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
 
     const tx = buildFunctionTx([
       {
         contractName: extractContractName(Token),
         contractAddress: token || "",
         method: "approve",
-        args: { spender: body.address || "", value: body.amount || "" },
+        args: { spender: poolAddress || "", value: amountIn || "" },
       },
       {
         contractName: extractContractName(Pool),
-        contractAddress: body.address || "",
-        method: body.method || "",
+        contractAddress: poolAddress || "",
+        method: "swap",
         args: {
-          [isTokenAToTokenB ? "tokenA_sold" : "tokenB_sold"]: body.amount,
-          [isTokenAToTokenB ? "min_tokenB" : "min_tokens"]: body.min_tokens,
+          isAToB,
+          amountIn,
+          minAmountOut,
         },
       }
     ]);
@@ -224,67 +234,48 @@ export const swap = async (
 
 export const calculateSwap = async (
   accessToken: string,
-  address: string,
-  direction: string,
-  amount: string
+  poolAddress: string,
+  isAToB: boolean,
+  amountIn: string,
 ) => {
-  try {
-    const pools = await getPools(accessToken, undefined, {
-      address: "eq." + address,
-    });
+  const pools = await getPools(accessToken, undefined, {
+    address: "eq." + poolAddress,
+    select: "tokenABalance,tokenBBalance,swapFeeRate",
+  });
 
-    if (!pools || pools.length === 0) {
-      throw new Error("No pools found for the given address");
-    }
-    const pool = pools[0];
-    if (direction === "true") {
-      return getInputPrice(
-        BigInt(amount),
-        BigInt(pool.tokenBBalance),
-        BigInt(pool.tokenABalance)
-      );
-    } else {
-      return getInputPrice(
-        BigInt(amount),
-        BigInt(pool.tokenABalance),
-        BigInt(pool.tokenBBalance)
-      );
-    }
-  } catch (error) {
-    throw error;
+  if (!pools || pools.length === 0) {
+    throw new Error("No pools found for the given address");
   }
+
+  const pool = pools[0];
+  const fee = (BigInt(amountIn) * BigInt(pool.swapFeeRate)) / BigInt(10000);
+  const netInput = BigInt(amountIn) - fee;
+  const [inputReserve, outputReserve] = isAToB 
+    ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
+    : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
+
+  return getInputPrice(netInput, inputReserve, outputReserve);
 };
 
 export const calculateSwapReverse = async (
   accessToken: string,
-  address: string,
-  direction: string,
-  amount: string
+  poolAddress: string,
+  isAToB: boolean,
+  amountIn: string,
 ) => {
-  try {
-    const pools = await getPools(accessToken, undefined, {
-      address: "eq." + address,
-    });
+  const pools = await getPools(accessToken, undefined, {
+    address: "eq." + poolAddress,
+    select: "tokenABalance,tokenBBalance",
+  });
 
-    if (!pools || pools.length === 0) {
-      throw new Error("No pools found for the given address");
-    }
-    const pool = pools[0];
-    
-    if (direction === "true") {
-      return getRequiredInput(
-        BigInt(amount),
-        BigInt(pool.tokenBBalance),
-        BigInt(pool.tokenABalance)
-      );
-    } else {
-      return getRequiredInput(
-        BigInt(amount),
-        BigInt(pool.tokenABalance),
-        BigInt(pool.tokenBBalance)
-      );
-    }
-  } catch (error) {
-    throw error;
+  if (!pools || pools.length === 0) {
+    throw new Error("No pools found for the given address");
   }
+
+  const pool = pools[0];
+  const [inputReserve, outputReserve] = isAToB 
+    ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
+    : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
+
+  return getRequiredInput(BigInt(amountIn), inputReserve, outputReserve);
 };

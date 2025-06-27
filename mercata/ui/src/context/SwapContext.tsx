@@ -12,33 +12,28 @@ type SwapContextType = {
   createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
   calculateSwap: (params: {
     poolAddress: string;
-    direction: boolean;
-    amount: string;
-    signal?: AbortSignal;
-  }) => Promise<string>;
-  calculateSwapReverse: (params: {
-    poolAddress: string;
-    direction: boolean;
-    amount: string;
+    isAToB: boolean;
+    amountIn: string;
+    reserve?: boolean;
     signal?: AbortSignal;
   }) => Promise<string>;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
   getPoolByAddress: (address: string) => Promise<any>;
-  swap: (data: {
-    address: string;
-    method: "tokenAToTokenB" | "tokenBToTokenA";
-    amount: string;
-    min_tokens: string;
+  swap: (data: {  
+    poolAddress: string;
+    isAToB: boolean;
+    amountIn: string;
+    minAmountOut: string;
   }) => Promise<any>;
   fetchPools: () => Promise<any[]>;
   addLiquidity: (data: {
-    address: string;
-    max_tokenA_amount: string;
-    tokenB_amount: string;
+    poolAddress: string;
+    tokenBAmount: string;
+    maxTokenAAmount: string;
   }) => Promise<any>;
   removeLiquidity: (data: {
-    address: string;
-    amount: string;
+    poolAddress: string;
+    lpTokenAmount: string;
   }) => Promise<any>;
   fetchTokenBalances: (pool: any, userAddress: string, usdstAddress: string) => Promise<{
     tokenABalance: string;
@@ -99,18 +94,20 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 
   const calculateSwap = useCallback(async ({
     poolAddress,
-    direction,
-    amount,
+    isAToB,
+    amountIn,
+    reserve = false,
     signal
   }: {
     poolAddress: string;
-    direction: boolean;
-    amount: string;
+    isAToB: boolean;
+    amountIn: string;
+    reserve?: boolean;
     signal?: AbortSignal;
   }) => {
     try {
       const { data } = await api.get(
-        `/swap/calculateSwap?address=${poolAddress}&direction=${direction}&amount=${amount}`,
+        `/swap/calculateSwap?poolAddress=${poolAddress}&isAToB=${isAToB}&amountIn=${amountIn}&reserve=${reserve}`,
         { signal }
       );
       return data;
@@ -118,30 +115,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
       throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap');
     }
-  }, []);
-
-  const calculateSwapReverse = useCallback(async ({
-    poolAddress,
-    direction,
-    amount,
-    signal
-  }: {
-    poolAddress: string;
-    direction: boolean;
-    amount: string;
-    signal?: AbortSignal;
-  }) => {
-    try {
-      const { data } = await api.get(
-        `/swap/calculateSwapReverse?address=${poolAddress}&direction=${direction}&amount=${amount}`,
-        { signal }
-      );
-      return data;
-    } catch (err: any) {
-      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
-      throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap reverse');
-    }
-  }, []);
+  }, []); 
 
   const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
     try {
@@ -165,10 +139,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const swap = useCallback(async (data: {
-    address: string;
-    method: "tokenAToTokenB" | "tokenBToTokenA";
-    amount: string;
-    min_tokens: string;
+    poolAddress: string;
+    isAToB: boolean;
+    amountIn: string;
+    minAmountOut: string;
   }) => {
     try {
       const res = await api.post("/swap/swap", data);
@@ -193,9 +167,9 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const addLiquidity = useCallback(async (data: {
-    address: string;
-    max_tokenA_amount: string;
-    tokenB_amount: string;
+    poolAddress: string;
+    tokenBAmount: string;
+    maxTokenAAmount: string;
   }) => {
     setLoading(true);
     setError(null);
@@ -211,8 +185,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const removeLiquidity = useCallback(async (data: {
-    address: string;
-    amount: string;
+    poolAddress: string;
+    lpTokenAmount: string;
   }) => {
     setLoading(true);
     setError(null);
@@ -269,7 +243,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         fetchPairableTokens,
         createPool,
         calculateSwap,
-        calculateSwapReverse,
         getPoolByTokenPair,
         getPoolByAddress,
         swap,

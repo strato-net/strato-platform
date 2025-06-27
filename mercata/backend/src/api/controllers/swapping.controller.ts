@@ -17,9 +17,11 @@ import {
   validateRemoveLiquidityArgs,
   validateSwapArgs,
   validateQueryParams,
+  validateCalculateSwapArgs,
 } from "../validators/swapping.validator";
 
 class SwappingController {
+  // Getters
   static async get(
     req: Request,
     res: Response,
@@ -58,6 +60,7 @@ class SwappingController {
     }
   }
 
+  // Creators
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body } = req;
@@ -71,6 +74,62 @@ class SwappingController {
     }
   }
 
+  // Liquidity
+  static async addLiquidity(req: Request, res: Response, next: NextFunction) {
+    const { accessToken, body } = req;
+    validateAddLiquidityArgs(body);
+
+    const result = await addLiquidity(accessToken, body.poolAddress, body.tokenBAmount, body.maxTokenAAmount);
+    res.status(200).json(result);
+    return next();
+  }
+
+  static async removeLiquidity(req: Request, res: Response, next: NextFunction) {
+    const { accessToken, body } = req;
+    validateRemoveLiquidityArgs(body);
+
+    const result = await removeLiquidity(accessToken, body.poolAddress, body.lpTokenAmount);
+    res.status(200).json(result);
+    return next();
+  }
+
+  // Swaps
+  static async swap(req: Request, res: Response, next: NextFunction) {
+    const { accessToken, body } = req;
+    validateSwapArgs(body);
+
+    const result = await swap(accessToken, body.poolAddress, body.isAToB, body.amountIn, body.minAmountOut);
+    res.status(200).json(result);
+    return next();
+  }
+
+  // Calculators
+  static async calculateSwap(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const { accessToken, query } = req;
+    validateCalculateSwapArgs(query);
+    const { poolAddress, isAToB, amountIn, reserve } = query;
+    const isReserve = reserve === "true";
+
+    if (isReserve) {
+      const price = await calculateSwapReverse(
+        accessToken,
+        poolAddress as string,
+        isAToB === "true",
+        amountIn as string
+      );
+      res.status(RestStatus.OK).json(price);
+    } else {
+      const price = await calculateSwap(
+        accessToken,
+        poolAddress as string,
+        isAToB === "true",
+        amountIn as string
+      );
+      res.status(RestStatus.OK).json(price);
+    }
+  }
+
+  // Helpers
   static async getLPTokens(
     req: Request,
     res: Response,
@@ -86,92 +145,6 @@ class SwappingController {
       });
 
       res.status(RestStatus.OK).json(pools);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async addLiquidity(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { accessToken, body } = req;
-      validateAddLiquidityArgs(body);
-
-      const result = await addLiquidity(accessToken, body);
-      res.status(200).json(result);
-      return next();
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async removeLiquidity(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const { accessToken, body } = req;
-      validateRemoveLiquidityArgs(body);
-
-      const result = await removeLiquidity(accessToken, body);
-      res.status(200).json(result);
-      return next();
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async swap(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { accessToken, body } = req;
-      validateSwapArgs(body);
-
-      const result = await swap(accessToken, body);
-      res.status(200).json(result);
-      return next();
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async calculateSwap(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      validateQueryParams(query);
-
-      const price = await calculateSwap(
-        accessToken,
-        query.address as string,
-        query.direction as string,
-        query.amount as string
-      );
-      res.status(RestStatus.OK).json(price);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async calculateSwapReverse(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      validateQueryParams(query);
-      
-      const price = await calculateSwapReverse(
-        accessToken,
-        query.address as string,
-        query.direction as string,
-        query.amount as string
-      );
-
-      res.status(RestStatus.OK).json(price);
     } catch (error) {
       next(error);
     }
