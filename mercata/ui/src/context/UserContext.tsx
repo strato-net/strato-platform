@@ -39,7 +39,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const storedUser = localStorage.getItem("user");
         if (!storedUser || !userAddress) {
           try {
-            const response = await api.get('/users/me');
+            const response = await api.get('/user/me');
             const newUserAddress = response.data.userAddress;
             const serverIsAdmin = response.data.isAdmin;
             const userName = response.data.userName

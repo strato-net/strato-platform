@@ -69,13 +69,14 @@ const SetInterestRateModal = ({ open, onOpenChange, token, currentRate, onSucces
         description: `${token.symbol} interest rate has been set to ${rateValue}%`,
       });
 
-      // Refresh data to show updated values
-      if (onSuccess) {
-        await onSuccess();
-      }
-
+      // Close modal first to prevent flickering
       form.reset();
       onOpenChange(false);
+
+      // Refresh data in background after modal closes
+      if (onSuccess) {
+        setTimeout(() => onSuccess(), 100);
+      }
     } catch (error: unknown) {
       const axiosError = error as AxiosError<any>;
       console.error('Interest rate error:', axiosError);
