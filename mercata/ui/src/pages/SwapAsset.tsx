@@ -361,7 +361,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 
 // Main Component
 const SwapAsset = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, calculateSwapReverse } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
   const { userAddress } = useUser();
   const { toast } = useToast();
 
@@ -442,12 +442,12 @@ const SwapAsset = () => {
           // Recalculate if not actively editing and we have a preserved amount
           if (fromAmount && fromAmount === lastCalculatedFromRef.current && editingField === null) {
             const parsedValue = parseUnits(fromAmount, DECIMALS);
-            const direction = poolData.tokenA?.address === fromAsset.address ? false : true;
+            const isAToB = poolData.tokenA?.address === fromAsset.address ? true : false;
 
             const swapAmount = await calculateSwap({
               poolAddress: poolData.address,
-              direction,
-              amount: parsedValue.toString(),
+              isAToB,
+              amountIn: parsedValue.toString(),
               signal: abortController.signal,
             });
 
@@ -592,13 +592,13 @@ const SwapAsset = () => {
         const poolBalanceBigInt = BigInt(inputPoolBalance);
         setInsufficientPoolBalance(parsedValue > poolBalanceBigInt && parsedValue <= inputBalance);
 
-        const direction = pool.tokenA?.address === inputAsset.address ? false : true;
+        const isAToB = pool.tokenA?.address === inputAsset.address ? true : false;
         lastCalculatedFromRef.current = inputAmount;
 
         const swapAmount = await calculateSwap({
           poolAddress: pool.address,
-          direction,
-          amount: parsedValue.toString(),
+          isAToB,
+          amountIn: parsedValue.toString(),
           signal: swapInputAbortRef.current.signal,
         });
 
@@ -608,12 +608,13 @@ const SwapAsset = () => {
         }
       } else {
         // Reverse calculation: output -> input
-        const direction = pool.tokenA?.address === outputAsset.address ? false : true;
+        const isAToB = pool.tokenA?.address === outputAsset.address ? true : false;
 
-        const requiredInput = await calculateSwapReverse({
+        const requiredInput = await calculateSwap({
           poolAddress: pool.address,
-          direction,
-          amount: parsedValue.toString(),
+          isAToB,
+          amountIn: parsedValue.toString(),
+          reverse: true,
           signal: swapInputAbortRef.current.signal,
         });
 
@@ -686,21 +687,22 @@ const SwapAsset = () => {
       if (!pool || !newEditingField || !preservedAmount || Number(preservedAmount) === 0) return;
 
       const parsed = parseUnits(preservedAmount, DECIMALS);
-      const direction = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? false : true;
+      const isAToB = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? true : false;
 
       try {
         if (newEditingField === 'from') {
           const swapAmount = await calculateSwap({
             poolAddress: pool.address,
-            direction: !direction,
-            amount: parsed.toString(),
+            isAToB: !isAToB,
+            amountIn: parsed.toString(),
           });
           setToAmount(formatUnits(BigInt(swapAmount || "0"), DECIMALS));
         } else {
-          const requiredInput = await calculateSwapReverse({
+          const requiredInput = await calculateSwap({
             poolAddress: pool.address,
-            direction,
-            amount: parsed.toString(),
+            isAToB,
+            amountIn: parsed.toString(),
+            reverse: true,
           });
           setFromAmount(formatUnits(BigInt(requiredInput || "0"), DECIMALS));
         }
@@ -716,19 +718,19 @@ const SwapAsset = () => {
     try {
       setSwapLoading(true);
 
-      const method = pool.tokenA?.address === fromAsset.address
-        ? "tokenAToTokenB"
-        : "tokenBToTokenA";
+      const isAToB = pool.tokenA?.address === fromAsset.address
+        ? true
+        : false;
 
       const toAmountInWei = parseUnits(toAmount || "0", DECIMALS);
       const slippageBps = Math.round(slippage * 100);
       const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
-        address: pool.address,
-        method,
-        amount: parseUnits(fromAmount || "0", DECIMALS).toString(),
-        min_tokens: minTokens.toString(),
+        poolAddress: pool.address,
+        isAToB,
+        amountIn: parseUnits(fromAmount || "0", DECIMALS).toString(),
+        minAmountOut: minTokens.toString(),
       });
 
       toast({
