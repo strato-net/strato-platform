@@ -1,0 +1,43 @@
+import { Router } from "express";
+import authHandler from "../middleware/authHandler";
+import SwappingController from "../controllers/swapping.controller";
+
+const router = Router();
+
+// ----- Pool Discovery & Information -----
+// Get all pools (with optional filtering)
+router.get("/swap-pools", authHandler.authorizeRequest(true), SwappingController.getAll);
+
+// Get all swappable tokens across all pools
+router.get("/swap-pools/tokens", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
+
+// Get token pairs that can be swapped with a specific token
+router.get("/swap-pools/tokens/:tokenAddress", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
+
+// Get user's LP token positions (pools they have liquidity in)
+router.get("/swap-pools/positions", authHandler.authorizeRequest(true), SwappingController.getLPTokens);
+
+// Get specific pool by token pair addresses
+router.get("/swap-pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
+
+// Get specific pool by pool address
+router.get("/swap-pools/:poolAddress", authHandler.authorizeRequest(true), SwappingController.get);
+
+// Create new pool
+router.post("/swap-pools", authHandler.authorizeRequest(), SwappingController.create);
+
+// ----- Liquidity Management -----
+// Add liquidity to a specific pool
+router.post("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.addLiquidity);
+
+// Remove liquidity from a specific pool
+router.delete("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
+
+// ----- Swap Operations -----
+// Get swap quote (calculate output amount for given input)
+router.get("/swap/quote", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
+
+// Execute swap transaction
+router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
+
+export default router;
