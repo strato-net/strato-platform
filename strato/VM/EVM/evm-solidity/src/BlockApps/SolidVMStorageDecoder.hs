@@ -17,6 +17,7 @@ where
 
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
+import Blockchain.Strato.Model.Account (unspecifiedChain)
 import Control.DeepSeq
 import Control.Monad.Extra
 import Data.Bifunctor
@@ -172,6 +173,8 @@ constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
 constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
+  BAccount a | a == unspecifiedChain 0x0 -> ValueArraySentinel 0
+  BDefault -> ValueArraySentinel 0
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
 constructFromNothing' (MapIndex n : sp) =

@@ -1,22 +1,26 @@
-require('dotenv').config();
-const feedsConfig = require('../config/feeds.json');
-const sourcesConfig = require('../config/sources.json');
-const cron = require('node-cron');
-const { oauthClient } = require('./oauth');
+import dotenv from 'dotenv';
+import * as feedsConfig from '../config/feeds.json';
+import * as sourcesConfig from '../config/sources.json';
+import cron from 'node-cron';
+import { oauthClient } from './oauth';
 
-function validateConfig() {
+dotenv.config();
+
+export function validateConfig(): boolean {
     console.log('=== Validating Oracle Configuration ===\n');
     
-    let errors = [];
-    let warnings = [];
+    let errors: string[] = [];
+    let warnings: string[] = [];
 
     // Validate environment variables
     console.log('1. Checking Environment Variables...');
     const requiredEnvVars = [
         'STRATO_NODE_URL',
-        'OAUTH_URL',
-        'CLIENT_ID',
-        'CLIENT_SECRET',
+        'OAUTH_DISCOVERY_URL',
+        'OAUTH_CLIENT_ID',
+        'OAUTH_CLIENT_SECRET',
+        'USERNAME',
+        'PASSWORD',
         'PRICE_ORACLE_ADDRESS',
         'ALCHEMY_API_KEY'
     ];
@@ -31,7 +35,7 @@ function validateConfig() {
 
     // Validate OAuth configuration
     console.log('\n2. Checking OAuth Configuration...');
-    if (process.env.OAUTH_URL && process.env.CLIENT_ID && process.env.CLIENT_SECRET) {
+    if (process.env.OAUTH_DISCOVERY_URL && process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET) {
         console.log('   ✅ OAuth credentials configured');
         
         // Test OAuth connection
@@ -44,7 +48,7 @@ function validateConfig() {
                 }
             })
             .catch(error => {
-                warnings.push(`OAuth connection test error: ${error.message}`);
+                warnings.push(`OAuth connection test error: ${(error as Error).message}`);
             });
     } else {
         errors.push('Incomplete OAuth configuration');
@@ -57,7 +61,7 @@ function validateConfig() {
     } else {
         console.log(`   ✅ Found ${feedsConfig.feeds.length} feeds`);
         
-        feedsConfig.feeds.forEach((feed, index) => {
+        feedsConfig.feeds.forEach((feed: any, index: number) => {
             const feedPrefix = `   Feed ${index + 1} (${feed.name}):`;
             
             // Check required fields
@@ -73,7 +77,7 @@ function validateConfig() {
             }
             
             // Check if source exists
-            if (feed.source && !sourcesConfig[feed.source]) {
+            if (feed.source && !(sourcesConfig as any)[feed.source]) {
                 errors.push(`${feedPrefix} Unknown source: ${feed.source}`);
             }
             
@@ -94,7 +98,7 @@ function validateConfig() {
     console.log(`   ✅ Found ${sourceNames.length} sources: ${sourceNames.join(', ')}`);
     
     sourceNames.forEach(sourceName => {
-        const source = sourcesConfig[sourceName];
+        const source = (sourcesConfig as any)[sourceName];
         const sourcePrefix = `   Source ${sourceName}:`;
         
         if (!source.urlTemplate) {
@@ -142,6 +146,4 @@ function validateConfig() {
 if (require.main === module) {
     const isValid = validateConfig();
     process.exit(isValid ? 0 : 1);
-}
-
-module.exports = { validateConfig };
+} 

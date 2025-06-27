@@ -11,9 +11,7 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Redirect to login on 401, except for /users/me calls
-    // Note: error.config.url contains the relative path without baseURL (e.g., '/users/me' not '/api/users/me')
-    if (error.response?.status === 401 && error.config?.url !== '/users/me') {
+    if (error.response?.status === 401 && error.config?.url !== '/user/me') {
       toast("Session expired. Redirecting to login...");
       setTimeout(() => {
         window.location.href = "/login";

@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: MIT
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Admin/AdminRegistry.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
-contract record Pool {
+contract record Pool is Ownable {
     
     // Events
     event Swap(address sender, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
     event AddLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
     event RemoveLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
+    event FeeParametersUpdated(uint256 oldSwapFeeRate, uint256 newSwapFeeRate, uint256 oldLpSharePercent, uint256 newLpSharePercent, uint256 oldProtocolSharePercent, uint256 newProtocolSharePercent);
+    event FeeCollectorUpdated(address oldFeeCollector, address newFeeCollector);
 
     Token public tokenA;
     Token public tokenB;
     Token public lpToken;
     TokenFactory public tokenFactory;
+    AdminRegistry public adminRegistry;
 
     bool private locked;   
     
@@ -37,14 +42,24 @@ contract record Pool {
         locked = false;
     }
 
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "Pool: caller is not owner or admin");
+        _;
+    }
+
     constructor(
         address tokenAAddr, 
         address tokenBAddr,
         address _tokenFactory,
-        address _feeCollector
-    ) {
+        address _feeCollector,
+        address _adminRegistry
+    ) Ownable(msg.sender) {
         require(_tokenFactory != address(0), "Zero token factory address");
+        require(_feeCollector != address(0), "Zero fee collector address");
+        require(_adminRegistry != address(0), "Zero admin registry address");
+        
         tokenFactory = TokenFactory(_tokenFactory);
+        adminRegistry = AdminRegistry(_adminRegistry);
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
         
@@ -68,6 +83,50 @@ contract record Pool {
         feeCollector = _feeCollector;
     }
 
+    /// @notice Update fee parameters (owner or admin only)
+    /// @param newSwapFeeRate New swap fee rate in basis points
+    /// @param newLpSharePercent New LP share percentage in basis points
+    /// @param newProtocolSharePercent New protocol share percentage in basis points
+    function updateFeeParameters(
+        uint256 newSwapFeeRate,
+        uint256 newLpSharePercent,
+        uint256 newProtocolSharePercent
+    ) external onlyOwnerOrAdmin {
+        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
+        require(newLpSharePercent + newProtocolSharePercent == 10000, "LP and protocol shares must sum to 100%");
+        require(newLpSharePercent > 0 && newProtocolSharePercent > 0, "Both shares must be greater than 0");
+        
+        uint256 oldSwapFeeRate = swapFeeRate;
+        uint256 oldLpSharePercent = lpSharePercent;
+        uint256 oldProtocolSharePercent = protocolSharePercent;
+        
+        swapFeeRate = newSwapFeeRate;
+        lpSharePercent = newLpSharePercent;
+        protocolSharePercent = newProtocolSharePercent;
+        
+        emit FeeParametersUpdated(
+            oldSwapFeeRate, newSwapFeeRate,
+            oldLpSharePercent, newLpSharePercent,
+            oldProtocolSharePercent, newProtocolSharePercent
+        );
+    }
+
+    /// @notice Update the fee collector address (owner or admin only)
+    /// @param newFeeCollector New fee collector address
+    function setFeeCollector(address newFeeCollector) external onlyOwnerOrAdmin {
+        require(newFeeCollector != address(0), "Zero fee collector address");
+        address oldFeeCollector = feeCollector;
+        feeCollector = newFeeCollector;
+        emit FeeCollectorUpdated(oldFeeCollector, newFeeCollector);
+    }
+
+    /// @notice Update the admin registry address (owner only)
+    /// @param newAdminRegistry New admin registry address
+    function setAdminRegistry(address newAdminRegistry) external onlyOwner {
+        require(newAdminRegistry != address(0), "Zero admin registry address");
+        adminRegistry = AdminRegistry(newAdminRegistry);
+    }
+
     function _updateStateVars() internal {
         tokenABalance = ERC20(tokenA).balanceOf(address(this));
         tokenBBalance = ERC20(tokenB).balanceOf(address(this));
@@ -80,7 +139,7 @@ contract record Pool {
         decimal tokenBReserve = decimal(tokenBBalance);
 
         if (tokenAReserve <= 0.000000000000000000 || tokenBReserve <= 0.000000000000000000) {
-            return 0;
+            return 0.000000000000000000;
         }
 
         if (isAToB) {
@@ -88,6 +147,7 @@ contract record Pool {
         } else {
             return decimal((tokenAReserve * 1.000000000000000000) / tokenBReserve) / 1.000000000000000000;
         }
+        return 0.000000000000000000;
     }
 
     // Core functions
@@ -134,17 +194,17 @@ contract record Pool {
     }
 
     function removeLiquidity(
-        uint256 amount, 
+        uint256 lpTokenAmount, 
         uint256 minTokenBAmount,
         uint256 minTokenAAmount
     ) external returns (uint256, uint256) {
-        require(amount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
+        require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
         uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
         uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokenBAmount = amount * tokenBReserve / totalLiquidity;
-        uint256 tokenAAmount = amount * tokenAReserve / totalLiquidity;
+        uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
+        uint256 tokenAAmount = lpTokenAmount * tokenAReserve / totalLiquidity;
         
         require(tokenBAmount >= minTokenBAmount && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
 
@@ -153,7 +213,7 @@ contract record Pool {
 
         emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
-        lpToken.burn(msg.sender, amount);
+        lpToken.burn(msg.sender, lpTokenAmount);
         rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
 
         _updateStateVars();
