@@ -46,6 +46,7 @@ export const constants = (() => {
   ];
   const poolSelectFields = [
     "address",
+    "_owner",
     "swapFeeRate",
     "aToBRatio::text", 
     "bToARatio::text",

@@ -28,7 +28,7 @@ export const getPools = async (
           "tokenB.balances.value": "gt.0",
           "tokenB.balances.key": `eq.${address}`,
         }),
-      owner: "eq." + constants.poolFactory,
+      _owner: "eq." + constants.poolFactory,
   };
 
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
