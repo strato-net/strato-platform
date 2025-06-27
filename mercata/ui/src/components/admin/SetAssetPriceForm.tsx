@@ -10,15 +10,14 @@ import { Loader2, Info, DollarSign} from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
-import { useUserTokens } from '@/context/UserTokensContext';
-import { useUser } from '@/context/UserContext';
+import { useTokenContext } from '@/context/TokenContext';
+import { formatUnits } from "ethers";
 
 
 const SetAssetPriceForm = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { userAddress } = useUser();
-  const { tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { activeTokens, getActiveTokens, loading: tokensLoading } = useTokenContext();
   const { setPrice } = useLendingContext();
   
   const form = useForm<PriceFormValues>({
@@ -28,13 +27,11 @@ const SetAssetPriceForm = () => {
     },
   });
 
-  const selectedToken = Array.isArray(tokens) ? tokens.find(t => t.address === form.watch('tokenAddress')) : null;
+  const selectedToken = Array.isArray(activeTokens) ? activeTokens.find(t => t.address === form.watch('tokenAddress')) : null;
 
   useEffect(() => {
-    if (userAddress) {
-      fetchTokens(userAddress);
-    }
-  }, [userAddress]);
+    getActiveTokens();
+  }, [getActiveTokens]);
 
   const onSubmit = async (data: PriceFormValues) => {
     setLoading(true);
@@ -51,15 +48,16 @@ const SetAssetPriceForm = () => {
 
       toast({
         title: 'Price Updated Successfully',
-        description: `Price for ${selectedToken?.token?._symbol} has been set to $${data.price}`,
+        description: `Price for ${selectedToken?._symbol} has been set to $${data.price}`,
       });
 
       form.reset();
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
+      const errMsg = (axiosError.response?.data as any)?.message;
       toast({
         title: 'Error Setting Price',
-        description: axiosError.response?.data?.message || 'Failed to set price. Please try again.',
+        description: errMsg || 'Failed to set price. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -86,11 +84,11 @@ const SetAssetPriceForm = () => {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {Array.isArray(tokens) && tokens.map((token) => {
+                      {Array.isArray(activeTokens) && activeTokens.map((token) => {
                         return (
                           <SelectItem key={token.address} value={token.address}>
                             <div className="flex items-center justify-between w-full">
-                              <span>{token.token._symbol} - {token.token._name}</span>
+                              <span>{token._symbol} - {token._name} ({token.address})</span>
                             </div>
                           </SelectItem>
                         );
@@ -100,6 +98,33 @@ const SetAssetPriceForm = () => {
                   <FormDescription>
                     Choose the token to update pricing for
                   </FormDescription>
+                  {selectedToken && (
+                    <div className="text-base font-medium text-gray-700 mt-1">
+                      Current price: $
+                      {(() => {
+                        try {
+                          if (selectedToken.price === undefined || selectedToken.price === null) {
+                            return "-";
+                          }
+                          // Handle scientific notation or BigInt-like inputs gracefully
+                          const raw =
+                            typeof selectedToken.price === "number" ||
+                            (typeof selectedToken.price === "string" && selectedToken.price.includes("e"))
+                              ? BigInt(Number(selectedToken.price)).toString()
+                              : selectedToken.price.toString();
+
+                          const formatted = parseFloat(formatUnits(raw, 18));
+                          if (isNaN(formatted)) return "-";
+                          return formatted.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 6,
+                          });
+                        } catch {
+                          return "-";
+                        }
+                      })()}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

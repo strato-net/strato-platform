@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import {
@@ -23,51 +23,16 @@ import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
+import { usdstAddress } from "@/lib/contants";
 
-// Types
-interface TokenSelectorProps {
-  asset: SwappableToken | undefined;
-  onSelect: (asset: SwappableToken) => void;
-  tokens: SwappableToken[];
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-}
+// Constants
+const SWAP_FEE = "0.2"; // USDST
+const DEFAULT_SLIPPAGE = 4; // 4%
+const POLL_INTERVAL = 10000; // 10 seconds
+const DECIMALS = 18;
 
-interface TokenInputProps {
-  amount: string;
-  onChange: (value: string) => void;
-  asset: SwappableToken | undefined;
-  balance: string | number;
-  isLoading: boolean;
-  wrongAmount: boolean;
-  onSelect: (asset: SwappableToken) => void;
-  tokens: SwappableToken[];
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  label: string;
-  onFocus: () => void;
-}
-
-interface SwapState {
-  isDialogOpen: boolean;
-  fromAsset: SwappableToken | undefined;
-  toAsset: SwappableToken | undefined;
-  fromAmount: string;
-  toAmount: string;
-  wrongAmount: boolean;
-  fromPopoverOpen: boolean;
-  toPopoverOpen: boolean;
-  pool: any;
-  exchangeRate: string;
-  fromBalanceLoading: boolean;
-  toBalanceLoading: boolean;
-  swapLoading: boolean;
-  slippage: number;
-  editingField: 'from' | 'to' | null;
-}
-
-// Format amount for display
-const formatAmount = (amount: string) => {
+// Utility functions
+const formatAmount = (amount: string): string => {
   if (!amount) return "";
   const value = Number(amount);
   const roundedDown = Math.floor(value * 1000000) / 1000000;
@@ -77,22 +42,27 @@ const formatAmount = (amount: string) => {
   });
 };
 
-// Utility functions
-const formatBalance = (balance: string | number | bigint, symbol: string) => {
-  // Always use BigInt or string for balance
-  let formatted = formatUnits(BigInt(balance.toString()), 18);
-  // Remove trailing zeros after decimal, but keep at least one digit after decimal if present
+const formatBalance = (balance: string | number | bigint, symbol: string): string => {
+  let formatted = formatUnits(BigInt(balance.toString()), DECIMALS);
   if (formatted.includes('.')) {
     formatted = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
   }
   return `${formatted} ${symbol}`;
 };
 
+// Components
 const LoadingSpinner = () => (
-  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
 );
 
-// Components
+interface TokenSelectorProps {
+  asset?: SwappableToken;
+  onSelect: (asset: SwappableToken) => void;
+  tokens: SwappableToken[];
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
 const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
@@ -106,7 +76,7 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
         {tokens.length > 0 ? (
           tokens.map((token) => (
             <Button
-              key={token?._symbol || ""}
+              key={token._symbol}
               variant="ghost"
               className="justify-start gap-2"
               onClick={() => {
@@ -114,19 +84,36 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
                 onSelect(token);
               }}
             >
-              <span>{token?._symbol || ""}</span>
-              {token?._symbol === asset?._symbol && (
-                <Check className="h-4 w-4 ml-auto" />
-              )}
+              <span>{token._symbol}</span>
+              {token._symbol === asset?._symbol && <Check className="h-4 w-4 ml-auto" />}
             </Button>
           ))
         ) : (
-          <span className="p-2">No data to show</span>
+          <span className="p-2">No tokens available</span>
         )}
       </div>
     </PopoverContent>
   </Popover>
 );
+
+interface TokenInputProps {
+  amount: string;
+  onChange: (value: string) => void;
+  asset?: SwappableToken;
+  balance: string | number;
+  isLoading: boolean;
+  wrongAmount: boolean;
+  insufficientPoolBalance: boolean;
+  onSelect: (asset: SwappableToken) => void;
+  tokens: SwappableToken[];
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  label: string;
+  onFocus: () => void;
+  usdstBalance: string;
+  isFromInput: boolean;
+  pool: any;
+}
 
 const TokenInput = ({
   amount,
@@ -135,74 +122,138 @@ const TokenInput = ({
   balance,
   isLoading,
   wrongAmount,
+  insufficientPoolBalance,
   onSelect,
   tokens,
   isOpen,
   onOpenChange,
   label,
-  onFocus
-}: TokenInputProps) => (
-  <div className="bg-gray-50 p-4 rounded-lg">
-    <div className="flex justify-between mb-2">
-      <label className="text-sm text-gray-600">{label}</label>
-      <span className="text-sm text-gray-600">
-        Balance: {isLoading ? <LoadingSpinner /> : formatBalance(balance, asset?._symbol || "")}
-      </span>
-    </div>
-    <div className="flex items-center justify-between">
-      <div className="w-full flex flex-col">
-        <input
-          type="text"
-          value={amount}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
-              onChange(value);
-            }
-          }}
-          onFocus={onFocus}
-          placeholder="0.00"
-          inputMode="decimal"
-          className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none${
-            wrongAmount ? " border border-red-500 rounded-md" : ""
-          }`}
-        />
-        {wrongAmount && (
-          <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
-        )}
-      </div>
-      <TokenSelector
-        asset={asset}
-        onSelect={onSelect}
-        tokens={tokens}
-        isOpen={isOpen}
-        onOpenChange={onOpenChange}
-      />
-    </div>
-  </div>
-);
+  onFocus,
+  usdstBalance,
+  isFromInput,
+  pool
+}: TokenInputProps) => {
+  const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+  const inputAmountWei = parseUnits(amount || "0", DECIMALS);
 
-const SwapDialog = ({ 
-  isOpen, 
-  onOpenChange, 
-  fromAmount, 
-  toAmount, 
-  fromAsset, 
-  toAsset, 
-  exchangeRate, 
-  onConfirm, 
-  isLoading 
-}: { 
+  // Validation checks
+  const isUsdstMaxIssue = isFromInput &&
+    asset?.address === usdstAddress &&
+    inputAmountWei > usdstBalanceBigInt - feeAmount &&
+    inputAmountWei <= usdstBalanceBigInt;
+    
+  const isInsufficientUsdstForFee = useMemo(() => {
+    if (
+      !isFromInput ||
+      !asset ||
+      !usdstBalanceBigInt ||
+      !feeAmount
+    ) return false;
+
+    return (
+      asset?.address !== usdstAddress &&
+      usdstBalanceBigInt < feeAmount
+    );
+  }, [isFromInput, asset, usdstBalanceBigInt, feeAmount]);
+
+  // Get pool balance
+  const getPoolBalance = () => {
+    if (!pool || !asset) return "0";
+    return pool.tokenA?.address === asset.address
+      ? pool.tokenABalance || "0"
+      : pool.tokenB?.address === asset.address
+        ? pool.tokenBBalance || "0"
+        : "0";
+  };
+
+  const poolBalance = getPoolBalance();
+
+  return (
+    <div className="bg-gray-50 p-4 rounded-lg">
+      <div className="flex justify-between mb-2">
+        <label className="text-sm text-gray-600">{label}</label>
+        <span className="text-sm text-gray-600">
+          User Balance: {isLoading ? <LoadingSpinner /> : formatBalance(balance, asset?._symbol || "")}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="w-full flex flex-col">
+          <input
+            type="text"
+            value={amount}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
+                onChange(value);
+              }
+            }}
+            onFocus={onFocus}
+            placeholder="0.00"
+            inputMode="decimal"
+            className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none${
+              wrongAmount ? " border border-red-500 rounded-md" : ""
+              }`}
+          />
+          {wrongAmount && (
+            <p className="text-red-600 text-sm mt-1">Insufficient user balance</p>
+          )}
+          {insufficientPoolBalance && (
+            <p className="text-orange-600 text-sm mt-1">Amount exceeds pool balance</p>
+          )}
+          {isUsdstMaxIssue && (
+            <p className="text-yellow-600 text-sm mt-1">
+              Insufficient balance for transaction fee ({SWAP_FEE} USDST)
+            </p>
+          )}
+          {isInsufficientUsdstForFee && (
+            <p className="text-yellow-600 text-sm mt-1">
+              Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+            </p>
+          )}
+        </div>
+        <TokenSelector
+          asset={asset}
+          onSelect={onSelect}
+          tokens={tokens}
+          isOpen={isOpen}
+          onOpenChange={onOpenChange}
+        />
+      </div>
+      {pool && asset && (
+        <div className="mt-2 flex justify-end">
+          <span className="text-sm text-gray-500">
+            Pool Balance: {formatBalance(poolBalance, asset._symbol || "")}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface SwapDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   fromAmount: string;
   toAmount: string;
-  fromAsset: SwappableToken | undefined;
-  toAsset: SwappableToken | undefined;
+  fromAsset?: SwappableToken;
+  toAsset?: SwappableToken;
   exchangeRate: string;
   onConfirm: () => void;
   isLoading: boolean;
-}) => (
+}
+
+const SwapDialog = ({
+  isOpen,
+  onOpenChange,
+  fromAmount,
+  toAmount,
+  fromAsset,
+  toAsset,
+  exchangeRate,
+  onConfirm,
+  isLoading
+}: SwapDialogProps) => (
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent>
       <DialogHeader>
@@ -211,20 +262,26 @@ const SwapDialog = ({
           Please review your transaction details before confirming.
         </DialogDescription>
       </DialogHeader>
-
       <div className="py-4 space-y-4">
-        {[
-          { label: "You pay", value: `${fromAmount} ${fromAsset?._symbol || ""}` },
-          { label: "You receive", value: `${toAmount} ${toAsset?._symbol || ""}` },
-          { label: "Exchange rate", value: `1 ${fromAsset?._symbol || ""} ≈ ${exchangeRate} ${toAsset?._symbol || ""}` }
-        ].map(({ label, value }) => (
-          <div className="flex justify-between" key={label}>
-            <span className="text-gray-600">{label}:</span>
-            <span className={label === "You pay" || label === "You receive" ? "font-semibold" : ""}>{value}</span>
-          </div>
-        ))}
+        <div className="flex justify-between">
+          <span className="text-gray-600">You pay:</span>
+          <span className="font-semibold">
+            {fromAmount} {fromAsset?._symbol || ""}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">You receive:</span>
+          <span className="font-semibold">
+            {toAmount} {toAsset?._symbol || ""}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Exchange rate:</span>
+          <span>
+            1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
+          </span>
+        </div>
       </div>
-
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>
           Cancel
@@ -237,159 +294,256 @@ const SwapDialog = ({
   </Dialog>
 );
 
+interface SlippageControlProps {
+  slippage: number;
+  autoSlippage: boolean;
+  onSlippageChange: (value: number) => void;
+  onAutoToggle: (auto: boolean) => void;
+}
+
+const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggle }: SlippageControlProps) => {
+  const isHighSlippage = slippage > 5;
+  const isLowSlippage = slippage < 1;
+  const slippageClass = isHighSlippage || isLowSlippage
+    ? 'border-yellow-400 text-yellow-600'
+    : 'border-gray-300 text-gray-700';
+
+  return (
+    <div className="flex flex-col gap-1 mt-2">
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span className="text-gray-600">Max slippage</span>
+        <div className="flex items-center gap-2">
+          <button
+            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+              autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
+              } border-gray-300`}
+            onClick={() => {
+              onAutoToggle(true);
+              onSlippageChange(DEFAULT_SLIPPAGE);
+            }}
+          >
+            Auto
+          </button>
+          <button
+            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+              !autoSlippage ? 'bg-gray-200 text-gray-700' : 'bg-transparent text-gray-500'
+              } border-gray-300`}
+            onClick={() => onAutoToggle(false)}
+          >
+            Manual
+          </button>
+          <span className={`ml-2 px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
+            {slippage}%
+          </span>
+        </div>
+      </div>
+      {!autoSlippage && (
+        <div className="flex items-center gap-2 mt-2">
+          <Slider
+            value={[slippage]}
+            min={0.1}
+            max={10}
+            step={0.1}
+            onValueChange={(value) => onSlippageChange(value[0])}
+            className="w-full"
+          />
+        </div>
+      )}
+      {isHighSlippage && (
+        <div className="text-xs text-yellow-600 mt-1 font-bold">⚠️ High slippage</div>
+      )}
+      {isLowSlippage && (
+        <div className="text-xs text-yellow-600 mt-1 font-bold">⚠️ Low slippage</div>
+      )}
+    </div>
+  );
+};
+
+// Main Component
 const SwapAsset = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, calculateSwapReverse } = useSwapContext();
   const { userAddress } = useUser();
   const { toast } = useToast();
 
-  const [state, setState] = useState<SwapState>({
-    isDialogOpen: false,
-    fromAsset: undefined,
-    toAsset: undefined,
-    fromAmount: "",
-    toAmount: "",
-    wrongAmount: false,
-    fromPopoverOpen: false,
-    toPopoverOpen: false,
-    pool: null,
-    exchangeRate: "0",
-    fromBalanceLoading: false,
-    toBalanceLoading: false,
-    swapLoading: false,
-    slippage: 4,
-    editingField: null
-  });
-
+  // State
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [fromAsset, setFromAsset] = useState<SwappableToken | undefined>();
+  const [toAsset, setToAsset] = useState<SwappableToken | undefined>();
+  const [fromAmount, setFromAmount] = useState("");
+  const [toAmount, setToAmount] = useState("");
+  const [wrongAmount, setWrongAmount] = useState(false);
+  const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
+  const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
+  const [toPopoverOpen, setToPopoverOpen] = useState(false);
+  const [pool, setPool] = useState<any>(null);
+  const [exchangeRate, setExchangeRate] = useState("0");
+  const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
+  const [toBalanceLoading, setToBalanceLoading] = useState(false);
+  const [swapLoading, setSwapLoading] = useState(false);
+  const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
+  const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
+  const [usdstBalance, setUsdstBalance] = useState("0");
 
+  // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
-  const swapPollAbortRef = useRef<AbortController | null>(null);
+  const lastCalculatedFromRef = useRef<string>("");
 
+  // Initial setup
   useEffect(() => {
     document.title = "Swap Assets | STRATO Mercata";
   }, []);
 
+  // Fetch USDST balance when user changes
   useEffect(() => {
-    if (state.fromAsset?.address) {
-      fetchPairableTokens(state.fromAsset.address);
+    if (userAddress) fetchUsdstBalance();
+  }, [userAddress]);
+
+  // Fetch pairable tokens when from asset changes
+  useEffect(() => {
+    if (fromAsset?.address) {
+      fetchPairableTokens(fromAsset.address);
     }
-  }, [state.fromAsset?.address, fetchPairableTokens]);
+  }, [fromAsset?.address, fetchPairableTokens]);
 
+  // Combined effect: fetch pool, update rate, and poll for updates
   useEffect(() => {
-    const fetchPool = async () => {
-      if (state.fromAsset?.address && state.toAsset?.address) {
-        try {
-          const pool = await getPoolByTokenPair(state.fromAsset.address, state.toAsset.address);
-          if (pool) {
-            setState(prev => ({ ...prev, pool }));
-          } else {
-            setState(prev => ({
-              ...prev,
-              pool: null,
-              toAsset: undefined,
-              toAmount: ""
-            }));
-          }
-        } catch (error) {
-          console.error("Error fetching pool:", error);
-          setState(prev => ({
-            ...prev,
-            pool: null,
-            toAsset: undefined,
-            toAmount: ""
-          }));
-        }
-      }
-    };
-    fetchPool();
-  }, [state.fromAsset?.address, state.toAsset?.address, getPoolByTokenPair]);
+    if (!fromAsset?.address || !toAsset?.address) return;
 
-  useEffect(() => {
-    if (!state.pool || !state.fromAsset || !state.toAsset) return;
-
-    const rate = state.pool?.tokenA?.address === state.fromAsset?.address
-      ? state.pool?.aToBRatio
-      : state.pool?.bToARatio;
-    
-    setState(prev => ({ ...prev, exchangeRate: rate || "0" }));
-  }, [state.pool, state.fromAsset, state.toAsset]);
-
-  useEffect(() => {
-    if (!state.pool || !state.fromAsset || !state.toAsset || !state.fromAmount || isNaN(Number(state.fromAmount)) || Number(state.fromAmount) === 0) return;
     let isMounted = true;
-    let requestId = 0;
-    if (swapPollAbortRef.current) swapPollAbortRef.current.abort();
-    const pollSwap = async () => {
-      requestId++;
-      const currentRequest = requestId;
-      if (swapPollAbortRef.current) swapPollAbortRef.current.abort();
-      swapPollAbortRef.current = new AbortController();
+    let pollInterval: NodeJS.Timeout | null = null;
+    let currentRequestId = 0;
+    let abortController: AbortController | null = null;
+
+    const fetchAndUpdatePool = async () => {
+      const requestId = ++currentRequestId;
+
+      // Abort previous request if still pending
+      if (abortController) {
+        abortController.abort();
+      }
+      abortController = new AbortController();
+
       try {
-        const decimals = 18;
-        const parsedValue = parseUnits(state.fromAmount, decimals);
-        const direction = state.pool.tokenA?.address === state.fromAsset.address ? false : true;
-        const swapAmount = await calculateSwap({
-          poolAddress: state.pool.address,
-          direction,
-          amount: parsedValue.toString(),
-          signal: swapPollAbortRef.current.signal,
-        });
-        const result = BigInt(swapAmount || "0");
-        if (isMounted && currentRequest === requestId && (state.editingField === 'from' || state.editingField === null)) {
-          setState(prev => ({
-            ...prev,
-            toAmount: formatUnits(result, decimals)
-          }));
+        const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address, abortController.signal);
+
+        // Check if this is still the current request
+        if (!isMounted || requestId !== currentRequestId) return;
+
+        if (poolData) {
+          setPool(poolData);
+
+          // Update exchange rate immediately
+          const rate = poolData.tokenA?.address === fromAsset.address
+            ? poolData.aToBRatio
+            : poolData.bToARatio;
+          setExchangeRate(rate || "0");
+
+          // Recalculate if not actively editing and we have a preserved amount
+          if (fromAmount && fromAmount === lastCalculatedFromRef.current && editingField === null) {
+            const parsedValue = parseUnits(fromAmount, DECIMALS);
+            const direction = poolData.tokenA?.address === fromAsset.address ? false : true;
+
+            const swapAmount = await calculateSwap({
+              poolAddress: poolData.address,
+              direction,
+              amount: parsedValue.toString(),
+              signal: abortController.signal,
+            });
+
+            setToAmount(formatUnits(BigInt(swapAmount || "0"), DECIMALS));
+          }
+        } else {
+          setPool(null);
+          setToAsset(undefined);
+          setToAmount("");
+          setExchangeRate("0");
         }
-      } catch (err: any) {
-        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-        // Optionally handle error
+      } catch (error: any) {
+        // Don't handle aborted requests as errors
+        if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
+
+        // Only handle errors for the current request
+        if (isMounted && requestId === currentRequestId) {
+          console.error("Error fetching pool:", error);
+          setPool(null);
+          setToAsset(undefined);
+          setToAmount("");
+          setExchangeRate("0");
+        }
       }
     };
-    pollSwap();
-    const interval = setInterval(pollSwap, 10000);
+
+    // Initial fetch
+    fetchAndUpdatePool();
+
+    // Set up polling
+    pollInterval = setInterval(fetchAndUpdatePool, POLL_INTERVAL);
+
+    // Cleanup
     return () => {
       isMounted = false;
-      clearInterval(interval);
-      requestId++;
-      if (swapPollAbortRef.current) swapPollAbortRef.current.abort();
+      currentRequestId++; // Invalidate any pending requests
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      if (abortController) {
+        abortController.abort();
+      }
     };
-  }, [state.pool, state.fromAsset, state.toAsset, state.fromAmount, calculateSwap, state.editingField]);
+  }, [fromAsset?.address, toAsset?.address, fromAmount, editingField, getPoolByTokenPair, calculateSwap]);
 
-  const handleSwapAssets = () => {
-    setState(prev => ({
-      ...prev,
-      fromAsset: prev.toAsset,
-      toAsset: prev.fromAsset,
-      fromAmount: prev.toAmount,
-      toAmount: prev.fromAmount
-    }));
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (swapInputAbortRef.current) {
+        swapInputAbortRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Helper functions
+  const fetchUsdstBalance = async () => {
+    try {
+      const res = await api.get(
+        `/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`
+      );
+      setUsdstBalance(res?.data?.[0]?.balance || "0");
+    } catch (error) {
+      console.error('Error fetching USDST balance:', error);
+    }
   };
 
   const getTokenBalance = async (asset: SwappableToken, isFrom: boolean) => {
     try {
-      setState(prev => ({
-        ...prev,
-        [`${isFrom ? 'from' : 'to'}BalanceLoading`]: true
-      }));
+      if (isFrom) {
+        setFromBalanceLoading(true);
+      } else {
+        setToBalanceLoading(true);
+      }
 
       const res = await api.get(
-        `/tokens/balance?key=eq.${userAddress}&address=eq.${asset?.address}`
+        `/tokens/balance?key=eq.${userAddress}&address=eq.${asset.address}`
       );
 
       const balance = res?.data?.[0]?.balance || "0";
-      
-      setState(prev => ({
-        ...prev,
-        [`${isFrom ? 'from' : 'to'}Asset`]: { ...asset, balance },
-        [`${isFrom ? 'from' : 'to'}BalanceLoading`]: false
-      }));
+
+      if (isFrom) {
+        setFromAsset({ ...asset, balance });
+        setFromBalanceLoading(false);
+      } else {
+        setToAsset({ ...asset, balance });
+        setToBalanceLoading(false);
+      }
+
+      await fetchUsdstBalance();
     } catch (err) {
       console.error(err);
-      setState(prev => ({
-        ...prev,
-        [`${isFrom ? 'from' : 'to'}BalanceLoading`]: false
-      }));
+      if (isFrom) {
+        setFromBalanceLoading(false);
+      } else {
+        setToBalanceLoading(false);
+      }
     }
   };
 
@@ -397,42 +551,87 @@ const SwapAsset = () => {
     if (swapInputAbortRef.current) swapInputAbortRef.current.abort();
     swapInputAbortRef.current = new AbortController();
 
-    const inputAsset = isFromInput ? state.fromAsset : state.toAsset;
-    const outputAsset = isFromInput ? state.toAsset : state.fromAsset;
+    const inputAsset = isFromInput ? fromAsset : toAsset;
+    const outputAsset = isFromInput ? toAsset : fromAsset;
 
-    if (!inputAsset?.address || !outputAsset?.address || !state.pool) return;
+    if (!inputAsset?.address || !outputAsset?.address || !pool) return;
+
+    // Check if pool has liquidity
+    const inputPoolBalance = pool.tokenA?.address === inputAsset.address
+      ? pool.tokenABalance || "0"
+      : pool.tokenB?.address === inputAsset.address
+        ? pool.tokenBBalance || "0"
+        : "0";
+
+    const outputPoolBalance = pool.tokenA?.address === outputAsset.address
+      ? pool.tokenABalance || "0"
+      : pool.tokenB?.address === outputAsset.address
+        ? pool.tokenBBalance || "0"
+        : "0";
+
+    // If either pool balance is 0, no liquidity available
+    if (BigInt(inputPoolBalance) === 0n || BigInt(outputPoolBalance) === 0n) {
+      if (isFromInput) {
+        setToAmount("");
+      } else {
+        setFromAmount("");
+      }
+      setInsufficientPoolBalance(true);
+      return;
+    }
 
     try {
-      const decimals = 18;
-      const parsedValue = parseUnits(inputAmount || "0", decimals);
-      const inputBalance = BigInt(inputAsset.balance?.toString() || "0");
+      const parsedValue = parseUnits(inputAmount || "0", DECIMALS);
 
       if (isFromInput) {
-        setState(prev => ({
-          ...prev,
-          wrongAmount: parsedValue > inputBalance
-        }));
-      }
+        // Forward calculation: input -> output
+        const inputBalance = BigInt(inputAsset.balance?.toString() || "0");
+        setWrongAmount(parsedValue > inputBalance);
 
-      const direction = state.pool.tokenA?.address === inputAsset.address ? false : true;
-      const swapAmount = await calculateSwap({
-        poolAddress: state.pool.address,
-        direction,
-        amount: parsedValue.toString(),
-        signal: swapInputAbortRef.current.signal,
-      });
+        // Check pool balance
+        const poolBalanceBigInt = BigInt(inputPoolBalance);
+        setInsufficientPoolBalance(parsedValue > poolBalanceBigInt && parsedValue <= inputBalance);
 
-      const result = BigInt(swapAmount || "0");
-      
-      setState(prev => {
-        if ((isFromInput && prev.editingField === 'from') || (!isFromInput && prev.editingField === 'to')) {
-          return {
-            ...prev,
-            [`${isFromInput ? 'to' : 'from'}Amount`]: formatUnits(result, decimals)
-          };
+        const direction = pool.tokenA?.address === inputAsset.address ? false : true;
+        lastCalculatedFromRef.current = inputAmount;
+
+        const swapAmount = await calculateSwap({
+          poolAddress: pool.address,
+          direction,
+          amount: parsedValue.toString(),
+          signal: swapInputAbortRef.current.signal,
+        });
+
+        const result = formatUnits(BigInt(swapAmount || "0"), DECIMALS);
+        if (editingField === 'from') {
+          setToAmount(result);
         }
-        return prev;
-      });
+      } else {
+        // Reverse calculation: output -> input
+        const direction = pool.tokenA?.address === outputAsset.address ? false : true;
+
+        const requiredInput = await calculateSwapReverse({
+          poolAddress: pool.address,
+          direction,
+          amount: parsedValue.toString(),
+          signal: swapInputAbortRef.current.signal,
+        });
+
+        const result = formatUnits(BigInt(requiredInput || "0"), DECIMALS);
+        if (editingField === 'to') {
+          setFromAmount(result);
+          lastCalculatedFromRef.current = result;
+
+          // Check if the calculated input amount exceeds balance
+          const fromBalance = BigInt(fromAsset?.balance?.toString() || "0");
+          const calculatedInput = BigInt(requiredInput || "0");
+          setWrongAmount(calculatedInput > fromBalance);
+
+          // Check pool balance
+          const poolBalanceBigInt = BigInt(inputPoolBalance);
+          setInsufficientPoolBalance(calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
+        }
+      }
     } catch (err: any) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       console.error("Conversion error:", err);
@@ -440,63 +639,113 @@ const SwapAsset = () => {
   };
 
   const handleAmountChange = async (isFromInput: boolean, value: string) => {
-    const isZero = Number(value) === 0;
+    setEditingField(isFromInput ? 'from' : 'to');
+    isFromInput ? setFromAmount(value) : setToAmount(value);
 
-    setState(prev => ({
-      ...prev,
-      [`${isFromInput ? 'from' : 'to'}Amount`]: value,
-      editingField: isFromInput ? 'from' : 'to'
-    }));
+    // Reset validation states
+    setWrongAmount(false);
+    setInsufficientPoolBalance(false);
 
-    if (!state.pool || isZero || value === "") {
-      setState(prev => ({
-        ...prev,
-        [`${isFromInput ? 'to' : 'from'}Amount`]: "",
-        wrongAmount: false
-      }));
-      return;
+    if (pool && value && Number(value) !== 0) {
+      await calculateSwapAmount(value, isFromInput);
+    } else {
+      isFromInput ? setToAmount('') : setFromAmount('');
+    }
+  };
+
+  const handleSwapAssets = () => {
+    const prevFromAsset = fromAsset;
+    const prevToAsset = toAsset;
+    const prevFromAmount = fromAmount;
+    const prevToAmount = toAmount;
+
+    let newEditingField: 'from' | 'to' | null = null;
+    let preservedAmount = "";
+
+    if (editingField === 'from') {
+      newEditingField = 'to';
+      preservedAmount = prevFromAmount;
+      setFromAmount(prevToAmount);
+      setToAmount(prevFromAmount);
+    } else if (editingField === 'to') {
+      newEditingField = 'from';
+      preservedAmount = prevToAmount;
+      setFromAmount(prevToAmount);
+      setToAmount(prevFromAmount);
+    } else {
+      setFromAmount(prevToAmount);
+      setToAmount(prevFromAmount);
     }
 
-    await calculateSwapAmount(value, isFromInput);
+    setFromAsset(prevToAsset);
+    setToAsset(prevFromAsset);
+    setEditingField(newEditingField);
+    lastCalculatedFromRef.current = preservedAmount;
+
+    setTimeout(async () => {
+      if (!pool || !newEditingField || !preservedAmount || Number(preservedAmount) === 0) return;
+
+      const parsed = parseUnits(preservedAmount, DECIMALS);
+      const direction = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? false : true;
+
+      try {
+        if (newEditingField === 'from') {
+          const swapAmount = await calculateSwap({
+            poolAddress: pool.address,
+            direction: !direction,
+            amount: parsed.toString(),
+          });
+          setToAmount(formatUnits(BigInt(swapAmount || "0"), DECIMALS));
+        } else {
+          const requiredInput = await calculateSwapReverse({
+            poolAddress: pool.address,
+            direction,
+            amount: parsed.toString(),
+          });
+          setFromAmount(formatUnits(BigInt(requiredInput || "0"), DECIMALS));
+        }
+      } catch (err) {
+        console.error("Swap recalculation error after swapping assets:", err);
+      }
+    }, 0);
   };
 
   const handleSwap = async () => {
-    if (!state.fromAsset || !state.toAsset) return;
+    if (!fromAsset || !toAsset || !pool) return;
+
     try {
-      setState(prev => ({ ...prev, swapLoading: true }));
-      
-      const method = state.pool?.tokenA?.address === state.fromAsset.address
+      setSwapLoading(true);
+
+      const method = pool.tokenA?.address === fromAsset.address
         ? "tokenAToTokenB"
         : "tokenBToTokenA";
 
-      const toAmountInWei = parseUnits(state.toAmount || "0", 18);
-      const slippageBps = Math.round(state.slippage * 100);
+      const toAmountInWei = parseUnits(toAmount || "0", DECIMALS);
+      const slippageBps = Math.round(slippage * 100);
       const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
-        address: state.pool.address,
+        address: pool.address,
         method,
-        amount: parseUnits(state.fromAmount || "0", 18).toString(),
+        amount: parseUnits(fromAmount || "0", DECIMALS).toString(),
         min_tokens: minTokens.toString(),
       });
 
       toast({
         title: "Success",
-        description: `Swap successful: ${state.fromAmount} ${state.fromAsset?._symbol || ""} to ${state.toAmount} ${state.toAsset?._symbol || ""}`,
+        description: `Swapped ${fromAmount} ${fromAsset._symbol} for ${toAmount} ${toAsset._symbol}`,
         variant: "success",
       });
 
-      setState(prev => ({
-        ...prev,
-        isDialogOpen: false,
-        swapLoading: false,
-        fromAmount: '',
-        toAmount: ''
-      }));
+      setIsDialogOpen(false);
+      setFromAmount('');
+      setToAmount('');
+      setEditingField(null);
+      lastCalculatedFromRef.current = "";
 
       await Promise.all([
-        getTokenBalance(state.fromAsset, true),
-        getTokenBalance(state.toAsset, false)
+        getTokenBalance(fromAsset, true),
+        getTokenBalance(toAsset, false)
       ]);
     } catch (error) {
       console.error("Swap error:", error);
@@ -505,12 +754,37 @@ const SwapAsset = () => {
         description: "Swap failed. Please try again.",
         variant: "destructive",
       });
-      setState(prev => ({
-        ...prev,
-        isDialogOpen: false,
-        swapLoading: false
-      }));
+    } finally {
+      setSwapLoading(false);
     }
+  };
+
+  // Validation helpers
+  const isSwapDisabled = () => {
+    const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+
+    // Basic validations
+    if (!fromAmount || !toAmount || !fromAsset || !toAsset || wrongAmount || insufficientPoolBalance) {
+      return true;
+    }
+
+    // Check if user has enough USDST for fee
+    if (usdstBalanceBigInt < feeAmount) {
+      return true;
+    }
+
+    // Check if swapping USDST and leaving enough for fee
+    if (fromAsset.address === usdstAddress) {
+      const fromAmountWei = parseUnits(fromAmount || "0", DECIMALS);
+      const balance = BigInt(fromAsset.balance || "0");
+
+      if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   return (
@@ -523,18 +797,22 @@ const SwapAsset = () => {
             <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
             <div className="space-y-6">
               <TokenInput
-                amount={state.fromAmount}
+                amount={fromAmount}
                 onChange={(value) => handleAmountChange(true, value)}
-                asset={state.fromAsset}
-                balance={state.fromAsset?.balance || 0}
-                isLoading={state.fromBalanceLoading}
-                wrongAmount={state.wrongAmount}
+                asset={fromAsset}
+                balance={fromAsset?.balance || 0}
+                isLoading={fromBalanceLoading}
+                wrongAmount={wrongAmount}
+                insufficientPoolBalance={insufficientPoolBalance}
                 onSelect={(asset) => getTokenBalance(asset, true)}
                 tokens={swappableTokens}
-                isOpen={state.fromPopoverOpen}
-                onOpenChange={(open) => setState(prev => ({ ...prev, fromPopoverOpen: open }))}
+                isOpen={fromPopoverOpen}
+                onOpenChange={setFromPopoverOpen}
                 label="From"
-                onFocus={() => setState(prev => ({ ...prev, editingField: 'from' }))}
+                onFocus={() => setEditingField('from')}
+                usdstBalance={usdstBalance}
+                isFromInput={true}
+                pool={pool}
               />
 
               <div className="flex justify-center">
@@ -549,92 +827,47 @@ const SwapAsset = () => {
               </div>
 
               <TokenInput
-                amount={state.toAmount}
+                amount={toAmount}
                 onChange={(value) => handleAmountChange(false, value)}
-                asset={state.toAsset}
-                balance={state.toAsset?.balance || 0}
-                isLoading={state.toBalanceLoading}
+                asset={toAsset}
+                balance={toAsset?.balance || 0}
+                isLoading={toBalanceLoading}
                 wrongAmount={false}
+                insufficientPoolBalance={false}
                 onSelect={(asset) => getTokenBalance(asset, false)}
                 tokens={pairableTokens}
-                isOpen={state.toPopoverOpen}
-                onOpenChange={(open) => setState(prev => ({ ...prev, toPopoverOpen: open }))}
+                isOpen={toPopoverOpen}
+                onOpenChange={setToPopoverOpen}
                 label="To"
-                onFocus={() => setState(prev => ({ ...prev, editingField: 'to' }))}
+                onFocus={() => setEditingField('to')}
+                usdstBalance={usdstBalance}
+                isFromInput={false}
+                pool={pool}
               />
 
               <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Exchange Rate</span>
                   <span className="font-medium">
-                    1 {state.fromAsset?._symbol || ""} ≈{" "}
-                    {formatAmount(state.exchangeRate)}{" "}
-                    {state.toAsset?._symbol || ""}
+                    1 {fromAsset?._symbol || ""} ≈ {formatAmount(exchangeRate)} {toAsset?._symbol || ""}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Transaction Fee</span>
-                  <span className="font-medium">0.2 USDST</span>
+                  <span className="font-medium">{SWAP_FEE} USDST</span>
                 </div>
-                <div className="flex flex-col gap-1 mt-2">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      Max slippage
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className={`px-3 py-1 rounded-full text-xs font-medium border ${autoSlippage ? 'bg-gray-200 text-gray-700 border-gray-300' : 'bg-transparent text-gray-500 border-gray-300'}`}
-                        onClick={() => {
-                          setAutoSlippage(true);
-                          setState(prev => ({ ...prev, slippage: 4 }));
-                        }}
-                      >
-                        Auto
-                      </button>
-                      <button
-                        className={`px-3 py-1 rounded-full text-xs font-medium border ${!autoSlippage ? 'bg-gray-200 text-gray-700 border-gray-300' : 'bg-transparent text-gray-500 border-gray-300'}`}
-                        onClick={() => setAutoSlippage(false)}
-                      >
-                        Manual
-                      </button>
-                      <span className={`ml-2 px-3 py-1 rounded-full border text-xs font-semibold ${state.slippage > 5 ? 'border-yellow-400 text-yellow-600' : state.slippage < 1 ? 'border-yellow-400 text-yellow-600' : 'border-gray-300 text-gray-700'}`}>{state.slippage}%</span>
-                    </div>
-                  </div>
-                  {!autoSlippage && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <Slider
-                        value={[state.slippage]}
-                        min={0.1}
-                        max={10}
-                        step={0.1}
-                        onValueChange={(value) => setState(prev => ({ ...prev, slippage: value[0] }))}
-                        className="w-full"
-                      />
-                    </div>
-                  )}
-                  {state.slippage > 5 && (
-                    <div className="flex items-center gap-1 text-xs text-yellow-600 mt-1">
-                      <span className="font-bold">⚠️ High slippage</span>
-                    </div>
-                  )}
-                  {state.slippage < 1 && (
-                    <div className="flex items-center gap-1 text-xs text-yellow-600 mt-1">
-                      <span className="font-bold">⚠️ Low slippage</span>
-                    </div>
-                  )}
-                </div>
+                <SlippageControl
+                  slippage={slippage}
+                  autoSlippage={autoSlippage}
+                  onSlippageChange={setSlippage}
+                  onAutoToggle={setAutoSlippage}
+                />
               </div>
 
               <Button
                 className="w-full bg-blue-600 hover:bg-blue-700"
-                onClick={() => setState(prev => ({ ...prev, isDialogOpen: true }))}
-                disabled={
-                  !state.fromAmount ||
-                  !state.toAmount ||
-                  !state.fromAsset ||
-                  !state.toAsset ||
-                  state.wrongAmount
-                }
+                onClick={() => setIsDialogOpen(true)}
+                disabled={isSwapDisabled()}
               >
                 Swap Assets
               </Button>
@@ -644,15 +877,15 @@ const SwapAsset = () => {
       </div>
 
       <SwapDialog
-        isOpen={state.isDialogOpen}
-        onOpenChange={(open) => setState(prev => ({ ...prev, isDialogOpen: open }))}
-        fromAmount={formatAmount(state.fromAmount)}
-        toAmount={formatAmount(state.toAmount)}
-        fromAsset={state.fromAsset}
-        toAsset={state.toAsset}
-        exchangeRate={formatAmount(state.exchangeRate)}
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        fromAmount={formatAmount(fromAmount)}
+        toAmount={formatAmount(toAmount)}
+        fromAsset={fromAsset}
+        toAsset={toAsset}
+        exchangeRate={formatAmount(exchangeRate)}
         onConfirm={handleSwap}
-        isLoading={state.swapLoading}
+        isLoading={swapLoading}
       />
     </div>
   );

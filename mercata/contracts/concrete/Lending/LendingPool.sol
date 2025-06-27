@@ -34,7 +34,7 @@ contract record LendingPool is Ownable {
     }
 
     uint256 public nextLoanId = 1;
-    mapping(uint256 => LoanInfo) public loans;
+    mapping(uint256 => LoanInfo) public record loans;
     mapping(address => uint256[]) public userLoans; // For easy lookup
     mapping(address => uint256) public record assetInterestRate;
     mapping(address => uint256) public record assetCollateralRatio;
@@ -138,8 +138,14 @@ contract record LendingPool is Ownable {
         LiquidityPool(_liquidityPool()).repay(loan.asset, amount, totalOwed, msg.sender);
 
         if (amount >= totalOwed) {
-            CollateralVault(_collateralVault()).removeCollateral(msg.sender, loan.collateralAsset, loan.collateralAmount);
+            // Retrieve the exact remaining collateral from the vault to avoid mismatch after partial liquidations
+            uint256 remainingCollateral = CollateralVault(_collateralVault()).getCollateral(msg.sender, loan.collateralAsset);
+            if (remainingCollateral > 0) {
+                CollateralVault(_collateralVault()).removeCollateral(msg.sender, loan.collateralAsset, remainingCollateral);
+            }
+
             loan.amount = 0;
+            loan.collateralAmount = 0;
             loan.active = false;
         } else {
             loan.amount = totalOwed - amount;
@@ -187,6 +193,12 @@ contract record LendingPool is Ownable {
         LiquidityPool(_liquidityPool()).repay(loan.asset, repayAmount, totalOwed, msg.sender);
         CollateralVault(_collateralVault()).removeCollateral(loan.user, loan.collateralAsset, seizeAmount);
 
+        // Update the loan's collateral tracking to reflect seized collateral
+        if (loan.collateralAmount >= seizeAmount) {
+            loan.collateralAmount -= seizeAmount;
+        } else {
+            loan.collateralAmount = 0;
+        }
         loan.amount = totalOwed - repayAmount;
         if (loan.amount == 0) {
             loan.active = false;

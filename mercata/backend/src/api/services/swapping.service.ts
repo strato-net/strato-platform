@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 
 const { poolSelectFields, Pool, PoolFactory, Token, PriceOracle } = constants;
@@ -71,7 +71,6 @@ export const createPool = async (
       hash,
     };
   } catch (error) {
-    console.error("Error creating pool:", error);
     throw error;
   }
 };
@@ -120,7 +119,6 @@ export const addLiquidity = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error adding liquidity:", error);
     throw error;
   }
 };
@@ -174,7 +172,6 @@ export const removeLiquidity = async (
       hash,
     };
   } catch (error) {
-    console.error("Error removing liquidity:", error);
     throw error;
   }
 };
@@ -221,7 +218,6 @@ export const swap = async (
 
     return { status, hash };
   } catch (error) {
-    console.error("Error swapping tokens:", error);
     throw error;
   }
 };
@@ -255,7 +251,40 @@ export const calculateSwap = async (
       );
     }
   } catch (error) {
-    console.error("Error calculating swap:", error);
+    throw error;
+  }
+};
+
+export const calculateSwapReverse = async (
+  accessToken: string,
+  address: string,
+  direction: string,
+  amount: string
+) => {
+  try {
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + address,
+    });
+
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+    const pool = pools[0];
+    
+    if (direction === "true") {
+      return getRequiredInput(
+        BigInt(amount),
+        BigInt(pool.tokenBBalance),
+        BigInt(pool.tokenABalance)
+      );
+    } else {
+      return getRequiredInput(
+        BigInt(amount),
+        BigInt(pool.tokenABalance),
+        BigInt(pool.tokenBBalance)
+      );
+    }
+  } catch (error) {
     throw error;
   }
 };

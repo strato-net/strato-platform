@@ -1,6 +1,5 @@
 import { formatUnits, parseUnits } from "ethers";
 import { DollarSign, ArrowDown, ArrowUp } from "lucide-react";
-import { api } from "@/lib/axios";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -19,6 +18,8 @@ const LendingPoolSection = () => {
     withdrawableTokens,
     loadingWithdrawableTokens,
     refreshWithdrawableTokens,
+    depositLiquidity,
+    withdrawLiquidity,
   } = useLendingContext();
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
@@ -97,7 +98,7 @@ const LendingPoolSection = () => {
       setIsProcessing(true);
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
       const amountWei = parseUnits(amount, 18).toString();
-      await api.post("/lend/" + (type === "deposit" ? "depositLiquidity" : "withdrawLiquidity"), {
+      await (type === "deposit" ? depositLiquidity : withdrawLiquidity)({
         asset: usdstAddress,
         amount: amountWei,
       });
@@ -143,7 +144,7 @@ const LendingPoolSection = () => {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Your deposit</span>
+                  <span className="text-gray-500">Your Deposit</span>
                   <span className="font-medium">
                     {loadingWithdrawableTokens ? (
                       <span className="text-gray-400 animate-pulse">
@@ -160,6 +161,10 @@ const LendingPoolSection = () => {
                       "$0.00"
                     )}
                   </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">APY</span>
+                  <span className="font-medium">-</span>
                 </div>
               </div>
             </div>

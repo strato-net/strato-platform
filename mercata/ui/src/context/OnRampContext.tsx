@@ -23,6 +23,27 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const buy = async (payload: any, userAddress: string): Promise<{ url: string }> => {
+    try {
+      const weiAmount = parseUnits(payload.amount, 18).toString();
+      const buyPayload = {
+        token: payload.token,
+        amount: weiAmount,
+        paymentProviderAddress: payload.paymentProviderAddress,
+      };
+
+      const headers = {
+        address: userAddress,
+      };
+
+      const res = await api.post("/onramp/buy", buyPayload, { headers });
+      return res.data;
+    } catch (err) {
+      console.error("OnRamp buy failed:", err);
+      throw err;
+    }
+  };
+
   const sell = async (payload: any): Promise<any> => {
     try {
     const weiAmount = parseUnits(payload.amount, 18).toString() ;
@@ -62,6 +83,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         error,
         
         get,
+        buy,
         sell,
         lock,
         unlockTokens,

@@ -11,9 +11,11 @@ import { Token, CreateTokenValues } from '@/interface';
 
 type TokenContextType = {
   tokens: Token[];
+  activeTokens: Token[];
   loading: boolean;
   error: string | null;
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
+  getActiveTokens: () => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   createToken: (token: CreateTokenValues) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
@@ -26,6 +28,7 @@ const TokenContext = createContext<TokenContextType | undefined>(undefined);
 
 export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [tokens, setTokens] = useState<Token[]>([]);
+  const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +40,19 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       setTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch tokens');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getActiveTokens = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
+      setActiveTokens(res.data || []);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch active tokens');
     } finally {
       setLoading(false);
     }
@@ -123,13 +139,15 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.post('/tokens/setStatus', payload);
+      // Refresh tokens to reflect the status change immediately
+      await getAllTokens();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to set token status');
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAllTokens]);
 
   useEffect(() => {
     getAllTokens();
@@ -139,9 +157,11 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     <TokenContext.Provider
       value={{
         tokens,
+        activeTokens,
         loading,
         error,
         getAllTokens,
+        getActiveTokens,
         getToken,
         createToken,
         transferToken,

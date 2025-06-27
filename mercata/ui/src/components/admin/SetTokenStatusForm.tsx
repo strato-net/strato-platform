@@ -1,19 +1,26 @@
-import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Info, Settings } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useUserTokens } from '@/context/UserTokensContext';
-import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
 
 interface SetTokenStatusFormValues {
-  tokenAddress: string;
   status: number;
+}
+
+interface SetTokenStatusModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  token: {
+    address: string;
+    symbol: string;
+    name: string;
+  } | null;
 }
 
 const TOKEN_STATUS_OPTIONS = [
@@ -22,32 +29,24 @@ const TOKEN_STATUS_OPTIONS = [
   { value: 3, label: 'LEGACY', description: 'Token is deprecated but still functional' },
 ];
 
-const SetTokenStatusForm = () => {
+const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalProps) => {
   const { toast } = useToast();
-  const { userAddress } = useUser();
-  const { tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
-  const { setTokenStatus, loading, error } = useTokenContext();
+  const { setTokenStatus, loading } = useTokenContext();
   
   const form = useForm<SetTokenStatusFormValues>({
     defaultValues: {
-      tokenAddress: '',
       status: 1,
     },
   });
 
-  const selectedToken = Array.isArray(tokens) ? tokens.find(t => t.address === form.watch('tokenAddress')) : null;
   const selectedStatus = TOKEN_STATUS_OPTIONS.find(s => s.value === form.watch('status'));
 
-  useEffect(() => {
-    if (userAddress) {
-      fetchTokens(userAddress);
-    }
-  }, [userAddress]);
-
   const onSubmit = async (data: SetTokenStatusFormValues) => {
+    if (!token) return;
+    
     try {
       const payload = {
-        address: data.tokenAddress,
+        address: token.address,
         status: data.status,
       };
 
@@ -57,68 +56,35 @@ const SetTokenStatusForm = () => {
 
       toast({
         title: 'Token Status Updated Successfully',
-        description: `${selectedToken?.token?._symbol || selectedToken?._symbol} status has been set to ${selectedStatus?.label}`,
+        description: `${token.symbol} status has been set to ${selectedStatus?.label}`,
       });
 
       form.reset();
+      onOpenChange(false);
     } catch (error: unknown) {
       const axiosError = error as AxiosError<any>;
       console.error('Token status error:', axiosError);
       
       toast({
         title: 'Error Setting Token Status',
-        description: axiosError.response?.data?.message || error?.message || 'Failed to set token status. Please try again.',
+        description: axiosError.response?.data?.message || (error as Error)?.message || 'Failed to set token status. Please try again.',
         variant: 'destructive',
       });
     }
   };
 
   return (
-    <div className="space-y-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="tokenAddress"
-              rules={{ required: 'Token selection is required' }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Select Token</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a token" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {tokensLoading ? (
-                        <SelectItem value="loading" disabled>
-                          Loading tokens...
-                        </SelectItem>
-                      ) : Array.isArray(tokens) && tokens.length > 0 ? (
-                        tokens.map((token) => (
-                          <SelectItem key={token.address} value={token.address}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{token.token?._symbol || token._symbol} - {token.token?._name || token._name}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-tokens" disabled>
-                          No tokens available
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Choose the token to update status for
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Set Token Status</DialogTitle>
+          <DialogDescription>
+            Update the status for {token?.symbol} ({token?.name})
+          </DialogDescription>
+        </DialogHeader>
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="status"
@@ -150,54 +116,54 @@ const SetTokenStatusForm = () => {
                 </FormItem>
               )}
             />
-          </div>
 
-          {selectedToken && selectedStatus && (
+            {token && selectedStatus && (
+              <Alert>
+                <Settings className="h-4 w-4" />
+                <AlertDescription>
+                  You are about to change the status of <strong>{token.symbol}</strong> to <strong>{selectedStatus.label}</strong>. 
+                  {selectedStatus.description && ` ${selectedStatus.description}.`}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Alert>
-              <Settings className="h-4 w-4" />
+              <Info className="h-4 w-4" />
               <AlertDescription>
-                You are about to change the status of <strong>{selectedToken.token?._symbol || selectedToken._symbol}</strong> to <strong>{selectedStatus.label}</strong>. 
-                {selectedStatus.description && ` ${selectedStatus.description}.`}
+                Changing token status affects how the token behaves across the platform. Only the TokenFactory 
+                contract can call this function. Ensure you have the proper permissions before attempting this operation.
               </AlertDescription>
             </Alert>
-          )}
 
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Changing token status affects how the token behaves across the platform. Only the TokenFactory 
-              contract can call this function. Ensure you have the proper permissions before attempting this operation.
-            </AlertDescription>
-          </Alert>
-
-          <div className="flex justify-end space-x-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => form.reset()}
-              disabled={loading}
-            >
-              Reset
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || !selectedToken}
-              className="bg-strato-blue hover:bg-strato-blue/90"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating Status...
-                </>
-              ) : (
-                'Update Token Status'
-              )}
-            </Button>
-          </div>
-        </form>
-      </Form>
-    </div>
+            <div className="flex justify-end space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading || !token}
+                className="bg-strato-blue hover:bg-strato-blue/90"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating Status...
+                  </>
+                ) : (
+                  'Update Token Status'
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default SetTokenStatusForm;
+export default SetTokenStatusModal;
