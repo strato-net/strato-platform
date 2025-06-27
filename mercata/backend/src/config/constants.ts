@@ -1,4 +1,4 @@
-import { baseCodeCollection, lendingPool, onRamp, poolFactory, tokenFactory, adminRegistry, poolConfigurator } from "./config";
+import { lendingPool, onRamp, poolFactory, tokenFactory, adminRegistry, poolConfigurator } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -83,7 +83,6 @@ export const constants = (() => {
     `paymentProviders:${OnRamp}-paymentProviders(key,PaymentProviderInfo:value)`,
   ];
   return {
-    baseCodeCollection,
     poolFactory,
     lendingPool,
     onRamp,
