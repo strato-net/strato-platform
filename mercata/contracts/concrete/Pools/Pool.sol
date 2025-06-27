@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
+import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Admin/AdminRegistry.sol";
+import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record Pool is Ownable {
@@ -10,14 +12,10 @@ contract record Pool is Ownable {
     event Swap(address sender, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
     event AddLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
     event RemoveLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
-    event FeeParametersUpdated(uint256 oldSwapFeeRate, uint256 newSwapFeeRate, uint256 oldLpSharePercent, uint256 newLpSharePercent, uint256 oldProtocolSharePercent, uint256 newProtocolSharePercent);
-    event FeeCollectorUpdated(address oldFeeCollector, address newFeeCollector);
 
     Token public tokenA;
     Token public tokenB;
     Token public lpToken;
-    TokenFactory public tokenFactory;
-    AdminRegistry public adminRegistry;
 
     bool private locked;   
     
@@ -27,12 +25,7 @@ contract record Pool is Ownable {
     uint public tokenABalance;
     uint public tokenBBalance;
 
-    // All fee variables are in basis points (bps): 1% = 100 bps, 0.3% = 30 bps, 70% = 7000 bps
-    uint256 public swapFeeRate = 30; // 30 bps = 0.3%
-    uint256 public lpSharePercent = 7000; // 7000 bps = 70%
-    uint256 public protocolSharePercent = 3000; // 3000 bps = 30%
     uint256 public feePerShare;
-    address public feeCollector;
     mapping(address => uint256) public record rewardDebt;
     
     modifier nonReentrant() {
@@ -42,24 +35,29 @@ contract record Pool is Ownable {
         locked = false;
     }
 
-    modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner() || adminRegistry.isAdminAddress(msg.sender), "Pool: caller is not owner or admin");
-        _;
+    function _feeCollector() internal view returns (address) {
+        return PoolFactory(owner()).feeCollector();
+    }
+
+    function _tokenFactory() internal view returns (address) {
+        return PoolFactory(owner()).tokenFactory();
+    }
+
+    function _swapFeeRate() internal view returns (uint256) {
+        return PoolFactory(owner()).swapFeeRate();
+    }
+
+    function _lpSharePercent() internal view returns (uint256) {
+        return PoolFactory(owner()).lpSharePercent();
     }
 
     constructor(
         address tokenAAddr, 
-        address tokenBAddr,
-        address _tokenFactory,
-        address _feeCollector,
-        address _adminRegistry
+        address tokenBAddr
     ) Ownable(msg.sender) {
-        require(_tokenFactory != address(0), "Zero token factory address");
-        require(_feeCollector != address(0), "Zero fee collector address");
-        require(_adminRegistry != address(0), "Zero admin registry address");
+        require(tokenAAddr != address(0), "Zero tokenA address");
+        require(tokenBAddr != address(0), "Zero tokenB address");
         
-        tokenFactory = TokenFactory(_tokenFactory);
-        adminRegistry = AdminRegistry(_adminRegistry);
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
         
@@ -67,7 +65,7 @@ contract record Pool is Ownable {
         string lpName = ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token";
         string lpSymbol = ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP";
         
-        address lpTokenAddress = tokenFactory.createToken(
+        address lpTokenAddress = TokenFactory(_tokenFactory()).createToken(
             lpName,
             "Liquidity Provider Token",
             [],
@@ -79,52 +77,6 @@ contract record Pool is Ownable {
         );
         
         lpToken = Token(lpTokenAddress);
-
-        feeCollector = _feeCollector;
-    }
-
-    /// @notice Update fee parameters (owner or admin only)
-    /// @param newSwapFeeRate New swap fee rate in basis points
-    /// @param newLpSharePercent New LP share percentage in basis points
-    /// @param newProtocolSharePercent New protocol share percentage in basis points
-    function updateFeeParameters(
-        uint256 newSwapFeeRate,
-        uint256 newLpSharePercent,
-        uint256 newProtocolSharePercent
-    ) external onlyOwnerOrAdmin {
-        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
-        require(newLpSharePercent + newProtocolSharePercent == 10000, "LP and protocol shares must sum to 100%");
-        require(newLpSharePercent > 0 && newProtocolSharePercent > 0, "Both shares must be greater than 0");
-        
-        uint256 oldSwapFeeRate = swapFeeRate;
-        uint256 oldLpSharePercent = lpSharePercent;
-        uint256 oldProtocolSharePercent = protocolSharePercent;
-        
-        swapFeeRate = newSwapFeeRate;
-        lpSharePercent = newLpSharePercent;
-        protocolSharePercent = newProtocolSharePercent;
-        
-        emit FeeParametersUpdated(
-            oldSwapFeeRate, newSwapFeeRate,
-            oldLpSharePercent, newLpSharePercent,
-            oldProtocolSharePercent, newProtocolSharePercent
-        );
-    }
-
-    /// @notice Update the fee collector address (owner or admin only)
-    /// @param newFeeCollector New fee collector address
-    function setFeeCollector(address newFeeCollector) external onlyOwnerOrAdmin {
-        require(newFeeCollector != address(0), "Zero fee collector address");
-        address oldFeeCollector = feeCollector;
-        feeCollector = newFeeCollector;
-        emit FeeCollectorUpdated(oldFeeCollector, newFeeCollector);
-    }
-
-    /// @notice Update the admin registry address (owner only)
-    /// @param newAdminRegistry New admin registry address
-    function setAdminRegistry(address newAdminRegistry) external onlyOwner {
-        require(newAdminRegistry != address(0), "Zero admin registry address");
-        adminRegistry = AdminRegistry(newAdminRegistry);
     }
 
     function _updateStateVars() internal {
@@ -246,8 +198,8 @@ contract record Pool is Ownable {
         uint256 inputReserve = ERC20(inputToken).balanceOf(address(this));
         uint256 outputReserve = ERC20(outputToken).balanceOf(address(this));
 
-        uint256 fee = (amountIn * swapFeeRate) / 10000;
-        uint256 lpFee = (fee * lpSharePercent) / 10000;
+        uint256 fee = (amountIn * _swapFeeRate()) / 10000;
+        uint256 lpFee = (fee * _lpSharePercent()) / 10000;
         uint256 protocolFee = fee - lpFee;
 
         uint256 netInput = amountIn - fee;
@@ -261,8 +213,8 @@ contract record Pool is Ownable {
         require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Total input transfer failed");
         
         // Send protocol fee to fee collector
-        require(ERC20(inputToken).approve(feeCollector, protocolFee), "Protocol fee approve failed");
-        FeeCollector(feeCollector).receiveFee(address(inputToken), protocolFee);
+        require(ERC20(inputToken).approve(_feeCollector(), protocolFee), "Protocol fee approve failed");
+        FeeCollector(_feeCollector()).receiveFee(address(inputToken), protocolFee);
 
         amountOut = getInputPrice(netInput, inputReserve, outputReserve);
         require(amountOut >= minAmountOut, "Slippage check failed");
