@@ -14,7 +14,7 @@ type SwapContextType = {
     poolAddress: string;
     isAToB: boolean;
     amountIn: string;
-    reserve?: boolean;
+    reverse?: boolean;
     signal?: AbortSignal;
   }) => Promise<string>;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
@@ -55,7 +55,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>('/swap/swappableTokens');
+      const res = await api.get<SwappableToken[]>('/swap-pools/tokens');
       setSwappableTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch swappable tokens');
@@ -70,7 +70,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>(`/swap/swappableTokenPairs/${tokenAddress}`);
+      const res = await api.get<SwappableToken[]>(`/swap-pools/tokens/${tokenAddress}`);
       setPairableTokens(res.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch pairable tokens');
@@ -83,7 +83,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      await api.post('/swap', data);
+      await api.post('/swap-pools', data);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to create pool');
       throw err;
@@ -96,18 +96,18 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     poolAddress,
     isAToB,
     amountIn,
-    reserve = false,
+    reverse = false,
     signal
   }: {
     poolAddress: string;
     isAToB: boolean;
     amountIn: string;
-    reserve?: boolean;
+    reverse?: boolean;
     signal?: AbortSignal;
   }) => {
     try {
       const { data } = await api.get(
-        `/swap/calculateSwap?poolAddress=${poolAddress}&isAToB=${isAToB}&amountIn=${amountIn}&reserve=${reserve}`,
+        `/swap/quote?poolAddress=${poolAddress}&isAToB=${isAToB}&amountIn=${amountIn}&reverse=${reverse}`,
         { signal }
       );
       return data;
@@ -119,7 +119,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 
   const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
     try {
-      const res = await api.get(`/swap/poolByTokenPair?tokenPair=${tokenA},${tokenB}`, { signal });
+      const res = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
       return res.data?.[0] || null;
     } catch (err: any) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
@@ -130,7 +130,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 
   const getPoolByAddress = useCallback(async (address: string) => {
     try {
-      const res = await api.get(`/swap/${address}`);
+      const res = await api.get(`/swap-pools/${address}`);
       return res.data || null;
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to get pool');
@@ -145,7 +145,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     minAmountOut: string;
   }) => {
     try {
-      const res = await api.post("/swap/swap", data);
+      const res = await api.post("/swap", data);
       return res.data;
     } catch (err: any) {
       throw new Error(err.response?.data?.message || err.message || "Swap transaction failed");
@@ -156,7 +156,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/swap');
+      const res = await api.get('/swap-pools');
       return res.data || [];
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch LP tokens');
@@ -174,7 +174,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post("/swap/addLiquidity", data);
+      const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
+        tokenBAmount: data.tokenBAmount,
+        maxTokenAAmount: data.maxTokenAAmount
+      });
       return response.data;
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to add liquidity');
@@ -191,7 +194,9 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post("/swap/removeLiquidity", data);
+      const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity`, {
+        data: { lpTokenAmount: data.lpTokenAmount }
+      });
       return response.data;
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to remove liquidity');

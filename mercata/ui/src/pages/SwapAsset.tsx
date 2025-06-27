@@ -614,7 +614,7 @@ const SwapAsset = () => {
           poolAddress: pool.address,
           isAToB,
           amountIn: parsedValue.toString(),
-          reserve: true,
+          reverse: true,
           signal: swapInputAbortRef.current.signal,
         });
 
@@ -702,7 +702,7 @@ const SwapAsset = () => {
             poolAddress: pool.address,
             isAToB,
             amountIn: parsed.toString(),
-            reserve: true,
+            reverse: true,
           });
           setFromAmount(formatUnits(BigInt(requiredInput || "0"), DECIMALS));
         }
