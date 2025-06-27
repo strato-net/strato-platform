@@ -97,12 +97,13 @@ basicParse input =
 
 textToBasicValue :: Text -> BasicValue
 textToBasicValue v =
-           fromMaybe (BString $ encodeUtf8 v)
+  let v' = fromMaybe (BString $ encodeUtf8 v)
            $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
          <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
          <|> (BInteger <$> readMaybe (T.unpack v))
          <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
          <|> (case T.split (=='.') v of [a,b,c] -> BEnumVal (textToLabel a) (textToLabel b) <$> readMaybe (T.unpack c); _ -> Nothing)
+   in if isDefault v' then BDefault else v'
 
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i) = i == 0
