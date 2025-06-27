@@ -2,6 +2,8 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "./TokenMetadata.sol";
 import "./TokenAccess.sol";
 import "../../abstract/ERC20.sol";
+import "../Admin/AdminRegistry.sol";
+import "./TokenFactory.sol";
 
 enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
@@ -12,8 +14,8 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     
     event StatusChanged(TokenStatus oldStatus, TokenStatus newStatus);
     
-    modifier onlyTokenFactory() {
-        require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
+    modifier onlyTokenFactoryOrAdmin() {
+        require(msg.sender == address(tokenFactory) || AdminRegistry(tokenFactory.adminRegistry()).isAdminAddress(msg.sender), "Token: caller is not token factory or admin");
         _;
     }
     
@@ -31,18 +33,20 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         customDecimals = _customDecimals;
         status = TokenStatus.PENDING;
         tokenFactory = TokenFactory(msg.sender);
+
         _mint(_tokenCreator, _initialSupply);
     }
 
-    function setStatus(uint newStatus) external onlyTokenFactory {
+    function setStatus(uint newStatus) external onlyTokenFactoryOrAdmin {
         require(newStatus != uint(status), "Token: New status is the same as the current status");
         require(newStatus != uint(TokenStatus.NULL), "Token: New status is NULL");
         TokenStatus _newStatus = TokenStatus(newStatus);
-        emit StatusChanged(status, _newStatus);
         status = _newStatus;
+
+        emit StatusChanged(status, _newStatus);
     }
 
-    function setTokenFactory(address _tokenFactory) external onlyTokenFactory {
+    function setTokenFactory(address _tokenFactory) external onlyTokenFactoryOrAdmin {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 

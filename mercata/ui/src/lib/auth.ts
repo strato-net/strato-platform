@@ -4,7 +4,7 @@ import { api } from './axios';
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
     // Make a request to check auth status - the cookie will be sent automatically
-    await api.get('/users/me');
+    await api.get('/user/me');
     return true;
   } catch (error: any) {
     // If we get a 401, the user is not authenticated

@@ -37,12 +37,6 @@ export const getPool = async (
     lendingPool: `eq.${lendingPool}`,
   };
 
-  // DEBUG: log the exact query params being sent to Cirrus (no secrets exposed)
-  console.log("[LendingService.getPool] Querying Cirrus", {
-    endpoint: `/${LendingRegistry}`,
-    params,
-  });
-
   const {
     data: [poolData],
   } = await cirrus.get(accessToken, `/${LendingRegistry}`, { params });
@@ -578,8 +572,6 @@ export const executeLiquidation = async (
 
     return { status, hash };
   } catch (error: any) {
-    // Surface Strato's response for easier debugging
-    console.error("[executeLiquidation] Strato 400 response", error?.response?.data || error);
     throw error;
   }
 };
@@ -622,8 +614,6 @@ export const setInterestRate = async (
     },
   });
 
-  console.log(`[setInterestRate] Setting interest rate for ${body.asset} to ${rateValue}%`);
-
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
   );
@@ -654,8 +644,6 @@ export const setCollateralRatio = async (
     },
   });
 
-  console.log(`[setCollateralRatio] Setting collateral ratio for ${body.asset} to ${ratioValue}%`);
-
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
   );
@@ -685,8 +673,6 @@ export const setLiquidationBonus = async (
       newBonus: bonusValue
     },
   });
-
-  console.log(`[setLiquidationBonus] Setting liquidation bonus for ${body.asset} to ${bonusValue}%`);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
