@@ -8,13 +8,13 @@
 module Frontend.Pages.BitcoinBridge.Bridge where
 
 import Reflex.Dom hiding (button)
+import Common.BridgeClient
 import Control.Exception
 import Control.Monad.IO.Class
 import Control.Monad (void)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Data.Text (Text)
-import Frontend.BridgeClient
 import Frontend.Components.Button
 import Frontend.Components.Card
 import Frontend.Components.Input

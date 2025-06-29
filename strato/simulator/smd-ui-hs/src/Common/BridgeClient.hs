@@ -1,11 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Frontend.BridgeClient where
+module Common.BridgeClient where
 
 import Bloc.API.Utils
 import Bloc.Client
 import BlockApps.Solidity.SolidityValue
+import Common.Client
 import Common.Types
 import Control.Exception (throwIO)
 import Data.Aeson
@@ -14,7 +15,6 @@ import qualified Data.Map.Strict as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Frontend.Client
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
 import Strato.Options (flags_backend_port)

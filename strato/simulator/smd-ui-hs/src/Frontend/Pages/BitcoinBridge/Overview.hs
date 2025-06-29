@@ -5,11 +5,11 @@
 
 module Frontend.Pages.BitcoinBridge.Overview where
 
+import Common.BridgeClient
 import Common.Types  -- for BitcoinBlockSummary, UtxoSummary
 import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (traverse_)
 import qualified Data.Text as T
-import Frontend.BridgeClient
 import Frontend.Components.Card
 import Frontend.Components.Table
 import Frontend.Types.State

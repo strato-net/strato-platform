@@ -9,6 +9,7 @@ import Backend.BitcoinRPC
 import Bloc.API.Transaction
 import Bloc.Client
 import BlockApps.Solidity.ArgValue
+import Common.BridgeClient (backendBaseUrl, blocBaseUrl)
 import Common.Types
 import Control.Exception (throwIO)
 import Control.Monad (guard)
@@ -22,10 +23,10 @@ import Data.Proxy
 import Data.Scientific (toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Frontend.BridgeClient (blocBaseUrl)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant hiding (HNil)
 import Servant.Client
+import Strato.Lite.Rest.Server (cirrusClient)
 
 -- Exposed to Servant
 getBlockSummaries :: Handler [BitcoinBlockSummary]
@@ -144,3 +145,175 @@ parseUtxoFor target v = do
   UtxoSummary addr amt conf <- toUtxoSummary v
   guard (addr == target)
   pure $ UtxoSummary addr amt conf
+
+callCirrus :: Text -> Handler Value
+callCirrus t = liftIO $ do
+  mgr <- newManager defaultManagerSettings
+  eRes <- runClientM (cirrusClient t) (mkClientEnv mgr backendBaseUrl)
+  case eRes of
+    Left ce -> throwIO ce
+    Right res -> pure res
+
+getUserMe :: Handler Value
+getUserMe = do
+  result <- callCirrus "BlockApps-Mercata-AdminRegistry"
+  pure result
+
+getUserAdmin :: Handler Value
+getUserAdmin = pure emptyObject
+
+postUserAdmin :: Value -> Handler Value
+postUserAdmin _ = pure emptyObject
+
+deleteUserAdmin :: Value -> Handler Value
+deleteUserAdmin _ = pure emptyObject
+
+getTokenBalance :: Handler Value
+getTokenBalance = pure emptyObject
+
+getTokenByAddress :: Text -> Handler Value
+getTokenByAddress _ = pure emptyObject
+
+getAllTokens :: Handler Value
+getAllTokens = pure emptyObject
+
+postToken :: Value -> Handler Value
+postToken _ = pure emptyObject
+
+postTokenTransfer :: Value -> Handler Value
+postTokenTransfer _ = pure emptyObject
+
+postTokenApprove :: Value -> Handler Value
+postTokenApprove _ = pure emptyObject
+
+postTokenTransferFrom :: Value -> Handler Value
+postTokenTransferFrom _ = pure emptyObject
+
+postTokenStatus :: Value -> Handler Value
+postTokenStatus _ = pure emptyObject
+
+getSwappableTokens :: Handler Value
+getSwappableTokens = pure emptyObject
+
+getSwappableTokenPairsByAddress :: Text -> Handler Value
+getSwappableTokenPairsByAddress _ = pure emptyObject
+
+getPoolByTokenPair :: Handler Value
+getPoolByTokenPair = pure emptyObject
+
+getCalculateSwap :: Handler Value
+getCalculateSwap = pure emptyObject
+
+getCalculateSwapReverse :: Handler Value
+getCalculateSwapReverse = pure emptyObject
+
+getLPToken :: Handler Value
+getLPToken = pure emptyObject
+
+getSwapPoolByAddress :: Text -> Handler Value
+getSwapPoolByAddress _ = pure emptyObject
+
+getAllSwapPools :: Handler Value
+getAllSwapPools = pure emptyObject
+
+postSwapPool :: Value -> Handler Value
+postSwapPool _ = pure emptyObject
+
+postSwapPoolAddLiquidity :: Value -> Handler Value
+postSwapPoolAddLiquidity _ = pure emptyObject
+
+postSwapPoolRemoveLiquidity :: Value -> Handler Value
+postSwapPoolRemoveLiquidity _ = pure emptyObject
+
+postSwapPoolSwap :: Value -> Handler Value
+postSwapPoolSwap _ = pure emptyObject
+
+getLendingPool :: Handler Value
+getLendingPool = pure emptyObject
+
+getLendingPoolDepositableTokens :: Handler Value
+getLendingPoolDepositableTokens = pure emptyObject
+
+getLendingPoolWithdrawableTokens :: Handler Value
+getLendingPoolWithdrawableTokens = pure emptyObject
+
+getLendingPoolLoans :: Handler Value
+getLendingPoolLoans = pure emptyObject
+
+getLendingPoolLoanById :: Text -> Handler Value
+getLendingPoolLoanById _ = pure emptyObject
+
+postLendingPoolDepositLiquidity :: Value -> Handler Value
+postLendingPoolDepositLiquidity _ = pure emptyObject
+
+postLendingPoolWithdrawLiquidity :: Value -> Handler Value
+postLendingPoolWithdrawLiquidity _ = pure emptyObject
+
+postLendingPoolRepay :: Value -> Handler Value
+postLendingPoolRepay _ = pure emptyObject
+
+postLendingPoolManageLiquidity :: Value -> Handler Value
+postLendingPoolManageLiquidity _ = pure emptyObject
+
+postLendingPoolBorrow :: Value -> Handler Value
+postLendingPoolBorrow _ = pure emptyObject
+
+postLendingPoolSetInterestRate :: Value -> Handler Value
+postLendingPoolSetInterestRate _ = pure emptyObject
+
+postLendingPoolSetCollateralRatio :: Value -> Handler Value
+postLendingPoolSetCollateralRatio _ = pure emptyObject
+
+postLendingPoolSetLiquidationBonus :: Value -> Handler Value
+postLendingPoolSetLiquidationBonus _ = pure emptyObject
+
+getLendingPoolLiquidatable :: Handler Value
+getLendingPoolLiquidatable = pure emptyObject
+
+getLendingPoolLiquidatableNearUnhealthy :: Handler Value
+getLendingPoolLiquidatableNearUnhealthy = pure emptyObject
+
+getLendingPoolLiquidatableById :: Text -> Handler Value
+getLendingPoolLiquidatableById _ = pure emptyObject
+
+postLendingPoolLiquidateById :: Text -> Value -> Handler Value
+postLendingPoolLiquidateById _ _ = pure emptyObject
+
+getOraclePrice :: Handler Value
+getOraclePrice = pure emptyObject
+
+postOraclePrice :: Value -> Handler Value
+postOraclePrice _ = pure emptyObject
+
+getOnRamp :: Handler Value
+getOnRamp = pure emptyObject
+
+postOnRampBuy :: Value -> Handler Value
+postOnRampBuy _ = pure emptyObject
+
+postOnRampSell :: Value -> Handler Value
+postOnRampSell _ = pure emptyObject
+
+postBridgeIn :: Value -> Handler Value
+postBridgeIn _ = pure emptyObject
+
+postBridgeOut :: Value -> Handler Value
+postBridgeOut _ = pure emptyObject
+
+getBridgeBalanceByAddress :: Text -> Handler Value
+getBridgeBalanceByAddress _ = pure emptyObject
+
+getBridgeInTokens :: Handler Value
+getBridgeInTokens = pure emptyObject
+
+getBridgeOutTokens :: Handler Value
+getBridgeOutTokens = pure emptyObject
+
+getBridgeDepositStatus :: Text -> Handler Value
+getBridgeDepositStatus _ = pure emptyObject
+
+getBridgeWithdrawalStatus :: Text -> Handler Value
+getBridgeWithdrawalStatus _ = pure emptyObject
+
+getHealth :: Handler Value
+getHealth = pure emptyObject

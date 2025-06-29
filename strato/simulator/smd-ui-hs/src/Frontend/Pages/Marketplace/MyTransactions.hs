@@ -5,10 +5,10 @@
 
 module Frontend.Pages.Marketplace.MyTransactions where
 
+import Common.BridgeClient (fetchMarketplaceTransactions)
 import Common.Types
 import qualified Data.Text as T
 import Frontend.Components.Badge
-import Frontend.BridgeClient (fetchMarketplaceTransactions)
 import Frontend.Types.State hiding (Transaction(..))
 import Frontend.Utils
 import Reflex.Dom

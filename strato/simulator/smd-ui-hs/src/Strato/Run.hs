@@ -6,6 +6,7 @@
 module Strato.Run where
 
 import Backend.Handlers
+import Backend.Server
 import Bitcoin.TxBuilder
 import Bloc.Monad (BlocEnv(..))
 import BlockApps.Logging
@@ -76,25 +77,6 @@ createHaskoinMultiSigScript = do
       putStrLn $ "Got Tx: " ++ show tx
       putStrLn $ "✅ Unsigned tx: " ++ T.unpack (encodeHex (BL.toStrict $ Binary.encode tx))
 
-bitcoinBridgeServer :: Server BitcoinBridgeAPI
-bitcoinBridgeServer = getBlockSummaries
-                 :<|> getGlobalUtxos
-                 :<|> getWalletUtxos
-                 :<|> getWalletBalance
-                 :<|> getMultisigUtxos
-                 :<|> postSendToMultisig
-                 :<|> postBitcoinRpcCommand
-                 :<|> getMarketplaceTransactions
-
-fullServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> (CombinedAPI :<|> CirrusAPI))
-fullServer d f c blocEnv urlMap = bitcoinBridgeServer :<|> (singleNodeRestServer d f c blocEnv urlMap) 
-
-api :: Proxy (BitcoinBridgeAPI :<|> (CombinedAPI :<|> CirrusAPI))
-api = Proxy
-
-app :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
-app d f c blocEnv urlMap = serve api $ fullServer d f c blocEnv urlMap
-
 -- CSS file path
 css :: BS.ByteString
 css = $(embedFile "static/style.css")
@@ -150,3 +132,12 @@ runStrato runUI = do
           traverse_ cancel $ a:as
           putStrLn "Done cancelling threads"
     finally (liftIO . runUI $ mainWidgetWithHead header App.mainWidget) $ liftIO finalize
+
+fullServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
+fullServer d f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer d f c blocEnv urlMap)
+
+api :: Proxy (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
+api = Proxy
+
+app :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
+app d f c blocEnv urlMap = serve api $ fullServer d f c blocEnv urlMap

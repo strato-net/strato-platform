@@ -6,6 +6,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -38,11 +39,12 @@ import Data.Maybe (catMaybes, listToMaybe)
 import qualified Data.Text as T
 import SQLM
 import Servant
+import Servant.Client
 import Strato.Lite.Base.Filesystem
 import Strato.Lite.Base.Simulator
 import Strato.Lite.Cirrus
 import Strato.Lite.Core
-import Strato.Lite.Simulator
+import Strato.Lite.Simulator hiding (client)
 import Strato.Lite.Rest.Api
 import UnliftIO hiding (Handler)
 
@@ -128,6 +130,9 @@ multinodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy Combi
         . flip runReaderT s
         . flip runReaderT c
         $ f
+
+cirrusClient :: Client ClientM CirrusAPI
+cirrusClient = client (Proxy @CirrusAPI)
 
 cirrusHandler :: MonadIO m => FilePath -> T.Text -> m Value
 cirrusHandler dbFileName tableName = liftIO $ queryCirrus dbFileName tableName

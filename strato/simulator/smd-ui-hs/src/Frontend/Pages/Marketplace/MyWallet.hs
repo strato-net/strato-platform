@@ -6,10 +6,10 @@
 
 module Frontend.Pages.Marketplace.MyWallet where
 
+-- import Common.BridgeClient (fetchMarketplaceTransactions)
 import Common.Types
 import Control.Monad (when)
 import qualified Data.Text as T
--- import Frontend.BridgeClient (fetchMarketplaceTransactions)
 import Frontend.Components.StatCard
 import Frontend.Types.State hiding (Transaction(..))
 import Reflex.Dom

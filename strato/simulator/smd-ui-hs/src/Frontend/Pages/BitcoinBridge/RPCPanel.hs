@@ -8,6 +8,7 @@
 
 module Frontend.Pages.BitcoinBridge.RPCPanel (rpcTabWidget) where
 
+import Common.BridgeClient
 import Control.Exception
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
@@ -17,7 +18,6 @@ import qualified Data.Map.Strict as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
-import Frontend.BridgeClient
 import Frontend.Components.Button
 import Frontend.Components.Card
 import Frontend.Components.Input

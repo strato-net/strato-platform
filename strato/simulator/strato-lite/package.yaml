@@ -44,6 +44,7 @@ library:
   - filepath
   - hflags
   - monad-alter
+  - servant-client
   - servant-server
   - text
   - unliftio
