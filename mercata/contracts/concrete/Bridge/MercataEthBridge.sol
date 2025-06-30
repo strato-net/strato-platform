@@ -45,7 +45,7 @@ contract record MercataEthBridge is Ownable {
     address public relayer;     // off‑chain relayer key
     TokenFactory public tokenFactory; // token factory for token status checks
 
-    uint256 public minAmount = 0 ether; // dust guard
+    uint256 public minAmount = 0; // dust guard
 
     // ──────────────────── state ─────────────────────────
     enum WithdrawState { NONE, INITIATED, PENDING_APPROVAL, COMPLETED }
@@ -63,12 +63,12 @@ contract record MercataEthBridge is Ownable {
     }
 
     // ─────────────────── events ─────────────────────────
-    event DepositInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
-    event DepositCompleted(string indexed txHash);
-    event WithdrawalInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
-    event WithdrawalPendingApproval(string indexed txHash);
-    event WithdrawalCompleted(string indexed txHash);
-    event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
+    event DepositInitiated(string txHash, address from, address token, uint256 amount, address to, address mercataUser);
+    event DepositCompleted(string txHash);
+    event WithdrawalInitiated(string txHash, address from, address token, uint256 amount, address to, address mercataUser);
+    event WithdrawalPendingApproval(string txHash);
+    event WithdrawalCompleted(string txHash);
+    event RelayerUpdated(address oldRelayer, address newRelayer);
     event MinAmountUpdated(uint256 oldVal, uint256 newVal);
     event TokenFactoryUpdated(address oldFactory, address newFactory);
     // ─────────────────── modifiers ─────────────────────
@@ -105,7 +105,7 @@ contract record MercataEthBridge is Ownable {
     // txHash = Ethereum TX hash, from = depositor's Eth address, to = Safe wallet address
     // mercataUser = Mercata user address of user initiating the deposit
     // token = wrapped token
-    function deposit(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
+    function deposit(string txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.NONE, "ALREADY_PROCESSED");
         require(amount >= minAmount, "BELOW_MIN");
 
@@ -113,20 +113,20 @@ contract record MercataEthBridge is Ownable {
         emit DepositInitiated(txHash, from, token, amount, to, mercataUser);
     }
 
-    function confirmDeposit(string calldata txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
+    function confirmDeposit(string txHash, address token, address to, uint256 amount, address mercataUser) external onlyRelayer {
         require(depositStatus[txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(tokenFactory).isTokenActive(address(token)), "INACTIVE_TOKEN");
+        require(tokenFactory.isTokenActive(token), "INACTIVE_TOKEN");
 
-        Token(address(token)).mint(address(mercataUser), amount);
+        Token(token).mint(mercataUser, amount);
         depositStatus[txHash] = DepositState.COMPLETED;
         emit DepositCompleted(txHash);
     }
 
-    function batchConfirmDeposits(DepositBatch[] calldata deposits) external onlyRelayer {
+    function batchConfirmDeposits(DepositBatch[] deposits) external onlyRelayer {
         for (uint256 i = 0; i < deposits.length; i++) {
-            DepositBatch calldata d = deposits[i];
+            DepositBatch d = deposits[i];
             require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
-            require(TokenFactory(tokenFactory).isTokenActive(address(d.token)), "INACTIVE_TOKEN");
+            require(tokenFactory.isTokenActive(address(d.token)), "INACTIVE_TOKEN");
 
             Token(address(d.token)).mint(address(d.mercataUser), d.amount);
             depositStatus[d.txHash] = DepositState.COMPLETED;
@@ -138,30 +138,30 @@ contract record MercataEthBridge is Ownable {
     // txHash = Safe TX hash, from = Safe wallet address, to = Eth address of recipient
     // mercataUser = Mercata user address of user initiating the withdrawal
     // token = wrapped token
-    function withdraw(string calldata txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
+    function withdraw(string txHash, address token, address from, uint256 amount, address to, address mercataUser) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.NONE, "ALREADY_PROCESSED");
-        require(TokenFactory(tokenFactory).isTokenActive(address(token)), "INACTIVE_TOKEN");
+        require(tokenFactory.isTokenActive(token), "INACTIVE_TOKEN");
         require(amount >= minAmount, "BELOW_MIN");
 
-        Token(address(token)).burn(address(mercataUser), amount);
+        Token(token).burn(mercataUser, amount);
         withdrawStatus[txHash] = WithdrawState.INITIATED;
 
         emit WithdrawalInitiated(txHash, from, token, amount, to, mercataUser);
     }
 
-    function markWithdrawalPendingApproval(string calldata txHash) external onlyRelayer {
+    function markWithdrawalPendingApproval(string txHash) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.INITIATED, "BAD_STATE");
         withdrawStatus[txHash] = WithdrawState.PENDING_APPROVAL;
         emit WithdrawalPendingApproval(txHash);
     }
 
-    function confirmWithdrawal(string calldata txHash) external onlyRelayer {
+    function confirmWithdrawal(string txHash) external onlyRelayer {
         require(withdrawStatus[txHash] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
         withdrawStatus[txHash] = WithdrawState.COMPLETED;
         emit WithdrawalCompleted(txHash);
     } 
 
-    function batchConfirmWithdrawals(string[] calldata txHashes) external onlyRelayer {
+    function batchConfirmWithdrawals(string[] txHashes) external onlyRelayer {
         for (uint256 i = 0; i < txHashes.length; i++) {
             require(withdrawStatus[txHashes[i]] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
             withdrawStatus[txHashes[i]] = WithdrawState.COMPLETED;
