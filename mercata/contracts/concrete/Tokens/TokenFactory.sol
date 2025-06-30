@@ -98,7 +98,7 @@ contract record TokenFactory is Ownable {
         string _symbol,
         uint256 _initialSupply,
         uint8 _customDecimals
-    ) external returns (address) {
+    ) external onlyOwnerOrAdmin returns (address) {
         // Create new token with msg.sender as the token creator
         Token newToken = new Token(
             _name,

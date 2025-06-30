@@ -156,16 +156,38 @@ contract record PoolFactory is Ownable {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
+        require(AdminRegistry(adminRegistry).isAdminAddress(address(this)), "PoolFactory is not admin");
         
-        // deploy new pool (pools now read config from factory)
-        pool = address(new Pool(tokenA, tokenB));
+        // deploy new lp token
+        string lpName = ERC20(tokenA).name() + "-" + ERC20(tokenB).name() + " LP Token";
+        string lpSymbol = ERC20(tokenA).symbol() + "-" + ERC20(tokenB).symbol() + "-LP";
+        
+        address lpTokenAddress = TokenFactory(tokenFactory).createToken(
+            lpName,
+            "Liquidity Provider Token",
+            [],
+            [],
+            [],
+            lpSymbol,
+            0,
+            18
+        );
 
+        // deploy new pool
+        pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
+        Ownable(lpTokenAddress).transferOwnership(pool);
+
+        // update pool state vars
+        pool._updateStateVars();
+
+        // update pool registry
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions
-
         allPools.push(pool);
         
         emit NewPool(tokenA, tokenB, pool);
+
+        return pool;
     }
     
     /// @notice Transfer all pools to a new factory

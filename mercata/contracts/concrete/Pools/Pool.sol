@@ -53,30 +53,16 @@ contract record Pool is Ownable {
 
     constructor(
         address tokenAAddr, 
-        address tokenBAddr
+        address tokenBAddr,
+        address lpTokenAddr
     ) Ownable(msg.sender) {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
+        require(lpTokenAddr != address(0), "Zero lpToken address");
         
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
-        
-        // Create LP token through token factory
-        string lpName = ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token";
-        string lpSymbol = ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP";
-        
-        address lpTokenAddress = TokenFactory(_tokenFactory()).createToken(
-            lpName,
-            "Liquidity Provider Token",
-            [],
-            [],
-            [],
-            lpSymbol,
-            0,
-            18
-        );
-        
-        lpToken = Token(lpTokenAddress);
+        lpToken = Token(lpTokenAddr);
     }
 
     function _updateStateVars() internal {
