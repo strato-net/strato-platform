@@ -21,6 +21,7 @@ import {
 import { parseEther, createPublicClient, http, parseUnits } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { NATIVE_TOKEN_ADDRESS, SAFE_ADDRESS } from "@/lib/bridge/constants";
+import { useBridgeContext } from "@/context/BridgeContext";
 
 interface Token {
   name: string;
@@ -37,45 +38,6 @@ interface BridgeInProps {
   showTestnet: boolean;
 }
 
-const formatBalance = (value: bigint, decimals: number): string => {
-  const formattedBalance = Number(value) / Math.pow(10, decimals);
-  return formattedBalance.toFixed(decimals);
-};
-
-const BRIDGE_API = {
-  bridgeIn: async (params: {
-    amount: string;
-    fromAddress: string;
-    tokenAddress: string;
-    ethHash: string;
-  }) => {
-    try {
-      const response = await fetch(`/api/bridge/bridgeIn`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(params),
-      });
-
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.error || "Bridge transaction failed");
-      }
-
-      return responseData.data;
-    } catch (error: any) {
-      console.error("Bridge API error:", error);
-      throw error;
-    }
-  },
-  bridgeInTokens: async () => {
-    const response = await fetch(`/api/bridge/bridgeInTokens`);
-    const responseData = await response.json();
-    return responseData.data.data.bridgeInTokens;
-  }
-};
-
 const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -83,22 +45,28 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const { writeContractAsync } = useWriteContract();
   const { toast } = useToast();
 
+  const {
+    bridgeInTokens,
+    loading: contextLoading,
+    fetchBridgeInTokens,
+    bridgeIn: bridgeInAPI,
+    formatBalance
+  } = useBridgeContext();
+
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [amount, setAmount] = useState("");
   const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [bridgeInTokens, setBridgeInTokens] = useState<Token[]>([]);
   const [amountError, setAmountError] = useState<string>("");
   const [fromChain, setFromChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
   const [toChain, setToChain] = useState<string>("STRATO");
 
   // Fetch network tokens
   useEffect(() => {
-    const fetchBridgeInTokens = async () => {
+    const loadBridgeInTokens = async () => {
       try {
-        const tokens = await BRIDGE_API.bridgeInTokens();
-        setBridgeInTokens(tokens);
+        const tokens = await fetchBridgeInTokens();
         if (!selectedToken && tokens.length > 0) {
           setSelectedToken(tokens[0]);
         }
@@ -107,8 +75,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       }
     };
 
-    fetchBridgeInTokens();
-  }, []);
+    loadBridgeInTokens();
+  }, [fetchBridgeInTokens]);
 
   // Balance fetching hooks
   const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
@@ -306,7 +274,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         hash = txHash as `0x${string}`;
       }
 
-      await BRIDGE_API.bridgeIn({
+      await bridgeInAPI({
         amount,
         fromAddress: address as string,
         tokenAddress: tokenAddress || "",

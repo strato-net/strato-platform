@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { useUser } from "@/context/UserContext";
+import { useOnRampContext } from "@/context/OnRampContext";
 import { ethers } from "ethers";
 import { useNavigate } from "react-router-dom";
 import {
@@ -44,6 +44,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { get, buy } = useOnRampContext();
 
   const [selectedListing, setSelectedListing] = useState<ListingInfo | null>(null);
   const [availablePaymentProviders, setAvailablePaymentProviders] = useState<PaymentProvider[]>([]);
@@ -53,7 +54,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data } = await axios.get<{ listings: Listing[] }>("/api/onramp");
+        const data = await get();
         const listings = data?.listings || [];
         
         // Find USDST listing
@@ -92,7 +93,7 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
     };
 
     if (isOpen) fetchData();
-  }, [isOpen, toast]);
+  }, [isOpen, toast, get]);
 
   const handleDeposit = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -117,20 +118,11 @@ const DepositModal = ({ isOpen, onClose }: DepositModalProps) => {
     try {
       const payload = {
         token: selectedListing.token,
-        amount: ethers.parseUnits(amount, 18).toString(),
+        amount: amount,
         paymentProviderAddress: selectedProvider.providerAddress,
       };
 
-      const headers = {
-        address: userAddress,
-      };
-
-      const { data } = await axios.post<{ url: string }>(
-        "/api/onramp/buy",
-        payload,
-        { headers }
-      );
-      const stripeUrl = data.url;
+      const { url: stripeUrl } = await buy(payload, userAddress);
 
       if (stripeUrl) {
         window.location.href = stripeUrl;

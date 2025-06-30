@@ -7,15 +7,16 @@ import authHandler from "./middleware/authHandler";
 import TokensController from "./controllers/tokens.controller";
 import SwappingController from "./controllers/swapping.controller";
 import LendingController from "./controllers/lending.controller";
-import UsersController from "./controllers/users.controller";
 import OnRampController from "./controllers/onramp.controller";
 import { BridgeController } from "./controllers/bridge.controller";
 import OracleController from "./controllers/oracle.controller";
+import userRoutes from "./routes/user.routes";
 
 const router = Router();
 const bridgeController = new BridgeController();
 
-router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
+// User routes
+router.use("/user", userRoutes);
 
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
@@ -30,6 +31,7 @@ router.get("/swap/swappableTokens/", authHandler.authorizeRequest(true), Swappin
 router.get("/swap/swappableTokenPairs/:address", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
 router.get("/swap/poolByTokenPair/", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 router.get("/swap/calculateSwap/", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
+router.get("/swap/calculateSwapReverse/", authHandler.authorizeRequest(true), SwappingController.calculateSwapReverse);
 router.get("/swap/lpToken", authHandler.authorizeRequest(), SwappingController.getLPTokens);
 router.get("/swap/:address", authHandler.authorizeRequest(true), SwappingController.get);
 router.get("/swap/", authHandler.authorizeRequest(true), SwappingController.getAll);
@@ -42,16 +44,32 @@ router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
 router.get("/lend/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
 router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
 router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
+router.get("/lend/loans/:id", authHandler.authorizeRequest(true), LendingController.getLoanById);
 router.post("/lend/depositLiquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
 router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
-router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
 router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
+router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
+router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
 
-router.post("/oracle/setPrice", authHandler.authorizeRequest(), OracleController.setPrice);
+// Liquidation routes
+router.get("/lend/liquidate", authHandler.authorizeRequest(true), LendingController.listLiquidatable);
+router.get("/lend/liquidate/near-unhealthy", authHandler.authorizeRequest(true), LendingController.listNearUnhealthy);
+router.get("/lend/liquidate/:id", authHandler.authorizeRequest(true), LendingController.getLiquidatable);
+router.post("/lend/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
 
+// Admin configuration routes
+router.post("/lend/setInterestRate", authHandler.authorizeRequest(), LendingController.setInterestRate);
+router.post("/lend/setCollateralRatio", authHandler.authorizeRequest(), LendingController.setCollateralRatio);
+router.post("/lend/setLiquidationBonus", authHandler.authorizeRequest(), LendingController.setLiquidationBonus);
+
+// ----- Oracle -----
+router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
+router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);
+
+// ----- Onramp -----
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
-router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.onRampSell);
-router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.onRampBuy);
+router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.buy);
+router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.sell);
 
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
 router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
@@ -69,38 +87,5 @@ router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   });
   return next();
 });
-
-// ----- Oracle price alias -----
-router.post("/oracle/price", authHandler.authorizeRequest(), LendingController.setPrice);
-router.get("/oracle/price", authHandler.authorizeRequest(true), LendingController.getPrice);
-
-// ----- Liquidation routes -----
-router.get(
-  "/lend/liquidate",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.listLiquidatable(req, res, next)
-);
-router.get(
-  "/lend/liquidate/near-unhealthy",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.listNearUnhealthy(req, res, next)
-);
-router.get(
-  "/lend/liquidate/:id",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.getLiquidatable(req, res, next)
-);
-router.post(
-  "/lend/liquidate/:id",
-  authHandler.authorizeRequest(),
-  (req, res, next) => LendingController.executeLiquidation(req, res, next)
-);
-
-// ----- Loan search -----
-router.get(
-  "/lend/loans/:id",
-  authHandler.authorizeRequest(true),
-  (req, res, next) => LendingController.getLoanById(req, res, next)
-);
 
 export default router;

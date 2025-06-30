@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import { 
@@ -9,17 +9,48 @@ import {
 } from "@/components/ui/card";
 import AssetSummary from '@/components/dashboard/AssetSummary';
 import AssetsGrid from '@/components/dashboard/AssetsGrid';
-import { Coins, ChartBar } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
+import { formatUnits } from 'ethers';
 
 const Assets = () => {
   const { userAddress } = useUser()
-  const { tokens: assets, loading, fetchTokens } = useUserTokens()
+  const { tokens, loading, fetchTokens } = useUserTokens()
+  const [totalBalance, setTotalBalance] = useState<number>(0)
 
   useEffect(()=>{
     fetchTokens(userAddress)
   },[userAddress])
+
+   useEffect(() => {
+      if (!tokens || tokens.length === 0) return;
+  
+      let total = 0;
+  
+      for (let i = 0; i < tokens.length; i++) {
+  
+        const token = tokens[i];
+        const rawPrice = token?.price || "0";
+        const rawBalance = token?.balance || "0";
+  
+        const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
+        const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
+  
+        const tokenValue = balance * price;
+        total += tokenValue;
+      }
+      setTotalBalance(total);
+    }, [tokens]);
+  
+    function formatBalance(value: number): string {
+      if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
+  
+      return value.toLocaleString("en-US", {
+        notation: "compact",
+        maximumFractionDigits: 2,
+      });
+    }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -33,7 +64,7 @@ const Assets = () => {
           <div className="mb-8">
             <AssetSummary 
               title="Total Assets" 
-              value="$386,787.71"
+              value={formatBalance(totalBalance)}
               change={4.2}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
@@ -46,7 +77,7 @@ const Assets = () => {
               <CardTitle>Available Assets</CardTitle>
             </CardHeader>
             <CardContent>
-              <AssetsGrid loading={loading} assets={assets} />
+              <AssetsGrid loading={loading} assets={tokens} />
             </CardContent>
           </Card>
         </main>

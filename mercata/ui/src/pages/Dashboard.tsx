@@ -1,16 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, ChartBar, Shield } from "lucide-react";
+import { Wallet, Coins, Shield } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { formatUnits } from "viem";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -24,6 +25,8 @@ const Dashboard = () => {
     averageInterestRate, 
     refreshLendingData 
   } = useLendingMetrics();
+  const [totalBalance, setTotalBalance] = useState<number>(0)
+  const [cataBalance, setCataBalance] = useState<number>(0);
 
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
@@ -48,6 +51,43 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!tokens || tokens.length === 0) return;
+
+    let total = 0;
+    let cataTotal = 0;
+
+    for (let i = 0; i < tokens.length; i++) {
+
+      const token = tokens[i];
+      const rawPrice = token?.price || "0";
+      const rawBalance = token?.balance || "0";
+
+      const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
+      const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
+      const name = token?._name || "";
+      const symbol = token?._symbol || "";
+
+      const tokenValue = balance * price;
+      total += tokenValue;
+
+      if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
+        cataTotal += tokenValue;
+      }
+    }
+    setTotalBalance(total);
+    setCataBalance(cataTotal);
+  }, [tokens]);
+
+  function formatBalance(value: number): string {
+    if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
+
+    return value.toLocaleString("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <DashboardSidebar />
@@ -56,10 +96,10 @@ const Dashboard = () => {
         <DashboardHeader title="Overview" />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <AssetSummary
               title="Total Balance"
-              value="N/A"
+              value={formatBalance(totalBalance)}
               change={0}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
@@ -67,7 +107,7 @@ const Dashboard = () => {
 
             <AssetSummary
               title="CATA Rewards"
-              value="N/A"
+              value={formatBalance(cataBalance)}
               change={0}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"

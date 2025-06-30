@@ -14,7 +14,14 @@ export interface Token {
     _name: string;
     _symbol: string;
     address?: string;
+    images?: any;
+    _owner?: string;
+    description?: string;
   },
+  available?: boolean;
+  provider?: string;
+  vaulter?: string;
+  color?: string;
   balance?: string;
   key: string;
   value: string;
@@ -149,6 +156,7 @@ export interface OnRampContextType {
   error: string | null;
   
   get: () => Promise<any>;
+  buy: (payload: any, userAddress: string) => Promise<{ url: string }>;
   sell: (body: any) => Promise<any>;
   lock: (body: any) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<any>;

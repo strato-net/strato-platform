@@ -6,7 +6,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { DepositableToken } from "@/interface";
@@ -53,6 +53,19 @@ const safeBigNumberish = (input: any): string => {
   return input?.toString() || "0";
 };
 
+const addCommasToInput = (value: string) => {
+  if (!value) return '';
+  
+  const parts = value.split('.');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  if (parts.length === 2) {
+    return integerPart + '.' + parts[1];
+  }
+  
+  return integerPart;
+};
+
 const BorrowAssetModal = ({
   borrowLoading,
   borrowAsset,
@@ -81,20 +94,28 @@ const BorrowAssetModal = ({
   } catch (e) {
     calculatedBorrowable = 0;
   }
-  const availableToBorrowFormatted = calculatedBorrowable.toLocaleString("en-US", {
+  const availableLiquidity = parseFloat(formatUnits(safeBigNumberish(borrowAsset?.liquidity), 18));
+  const effectiveMaxBorrowable = Math.min(calculatedBorrowable, availableLiquidity);
+
+  // Risk calculations should be scaled to the maximum based on collateral (liquidation threshold),
+  // *not* the lower pool-liquidity cap.
+  const collateralMaxBorrowable = calculatedBorrowable;
+
+  const availableToBorrowFormatted = effectiveMaxBorrowable.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  const maxBorrowAmount = calculatedBorrowable;
+  const maxBorrowAmount = effectiveMaxBorrowable;
   const [borrowAmount, setBorrowAmount] = useState(maxBorrowAmount / 2);
+  const [displayAmount, setDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
 
   // Calculate risk level based on borrowed amount (0-100)
   useEffect(() => {
-    const risk =
-      ((borrowAmount * 10 ** 18) / (maxBorrowAmount * 10 ** 18)) * 100;
+    const denom = collateralMaxBorrowable === 0 ? 1 : collateralMaxBorrowable;
+    const risk = ((borrowAmount * 10 ** 18) / (denom * 10 ** 18)) * 100;
     setRiskLevel(risk);
-  }, [borrowAmount, maxBorrowAmount]);
+  }, [borrowAmount, collateralMaxBorrowable]);
 
   const getRiskColor = () => {
     if (riskLevel < 30) return "bg-green-500";
@@ -110,6 +131,15 @@ const BorrowAssetModal = ({
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
+    if (/^\d*\.?\d*$/.test(value)) {
+      setDisplayAmount(addCommasToInput(value));
+      const numValue = parseFloat(value) || 0;
+      setBorrowAmount(numValue);
+    }
   };
 
   return (
@@ -166,33 +196,28 @@ const BorrowAssetModal = ({
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-medium">Borrow Amount</label>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm text-gray-500">$0.00</span>
-              <span className="text-sm text-gray-500">
-                $
-                {maxBorrowAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+            <label className="text-sm font-medium">Borrow Amount (USDST)</label>
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Min: $0.01</span>
+              <span>Max: ${maxBorrowAmount.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</span>
             </div>
-            <Slider
-              value={[borrowAmount]}
-              max={maxBorrowAmount}
-              step={0.01}
-              onValueChange={(value) => setBorrowAmount(value[0])}
-            />
-            <div className="flex justify-between">
-              <span>Selected amount:</span>
-              <span className="font-semibold">
-                $
-                {borrowAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+            <div className="relative">
+              <Input
+                placeholder="0.00"
+                className="pr-8"
+                value={displayAmount}
+                onChange={handleAmountChange}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
             </div>
+            {availableLiquidity < calculatedBorrowable && (
+              <div className="text-xs text-red-600 text-right">
+                Limited by pool liquidity (available: {availableLiquidity.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2})} USDST)
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -218,7 +243,7 @@ const BorrowAssetModal = ({
                 <div
                   className={`absolute inset-0 ${getRiskColor()} h-full rounded-full`}
                   style={{ width: `${riskLevel}%` }}
-                ></div>
+                />
               </Progress>
 
               <div className="flex justify-between mt-1 text-xs text-gray-500">
@@ -251,7 +276,7 @@ const BorrowAssetModal = ({
             {borrowLoading && (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
             )}{" "}
-            Borrow Now
+            Borrow
           </Button>
         </DialogFooter>
       </DialogContent>

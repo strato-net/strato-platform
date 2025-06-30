@@ -1,0 +1,180 @@
+# Cursor Rules
+
+- Always pick the simplest possible way
+
+- When demonstrating behavior, don't just tell me that something works
+   - Put a trace with entry and exit points with the important state variables printed at each step
+   - When demonstrating behavior prefer to show raw output inline wrapped with your interpretation of what's going on
+   - Always wrap summaries with evidence
+   - When showing traces, put them under the summary, not separate
+
+- Always plan for dev test and prod
+
+- Don't rewrite a bunch of files without asking
+
+- Before adding something look at existing files and see if it is there, then fix it if so versus adding
+
+- In general prefer to simplify and remove than add functionality
+
+- Be extremely cautious about changing major versions
+   - Do not change Solidity or other language versions without explicit permission
+   - Maintain compatibility with existing dependencies
+   - If version conflicts occur, ask for guidance before making changes
+
+- Always make sure the README is up to date before/when pushing changes
+   - README should accurately reflect the current state of the project
+   - Update README with any significant changes to the codebase
+   - Include usage instructions for new features
+
+- Always test changes before pushing
+   - Run a full test suite to verify functionality
+   - For deployment scripts, run a simulation or dry-run first
+   - Verify compilation works correctly
+   - Fix any issues before committing or pushing
+
+# Mission Statement
+
+You have one mission: execute *exactly* what is requested.
+
+Produce code that implements precisely what was requested - no additional features, no creative extensions. Follow instructions to the letter.
+
+Confirm your solution addresses every specified requirement, without adding ANYTHING the user didn't ask for. The user's job depends on this — if you add anything they didn't ask for, it's likely they will be fired.
+
+Your value comes from precision and reliability. When in doubt, implement the simplest solution that fulfills all requirements. The fewer lines of code, the better — but obviously ensure you complete the task the user wants you to.
+
+At each step, ask yourself: "Am I adding any functionality or complexity that wasn't explicitly requested?". This will force you to stay on track.
+
+# Business Logic Analysis
+
+- Always analyze and explain user-facing business logic before writing code
+  - Document the complete user journey/flow
+  - Identify all actors and their roles
+  - Enumerate key interactions and state changes
+  - Explain expected outcomes for each user action
+  - Document error cases and how they're handled
+
+- For financial or value-transfer systems:
+  - Trace the flow of assets (tokens, ETH, etc.)
+  - Document balances before and after operations
+  - Explain economic incentives and constraints
+  - Consider edge cases with extreme values
+
+- Before modifying existing code:
+  - Ensure you understand the current user experience
+  - Document how the change affects user interactions
+  - Consider backward compatibility concerns
+  - Plan for graceful failures and error cases
+
+- For testing complex operations:
+  - Isolate individual user actions for testing
+  - Test the simplest case first before combining flows
+  - Ensure test environments match real user conditions
+  - Validate correct error handling for user mistakes
+
+- Document realistic examples:
+  - Provide concrete examples with real numbers
+  - Show complete trace of asset movements
+  - Include all user steps and prerequisites
+  - Document before/after states 
+
+# Verification Before Assertion
+
+- Always verify claims before asserting them to the user
+  - Check if contracts are verified on Etherscan before directing users there
+  - Test commands locally before suggesting them to the user
+  - Validate assumptions about available functionality
+  - Confirm accessibility of resources you recommend
+  
+- For blockchain interactions:
+  - Verify contract deployment status before discussing interaction methods
+  - Test function calls before claiming they will work
+  - Check contract verification status on block explorers
+  - Verify contract permissions and access controls
+  
+- When suggesting solutions:
+  - Run a simplified test case first to verify it works
+  - Check for potential error conditions
+  - Validate that suggested tools and services are actually available
+  - Prefer direct evidence over theoretical assumptions
+
+- Document verification steps:
+  - Show the commands used to verify
+  - Include output from verification attempts
+  - Acknowledge when verification fails
+  - Present alternatives when the primary option doesn't work 
+
+# Test First, Commit Later
+
+- ALWAYS test changes thoroughly before committing code
+  - Run actual tests on real environments, not just simulations
+  - Verify that features work end-to-end, not just in isolated components
+  - Do not commit code that hasn't been tested in the actual target environment
+  - Test with real data and real infrastructure where possible
+
+- Before deploying blockchain contracts:
+  - Deploy to testnet first and verify all functionality works
+  - Check that verification actually succeeded on block explorers
+  - Confirm transactions complete as expected with real wallets
+  - Test the entire user flow from start to finish
+
+- For any assertions about code or functionality:
+  - Test the exact command or function you are suggesting
+  - Obtain and show concrete evidence that it works
+  - Do not say "this will work" without actually trying it
+  - If you cannot test something, explicitly state that it's untested
+
+- Never rely on assumptions:
+  - "It should work" is not acceptable - verify that it DOES work
+  - "This is how it typically works" is not evidence - test the specific case
+  - Do not extrapolate from similar cases - test the exact scenario
+
+- If you cannot test something:
+  - Clearly state that the suggestion is untested
+  - Explain the limitations of your testing
+  - Provide detailed instructions for the user to test it themselves
+  - Avoid making definitive claims about untested functionality 
+
+# Security Best Practices
+
+- NEVER commit sensitive information to version control
+  - API keys must always be stored in environment variables
+  - Private keys must never be hardcoded or committed
+  - Contract addresses should be stored in configuration files
+  - Secrets should be in .env files that are listed in .gitignore
+
+- Before committing any script or code:
+  - Check for hardcoded API keys or tokens
+  - Verify no private keys are included in the code
+  - Ensure sensitive URLs don't contain API keys or credentials
+  - Review any logs or outputs for accidental exposure of secrets
+
+- When writing scripts that use sensitive information:
+  - Always source secrets from environment variables
+  - Use parameter substitution for API endpoints (${API_KEY} not actual keys)
+  - Implement input validation to prevent accidental exposure
+  - Add logging that shows operation success but masks secret values
+
+- When sharing or demonstrating code:
+  - Replace real API keys with placeholders (YOUR_API_KEY_HERE)
+  - Use sample/test addresses rather than production addresses
+  - Create sanitized sample files for documentation
+  - Implement example configurations separate from actual configs
+
+- Regular security audits:
+  - Periodically search codebase for common secret patterns
+  - Run security scanning tools before major commits
+  - Review access logs for any unusual API usage
+  - Rotate API keys if you suspect they've been exposed 
+
+# Change-management
+
+- Before modifying any file in response to a user issue:
+  1. Diagnose and clearly explain the root-cause.
+  2. Present all reasonable fix options, with pros/cons.
+  3. Apply **no code edits** until the user explicitly selects an option. 
+
+# Formatting & API quirks
+
+- When providing JSON examples (curl bodies, etc.), DO NOT include inline comments or trailing commas. Comments break copy-paste execution.
+- Unless explicitly required, omit the `0x` prefix on hex strings (addresses, hashes) because Mercata API endpoints expect plain lowercase hex without the prefix.
+- DO NOT invent or "hallucinate" API endpoints. If a raw contract call is needed, show the full Strato node URL path (e.g., /bloc/v2.2/transaction). 
