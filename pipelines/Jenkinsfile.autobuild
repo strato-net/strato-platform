@@ -40,7 +40,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b mercata-healthcheck
+          git clone https://github.com/blockapps/strato-getting-started -b strato-erc20-revamp
           cp docker-compose.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
           cp docker-compose.highway.yml strato-getting-started/
