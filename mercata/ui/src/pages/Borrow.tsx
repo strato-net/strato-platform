@@ -4,7 +4,6 @@ import { PiggyBank } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useLendingMetrics } from "@/hooks/useLendingMetrics";
-
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
@@ -149,7 +148,6 @@ const Borrow = () => {
       });
     }
   };
-
 
   const fetchLoans = useCallback(async () => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
