@@ -321,12 +321,11 @@ contract record Pool is Ownable {
             feePerShare += (lpFee * 1e18) / totalSupply;
         }
 
-        // Transfer total amount (including protocol fee) to pool
-        require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Total input transfer failed");
+        // Transfer full amount to pool
+        require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Input transfer failed");
         
         // Send protocol fee to fee collector
-        require(ERC20(inputToken).approve(_feeCollector(), protocolFee), "Protocol fee approve failed");
-        FeeCollector(_feeCollector()).receiveFee(address(inputToken), protocolFee);
+        require(ERC20(inputToken).transfer(_feeCollector(), protocolFee), "Protocol fee transfer failed");
 
         amountOut = getInputPrice(netInput, inputReserve, outputReserve);
         require(amountOut >= minAmountOut, "Slippage check failed");
