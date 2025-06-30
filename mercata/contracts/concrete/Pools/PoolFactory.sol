@@ -41,6 +41,9 @@ contract record PoolFactory is Ownable {
     /// @notice Event emitted when fee parameters are updated
     event FeeParametersUpdated(uint256 newSwapFeeRate, uint256 newLpSharePercent);
 
+    /// @notice Event emitted when pool fee parameters are updated
+    event PoolFeeParametersUpdated(address poolAddress, uint256 newSwapFeeRate, uint256 newLpSharePercent);
+
     // ============ STATE VARIABLES ============
     
     /// @notice Mapping of tokenA/tokenB pairs to pool addresses
@@ -149,6 +152,31 @@ contract record PoolFactory is Ownable {
         emit FeeParametersUpdated(newSwapFeeRate, newLpSharePercent);
     }
 
+    /// @notice Update fee parameters for a specific pool (owner or admin)
+    /// @param poolAddress The address of the pool to update
+    /// @param newSwapFeeRate New swap fee rate in basis points
+    /// @param newLpSharePercent New LP share percentage in basis points
+    /// @dev This function allows setting custom fee parameters for individual pools
+    /// @dev The pool must be owned by this factory (i.e., created by this factory)
+    function setPoolFeeParameters(
+        address poolAddress,
+        uint256 newSwapFeeRate,
+        uint256 newLpSharePercent
+    ) external onlyOwnerOrAdmin {
+        require(poolAddress != address(0), "Zero pool address");
+        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
+        require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
+        require(newLpSharePercent > 0, "LP share must be greater than 0");
+        
+        // Verify the pool is owned by this factory
+        require(Ownable(poolAddress).owner() == address(this), "Pool not owned by factory");
+        
+        // Call the pool's single setFeeParameters function
+        Pool(poolAddress).setFeeParameters(newSwapFeeRate, newLpSharePercent);
+        
+        emit PoolFeeParametersUpdated(poolAddress, newSwapFeeRate, newLpSharePercent);
+    }
+
     // ============ POOL MANAGEMENT ============
     
     /// @notice Create a new pool for tokenA/tokenB
@@ -176,9 +204,6 @@ contract record PoolFactory is Ownable {
         // deploy new pool
         pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
         Ownable(lpTokenAddress).transferOwnership(pool);
-
-        // update pool state vars
-        pool._updateStateVars();
 
         // update pool registry
         pools[tokenA][tokenB] = pool;

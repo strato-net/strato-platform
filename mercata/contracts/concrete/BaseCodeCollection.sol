@@ -57,7 +57,8 @@ contract Mercata {
 
     constructor() public {
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry(msg.sender);
+        adminRegistry = new AdminRegistry(this);
+        adminRegistry.addAdmin(msg.sender);
 
         // Create FeeCollector
         feeCollector = new FeeCollector(msg.sender);
@@ -65,6 +66,9 @@ contract Mercata {
         // Create Factories
         tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
         poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
+        adminRegistry.addAdmin(address(poolFactory));
+        adminRegistry.removeAdmin(this);
+        Ownable(adminRegistry).transferOwnership(msg.sender);
 
         // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
