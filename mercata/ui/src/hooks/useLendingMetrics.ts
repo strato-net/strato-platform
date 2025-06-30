@@ -228,6 +228,7 @@ export const useLendingMetrics = () => {
     currentBorrowed,
     averageInterestRate,
     loanList,
+    setLoanList,
     refreshLendingData,
     loading: !depositableTokens || !loans,
   };
