@@ -1,7 +1,8 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "./TokenMetadata.sol";
 import "./TokenAccess.sol";
-import "../../abstract/ERC20.sol";
+import "./TokenFactory.sol";
+import "../../abstract/ERC20/ERC20.sol";
 
 enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
