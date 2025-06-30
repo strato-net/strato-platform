@@ -109,14 +109,14 @@ export const TESTNET_STRATO_TOKENS = [
   {
     name: "STRATO Ether",
     symbol: "ETHST",
-    tokenAddress: "0x5104b3d179b3e4e314f66e814e0017587780b3b9" , // Native token address
+    tokenAddress: "0x581ee622fb866f3c2076d4260824ce681b15b715" , // Native token address
     decimals: 18,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
   {
     name: "STRATO USDC",
     symbol: "USDCST",
-    tokenAddress: "0xf1b09321667dab4f41847e405813b0fc71c067fb",
+    tokenAddress: "0x500fb797b0be4ce0edf070a9b17bae56d22a2131",
     decimals: 6,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
   }
@@ -140,8 +140,8 @@ export const MAINNET_STRATO_TOKENS = [
 ];
 
 export const TESTNET_ETH_STRATO_TOKEN_MAPPING = {
-  '0x0000000000000000000000000000000000000000': '0x5104b3d179b3e4e314f66e814e0017587780b3b9', // ETH        
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0xf1b09321667dab4f41847e405813b0fc71c067fb' // USDC
+  '0x0000000000000000000000000000000000000000': '0x581ee622fb866f3c2076d4260824ce681b15b715', // ETH        
+  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x500fb797b0be4ce0edf070a9b17bae56d22a2131' // USDC
 }
   
 export const MAINNET_ETH_STRATO_TOKEN_MAPPING = {
