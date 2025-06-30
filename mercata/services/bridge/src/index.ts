@@ -4,9 +4,10 @@ import express from "express";
 import cors from "cors";
 import bridgeRoutes from "./routes/bridgeRoutes";
 import bodyParser from "body-parser";
-// import { initializeSockets } from "./sockets/initializeSockets";
-import { initOpenIdConfig } from "./auth";
+// import { initializeSockets } from "./sockets/initializeSockets";   
 import { initializeAlchemyPolling } from "./polling/initializePolling";
+import { initializeOAuth } from "./config";
+import { initOpenIdConfig } from "./auth";
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +33,7 @@ app.get("/health", (req, res) => {
 
 
 app.listen(port, async () => {
+  await initializeOAuth();
   await initOpenIdConfig();
   await initializeAlchemyPolling();
   logger.info(`Bridge service listening on port ${port}`);
