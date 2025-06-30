@@ -1,6 +1,7 @@
 import "./Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
+
 /*
  *  MercataEthBridge – STRATO ↔ Ethereum Safe bridge contract (no OpenZeppelin deps)
  *  ------------------------------------------------------------------------------
@@ -40,7 +41,7 @@ import "../Tokens/TokenFactory.sol";
  */
 
 contract record MercataEthBridge is Ownable {
-   // ────────────────── configuration ──────────────────
+    // ────────────────── configuration ──────────────────
     address public relayer;     // off‑chain relayer key
     TokenFactory public tokenFactory; // token factory for token status checks
 
@@ -54,12 +55,12 @@ contract record MercataEthBridge is Ownable {
     mapping(string => DepositState) public record depositStatus; 
 
     struct DepositBatch {
-    string txHash;
-    address token;
-    address to;
-    uint256 amount;
-    address mercataUser;
-    }   
+        string txHash;
+        address token;
+        address to;
+        uint256 amount;
+        address mercataUser;
+    }
 
     // ─────────────────── events ─────────────────────────
     event DepositInitiated(string indexed txHash, address indexed from, address indexed token, uint256 amount, address to, address mercataUser);
@@ -122,14 +123,14 @@ contract record MercataEthBridge is Ownable {
     }
 
     function batchConfirmDeposits(DepositBatch[] calldata deposits) external onlyRelayer {
-    for (uint256 i = 0; i < deposits.length; i++) {
-        DepositBatch calldata d = deposits[i];
-        require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
-        require(TokenFactory(tokenFactory).isTokenActive(address(d.token)), "INACTIVE_TOKEN");
+        for (uint256 i = 0; i < deposits.length; i++) {
+            DepositBatch calldata d = deposits[i];
+            require(depositStatus[d.txHash] == DepositState.INITIATED, "BAD_STATE");
+            require(TokenFactory(tokenFactory).isTokenActive(address(d.token)), "INACTIVE_TOKEN");
 
-        Token(address(d.token)).mint(address(d.mercataUser), d.amount);
-        depositStatus[d.txHash] = DepositState.COMPLETED;
-        emit DepositCompleted(d.txHash);
+            Token(address(d.token)).mint(address(d.mercataUser), d.amount);
+            depositStatus[d.txHash] = DepositState.COMPLETED;
+            emit DepositCompleted(d.txHash);
         }
     }
      
@@ -166,6 +167,5 @@ contract record MercataEthBridge is Ownable {
             withdrawStatus[txHashes[i]] = WithdrawState.COMPLETED;
             emit WithdrawalCompleted(txHashes[i]);
         }   
-    }   
-
+    }
 }
