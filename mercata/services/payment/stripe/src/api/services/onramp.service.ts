@@ -91,20 +91,53 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   }
 
   try {
+    console.log("--------- handleStripeWebhook ---------");
+    console.log(`Processing payment for token ${token}, buyer ${buyerAddress}, amount ${tokenAmount}`);
+
+    // HACK: Add random delay to avoid nonce conflicts
+    await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 2000) + 500)); // 500-2500ms delay
+
     const accessToken = await getServiceToken();
+    
+    // TESTING: Only mint voucher tokens for now (fulfillListing commented out)
+    // const tokenAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"; // USDST address
+    // const fulfillTx = buildFunctionTx({
+    //   contractName: OnRamp,
+    //   contractAddress,
+    //   method: "fulfillListing",
+    //   args: { token: tokenAddress, buyer: buyerAddress, amount: tokenAmount },
+    // });
+
+    const voucherTx = buildFunctionTx({
+      contractName: "Voucher",
+      contractAddress: "A96c02a13b558fbcf923af1d586967cf7f55c753",
+      method: "mint",
+      args: { 
+        to: buyerAddress,
+        amount: (10n ** 18n).toString() // 10^18 units
+      },
+    });
+
+    // Only voucher minting for now
+    // HACK: Add timestamp + random gas price to avoid nonce conflicts
+    const timestamp = Date.now() % 10000; // last 4 digits of timestamp
+    const randomGasPrice = timestamp + Math.floor(Math.random() * 1000) + 10000; // 10000+ range
+    const combinedTx = {
+      txs: [...voucherTx.txs],
+      txParams: {
+        ...voucherTx.txParams,
+        gasPrice: randomGasPrice
+      },
+    };
+
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-        contractName: OnRamp,
-        contractAddress,
-        method: "fulfillListing",
-        args: { token, buyer: buyerAddress, amount: tokenAmount },
-      }))
+      strato.post(accessToken, StratoPaths.transactionParallel, combinedTx)
     );
 
     if (status === "Success") {
-      console.log(`Order ${token} confirmed on-chain: ${hash}`);
+      console.log(`PAYMENT SUCCESSFUL - Order ${token} confirmed on-chain: ${hash}`);
     } else {
-      console.error(`On-chain confirmation failed (${status}): ${hash}`);
+      console.error(`Payment processing failed (${status}): ${hash}`);
     }
   } catch (err) {
     console.error("Error confirming order on-chain:", err);

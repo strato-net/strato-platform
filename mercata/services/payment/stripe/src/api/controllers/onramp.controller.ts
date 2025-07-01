@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { checkout } from "../services/onramp.service";
+import { checkout, handleStripeWebhook } from "../services/onramp.service";
 
 class OnRampController {
   static async checkout(
@@ -17,6 +17,29 @@ class OnRampController {
       next(error);
     }
   }
+
+  // static async stripeWebhook(
+  //   req: Request,
+  //   res: Response,
+  //   next: NextFunction
+  // ): Promise<void> {
+  //   console.log("=== WEBHOOK ENDPOINT HIT ===");
+  //   console.log("Headers:", req.headers);
+  //   console.log("Body type:", typeof req.body);
+  //   console.log("Body:", req.body);
+    
+  //   try {
+  //     // Extract the session from the Stripe event
+  //     const event = req.body;
+  //     if (event.type === 'checkout.session.completed') {
+  //       await handleStripeWebhook(event.data.object);
+  //     }
+  //     res.status(200).send("ok");
+  //   } catch (error) {
+  //     console.error("Webhook error:", error);
+  //     next(error);
+  //   }
+  // }
 }
 
 export default OnRampController;

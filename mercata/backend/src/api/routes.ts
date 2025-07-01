@@ -15,6 +15,9 @@ import OracleController from "./controllers/oracle.controller";
 const router = Router();
 const bridgeController = new BridgeController();
 
+// Stripe webhook endpoint (must be before express.json() middleware)
+// router.post("/stripe/webhook", express.raw({ type: "application/json" }), OnRampController.stripeWebhook);
+
 router.get("/users/me", authHandler.authorizeRequest(), UsersController.me);
 
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);

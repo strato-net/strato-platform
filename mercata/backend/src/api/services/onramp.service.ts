@@ -41,9 +41,23 @@ export const get = async (accessToken: string) => {
     const providerMap = Object.fromEntries(
       (paymentProviders || []).map((p: any) => [
         p.key,
-        p.PaymentProviderInfo
+        {
+          ...p.value,
+          providerAddress: p.key, // Use the key as the provider address
+          // Override corrupted data if needed
+          ...(p.value.name === "0000000000000000000000000000000000000000" ? {
+            name: "Local Provider",
+            endpoint: "http://localhost:3002/checkout"
+          } : {})
+        }
       ])
     );
+
+    // DEBUG: Log the raw data structure
+    console.log("=== DEBUG: OnRamp Data Structure ===");
+    console.log("Listings:", JSON.stringify(listings, null, 2));
+    console.log("Payment Providers:", JSON.stringify(paymentProviders, null, 2));
+    console.log("Provider Map:", JSON.stringify(providerMap, null, 2));
 
     // Fetch token metadata
     let tokenInfoMap: Record<string, { _name: string; _symbol: string }> = {};
@@ -67,7 +81,12 @@ export const get = async (accessToken: string) => {
 
     // Enhance listings
     const enhancedListings = listings.map((listing: any) => {
-      const { key: id, ListingInfo: info } = listing;
+      const { key: id, value: info } = listing; // Fixed: use 'value' instead of 'ListingInfo'
+
+      if (!info) {
+        console.error("Warning: Listing has no value data:", listing);
+        return null;
+      }
 
       const tokenMeta = tokenInfoMap[info.token] || {
         _name: null,
@@ -75,7 +94,7 @@ export const get = async (accessToken: string) => {
       };
 
       // Map provider addresses to their full info
-      const providers = info.providers
+      const providers = (info.providers || [])
         .map((providerAddress: string) => providerMap[providerAddress])
         .filter(Boolean);
 
@@ -89,7 +108,7 @@ export const get = async (accessToken: string) => {
           providers,
         },
       };
-    });
+    }).filter(Boolean); // Remove null entries
 
     return {
       ...onRamp,
@@ -160,10 +179,10 @@ export async function buy(
   try {
     const ramp = await get(accessToken);
     
-    // Validate listing
-    const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(token));
+    // Validate listing - find by token address, not listing ID
+    const listing = ramp.listings.find((l: any) => String(l.ListingInfo?.token) === String(token));
     if (!listing) {
-      throw new Error(`Listing ${token} not found`);
+      throw new Error(`Listing for token ${token} not found. Available tokens: ${ramp.listings.map((l: any) => l.ListingInfo?.token).join(', ')}`);
     }
 
     // Validate and get payment provider
@@ -175,22 +194,98 @@ export async function buy(
     }
 
     // Process payment
-    const { data } = await axios.post(paymentProvider.endpoint, {
-      token,
-      buyerAddress,
-      amount,
-      baseUrl,
-    });
+    console.log("STRIPE: Making request to:", paymentProvider.endpoint);
+    console.log("STRIPE: Payload:", { token, buyerAddress, amount, baseUrl });
+    
+    try {
+      const { data } = await axios.post(paymentProvider.endpoint, {
+        token,
+        buyerAddress,
+        amount,
+        baseUrl,
+      });
 
-    if (!data?.sessionId || !data?.url) {
-      throw new Error("Invalid provider session response");
+      console.log("STRIPE: Response:", data);
+
+      if (!data?.sessionId || !data?.url) {
+        throw new Error("Invalid provider session response");
+      }
+
+      return {
+        sessionId: data.sessionId,
+        url: data.url,
+      };
+    } catch (stripeError) {
+      console.error("STRIPE: Error making request:", stripeError.response?.data || stripeError.message);
+      throw stripeError;
     }
-
-    return {
-      sessionId: data.sessionId,
-      url: data.url,
-    };
   } catch (error) {
+    console.error("BUY: General error:", error);
     throw new Error("Failed to process payment. Please try again.");
+  }
+}
+
+export async function handleStripeWebhook(
+  body: any,
+  signature: string
+): Promise<void> {
+  // TODO: Verify webhook signature with Stripe
+  // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  // const event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+  
+  try {
+    // For now, parse the webhook payload directly
+    const event = JSON.parse(body);
+    console.log(" ---------------- ENTERED HANDLE STRIPE WEBHOOK ----------------");
+    
+    if (event.type === 'checkout.session.completed') {
+
+      console.log("---------SUCCESSFUL PAYMENT---------");
+
+      const session = event.data.object;
+      const { token, buyerAddress, amount, tokenAmount } = session.metadata || {};
+      
+      if (!token || !buyerAddress || !tokenAmount) {
+        console.error("Missing required metadata in Stripe session");
+        return;
+      }
+
+      console.log(`Processing payment for token ${token}, buyer ${buyerAddress}, amount ${tokenAmount}`);
+
+      // Get service token for API calls
+      const accessToken = process.env.SERVICE_TOKEN || "";
+
+      // Build transaction to fulfill listing AND mint voucher tokens
+      const tx = buildFunctionTx([
+        {
+          contractName: extractContractName(OnRamp),
+          contractAddress,
+          method: "fulfillListing",
+          args: { token, buyer: buyerAddress, amount: tokenAmount },
+        },
+        {
+          contractName: "Voucher",
+          contractAddress: "A96c02a13b558fbcf923af1d586967cf7f55c753",
+          method: "mint",
+          args: { 
+            to: buyerAddress,
+            amount: (10n ** 18n).toString() // 10^18 units
+          },
+        }
+      ]);
+
+      const { status, hash } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
+
+      if (status === "Success") {
+        console.log(`PAYMENT SUCCESSFUL - Order ${token} confirmed on-chain: ${hash}`);
+      } else {
+        console.error(`Payment processing failed (${status}): ${hash}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error processing Stripe webhook:", error);
+    throw error;
   }
 }

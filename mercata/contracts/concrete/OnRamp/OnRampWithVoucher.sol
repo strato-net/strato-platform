@@ -1,13 +1,11 @@
-import "./../abstract/ERC20/IERC20.sol";
-import "../Lending/PriceOracle.sol";
-import "../Voucher/Voucher.sol";
+import <1000>;
 
 // Interface for Voucher contract
 interface IVoucher {
     function mint(address to, uint256 amount) external;
 }
 
-contract record OnRamp {
+contract record OnRampWithVoucher {
     event SellerApprovalUpdated(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
