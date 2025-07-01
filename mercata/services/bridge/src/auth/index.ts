@@ -41,13 +41,17 @@ let oauthInstance: any = null;
 export const initOpenIdConfig = async () => {
   // If already initialized, return immediately
   if (oauthInitialized) {
+    console.log("✅ OAuth client already initialized");
     return;
   }
 
   try {
+    console.log("🔧 Initializing OAuth client...");
     oauthInstance = await OAuthUtil.init(oauthConfig);
     oauthInitialized = true;
+    console.log("✅ OAuth client initialized successfully");
   } catch (error) {
+    console.error("❌ Failed to initialize OAuth client:", error);
     throw error;
   }
 };
@@ -73,7 +77,7 @@ export const getBAUserToken = async (): Promise<string> => {
 
   try {
     if (!oauthInstance) {
-      throw new Error('OAuth not initialized. Call initOpenIdConfig first');
+      throw new Error('OAuth client not initialized. Call initOpenIdConfig() first');
     }
 
     if (!config.auth.baPassword) {
