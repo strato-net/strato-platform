@@ -50,7 +50,7 @@ const AssetCard = ({ id, name, symbol, price, deposit }: AssetCardProps) => {
         </div>
 
         <Link
-          to={`/dashboard/assets/${id}`}
+          to={`/dashboard/deposits/${id}`}
           className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium text-sm mt-2"
         >
           View Details <ArrowUpRight className="ml-1 h-4 w-4" />
