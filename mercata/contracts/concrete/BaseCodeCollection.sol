@@ -16,6 +16,9 @@ import "Admin/AdminRegistry.sol";
 import "Pools/Pool.sol";
 import "Pools/PoolFactory.sol";
 
+//Admin
+import "Admin/FeeCollector.sol";
+
 //OnRamp
 import "OnRamp/OnRamp.sol";
 
@@ -49,15 +52,23 @@ contract Mercata {
     OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
+    FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
 
     constructor() public {
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry(msg.sender);
+        adminRegistry = new AdminRegistry(this);
+        adminRegistry.addAdmin(msg.sender);
+
+        // Create FeeCollector
+        feeCollector = new FeeCollector(msg.sender);
 
         // Create Factories
         tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
-        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
+        poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
+        adminRegistry.addAdmin(address(poolFactory));
+        adminRegistry.removeAdmin(this);
+        Ownable(adminRegistry).transferOwnership(msg.sender);
 
         // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
