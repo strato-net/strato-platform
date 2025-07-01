@@ -57,7 +57,7 @@ const Assets = () => {
       <DashboardSidebar />
       
       <div className="flex-1 ml-64">
-        <DashboardHeader title="Assets" />
+        <DashboardHeader title="Deposits" />
         
         <main className="p-6">
           {/* Asset Summary */}
@@ -65,7 +65,6 @@ const Assets = () => {
             <AssetSummary 
               title="Total Assets" 
               value={formatBalance(totalBalance)}
-              change={4.2}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />

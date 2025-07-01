@@ -6,13 +6,36 @@ import { useNavigate } from "react-router-dom";
 
 const BorrowingSection = () => {
   const navigate = useNavigate()
-  const riskPercentage = 36;
-  
+
+  const collateralValue = 3462.91; // from API
+  const borrowedAmount = 1250.00; // from API
+
+  const ltvRatio = collateralValue > 0 ? borrowedAmount / collateralValue : 0;
+  const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%
+
+  // Risk level mapping
+  let riskLevel = 'Low';
+  let riskColor = '#22c55e'; // green
+  let badgeColor = 'bg-green-50 text-green-600';
+
+  if (ltvRatio >= 0.3 && ltvRatio < 0.6) {
+    riskLevel = 'Moderate';
+    riskColor = '#facc15'; // yellow
+    badgeColor = 'bg-yellow-50 text-yellow-600';
+  } else if (ltvRatio >= 0.6) {
+    riskLevel = 'High';
+    riskColor = '#ef4444'; // red
+    badgeColor = 'bg-red-50 text-red-600';
+  }
+
+  // Assume liquidation threshold is at 80%
+  const liquidationThreshold = 80;
+
   return (
     <Card className="border border-gray-100 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle className="text-xl font-bold">Your Loans</CardTitle>
+          <CardTitle className="text-xl font-bold">My Borrowing</CardTitle>
           <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
         </div>
         <div>
@@ -26,35 +49,35 @@ const BorrowingSection = () => {
           <div className="space-y-6">
             {/* Bar graph now appears first */}
             <div className="mb-2">
-              {/* Reduced width bar graph that now appears above risk level text */}
+              {/* Dynamic risk bar */}
               <div className="w-4/5 mx-auto bg-gray-200 rounded-full h-2 relative mb-3">
-                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${riskPercentage}%` }}></div>
-                
-                {/* Portfolio Value indicator with improved positioning */}
+                <div className="h-2 rounded-full" style={{ width: `${riskPercentage}%`, backgroundColor: riskColor,}}></div>
+
+                {/* Collateral Value Marker */}
                 <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
                   <div className="h-4 w-0.5 bg-blue-500"></div>
-                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap">Portfolio Value</div>
+                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap">Collateral Value</div>
                 </div>
-                
-                {/* Liquidation indicator with improved positioning */}
-                <div className="absolute top-0 flex flex-col items-center" style={{ left: '80%', transform: 'translateX(-50%)' }}>
+
+                {/* Liquidation Marker */}
+                <div className="absolute top-0 flex flex-col items-center" style={{ left: `${liquidationThreshold}%`, transform: 'translateX(-50%)' }}>
                   <div className="h-4 w-0.5 bg-red-500"></div>
                   <div className="mt-1 text-xs text-red-600 whitespace-nowrap">Liquidation</div>
                 </div>
               </div>
-              
-              {/* Risk level text now appears below the bar graph - removed percentage */}
+
+              {/* Risk Level Label */}
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center">
                   <span className="text-gray-600 mr-2">Risk Level:</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-600">
-                    Moderate
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>
+                    {riskLevel}
                   </span>
                 </div>
                 {/* Removed the percentage display that was here */}
               </div>
             </div>
-            
+
             {/* Added extra spacing with mt-8 to separate indicators from data */}
             <div className="flex flex-col gap-1 mt-8">
               <div className="flex justify-between">
