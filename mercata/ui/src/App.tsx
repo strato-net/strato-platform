@@ -102,7 +102,7 @@ const App = () => (
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/assets"
+                                  path="/dashboard/deposits"
                                   element={
                                     <ProtectedRoute>
                                       <Assets />
@@ -110,7 +110,7 @@ const App = () => (
                                   }
                                 />
                                 <Route
-                                  path="/dashboard/assets/:id"
+                                  path="/dashboard/deposits/:id"
                                   element={
                                     <ProtectedRoute>
                                       <AssetDetail />
