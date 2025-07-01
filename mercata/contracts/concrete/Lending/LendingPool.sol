@@ -60,7 +60,7 @@ contract record LendingPool is Ownable {
     mapping(address => AssetConfig) public record assetConfigs;
     
     // Array of all configured assets (for iteration)
-    address[] public configuredAssets;
+    address[] public record configuredAssets;
 
     // Single Borrowable Asset
     address public borrowableAsset; // The one asset that can be borrowed
@@ -127,6 +127,11 @@ contract record LendingPool is Ownable {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
         
+        // Check that borrowable asset has lending parameters configured
+        AssetConfig memory config = assetConfigs[borrowableAsset];
+        require(config.interestRate > 0, "Interest rate not configured");
+        require(config.reserveFactor > 0, "Reserve factor not configured"); 
+        
         // LiquidityPool handles token transfer and mToken minting based on current exchange rate
         LiquidityPool(_liquidityPool()).deposit(amount, msg.sender);
         
@@ -167,6 +172,12 @@ contract record LendingPool is Ownable {
      */
     function supplyCollateral(address asset, uint256 amount) external onlyTokenFactory(asset) {
         require(amount > 0, "Invalid amount");
+        
+        // Check that asset is configured as eligible collateral
+        AssetConfig memory config = assetConfigs[asset];
+        require(config.ltv > 0, "Asset not configured as collateral");
+        require(config.liquidationThreshold > 0, "Asset missing liquidation threshold");
+        require(config.liquidationBonus >= 10000, "Asset missing liquidation bonus");
         
         // The CollateralVault will handle the token transfer from msg.sender
         // User must have approved CollateralVault to spend their tokens
