@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BanknoteIcon, CircleArrowDown, Search } from "lucide-react";
-import { api } from '@/lib/axios';
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -81,7 +80,7 @@ const SwapPoolsSection = () => {
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const operationInProgressRef = useRef(false);
 
-  const { fetchPools, addLiquidity, removeLiquidity, getPoolByAddress } = useSwapContext();
+  const { fetchPools, addLiquidity, removeLiquidity, getPoolByAddress, fetchTokenBalances, enrichPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -132,11 +131,7 @@ const SwapPoolsSection = () => {
     try {
       setLoading(true);
       const tempPools = await fetchPools();
-      const enrichedPools = tempPools.map((pool: Pool) => ({
-        ...pool,
-        _name: `${pool.tokenA._name}/${pool.tokenB._name}`,
-        _symbol: `${pool.tokenA._symbol}/${pool.tokenB._symbol}`,
-      }));
+      const enrichedPools = enrichPools(tempPools);
       setPools(enrichedPools);
     } catch (err) {
       toast({
@@ -154,7 +149,18 @@ const SwapPoolsSection = () => {
     
     setSelectedPool(pool);
     setIsDepositModalOpen(true);
-    await fetchTokenBalances(pool);
+    try {
+      const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
+      setTokenABalance(balances.tokenABalance);
+      setTokenBBalance(balances.tokenBBalance);
+      setUsdstBalance(balances.usdstBalance);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch token balances",
+        variant: "destructive",
+      });
+    }
     setToken1Amount('');
     setToken2Amount('');
   };
@@ -177,27 +183,6 @@ const SwapPoolsSection = () => {
     setSelectedPool(null);
     setToken1Amount('');
     setToken2Amount('');
-  };
-
-  const fetchTokenBalances = async (pool: Pool) => {
-    if (operationInProgressRef.current) return;
-    
-    try {
-      const [balanceA, balanceB, balanceUsdst] = await Promise.all([
-        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${pool.tokenA.address}`),
-        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${pool.tokenB.address}`),
-        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`)
-      ]);
-      setTokenABalance(balanceA?.data[0]?.balance || "0");
-      setTokenBBalance(balanceB?.data[0]?.balance || "0");
-      setUsdstBalance(balanceUsdst?.data[0]?.balance || "0");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch token balances",
-        variant: "destructive",
-      });
-    }
   };
 
   const handleDepositSubmit = async (values: DepositFormValues) => {
@@ -253,15 +238,14 @@ const SwapPoolsSection = () => {
         }));
 
         // Update pools list
-        const enrichedPools = newPools.map((pool: Pool) => ({
-          ...pool,
-          _name: `${pool.tokenA._name}/${pool.tokenB._name}`,
-          _symbol: `${pool.tokenA._symbol}/${pool.tokenB._symbol}`,
-        }));
+        const enrichedPools = enrichPools(newPools);
         setPools(enrichedPools);
 
         // Refresh balances
-        await fetchTokenBalances(updatedPool);
+        const balances = await fetchTokenBalances(updatedPool, userAddress, usdstAddress);
+        setTokenABalance(balances.tokenABalance);
+        setTokenBBalance(balances.tokenBBalance);
+        setUsdstBalance(balances.usdstBalance);
       }
 
       handleCloseDepositModal();
@@ -318,15 +302,14 @@ const SwapPoolsSection = () => {
         }));
 
         // Update pools list
-        const enrichedPools = newPools.map((pool: Pool) => ({
-          ...pool,
-          _name: `${pool.tokenA._name}/${pool.tokenB._name}`,
-          _symbol: `${pool.tokenA._symbol}/${pool.tokenB._symbol}`,
-        }));
+        const enrichedPools = enrichPools(newPools);
         setPools(enrichedPools);
 
         // Refresh balances
-        await fetchTokenBalances(updatedPool);
+        const balances = await fetchTokenBalances(updatedPool, userAddress, usdstAddress);
+        setTokenABalance(balances.tokenABalance);
+        setTokenBBalance(balances.tokenBBalance);
+        setUsdstBalance(balances.usdstBalance);
       }
 
       handleCloseWithdrawModal();

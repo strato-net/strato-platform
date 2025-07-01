@@ -26,4 +26,9 @@ COPY --from=builder /app/package.json ./
 
 EXPOSE 8080
 
+# Add health check
+HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
+  CMD lsof -i :8080 || \
+    exit 1
+
 CMD ["serve", "-s", "dist", "-l", "8080"]

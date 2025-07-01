@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAccount } from "wagmi";
+import { useBridgeContext } from "@/context/BridgeContext";
 
 interface Token {
   name: string;
@@ -29,86 +30,34 @@ interface BridgeOutProps {
   showTestnet: boolean;
 }
 
-const formatBalance = (value: string, decimals: number): string => {
-  const numericValue = parseFloat(value);
-  if (isNaN(numericValue)) return "0";
-  return numericValue.toFixed(decimals);
-};
-
-const BRIDGE_API = {
-  bridgeOut: async (params: {
-    amount: string;
-    toAddress: string;
-    tokenAddress: string;
-  }) => {
-    try {
-      const response = await fetch(`/api/bridge/bridgeOut`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(params),
-      });
-
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.error || "Bridge transaction failed");
-      }
-
-      return responseData.data;
-    } catch (error: any) {
-      console.error("Bridge API error:", error);
-      throw error;
-    }
-  },
-
-  bridgeOutTokens: async () => {
-    const response = await fetch(`/api/bridge/bridgeOutTokens`);
-    const responseData = await response.json();
-    return responseData.data.data.bridgeOutTokens;
-  },
-
-  getBalance: async (params: { tokenAddress: string }) => {
-    try {
-      const response = await fetch(`/api/bridge/balance/${params.tokenAddress}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.error || "Failed to fetch balance");
-      }
-      return responseData.data;
-    } catch (error: any) {
-      console.error("Balance API error:", error);
-      throw error;
-    }
-  },
-};
-
 const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const {
+    bridgeOutTokens,
+    loading: contextLoading,
+    fetchBridgeOutTokens,
+    bridgeOut: bridgeOutAPI,
+    getBalance,
+    formatBalance
+  } = useBridgeContext();
 
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [amount, setAmount] = useState("");
   const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
   const [amountError, setAmountError] = useState<string>("");
   const [fromChain, setFromChain] = useState<string>("STRATO");
   const [toChain, setToChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
 
   // Fetch network tokens
   useEffect(() => {
-    const fetchBridgeOutTokens = async () => {
+    const loadBridgeOutTokens = async () => {
       try {
-        const tokens = await BRIDGE_API.bridgeOutTokens();
-        setBridgeOutTokens(tokens);
+        const tokens = await fetchBridgeOutTokens();
         if (!selectedToken && tokens.length > 0) {
           setSelectedToken(tokens[0]);
         }
@@ -117,8 +66,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       }
     };
 
-    fetchBridgeOutTokens();
-  }, []);
+    loadBridgeOutTokens();
+  }, [fetchBridgeOutTokens]);
 
   // Balance update effect
   useEffect(() => {
@@ -133,13 +82,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         }
 
         if (selectedToken?.tokenAddress && address) {
-          const formattedTokenAddress = selectedToken.tokenAddress.startsWith("0x")
-            ? selectedToken.tokenAddress
-            : `0x${selectedToken.tokenAddress}`;
-
-          const balanceData = await BRIDGE_API.getBalance({
-            tokenAddress: formattedTokenAddress,
-          });
+          const balanceData = await getBalance(selectedToken.tokenAddress);
 
           if (mounted && balanceData?.balance) {
             const formattedBalance = formatBalance(
@@ -172,7 +115,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     return () => {
       mounted = false;
     };
-  }, [isConnected, address, selectedToken]);
+  }, [isConnected, address, selectedToken, getBalance, formatBalance]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -237,7 +180,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     });
 
     try {
-      const response = await BRIDGE_API.bridgeOut({
+      const response = await bridgeOutAPI({
         amount,
         toAddress: address,
         tokenAddress: selectedToken.tokenAddress,
@@ -250,9 +193,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         });
 
         // Refresh balance after successful transaction
-        const balanceData = await BRIDGE_API.getBalance({
-          tokenAddress: selectedToken.tokenAddress,
-        });
+        const balanceData = await getBalance(selectedToken.tokenAddress);
         if (balanceData?.balance) {
           const formattedBalance = formatBalance(
             balanceData.balance,

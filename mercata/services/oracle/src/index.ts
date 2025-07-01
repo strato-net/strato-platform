@@ -1,18 +1,20 @@
-require('dotenv').config();
-const { startCronScheduler } = require('./cronScheduler');
-const { logInfo, logError } = require('./utils/logger');
-const { oauthClient } = require('./utils/oauth');
-const express = require('express');
-const packageJson = require('../package.json');
+import dotenv from 'dotenv';
+import { startCronScheduler } from './cronScheduler';
+import { logInfo, logError } from './utils/logger';
+import { oauthClient } from './utils/oauth';
+import express from 'express';
+import * as packageJson from '../package.json';
 
-async function main() {
+dotenv.config();
+
+async function main(): Promise<void> {
     try {
         // Validate required environment variables
-        const requiredEnvVars = [
+        const requiredEnvVars: string[] = [
             'STRATO_NODE_URL',
             'OAUTH_DISCOVERY_URL',
-            'CLIENT_ID',
-            'CLIENT_SECRET',
+            'OAUTH_CLIENT_ID',
+            'OAUTH_CLIENT_SECRET',
             'USERNAME',
             'PASSWORD',
             'PRICE_ORACLE_ADDRESS',
@@ -37,7 +39,7 @@ async function main() {
             }
             logInfo('Main', 'OAuth connection successful');
         } catch (error) {
-            logError('Main', new Error(`OAuth test failed: ${error.message}`));
+            logError('Main', new Error(`OAuth test failed: ${(error as Error).message}`));
             process.exit(1);
         }
         
@@ -47,18 +49,18 @@ async function main() {
         logInfo('Main', 'Price Oracle Service started successfully');
         
     } catch (error) {
-        logError('Main', error);
+        logError('Main', error as Error);
         process.exit(1);
     }
 }
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', (error: Error) => {
     logError('UncaughtException', error);
     process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
     logError('UnhandledRejection', new Error(`Unhandled Rejection at: ${promise}, reason: ${reason}`));
     process.exit(1);
 });
@@ -72,4 +74,4 @@ app.listen(PORT, () => {
 });
 
 // Start the service
-main();
+main(); 

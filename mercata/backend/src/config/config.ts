@@ -18,24 +18,6 @@ if (!process.env.OAUTH_CLIENT_SECRET) {
 if (!process.env.NODE_URL) {
   throw new Error("NODE_URL is not defined");
 }
-if (!process.env.BASE_CODE_COLLECTION) {
-  throw new Error("BASE_CODE_COLLECTION is not defined");
-}
-if (!process.env.POOL_FACTORY) {
-  throw new Error("POOL_FACTORY is not defined");
-}
-if (!process.env.LENDING_POOL) {
-  throw new Error("LENDING_POOL is not defined");
-}
-if (!process.env.ONRAMP) {
-  throw new Error("ONRAMP is not defined");
-}
-if (!process.env.TOKEN_FACTORY) {
-  throw new Error("TOKEN_FACTORY is not defined");
-}
-if (!process.env.POOL_CONFIGURATOR) {
-  throw new Error("POOL_CONFIGURATOR is not defined");
-}
 
 export let openIdTokenEndpoint: string | undefined;
 /**
@@ -48,9 +30,9 @@ export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
-export const baseCodeCollection = process.env.BASE_CODE_COLLECTION;
-export const poolFactory = process.env.POOL_FACTORY;
-export const lendingPool = process.env.LENDING_POOL;
-export const onRamp = process.env.ONRAMP;
-export const tokenFactory = process.env.TOKEN_FACTORY;
-export const poolConfigurator = process.env.POOL_CONFIGURATOR;
+export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
+export const lendingPool = process.env.LENDING_POOL || "0000000000000000000000000000000000001005";
+export const onRamp = process.env.ONRAMP || "0000000000000000000000000000000000001009";
+export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
+export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
+export const poolConfigurator = process.env.POOL_CONFIGURATOR || "000000000000000000000000000000000000100d";
