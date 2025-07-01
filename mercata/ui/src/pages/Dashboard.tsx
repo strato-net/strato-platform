@@ -11,6 +11,7 @@ import { useUser } from "@/context/UserContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
+import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -92,7 +93,6 @@ const Dashboard = () => {
             <AssetSummary
               title="Total Balance"
               value={formatBalance(totalBalance)}
-              change={0}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
@@ -100,7 +100,6 @@ const Dashboard = () => {
             <AssetSummary
               title="CATA Rewards"
               value={formatBalance(cataBalance)}
-              change={0}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />
@@ -108,7 +107,6 @@ const Dashboard = () => {
             <AssetSummary
               title="Borrowing"
               value="N/A"
-              change={0}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />
@@ -120,6 +118,10 @@ const Dashboard = () => {
 
           <div className="mb-8">
             <BorrowingSection />
+          </div>
+
+          <div className="mb-8">
+            <MyPoolParticipationSection /> 
           </div>
 
           <div className="mb-8">

@@ -45,7 +45,7 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
-          <h2 className="font-bold text-lg">Your Assets</h2>
+          <h2 className="font-bold text-lg">My Deposits</h2>
           <Button
             size="sm"
             className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
@@ -165,7 +165,7 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
 
       <div className="p-4 text-right border-t border-gray-100">
         <a
-          href="/dashboard/assets"
+          href="/dashboard/deposits"
           className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end"
         >
           View All <ArrowUpRight size={14} className="ml-1" />
