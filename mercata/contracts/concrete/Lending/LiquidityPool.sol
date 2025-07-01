@@ -1,100 +1,156 @@
 import "./LendingRegistry.sol";
+import "../Tokens/Token.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/IERC20.sol";
 
 /**
  * @title LiquidityPool
- * @notice Manages token liquidity for lending and borrowing, including ERC20 token transfers.
- * @dev Only callable by LendingPool; holds deposited funds and tracks borrowed balances.
+ * @notice Manages liquidity and mToken minting/burning for a single borrowable asset.
+ * @dev Interacts only with LendingPool; the borrowable asset is fetched from LendingPool dynamically.
  */
 
- contract record LiquidityPool is IERC20, Ownable  {
-    event Deposited(address indexed user, address indexed asset, uint256 amount);
-    event Withdrawn(address indexed user, address indexed asset, uint256 amount);
-    event Borrowed(address indexed user, address indexed asset, uint256 amount);
-    event Repaid(address indexed user, address indexed asset, uint256 amount);
+contract record LiquidityPool is Ownable  {
+    event Deposited(address indexed user, uint256 amount, uint256 mTokenMinted);
+    event Withdrawn(address indexed user, uint256 amount, uint256 mTokenBurned);
+    event Borrowed(address indexed user, uint256 amount);
+    event Repaid(address indexed user, uint256 amount);
 
-    struct Deposit {   
-        address user;
-        address asset;
-        uint256 amount;
-    }
-    struct Borrow {   
-        address user;
-        address asset;
-        uint256 amount;
-    }
     LendingRegistry public registry;
-    mapping(string => Deposit) public record deposited;
-    mapping(address => uint256) public record totalLiquidity;
-    mapping(string => Borrow) public record borrowed;
+    Token public mToken;
 
-    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+    // Restrict to only LendingPool (verified through the registry)
+    modifier onlyLendingPool() {
+        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
+        _;
+    }
+
+    constructor(address _registry, address _owner) Ownable(_owner) {
         require(_registry != address(0), "Invalid registry");
         registry = LendingRegistry(_registry);
     }
 
-    modifier onlyLendingPool() {
-        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
-        _;
-    }	
-
-    function _key(address user, address asset) pure returns (string) {
-        return keccak256(string(user), string(asset));
+    /**
+     * @notice Get current underlying asset address
+     */
+    function _getAsset() internal view returns (address) {
+        return LendingPool(registry.lendingPool()).borrowableAsset();
     }
 
-    function deposit(address asset, uint256 amount, address onBehalfOf) public onlyLendingPool {
-        string key = _key(onBehalfOf, asset);
-        require(amount > 0, "Amount must be greater than 0");
-        require(onBehalfOf != address(0), "Invalid user address");
-        require(IERC20(asset).transferFrom(onBehalfOf, address(this), amount), "Transfer failed");
-        deposited[key].amount += amount;
-        deposited[key].user = onBehalfOf;
-        deposited[key].asset = asset;
-
-        totalLiquidity[asset] += amount;
-        emit Deposited(onBehalfOf, asset, amount);
+    /**
+     * @notice Get current underlying balance
+     */
+    function getUnderlyingBalance() external view returns (uint256) {
+        address asset = _getAsset();
+        return IERC20(asset).balanceOf(address(this));
     }
 
-    function withdraw(address asset, uint256 amount, address to) public onlyLendingPool {
-        require(amount > 0, "Amount must be greater than 0");
-        require(to != address(0), "Invalid recipient address");
-        string key = _key(to, asset);
-        require(deposited[key].amount >= amount, "Insufficient balance");
-        deposited[key].amount -= amount;
-        totalLiquidity[asset] -= amount;
-        require(IERC20(asset).transfer(to, amount), "Withdraw failed");
-        emit Withdrawn(to, asset, amount);
+    /**
+     * @notice Deposit underlying asset into the pool
+     * @param amount Amount of underlying asset to deposit
+     * @param user Recipient of the minted mTokens
+     */
+    function deposit(uint256 amount, address user) external onlyLendingPool {
+        require(amount > 0 && user != address(0), "Invalid deposit");
+        require(address(mToken) != address(0), "mToken not set");
+
+        address asset = _getAsset();
+
+        // Pull funds from user
+        require(IERC20(asset).transferFrom(user, address(this), amount), "Transfer failed");
+
+        // Mint mTokens 1:1 with deposits 
+        mToken.mint(user, amount);
+
+        emit Deposited(user, amount, amount);
     }
 
-    function borrow(address asset, uint256 amount, address borrower) public onlyLendingPool {
-        string key = _key(borrower, asset);
-        require(amount > 0, "Amount must be greater than 0");
-        require(borrower != address(0), "Invalid borrower address");
-        require(totalLiquidity[asset] >= amount, "Insufficient liquidity");
-        totalLiquidity[asset] -= amount;
-        borrowed[key].amount += amount;
-        borrowed[key].user = borrower;
-        borrowed[key].asset = asset;
+    /**
+     * @notice Withdraw underlying by burning mTokens
+     * @param mTokenAmount Amount of mTokens to burn
+     * @param user Recipient of underlying asset
+     * @param underlyingAmount Exact amount of underlying asset to transfer
+     */
+    function withdraw(uint256 mTokenAmount, address user, uint256 underlyingAmount) external onlyLendingPool {
+        require(mTokenAmount > 0 && user != address(0), "Invalid withdrawal");
+        require(underlyingAmount > 0, "Invalid underlying amount");
+        require(address(mToken) != address(0), "mToken not set");
+
+        address asset = _getAsset();
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        require(currentBalance >= underlyingAmount, "Insufficient liquidity");
+
+        // Burn mTokens from user first
+        mToken.burn(user, mTokenAmount);
+
+        // Transfer exact underlying amount to user
+        require(IERC20(asset).transfer(user, underlyingAmount), "Withdraw failed");
+
+        emit Withdrawn(user, underlyingAmount, mTokenAmount);
+    }
+
+    /**
+     * @notice Borrow underlying asset
+     * @param amount Amount to borrow
+     * @param borrower Address receiving the funds
+     */
+    function borrow(uint256 amount, address borrower) external onlyLendingPool {
+        require(amount > 0 && borrower != address(0), "Invalid borrow");
+
+        address asset = _getAsset();
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        require(currentBalance >= amount, "Insufficient liquidity");
+
+        // Transfer underlying to borrower
         require(IERC20(asset).transfer(borrower, amount), "Borrow transfer failed");
-        emit Borrowed(borrower, asset, amount);
+
+        emit Borrowed(borrower, amount);
     }
 
-    function repay(address asset, uint256 amount, uint256 totalOwed, address borrower) public onlyLendingPool {
-        require(amount > 0, "Amount must be greater than 0");
-        require(borrower != address(0), "Invalid borrower address");
-        string key = _key(borrower, asset);
-        //set to latest owed amount that includes interest
-        borrowed[key].amount = totalOwed;
-        require(borrowed[key].amount > 0, "No outstanding debt");
-        uint256 repayAmount = amount > totalOwed ? totalOwed : amount;
-        borrowed[key].amount -= repayAmount;
-        // Transfer only the amount that will actually be credited, refunding any excess left in the user wallet
-        require(IERC20(asset).transferFrom(borrower, address(this), repayAmount), "Repay failed");
-        totalLiquidity[asset] += repayAmount;
-        emit Repaid(borrower, asset, repayAmount);
+    /**
+     * @notice Repay borrowed funds
+     * @param amount Amount to repay
+     * @param borrower Payer of the repayment
+     */
+    function repay(uint256 amount, address borrower) external onlyLendingPool {
+        require(amount > 0 && borrower != address(0), "Invalid repayment");
+
+        address asset = _getAsset();
+
+        // Pull repayment funds from user
+        require(IERC20(asset).transferFrom(borrower, address(this), amount), "Repay failed");
+
+        emit Repaid(borrower, amount);
     }
 
-    function getUserBalance(address user, address asset)  view  returns (uint256) public view {
-        return deposited[_key(user, asset)].amount;
+    /**
+     * @notice Transfer reserve fees to fee collector
+     * @param reserveAmount Amount to transfer as reserve fees
+     * @param feeCollector Address to receive the reserve fees
+     */
+    function transferReserve(uint256 reserveAmount, address feeCollector) external onlyLendingPool {
+        require(reserveAmount > 0 && feeCollector != address(0), "Invalid reserve transfer");
+        
+        address asset = _getAsset();
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        require(currentBalance >= reserveAmount, "Insufficient liquidity to transfer to reserve");
+        
+        // Transfer reserve to fee collector
+        require(IERC20(asset).transfer(feeCollector, reserveAmount), "Reserve transfer failed");
     }
-}
+
+    /**
+     * @notice Set mToken address (only callable by LendingPool)
+     */
+    function setMToken(address _mToken) external onlyLendingPool {
+        require(_mToken != address(0), "Invalid mToken");
+        mToken = Token(_mToken);
+    }
+
+    /**
+     * @notice Allows owner to update the registry (for upgradeability)
+     */
+    function setRegistry(address _registry) external onlyOwner {
+        require(_registry != address(0), "Invalid registry address");
+        registry = LendingRegistry(_registry);
+    }
+} 

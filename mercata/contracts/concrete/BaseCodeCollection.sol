@@ -39,6 +39,9 @@ import "Lending/RateStrategy.sol";
 //Bridging
 import "Bridge/MercataEthBridge.sol";
 
+//Fee Collector
+import "Admin/FeeCollector.sol";
+
 //TODO
 contract Mercata {
     RateStrategy public rateStrategy;
@@ -77,15 +80,10 @@ contract Mercata {
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(msg.sender); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory));
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.setLendingPool(address(lendingPool));
-        poolConfigurator.setLiquidityPool(address(liquidityPool));
-        poolConfigurator.setCollateralVault(address(collateralVault));
-        poolConfigurator.setRateStrategy(address(rateStrategy));
-        poolConfigurator.setPriceOracle(address(priceOracle)); 
-        poolConfigurator.setTokenFactory(address(tokenFactory));
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[]);
         Ownable(poolConfigurator).transferOwnership(msg.sender);
 
         // Create Services
