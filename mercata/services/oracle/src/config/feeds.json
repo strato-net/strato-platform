@@ -3,18 +3,65 @@
     {
       "name": "ETH-USD",
       "source": "Alchemy",
-      "targetAssetAddress": "3a928dfa06b73468a304af3c039c720651b50024",
-      "cron": "*/2 * * * *",
+      "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c",
+      "cron": "0 */1 * * *",
       "apiParams": {
         "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
       }
     },
     {
-      "name": "XAU-USD",
-      "source": "Metals.dev",
-      "targetAssetAddress": "e05f6618b3fae1c7587fe61301131ca28efb774a",
-      "cron": "*/2 * * * *",
-      "apiParams": {}
-    }
+      "name": "WBTC-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9",
+      "cron": "1 */1 * * *",
+      "apiParams": {
+        "tokenAddress": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+      }
+    },
+    {
+      "name": "PAXG-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d",
+      "cron": "2 */1 * * *",
+      "apiParams": {
+        "tokenAddress": "0x45804880De22913dAFE09f4980848ECE6EcbAf78"
+      }
+    },
+     {
+      "name": "USDT-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "86a5ae535ded415203c3e27d654f9a1d454c553b",
+      "cron": "3 */1 * * *",
+      "apiParams": {
+        "tokenAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      }
+    },
+     {
+      "name": "USDC-USD",
+      "source": "Alchemy",
+      "targetAssetAddress": "3d351a4a339f6eef7371b0b1b025b3a434ad0399",
+      "cron": "4 */1 * * *",
+      "apiParams": {
+        "tokenAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      }
+    },
+           {
+       "name": "XAU-USD",
+       "source": "Metals.dev",
+       "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",
+       "cron": "5 */1 * * *",
+       "apiParams": {
+         "metal": "gold"
+       }
+     },
+     {
+       "name": "XAG-USD",
+       "source": "Metals.dev",
+       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+       "cron": "6 */1 * * *",
+       "apiParams": {
+         "metal": "silver"
+       }
+     }
   ]
 } 

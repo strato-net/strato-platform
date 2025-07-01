@@ -12,6 +12,9 @@ const ALCHEMY_URL = process.env.SHOW_TESTNET === 'true' ? 'https://eth-sepolia.g
 
  const SEARCH_URL = "BlockApps-Mercata-MercataEthBridge" ;
 // const MERCATA_URL = "MercataEthBridge" ;
+const stripHexPrefix = (hashes: string[]): string[] =>
+  hashes.map(hash => hash.replace('0x', '')
+);
 
 export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
   console.log("🚀 Starting Alchemy get transaction polling");
@@ -111,7 +114,9 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
           console.error(`❌ Failed to process transaction ${txHash}:`, err);
         }
       }
-      await confirmBridgeOutSafePolling(approvedTxHashes);
+      const strippedHashes = stripHexPrefix(approvedTxHashes);
+      console.log("🚀 strippedHashes: step4", strippedHashes);
+      await confirmBridgeOutSafePolling(strippedHashes);
     } catch (e: any) {
       console.error('❌ Polling error:', e.message);
     }

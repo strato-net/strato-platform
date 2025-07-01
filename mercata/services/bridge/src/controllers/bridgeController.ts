@@ -34,8 +34,8 @@ class BridgeController {
       const toAddress = config.safe.address || '';
   
       const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
-      const decimals = STRATO_TOKENS.find((tokenObj) => tokenObj.tokenAddress === tokenAddress)?.decimals || 18;
-  
+      const decimals = STRATO_TOKENS.find((tokenObj) => tokenObj.tokenAddress === stratoTokenAddress)?.decimals || 18;
+    
       const bridgeInResponse = await bridgeIn(
         ethHash,
         stratoTokenAddress,

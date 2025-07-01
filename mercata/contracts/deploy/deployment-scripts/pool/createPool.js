@@ -44,12 +44,12 @@ async function createPool(tokenAAddress, tokenBAddress, poolFactoryAddress) {
     transactionHash: final.hash,
     status: final.status,
     poolAddress:
-      final.status === "Success" ? final.txResult.contractsCreated[2] : "Failed",
+      final.status === "Success" ? final.data.contents[0] : "Failed",
   };
 
   saveCallListTXDataAsFile(poolInfo);
 
-  return final.status === "Success" ? final.txResult.contractsCreated[2] : null;
+  return final.status === "Success" ? final.data.contents[0] : null;
 }
 
 async function main() {

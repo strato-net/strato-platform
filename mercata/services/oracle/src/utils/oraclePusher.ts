@@ -1,14 +1,33 @@
-require('dotenv').config();
-const axios = require('axios');
-const { oauthClient } = require('./oauth');
+import dotenv from 'dotenv';
+import axios from 'axios';
+import { oauthClient } from './oauth';
+
+dotenv.config();
 
 // STRATO transaction builder utilities
 const DEFAULT_GAS_PARAMS = {
     gasLimit: 32_100_000_000,
-    gasPrice: 1,
+    gasPrice: 10, // Increased from 1 to 10 for faster confirmation
 };
 
-function buildFunctionTx({ contractName, contractAddress, method, args }) {
+interface TransactionResult {
+    hash: string;
+    status: string;
+    timestamp?: string;
+}
+
+interface CallListArg {
+    contract: { address: string; name: string };
+    method: string;
+    args: Record<string, any>;
+}
+
+function buildFunctionTx({ contractName, contractAddress, method, args }: {
+    contractName: string;
+    contractAddress: string;
+    method: string;
+    args: Record<string, any>;
+}) {
     const tx = {
         type: "FUNCTION",
         payload: { contractName, contractAddress, method, args },
@@ -21,7 +40,7 @@ function buildFunctionTx({ contractName, contractAddress, method, args }) {
 }
 
 // STRATO interaction utilities
-async function callListAndWait(callListArgs, retryCount = 0) {
+async function callListAndWait(callListArgs: CallListArg[], retryCount: number = 0): Promise<TransactionResult> {
     const maxRetries = 3;
     
     try {
@@ -51,10 +70,8 @@ async function callListAndWait(callListArgs, retryCount = 0) {
             }
         );
 
-
-
         // Handle different response formats
-        let txHash;
+        let txHash: string;
         if (Array.isArray(response.data) && response.data.length > 0) {
             txHash = response.data[0].hash || response.data[0];
         } else if (response.data && response.data.hash) {
@@ -69,7 +86,7 @@ async function callListAndWait(callListArgs, retryCount = 0) {
 
         // Wait for transaction confirmation
         return await waitForTransaction(txHash);
-    } catch (error) {
+    } catch (error: any) {
         const errorMessage = error.response?.data?.message || error.message;
         
         // Check if this is a mempool rejection and we can retry
@@ -88,18 +105,18 @@ async function callListAndWait(callListArgs, retryCount = 0) {
     }
 }
 
-async function pushAssetPrices(assets, prices) {
+export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
     try {
         console.log(`[OraclePusher] Preparing to push ${assets.length} asset prices...`);
         
         // Log the assets and prices being pushed
         for (let i = 0; i < assets.length; i++) {
-            console.log(`[OraclePusher] ${assets[i]} → ${prices[i]} (${(prices[i] / 1e8).toFixed(8)} USD)`);
+            console.log(`[OraclePusher] ${assets[i]} → ${prices[i]} (${(prices[i] / 1e18).toFixed(8)} USD)`);
         }
 
         // Build STRATO transaction call list
-        const callListArgs = assets.map((asset, index) => ({
-            contract: { address: process.env.PRICE_ORACLE_ADDRESS, name: "PriceOracle" },
+        const callListArgs: CallListArg[] = assets.map((asset, index) => ({
+            contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
             method: "setAssetPrice",
             args: {
                 asset: asset,
@@ -110,8 +127,6 @@ async function pushAssetPrices(assets, prices) {
         // Submit transaction to STRATO
         const result = await callListAndWait(callListArgs);
 
-
-
         // Check if the transaction was successful
         if (result.status !== "Success") {
             throw new Error(`Transaction failed with status: ${result.status}. Transaction hash: ${result.hash}`);
@@ -119,19 +134,15 @@ async function pushAssetPrices(assets, prices) {
 
         console.log(`[OraclePusher] Transaction completed → TX: ${result.hash}`);
 
-        return {
-            txHash: result.hash,
-            status: result.status,
-            timestamp: new Date().toISOString()
-        };
-    } catch (error) {
+        return result;
+    } catch (error: any) {
         console.error(`[OraclePusher] Error pushing prices:`, error.message);
         throw error;
     }
 }
 
 // Wait for transaction confirmation
-async function waitForTransaction(txHash, timeout = 60000) {
+async function waitForTransaction(txHash: string, timeout: number = 120000): Promise<TransactionResult> { // Increased from 60s to 120s
     const startTime = Date.now();
     
     while (Date.now() - startTime < timeout) {
@@ -149,15 +160,13 @@ async function waitForTransaction(txHash, timeout = 60000) {
                 }
             );
 
-
-
             if (response.data && response.data.status && response.data.status !== "Pending") {
                 return response.data;
             }
             
             // Wait 2 seconds before checking again
             await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (error) {
+        } catch (error: any) {
             console.error(`[OraclePusher] Error checking transaction status:`, error.response?.data || error.message);
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
@@ -166,7 +175,7 @@ async function waitForTransaction(txHash, timeout = 60000) {
     throw new Error(`Transaction ${txHash} did not confirm within ${timeout}ms`);
 }
 
-async function getAssetPrice(assetAddress) {
+export async function getAssetPrice(assetAddress: string): Promise<string> {
     try {
         const accessToken = await oauthClient.getAccessToken();
         
@@ -187,10 +196,8 @@ async function getAssetPrice(assetAddress) {
         } else {
             throw new Error(`No price found for asset: ${assetAddress}`);
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error(`[OraclePusher] Error getting asset price:`, error.message);
         throw error;
     }
-}
-
-module.exports = { pushAssetPrices, getAssetPrice };
+} 

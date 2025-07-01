@@ -55,6 +55,13 @@ export const contractCall = async (
     throw new Error("Missing transaction result or hash");
   }
 
+
+  // Check if the transaction is already complete from the initial response
+  if (result.status && result.status !== "Pending") {
+    console.log("Transaction already complete, returning result directly");
+    return result;
+  }
+
   const txHash = result.hash;
 
   const predicate = (results: any[]) =>
@@ -87,18 +94,35 @@ export const until = async (
 ): Promise<any> => {
   const start = Date.now();
 
+  // Make initial call to get current status
+  let result = await action();
+  
+  // If predicate is already satisfied, return immediately
+  if (predicate(result)) {
+    return result;
+  }
+
   while (true) {
-    const result = await action();
-
-    if (predicate(result)) {
-      return result;
-    }
-
+    // Check if we've exceeded the timeout
     if (Date.now() - start >= timeout) {
       console.warn("Timeout reached before predicate was satisfied.");
       return result;
     }
 
+    // Wait before next check
     await new Promise((res) => setTimeout(res, interval));
+
+    // Only call action if status is still Pending
+    // Check if any result still has "Pending" status
+    const hasPendingStatus = result.some((r: any) => r.status === "Pending");
+    
+    if (hasPendingStatus) {
+      result = await action();
+    }
+
+    // Check if predicate is satisfied (no more Pending status)
+    if (predicate(result)) {
+      return result;
+    }
   }
 };
