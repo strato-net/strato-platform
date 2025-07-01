@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   const {
     bridgeInTokens,
@@ -62,13 +64,35 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const [fromChain, setFromChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
   const [toChain, setToChain] = useState<string>("STRATO");
 
+
   // Fetch network tokens
   useEffect(() => {
     const loadBridgeInTokens = async () => {
       try {
         const tokens = await fetchBridgeInTokens();
-        if (!selectedToken && tokens.length > 0) {
-          setSelectedToken(tokens[0]);
+        if (tokens.length > 0) {
+          // Check if asset is provided in query params
+          const assetFromQuery = searchParams.get('asset');
+          
+          if (assetFromQuery && !selectedToken) {
+            // Find token that matches the asset symbol from query params
+            const matchingToken = tokens.find(token => 
+              token.symbol.toUpperCase() === assetFromQuery.toUpperCase()
+            );
+            
+            if (matchingToken) {
+              setSelectedToken(matchingToken);
+           
+              console.log(`Pre-selected token from query param: ${matchingToken.symbol}`);
+            } else {
+              // If no match found, fall back to first token
+              setSelectedToken(tokens[0]);
+              console.log(`Asset "${assetFromQuery}" not found, using default token: ${tokens[0].symbol}`);
+            }
+          } else if (!selectedToken) {
+            // No asset in query params, use first token as default
+            setSelectedToken(tokens[0])
+          }
         }
       } catch (error) {
         console.error('Error fetching bridge in tokens:', error);
@@ -76,7 +100,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     };
 
     loadBridgeInTokens();
-  }, [fetchBridgeInTokens]);
+  }, [fetchBridgeInTokens, searchParams, selectedToken]);
 
   // Balance fetching hooks
   const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({

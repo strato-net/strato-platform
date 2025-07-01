@@ -83,7 +83,15 @@ export const TESTNET_ETH_TOKENS = [
     chainId: 11155111,
     decimals: 6,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
+  },{
+    name: "Gold Coin",
+    symbol:"GOLDST",
+    tokenAddress: "0x28c8d01ff633ea9cd8fc6a451d7457889e698de6", // Native token address
+    decimals: 18,
+    chainId: 11155111,
+    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   }
+
 ];
 
 export const MAINNET_ETH_TOKENS = [

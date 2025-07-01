@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Wallet } from 'lucide-react';
+import { ChevronLeft, Wallet, Copy } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { Token } from '@/interface';
@@ -19,6 +19,15 @@ import {
   CartesianGrid,
 } from "recharts";
 import CopyButton from '@/components/ui/copy';
+import { useAccount, useDisconnect } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const generatePriceData = (basePrice: number, days: number = 30) => {
   const data = [];
@@ -41,11 +50,15 @@ const generatePriceData = (basePrice: number, days: number = 30) => {
 const AssetDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [asset, setAsset] = useState<Token | null>(null);
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<any[]>([]);
   const { userAddress } = useUser()
   const { tokens: assets, loading, fetchTokens } = useUserTokens()
-
+  const navigate = useNavigate();
+  
+  // Wallet connection state from wagmi
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchTokens(userAddress)
@@ -93,12 +106,27 @@ const AssetDetail = () => {
     );
   }
 
-  const handleConnectWallet = () => { };
-
   const handleBuyNow = () => { };
 
-  const handleBridge = () => { };
+  const handleBridge = () => {
+    if (asset?.token?._name) {
+      const assetName = encodeURIComponent(asset.token._name);
+      navigate(`/dashboard/bridge?asset=${assetName}`);
+    } else {
+      navigate('/dashboard/bridge');
+    }
+  };
 
+  const copyToClipboard = async () => {
+    if (address) {
+      await navigator.clipboard.writeText(address);
+      toast({
+        title: "Address copied!",
+        description: "Wallet address copied to clipboard",
+        duration: 2000,
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -157,13 +185,13 @@ const AssetDetail = () => {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Current Price:</span>
                       <span className="font-medium">
-                        {formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)}
+                        {asset?.price ? formatUnits(BigInt(asset.price), 18) : '0'}
                       </span>
                     </div>
 
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Asset Deposits:</span>
-                      <span className="font-medium">{formatUnits(asset?.balance?.toLocaleString("fullwide", { useGrouping: false }), 18)}</span>
+                      <span className="font-medium">{asset?.balance ? formatUnits(BigInt(asset.balance), 18) : '0'}</span>
                     </div>
 
                     {asset?.available ? (
@@ -208,26 +236,52 @@ const AssetDetail = () => {
                       <span className="font-medium">{asset?.vaulter || 'N/A'}</span>
                     </div>
                   </div>
-                  {!isWalletConnected ? (
-                    <Button
-                      onClick={handleConnectWallet}
-                      className="w-full flex items-center justify-center gap-2 mb-4"
-                    >
-                      <Wallet size={16} />
-                      Connect Ethereum Wallet
-                    </Button>
+                  {!isConnected ? (
+                    <div className="w-full mb-4">
+                      <ConnectButton label="Connect Ethereum Wallet" />
+                    </div>
                   ) : (
-                    <div className="flex items-center gap-2 justify-center mb-4 text-green-600">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-sm font-medium">Wallet Connected</span>
-                      <span className="text-gray-500">Address:</span>
-                      <span className="font-medium">{asset?.address}</span>
+                    <div className="flex items-center gap-2 justify-center mb-4">
+                      <div
+                        onClick={() => disconnect()}
+                        className="relative group cursor-pointer"
+                      >
+                        <div className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold group-hover:opacity-0 transition-opacity">
+                          Wallet Connected
+                        </div>
+                        <div className="absolute inset-0 bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-red-600 font-semibold">
+                            Disconnect
+                          </span>
+                        </div>
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2 text-xs bg-green-100/50 px-2 py-1 rounded-md font-mono text-green-700 cursor-pointer">
+                              {address?.slice(0, 6)}...{address?.slice(-4)}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard();
+                                }}
+                                className="hover:text-green-900 transition-colors cursor-pointer"
+                              >
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{address}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <Button
                       onClick={handleBuyNow}
-                      disabled={!asset?.available || !isWalletConnected}
+                      disabled={!asset?.available || !isConnected}
                       className="w-full"
                     >
                       Buy Now
@@ -236,7 +290,7 @@ const AssetDetail = () => {
                     <Button
                       variant="secondary"
                       onClick={handleBridge}
-                      disabled={!isWalletConnected}
+                      disabled={!isConnected}
                       className="w-full"
                     >
                       Bridge
@@ -249,7 +303,7 @@ const AssetDetail = () => {
             {/* Charts and Description */}
             <div className="lg:col-span-2">
 
-              <Card className="mb-6">
+              {/* <Card className="mb-6">
                 <CardHeader>
                   <CardTitle>Price History</CardTitle>
                 </CardHeader>
@@ -324,7 +378,7 @@ const AssetDetail = () => {
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </Card> */}
 
               <Card>
                 <CardHeader>

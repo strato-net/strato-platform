@@ -13,6 +13,7 @@ import { Coins } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { formatUnits } from 'ethers';
+import AssetsList from '@/components/dashboard/AssetsList';
 
 const Assets = () => {
   const { userAddress } = useUser()
@@ -61,6 +62,11 @@ const Assets = () => {
         
         <main className="p-6">
           {/* Asset Summary */}
+
+          <div className="mb-8">
+            <AssetsList loading={loading} tokens={tokens} />
+          </div>
+
           <div className="mb-8">
             <AssetSummary 
               title="Total Assets" 
