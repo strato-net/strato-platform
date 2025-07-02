@@ -166,21 +166,22 @@ export const simulateLoan = (
 
   return {
     // Original loan data from contract
-    principalBalance: loan.principalBalance,        // Original borrowed amount (USD)
-    interestOwed: loan.interestOwed,                // Previously accrued interest (USD)
-    lastIntCalculated: loan.lastIntCalculated,      // Timestamp of last interest calculation
-    lastUpdated: loan.lastUpdated,                  // Timestamp of last loan update
+    principalBalance: loan.principalBalance,
+    interestOwed: loan.interestOwed,
+    lastIntCalculated: loan.lastIntCalculated,
+    lastUpdated: loan.lastUpdated,
     
     // Calculated values
-    newlyAccruedInterest: accruedInterest,          // Interest accrued since last calculation (USD)
-    totalAmountOwed: newTotalOwed,                  // Total debt including all interest (USD)
-    totalCollateralValueUSD: totalCollateralValue,  // Total collateral value weighted by liquidation thresholds (USD)
-    maxBorrowingPowerUSD: maxBorrowingPowerUSD.toString(), // Max borrowing power in USD
-    maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(), // Max available to borrow in USD
-    healthFactorRatio: healthFactorToPercentage(healthFactor), // Health factor as decimal (1.0 = 100% = liquidation threshold)
+    healthFactor: healthFactorToPercentage(healthFactor),
+    totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
+    accruedInterest,
+    interestRate: borrowableAssetConfig.interestRate / 100,
+    totalAmountOwed: newTotalOwed,
+    totalCollateralValueUSD: totalCollateralValue,
+    maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
     
     // Health status flags
-    isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS), // True if user is safe from liquidation
+    isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS),
   };
 };
 

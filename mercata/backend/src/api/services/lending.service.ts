@@ -257,6 +257,7 @@ export const collateralAndBalance = async (
     const userBalance = token?.balance?.toString() || "0";
     const collateralizedAmount = collateral?.amount || "0";
     const ltv = assetConfig?.ltv || 0;
+    const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
     // Calculate metrics using the helper function
     const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
@@ -279,6 +280,7 @@ export const collateralAndBalance = async (
       // Add additional context
       assetPrice,
       ltv,
+      liquidationThreshold,
     };
   });
 };
