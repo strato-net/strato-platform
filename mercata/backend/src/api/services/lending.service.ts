@@ -242,7 +242,7 @@ export const collateralAndBalance = async (
       ...token?.token,
       userBalance: token?.balance?.toString() || "0",
       collateralizedAmount: collateral?.amount || "0",
-      isCollateralized: !!collateral,
+      isCollateralized: collateral?.amount > 0,
       canSupply: BigInt(token?.balance || "0") > 0n,
     };
   });
