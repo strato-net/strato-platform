@@ -10,7 +10,7 @@ const apiKit = new SafeApiKit({ chainId: process.env.SHOW_TESTNET === 'true' ? 1
 
 const ALCHEMY_URL = process.env.SHOW_TESTNET === 'true' ? 'https://eth-sepolia.g.alchemy.com/v2' : 'https://eth-mainnet.g.alchemy.com/v2';
 
- const SEARCH_URL = "BlockApps-Mercata-MercataEthBridge" ;
+const SEARCH_URL = "BlockApps-Mercata-MercataEthBridge";
 // const MERCATA_URL = "MercataEthBridge" ;
 const stripHexPrefix = (hashes: string[]): string[] =>
   hashes.map(hash => hash.replace('0x', '')
@@ -19,17 +19,13 @@ const stripHexPrefix = (hashes: string[]): string[] =>
 export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
   console.log("🚀 Starting Alchemy get transaction polling");
 
-  const token = await getBAUserToken();
-  if (!token) return console.error('❌ No access token');
-
   const poll = async () => {
     try {
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-depositStatus?value=eq.1&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
-
       console.log("🚀 url: step1", url);
 
       const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
       });
 
       console.log("🚀 data: step1", data);
@@ -69,27 +65,25 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       await confirmBridgeinSafePolling(completedTxHashes);
     } catch (e: any) {
       console.error('❌ Polling error:', e.message);
+      // Don't stop polling on errors, let it retry on next interval
     }
   };
 
+  // Run once now, then every specified interval
   await poll();
   setInterval(poll, pollingInterval);
 };
 
-
-
 export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
   console.log("🚀 Starting Alchemy withdrawal transaction polling");
-
-  const token = await getBAUserToken();
-  if (!token) return console.error('❌ No access token');
 
   const poll = async () => {
     try {
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.2&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
       console.log("🚀 url: step1", url);
+      
       const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
       });
 
       if (!Array.isArray(data) || data.length === 0) {
@@ -101,6 +95,7 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
       const txHashes = data.map(({ key }: { key: string }) => `0x${key}`);
       console.log("🚀 txHashes: step1", txHashes);
       const approvedTxHashes = [];
+      
       for (const txHash of txHashes) {
         try {
           const safeTransaction = await apiKit.getTransaction(txHash);
@@ -109,20 +104,20 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
             approvedTxHashes.push(txHash);
           }
           console.log("🚀 approvedTxHashes: step3", approvedTxHashes);
-          // const allTransactions = await apiKit.getAllTransactions(config.safe.address as string);
         } catch (err) {
           console.error(`❌ Failed to process transaction ${txHash}:`, err);
         }
       }
+      
       const strippedHashes = stripHexPrefix(approvedTxHashes);
       console.log("🚀 strippedHashes: step4", strippedHashes);
       await confirmBridgeOutSafePolling(strippedHashes);
     } catch (e: any) {
       console.error('❌ Polling error:', e.message);
+      // Don't stop polling on errors, let it retry on next interval
     }
   };
 
-  // Run once now, then every specified interval
   await poll();
   setInterval(poll, pollingInterval);
 };
