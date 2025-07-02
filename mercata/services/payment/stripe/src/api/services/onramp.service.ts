@@ -78,70 +78,115 @@ export async function checkout(
 }
 
 export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
-  const token = session.metadata?.token;
+  const tokenMeta = session.metadata?.token; // listing ID (for lock bookkeeping)
   const buyerAddress = session.metadata?.buyerAddress;
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
   const stripeSessionId = session.id;
-  
-  if (!token || !buyerAddress || !amount || !tokenAmount) {
+
+  if (!tokenMeta || !buyerAddress || !amount || !tokenAmount) {
     console.error("Missing required metadata in session");
-    removeLock(token || '', tokenAmount || '', stripeSessionId);
+    removeLock(tokenMeta ?? '', tokenAmount ?? '', stripeSessionId);
     return;
   }
 
   try {
-    console.log("--------- handleStripeWebhook ---------");
-    console.log(`Processing payment for token ${token}, buyer ${buyerAddress}, amount ${tokenAmount}`);
-
-    // HACK: Add random delay to avoid nonce conflicts
-    await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 2000) + 500)); // 500-2500ms delay
+    // console.log("--------- handleStripeWebhook ---------");
+    // console.log(`Processing payment for token ${tokenMeta}, buyer ${buyerAddress}, amount ${tokenAmount}`);
 
     const accessToken = await getServiceToken();
-    
-    // TESTING: Only mint voucher tokens for now (fulfillListing commented out)
-    // const tokenAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"; // USDST address
-    // const fulfillTx = buildFunctionTx({
-    //   contractName: OnRamp,
-    //   contractAddress,
-    //   method: "fulfillListing",
-    //   args: { token: tokenAddress, buyer: buyerAddress, amount: tokenAmount },
-    // });
+    // const signer = JSON.parse(
+    //   Buffer.from(accessToken.split('.')[1], 'base64').toString()
+    // ).sub;
+    // console.log('SERVICE SIGNER ADDRESS:', signer);
 
-    const voucherTx = buildFunctionTx({
-      contractName: "Voucher",
-      contractAddress: "A96c02a13b558fbcf923af1d586967cf7f55c753",
-      method: "mint",
-      args: { 
-        to: buyerAddress,
-        amount: (10n ** 18n).toString() // 10^18 units
-      },
+    // Build a zero-value self-transfer on USDST to clear any stuck nonce,
+    // followed by the actual fulfillListing. Both will be sent in one batch.
+    const usdstTokenAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"; // USDST
+
+    const selfTransferTx = buildFunctionTx({
+      contractName: "Token",
+      contractAddress: usdstTokenAddress,
+      method: "transfer",
+      args: { to: buyerAddress, value: "0" },
     });
 
-    // Only voucher minting for now
-    // HACK: Add timestamp + random gas price to avoid nonce conflicts
-    const timestamp = Date.now() % 10000; // last 4 digits of timestamp
-    const randomGasPrice = timestamp + Math.floor(Math.random() * 1000) + 10000; // 10000+ range
-    const combinedTx = {
-      txs: [...voucherTx.txs],
-      txParams: {
-        ...voucherTx.txParams,
-        gasPrice: randomGasPrice
-      },
-    };
+    // let st1 = "";
+    // let hash1 = "";
+    // for (let attempt = 0; attempt < 3; attempt++) {
+    //   if (attempt > 0) {
+    //     // bump gas price
+    //     selfTransferTx.txParams.gasPrice =
+    //       (selfTransferTx.txParams.gasPrice || 1) + 10000 + Math.floor(Math.random() * 2000);
+    //     console.warn(`Retrying self-transfer with higher gasPrice (attempt ${attempt + 1})…`);
+    //   } else {
+    //     console.log("Submitting nonce-clearing self-transfer…");
+    //   }
 
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, combinedTx)
+    //   try {
+    //     ({ status: st1, hash: hash1 } = await postAndWaitForTx(accessToken, () =>
+    //       strato.post(accessToken, StratoPaths.transactionParallel, selfTransferTx)
+    //     ));
+    //     if (st1 === "Success") break;
+    //   } catch (e: any) {
+    //     const isMempoolError = e?.response?.status === 422 || String(e).includes("mempool");
+    //     if (!isMempoolError || attempt === 2) throw e;
+    //   }
+    // }
+
+    // if (st1 !== "Success") {
+    //   console.error(`Self-transfer failed (${st1}): ${hash1}`);
+    //   return;
+    // }
+    // console.log(`Self-transfer mined: ${hash1}`);
+
+    const tokenAddress: string = usdstTokenAddress;
+
+    console.log(`Processing payment for token ${tokenAddress}, buyer ${buyerAddress}, amount ${tokenAmount}`);
+
+    const fulfillTx = buildFunctionTx({
+      contractName: OnRamp,
+      contractAddress,
+      method: "fulfillListing",
+      args: { token: tokenAddress, buyer: buyerAddress, amount: tokenAmount },
+    });
+
+    console.log("Submitting fulfillListing…");
+    const { status: st2, hash: hash2 } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
     );
 
-    if (status === "Success") {
-      console.log(`PAYMENT SUCCESSFUL - Order ${token} confirmed on-chain: ${hash}`);
+    if (st2 === "Success") {
+      console.log(`Order ${tokenAddress} confirmed on-chain: ${hash2}`);
+
+      const voucherContractAddress = process.env.VOUCHER_CONTRACT_ADDRESS || "A96c02a13b558fbcf923af1d586967cf7f55c753"; // TODO: move to config
+
+      const mintTx = buildFunctionTx({
+        contractName: "Voucher",
+        contractAddress: voucherContractAddress,
+        method: "mint",
+        args: {
+          to: buyerAddress,
+          amount: (1000000000000000000).toString(), // 1 voucher (18 decimals)
+        },
+      });
+
+      console.log("Submitting Voucher.mint…");
+      const { status: st3, hash: hash3 } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, mintTx)
+      );
+
+      if (st3 === "Success") {
+        console.log(`Voucher minted: ${hash3}`);
+      } else {
+        console.error(`Voucher mint failed (${st3}): ${hash3}`);
+      }
     } else {
-      console.error(`Payment processing failed (${status}): ${hash}`);
+      console.error(`On-chain confirmation failed (${st2}): ${hash2}`);
     }
   } catch (err) {
     console.error("Error confirming order on-chain:", err);
   } finally {
-    removeLock(token, tokenAmount, stripeSessionId);
+    removeLock(tokenMeta ?? '', tokenAmount ?? '', stripeSessionId);
   }
 }

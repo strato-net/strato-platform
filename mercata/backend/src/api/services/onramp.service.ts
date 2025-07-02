@@ -225,67 +225,67 @@ export async function buy(
   }
 }
 
-export async function handleStripeWebhook(
-  body: any,
-  signature: string
-): Promise<void> {
-  // TODO: Verify webhook signature with Stripe
-  // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-  // const event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+// export async function handleStripeWebhook(
+//   body: any,
+//   signature: string
+// ): Promise<void> {
+//   // TODO: Verify webhook signature with Stripe
+//   // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+//   // const event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
   
-  try {
-    // For now, parse the webhook payload directly
-    const event = JSON.parse(body);
-    console.log(" ---------------- ENTERED HANDLE STRIPE WEBHOOK ----------------");
+//   try {
+//     // For now, parse the webhook payload directly
+//     const event = JSON.parse(body);
+//     console.log(" ---------------- ENTERED HANDLE STRIPE WEBHOOK ----------------");
     
-    if (event.type === 'checkout.session.completed') {
+//     if (event.type === 'checkout.session.completed') {
 
-      console.log("---------SUCCESSFUL PAYMENT---------");
+//       console.log("---------SUCCESSFUL PAYMENT---------");
 
-      const session = event.data.object;
-      const { token, buyerAddress, amount, tokenAmount } = session.metadata || {};
+//       const session = event.data.object;
+//       const { token, buyerAddress, amount, tokenAmount } = session.metadata || {};
       
-      if (!token || !buyerAddress || !tokenAmount) {
-        console.error("Missing required metadata in Stripe session");
-        return;
-      }
+//       if (!token || !buyerAddress || !tokenAmount) {
+//         console.error("Missing required metadata in Stripe session");
+//         return;
+//       }
 
-      console.log(`Processing payment for token ${token}, buyer ${buyerAddress}, amount ${tokenAmount}`);
+//       console.log(`Processing payment for token ${token}, buyer ${buyerAddress}, amount ${tokenAmount}`);
 
-      // Get service token for API calls
-      const accessToken = process.env.SERVICE_TOKEN || "";
+//       // Get service token for API calls
+//       const accessToken = process.env.SERVICE_TOKEN || "";
 
-      // Build transaction to fulfill listing AND mint voucher tokens
-      const tx = buildFunctionTx([
-        {
-          contractName: extractContractName(OnRamp),
-          contractAddress,
-          method: "fulfillListing",
-          args: { token, buyer: buyerAddress, amount: tokenAmount },
-        },
-        {
-          contractName: "Voucher",
-          contractAddress: "A96c02a13b558fbcf923af1d586967cf7f55c753",
-          method: "mint",
-          args: { 
-            to: buyerAddress,
-            amount: (10n ** 18n).toString() // 10^18 units
-          },
-        }
-      ]);
+//       // Build transaction to fulfill listing AND mint voucher tokens
+//       const tx = buildFunctionTx([
+//         {
+//           contractName: extractContractName(OnRamp),
+//           contractAddress,
+//           method: "fulfillListing",
+//           args: { token, buyer: buyerAddress, amount: tokenAmount },
+//         },
+//         {
+//           contractName: "Voucher",
+//           contractAddress: "A96c02a13b558fbcf923af1d586967cf7f55c753",
+//           method: "mint",
+//           args: { 
+//             to: buyerAddress,
+//             amount: (10n ** 18n).toString() // 10^18 units
+//           },
+//         }
+//       ]);
 
-      const { status, hash } = await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, tx)
-      );
+//       const { status, hash } = await postAndWaitForTx(accessToken, () =>
+//         strato.post(accessToken, StratoPaths.transactionParallel, tx)
+//       );
 
-      if (status === "Success") {
-        console.log(`PAYMENT SUCCESSFUL - Order ${token} confirmed on-chain: ${hash}`);
-      } else {
-        console.error(`Payment processing failed (${status}): ${hash}`);
-      }
-    }
-  } catch (error) {
-    console.error("Error processing Stripe webhook:", error);
-    throw error;
-  }
-}
+//       if (status === "Success") {
+//         console.log(`PAYMENT SUCCESSFUL - Order ${token} confirmed on-chain: ${hash}`);
+//       } else {
+//         console.error(`Payment processing failed (${status}): ${hash}`);
+//       }
+//     }
+//   } catch (error) {
+//     console.error("Error processing Stripe webhook:", error);
+//     throw error;
+//   }
+// }
