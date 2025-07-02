@@ -16,15 +16,6 @@ const stripHexPrefix = (hashes: string[]): string[] =>
   hashes.map(hash => hash.replace('0x', '')
 );
 
-const makeAuthenticatedRequest = async (url: string) => {
-  const token = await getBAUserToken(); // Get fresh token on each request
-  if (!token) throw new Error('No access token available');
-
-  return axios.get(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-};
-
 export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
   console.log("🚀 Starting Alchemy get transaction polling");
 
@@ -33,7 +24,10 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-depositStatus?value=eq.1&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
       console.log("🚀 url: step1", url);
 
-      const { data } = await makeAuthenticatedRequest(url);
+      const { data } = await axios.get(url, {
+        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
+      });
+
       console.log("🚀 data: step1", data);
 
       if (!Array.isArray(data) || data.length === 0) {
@@ -88,7 +82,9 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.2&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
       console.log("🚀 url: step1", url);
       
-      const { data } = await makeAuthenticatedRequest(url);
+      const { data } = await axios.get(url, {
+        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
+      });
 
       if (!Array.isArray(data) || data.length === 0) {
         console.log('✅ No more transactions to fetch');
@@ -122,7 +118,6 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
     }
   };
 
-  // Run once now, then every specified interval
   await poll();
   setInterval(poll, pollingInterval);
 };
