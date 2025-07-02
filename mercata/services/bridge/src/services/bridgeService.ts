@@ -172,7 +172,7 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
       deposits: depositStatus,
     });
   } catch (error) {
-    console.error("Error in confirmDeposit for tx:", error);
+    console.error("Error in BatchconfirmDeposit for tx:", error);
   }
 };
 
