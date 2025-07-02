@@ -546,22 +546,41 @@ export const executeLiquidation = async (
   }
   const loan = found.LoanInfo;
 
-  // Approve the LiquidityPool to pull up to the full outstanding amount.
-  const maxApprove = (BigInt(loan.amount) * 2n).toString();
+  // Determine up-to-date interest and allowed repay cap (50% or full)
+  const now = Math.floor(Date.now() / 1000);
+  const rateArr = registry.lendingPool.interestRate || [];
+  const rateObj = rateArr.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
+  const rateNum = rateObj ? Number(rateObj.rate) : 0;
+  const rateScaled = Math.round(rateNum * 100);
+  const durationSec = Math.max(0, now - Number(loan.lastUpdated));
+  const interestAcc = (BigInt(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
+  const totalOwed = BigInt(loan.amount) + interestAcc;
+
+  // health factor already computed earlier in listLiquidatable etc. Compute again quickly
+  const { priceMap, ratioMap } = buildMaps(registry);
+  const hf = calculateHealthFactor(loan, priceMap, ratioMap);
+
+  let repayAmount = totalOwed;
+  if (hf >= 0.95) {
+    repayAmount = totalOwed / 2n; // 50%
+  }
 
   const tx = buildFunctionTx([
     {
-      // First approve the debt token so LiquidityPool can pull repayment
       contractName: extractContractName(Token),
       contractAddress: loan.asset,
       method: "approve",
-      args: { spender: liquidityPoolAddr, value: maxApprove },
+      args: { spender: liquidityPoolAddr, value: repayAmount.toString() },
     },
     {
       contractName: extractContractName(LendingPool),
       contractAddress: constants.lendingPool,
-      method: "liquidate",
-      args: { loanId },
+      method: "liquidationCall",
+      args: {
+        collateralAsset: loan.collateralAsset,
+        borrower: loan.user,
+        debtToCover: repayAmount.toString(),
+      },
     },
   ]);
 

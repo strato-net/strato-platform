@@ -54,6 +54,23 @@ contract record CollateralVault is Ownable {
     }
 
     /**
+     * @notice Seize collateral from borrower and send to liquidator
+     * @param borrower The borrower whose collateral is being seized
+     * @param to The liquidator address receiving the collateral
+     * @param asset The collateral asset address
+     * @param amount Amount of collateral to seize
+     */
+    function seizeCollateral(address borrower, address to, address asset, uint256 amount) public onlyLendingPool {
+        require(amount > 0, "Invalid amount");
+        require(userCollaterals[borrower][asset] >= amount, "Insufficient collateral to seize");
+
+        userCollaterals[borrower][asset] -= amount;
+        require(IERC20(asset).transfer(to, amount), "Collateral transfer failed");
+
+        emit CollateralRemoved(borrower, asset, amount);
+    }
+
+    /**
      * @notice Get collateral amount for a specific user and asset
      * @param user The user address
      * @param asset The asset address
