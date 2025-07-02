@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { checkout, handleStripeWebhook } from "../services/onramp.service";
+import { checkout, handleStripeWebhook, mintVouchers } from "../services/onramp.service";
 
 class OnRampController {
   static async checkout(
@@ -18,28 +18,24 @@ class OnRampController {
     }
   }
 
-  // static async stripeWebhook(
-  //   req: Request,
-  //   res: Response,
-  //   next: NextFunction
-  // ): Promise<void> {
-  //   console.log("=== WEBHOOK ENDPOINT HIT ===");
-  //   console.log("Headers:", req.headers);
-  //   console.log("Body type:", typeof req.body);
-  //   console.log("Body:", req.body);
-    
-  //   try {
-  //     // Extract the session from the Stripe event
-  //     const event = req.body;
-  //     if (event.type === 'checkout.session.completed') {
-  //       await handleStripeWebhook(event.data.object);
-  //     }
-  //     res.status(200).send("ok");
-  //   } catch (error) {
-  //     console.error("Webhook error:", error);
-  //     next(error);
-  //   }
-  // }
+  static async mintVouchers(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { sessionId } = req.body;
+      if (!sessionId) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "sessionId is required" });
+        return;
+      }
+
+      await mintVouchers(sessionId);
+      res.status(RestStatus.OK).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default OnRampController;

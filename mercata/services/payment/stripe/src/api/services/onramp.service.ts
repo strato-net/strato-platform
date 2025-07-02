@@ -1,4 +1,5 @@
 import { strato, bloc } from "../../utils/mercataApiHelper";
+import { stripe } from "../../utils/stripeClient";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
@@ -78,7 +79,7 @@ export async function checkout(
 }
 
 export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
-  const tokenMeta = session.metadata?.token; // listing ID (for lock bookkeeping)
+  const tokenMeta = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
@@ -91,56 +92,9 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   }
 
   try {
-    // console.log("--------- handleStripeWebhook ---------");
-    // console.log(`Processing payment for token ${tokenMeta}, buyer ${buyerAddress}, amount ${tokenAmount}`);
 
     const accessToken = await getServiceToken();
-    // const signer = JSON.parse(
-    //   Buffer.from(accessToken.split('.')[1], 'base64').toString()
-    // ).sub;
-    // console.log('SERVICE SIGNER ADDRESS:', signer);
-
-    // Build a zero-value self-transfer on USDST to clear any stuck nonce,
-    // followed by the actual fulfillListing. Both will be sent in one batch.
-    const usdstTokenAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"; // USDST
-
-    const selfTransferTx = buildFunctionTx({
-      contractName: "Token",
-      contractAddress: usdstTokenAddress,
-      method: "transfer",
-      args: { to: buyerAddress, value: "0" },
-    });
-
-    // let st1 = "";
-    // let hash1 = "";
-    // for (let attempt = 0; attempt < 3; attempt++) {
-    //   if (attempt > 0) {
-    //     // bump gas price
-    //     selfTransferTx.txParams.gasPrice =
-    //       (selfTransferTx.txParams.gasPrice || 1) + 10000 + Math.floor(Math.random() * 2000);
-    //     console.warn(`Retrying self-transfer with higher gasPrice (attempt ${attempt + 1})…`);
-    //   } else {
-    //     console.log("Submitting nonce-clearing self-transfer…");
-    //   }
-
-    //   try {
-    //     ({ status: st1, hash: hash1 } = await postAndWaitForTx(accessToken, () =>
-    //       strato.post(accessToken, StratoPaths.transactionParallel, selfTransferTx)
-    //     ));
-    //     if (st1 === "Success") break;
-    //   } catch (e: any) {
-    //     const isMempoolError = e?.response?.status === 422 || String(e).includes("mempool");
-    //     if (!isMempoolError || attempt === 2) throw e;
-    //   }
-    // }
-
-    // if (st1 !== "Success") {
-    //   console.error(`Self-transfer failed (${st1}): ${hash1}`);
-    //   return;
-    // }
-    // console.log(`Self-transfer mined: ${hash1}`);
-
-    const tokenAddress: string = usdstTokenAddress;
+    const tokenAddress: string = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 
     console.log(`Processing payment for token ${tokenAddress}, buyer ${buyerAddress}, amount ${tokenAmount}`);
 
@@ -188,5 +142,32 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
     console.error("Error confirming order on-chain:", err);
   } finally {
     removeLock(tokenMeta ?? '', tokenAmount ?? '', stripeSessionId);
+  }
+}
+
+export async function mintVouchers(sessionId: string): Promise<void> {
+  const MAX_ATTEMPTS = 6;
+  const DELAY_MS = 5_000;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status === "paid" && session.status === "complete") {
+      await handleStripeWebhook(session as unknown as Stripe.Checkout.Session);
+      return;
+    }
+
+    console.log(
+      `Session ${sessionId} not complete yet (attempt ${attempt}/${MAX_ATTEMPTS}) – ` +
+      `status=${session.status}, payment_status=${session.payment_status}`
+    );
+
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise(res => setTimeout(res, DELAY_MS));
+    } else {
+      throw new Error(
+        `Session ${sessionId} did not reach paid/complete after ${MAX_ATTEMPTS} attempts`
+      );
+    }
   }
 }
