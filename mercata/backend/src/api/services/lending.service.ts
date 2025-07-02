@@ -5,7 +5,19 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getBalance } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { simulateLoan, CollateralInfo, AssetConfig, calculateCollateralMetrics } from "../helpers/lending.helper";
+import { 
+  simulateLoan, 
+  CollateralInfo, 
+  AssetConfig, 
+  calculateCollateralMetrics, 
+  calculateAccruedInterest,
+  calculateExchangeRate,
+  calculateTotalUSDSTSupplied,
+  calculateTotalBorrowed,
+  calculateUtilizationRate,
+  calculateTotalCollateralValue,
+  calculateAPYs
+} from "../helpers/lending.helper";
 
 const {
   registrySelectFields,
@@ -289,16 +301,20 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
+  // Fetch pool data
   const registry = await getPool(accessToken, undefined, { 
-    select: `lendingPool:lendingPool_fkey(borrowableAsset,mToken)`
+    select: `lendingPool:lendingPool_fkey(borrowableAsset,mToken,assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`
   });
   
-  const { borrowableAsset, mToken } = registry.lendingPool || {};
+  const { borrowableAsset, mToken, assetConfigs, userLoan } = registry.lendingPool || {};
+  const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  
   if (!borrowableAsset || !mToken) {
     throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  const balances = await Promise.all([
+  // Get user balances
+  const [borrowableBalance, mTokenBalance] = await Promise.all([
     getBalance(accessToken, userAddress, { 
       address: `eq.${borrowableAsset}`,
       select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
@@ -307,10 +323,42 @@ export const liquidityAndBalance = async (
       address: `eq.${mToken}`,
       select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
     })
-  ]);
+  ]).then(balances => balances.map(b => b[0]));
 
-  const [borrowableBalance, mTokenBalance] = balances.map(b => b[0]);
-  const mTokenAmount = BigInt(mTokenBalance?.balance || "0");
+  // Get borrowable asset config and price
+  const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
+
+  // Build price map for helper functions
+  const priceMap = new Map<string, string>(
+    registry.oracle?.prices?.map((price: any) => [price.asset, price.price]) || []
+  );
+
+  // Calculate pool metrics using helper functions
+  const totalMTokenSupply = mTokenBalance?.token?._totalSupply || "0";
+  const actualUnderlying = borrowableBalance?.token?._totalSupply || "0";
+  
+  const exchangeRate = calculateExchangeRate(totalMTokenSupply, actualUnderlying);
+  const totalUSDSTSupplied = calculateTotalUSDSTSupplied(totalMTokenSupply, exchangeRate);
+  const totalBorrowed = calculateTotalBorrowed(
+    userLoan || [], 
+    borrowableAssetConfig?.interestRate || 0, 
+    Math.floor(Date.now() / 1000)
+  );
+  const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
+  const totalCollateralValue = calculateTotalCollateralValue(
+    assetConfigs || [], 
+    allCollaterals, 
+    priceMap, 
+    borrowableAsset
+  );
+  const { supplyAPY, borrowAPY } = calculateAPYs(
+    borrowableAssetConfig?.interestRate || 0,
+    borrowableAssetConfig?.reserveFactor || 1000
+  );
+
+  // Calculate derived values
+  const availableLiquidity = BigInt(totalUSDSTSupplied) - BigInt(totalBorrowed);
+  const conversionRate = Number(exchangeRate) / Number(10n ** 18n);
 
   return {
     supplyable: {
@@ -320,8 +368,17 @@ export const liquidityAndBalance = async (
     withdrawable: {
       ...mTokenBalance?.token,
       userBalance: mTokenBalance?.balance?.toString() || "0",
-      canWithdraw: mTokenAmount > 0n,
-    }
+      canWithdraw: BigInt(mTokenBalance?.balance || "0") > 0n,
+    },
+    // Pool metrics
+    totalUSDSTSupplied,
+    totalBorrowed,
+    utilizationRate,
+    availableLiquidity: availableLiquidity.toString(),
+    totalCollateralValue,
+    supplyAPY,
+    borrowAPY,
+    conversionRate,
   };
 };
 

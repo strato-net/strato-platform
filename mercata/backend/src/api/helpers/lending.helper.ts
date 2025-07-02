@@ -238,4 +238,152 @@ export const calculateCollateralMetrics = (
     collateralizedAmountValue,
     maxBorrowingPower,
   };
+};
+
+/**
+ * Calculate exchange rate between mToken and underlying asset
+ * @param totalMTokenSupply Total mToken supply
+ * @param actualUnderlying Total underlying asset in pool
+ * @returns Exchange rate scaled by 1e18
+ */
+export const calculateExchangeRate = (
+  totalMTokenSupply: string,
+  actualUnderlying: string
+): string => {
+  const mTokenSupply = toBig(totalMTokenSupply);
+  const underlying = toBig(actualUnderlying);
+  
+  if (mTokenSupply === 0n || underlying === 0n) {
+    return DECIMALS.toString(); // Default 1:1 ratio
+  }
+  
+  // Exchange rate = actualUnderlying / totalSupply (scaled by 1e18)
+  return ((underlying * DECIMALS) / mTokenSupply).toString();
+};
+
+/**
+ * Calculate total USDST supplied based on mToken supply and exchange rate
+ * @param totalMTokenSupply Total mToken supply
+ * @param exchangeRate Exchange rate scaled by 1e18
+ * @returns Total USDST supplied
+ */
+export const calculateTotalUSDSTSupplied = (
+  totalMTokenSupply: string,
+  exchangeRate: string
+): string => {
+  const mTokenSupply = toBig(totalMTokenSupply);
+  const rate = toBig(exchangeRate);
+  
+  return ((mTokenSupply * rate) / DECIMALS).toString();
+};
+
+/**
+ * Calculate total borrowed amount across all loans
+ * @param loans Array of loan entries
+ * @param interestRate Interest rate in basis points
+ * @param currentTime Current timestamp
+ * @returns Total borrowed amount including accrued interest
+ */
+export const calculateTotalBorrowed = (
+  loans: any[],
+  interestRate: number,
+  currentTime: number
+): string => {
+  let totalBorrowed = 0n;
+  
+  for (const loanEntry of loans) {
+    const loan = loanEntry.LoanInfo;
+    if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {
+      const { newTotalOwed } = calculateAccruedInterest(
+        {
+          principalBalance: loan.principalBalance,
+          interestOwed: loan.interestOwed || "0",
+          lastIntCalculated: loan.lastIntCalculated || currentTime.toString(),
+          lastUpdated: loan.lastUpdated || currentTime.toString(),
+        },
+        interestRate,
+        currentTime
+      );
+      totalBorrowed += toBig(newTotalOwed);
+    }
+  }
+  
+  return totalBorrowed.toString();
+};
+
+/**
+ * Calculate utilization rate of the pool
+ * @param totalBorrowed Total borrowed amount
+ * @param totalSupplied Total supplied amount
+ * @returns Utilization rate as percentage
+ */
+export const calculateUtilizationRate = (
+  totalBorrowed: string,
+  totalSupplied: string
+): number => {
+  const borrowed = toBig(totalBorrowed);
+  const supplied = toBig(totalSupplied);
+  
+  if (supplied === 0n) return 0;
+  
+  return Number((borrowed * 10000n) / supplied) / 100;
+};
+
+/**
+ * Calculate total collateral value across all users
+ * @param assetConfigs Array of asset configurations
+ * @param allCollaterals Array of all user collaterals
+ * @param prices Map of asset prices
+ * @param borrowableAsset Address of borrowable asset to exclude
+ * @returns Total collateral value in USD
+ */
+export const calculateTotalCollateralValue = (
+  assetConfigs: any[],
+  allCollaterals: any[],
+  prices: Map<string, string>,
+  borrowableAsset: string
+): string => {
+  let totalValue = 0n;
+  
+  for (const config of assetConfigs) {
+    if (config.asset === borrowableAsset) continue;
+    
+    const price = prices.get(config.asset) || "0";
+    if (price === "0" || !config.AssetConfig?.liquidationThreshold) continue;
+    
+    // Sum all collateral for this asset across all users
+    let totalAssetCollateral = 0n;
+    for (const collateral of allCollaterals) {
+      if (collateral.asset === config.asset) {
+        totalAssetCollateral += toBig(collateral.amount);
+      }
+    }
+    
+    if (totalAssetCollateral > 0n) {
+      const collateralValue = (
+        totalAssetCollateral * 
+        toBig(price) * 
+        BigInt(config.AssetConfig.liquidationThreshold)
+      ) / (DECIMALS * 10000n);
+      totalValue += collateralValue;
+    }
+  }
+  
+  return totalValue.toString();
+};
+
+/**
+ * Calculate APY values for supply and borrow
+ * @param interestRate Interest rate in basis points
+ * @param reserveFactor Reserve factor in basis points
+ * @returns Object with supplyAPY and borrowAPY
+ */
+export const calculateAPYs = (
+  interestRate: number,
+  reserveFactor: number = 1000
+): { supplyAPY: number; borrowAPY: number } => {
+  const borrowAPY = interestRate / 100; // Convert from basis points
+  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000); // Subtract reserve factor
+  
+  return { supplyAPY, borrowAPY };
 }; 
