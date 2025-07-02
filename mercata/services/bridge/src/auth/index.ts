@@ -66,12 +66,24 @@ export const getBAUserToken = async (): Promise<string> => {
   const userTokenData = CACHED_DATA[cacheKey];
   const currentTime = Math.floor(Date.now() / 1000);
 
+  // Log cache check
+  console.log("🔍 Checking token cache:", {
+    timestamp: new Date().toISOString(),
+    username: cacheKey,
+    hasToken: !!userTokenData?.token,
+    expiresAt: userTokenData?.expiresAt ? new Date(userTokenData.expiresAt * 1000).toISOString() : null,
+    currentTime: new Date(currentTime * 1000).toISOString(),
+    timeUntilExpiry: userTokenData?.expiresAt ? userTokenData.expiresAt - currentTime : null,
+    reserveTime: TOKEN_LIFETIME_RESERVE_SECONDS
+  });
+
   // Check if a valid cached token exists
   if (
     userTokenData &&
     userTokenData.token &&
     userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_RESERVE_SECONDS
   ) {
+    console.log("✅ Using cached token that expires in", userTokenData.expiresAt - currentTime, "seconds");
     return userTokenData.token;
   }
 
@@ -84,6 +96,7 @@ export const getBAUserToken = async (): Promise<string> => {
       throw new Error('BA_PASSWORD is not configured');
     }
 
+    console.log("🔄 Fetching new token...");
     // Fetch a new token using Resource Owner Password Credentials
     const tokenObj = await oauthInstance.getAccessTokenByResourceOwnerCredential(
       config.auth.baUsername,
@@ -94,10 +107,23 @@ export const getBAUserToken = async (): Promise<string> => {
     const token = tokenObj.token[oauthConfig.tokenField] as string;
     const expiresAt = Math.floor((tokenObj.token.expires_at as number) / 1000);
     
+    console.log("✨ New token details:", {
+      timestamp: new Date().toISOString(),
+      expiresAt: new Date(expiresAt * 1000).toISOString(),
+      timeUntilExpiry: expiresAt - currentTime,
+      tokenPrefix: token.substring(0, 10) + '...'
+    });
+
     // Cache the new token
     CACHED_DATA[cacheKey] = { token, expiresAt };
     return token;
   } catch (error: any) {
+    console.error("❌ Token fetch error:", {
+      timestamp: new Date().toISOString(),
+      error: error?.message,
+      response: error?.response?.data,
+      status: error?.response?.status
+    });
     throw new Error(`Failed to fetch user OAuth token: ${error?.message || 'Unknown error'}`);
   }
 };

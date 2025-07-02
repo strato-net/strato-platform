@@ -24,8 +24,16 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-depositStatus?value=eq.1&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
       console.log("🚀 url: step1", url);
 
+      // Get token and log its details
+      const token = await getBAUserToken();
+      console.log("🔑 Token details for deposit polling:", {
+        timestamp: new Date().toISOString(),
+        tokenLength: token?.length,
+        tokenPrefix: token?.substring(0, 10) + '...',
+      });
+
       const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       console.log("🚀 data: step1", data);
@@ -64,12 +72,16 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
 
       await confirmBridgeinSafePolling(completedTxHashes);
     } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
+      console.error('❌ Polling error:', {
+        message: e.message,
+        status: e.response?.status,
+        data: e.response?.data,
+        timestamp: new Date().toISOString()
+      });
       // Don't stop polling on errors, let it retry on next interval
     }
   };
 
-  // Run once now, then every specified interval
   await poll();
   setInterval(poll, pollingInterval);
 };
@@ -82,8 +94,16 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.2&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
       console.log("🚀 url: step1", url);
       
+      // Get token and log its details
+      const token = await getBAUserToken();
+      console.log("🔑 Token details for withdrawal polling:", {
+        timestamp: new Date().toISOString(),
+        tokenLength: token?.length,
+        tokenPrefix: token?.substring(0, 10) + '...',
+      });
+
       const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!Array.isArray(data) || data.length === 0) {
@@ -113,7 +133,12 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
       console.log("🚀 strippedHashes: step4", strippedHashes);
       await confirmBridgeOutSafePolling(strippedHashes);
     } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
+      console.error('❌ Polling error:', {
+        message: e.message,
+        status: e.response?.status,
+        data: e.response?.data,
+        timestamp: new Date().toISOString()
+      });
       // Don't stop polling on errors, let it retry on next interval
     }
   };
