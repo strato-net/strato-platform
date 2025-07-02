@@ -14,6 +14,7 @@ export interface AssetConfig {
   interestRate: number;
   liquidationThreshold: number;
   price: string;
+  ltv?: number;
 }
 
 export interface CollateralInfo {
@@ -57,8 +58,6 @@ export const calculateAccruedInterest = (
 
   return { accruedInterest, newTotalOwed };
 };
-
-
 
 /**
  * Simulates the smart contract's _getTotalCollateralValueForHealth function
@@ -144,6 +143,24 @@ export const simulateLoan = (
     assetConfigs
   );
 
+  // Calculate max borrowing power using existing calculateCollateralMetrics logic
+  let maxBorrowingPowerUSD = 0n;
+  for (const collateral of collaterals) {
+    const config = assetConfigs.get(collateral.asset);
+    if (!config) continue;
+
+    const metrics = calculateCollateralMetrics(
+      "0", // userBalance not needed for this calculation
+      collateral.amount,
+      config.price,
+      config.ltv || 0
+    );
+    
+    maxBorrowingPowerUSD += toBig(metrics.maxBorrowingPower);
+  }
+
+  const maxAvailableToBorrowUSD = maxBorrowingPowerUSD - toBig(newTotalOwed);
+
   // Calculate health factor using newTotalOwed directly
   const healthFactor = calculateHealthFactor(totalCollateralValue, newTotalOwed);
 
@@ -157,12 +174,13 @@ export const simulateLoan = (
     // Calculated values
     newlyAccruedInterest: accruedInterest,          // Interest accrued since last calculation (USD)
     totalAmountOwed: newTotalOwed,                  // Total debt including all interest (USD)
-    collateralValueForHealth: totalCollateralValue, // Total collateral value weighted by liquidation thresholds (USD)
+    totalCollateralValueUSD: totalCollateralValue,  // Total collateral value weighted by liquidation thresholds (USD)
+    maxBorrowingPowerUSD: maxBorrowingPowerUSD.toString(), // Max borrowing power in USD
+    maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(), // Max available to borrow in USD
     healthFactorRatio: healthFactorToPercentage(healthFactor), // Health factor as decimal (1.0 = 100% = liquidation threshold)
     
     // Health status flags
     isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS), // True if user is safe from liquidation
-    isBelowLiquidationThreshold: Number(healthFactor) < Number(DECIMALS),   // True if user can be liquidated
   };
 };
 
@@ -172,7 +190,7 @@ export const simulateLoan = (
  * @returns Health factor as percentage (1.0 = 100%)
  */
 export const healthFactorToPercentage = (healthFactor: string): number => {
-  return Number(toBig(healthFactor) / DECIMALS);
+  return Number(toBig(healthFactor)) / Number(DECIMALS);
 };
 
 /**
@@ -182,4 +200,41 @@ export const healthFactorToPercentage = (healthFactor: string): number => {
  */
 export const percentageToHealthFactor = (percentage: number): string => {
   return (BigInt(Math.round(percentage * Number(DECIMALS)))).toString();
+};
+
+/**
+ * Calculate user balance value, collateralized amount value, and max borrowing power
+ * @param userBalance User's token balance
+ * @param collateralizedAmount Amount of tokens used as collateral
+ * @param assetPrice Price of the asset in USD (18 decimals)
+ * @param ltv Loan-to-Value ratio in basis points (e.g., 7500 = 75%)
+ * @returns Object with calculated values
+ */
+export const calculateCollateralMetrics = (
+  userBalance: string,
+  collateralizedAmount: string,
+  assetPrice: string,
+  ltv: number
+): {
+  userBalanceValue: string;
+  collateralizedAmountValue: string;
+  maxBorrowingPower: string;
+} => {
+  const balance = toBig(userBalance);
+  const collateralized = toBig(collateralizedAmount);
+  const price = toBig(assetPrice);
+  const ltvBasisPoints = BigInt(ltv);
+
+  // Calculate values in USD (18 decimals)
+  const userBalanceValue = ((balance * price) / DECIMALS).toString();
+  const collateralizedAmountValue = ((collateralized * price) / DECIMALS).toString();
+  
+  // Calculate max borrowing power using LTV: (collateralizedAmount * price * ltv) / (1e18 * 10000)
+  const maxBorrowingPower = ((collateralized * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
+
+  return {
+    userBalanceValue,
+    collateralizedAmountValue,
+    maxBorrowingPower,
+  };
 }; 

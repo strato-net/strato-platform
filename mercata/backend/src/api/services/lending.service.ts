@@ -5,7 +5,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getBalance } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { simulateLoan, CollateralInfo, AssetConfig } from "../helpers/lending.helper";
+import { simulateLoan, CollateralInfo, AssetConfig, calculateCollateralMetrics } from "../helpers/lending.helper";
 
 const {
   registrySelectFields,
@@ -14,6 +14,7 @@ const {
   LendingRegistry,
   Token,
   CollateralVault,
+  PriceOracle,
 } = constants;
 
 export const getPool = async (
@@ -216,7 +217,7 @@ export const collateralAndBalance = async (
   userAddress: string,
 ) => {
   const registry = await getPool(accessToken, undefined, { 
-    select: `lendingPool:lendingPool_fkey(assetConfigs:${LendingPool}-assetConfigs(asset:key),borrowableAsset),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text))`,
+    select: `lendingPool:lendingPool_fkey(assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),borrowableAsset),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`,
     "collateralVault.userCollaterals.key": `eq.${userAddress}`
   });
 
@@ -233,17 +234,51 @@ export const collateralAndBalance = async (
   const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
   const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c]));
 
+  // Create maps for asset configs and prices
+  const assetConfigMap = new Map();
+  const priceMap = new Map();
+  
+  // Build asset config map
+  (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+    assetConfigMap.set(config.asset, config.AssetConfig);
+  });
+
+  // Build price map
+  (registry.oracle?.prices || []).forEach((price: any) => {
+    priceMap.set(price.asset, price.price);
+  });
+
   return assets.map((asset: string) => {
     const token = tokenMap.get(asset) as any;
     const collateral = collateralMap.get(asset) as any;
+    const assetConfig = assetConfigMap.get(asset);
+    const assetPrice = priceMap.get(asset) || "0";
+
+    const userBalance = token?.balance?.toString() || "0";
+    const collateralizedAmount = collateral?.amount || "0";
+    const ltv = assetConfig?.ltv || 0;
+
+    // Calculate metrics using the helper function
+    const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      userBalance,
+      collateralizedAmount,
+      assetPrice,
+      ltv
+    );
 
     return {
       address: asset,
       ...token?.token,
-      userBalance: token?.balance?.toString() || "0",
-      collateralizedAmount: collateral?.amount || "0",
+      userBalance,
+      userBalanceValue,
+      collateralizedAmount,
+      collateralizedAmountValue,
       isCollateralized: collateral?.amount > 0,
-      canSupply: BigInt(token?.balance || "0") > 0n,
+      canSupply: BigInt(userBalance) > 0n,
+      maxBorrowingPower,
+      // Add additional context
+      assetPrice,
+      ltv,
     };
   });
 };
@@ -319,6 +354,7 @@ export const getLoan = async (
     assetConfigs.set(config.asset, {
       interestRate: config.AssetConfig?.interestRate || 0,
       liquidationThreshold: config.AssetConfig?.liquidationThreshold || 0,
+      ltv: config.AssetConfig?.ltv || 0,
       price: price,
     });
   });
