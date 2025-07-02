@@ -46,6 +46,8 @@ export const constants = (() => {
   ];
   const poolSelectFields = [
     "address",
+    "_owner",
+    "swapFeeRate",
     "aToBRatio::text", 
     "bToARatio::text",
     `tokenA:tokenA_fkey(${tokenSelectFields.join(',')})`,

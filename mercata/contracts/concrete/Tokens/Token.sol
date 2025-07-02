@@ -12,13 +12,18 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     TokenStatus public status;
     TokenFactory public tokenFactory;
     
-    event StatusChanged(TokenStatus oldStatus, TokenStatus newStatus);
-    
-    modifier onlyTokenFactoryOrAdmin() {
-        require(msg.sender == address(tokenFactory) || AdminRegistry(tokenFactory.adminRegistry()).isAdminAddress(msg.sender), "Token: caller is not token factory or admin");
+    event StatusChanged(TokenStatus newStatus);
+
+    modifier onlyTokenFactory() {
+        require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
         _;
     }
-    
+
+    modifier onlyAdmin() {
+        require(AdminRegistry(tokenFactory.adminRegistry()).isAdminAddress(msg.sender), "Token: caller is not admin");
+        _;
+    }
+
     constructor(
         string _name,
         string _description,
@@ -35,18 +40,20 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         tokenFactory = TokenFactory(msg.sender);
 
         _mint(_tokenCreator, _initialSupply);
+
+        emit StatusChanged(status);
     }
 
-    function setStatus(uint newStatus) external onlyTokenFactoryOrAdmin {
+    function setStatus(uint newStatus) external onlyAdmin {
         require(newStatus != uint(status), "Token: New status is the same as the current status");
         require(newStatus != uint(TokenStatus.NULL), "Token: New status is NULL");
         TokenStatus _newStatus = TokenStatus(newStatus);
         status = _newStatus;
 
-        emit StatusChanged(status, _newStatus);
+        emit StatusChanged(status);
     }
 
-    function setTokenFactory(address _tokenFactory) external onlyTokenFactoryOrAdmin {
+    function setTokenFactory(address _tokenFactory) external onlyTokenFactory {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 

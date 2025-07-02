@@ -8,6 +8,7 @@ import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
+import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
@@ -18,6 +19,12 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { tokens, loading, fetchTokens } = useUserTokens();
+  const { 
+    availableBorrowingPower, 
+    currentBorrowed, 
+    averageInterestRate, 
+    refreshLendingData 
+  } = useLendingMetrics();
   const [totalBalance, setTotalBalance] = useState<number>(0)
   const [cataBalance, setCataBalance] = useState<number>(0);
 
@@ -26,6 +33,7 @@ const Dashboard = () => {
     setTimeout(() => {
       fetchTokens(userAddress || "");
     }, 500);
+    refreshLendingData();
   }, [userAddress]);
 
   useEffect(() => {
@@ -119,7 +127,11 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <BorrowingSection />
+            <BorrowingSection 
+              availableBorrowingPower={availableBorrowingPower}
+              currentBorrowed={currentBorrowed}
+              averageInterestRate={averageInterestRate}
+            />
           </div>
 
           <div className="mb-8">
