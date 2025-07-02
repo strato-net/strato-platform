@@ -13,6 +13,8 @@ import { Coins } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { formatUnits } from 'ethers';
+import AssetsList from '@/components/dashboard/AssetsList';
+import ExchangeCart from './ExchangeCart';
 
 const Assets = () => {
   const { userAddress } = useUser()
@@ -61,6 +63,15 @@ const Assets = () => {
         
         <main className="p-6">
           {/* Asset Summary */}
+      
+          <div className="mb-8 flex gap-6 items-stretch">
+            <div className="flex-1 max-w-[700px]">
+              <AssetsList loading={loading} tokens={tokens} hideAddDepositsButton />
+            </div>
+            <ExchangeCart />
+          </div>
+
+
           <div className="mb-8">
             <AssetSummary 
               title="Total Assets" 
