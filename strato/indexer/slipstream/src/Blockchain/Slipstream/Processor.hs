@@ -70,7 +70,7 @@ diffNull (Action.SolidVMDiff m) = Map.null m
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: (E.ProcessedContract, [T.Text]),
-    abstractInserts :: [(E.ProcessedContract,[T.Text],T.Text, TableColumns)],
+    abstractInserts :: [(E.ProcessedContract,[T.Text], TableName, TableColumns)],
     historyInserts :: [E.ProcessedContract],
     collectionInserts :: [ProcessedCollectionRow]
   }
@@ -238,7 +238,7 @@ processTheMessages ::
   , MonadLogger m
   ) =>
   [VME.VMEvent] ->
-  ConduitM i (Either TransactionResult [Text]) m [AggregateEvent]
+  ConduitM i (Either TransactionResult [SlipstreamQuery]) m [AggregateEvent]
 processTheMessages messages = do
   case length messages of
     0 -> return ()
@@ -330,7 +330,7 @@ processTheMessages messages = do
 
   inserts <- fmap concat $ do
     forM changes $ \(_, actions) -> do
-      results <- forM actions $ \(row) -> do
+      forM actions $ \(row) -> do
         case actionStorage row of
           Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
           Action.SolidVMDiff {} -> do
@@ -361,7 +361,7 @@ processTheMessages messages = do
                 $logInfoS "Row will be inserted into abstract table: " tableNameText
                 $logInfoS "cols: " $ T.pack (show cols)
                 
-                let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
+                let result = (indexContract, fkeysForThisContract, tableName, (cr', ap', n'), cols)
                 $logInfoS "result: " $ T.pack (show result)
                 pure (Just result)
             $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
@@ -374,8 +374,6 @@ processTheMessages messages = do
                 pCollectionsWithAbstracts = duplicateForParentsAndIncludeOriginal pCollections parents'
             recordAction row
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
-      
-      pure results
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 

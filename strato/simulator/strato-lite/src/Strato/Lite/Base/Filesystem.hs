@@ -204,7 +204,7 @@ instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m)
 instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` SlipstreamCommands where
   output (SlipstreamCommands cmds) = do
     conn <- asks $ _sqlPool . _filesystemDBs
-    flip for_ ($logInfoS ("slipstream/cmds")) $ concatMap T.lines cmds
+    flip for_ ($logDebugS ("slipstream/cmds")) $ concatMap T.lines cmds
     liftIO . withResource conn $ \c -> loggingFunc $ flip SQL.runSqlConn c . for_ cmds $ \cmd ->
       (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) []) `catch` (\(e :: SomeException) -> $logErrorS "slipstream/error" . T.pack $ show e)
 

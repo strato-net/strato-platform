@@ -48,7 +48,7 @@ getAndProcessMessages conn = do
       processTheMessages messages `fuseUpstream`
         awaitForever (\case
           Left txr -> void . lift $ putTransactionResult txr
-          Right cmds -> lift $ mapM_ (dbQueryCatchError conn) cmds
+          Right cmds -> lift $ mapM_ (dbQueryCatchError conn . slipstreamQueryPostgres) cmds
         )
     _ <- produceSolidVmEvents emittedEvents
     return ()

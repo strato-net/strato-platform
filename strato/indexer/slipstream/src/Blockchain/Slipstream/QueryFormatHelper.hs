@@ -77,10 +77,10 @@ wrapAndEscape :: [T.Text] -> T.Text
 wrapAndEscape = wrapParens . csv
 
 wrapAndEscapeSingle :: [T.Text] -> T.Text
-wrapAndEscapeSingle = wrapParens . csv . map wrapSingleQuotes
+wrapAndEscapeSingle = wrapParens . csv . map (wrapSingleQuotes . escapeSingleQuotes)
 
 wrapAndEscapeDouble :: [T.Text] -> T.Text
-wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
+wrapAndEscapeDouble = wrapParens . csv . map (wrapDoubleQuotes . escapeDoubleQuotes)
 
 unwrapDoubleQuotes :: T.Text -> T.Text
 unwrapDoubleQuotes = T.dropAround (== '"')
@@ -141,6 +141,10 @@ tableNameToText (AbstractTableName c a n) =
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
 
+indexedEventTableName :: TableName -> TableName
+indexedEventTableName (EventTableName c a n e) = EventTableName ("indexed@" <> c) a n e
+indexedEventTableName tn = tn
+
 tableShortName :: TableName -> T.Text
 tableShortName (IndexTableName _ _ n) = n
 tableShortName (CollectionTableName _ _ n m) = n <> "-" <> m
@@ -148,17 +152,6 @@ tableShortName (HistoryTableName _ _ n) = "history@" <> n
 tableShortName (EventTableName _ _ n e) = n <> "-" <> e
 tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
 tableShortName (AbstractTableName _ _ n) = n
-
--- TODO: delete once marketplace uses new separator format everywhere
-oldTableNameToText :: TableName -> T.Text
-oldTableNameToText (EventTableName c a n e) =
-  let prefix
-        | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = n <> "." <> e
-   in prefix <> contractAndEvent
-oldTableNameToText t = tableNameToText t
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
@@ -168,10 +161,6 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
-
--- TODO: delete once marketplace uses new separator format everywhere
-oldTableNameToDoubleQuoteText :: TableName -> T.Text
-oldTableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . oldTableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
 textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes

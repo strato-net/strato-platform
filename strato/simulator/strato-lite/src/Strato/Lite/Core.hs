@@ -56,7 +56,9 @@ import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Monad
+import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.Processor
+import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.ApiIndexer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
@@ -956,5 +958,45 @@ corePeerSlipstream = do
          )
       .| ( awaitForever $ \case
            Left txr -> lift $ Mod.yield txr
-           Right cmds  -> lift . Mod.output $ SlipstreamCommands cmds
+           Right cmds  -> lift . Mod.output . SlipstreamCommands $ concatMap slipstreamQuerySQLite cmds
          )
+
+sqlTypeSQLite :: SqlType -> Text
+sqlTypeSQLite SqlBool    = "bool"
+sqlTypeSQLite SqlDecimal = "decimal"
+sqlTypeSQLite SqlText    = "text"
+sqlTypeSQLite SqlJsonb   = "jsonb"
+
+slipstreamQuerySQLite :: SlipstreamQuery -> [Text]
+slipstreamQuerySQLite (CreateTable tableName cols pk mUc) = [T.concat
+  [ "CREATE TABLE IF NOT EXISTS ",
+    tableNameToDoubleQuoteText tableName,
+    " (",
+    csv $ (\(c,t) -> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeSQLite t) <$> cols,
+    case pk of
+      [] -> ""
+      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk,
+    case mUc of
+      Nothing -> ""
+      Just (n, uc) -> T.concat
+        [
+          ", CONSTRAINT ",
+          wrapDoubleQuotes $ escapeQuotes n,
+          " UNIQUE ",
+          uc
+        ],
+    ");"
+  ]]
+slipstreamQuerySQLite (AlterTableAddColumns tableName cols) = (\(c,t) -> T.concat
+  [ "ALTER TABLE ",
+    tableNameToDoubleQuoteText tableName,
+    " ADD COLUMN ",
+    wrapDoubleQuotes (escapeDoubleQuotes c),
+    " ",
+    sqlTypeSQLite t,
+    ";"
+  ]) <$> cols
+slipstreamQuerySQLite AlterTableAddForeignKey{} = []
+slipstreamQuerySQLite AlterTableAddPrimaryKey{} = []
+slipstreamQuerySQLite NotifyPostgREST = []
+slipstreamQuerySQLite sq = [slipstreamQueryText sqlTypeSQLite sq]
