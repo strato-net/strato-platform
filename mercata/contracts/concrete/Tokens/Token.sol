@@ -3,6 +3,7 @@ import "./TokenMetadata.sol";
 import "./TokenAccess.sol";
 import "../../abstract/ERC20.sol";
 import "../Admin/AdminRegistry.sol";
+import "../Rewards/RewardsManager.sol";
 import "./TokenFactory.sol";
 
 enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
@@ -11,6 +12,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     uint8 public customDecimals;
     TokenStatus public status;
     TokenFactory public tokenFactory;
+    RewardsManager public rewardsManager;
     
     event StatusChanged(TokenStatus newStatus);
 
@@ -57,6 +59,10 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 
+    function setRewardsManager(address _rewardsManager) external onlyOwner {
+        rewardsManager = RewardsManager_1(_rewardsManager);
+    }
+
     function mint(address to, uint256 amount) external {
         require(
             TokenAccess(this).isMinter(msg.sender), 
@@ -88,5 +94,17 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     
     function decimals() external view virtual override returns (uint8) {
         return customDecimals;
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (address(rewardsManager) != address(0)) {
+            if (from != address(0)) {
+                rewardsManager.updateRewardsBalanceFor(address(this), from);
+            }
+            if (to != address(0)) {
+                rewardsManager.updateRewardsBalanceFor(address(this), to);
+            }
+        }
+        super._update(from, to, value);
     }
 }
