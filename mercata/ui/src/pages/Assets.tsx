@@ -18,7 +18,7 @@ import ExchangeCart from './ExchangeCart';
 
 const Assets = () => {
   const { userAddress } = useUser()
-  const { tokens, loading, fetchTokens } = useUserTokens()
+  const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens()
   const [totalBalance, setTotalBalance] = useState<number>(0)
 
   useEffect(()=>{
@@ -66,7 +66,7 @@ const Assets = () => {
       
           <div className="mb-8 flex gap-6 items-stretch">
             <div className="flex-1 max-w-[700px]">
-              <AssetsList loading={loading} tokens={tokens} hideAddDepositsButton />
+              <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
             </div>
             <ExchangeCart />
           </div>

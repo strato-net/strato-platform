@@ -1,11 +1,12 @@
 // src/context/UserTokensContext.tsx
-import React, { createContext, useContext, useState, useMemo } from "react";
+import React, { createContext, useContext, useState, useMemo, useCallback } from "react";
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
 
 type UserTokensContextType = {
-  tokens: Token[];
+  activeTokens: Token[];
+  inactiveTokens: Token[];
   loading: boolean;
   error: string | null;
   fetchTokens: (userAddress: string, signal?: AbortSignal) => Promise<void>;
@@ -16,13 +17,14 @@ const UserTokensContext = createContext<UserTokensContextType | undefined>(
 );
 
 export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
+  children
 }) => {
-  const [tokens, setTokens] = useState<Token[]>([]);
+  const [activeTokens, setActiveTokens] = useState<Token[]>([]);
+  const [inactiveTokens, setInactiveTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTokens = async (userAddress: string, signal?: AbortSignal) => {
+  const fetchTokens = useCallback(async (userAddress: string, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -32,12 +34,14 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       );
       // Only update state if not aborted and data has actually changed
       if (signal?.aborted) return;
-      setTokens((prevTokens) => {
-        if (isEqual(prevTokens, response.data)) {
-          return prevTokens;
-        }
-        return response.data;
-      });
+
+      const allTokens = response.data || [];
+
+      const active = allTokens.filter((token: Token) => token.token.status === '2');
+      const inactive = allTokens.filter((token: Token) => token.token.status !== '2');
+
+      setActiveTokens(prev => (isEqual(prev, active) ? prev : active));
+      setInactiveTokens(prev => (isEqual(prev, inactive) ? prev : inactive));
     } catch (err: any) {
       if (
         axios.isCancel?.(err) ||
@@ -45,27 +49,28 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
         err?.code === "ERR_CANCELED" ||
         err?.message === "canceled"
       ) {
-        // Request was aborted, don't update state
         return;
       }
       console.error("Failed to fetch tokens:", err);
       setError("Failed to fetch token data");
-      setTokens([]); // Reset to empty array on error
+      setActiveTokens([]);
+      setInactiveTokens([]);
     } finally {
       if (!signal?.aborted) {
         setLoading(false);
       }
     }
-  };
+  }, []);
 
   const contextValue = useMemo(
     () => ({
-      tokens,
+      activeTokens,
+      inactiveTokens,
       loading,
       error,
       fetchTokens,
     }),
-    [tokens, loading, error, fetchTokens]
+    [activeTokens, inactiveTokens, loading, error, fetchTokens]
   );
 
   return (

@@ -16,11 +16,8 @@ const BorrowingSection = ({
 }: BorrowingSectionProps) => {
   const navigate = useNavigate()
 
-  const collateralValue = 3462.91; // from API
-  const borrowedAmount = 1250.00; // from API
-
-  const ltvRatio = collateralValue > 0 ? borrowedAmount / collateralValue : 0;
-  const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%
+  const ltvRatio = parseFloat(availableBorrowingPower.split('$')[1].replace(/,/g, '')) > 0 ? parseFloat(currentBorrowed.split('$')[1].replace(/,/g, '')) / parseFloat(availableBorrowingPower.split('$')[1].replace(/,/g, '')) : 0;
+  const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%  
 
   // Risk level mapping
   let riskLevel = 'Low';
@@ -98,7 +95,7 @@ const BorrowingSection = ({
                 <span className="font-semibold">{currentBorrowed}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Average Interest Rate</span>
+                <span className="text-gray-600">Interest Rate</span>
                 <span className="font-semibold">{averageInterestRate}</span>
               </div>
             </div>

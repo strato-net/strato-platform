@@ -19,7 +19,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { tokens, loading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens();
   const { 
     availableBorrowingPower, 
     currentBorrowed, 
@@ -121,7 +121,7 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <AssetsList loading={loading} tokens={tokens} />
+            <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} />
           </div>
 
           <div className="mb-8">
