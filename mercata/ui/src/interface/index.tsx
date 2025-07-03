@@ -1,15 +1,30 @@
 export interface Token {
   address: string;
-  block_hash: string;
-  block_timestamp: string;
-  block_number: string;
-  transaction_hash: string;
-  transaction_sender: string;
-  creator: string;
-  root: string;
-  contract_name: string;
-  collectionname: string;
-  collectiontype: string;
+  _name?: string;
+  _symbol?: string;
+  _owner?: string;
+  _totalSupply?: string;
+  customDecimals?: number;
+  description?: string;
+  status?: string;
+  images?: Array<{ value: string }>;
+  attributes?: Array<{ key: string; value: string }>;
+  balances?: Array<{ user: string; balance: string }>;
+  minters?: Array<{ user: string; value: boolean }>;
+  burners?: Array<{ user: string; value: boolean }>;
+  price?: number;
+  
+  // Legacy fields for backward compatibility
+  block_hash?: string;
+  block_timestamp?: string;
+  block_number?: string;
+  transaction_hash?: string;
+  transaction_sender?: string;
+  creator?: string;
+  root?: string;
+  contract_name?: string;
+  collectionname?: string;
+  collectiontype?: string;
   token?: {
     _name: string;
     _symbol: string;
@@ -24,11 +39,8 @@ export interface Token {
   vaulter?: string;
   color?: string;
   balance?: string;
-  key: string;
-  value: string;
-  price?: string;
-  _name?: string;
-  _symbol?: string;
+  key?: string;
+  value?: string;
   "BlockApps-Mercata-ERC20"?: {
     data: {
       token: string;
