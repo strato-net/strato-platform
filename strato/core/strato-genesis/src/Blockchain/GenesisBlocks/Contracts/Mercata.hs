@@ -32,6 +32,7 @@ filesToEmbed = [
   "contracts/concrete/OnRamp/OnRamp.sol",
   "contracts/concrete/Pools/Pool.sol",
   "contracts/concrete/Pools/PoolFactory.sol",
+  "contracts/concrete/Rewards/RewardsManager.sol",
   "contracts/concrete/Tokens/Token.sol",
   "contracts/concrete/Tokens/TokenAccess.sol",
   "contracts/concrete/Tokens/TokenFaucet.sol",

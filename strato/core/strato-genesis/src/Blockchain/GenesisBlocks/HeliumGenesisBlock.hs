@@ -49,13 +49,10 @@ usdstAddress :: Address
 usdstAddress = GA.root usdstAsset
 
 cataAsset :: GA.Asset
-cataAsset = head $ filter ((== "CATA") . GA.name) GA.assets
+cataAsset = maybe (error "Could not find cataAsset") id $ find ((== "CATA") . GA.name) GA.assets
 
 cataAddress :: Address
 cataAddress = GA.root cataAsset
-
-mercataUsdstBalance :: Integer
-mercataUsdstBalance = sum $ map GA.quantity . filter ((== "mercata_usdst") . GA.ownerCommonName) . M.elems $ GA.balances usdstAsset
 
 addrBS :: Address -> B.ByteString
 addrBS = BC.pack . formatAddressWithoutColor
@@ -277,7 +274,7 @@ assetToAccountInfos GA.Asset{..} =
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
             ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
-            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const root) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
+            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
             ++ accountBalances
             ++ contractBalances
 
@@ -374,7 +371,7 @@ onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddres
 
 poolFactory :: AccountInfo
 poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mercataAddress "PoolFactory") $ ownedByBlockApps mercataAddress ++
-  [ (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress) : ownedByBlockApps mercataAddress
+  [ (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
   , (".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)
   , (".feeCollector", BAccount $ unspecifiedChain feeCollectorAddress)
   , (".swapFeeRate", BInteger 30)
@@ -385,11 +382,11 @@ tokenFactory :: AccountInfo
 tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount mercataAddress "TokenFactory") $ ownedByBlockApps mercataAddress
   ++ [(".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)]
   ++ ((\GA.Asset{..} -> (".isFactoryToken<a:" <> addrBS root <> ">", BBool True)) <$> GA.assets)
-  ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> show i <> "]", BAccount $ unspecifiedChain root)) <$> zip [0..] GA.assets)
+  ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(0 :: Integer)..] GA.assets)
 
 adminRegistry :: AccountInfo
 adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount mercataAddress "AdminRegistry") $ ownedByBlockApps mercataAddress
-  ++ (".isAdmin<a:" <> addrBS blockappsAddress <> ">", BBool True)
+  ++ [(".isAdmin<a:" <> addrBS blockappsAddress <> ">", BBool True)]
 
 feeCollector :: AccountInfo
 feeCollector = SolidVMContractWithStorage feeCollectorAddress 0 (CodeAtAccount mercataAddress "FeeCollector") $ ownedByBlockApps mercataAddress
@@ -423,8 +420,8 @@ rewardsManager = SolidVMContractWithStorage rewardsManagerAddress 0 (CodeAtAccou
      , (".rewardTokenMap<a:" <> addrBS cataAddress <> ">", BInteger 1)
      , (".rewardDelegate", BAccount $ unspecifiedChain 0x0)
      ]
-  ++ concatMap (\(i, GR.Reserve{..}) -> flip (maybe []) (M.lookup assetRootAddress assetMap) $ \a ->
-    [ (".eligibleTokens[" <> show i <> "]", BContract "Token" $ unspecifiedChain assetRootAddress)
+  ++ concatMap (\(i, GR.Reserve{..}) ->
+    [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain assetRootAddress)
     , (".eligibleTokenMap<a:" <> addrBS assetRootAddress <> ">", BInteger $ i + 1)
     ]
   ) (zip [0..] GR.reserves)

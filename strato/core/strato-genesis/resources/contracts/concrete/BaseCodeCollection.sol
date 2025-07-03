@@ -46,7 +46,7 @@ import "./Bridge/MercataEthBridge.sol";
 import "Admin/FeeCollector.sol";
 
 //TODO
-contract Mercata {
+contract record Mercata {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
     CollateralVault public collateralVault;
