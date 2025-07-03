@@ -36,8 +36,7 @@ npm run dev
 
 ### 🔬 Local end-to-end test guide
 
-This assumes you are **not** relying on Stripe's remote webhooks – the local
-Stripe service polls and mints vouchers automatically.
+This assumes you are **not** relying on Stripe's remote webhooks.
 
 1. Environment file
 
