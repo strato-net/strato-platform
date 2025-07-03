@@ -17,6 +17,7 @@ export interface Token {
     images?: any;
     _owner?: string;
     description?: string;
+    status?: string;
   },
   available?: boolean;
   provider?: string;

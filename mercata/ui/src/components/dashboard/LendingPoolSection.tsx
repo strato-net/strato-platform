@@ -13,7 +13,7 @@ import { usdstAddress } from "@/lib/contants";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
-  const { tokens, loading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
   const {
     withdrawableTokens,
     loadingWithdrawableTokens,
