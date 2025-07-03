@@ -134,6 +134,8 @@ nix:
   # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
   shell-file: nix/stack-integration.nix
 
+notify-if-nix-on-path: false
+
 resolver: lts-22.4 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:

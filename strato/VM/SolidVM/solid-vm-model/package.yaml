@@ -11,7 +11,7 @@ default-extensions:
 library:
   source-dirs: src/
   dependencies:
-  - aeson ==2.1.1.0
+  - aeson >=2.1.1.0 && <2.2
   - aeson-casing
   - attoparsec
   - base16-bytestring
