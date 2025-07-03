@@ -77,9 +77,8 @@ Stripe service polls and mints vouchers automatically.
 
 4. Prepare the **service signer**
 
-    # a) fund with gas (USDST or Vouchers)
-    # b) allow minting on Voucher
-    Call `addMinter(<service-signer>)` on Voucher contract
+    1. Fund its STRATO address with gas (USDST or Vouchers)
+    2. Call `addMinter(<service-signer>)` on Voucher contract
 
 5. Register the payment provider (must be done from an OnRamp admin)
 
