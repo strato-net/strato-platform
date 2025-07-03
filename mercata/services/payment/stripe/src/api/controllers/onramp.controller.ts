@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { checkout, handleStripeWebhook, mintVouchers } from "../services/onramp.service";
+import { checkout, mintVouchers } from "../services/onramp.service";
 
 class OnRampController {
   static async checkout(
