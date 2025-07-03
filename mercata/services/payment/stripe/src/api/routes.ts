@@ -9,6 +9,8 @@ const router = Router();
 
 router.post("/checkout", OnRampController.checkout);
 
+router.post("/mint-vouchers", OnRampController.mintVouchers);
+
 
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
   res.json({

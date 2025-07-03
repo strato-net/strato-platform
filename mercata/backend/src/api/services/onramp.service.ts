@@ -41,9 +41,10 @@ export const get = async (accessToken: string) => {
     const providerMap = Object.fromEntries(
       (paymentProviders || []).map((p: any) => [
         p.key,
-        p.PaymentProviderInfo
+        p.value
       ])
     );
+
 
     // Fetch token metadata
     let tokenInfoMap: Record<string, { _name: string; _symbol: string }> = {};
@@ -67,7 +68,12 @@ export const get = async (accessToken: string) => {
 
     // Enhance listings
     const enhancedListings = listings.map((listing: any) => {
-      const { key: id, ListingInfo: info } = listing;
+      const { key: id, value: info } = listing;
+
+      if (!info) {
+        console.error("Warning: Listing has no value data:", listing);
+        return null;
+      }
 
       const tokenMeta = tokenInfoMap[info.token] || {
         _name: null,
@@ -75,7 +81,7 @@ export const get = async (accessToken: string) => {
       };
 
       // Map provider addresses to their full info
-      const providers = info.providers
+      const providers = (info.providers || [])
         .map((providerAddress: string) => providerMap[providerAddress])
         .filter(Boolean);
 
@@ -89,7 +95,7 @@ export const get = async (accessToken: string) => {
           providers,
         },
       };
-    });
+    }).filter(Boolean); // Remove null entries
 
     return {
       ...onRamp,
@@ -160,10 +166,9 @@ export async function buy(
   try {
     const ramp = await get(accessToken);
     
-    // Validate listing
     const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(token));
     if (!listing) {
-      throw new Error(`Listing ${token} not found`);
+      throw new Error(`Listing for token ${token} not found. Available tokens: ${ramp.listings.map((l: any) => l.ListingInfo?.token).join(', ')}`);
     }
 
     // Validate and get payment provider
@@ -173,24 +178,36 @@ export async function buy(
     if (!paymentProvider) {
       throw new Error("Payment provider not found");
     }
+    
+    try {
+      const { data } = await axios.post(paymentProvider.endpoint, {
+        token,
+        buyerAddress,
+        amount,
+        baseUrl,
+      });
 
-    // Process payment
-    const { data } = await axios.post(paymentProvider.endpoint, {
-      token,
-      buyerAddress,
-      amount,
-      baseUrl,
-    });
+      if (!data?.sessionId || !data?.url) {
+        throw new Error("Invalid provider session response");
+      }
 
-    if (!data?.sessionId || !data?.url) {
-      throw new Error("Invalid provider session response");
+      try {
+        const mintUrl = paymentProvider.endpoint.replace("/checkout", "/mint-vouchers");
+        axios.post(mintUrl, { sessionId: data.sessionId }).catch(() => {});
+      } catch (e) {
+        console.warn("Unable to trigger voucher minting: ", e);
+      }
+
+      return {
+        sessionId: data.sessionId,
+        url: data.url,
+      };
+    } catch (stripeError: any) {
+      console.error("STRIPE: Error making request:", stripeError.response?.data || stripeError.message);
+      throw stripeError;
     }
-
-    return {
-      sessionId: data.sessionId,
-      url: data.url,
-    };
   } catch (error) {
+    console.error("BUY: General error:", error);
     throw new Error("Failed to process payment. Please try again.");
   }
 }

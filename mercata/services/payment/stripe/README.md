@@ -34,11 +34,83 @@ npm run dev
 ```
 - The app will start on port 3002 with http
 
-To test Stripe webhooks locally during development, run the Stripe CLI:
+### 🔬 Local end-to-end test guide
 
-```bash
-stripe listen --forward-to localhost:3002/webhook
-```
+This assumes you are **not** relying on Stripe's remote webhooks.
+
+1. Environment file
+
+   ```bash
+   # .env (or env.list for Docker)
+   OAUTH_DISCOVERY_URL=<KC-realm-discovery-url>
+   CLIENT_ID=localhost                       # or your client-id
+   CLIENT_SECRET=<client-secret>
+   NODE_URL=http://localhost:8545/strato/v2.3
+   STRIPE_SECRET_KEY=sk_test_…
+   ONRAMP=<will fill in after deploy>
+   VOUCHER_CONTRACT_ADDRESS=<voucher-contract>
+   ```
+
+2. Deploy contracts
+
+   1. Deploy **Voucher**.
+   2. Deploy **OnRamp** (use *Base Code Collection* so Cirrus can index it).
+   3. Save the OnRamp address into `ONRAMP` in the `.env` **and restart** the
+      service so it picks up the change.
+
+3. Obtain the **service-signer address** from your OAuth credentials
+
+   1. Fetch a JWT via **Postman**:
+
+       • Open Postman and switch to the **Mercata** workspace (Workspaces → Mercata).  
+       • In the *jwt* collection run the request **`get testnet jwt token`**.  
+       • Fill out Auth section using `CLIENT_ID` and `CLIENT_SECRET`. 
+       • The call returns a JSON object – copy the value of `access_token`.
+
+   2. Get the Strato address for that token (use the same Postman workspace):
+
+       • Create a GET request to `https://node5.mercata-testnet.blockapps.net/strato/v2.3/key` setting Auth to Bearer Token and passing your `access_token`.
+       • The response contains `{ "address": "0x…" }` – copy that address; it is your `<service-signer>`.
+
+   Keep this address handy – you'll need it in the next steps.
+
+4. Prepare the **service signer**
+
+    1. Fund its STRATO address with gas (USDST or Vouchers)
+    2. Call `addMinter(<service-signer>)` on Voucher contract
+
+5. Register the payment provider (must be done from an OnRamp admin)
+
+   ```bash
+   OnRamp.addPaymentProvider(
+     ProviderAddress: <service-signer>,
+     Name: "Local Stripe Service",
+     Endpoint: "http://localhost:3002/checkout"
+   )
+   ```
+
+6. Create the listing for **USDST**
+
+   1. Call `registerToken(USDST)` on your OnRamp's corresponding Token Factory.
+   2. Call `setApprovedSeller(<your-EOA>, true)` on your OnRamp contract.
+   3. Call `approve(<OnRamp.address>, 999999999999999999999999)` on the USDST contract.
+   4. Call `createListing(<USDST.address>, <amount>, <marginBps>, ["<service-signer>"])` on your OnRamp contract.
+
+7. Set the price oracle in OnRamp
+
+8. Install & run the service
+
+   ```bash
+   npm install
+   npm run dev        # service on http://localhost:3002
+   ```
+
+9. Front-end test
+
+    • Complete the Stripe Checkout form with a test card from the UI.
+
+10. Add some console.logs throughout the functions used to observe behavior in your terminal
+
 
 ### Production
 
