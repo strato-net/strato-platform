@@ -9,9 +9,10 @@ import { formatUnits } from "ethers";
 interface AssetsProps {
   loading: boolean;
   tokens: Token[];
+  hideAddDepositsButton?: boolean;
 }
 
-const AssetsList = ({ loading, tokens }: AssetsProps) => {
+const AssetsList = ({ loading, tokens, hideAddDepositsButton }: AssetsProps) => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
@@ -46,14 +47,16 @@ const AssetsList = ({ loading, tokens }: AssetsProps) => {
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">My Deposits</h2>
-          <Button
-            size="sm"
-            className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
-            onClick={() => setIsOptionsModalOpen(true)}
-          >
-            <Plus size={16} />
-            Add Deposits
-          </Button>
+          {!hideAddDepositsButton && (
+            <Button
+              size="sm"
+              className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
+              onClick={() => setIsOptionsModalOpen(true)}
+            >
+              <Plus size={16} />
+              Add Deposits
+            </Button>
+          )}
         </div>
       </div>
 
