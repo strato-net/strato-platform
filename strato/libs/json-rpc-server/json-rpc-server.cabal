@@ -8,7 +8,7 @@ maintainer:          Kristen Kozak <grayjay@wordroute.com>
 synopsis:            JSON-RPC 2.0 on the server side.
 build-type:          Simple
 extra-source-files:  changelog.md
-cabal-version:       >=1.8
+cabal-version:       >=1.10
 tested-with:         GHC == 7.0.1, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.1,
                      GHC == 7.10.2, GHC == 7.10.3, GHC == 8.0.1, GHC == 8.0.2,
                      GHC == 8.2.2, GHC == 8.4.1, GHC == 8.4.4, GHC == 8.6.1,
