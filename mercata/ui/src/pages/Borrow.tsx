@@ -3,6 +3,7 @@ import { formatEther, formatUnits, parseUnits } from "ethers";
 import { PiggyBank } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
+import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
@@ -44,23 +45,31 @@ const Borrow = () => {
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [showRepayModal, setShowRepayModal] = useState(false)
   const [loan, setLoan] = useState<any | null>(null);
-  const [loanList, setLoanList] = useState<any[]>([]);
+  const [wrongAmount, setWrongAmount] = useState(false);
 
   const { toast } = useToast();
   const {
     depositableTokens,
     refreshDepositTokens,
-    loadingDepositTokens,
-    loans,
     refreshLoans,
-    loadingLoans,
+    loans,
+    loadingDepositTokens,
     borrowAsset: borrowAssetFn,
   } = useLendingContext();
 
+  const { 
+    availableBorrowingPower, 
+    currentBorrowed, 
+    averageInterestRate, 
+    loanList,
+    setLoanList,
+    refreshLendingData,
+    loading: lendingLoading
+  } = useLendingMetrics();
+
   useEffect(() => {
-    refreshDepositTokens()
-    refreshLoans()
-  }, [])
+    refreshLendingData();
+  }, []);
 
   useEffect(() => {
     if (!depositableTokens || depositableTokens.length === 0) return;
@@ -115,6 +124,7 @@ const Borrow = () => {
 
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
+      await refreshLendingData();
       await refreshDepositTokens();
 
       // Poll loans until list length changes (max 5 attempts)
@@ -138,7 +148,6 @@ const Borrow = () => {
       });
     }
   };
-
 
   const fetchLoans = useCallback(async () => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -259,9 +268,12 @@ const Borrow = () => {
 
         <main className="p-6">
           <div className="mb-8">
-            <BorrowingSection />
+            <BorrowingSection 
+              availableBorrowingPower={availableBorrowingPower}
+              currentBorrowed={currentBorrowed}
+              averageInterestRate={averageInterestRate}
+            />
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Borrow</CardTitle>
@@ -380,9 +392,9 @@ const Borrow = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loadingLoans ? (
+                  {lendingLoading ? (
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={5}>
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>

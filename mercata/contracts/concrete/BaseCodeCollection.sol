@@ -16,6 +16,9 @@ import "Admin/AdminRegistry.sol";
 import "Pools/Pool.sol";
 import "Pools/PoolFactory.sol";
 
+//Admin
+import "Admin/FeeCollector.sol";
+
 //OnRamp
 import "OnRamp/OnRamp.sol";
 
@@ -36,6 +39,9 @@ import "Lending/RateStrategy.sol";
 //Bridging
 import "Bridge/MercataEthBridge.sol";
 
+//Fee Collector
+import "Admin/FeeCollector.sol";
+
 //TODO
 contract Mercata {
     RateStrategy public rateStrategy;
@@ -49,15 +55,23 @@ contract Mercata {
     OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
+    FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
 
     constructor() public {
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry(msg.sender);
+        adminRegistry = new AdminRegistry(this);
+        adminRegistry.addAdmin(msg.sender);
+
+        // Create FeeCollector
+        feeCollector = new FeeCollector(msg.sender);
 
         // Create Factories
         tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
-        poolFactory = new PoolFactory(msg.sender, address(adminRegistry), address(tokenFactory));
+        poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
+        adminRegistry.addAdmin(address(poolFactory));
+        adminRegistry.removeAdmin(this);
+        Ownable(adminRegistry).transferOwnership(msg.sender);
 
         // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
@@ -66,15 +80,10 @@ contract Mercata {
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(msg.sender); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory));
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.setLendingPool(address(lendingPool));
-        poolConfigurator.setLiquidityPool(address(liquidityPool));
-        poolConfigurator.setCollateralVault(address(collateralVault));
-        poolConfigurator.setRateStrategy(address(rateStrategy));
-        poolConfigurator.setPriceOracle(address(priceOracle)); 
-        poolConfigurator.setTokenFactory(address(tokenFactory));
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[]);
         Ownable(poolConfigurator).transferOwnership(msg.sender);
 
         // Create Services

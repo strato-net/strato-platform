@@ -1,10 +1,19 @@
-
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 
-const BorrowingSection = () => {
+interface BorrowingSectionProps {
+  availableBorrowingPower?: string;
+  currentBorrowed?: string;
+  averageInterestRate?: string;
+}
+
+const BorrowingSection = ({ 
+  availableBorrowingPower = "$0.00", 
+  currentBorrowed = "$0.00", 
+  averageInterestRate = "0.00%" 
+}: BorrowingSectionProps) => {
   const navigate = useNavigate()
   const riskPercentage = 36;
   
@@ -59,15 +68,15 @@ const BorrowingSection = () => {
             <div className="flex flex-col gap-1 mt-8">
               <div className="flex justify-between">
                 <span className="text-gray-600">Available Borrowing Power</span>
-                <span className="font-semibold">$3,462.91</span>
+                <span className="font-semibold">{availableBorrowingPower}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Current Borrowed</span>
-                <span className="font-semibold">$1,250.00</span>
+                <span className="font-semibold">{currentBorrowed}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Average Interest Rate</span>
-                <span className="font-semibold">3.2% APY</span>
+                <span className="font-semibold">{averageInterestRate}</span>
               </div>
             </div>
           </div>
