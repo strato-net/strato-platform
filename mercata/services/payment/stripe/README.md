@@ -80,7 +80,7 @@ Stripe service polls and mints vouchers automatically.
     ```bash
     # a) fund with gas (USDST or Vouchers)
     # b) allow minting on Voucher
-    Voucher.addMinter(<service-signer>)
+    Call `addMinter(<service-signer>)` on Voucher contract
     ```
 
 5. Register the payment provider (must be done from an OnRamp admin)
