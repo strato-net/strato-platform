@@ -79,8 +79,8 @@ export const constants = (() => {
   const onRampSelectFields = [
     "address",
     `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`,
-    `listings:${OnRamp}-listings(key,ListingInfo:value)`,
-    `paymentProviders:${OnRamp}-paymentProviders(key,PaymentProviderInfo:value)`,
+    `listings:${OnRamp}-listings(key,value)`,
+    `paymentProviders:${OnRamp}-paymentProviders(key,value)`,
   ];
   return {
     poolFactory,

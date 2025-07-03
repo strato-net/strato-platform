@@ -1,4 +1,5 @@
 import { strato, bloc } from "../../utils/mercataApiHelper";
+import { stripe } from "../../utils/stripeClient";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
@@ -77,38 +78,96 @@ export async function checkout(
   }
 }
 
-export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
-  const token = session.metadata?.token;
+export async function handleStripeSession(session: Stripe.Checkout.Session): Promise<void> {
+  const tokenMeta = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
   const stripeSessionId = session.id;
-  
-  if (!token || !buyerAddress || !amount || !tokenAmount) {
+
+  if (!tokenMeta || !buyerAddress || !amount || !tokenAmount) {
     console.error("Missing required metadata in session");
-    removeLock(token || '', tokenAmount || '', stripeSessionId);
+    removeLock(tokenMeta ?? '', tokenAmount ?? '', stripeSessionId);
     return;
   }
 
   try {
+
     const accessToken = await getServiceToken();
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-        contractName: OnRamp,
-        contractAddress,
-        method: "fulfillListing",
-        args: { token, buyer: buyerAddress, amount: tokenAmount },
-      }))
+    const tokenAddress: string = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
+
+    console.log(`Processing payment for token ${tokenAddress}, buyer ${buyerAddress}, amount ${tokenAmount}`);
+
+    const fulfillTx = buildFunctionTx({
+      contractName: OnRamp,
+      contractAddress,
+      method: "fulfillListing",
+      args: { token: tokenAddress, buyer: buyerAddress, amount: tokenAmount },
+    });
+
+    console.log("Submitting fulfillListing…");
+    const { status: st2, hash: hash2 } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
     );
 
-    if (status === "Success") {
-      console.log(`Order ${token} confirmed on-chain: ${hash}`);
+    if (st2 === "Success") {
+      console.log(`Order ${tokenAddress} confirmed on-chain: ${hash2}`);
+
+      const voucherContractAddress = process.env.VOUCHER_CONTRACT_ADDRESS || "A96c02a13b558fbcf923af1d586967cf7f55c753"; // TODO: move to config
+
+      const mintTx = buildFunctionTx({
+        contractName: "Voucher",
+        contractAddress: voucherContractAddress,
+        method: "mint",
+        args: {
+          to: buyerAddress,
+          amount: (10000000000000000000).toString(), // 10 vouchers (10 * 10^18)
+        },
+      });
+
+      console.log("Submitting Voucher.mint…");
+      const { status: st3, hash: hash3 } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, mintTx)
+      );
+
+      if (st3 === "Success") {
+        console.log(`10 Vouchers minted: ${hash3}`);
+      } else {
+        console.error(`Voucher mint failed (${st3}): ${hash3}`);
+      }
     } else {
-      console.error(`On-chain confirmation failed (${status}): ${hash}`);
+      console.error(`On-chain confirmation failed (${st2}): ${hash2}`);
     }
   } catch (err) {
     console.error("Error confirming order on-chain:", err);
   } finally {
-    removeLock(token, tokenAmount, stripeSessionId);
+    removeLock(tokenMeta ?? '', tokenAmount ?? '', stripeSessionId);
+  }
+}
+
+export async function mintVouchers(sessionId: string): Promise<void> {
+  const MAX_ATTEMPTS = 6;
+  const DELAY_MS = 5_000;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status === "paid" && session.status === "complete") {
+      await handleStripeSession(session as unknown as Stripe.Checkout.Session);
+      return;
+    }
+
+    console.log(
+      `Session ${sessionId} not complete yet (attempt ${attempt}/${MAX_ATTEMPTS}) – ` +
+      `status=${session.status}, payment_status=${session.payment_status}`
+    );
+
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise(res => setTimeout(res, DELAY_MS));
+    } else {
+      throw new Error(
+        `Session ${sessionId} did not reach paid/complete after ${MAX_ATTEMPTS} attempts`
+      );
+    }
   }
 }
