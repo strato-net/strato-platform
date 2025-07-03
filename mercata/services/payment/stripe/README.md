@@ -34,7 +34,7 @@ npm run dev
 ```
 - The app will start on port 3002 with http
 
-### 🔬 Local end-to-end test guide  (“card → USDT → voucher”) 
+### 🔬 Local end-to-end test guide
 
 This assumes you are **not** relying on Stripe's remote webhooks – the local
 Stripe service polls and mints vouchers automatically.
