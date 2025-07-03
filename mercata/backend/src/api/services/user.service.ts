@@ -12,7 +12,7 @@ export const isUserAdmin = async (
   userAddress: string
 ): Promise<boolean> => {
   try {
-    const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
+    const response = await cirrus.get(accessToken, "/" + AdminRegistry + "-isAdmin", {
       params: {
         key: "eq." + userAddress,
         select: "key,value",

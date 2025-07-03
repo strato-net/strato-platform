@@ -4,8 +4,8 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * @title AdminRegistry
  * @notice Centralized registry of trusted admin accounts used for access control across system contracts.
  */
-contract AdminRegistry is Ownable {
-    mapping(address => bool) public isAdmin;
+contract record AdminRegistry is Ownable {
+    mapping(address => bool) public record isAdmin;
     
     event AdminAdded(address admin);
     event AdminRemoved(address admin);
