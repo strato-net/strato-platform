@@ -78,7 +78,7 @@ export async function checkout(
   }
 }
 
-export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
+export async function handleStripeSession(session: Stripe.Checkout.Session): Promise<void> {
   const tokenMeta = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
   const amount = session.metadata?.amount;
@@ -121,7 +121,7 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
         method: "mint",
         args: {
           to: buyerAddress,
-          amount: (1000000000000000000).toString(), // 1 voucher (18 decimals)
+          amount: (10000000000000000000).toString(), // 10 vouchers (10 * 10^18)
         },
       });
 
@@ -131,7 +131,7 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
       );
 
       if (st3 === "Success") {
-        console.log(`Voucher minted: ${hash3}`);
+        console.log(`10 Vouchers minted: ${hash3}`);
       } else {
         console.error(`Voucher mint failed (${st3}): ${hash3}`);
       }
@@ -153,7 +153,7 @@ export async function mintVouchers(sessionId: string): Promise<void> {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status === "paid" && session.status === "complete") {
-      await handleStripeWebhook(session as unknown as Stripe.Checkout.Session);
+      await handleStripeSession(session as unknown as Stripe.Checkout.Session);
       return;
     }
 
