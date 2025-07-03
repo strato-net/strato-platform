@@ -70,7 +70,7 @@ Stripe service polls and mints vouchers automatically.
 
    2. Get the Strato address for that token (use the same Postman workspace):
 
-       • Create a GET request to `https://node5.mercata-testnet.blockapps.net/strato/v2.3/key` setting Auth to Bearer Token and passing your access_token`.
+       • Create a GET request to `https://node5.mercata-testnet.blockapps.net/strato/v2.3/key` setting Auth to Bearer Token and passing your `access_token`.
        • The response contains `{ "address": "0x…" }` – copy that address; it is your `<service-signer>`.
 
    Keep this address handy – you'll need it in the next steps.
