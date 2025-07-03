@@ -59,15 +59,31 @@ Stripe service polls and mints vouchers automatically.
    3. Save the OnRamp address into `ONRAMP` in the `.env` **and restart** the
       service so it picks up the change.
 
-3. Prepare the **service signer** (the address behind your JWT)
+3. Obtain the **service-signer address** from your OAuth credentials
 
-   ```bash
-   # a) fund with gas (USDST or Vouchers)
-   # b) allow minting on Voucher
-   Voucher.addMinter(<service-signer>)
-   ```
+   1. Fetch a JWT via **Postman**:
 
-4. Register the payment provider (must be done from an OnRamp admin)
+       • Open Postman and switch to the **Mercata** workspace (Workspaces → Mercata).  
+       • In the *jwt* collection run the request **`get testnet jwt token`**.  
+       • Fill out Auth section using `CLIENT_ID` and `CLIENT_SECRET`. 
+       • The call returns a JSON object – copy the value of `access_token`.
+
+   2. Get the Strato address for that token (use the same Postman workspace):
+
+       • Create a GET request to `https://node5.mercata-testnet.blockapps.net/strato/v2.3/key` setting Auth to Bearer Token and passing your access_token`.
+       • The response contains `{ "address": "0x…" }` – copy that address; it is your `<service-signer>`.
+
+   Keep this address handy – you'll need it in the next steps.
+
+4. Prepare the **service signer**
+
+    ```bash
+    # a) fund with gas (USDST or Vouchers)
+    # b) allow minting on Voucher
+    Voucher.addMinter(<service-signer>)
+    ```
+
+5. Register the payment provider (must be done from an OnRamp admin)
 
    ```bash
    OnRamp.addPaymentProvider(
@@ -77,27 +93,27 @@ Stripe service polls and mints vouchers automatically.
    )
    ```
 
-5. Create the listing for **USDST**
+6. Create the listing for **USDST**
 
    1. Call `registerToken(USDST)` on your OnRamp's corresponding Token Factory.
    2. Call `setApprovedSeller(<your-EOA>, true)` on your OnRamp contract.
    3. Call `approve(<OnRamp.address>, 999999999999999999999999)` on the USDST contract.
    4. Call `createListing(<USDST.address>, <amount>, <marginBps>, ["<service-signer>"])` on your OnRamp contract.
 
-6. Set the price oracle in OnRamp
+7. Set the price oracle in OnRamp
 
-7. Install & run the service
+8. Install & run the service
 
    ```bash
    npm install
    npm run dev        # service on http://localhost:3002
    ```
 
-8. Front-end test
+9. Front-end test
 
     • Complete the Stripe Checkout form with a test card from the UI.
 
-9. Add some console.logs throughout the functions used to observe behavior in your terminal
+10. Add some console.logs throughout the functions used to observe behavior in your terminal
 
 
 ### Production
