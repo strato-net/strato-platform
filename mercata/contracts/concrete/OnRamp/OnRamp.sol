@@ -1,11 +1,5 @@
 import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
-import "../Voucher/Voucher.sol";
-
-// Interface for Voucher contract
-interface IVoucher {
-    function mint(address to, uint256 amount) external;
-}
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 
@@ -16,7 +10,6 @@ contract record OnRamp is Ownable {
     event ListingCanceled(uint256 listingId);
     event ListingFulfilled(uint256 listingId, address buyer, uint256 amount, uint256 totalFiat);
     event PaymentProviderStatusUpdated(address provider, bool enabled);
-    event VoucherMinted(address buyer, uint256 voucherAmount);
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
     event TokenFactoryUpdated(address oldFactory, address newFactory);
 
@@ -45,22 +38,17 @@ contract record OnRamp is Ownable {
 
     // Price oracle
     PriceOracle public priceOracle;
-
-    // Voucher contract for rewards
-    IVoucher public voucherContract;
     // Listing management
     mapping(address => Listing) public record listings;
 
     // Constructor
-    constructor(address _oracle, address _owner, address _tokenFactory, address _voucherContract, address _adminRegistry) Ownable(_owner) {
+    constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry) Ownable(_owner) {
         require(_oracle != address(0), "Invalid oracle");
-        require(_voucherContract != address(0), "Invalid voucher contract");
         require(_adminRegistry != address(0), "Invalid admin registry");
         require(_tokenFactory != address(0), "Invalid token factory");
         priceOracle = PriceOracle(_oracle);
         adminRegistry = AdminRegistry(_adminRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
-        voucherContract = IVoucher(_voucherContract);
     }
 
     // Modifiers
@@ -123,11 +111,6 @@ contract record OnRamp is Ownable {
 
     function setPriceOracle(address newOracle) external onlyOwnerOrAdmin {
         priceOracle = PriceOracle(newOracle);
-    }
-
-    function setVoucherContract(address newVoucherContract) external onlyAdmin {
-        require(newVoucherContract != address(0), "Invalid voucher contract");
-        voucherContract = IVoucher(newVoucherContract);
     }
 
     function setAdminRegistry(address newAdminRegistry) external onlyOwner {
@@ -223,15 +206,6 @@ contract record OnRamp is Ownable {
 
         uint256 totalFiat = calculatePrice(listings[token].token, amount, listings[token].marginBps);
         emit ListingFulfilled(listings[token].id, buyer, amount, totalFiat);
-
-        // Mint voucher tokens as reward for purchasing USDT
-        uint256 voucherAmount = 1e18; // 1 voucher token (10^18 wei)
-        try voucherContract.mint(buyer, voucherAmount) {
-            emit VoucherMinted(buyer, voucherAmount);
-        } catch {
-            // Don't fail the transaction if voucher minting fails
-            // This ensures USDT transfer still succeeds even if voucher fails
-        }
 
         if (listings[token].amount == 0) {
             delete listings[token];
