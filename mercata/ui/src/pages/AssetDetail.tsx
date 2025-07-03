@@ -44,9 +44,9 @@ const AssetDetail = () => {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<any[]>([]);
   const { userAddress } = useUser()
-  const { tokens: assets, loading, fetchTokens } = useUserTokens()
+  const { activeTokens: assets, inactiveTokens, loading, fetchTokens } = useUserTokens()
 
-
+  
   useEffect(() => {
     fetchTokens(userAddress)
   }, [userAddress])
@@ -54,6 +54,7 @@ const AssetDetail = () => {
   useEffect(() => {
     // Find the asset with the matching id
     const foundAsset = assets.find(a => a?.address === id);
+    const foundInActiveAsset = inactiveTokens.find(a => a?.address === id)
     if (foundAsset) {
       setAsset(foundAsset);
       document.title = `${foundAsset?.token?._name} | Asset Details`;
@@ -64,8 +65,18 @@ const AssetDetail = () => {
           setPriceData(generatePriceData(basePrice));
         }
       }
+    } else if (foundInActiveAsset){
+      setAsset(foundInActiveAsset);
+      document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
+
+      if (foundInActiveAsset?.price) {
+        const basePrice = parseFloat(foundInActiveAsset.price);
+        if (!isNaN(basePrice)) {
+          setPriceData(generatePriceData(basePrice));
+        }
+      }
     }
-  }, [id, assets]);
+  }, [id, assets]);  
 
   if (!asset) {
     return (
