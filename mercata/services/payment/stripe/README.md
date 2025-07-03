@@ -34,11 +34,71 @@ npm run dev
 ```
 - The app will start on port 3002 with http
 
-To test Stripe webhooks locally during development, run the Stripe CLI:
+### 🔬 Local end-to-end test guide  (“card → USDT → voucher”) 
 
-```bash
-stripe listen --forward-to localhost:3002/webhook
-```
+This assumes you are **not** relying on Stripe's remote webhooks – the local
+Stripe service polls and mints vouchers automatically.
+
+1. Environment file
+
+   ```bash
+   # .env (or env.list for Docker)
+   OAUTH_DISCOVERY_URL=<KC-realm-discovery-url>
+   CLIENT_ID=localhost                       # or your client-id
+   CLIENT_SECRET=<client-secret>
+   NODE_URL=http://localhost:8545/strato/v2.3
+   STRIPE_SECRET_KEY=sk_test_…
+   ONRAMP=<will fill in after deploy>
+   VOUCHER_CONTRACT_ADDRESS=<voucher-contract>
+   ```
+
+2. Deploy contracts
+
+   1. Deploy **Voucher**.
+   2. Deploy **OnRamp** (use *Base Code Collection* so Cirrus can index it).
+   3. Save the OnRamp address into `ONRAMP` in the `.env` **and restart** the
+      service so it picks up the change.
+
+3. Prepare the **service signer** (the address behind your JWT)
+
+   ```bash
+   # a) fund with gas (USDST or Vouchers)
+   # b) allow minting on Voucher
+   Voucher.addMinter(<service-signer>)
+   ```
+
+4. Register the payment provider (must be done from an OnRamp admin)
+
+   ```bash
+   OnRamp.addPaymentProvider(
+     ProviderAddress: <service-signer>,
+     Name: "Local Stripe Service",
+     Endpoint: "http://localhost:3002/checkout"
+   )
+   ```
+
+5. Create the listing for **USDST**
+
+   1. Call `registerToken(USDST)` on your OnRamp's corresponding Token Factory.
+   2. Call `setApprovedSeller(<your-EOA>, true)` on your OnRamp contract.
+   3. Call `approve(<OnRamp.address>, 999999999999999999999999)` on the USDST contract.
+   4. Call `createListing(<USDST.address>, <amount>, <marginBps>, ["<service-signer>"])` on your OnRamp contract.
+
+6. Set the price oracle in OnRamp
+
+7. Install & run the service
+
+   ```bash
+   npm install
+   npm run dev        # service on http://localhost:3002
+   ```
+
+8. Front-end test
+
+    • Complete the Stripe Checkout form with a test card from the UI.
+
+9. Add some console.logs throughout the functions used to observe behavior in your terminal
+
 
 ### Production
 
