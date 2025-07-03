@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { get, sell, buy, handleStripeWebhook } from "../services/onramp.service";
+import { get, sell, buy } from "../services/onramp.service";
 
 class OnRampController {
   static async get(
@@ -38,10 +38,6 @@ class OnRampController {
     res: Response,
     next: NextFunction
   ): Promise<void> {
-    console.log("=== BUY ENDPOINT HIT ===");
-    console.log("Headers:", req.headers);
-    console.log("Body type:", typeof req.body);
-    console.log("Body:", req.body);
 
     try {
       const { accessToken, address, body } = req;
