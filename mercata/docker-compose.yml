@@ -15,6 +15,7 @@ services:
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ONRAMP=${ONRAMP}
       - ADMIN_ADDRESS=${ADMIN_ADDRESS}
+      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
     restart: unless-stopped
     logging:
       driver: "json-file"
