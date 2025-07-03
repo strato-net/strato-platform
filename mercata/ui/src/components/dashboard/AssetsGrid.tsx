@@ -1,7 +1,6 @@
-
 import { Token } from '@/interface';
 import AssetCard from './AssetCard';
-
+import { useUser } from '@/context/UserContext';
 
 interface AssetsGridProps {
   assets: Token[];
@@ -9,6 +8,15 @@ interface AssetsGridProps {
 }
 
 const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
+  const { userAddress } = useUser();
+
+  // Helper to get user balance from balances array
+  function getUserBalance(token: Token, userAddress: string | null): string {
+    if (!userAddress) return '0';
+    const entry = token.balances?.find(b => b.user.toLowerCase() === userAddress.toLowerCase());
+    return entry ? entry.balance : '0';
+  }
+
   return (
     loading ?
       <div className="flex justify-center items-center h-12">
@@ -23,10 +31,12 @@ const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
             <AssetCard
               key={id}
               id={asset?.address}
-              name={asset?.token?._name}
-              symbol={asset?.token?._symbol}
-              price={asset?.price || "0"}
-              deposit={asset?.balance}
+              name={asset?._name || ''}
+              symbol={asset?._symbol || ''}
+              price={asset?.price?.toString() || '0'}
+              deposit={getUserBalance(asset, userAddress)}
+              image={asset.images?.[0]?.value}
+              customDecimals={asset?.customDecimals || 18}
             />
           ))}
         </div>
