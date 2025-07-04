@@ -309,8 +309,100 @@ contract record LendingPool is Ownable {
     // LIQUIDATION OPERATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    // Permissionless liquidation (no onlyOwner)
-    function liquidate(address borrower) external {
+    /**
+     * @notice Liquidate an unhealthy position
+     * @param collateralAsset The collateral asset to seize
+     * @param borrower The address of the borrower being liquidated
+     * @param debtToCover Amount of debt (in borrowableAsset units) the liquidator is repaying
+     * Requirements:
+     *  - Borrower health factor must be < 1e18 (unsafe)
+     *  - If health factor >= 0.95e18, liquidator may repay at most 50% of outstanding debt
+     *  - Otherwise liquidator may repay up to 100% of outstanding debt
+     */
+    function liquidationCall(
+        address collateralAsset,
+        address borrower,
+        uint256 debtToCover
+    ) external onlyTokenFactory(borrowableAsset) {
+        require(collateralAsset != address(0), "Invalid collateral asset");
+        require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
+        require(debtToCover > 0, "Invalid debt amount");
+
+        // Ensure collateral asset is configured and has liquidation parameters
+        AssetConfig memory cConfig = assetConfigs[collateralAsset];
+        require(cConfig.liquidationBonus >= 10000, "Asset not eligible for liquidation");
+
+        // Fetch loan info & total debt
+        LoanInfo storage loan = userLoan[borrower];
+        require(loan.principalBalance > 0, "Borrower has no debt");
+
+        uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
+        (uint256 accruedInterest, uint256 totalOwed) = _accrueInterest(loan, interestRate);
+
+        uint256 health = getHealthFactor(borrower); // 1e18 scaled
+        require(health < 1e18, "Position healthy");
+
+        // Determine max allowed repayment
+        uint256 maxRepay;
+        if (health < 95e16) { // 0.95 * 1e18
+            maxRepay = totalOwed; // full liquidation allowed
+        } else {
+            maxRepay = totalOwed / 2; // 50%
+        }
+
+        require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
+
+        // Collect repayment from liquidator into LiquidityPool
+        LiquidityPool(_liquidityPool()).repay(debtToCover, msg.sender);
+
+        // Apply repayment to loan (interest first)
+        uint256 newInterestOwed = loan.interestOwed + accruedInterest;
+        uint256 repaidPrincipal;
+        uint256 repaidInterest;
+
+        if (debtToCover <= newInterestOwed) {
+            // All goes to interest
+            repaidInterest = debtToCover;
+            loan.interestOwed = newInterestOwed - debtToCover;
+        } else {
+            // Pay off all interest, remainder to principal
+            repaidInterest = newInterestOwed;
+            repaidPrincipal = debtToCover - newInterestOwed;
+            loan.interestOwed = 0;
+            loan.principalBalance -= repaidPrincipal;
+        }
+
+        // Distribute protocol interest cut if any
+        if (repaidInterest > 0) {
+            distributeInterest(repaidInterest);
+        }
+
+        // If loan fully repaid, delete the record
+        if (loan.principalBalance == 0 && loan.interestOwed == 0) {
+            delete userLoan[borrower];
+        } else {
+            loan.lastIntCalculated = block.timestamp;
+            loan.lastUpdated = block.timestamp;
+        }
+
+        // Calculate collateral to seize
+        uint256 priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
+        uint256 priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+
+        uint256 collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
+        // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
+
+        // Ensure borrower has enough collateral
+        uint256 borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
+        if (collateralToSeize > borrowerCollateral) {
+            collateralToSeize = borrowerCollateral; // seize all remaining
+        }
+
+        // Transfer collateral to liquidator
+        CollateralVault(_collateralVault()).seizeCollateral(borrower, msg.sender, collateralAsset, collateralToSeize);
+
+        emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
