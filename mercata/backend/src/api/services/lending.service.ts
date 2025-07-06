@@ -29,8 +29,6 @@ export const getPool = async (
     ...(select
       ? {}
       : {
-          "lendingPool.loans.value->>active": "eq.true",
-          "collateralVault.collaterals.value->>amount": "gt.0",
           "liquidityPool.deposited.value->>amount": "gt.0",
           "liquidityPool.borrowed.value->>amount": "gt.0",
         }),
@@ -45,6 +43,181 @@ export const getPool = async (
     throw new Error(
       `Error fetching ${extractContractName(LendingRegistry)} data from Cirrus`
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fallback: transform new userLoan mapping into the legacy "loans" shape that
+  // downstream services expect. Also attach collateral info for each user so
+  // health-factor calculations work again.
+  // ---------------------------------------------------------------------------
+
+  try {
+    const lp = poolData.lendingPool || {};
+    // Only enrich if legacy loans array is missing/empty but userLoan exists
+    if ((!lp.loans || lp.loans.length === 0) && Array.isArray(lp.userLoan)) {
+      const borrowableAsset = lp.borrowableAsset;
+
+      // Build quick lookup map of all collateral per user
+      const collateralEntries: any[] = poolData.collateralVault?.collaterals || [];
+      const collateralMap = new Map<string, { asset: string; amount: string }[]>();
+
+      const formatAmt = (v: any): string => {
+        if (typeof v === "string") return v;
+        if (typeof v === "number") {
+          // Convert scientific notation to full integer string
+          return v.toLocaleString("fullwide", { useGrouping: false });
+        }
+        return v?.toString?.() || "0";
+      };
+
+      const pushColl = (u: string, a: string, amtRaw: any) => {
+        const amt = formatAmt(amtRaw);
+        if (!u) return;
+        const arr = collateralMap.get(u) || [];
+        arr.push({ asset: a, amount: amt });
+        collateralMap.set(u, arr);
+      };
+
+      collateralEntries.forEach((entry: any) => {
+        const userKey: string = entry?.user ?? entry?.key ?? ""; // user column or legacy key
+        const assetKey: string = entry?.asset ?? entry?.key2 ?? ""; // asset column if selected
+        const valObj: any = entry?.Collateral ?? entry?.value ?? {};
+
+        // Prefer columns first
+        let user: string = userKey;
+        let asset: string = assetKey;
+        let amount: string = (entry?.amount ?? "").toString();
+
+        // If columns empty fall back to object
+        if (!user) user = valObj.user || "";
+        if (!asset) asset = valObj.asset || "";
+
+        // If still missing asset try composite key string
+        const keyStr = entry?.key ?? "";
+        if (!asset && keyStr.includes(",")) {
+          asset = keyStr.split(",")[1] || "";
+        }
+
+        // Fallback: amount could be primitive
+        if (!amount || amount === "[object Object]") {
+          if (typeof entry.value === "string" || typeof entry.value === "number") {
+            amount = entry.value.toString();
+          }
+        }
+
+        pushColl(user, asset, amount);
+      });
+
+      // Convert each userLoan row into legacy LoanInfo format
+      lp.loans = lp.userLoan.map((row: any) => {
+        const key = row.key; // Should be user address
+        const raw = row.LoanInfo ?? row.value ?? {};
+        const principal = raw.principalBalance ?? raw.amount ?? "0";
+        const lastUpdated = raw.lastUpdated ?? raw.lastIntCalculated ?? 0;
+
+        const collArr = collateralMap.get(key) || [];
+        const primaryColl = collArr[0] || { asset: "", amount: "0" };
+
+        const loanInfo = {
+          user: key,
+          asset: borrowableAsset || "",
+          amount: principal.toString(),
+          collateralAsset: undefined,
+          collateralAmount: undefined,
+          collaterals: collArr,
+          lastUpdated: lastUpdated.toString(),
+          active: principal && principal.toString() !== "0",
+        };
+
+        return { key, LoanInfo: loanInfo };
+      });
+
+      // Once converted, drop userLoan to avoid duplicate arrays
+      delete lp.userLoan;
+
+      // ---------- Enrich loans with collateral USD values & health factor ----------
+      const priceMapHF = new Map<string, bigint>(
+        (poolData.oracle?.prices || []).map((p: any) => [p.asset.toLowerCase(), toBig(p.price)])
+      );
+
+      const ltMapHF = new Map<string, number>(
+        (lp.assetConfigs || []).map((row: any) => [
+          (row.asset || '').toLowerCase(),
+          Number(row.AssetConfig?.liquidationThreshold || 0),
+        ])
+      );
+
+      const calcHF = (loan: any): number => {
+        const debtPrice = priceMapHF.get((loan.asset || '').toLowerCase()) || 0n;
+        const debtValue = (toBig(loan.amount || 0) * debtPrice) / 10n ** 18n;
+        if (debtValue === 0n) return Infinity;
+
+        let numerator = 0n;
+        (loan.collaterals || []).forEach((c: any) => {
+          if (!c.asset) return;
+          const price = priceMapHF.get(c.asset.toLowerCase()) || 0n;
+          const val = (toBig(c.amount || 0) * price) / 10n ** 18n;
+          const lt = BigInt(ltMapHF.get(c.asset.toLowerCase()) || 0);
+          if (lt === 0n) return;
+          numerator += val * lt;
+        });
+
+        if (numerator === 0n) return Infinity;
+        // scale back by 1e4 because LT is in basis points
+        return Number(numerator) / Number(debtValue * 10000n);
+      };
+
+      lp.loans = lp.loans.map((entry: any) => {
+        const loan = entry.LoanInfo;
+
+        // Enrich collaterals with USD value
+        loan.collaterals = (loan.collaterals || []).map((c: any) => {
+          const price = priceMapHF.get((c.asset || '').toLowerCase()) || 0n;
+          const usd = ((toBig(c.amount || 0) * price) / 10n ** 18n).toString();
+          return { ...c, usdValue: usd };
+        });
+
+        const hfVal = calcHF(loan);
+        return { ...entry, healthFactor: isFinite(hfVal) ? hfVal : null };
+      });
+
+      // remove redundant arrays now that assetConfigs exists
+      delete lp.ltv;
+      delete lp.liquidationBonus;
+    }
+
+    // ---------------------------------------------------------------------
+    // Derive legacy arrays (interestRate, ltv, liquidationBonus) from the
+    // new assetConfigs mapping so downstream logic keeps working.
+    // ---------------------------------------------------------------------
+
+    if (Array.isArray(lp.assetConfigs)) {
+      if (!lp.interestRate) {
+        lp.interestRate = lp.assetConfigs.map((row: any) => {
+          const rate = row.AssetConfig?.interestRate ?? row.AssetConfig?.rate ?? 0;
+          return { asset: row.asset, rate };
+        });
+      }
+      if (!lp.ltv) {
+        lp.ltv = lp.assetConfigs.map((row: any) => {
+          const ltvVal = row.AssetConfig?.ltv ?? 0;
+          return { asset: row.asset, ltv: ltvVal };
+        });
+      }
+      if (!lp.liquidationBonus) {
+        lp.liquidationBonus = lp.assetConfigs.map((row: any) => {
+          const bonus = row.AssetConfig?.liquidationBonus ?? 0;
+          return { asset: row.asset, bonus };
+        });
+      }
+    }
+
+    // Final clean-up: remove redundant arrays
+    delete lp.ltv;
+    delete lp.liquidationBonus;
+  } catch (err) {
+    // Silently swallow enrichment errors – better to return raw data than break API
+    console.error("[getPool] loan enrichment failed", err);
   }
 
   return poolData;
@@ -193,13 +366,13 @@ export const repay = async (
     const bufferSec = 600; // 10-min buffer
     const hoursElapsed = BigInt(Math.floor((durationSec + bufferSec) / 3600)); // whole hours, ensures at least one hour after buffer
     const interest =
-      (BigInt(loan.amount) * BigInt(rateScaled) * hoursElapsed) /
+      (toBig(loan.amount) * BigInt(rateScaled) * hoursElapsed) /
       BigInt(8760 * 100 * 100); // extra *100 due to scaling
-    const totalOwed = (BigInt(loan.amount) + interest).toString();
+    const totalOwed = (toBig(loan.amount) + interest).toString();
 
     // Allow partial repayments. If caller over-pays, clip to the exact amount owed.
     let repayAmount = body.amount || totalOwed;
-    if (BigInt(repayAmount) > BigInt(totalOwed)) {
+    if (toBig(repayAmount) > toBig(totalOwed)) {
       repayAmount = totalOwed;
     }
 
@@ -260,19 +433,22 @@ export const getDepositableTokens = async (
       ({ asset, amount }: { asset: string; amount: string }) => [asset, amount]
     )
   );
-  return (registry.lendingPool.collateralRatio || [])
+  const collateralConfigs = registry.lendingPool.ltv || registry.lendingPool.collateralRatio || [];
+  return collateralConfigs
     .filter(
       ({ asset }: any) =>
         oraclePriceMap.has(asset) !== undefined && userTokenMap.has(asset)
     )
-    .map(({ asset, ratio }: { asset: string; ratio: number }) => {
+    .map((entry: any) => {
+      const asset = entry.asset;
+      const ratioVal = entry.ratio ?? entry.ltv ?? 0;
       const userToken = userTokenMap.get(asset) as any;
       return {
         address: asset,
         _name: userToken?.token?._name || "",
         _symbol: userToken?.token?._symbol || "",
         value: userToken?.balance?.toString() || "0",
-        collateralRatio: ratio || 0,
+        collateralRatio: ratioVal,
         interestRate: interestRateMap.get(asset) || 0,
         price: oraclePriceMap.get(asset) || "0",
         liquidity: liquidityMap.get(asset) || "0",
@@ -343,10 +519,14 @@ export const getLoans = async (
   // Collect all unique token addresses used in loans
   const tokenAddresses = [
     ...new Set(
-      combinedLoans.flatMap((entry: any) => [
-        entry.LoanInfo.asset,
-        entry.LoanInfo.collateralAsset,
-      ])
+      combinedLoans.flatMap((entry: any) => {
+        const base = [entry.LoanInfo.asset];
+        const collArr = entry.LoanInfo.collaterals || [];
+        if (collArr.length) {
+          return base.concat(collArr.map((c: any) => c.asset));
+        }
+        return base.concat(entry.LoanInfo.collateralAsset);
+      })
     ),
   ];
 
@@ -372,26 +552,44 @@ export const getLoans = async (
 
     const hf = calculateHealthFactor(loan, priceMap, ratioMap);
 
-    return {
-      key,
+    // Enrich collaterals with metadata & USD value
+    const collateralsEnriched = (loan.collaterals || []).map((c: any) => {
+      const tok = tokenMap.get(c.asset) || {};
+      const price = priceMap.get((c.asset || "").toLowerCase()) || 0n;
+      const usd = ((toBig(c.amount || 0) * price) / 10n ** 18n).toString();
+      return {
+        asset: c.asset,
+        amount: c.amount,
+        symbol: tok?._symbol || "",
+        name: tok?._name || "",
+        usdValue: usd,
+      };
+    });
+
+    // Backwards-compat collateralSymbol etc use first collateral
+    const firstColl = collateralsEnriched[0] || { symbol: "", name: "" };
+
+    const loanResp: any = {
+      ...loan,
+      assetName: assetToken?._name || "",
+      assetSymbol: assetToken?._symbol || "",
+      collateralName: firstColl.name,
+      collateralSymbol: firstColl.symbol,
+      collaterals: collateralsEnriched,
+      interest: loan.lastUpdated
+        ? (
+            (toBig(loan.amount) *
+              BigInt(interestRateMap.get(loan.asset.toLowerCase()) || 0) *
+              BigInt(Math.floor((Math.max(0, now - Number(loan.lastUpdated))) / 3600))) /
+            BigInt(8760 * 100)
+          ).toString()
+        : "0",
       healthFactor: hf,
-      loan: {
-        ...loan,
-        assetName: assetToken?._name || "",
-        assetSymbol: assetToken?._symbol || "",
-        collateralName: collateralToken?._name || "",
-        collateralSymbol: collateralToken?._symbol || "",
-        interest: loan.lastUpdated
-          ? (
-              (BigInt(loan.amount) *
-                BigInt(interestRateMap.get(loan.asset.toLowerCase()) || 0) *
-                BigInt(Math.floor((Math.max(0, now - Number(loan.lastUpdated))) / 3600))) /
-              BigInt(8760 * 100)
-            ).toString()
-          : "0",
-        healthFactor: hf,
-      },
     };
+    delete loanResp.collateralAsset;
+    delete loanResp.collateralAmount;
+
+    return { key, healthFactor: hf, loan: loanResp };
   });
 };
 
@@ -402,8 +600,13 @@ const buildMaps = (registry: any) => {
   const priceMap = new Map<string, bigint>(
     (registry.oracle.prices || []).map((p: any) => [p.asset.toLowerCase(), toBig(p.price)])
   );
+  const collateralEntries = registry.lendingPool.ltv || registry.lendingPool.collateralRatio || [];
   const ratioMap = new Map<string, number>(
-    (registry.lendingPool.collateralRatio || []).map((r: any) => [r.asset.toLowerCase(), r.ratio])
+    collateralEntries.map((r: any) => {
+      const assetAddr = (r.asset || "").toLowerCase();
+      const val = r.ltv ?? r.ratio ?? 0;
+      return [assetAddr, Number(val)];
+    })
   );
   return { priceMap, ratioMap };
 };
@@ -414,14 +617,28 @@ const calculateHealthFactor = (
   ratioMap: Map<string, number>
 ) => {
   const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
-  const collPrice = priceMap.get(loan.collateralAsset.toLowerCase()) || 0n;
   const loanValue = (toBig(loan.amount) * loanPrice) / 10n ** 18n;
-  const collValue = (toBig(loan.collateralAmount) * collPrice) / 10n ** 18n;
-  const ratio = BigInt(ratioMap.get(loan.collateralAsset.toLowerCase()) || 0);
-  if (ratio === 0n || loanValue === 0n) return Infinity;
-  const hfNumerator = collValue * 100n;
-  const hfDenominator = loanValue * ratio;
-  return Number((hfNumerator * 10000n) / hfDenominator) / 10000; // 4 decimal precision
+  if (loanValue === 0n) return Infinity;
+
+  // Handle multi-collateral
+  const collArr: { asset: string; amount: string }[] = loan.collaterals || [
+    { asset: loan.collateralAsset, amount: loan.collateralAmount },
+  ];
+
+  let thresholdValue = 0n;
+  for (const c of collArr) {
+    if (!c.asset) continue;
+    const p = priceMap.get(c.asset.toLowerCase()) || 0n;
+    const amt = toBig(c.amount || 0);
+    const val = (amt * p) / 10n ** 18n; // USD value
+    const ratio = BigInt(ratioMap.get(c.asset.toLowerCase()) || 0); // basis points
+    if (ratio === 0n) continue;
+    // Effective value before liquidation threshold: (coll * 100) / ratio
+    thresholdValue += (val * 100n) / ratio;
+  }
+
+  if (thresholdValue === 0n) return Infinity;
+  return Number((thresholdValue * 10000n) / loanValue) / 10000; // 4-dec precision
 };
 
 export const listLiquidatableLoans = async (accessToken: string) => {
@@ -430,12 +647,17 @@ export const listLiquidatableLoans = async (accessToken: string) => {
 
   const loans = (registry.lendingPool.loans || []) as any[];
 
-  // Fetch token metadata for unique addresses
+  // Fetch token metadata for all unique addresses involved
   const tokenAddresses = [
     ...new Set(
-      loans.flatMap((e) => [e.LoanInfo.asset, e.LoanInfo.collateralAsset])
+      loans.flatMap((e) => {
+        const base = [e.LoanInfo.asset];
+        const nodes = e.LoanInfo.collaterals?.map((c: any) => c.asset) || [];
+        return base.concat(nodes);
+      })
     ),
   ];
+
   const tokenMap = new Map(
     (
       await getTokens(accessToken, {
@@ -447,23 +669,47 @@ export const listLiquidatableLoans = async (accessToken: string) => {
   return loans
     .filter((e) => e.LoanInfo?.active)
     .map((e) => {
-      const hf = calculateHealthFactor(e.LoanInfo, priceMap, ratioMap);
       const loan = e.LoanInfo;
-      const assetToken = tokenMap.get(loan.asset) as any;
-      const collToken = tokenMap.get(loan.collateralAsset) as any;
+      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap);
 
-      // compute expected profit in USD terms using current prices
-      const totalOwed = BigInt(loan.amount); // ignore interest for estimate
-      const repayAmount = (totalOwed * 50n) / 100n; // 50% close factor
-      const bonusEntry = registry.lendingPool.liquidationBonus?.find?.((b: any) => b.asset === loan.collateralAsset);
-      const bonusPct = bonusEntry ? BigInt(bonusEntry.bonus) : 105n; // default 105
-      const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
-      const collPrice = priceMap.get(loan.collateralAsset.toLowerCase()) || 0n;
-      let seizeAmount = 0n;
-      if (collPrice > 0n) {
-        seizeAmount = (repayAmount * bonusPct * loanPrice) / (collPrice * 100n);
-      }
-      const profitWei = (seizeAmount * collPrice) / 1_000000000000000000n - (repayAmount * loanPrice) / 1_000000000000000000n;
+      const primaryCollAsset = (loan.collaterals && loan.collaterals[0]?.asset) || loan.collateralAsset || "";
+
+      const assetToken = tokenMap.get(loan.asset) as any;
+      const collToken = primaryCollAsset ? tokenMap.get(primaryCollAsset) as any : {};
+
+      // Determine close factor: 1.0 if HF < 0.95, else 0.5
+      const closeFactorNum = hf < 0.95 ? 100n : 50n; // 100% or 50%
+      const repayAmount = (toBig(loan.amount) * closeFactorNum) / 100n;
+
+      const collateralsWithProfit = (loan.collaterals || []).map((c: any) => {
+        if (!c.asset) return { ...c, expectedProfit: "0" };
+
+        const tokenMeta = tokenMap.get(c.asset) as any;
+        const symbol = tokenMeta?._symbol || "";
+
+        const acEntry = registry.lendingPool.assetConfigs?.find?.((ac: any) => ac.asset === c.asset);
+        const bonusBp = acEntry ? BigInt(acEntry.AssetConfig?.liquidationBonus ?? 10500) : 10500n;
+
+        const collPrice = priceMap.get(c.asset.toLowerCase()) || 0n;
+        const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
+        const availableTokens = toBig(c.amount);
+
+        // Seize amount calculated per Aave-style formula (collateral tokens)
+        let seizeTheory = 0n;
+        if (collPrice > 0n) {
+          seizeTheory = (repayAmount * bonusBp * loanPrice) / (collPrice * 10000n);
+        }
+
+        const seizeAmt = seizeTheory > availableTokens ? availableTokens : seizeTheory;
+
+        const profitWei = (seizeAmt * collPrice) / 1_000000000000000000n - (repayAmount * loanPrice) / 1_000000000000000000n;
+
+        const usdVal = ((availableTokens * collPrice) / 10n ** 18n).toString();
+
+        return { ...c, symbol, usdValue: usdVal, expectedProfit: profitWei.toString() };
+      });
+
+      loan.collaterals = collateralsWithProfit;
 
       return {
         id: e.key,
@@ -471,7 +717,6 @@ export const listLiquidatableLoans = async (accessToken: string) => {
         assetSymbol: assetToken?._symbol || '',
         collateralSymbol: collToken?._symbol || '',
         ...loan,
-        expectedProfit: profitWei.toString(),
       };
     })
     .filter((l) => l.healthFactor < 1);
@@ -488,7 +733,13 @@ export const listNearUnhealthyLoans = async (
 
   const tokenAddresses = [
     ...new Set(
-      loans.flatMap((e) => [e.LoanInfo.asset, e.LoanInfo.collateralAsset])
+      loans.flatMap((e) => {
+        const arr = [e.LoanInfo.asset];
+        const collArr = e.LoanInfo.collaterals || [];
+        if (collArr.length) arr.push(...collArr.map((c: any) => c.asset));
+        else arr.push(e.LoanInfo.collateralAsset);
+        return arr;
+      })
     ),
   ];
   const tokenMap = new Map(
@@ -502,10 +753,13 @@ export const listNearUnhealthyLoans = async (
   return loans
     .filter((e) => e.LoanInfo?.active)
     .map((e) => {
-      const hf = calculateHealthFactor(e.LoanInfo, priceMap, ratioMap);
       const loan = e.LoanInfo;
+      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap);
+      const primaryCollAsset = (loan.collaterals && loan.collaterals[0]?.asset) || loan.collateralAsset || "";
+
       const assetToken = tokenMap.get(loan.asset) as any;
-      const collToken = tokenMap.get(loan.collateralAsset) as any;
+      const collToken = primaryCollAsset ? tokenMap.get(primaryCollAsset) as any : {};
+
       return {
         id: e.key,
         healthFactor: hf,
@@ -553,8 +807,8 @@ export const executeLiquidation = async (
   const rateNum = rateObj ? Number(rateObj.rate) : 0;
   const rateScaled = Math.round(rateNum * 100);
   const durationSec = Math.max(0, now - Number(loan.lastUpdated));
-  const interestAcc = (BigInt(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
-  const totalOwed = BigInt(loan.amount) + interestAcc;
+  const interestAcc = (toBig(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
+  const totalOwed = toBig(loan.amount) + interestAcc;
 
   // health factor already computed earlier in listLiquidatable etc. Compute again quickly
   const { priceMap, ratioMap } = buildMaps(registry);
@@ -608,7 +862,10 @@ export const getLoanWithHealthFactor = async (
   return { id, healthFactor, ...loan };
 };
 
-const toBig = (v: string | number | bigint) => BigInt(v);
+const toBig = (v: string | number | bigint | undefined | null) => {
+  if (v === undefined || v === null) return 0n;
+  return BigInt(v);
+};
 
 export const setInterestRate = async (
   accessToken: string,
