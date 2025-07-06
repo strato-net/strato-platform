@@ -679,7 +679,10 @@ export const listLiquidatableLoans = async (accessToken: string) => {
 
       // Determine close factor: 1.0 if HF < 0.95, else 0.5
       const closeFactorNum = hf < 0.95 ? 100n : 50n; // 100% or 50%
-      const repayAmount = (toBig(loan.amount) * closeFactorNum) / 100n;
+      const maxRepayCloseFactor = (toBig(loan.amount) * closeFactorNum) / 100n;
+
+      // Store per-loan cap so the UI knows the global upper-bound
+      loan.maxRepay = maxRepayCloseFactor.toString();
 
       const collateralsWithProfit = (loan.collaterals || []).map((c: any) => {
         if (!c.asset) return { ...c, expectedProfit: "0" };
@@ -694,19 +697,23 @@ export const listLiquidatableLoans = async (accessToken: string) => {
         const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
         const availableTokens = toBig(c.amount);
 
-        // Seize amount calculated per Aave-style formula (collateral tokens)
-        let seizeTheory = 0n;
-        if (collPrice > 0n) {
-          seizeTheory = (repayAmount * bonusBp * loanPrice) / (collPrice * 10000n);
+        // --- Optimal repay so we seize *all* available collateral tokens ---
+        let repayOptimal = 0n;
+        if (collPrice > 0n && loanPrice > 0n) {
+          repayOptimal = (availableTokens * collPrice * 10000n) / (bonusBp * loanPrice);
         }
 
-        const seizeAmt = seizeTheory > availableTokens ? availableTokens : seizeTheory;
+        // Final repay is the lower of (close-factor cap) and (what inventory allows)
+        const repayEffective = repayOptimal > maxRepayCloseFactor ? maxRepayCloseFactor : repayOptimal;
 
-        const profitWei = (seizeAmt * collPrice) / 1_000000000000000000n - (repayAmount * loanPrice) / 1_000000000000000000n;
+        // With repayEffective we seize all available tokens (by construction)
+        const seizeAmt = availableTokens;
+
+        const profitWei = (seizeAmt * collPrice) / 1_000000000000000000n - (repayEffective * loanPrice) / 1_000000000000000000n;
 
         const usdVal = ((availableTokens * collPrice) / 10n ** 18n).toString();
 
-        return { ...c, symbol, usdValue: usdVal, expectedProfit: profitWei.toString() };
+        return { ...c, symbol, usdValue: usdVal, expectedProfit: profitWei.toString(), maxRepay: repayEffective.toString() };
       });
 
       loan.collaterals = collateralsWithProfit;
@@ -783,7 +790,8 @@ export const getLoanByIdDirect = async (
 
 export const executeLiquidation = async (
   accessToken: string,
-  loanId: string
+  loanId: string,
+  options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
   // Fetch liquidityPool address directly to avoid accidentally passing the whole object
   const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
@@ -801,29 +809,31 @@ export const executeLiquidation = async (
   const loan = found.LoanInfo;
 
   // choose collateral asset: if client supplied via body use it, else first collateral
-  const chosenCollateral = (loan.collaterals?.[0]?.asset) || loan.collateralAsset;
+  const chosenCollateral = options.collateralAsset || (loan.collaterals?.[0]?.asset) || loan.collateralAsset;
 
   if (!chosenCollateral) {
     throw new Error("Unable to determine collateral asset for liquidation");
   }
 
-  // Determine up-to-date interest and allowed repay cap (50% or full)
-  const now = Math.floor(Date.now() / 1000);
-  const rateArr = registry.lendingPool.interestRate || [];
-  const rateObj = rateArr.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
-  const rateNum = rateObj ? Number(rateObj.rate) : 0;
-  const rateScaled = Math.round(rateNum * 100);
-  const durationSec = Math.max(0, now - Number(loan.lastUpdated));
-  const interestAcc = (toBig(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
-  const totalOwed = toBig(loan.amount) + interestAcc;
+  // Determine repay amount
+  let repayAmount: bigint;
+  if (options.repayAmount !== undefined) {
+    repayAmount = toBig(options.repayAmount);
+  } else {
+    // Default logic: up-to-date owed amount (subject to close factor)
+    const now = Math.floor(Date.now() / 1000);
+    const rateArr = registry.lendingPool.interestRate || [];
+    const rateObj = rateArr.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
+    const rateNum = rateObj ? Number(rateObj.rate) : 0;
+    const rateScaled = Math.round(rateNum * 100);
+    const durationSec = Math.max(0, now - Number(loan.lastUpdated));
+    const interestAcc = (toBig(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
+    const totalOwed = toBig(loan.amount) + interestAcc;
 
-  // health factor already computed earlier in listLiquidatable etc. Compute again quickly
-  const { priceMap, ratioMap } = buildMaps(registry);
-  const hf = calculateHealthFactor(loan, priceMap, ratioMap);
-
-  let repayAmount = totalOwed;
-  if (hf >= 0.95) {
-    repayAmount = totalOwed / 2n; // 50%
+    // health factor to choose close factor
+    const { priceMap, ratioMap } = buildMaps(registry);
+    const hf = calculateHealthFactor(loan, priceMap, ratioMap);
+    repayAmount = hf >= 0.95 ? totalOwed / 2n : totalOwed;
   }
 
   const tx = buildFunctionTx([

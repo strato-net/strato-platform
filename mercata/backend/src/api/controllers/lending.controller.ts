@@ -204,7 +204,7 @@ class LendingController {
       const { accessToken } = req;
       const id = req.params.id;
 
-      const result = await executeLiquidationService(accessToken, id);
+      const result = await executeLiquidationService(accessToken, id, req.body || {});
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

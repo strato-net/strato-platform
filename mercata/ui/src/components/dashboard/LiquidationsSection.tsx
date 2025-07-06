@@ -1,8 +1,8 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 import CopyButton from "../ui/copy";
 import { useLiquidationContext } from "@/context/LiquidationContext";
+import LiquidateModal from "./LiquidateModal";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -15,21 +15,15 @@ const weiToEther = (v?: string) => {
 };
 
 const LiquidationsSection: React.FC = () => {
-  const { liquidatable, loading, error, executeLiquidation } = useLiquidationContext();
-  const { toast } = useToast();
+  const { liquidatable, loading, error, refreshData } = useLiquidationContext();
 
-  const handleLiquidate = async (id: string) => {
-    try {
-      await executeLiquidation(id);
-      toast({ title: "Liquidation submitted", variant: "success" });
-    } catch (err: any) {
-      toast({
-        title: "Liquidation failed",
-        description: err.message || "Error executing liquidation",
-        variant: "destructive",
-      });
-    }
-  };
+  const [modalData, setModalData] = React.useState<{
+    loan: any;
+    collateral: any;
+  } | null>(null);
+
+  const openModal = (loan: any, collateral: any) => setModalData({ loan, collateral });
+  const closeModal = () => setModalData(null);
 
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
@@ -93,7 +87,7 @@ const LiquidationsSection: React.FC = () => {
                                   <span className={positive ? "text-green-600" : "text-red-600"}>${profit}</span>
                                 </td>
                                 <td className="px-4 py-2 text-sm">
-                                  <Button size="sm" variant="destructive" onClick={() => handleLiquidate(ln.id)}>
+                                  <Button size="sm" variant="destructive" onClick={() => openModal(ln, c)}>
                                     Liquidate
                                   </Button>
                                 </td>
@@ -109,6 +103,21 @@ const LiquidationsSection: React.FC = () => {
             ))}
           </tbody>
         </table>
+      )}
+      {modalData && (
+        <LiquidateModal
+          key={`${modalData.loan.id}-${modalData.collateral.asset}`}
+          open={!!modalData}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+          loan={modalData.loan}
+          collateral={modalData.collateral}
+          onSuccess={async () => {
+            await refreshData();
+            closeModal();
+          }}
+        />
       )}
     </div>
   );
