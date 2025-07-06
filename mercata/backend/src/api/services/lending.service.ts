@@ -531,12 +531,12 @@ export const getLoans = async (
   ];
 
   // Fetch token metadata and build a lookup map
-  const tokenMap = new Map(
-    (
-      await getTokens(accessToken, {
-        address: `in.(${tokenAddresses.join(",")})`,
-      })
-    ).map((t: any) => [t.address, t])
+  const tokenRows = await getTokens(accessToken, {
+    address: `in.(${tokenAddresses.join(',')})`,
+  });
+  const tokenMap = new Map(tokenRows.map((t: any) => [t.address, t]));
+  const decimalsMap = new Map<string, number>(
+    tokenRows.map((t: any) => [t.address.toLowerCase(), Number(t.customDecimals ?? 18)])
   );
 
   const now = Math.floor(Date.now() / 1000);
@@ -550,13 +550,14 @@ export const getLoans = async (
     const assetToken = tokenMap.get(loan.asset) as any;
     const collateralToken = tokenMap.get(loan.collateralAsset) as any;
 
-    const hf = calculateHealthFactor(loan, priceMap, ratioMap);
+    const hf = calculateHealthFactor(loan, priceMap, ratioMap, decimalsMap);
 
     // Enrich collaterals with metadata & USD value
     const collateralsEnriched = (loan.collaterals || []).map((c: any) => {
       const tok = tokenMap.get(c.asset) || {};
       const price = priceMap.get((c.asset || "").toLowerCase()) || 0n;
-      const usd = ((toBig(c.amount || 0) * price) / 10n ** 18n).toString();
+      const dec = decimalsMap.get((c.asset || '').toLowerCase()) ?? 18;
+      const usd = valueInUsd(c.amount, price, dec).toString();
       return {
         asset: c.asset,
         amount: c.amount,
@@ -611,13 +612,25 @@ const buildMaps = (registry: any) => {
   return { priceMap, ratioMap };
 };
 
+/** Convert raw token amount to USD (18-dec price) respecting token decimals */
+const valueInUsd = (
+  amount: bigint | string | number,
+  price: bigint,
+  decimals: number = 18
+) => {
+  const amt = toBig(amount);
+  return (amt * price) / 10n ** BigInt(decimals);
+};
+
 const calculateHealthFactor = (
   loan: any,
   priceMap: Map<string, bigint>,
-  ratioMap: Map<string, number>
+  ratioMap: Map<string, number>,
+  decimalsMap: Map<string, number> = new Map()
 ) => {
+  const loanDecimals = decimalsMap.get(loan.asset.toLowerCase()) ?? 18;
   const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
-  const loanValue = (toBig(loan.amount) * loanPrice) / 10n ** 18n;
+  const loanValue = valueInUsd(toBig(loan.amount), loanPrice, loanDecimals);
   if (loanValue === 0n) return Infinity;
 
   // Handle multi-collateral
@@ -629,8 +642,8 @@ const calculateHealthFactor = (
   for (const c of collArr) {
     if (!c.asset) continue;
     const p = priceMap.get(c.asset.toLowerCase()) || 0n;
-    const amt = toBig(c.amount || 0);
-    const val = (amt * p) / 10n ** 18n; // USD value
+    const dec = decimalsMap.get(c.asset.toLowerCase()) ?? 18;
+    const val = valueInUsd(c.amount || 0, p, dec); // USD value
     const ratio = BigInt(ratioMap.get(c.asset.toLowerCase()) || 0); // basis points
     if (ratio === 0n) continue;
     // Effective value before liquidation threshold: (coll * 100) / ratio
@@ -658,19 +671,19 @@ export const listLiquidatableLoans = async (accessToken: string) => {
     ),
   ];
 
-  const tokenMap = new Map(
-    (
-      await getTokens(accessToken, {
-        address: `in.(${tokenAddresses.join(',')})`,
-      })
-    ).map((t: any) => [t.address, t])
+  const tokenRows = await getTokens(accessToken, {
+    address: `in.(${tokenAddresses.join(',')})`,
+  });
+  const tokenMap = new Map(tokenRows.map((t: any) => [t.address, t]));
+  const decimalsMap = new Map<string, number>(
+    tokenRows.map((t: any) => [t.address.toLowerCase(), Number(t.customDecimals ?? 18)])
   );
 
   return loans
     .filter((e) => e.LoanInfo?.active)
     .map((e) => {
       const loan = e.LoanInfo;
-      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap);
+      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap, decimalsMap);
 
       const primaryCollAsset = (loan.collaterals && loan.collaterals[0]?.asset) || loan.collateralAsset || "";
 
@@ -695,12 +708,15 @@ export const listLiquidatableLoans = async (accessToken: string) => {
 
         const collPrice = priceMap.get(c.asset.toLowerCase()) || 0n;
         const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
+        const dec = decimalsMap.get((c.asset || '').toLowerCase()) ?? 18;
         const availableTokens = toBig(c.amount);
 
         // --- Optimal repay so we seize *all* available collateral tokens ---
         let repayOptimal = 0n;
         if (collPrice > 0n && loanPrice > 0n) {
-          repayOptimal = (availableTokens * collPrice * 10000n) / (bonusBp * loanPrice);
+          repayOptimal =
+            (availableTokens * collPrice * 10n ** BigInt(dec) * 10000n) /
+            (bonusBp * loanPrice * 10n ** BigInt(dec));
         }
 
         // Final repay is the lower of (close-factor cap) and (what inventory allows)
@@ -709,9 +725,11 @@ export const listLiquidatableLoans = async (accessToken: string) => {
         // With repayEffective we seize all available tokens (by construction)
         const seizeAmt = availableTokens;
 
-        const profitWei = (seizeAmt * collPrice) / 1_000000000000000000n - (repayEffective * loanPrice) / 1_000000000000000000n;
+        const profitWei =
+          valueInUsd(seizeAmt, collPrice, dec) -
+          valueInUsd(repayEffective, loanPrice, dec);
 
-        const usdVal = ((availableTokens * collPrice) / 10n ** 18n).toString();
+        const usdVal = valueInUsd(seizeAmt, collPrice, dec).toString();
 
         return { ...c, symbol, usdValue: usdVal, expectedProfit: profitWei.toString(), maxRepay: repayEffective.toString() };
       });
@@ -749,19 +767,19 @@ export const listNearUnhealthyLoans = async (
       })
     ),
   ];
-  const tokenMap = new Map(
-    (
-      await getTokens(accessToken, {
-        address: `in.(${tokenAddresses.join(',')})`,
-      })
-    ).map((t: any) => [t.address, t])
+  const tokenRows = await getTokens(accessToken, {
+    address: `in.(${tokenAddresses.join(',')})`,
+  });
+  const tokenMap = new Map(tokenRows.map((t: any) => [t.address, t]));
+  const decimalsMap = new Map<string, number>(
+    tokenRows.map((t: any) => [t.address.toLowerCase(), Number(t.customDecimals ?? 18)])
   );
 
   return loans
     .filter((e) => e.LoanInfo?.active)
     .map((e) => {
       const loan = e.LoanInfo;
-      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap);
+      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap, decimalsMap);
       const primaryCollAsset = (loan.collaterals && loan.collaterals[0]?.asset) || loan.collateralAsset || "";
 
       const assetToken = tokenMap.get(loan.asset) as any;
