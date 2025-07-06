@@ -800,6 +800,13 @@ export const executeLiquidation = async (
   }
   const loan = found.LoanInfo;
 
+  // choose collateral asset: if client supplied via body use it, else first collateral
+  const chosenCollateral = (loan.collaterals?.[0]?.asset) || loan.collateralAsset;
+
+  if (!chosenCollateral) {
+    throw new Error("Unable to determine collateral asset for liquidation");
+  }
+
   // Determine up-to-date interest and allowed repay cap (50% or full)
   const now = Math.floor(Date.now() / 1000);
   const rateArr = registry.lendingPool.interestRate || [];
@@ -831,7 +838,7 @@ export const executeLiquidation = async (
       contractAddress: constants.lendingPool,
       method: "liquidationCall",
       args: {
-        collateralAsset: loan.collateralAsset,
+        collateralAsset: chosenCollateral,
         borrower: loan.user,
         debtToCover: repayAmount.toString(),
       },
@@ -845,6 +852,10 @@ export const executeLiquidation = async (
 
     return { status, hash };
   } catch (error: any) {
+    const msg = error?.response?.data?.message || error.message || "";
+    if (msg.includes("Invalid borrower")) {
+      throw new Error("Self-liquidation is not allowed. Use a different account to liquidate this position.");
+    }
     throw error;
   }
 };

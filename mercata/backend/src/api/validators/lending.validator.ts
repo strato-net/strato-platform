@@ -19,7 +19,10 @@ const repayLoanArgsSchema = Joi.object({
 });
 
 const loanIdParamSchema = Joi.object({
-  id: Joi.string().pattern(/^\d+$/).required(),
+  // allow plain numeric IDs (legacy) or 40-byte hex strings (current)
+  id: Joi.string()
+        .pattern(/^(\d+|[0-9a-fA-F]{40})$/)
+        .required(),
 });
 
 const marginQuerySchema = Joi.object({
