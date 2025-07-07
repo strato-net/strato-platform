@@ -1,6 +1,6 @@
 import { constants } from "../../config/constants";
 
-const toBig = (v: string | number | bigint) => BigInt(v);
+export const toBig = (v: string | number | bigint) => BigInt(v);
 const { DECIMALS } = constants;
 
 export interface LoanInfo {

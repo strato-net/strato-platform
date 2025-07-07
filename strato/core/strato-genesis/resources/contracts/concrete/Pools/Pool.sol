@@ -1,30 +1,97 @@
 // SPDX-License-Identifier: MIT
+import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Admin/AdminRegistry.sol";
+import "../Admin/FeeCollector.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
-//Removed deadlineCheck for now
-//Removed slippage protection as it is pbft
-contract record Pool {
+/**
+ * @title Pool
+ * @notice A decentralized exchange (DEX) liquidity pool for trading between two ERC20 tokens
+ * @dev This contract implements an automated market maker (AMM) with constant product formula
+ * 
+ * Key Features:
+ * - Automated market making using x * y = k formula
+ * - Liquidity provision and removal with LP token rewards
+ * - Swap functionality with configurable fees
+ * - Fee distribution between protocol and liquidity providers
+ * - Reentrancy protection for security
+ * 
+ * Fee Structure:
+ * - Total swap fee is split between protocol and LP providers
+ * - Protocol fee goes to fee collector
+ * - LP fee is distributed to liquidity providers based on their share
+ * 
+ * @author Mercata Protocol
+ * @version 1.0.0
+ */
+contract record Pool is Ownable {
     
-    // Events
-    event TokenAPurchase(address buyer, uint256 tokenB_sold, uint256 tokens_bought);
-    event TokenBPurchase(address buyer, uint256 tokenA_sold, uint256 tokenB_bought);
-    event AddLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
-    event RemoveLiquidity(address provider, uint256 tokenB_amount, uint256 tokenA_amount);
+    // ============ EVENTS ============
+    
+    /// @notice Emitted when a swap occurs
+    /// @param sender The address that initiated the swap
+    /// @param tokenIn The address of the input token
+    /// @param tokenOut The address of the output token
+    /// @param amountIn The amount of input tokens
+    /// @param amountOut The amount of output tokens received
+    event Swap(address sender, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+    
+    /// @notice Emitted when liquidity is added to the pool
+    /// @param provider The address that provided liquidity
+    /// @param tokenBAmount The amount of tokenB added
+    /// @param tokenAAmount The amount of tokenA added
+    event AddLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
+    
+    /// @notice Emitted when liquidity is removed from the pool
+    /// @param provider The address that removed liquidity
+    /// @param tokenBAmount The amount of tokenB received
+    /// @param tokenAAmount The amount of tokenA received
+    event RemoveLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
 
+    // ============ STATE VARIABLES ============
+    
+    /// @notice The first token in the trading pair
     Token public tokenA;
+    
+    /// @notice The second token in the trading pair
     Token public tokenB;
+    
+    /// @notice The liquidity provider token representing ownership in the pool
     Token public lpToken;
-    TokenFactory public tokenFactory;
 
+    /// @notice Reentrancy guard to prevent recursive calls
     bool private locked;   
     
+    /// @notice Current exchange rate from tokenA to tokenB
     decimal public aToBRatio;
+    
+    /// @notice Current exchange rate from tokenB to tokenA
     decimal public bToARatio;
 
+    /// @notice Current balance of tokenA in the pool
     uint public tokenABalance;
-    uint public tokenBBalance;
     
+    /// @notice Current balance of tokenB in the pool
+    uint public tokenBBalance;
+
+    /// @notice Accumulated fees per LP token share (scaled by 1e18)
+    uint256 public feePerShare;
+    
+    /// @notice Mapping of user addresses to their reward debt for fee calculations
+    mapping(address => uint256) public record rewardDebt;
+
+    /// @notice Pool-specific swap fee rate in basis points (0 = use factory default)
+    uint256 public swapFeeRate;
+    
+    /// @notice Pool-specific LP share percentage in basis points (0 = use factory default)
+    uint256 public lpSharePercent;
+    
+    // ============ MODIFIERS ============
+    
+    /// @notice Prevents reentrant calls to functions
+    /// @dev Uses a simple boolean lock to prevent recursive calls
     modifier nonReentrant() {
         require(!locked, "REENTRANT");
         locked = true;
@@ -32,194 +99,277 @@ contract record Pool {
         locked = false;
     }
 
+    // ============ INTERNAL FUNCTIONS ============
+    
+    /// @notice Get the fee collector address from the factory
+    /// @return The address of the fee collector contract
+    function _feeCollector() internal view returns (address) {
+        return PoolFactory(owner()).feeCollector();
+    }
+
+    /// @notice Get the token factory address from the factory
+    /// @return The address of the token factory contract
+    function _tokenFactory() internal view returns (address) {
+        return PoolFactory(owner()).tokenFactory();
+    }
+
+    /// @notice Get the effective swap fee rate for this pool
+    /// @return The swap fee rate in basis points (uses pool-specific rate if set, otherwise factory default)
+    function _swapFeeRate() internal view returns (uint256) {
+        if (swapFeeRate == 0) {
+            return PoolFactory(owner()).swapFeeRate();
+        }
+        return swapFeeRate;
+    }
+
+    /// @notice Get the effective LP share percentage for this pool
+    /// @return The LP share percentage in basis points (uses pool-specific rate if set, otherwise factory default)
+    function _lpSharePercent() internal view returns (uint256) {
+        if (lpSharePercent == 0) {
+            return PoolFactory(owner()).lpSharePercent();
+        }
+        return lpSharePercent;
+    }
+
+    // ============ CONSTRUCTOR ============
+    
+    /// @notice Initialize a new liquidity pool
+    /// @param tokenAAddr The address of the first token in the pair
+    /// @param tokenBAddr The address of the second token in the pair
+    /// @param lpTokenAddr The address of the LP token contract
+    /// @dev The pool owner is set to the factory that creates it
     constructor(
         address tokenAAddr, 
         address tokenBAddr,
-        address _tokenFactory
-    ) {
-        require(_tokenFactory != address(0), "Zero token factory address");
-        tokenFactory = TokenFactory(_tokenFactory);
+        address lpTokenAddr
+    ) Ownable(msg.sender) {
+        require(tokenAAddr != address(0), "Zero tokenA address");
+        require(tokenBAddr != address(0), "Zero tokenB address");
+        require(lpTokenAddr != address(0), "Zero lpToken address");
+        
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
-        
-        // Create LP token through token factory
-        string lpName = ERC20(tokenAAddr).name() + "-" + ERC20(tokenBAddr).name() + " LP Token";
-        string lpSymbol = ERC20(tokenAAddr).symbol() + "-" + ERC20(tokenBAddr).symbol() + "-LP";
-        
-        address lpTokenAddress = tokenFactory.createToken(
-            lpName,
-            "Liquidity Provider Token",
-            [],
-            [],
-            [],
-            lpSymbol,
-            0,
-            18
-        );
-        
-        lpToken = Token(lpTokenAddress);
+        lpToken = Token(lpTokenAddr);
     }
 
-    function updateStateVars() internal {
-        aToBRatio = getCurrentTokenABRatio();
-        bToARatio = getCurrentTokenBARatio();
+    // ============ UTILITY FUNCTIONS ============
+    
+    /// @notice Update the pool's state variables (balances and ratios)
+    /// @dev Called after operations that change token balances
+    function _updateStateVars() internal {
         tokenABalance = ERC20(tokenA).balanceOf(address(this));
         tokenBBalance = ERC20(tokenB).balanceOf(address(this));
+        aToBRatio = _getCurrentTokenRatio(true);
+        bToARatio = _getCurrentTokenRatio(false);
     }
 
-    // Core functions
-    function addLiquidity(
-        uint256 tokenB_amount,
-        uint256 max_tokenA_amount
-    ) external returns (uint256) {
-        require(tokenB_amount > 0 && max_tokenA_amount > 0, "Invalid inputs");
-        uint256 total_liquidity = ERC20(lpToken).totalSupply();
-        
-        if (total_liquidity > 0) {
-            require(tokenB_amount > 0, "Min liquidity required");
-            uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
-            uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
-            uint256 tokenA_amount = (tokenB_amount * tokenA_reserve / tokenB_reserve) + 1;
-            uint256 liquidity_minted = tokenB_amount * total_liquidity / tokenB_reserve;
-            
-            require(max_tokenA_amount >= tokenA_amount, "Insufficient tokenA amount");
-            lpToken.mint(msg.sender, liquidity_minted);
-            
-            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
-            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
-            
-            emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
+    /// @notice Calculate the current exchange ratio between tokens
+    /// @param isAToB If true, calculate A to B ratio; if false, calculate B to A ratio
+    /// @return The exchange ratio as a decimal value
+    /// @dev Returns 0 if either reserve is too small to calculate a meaningful ratio
+    function _getCurrentTokenRatio(bool isAToB) internal view returns (decimal) {
+        decimal tokenAReserve = decimal(tokenABalance);
+        decimal tokenBReserve = decimal(tokenBBalance);
 
-            updateStateVars();
+        if (tokenAReserve <= 0.000000000000000000 || tokenBReserve <= 0.000000000000000000) {
+            return 0.000000000000000000;
+        }
 
-            return liquidity_minted;
+        if (isAToB) {
+            return decimal((tokenBReserve * 1.000000000000000000) / tokenAReserve) / 1.000000000000000000;
         } else {
-            require(tokenB_amount >= 1000000000, "Minimum liquidity required");
-            
-            uint256 tokenA_amount = max_tokenA_amount;
-            uint256 initial_liquidity = tokenB_amount;
-            lpToken.mint(msg.sender, initial_liquidity);
-            
-            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_amount), "TokenB transfer failed");
-            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_amount), "TokenA transfer failed");
-            
-            emit AddLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-            
-            updateStateVars();
+            return decimal((tokenAReserve * 1.000000000000000000) / tokenBReserve) / 1.000000000000000000;
+        }
+        return 0.000000000000000000;
+    }
 
-            return initial_liquidity;
+    // ============ CORE FUNCTIONS ============
+    
+    /// @notice Add liquidity to the pool and receive LP tokens
+    /// @param tokenBAmount The amount of tokenB to add (used as the base for calculations)
+    /// @param maxTokenAAmount The maximum amount of tokenA the user is willing to add
+    /// @return The amount of LP tokens minted to the user
+    /// @dev For the first liquidity provision, tokenBAmount determines the initial LP token supply
+    /// @dev For subsequent provisions, the ratio must match the current pool ratio
+    /// @dev The user must approve both tokens for transfer before calling this function
+    function addLiquidity(
+        uint256 tokenBAmount,
+        uint256 maxTokenAAmount
+    ) external returns (uint256) {
+        require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
+        uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        
+        if (totalLiquidity > 0) {
+            uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
+            uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
+            uint256 tokenAAmount = (tokenBAmount * tokenAReserve / tokenBReserve) + 1;
+            uint256 liquidityMinted = tokenBAmount * totalLiquidity / tokenBReserve;
+
+            require(maxTokenAAmount >= tokenAAmount, "Insufficient tokenA amount");
+            lpToken.mint(msg.sender, liquidityMinted);
+            rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
+
+            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
+            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
+
+            emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
+
+            _updateStateVars();
+
+            return liquidityMinted;
+        } else {
+            uint256 tokenAAmount = maxTokenAAmount;
+            uint256 initialLiquidity = tokenBAmount;
+            lpToken.mint(msg.sender, initialLiquidity);
+            rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
+
+            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
+            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
+
+            emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
+
+            _updateStateVars();
+
+            return initialLiquidity;
         }
     }
 
+    /// @notice Remove liquidity from the pool by burning LP tokens
+    /// @param lpTokenAmount The amount of LP tokens to burn
+    /// @param minTokenBAmount The minimum amount of tokenB to receive
+    /// @param minTokenAAmount The minimum amount of tokenA to receive
+    /// @return tokenBAmount The amount of tokenB received
+    /// @return tokenAAmount The amount of tokenA received
+    /// @dev The user must approve LP tokens for burning before calling this function
+    /// @dev Slippage protection is provided by minTokenBAmount and minTokenAAmount parameters
     function removeLiquidity(
-        uint256 amount, 
-        uint256 min_tokenB,
-        uint256 min_tokenA_amount
+        uint256 lpTokenAmount, 
+        uint256 minTokenBAmount,
+        uint256 minTokenAAmount
     ) external returns (uint256, uint256) {
-        require(amount > 0 && min_tokenB > 0 && min_tokenA_amount > 0, "Invalid inputs");
-        uint256 total_liquidity = ERC20(lpToken).totalSupply();
-        require(total_liquidity > 0, "No liquidity");
-        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
-        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokenB_amount = amount * tokenB_reserve / total_liquidity;
-        uint256 tokenA_amount = amount * tokenA_reserve / total_liquidity;
+        require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
+        uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        require(totalLiquidity > 0, "No liquidity");
+        uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
+        uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
+        uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
+        uint256 tokenAAmount = lpTokenAmount * tokenAReserve / totalLiquidity;
         
-        require(tokenB_amount >= min_tokenB && tokenA_amount >= min_tokenA_amount, "Insufficient amounts");
-        
-        require(ERC20(tokenB).transfer(msg.sender, tokenB_amount), "TokenB transfer failed");
-        require(ERC20(tokenA).transfer(msg.sender, tokenA_amount), "TokenA transfer failed");
-        
-        emit RemoveLiquidity(msg.sender, tokenB_amount, tokenA_amount);
-        
-        lpToken.burn(msg.sender, amount);
-        
-        updateStateVars();
+        require(tokenBAmount >= minTokenBAmount && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
 
-        return (tokenB_amount, tokenA_amount);
+        require(ERC20(tokenB).transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
+        require(ERC20(tokenA).transfer(msg.sender, tokenAAmount), "TokenA transfer failed");
+
+        emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
+
+        lpToken.burn(msg.sender, lpTokenAmount);
+        rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
+
+        _updateStateVars();
+
+        return (tokenBAmount, tokenAAmount);
     }
 
-    // Private pricing functions
+    // ============ SWAP FUNCTIONS ============
+    
+    /// @notice Calculate the output amount for a given input amount using the constant product formula
+    /// @param inputAmount The amount of input tokens
+    /// @param inputReserve The current reserve of input tokens
+    /// @param outputReserve The current reserve of output tokens
+    /// @return The amount of output tokens that would be received
+    /// @dev Uses the formula: outputAmount = (inputAmount * outputReserve) / (inputReserve + inputAmount)
     function getInputPrice(
-        uint256 input_amount,
-        uint256 input_reserve,
-        uint256 output_reserve
+        uint256 inputAmount,
+        uint256 inputReserve,
+        uint256 outputReserve
     ) pure returns (uint256) {
-        require(input_reserve > 0 && output_reserve > 0, "Invalid reserves");
-        uint256 input_amount_with_fee = input_amount *  1000;//Mercata_Compatibility: Updated from 997 which would be 0.03% fees
-        uint256 numerator = input_amount_with_fee * output_reserve;
-        uint256 denominator = (input_reserve * 1000) + input_amount_with_fee;
+        require(inputReserve > 0 && outputReserve > 0, "Invalid reserves");
+        uint256 numerator = inputAmount * outputReserve;
+        uint256 denominator = inputReserve + inputAmount;
         return numerator / denominator;
     }
 
-    // Public price functions
-    function getTokenAQuantityNeededForTokenBQuantity(uint256 amount, bool isTokenBToTokenA) external view returns (uint256) {
-        require(amount > 0, "Invalid stable amount");
-        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
-        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
+    /// @notice Swap tokens using the automated market maker
+    /// @param isAToB If true, swap tokenA for tokenB; if false, swap tokenB for tokenA
+    /// @param amountIn The amount of input tokens to swap
+    /// @param minAmountOut The minimum amount of output tokens to receive (slippage protection)
+    /// @return amountOut The actual amount of output tokens received
+    /// @dev The user must approve input tokens for transfer before calling this function
+    /// @dev Fees are automatically deducted and distributed between protocol and LP providers
+    /// @dev Reentrancy protection is applied to prevent attacks
+    function swap(
+        bool isAToB,
+        uint256 amountIn,
+        uint256 minAmountOut
+    ) external nonReentrant returns (uint256 amountOut) {
+        require(amountIn > 0 && minAmountOut > 0, "Invalid input");
 
-        if (isTokenBToTokenA) {
-            return getInputPrice(amount, tokenB_reserve, tokenA_reserve);
-        } else {
-            return getInputPrice(amount, tokenA_reserve, tokenB_reserve);
+        Token inputToken = isAToB ? tokenA : tokenB;
+        Token outputToken = isAToB ? tokenB : tokenA;
+
+        uint256 inputReserve = ERC20(inputToken).balanceOf(address(this));
+        uint256 outputReserve = ERC20(outputToken).balanceOf(address(this));
+
+        uint256 fee = (amountIn * _swapFeeRate()) / 10000;
+        uint256 lpFee = (fee * _lpSharePercent()) / 10000;
+        uint256 protocolFee = fee - lpFee;
+
+        uint256 netInput = amountIn - fee;
+        uint256 totalSupply = ERC20(lpToken).totalSupply();
+
+        if (totalSupply > 0) {
+            feePerShare += (lpFee * 1e18) / totalSupply;
         }
+
+        // Transfer full amount to pool
+        require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Input transfer failed");
+        
+        // Send protocol fee to fee collector
+        require(ERC20(inputToken).transfer(_feeCollector(), protocolFee), "Protocol fee transfer failed");
+
+        amountOut = getInputPrice(netInput, inputReserve, outputReserve);
+        require(amountOut >= minAmountOut, "Slippage check failed");
+
+        require(ERC20(outputToken).transfer(msg.sender, amountOut), "Output xfer failed");
+
+        _updateStateVars();
+
+        emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
     }
 
-    // Price view functions
-    function getCurrentTokenABRatio() public view returns (decimal) {
-        decimal tokenA_reserve = decimal(ERC20(tokenA).balanceOf(address(this)));
-        decimal tokenB_reserve = decimal(ERC20(tokenB).balanceOf(address(this)));
-        require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
-        // Price of 1 tokenA in stablecoins (tokenB_reserve / tokenA_reserve)
-        return decimal((tokenB_reserve * 1.000000000000000000 ) / tokenA_reserve) / 1.000000000000000000;//MERCATA_COMPATIBILITY: Added decimal division for my testing
+    // ============ FEE MANAGEMENT ============
+    
+    /// @notice Claim accumulated swap fees for the caller
+    /// @dev Calculates the user's share of accumulated fees based on their LP token balance
+    /// @dev Updates the user's reward debt to prevent double-claiming
+    /// @dev Fees are paid in tokenA
+    function claimFees() external {
+        uint256 accrued = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
+        uint256 pending = accrued - rewardDebt[msg.sender];
+        rewardDebt[msg.sender] = accrued;
+
+        require(ERC20(tokenA).transfer(msg.sender, pending), "Claim transfer failed");
     }
 
-
-    function getCurrentTokenBARatio() public view returns (decimal) {
-        decimal tokenA_reserve = decimal(ERC20(tokenA).balanceOf(address(this)))* 1.000000000000000000;
-        decimal tokenB_reserve = decimal(ERC20(tokenB).balanceOf(address(this)))* 1.000000000000000000;
-        require(tokenA_reserve > 0.000000000000000000 && tokenB_reserve > 0.000000000000000000, "No liquidity");
-        // Price of 1 tokenB in tokens (tokenA_reserve / tokenB_reserve)
-        return decimal((tokenA_reserve * 1.000000000000000000) / tokenB_reserve) / 1.000000000000000000; //MERCATA_COMPATIBILITY: Added decimal division for my testing
-    }
-
-    // Swap functions
-    function tokenBToTokenA(
-        uint256 tokenB_sold,
-        uint256 min_tokens  
-    ) external nonReentrant returns (uint256) {
-        require(tokenB_sold > 0 && min_tokens > 0, "Invalid inputs");
-        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
-        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokens_bought = getInputPrice(tokenB_sold, tokenB_reserve, tokenA_reserve);
+    // ============ ADMIN FUNCTIONS ============
+    
+    /// @notice Set fee parameters for this pool (owner only)
+    /// @param newSwapFeeRate New swap fee rate in basis points (e.g., 30 = 0.3%)
+    /// @param newLpSharePercent New LP share percentage in basis points (e.g., 7000 = 70%)
+    /// @dev This function can only be called by the owner of the pool which is the PoolFactory contract
+    /// @dev Updates both swap fee rate and LP share percentage in a single transaction
+    /// @dev If set to 0, the pool will use the factory's default values
+    /// @dev Maximum swap fee rate is 10% (1000 basis points)
+    /// @dev LP share percentage must be between 0 and 100% (0-10000 basis points)
+    function setFeeParameters(
+        uint256 newSwapFeeRate,
+        uint256 newLpSharePercent
+    ) external onlyOwner {
+        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
+        require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
+        require(newLpSharePercent > 0, "LP share must be greater than 0");
         
-        require(tokens_bought >= min_tokens, "Insufficient output amount");
-        
-        require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenB_sold), "TokenB transfer failed");
-        require(ERC20(tokenA).transfer(msg.sender, tokens_bought), "TokenA transfer failed");
-        
-        updateStateVars();
-
-        emit TokenAPurchase(msg.sender, tokenB_sold, tokens_bought);
-        return tokens_bought;
-    }
-
-    function tokenAToTokenB(
-        uint256 tokenA_sold,
-        uint256 min_tokenB
-    ) external nonReentrant returns (uint256) {
-        require(tokenA_sold > 0 && min_tokenB > 0, "Invalid inputs");
-        uint256 tokenA_reserve = ERC20(tokenA).balanceOf(address(this));
-        uint256 tokenB_reserve = ERC20(tokenB).balanceOf(address(this));
-        uint256 tokenB_bought = getInputPrice(tokenA_sold, tokenA_reserve, tokenB_reserve);
-        
-        require(tokenB_bought >= min_tokenB, "Insufficient output amount");
-        
-        require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenA_sold), "TokenA transfer failed");
-        require(ERC20(tokenB).transfer(msg.sender, tokenB_bought), "TokenB transfer failed");
-        
-        updateStateVars();
-        
-        emit TokenBPurchase(msg.sender, tokenA_sold, tokenB_bought);
-        return tokenB_bought;
+        swapFeeRate = newSwapFeeRate;
+        lpSharePercent = newLpSharePercent;
     }
 }

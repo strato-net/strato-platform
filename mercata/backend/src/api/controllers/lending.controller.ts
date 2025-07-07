@@ -209,12 +209,7 @@ class LendingController {
       const { accessToken } = req;
       const id = req.params.id;
 
-      if (!id) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Loan ID is required" });
-        return;
-      }
-
-      const result = await executeLiquidationService(accessToken, id);
+      const result = await executeLiquidationService(accessToken, id, req.body || {});
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

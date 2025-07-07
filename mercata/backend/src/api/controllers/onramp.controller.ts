@@ -38,15 +38,18 @@ class OnRampController {
     res: Response,
     next: NextFunction
   ): Promise<void> {
+
     try {
-      const { accessToken, address,  body } = req;
+      const { accessToken, address, body } = req;
 
       const result = await buy(accessToken, address, body);
+
       res.status(RestStatus.OK).json({ url: result.url });
     } catch (error) {
       next(error);
     }
   }
+  
 }
 
 export default OnRampController;

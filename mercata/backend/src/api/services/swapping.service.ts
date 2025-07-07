@@ -31,12 +31,17 @@ export const getPools = async (
       _owner: "eq." + constants.poolFactory,
   };
 
+  // DEBUG: log Cirrus query parameters to verify filters
+  if (process.env.DEBUG_GET_POOLS === 'true') {
+    console.log('[getPools] params →', params);
+  }
+
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params,
   });
 
   // Fetch oracle prices
-  const { oracle: { prices } } = await getLendingRegistry(accessToken, {
+  const { oracle: { prices } } = await getLendingRegistry(accessToken, undefined, {
     select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
   });
   

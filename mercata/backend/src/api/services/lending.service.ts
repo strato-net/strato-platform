@@ -16,7 +16,10 @@ import {
   calculateTotalBorrowed,
   calculateUtilizationRate,
   calculateTotalCollateralValue,
-  calculateAPYs
+  calculateTotalCollateralValueForHealth,
+  calculateHealthFactor,
+  calculateAPYs,
+  toBig,
 } from "../helpers/lending.helper";
 
 const {
@@ -423,7 +426,8 @@ export const getLoan = async (
 
 export const executeLiquidation = async (
   accessToken: string,
-  loanId: string  
+  loanId: string,
+  options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
   const { liquidityPool } = await getPool(accessToken, undefined, { select: "liquidityPool" });
   if (!liquidityPool || typeof liquidityPool !== "string") {
@@ -439,16 +443,67 @@ export const executeLiquidation = async (
   }
   const loan = found.LoanInfo;
 
-  // Approve the LiquidityPool to pull up to the full outstanding amount.
-  const maxApprove = (BigInt(loan.amount) * 2n).toString();
+  // choose collateral asset: if client supplied via body use it, else first collateral
+  const chosenCollateral = options.collateralAsset || (loan.collaterals?.[0]?.asset) || loan.collateralAsset;
+
+  if (!chosenCollateral) {
+    throw new Error("Unable to determine collateral asset for liquidation");
+  }
+
+  // Determine repay amount
+  let repayAmount: bigint;
+  if (options.repayAmount !== undefined) {
+    repayAmount = toBig(options.repayAmount);
+  } else {
+    // Default logic: up-to-date owed amount (subject to close factor)
+    const now = Math.floor(Date.now() / 1000);
+    const rateArr = registry.lendingPool.interestRate || [];
+    const rateObj = rateArr.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
+    const rateNum = rateObj ? Number(rateObj.rate) : 0;
+    const rateScaled = Math.round(rateNum * 100);
+    const durationSec = Math.max(0, now - Number(loan.lastUpdated));
+    const interestAcc = (toBig(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
+    const totalOwed = toBig(loan.amount) + interestAcc;
+
+    // health factor to choose close factor
+    // Build price and ratio maps from registry data
+    const priceMap = new Map<string, string>();
+    const ratioMap = new Map<string, any>();
+    
+    // Build price map from oracle data
+    (registry.oracle?.prices || []).forEach((price: any) => {
+      priceMap.set(price.asset, price.price);
+    });
+    
+    // Build ratio map from asset configs
+    (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+      ratioMap.set(config.asset, config.AssetConfig);
+    });
+    
+    // Calculate health factor using total collateral value and total owed
+    const totalCollateralValue = calculateTotalCollateralValueForHealth(
+      loan.collaterals || [],
+      new Map(Array.from(ratioMap.entries()).map(([asset, config]) => [
+        asset, 
+        { 
+          price: priceMap.get(asset) || "0",
+          liquidationThreshold: config?.liquidationThreshold || 0,
+          interestRate: config?.interestRate || 0
+        }
+      ]))
+    );
+    
+    const hf = calculateHealthFactor(totalCollateralValue, totalOwed.toString());
+    const healthFactorPercentage = Number(hf) / Number(constants.DECIMALS);
+    repayAmount = healthFactorPercentage >= 0.95 ? totalOwed / 2n : totalOwed;
+  }
 
   const tx = buildFunctionTx([
     {
-      // First approve the debt token so LiquidityPool can pull repayment
       contractName: extractContractName(Token),
       contractAddress: loan.asset,
       method: "approve",
-      args: { spender: liquidityPoolAddr, value: maxApprove },
+      args: { spender: liquidityPoolAddr, value: repayAmount.toString() },
     },
     {
       contractName: extractContractName(LendingPool),
@@ -465,6 +520,10 @@ export const executeLiquidation = async (
 
     return { status, hash };
   } catch (error: any) {
+    const msg = error?.response?.data?.message || error.message || "";
+    if (msg.includes("Invalid borrower")) {
+      throw new Error("Self-liquidation is not allowed. Use a different account to liquidate this position.");
+    }
     throw error;
   }
 };
@@ -482,9 +541,17 @@ export const setInterestRate = async (
     throw new Error("Interest rate must be a number between 0 and 100");
   }
 
+  // Get pool configurator address from lending registry
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = registry._owner;
+  
+  if (!poolConfiguratorAddress) {
+    throw new Error("Pool configurator address not found in lending registry");
+  }
+
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: constants.PoolConfigurator,
+    contractAddress: poolConfiguratorAddress,
     method: "setInterestRate",
     args: { 
       asset: body.asset, 
@@ -512,9 +579,17 @@ export const setCollateralRatio = async (
     throw new Error("Collateral ratio must be a number between 100 and 1000");
   }
 
+  // Get pool configurator address from lending registry
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = registry._owner;
+  
+  if (!poolConfiguratorAddress) {
+    throw new Error("Pool configurator address not found in lending registry");
+  }
+
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: constants.PoolConfigurator,
+    contractAddress: poolConfiguratorAddress,
     method: "setCollateralRatio",
     args: { 
       asset: body.asset, 
@@ -542,9 +617,17 @@ export const setLiquidationBonus = async (
     throw new Error("Liquidation bonus must be a number between 100 and 200");
   }
 
+  // Get pool configurator address from lending registry
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = registry._owner;
+  
+  if (!poolConfiguratorAddress) {
+    throw new Error("Pool configurator address not found in lending registry");
+  }
+
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: constants.PoolConfigurator,
+    contractAddress: poolConfiguratorAddress,
     method: "setLiquidationBonus",
     args: { 
       asset: body.asset, 

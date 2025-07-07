@@ -59,8 +59,43 @@ async function uploadDappContract(token, options) {
   try {
     // Combine all contracts
     console.log("Combining contract source files...");
-    const source = await importer.combine(contractFilePath);
-    console.log("Contract source files combined successfully");
+    let source = await importer.combine(contractFilePath);
+
+    const stripComments = (str) => {
+      // Remove block comments
+      let out = str.replace(/\/\*[\s\S]*?\*\//g, "");
+      // Remove line comments but keep SPDX license
+      out = out
+        .split("\n")
+        .map((ln) => {
+          const t = ln.trim();
+          if (t.startsWith("//")) {
+            return t.includes("SPDX-License-Identifier") ? ln : "";
+          }
+          return ln.replace(/\/\/.*$/, "");
+        })
+        .join("\n");
+      return out;
+    };
+
+    if (Buffer.isBuffer(source)) {
+      source = stripComments(source.toString());
+    } else if (typeof source === "object") {
+      const processed = Object.keys(source).map((k) => {
+        let content = source[k];
+        content = typeof content === "string" ? content : String(content);
+        // Remove filename prefix like "File.sol,"
+        content = content.replace(/^.*?\.sol,\s*/i, "");
+        return stripComments(content);
+      });
+      source = processed.join("\n");
+    } else if (typeof source === "string") {
+      source = stripComments(source);
+    } else {
+      source = stripComments(String(source));
+    }
+
+    console.log("Comments stripped from combined source(s)");
 
     // Deployment arguments
     const contractArgs = {

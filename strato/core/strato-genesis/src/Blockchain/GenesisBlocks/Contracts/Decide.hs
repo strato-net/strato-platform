@@ -22,7 +22,7 @@ blockappsAddress = 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce -- 0x0dbb9131d99c8
 mercataAddress :: Address
 mercataAddress = 0x1000
 
--- | Inserts the 0xDEC1DE and contract 0xDEC1DEFF into the genesis block with the BlockApps root cert as owner
+-- | Inserts the 0xDEC1DE and contract 0xDEC1DE02 into the genesis block with the BlockApps root cert as owner
 insertDecideContract :: GenesisInfo -> GenesisInfo
 insertDecideContract gi =
   gi
@@ -38,14 +38,14 @@ insertDecideContract gi =
         []
     decideStateAcct =
       SolidVMContractWithStorage
-        0xDEC1DEFF
+        0xDEC1DE02
         0
         (SolidVMCode "DeciderState" (KECCAK256.hash $ encodeUtf8 dec1deStateContract))
         [ (".:creator", BString $ encodeUtf8 "BlockApps"),
           (".:creatorAddress", BAccount $ unspecifiedChain blockappsAddress),
           (".:originAddress", BAccount $ unspecifiedChain mercataAddress),
           (".owner", BAccount $ unspecifiedChain blockappsAddress),
-          (".currentFeeContract", BAccount $ unspecifiedChain 0xDEC1DEFF)
+          (".currentFeeContract", BAccount $ unspecifiedChain 0xDEC1DE02)
         ]
 
 dec1deContract :: Text
@@ -60,7 +60,7 @@ contract record Decider {
     }
 
     function decide() returns (bool) {
-      GetImplContract deciderStateContract = GetImplContract(address(0xDEC1DEFF));
+      GetImplContract deciderStateContract = GetImplContract(address(0xDEC1DE02));
       address payFeesImplContract = deciderStateContract.getImplContract();
       payFeesImplContract.delegatecall("payFees");
       return true;
@@ -108,8 +108,13 @@ contract record DeciderState is GetImplContract {
 
     function payFees() external {
         uint oneDollar = 1e18;
+        address voucher = address(0x000000000000000000000000000000000000100e);
         address USDST = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
         address validatorPool = address(0x1234);
-        ERC20_Template(USDST).transfer(validatorPool, oneDollar / 10);
+        try { // try to use a voucher
+            voucher.call("burn", address(this), 1000000000000000000);
+        } catch { // if no voucher, pay in USDST
+            ERC20_Template(USDST).transfer(validatorPool, oneDollar / 100);
+        }
     }
 }|]
