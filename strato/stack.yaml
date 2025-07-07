@@ -69,8 +69,8 @@ packages:
 - libs/type-lits
 
 #removing for now, too hard to keep this up to date when making large changes elsewhere
-#- simulator/strato-lite
-#- simulator/smd-ui-hs
+- simulator/strato-lite
+- simulator/smd-ui-hs
 
 - tools/blockapps-tools
 - tools/debugger-tools
@@ -128,7 +128,7 @@ extra-deps:
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
-# arch: aarch64 # uncomment for MacOS
+arch: aarch64 # uncomment for MacOS
 
 flags:
   blockapps-secp256k1-haskell:
@@ -146,20 +146,20 @@ notify-if-nix-on-path: false
 resolver: lts-23.14 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
-- /usr/local/include
-- /usr/include
+# - /usr/local/include
+# - /usr/include
 # For MacOS
-# - /opt/homebrew/opt/libffi/include
-# - /opt/homebrew/opt/leveldb/include
-# - /opt/homebrew/opt/postgresql@14/include
+- /opt/homebrew/opt/libffi/include
+- /opt/homebrew/opt/leveldb/include
+- /opt/homebrew/opt/postgresql@14/include
 
 extra-lib-dirs:
-- /usr/local/lib
-- /usr/lib
+# - /usr/local/lib
+# - /usr/lib
 # For MacOS
-# - /opt/homebrew/opt/libffi/lib
-# - /opt/homebrew/opt/leveldb/lib
-# - /opt/homebrew/opt/postgresql@14/lib
+- /opt/homebrew/opt/libffi/lib
+- /opt/homebrew/opt/leveldb/lib
+- /opt/homebrew/opt/postgresql@14/lib
 
 allow-newer: true
 allow-different-user: true
@@ -175,7 +175,7 @@ ghc-options:
 
 
 docker:
-  enable: true # set to false for MacOS
+  enable: false # set to false for MacOS
   image: "strato-buildbase:lts-23.14"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

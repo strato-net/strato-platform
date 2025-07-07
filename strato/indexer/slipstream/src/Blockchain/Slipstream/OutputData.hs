@@ -1257,7 +1257,6 @@ insertAbstractTableQuery cs =
                     "block_number",
                     "transaction_hash",
                     "transaction_sender",
-                    "contract_sender",
                     "contract_name"
                   ] ++ keysForSQL
                 mExtraSQL = Just $ T.concat
