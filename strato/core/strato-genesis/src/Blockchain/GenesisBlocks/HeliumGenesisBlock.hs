@@ -398,6 +398,7 @@ voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddr
      , ("._totalSupply", BInteger 0)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger 1000000000000000000000000)
      ]
 
 mToken :: AccountInfo
@@ -409,6 +410,8 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddres
      , ("._totalSupply", BInteger 0)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".minters<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , (".burners<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
