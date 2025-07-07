@@ -7,6 +7,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { api } from '@/lib/axios';
+import { toast } from '@/components/ui/use-toast';
 
 interface LiquidationEntry {
   id: string;
@@ -79,8 +80,9 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       await refreshData();
     } catch (err: any) {
       console.error('Liquidation failed:', err);
-      setError(err.response?.data?.message || err.message || 'Error executing liquidation');
-      throw err;
+      const backendMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message;
+      // rethrow a clean Error so the UI layer can surface it
+      throw new Error(backendMsg);
     } finally {
       setLoading(false);
     }

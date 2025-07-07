@@ -1,4 +1,5 @@
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/IERC20.sol";
 import "./LendingRegistry.sol";
 
 /**
@@ -7,16 +8,14 @@ import "./LendingRegistry.sol";
  * @dev Only callable by LendingPool for adding or removing user collateral.
  */
  
-contract record CollateralVault is IERC20, Ownable {
+contract record CollateralVault is Ownable {
     event CollateralAdded(address indexed user, address indexed asset, uint256 amount);
     event CollateralRemoved(address indexed user, address indexed asset, uint256 amount);
-    struct Collateral {   
-        address user;
-        address asset;
-        uint256 amount;
-    }
+
     LendingRegistry public registry;
-    mapping(string => Collateral) public record collaterals;
+    
+    // user => asset => amount
+    mapping(address => mapping(address => uint256)) public record userCollaterals;
 
     constructor(address _registry, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
@@ -28,35 +27,62 @@ contract record CollateralVault is IERC20, Ownable {
         _;
     }
 
-    function _key(address user, address asset) pure returns (string) {
-        return keccak256(string(user), string(asset));
-    }
-
+    /**
+     * @notice Add collateral for a user
+     * @param borrower The user address
+     * @param asset The collateral asset address
+     * @param amount The amount to add
+     */
     function addCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
         require(amount > 0, "Invalid amount");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
-
-        string key = _key(borrower, asset);
-
-        Collateral collateral = collaterals[key];
-        collateral.user = borrower;
-        collateral.asset = asset;
-        collateral.amount += amount;
-
+        userCollaterals[borrower][asset] += amount;
         emit CollateralAdded(borrower, asset, amount);
     }
 
+    /**
+     * @notice Remove collateral for a user
+     * @param borrower The user address
+     * @param asset The collateral asset address
+     * @param amount The amount to remove
+     */
     function removeCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
-        string key = _key(borrower, asset);
-        require(collaterals[key].amount >= amount, "Insufficient collateral");
-        
-        collaterals[key].amount -= amount;
+        require(userCollaterals[borrower][asset] >= amount, "Insufficient collateral");
+        userCollaterals[borrower][asset] -= amount; 
         require(IERC20(asset).transfer(borrower, amount), "Transfer failed");
+        emit CollateralRemoved(borrower, asset, amount);
+    }
+
+    /**
+     * @notice Seize collateral from borrower and send to liquidator
+     * @param borrower The borrower whose collateral is being seized
+     * @param to The liquidator address receiving the collateral
+     * @param asset The collateral asset address
+     * @param amount Amount of collateral to seize
+     */
+    function seizeCollateral(address borrower, address to, address asset, uint256 amount) public onlyLendingPool {
+        require(amount > 0, "Invalid amount");
+        require(userCollaterals[borrower][asset] >= amount, "Insufficient collateral to seize");
+
+        userCollaterals[borrower][asset] -= amount;
+        require(IERC20(asset).transfer(to, amount), "Collateral transfer failed");
 
         emit CollateralRemoved(borrower, asset, amount);
     }
 
-    function getCollateral(address borrower, address asset) public view  returns (uint256) {
-        return collaterals[_key(borrower, asset)].amount;
+    /**
+     * @notice Get collateral amount for a specific user and asset
+     * @param user The user address
+     * @param asset The asset address
+     * @return The collateral amount
+     */
+    function getCollateral(address user, address asset) public view returns (uint256) {
+        return userCollaterals[user][asset];
     }
-}
+
+    // Setter function for updating the LendingRegistry reference
+    function setRegistry(address _registry) external onlyOwner {
+        require(_registry != address(0), "Invalid registry address");
+        registry = LendingRegistry(_registry);
+    }
+} 

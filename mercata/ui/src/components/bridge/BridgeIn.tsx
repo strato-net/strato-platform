@@ -22,6 +22,7 @@ import { parseEther, createPublicClient, http, parseUnits } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { NATIVE_TOKEN_ADDRESS, SAFE_ADDRESS } from "@/lib/bridge/constants";
 import { useBridgeContext } from "@/context/BridgeContext";
+import BridgeWalletStatus from './BridgeWalletStatus';
 
 interface Token {
   name: string;
@@ -334,6 +335,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
   return (
     <div className="space-y-6">
+      <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="from">From Network</Label>

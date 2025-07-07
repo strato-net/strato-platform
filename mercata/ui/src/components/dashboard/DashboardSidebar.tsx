@@ -11,7 +11,7 @@ const DashboardSidebar = () => {
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
-    { icon: <Wallet size={20} />, label: 'Assets', path: '/dashboard/assets' },
+    { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },

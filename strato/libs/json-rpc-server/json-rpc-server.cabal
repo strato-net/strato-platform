@@ -8,7 +8,7 @@ maintainer:          Kristen Kozak <grayjay@wordroute.com>
 synopsis:            JSON-RPC 2.0 on the server side.
 build-type:          Simple
 extra-source-files:  changelog.md
-cabal-version:       >=1.8
+cabal-version:       >=1.10
 tested-with:         GHC == 7.0.1, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.1,
                      GHC == 7.10.2, GHC == 7.10.3, GHC == 8.0.1, GHC == 8.0.2,
                      GHC == 8.2.2, GHC == 8.4.1, GHC == 8.4.4, GHC == 8.6.1,
@@ -37,13 +37,13 @@ flag demo
 library
   exposed-modules:     Network.JsonRpc.Server
   other-modules:       Network.JsonRpc.Types
-  build-depends:       base >=4.3 && <4.16,
+  build-depends:       base >=4.3 && <5,
                        aeson (>=0.6 && <1.6) || (>=2.1 && <2.2),
                        deepseq >= 1.1 && <1.5,
-                       bytestring >=0.9 && <0.11,
-                       mtl >=2.2.1 && <2.3,
-                       text >=0.11 && <1.3,
-                       vector >=0.7.1 && <0.13,
+                       bytestring >=0.9 && <0.12,
+                       mtl >=2.2.1 && <2.4,
+                       text >=0.11 && <2.1,
+                       vector >=0.7.1 && <0.14,
                        unordered-containers >=0.1 && <0.3
   hs-source-dirs:      src
   ghc-options:         -Wall

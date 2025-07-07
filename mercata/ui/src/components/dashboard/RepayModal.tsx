@@ -35,7 +35,7 @@ const addCommasToInput = (value: string) => {
   return integerPart;
 };
 
-const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) => {
+const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) => {  
   const [repayAmount, setRepayAmount] = useState('');
   const [displayAmount, setDisplayAmount] = useState('');
   const [repayLoading, setRepayLoading] = useState(false);
@@ -57,13 +57,13 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
     const value = e.target.value.replace(/,/g, ''); // Remove existing commas
     if (/^\d*\.?\d*$/.test(value)) {
       const numValue = parseFloat(value || "0");
-      const maxValue = parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, ""));
+      const maxValue = parseFloat(formatUnits(loan?.totalAmountOwed || 0,18))
       
       // Cap the input at the maximum loan balance
       if (numValue <= maxValue || value === "") {
         setRepayAmount(value);
         setDisplayAmount(addCommasToInput(value));
-        const totalOwedWei = BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0);
+        const totalOwedWei = BigInt(loan?.totalAmountOwed || 0) + BigInt(loan?.interestRate || 0);
         setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > totalOwedWei);
       }
     }
@@ -72,16 +72,14 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
   const repayLoan = async () => {
     try {
       setRepayLoading(true);
-      const totalOwedWei = (BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0)).toString();
+      const totalOwedWei = (BigInt(loan?.totalAmountOwed || 0) + BigInt(loan?.interestRate || 0)).toString();
       let amountInWei = parseUnits(repayAmount === "" ? "0" : repayAmount, 18).toString();
       if (BigInt(amountInWei) > BigInt(totalOwedWei)) {
         amountInWei = totalOwedWei; // clip to full repay
       }
 
       await repayLoanFn({
-        loanId: loan?.key,
         amount: amountInWei,
-        asset: loan?.loan?.asset,
       });
       
       toast({
@@ -119,7 +117,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
     setRepayAmount("");
     setDisplayAmount("");
   };
-
+  
   if (!loan) return null;
 
   return (
@@ -137,12 +135,12 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
         <div className="space-y-2 py-4">
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Original Loan Amount</span>
-            <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.amount || 0, 18))}</span>
+            <span className="font-medium">${loan?.totalAmountOwed != null ? formatCurrency(formatUnits(loan.totalAmountOwed.toString(), 18)) : "0.00"}</span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Accrued Interest</span>
-            <span className="font-medium">${formatCurrency(formatUnits(loan?.loan?.interest || 0, 18))}</span>
+            <span className="font-medium">${formatCurrency(formatUnits(loan?.interestRate || 0, 18))}</span>
           </div>
           
           <div className="flex justify-between items-center font-bold pt-2 border-t">
@@ -265,7 +263,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
               !repayAmount ||
               isNaN(Number(repayAmount)) ||
               Number(repayAmount) <= 0 ||
-              Number(repayAmount) > Number((loan?.balanceHuman || "0").toString().replace(/,/g, ""))
+              Number(repayAmount) > Number((loan?.totalAmountOwed || "0").toString().replace(/,/g, ""))
             }
             className="px-6"
           >
