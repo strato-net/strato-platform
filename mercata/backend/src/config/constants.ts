@@ -1,5 +1,4 @@
-import 'dotenv/config';
-import { lendingPool, onRamp, poolFactory, tokenFactory, adminRegistry, poolConfigurator } from "./config";
+import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -58,21 +57,18 @@ export const constants = (() => {
     `lpToken:lpToken_fkey(${tokenSelectFields.join(',')})`,
   ];
   const registrySelectFields = [
+    "address",
     "lendingPool: lendingPool_fkey(" +
-      "address,borrowableAsset," +
-      `userLoan:${LendingPool}-userLoan(key,LoanInfo:value),` +
+      "address," +
+      `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value),` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`,
     "oracle:priceOracle_fkey(" +
       "address," +
       `prices:${PriceOracle}-prices(asset:key,price:value::text))`,
-    "liquidityPool:liquidityPool_fkey(" +
-      "address," +
-      `deposited:${LiquidityPool}-deposited(key,Deposit:value),` +
-      `totalLiquidity:${LiquidityPool}-totalLiquidity(asset:key,amount:value),` +
-      `borrowed:${LiquidityPool}-borrowed(key,Borrow:value))`,
     "collateralVault:collateralVault_fkey(" +
       "address," +
-      `collaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value))`,
+      `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text))`,
+    "liquidityPool:liquidityPool_fkey(address)",
   ];
 
   const onRampSelectFields = [
@@ -83,10 +79,9 @@ export const constants = (() => {
   ];
   return {
     poolFactory,
-    lendingPool,
+    lendingRegistry,
     onRamp,
     tokenFactory,
-    poolConfigurator,
     adminRegistry,
     Token,
     TokenFactory,

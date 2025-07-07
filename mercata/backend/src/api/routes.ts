@@ -5,12 +5,12 @@ import packageJson from "../../package.json";
 import authHandler from "./middleware/authHandler";
 
 import TokensController from "./controllers/tokens.controller";
-import LendingController from "./controllers/lending.controller";
 import OnRampController from "./controllers/onramp.controller";
 import { BridgeController } from "./controllers/bridge.controller";
 import OracleController from "./controllers/oracle.controller";
 import userRoutes from "./routes/user.routes";
 import swapRoutes from "./routes/swap.routes";
+import lendingRoutes from "./routes/lending.routes";
 
 const router = Router();
 const bridgeController = new BridgeController();
@@ -32,27 +32,7 @@ router.post("/tokens/setStatus", authHandler.authorizeRequest(), TokensControlle
 router.use(swapRoutes);
 
 // ----- Lending Routes -----
-router.get("/lend/", authHandler.authorizeRequest(true), LendingController.get);
-router.get("/lend/depositableTokens/", authHandler.authorizeRequest(), LendingController.getDepositableTokens);
-router.get("/lend/withdrawableTokens/", authHandler.authorizeRequest(), LendingController.getWithdrawableTokens);
-router.get("/lend/loans/", authHandler.authorizeRequest(), LendingController.getLoans);
-router.get("/lend/loans/:id", authHandler.authorizeRequest(true), LendingController.getLoanById);
-router.post("/lend/depositLiquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
-router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
-router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
-router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
-router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
-
-// Liquidation routes
-router.get("/lend/liquidate", authHandler.authorizeRequest(true), LendingController.listLiquidatable);
-router.get("/lend/liquidate/near-unhealthy", authHandler.authorizeRequest(true), LendingController.listNearUnhealthy);
-router.get("/lend/liquidate/:id", authHandler.authorizeRequest(true), LendingController.getLiquidatable);
-router.post("/lend/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
-
-// Admin configuration routes
-router.post("/lend/setInterestRate", authHandler.authorizeRequest(), LendingController.setInterestRate);
-router.post("/lend/setCollateralRatio", authHandler.authorizeRequest(), LendingController.setCollateralRatio);
-router.post("/lend/setLiquidationBonus", authHandler.authorizeRequest(), LendingController.setLiquidationBonus);
+router.use("/lending", lendingRoutes);
 
 // ----- Oracle Routes -----
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);

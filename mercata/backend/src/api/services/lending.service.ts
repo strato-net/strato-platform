@@ -2,21 +2,39 @@ import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
-import { getBalance, getTokens } from "./tokens.service";
+import { getBalance } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
+import { 
+  simulateLoan, 
+  CollateralInfo, 
+  AssetConfig, 
+  calculateCollateralMetrics, 
+  calculateAccruedInterest,
+  calculateExchangeRate,
+  calculateTotalUSDSTSupplied,
+  calculateTotalBorrowed,
+  calculateUtilizationRate,
+  calculateTotalCollateralValue,
+  calculateTotalCollateralValueForHealth,
+  calculateHealthFactor,
+  calculateAPYs,
+  toBig,
+} from "../helpers/lending.helper";
 
 const {
   registrySelectFields,
-  lendingPool,
+  lendingRegistry,
   LendingPool,
   LendingRegistry,
-  PriceOracle,
   Token,
+  CollateralVault,
+  PriceOracle,
 } = constants;
 
 export const getPool = async (
   accessToken: string,
+  userAddress: string | undefined,
   options: Record<string, string> = {}
 ): Promise<Record<string, any>> => {
   const { select, ...filters } = options;
@@ -26,8 +44,13 @@ export const getPool = async (
   const params = {
     ...cleanedFilters,
     select: select ?? registrySelectFields.join(","),
-    ...(select ? {} : {}),
-    lendingPool: `eq.${lendingPool}`,
+    ...(select
+      ? {}
+      : {
+          "lendingPool.userLoan.key": `eq.${userAddress}`,
+          "collateralVault.userCollaterals.key": `eq.${userAddress}`,
+        }),
+    address: `eq.${lendingRegistry}`,
   };
 
   const {
@@ -40,765 +63,365 @@ export const getPool = async (
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Fallback: transform new userLoan mapping into the legacy "loans" shape that
-  // downstream services expect. Also attach collateral info for each user so
-  // health-factor calculations work again.
-  // ---------------------------------------------------------------------------
-
-  try {
-    const lp = poolData.lendingPool || {};
-    // Only enrich if legacy loans array is missing/empty but userLoan exists
-    if ((!lp.loans || lp.loans.length === 0) && Array.isArray(lp.userLoan)) {
-      const borrowableAsset = lp.borrowableAsset;
-
-      // Build quick lookup map of all collateral per user
-      const collateralEntries: any[] = poolData.collateralVault?.collaterals || [];
-      const collateralMap = new Map<string, { asset: string; amount: string }[]>();
-
-      const formatAmt = (v: any): string => {
-        if (typeof v === "string") return v;
-        if (typeof v === "number") {
-          // Convert scientific notation to full integer string
-          return v.toLocaleString("fullwide", { useGrouping: false });
-        }
-        return v?.toString?.() || "0";
-      };
-
-      const pushColl = (u: string, a: string, amtRaw: any) => {
-        const amt = formatAmt(amtRaw);
-        if (!u) return;
-        const arr = collateralMap.get(u) || [];
-        arr.push({ asset: a, amount: amt });
-        collateralMap.set(u, arr);
-      };
-
-      collateralEntries.forEach((entry: any) => {
-        const userKey: string = entry?.user ?? entry?.key ?? ""; // user column or legacy key
-        const assetKey: string = entry?.asset ?? entry?.key2 ?? ""; // asset column if selected
-        const valObj: any = entry?.Collateral ?? entry?.value ?? {};
-
-        // Prefer columns first
-        let user: string = userKey;
-        let asset: string = assetKey;
-        let amount: string = (entry?.amount ?? "").toString();
-
-        // If columns empty fall back to object
-        if (!user) user = valObj.user || "";
-        if (!asset) asset = valObj.asset || "";
-
-        // If still missing asset try composite key string
-        const keyStr = entry?.key ?? "";
-        if (!asset && keyStr.includes(",")) {
-          asset = keyStr.split(",")[1] || "";
-        }
-
-        // Fallback: amount could be primitive
-        if (!amount || amount === "[object Object]") {
-          if (typeof entry.value === "string" || typeof entry.value === "number") {
-            amount = entry.value.toString();
-          }
-        }
-
-        pushColl(user, asset, amount);
-      });
-
-      // Convert each userLoan row into legacy LoanInfo format
-      lp.loans = lp.userLoan.map((row: any) => {
-        const key = row.key; // Should be user address
-        const raw = row.LoanInfo ?? row.value ?? {};
-        const principal = raw.principalBalance ?? raw.amount ?? "0";
-        const lastUpdated = raw.lastUpdated ?? raw.lastIntCalculated ?? 0;
-
-        const collArr = collateralMap.get(key) || [];
-        const primaryColl = collArr[0] || { asset: "", amount: "0" };
-
-        const loanInfo = {
-          user: key,
-          asset: borrowableAsset || "",
-          amount: principal.toString(),
-          collateralAsset: undefined,
-          collateralAmount: undefined,
-          collaterals: collArr,
-          lastUpdated: lastUpdated.toString(),
-          active: principal && principal.toString() !== "0",
-        };
-
-        return { key, LoanInfo: loanInfo };
-      });
-
-      // Once converted, drop userLoan to avoid duplicate arrays
-      delete lp.userLoan;
-
-      // ---------- Enrich loans with collateral USD values & health factor ----------
-      const priceMapHF = new Map<string, bigint>(
-        (poolData.oracle?.prices || []).map((p: any) => [p.asset.toLowerCase(), toBig(p.price)])
-      );
-
-      const ltMapHF = new Map<string, number>(
-        (lp.assetConfigs || []).map((row: any) => [
-          (row.asset || '').toLowerCase(),
-          Number(row.AssetConfig?.liquidationThreshold || 0),
-        ])
-      );
-
-      const calcHF = (loan: any): number => {
-        const debtPrice = priceMapHF.get((loan.asset || '').toLowerCase()) || 0n;
-        const debtValue = (toBig(loan.amount || 0) * debtPrice) / 10n ** 18n;
-        if (debtValue === 0n) return Infinity;
-
-        let numerator = 0n;
-        (loan.collaterals || []).forEach((c: any) => {
-          if (!c.asset) return;
-          const price = priceMapHF.get(c.asset.toLowerCase()) || 0n;
-          const val = (toBig(c.amount || 0) * price) / 10n ** 18n;
-          const lt = BigInt(ltMapHF.get(c.asset.toLowerCase()) || 0);
-          if (lt === 0n) return;
-          numerator += val * lt;
-        });
-
-        if (numerator === 0n) return Infinity;
-        // scale back by 1e4 because LT is in basis points
-        return Number(numerator) / Number(debtValue * 10000n);
-      };
-
-      lp.loans = lp.loans.map((entry: any) => {
-        const loan = entry.LoanInfo;
-
-        // Enrich collaterals with USD value
-        loan.collaterals = (loan.collaterals || []).map((c: any) => {
-          const price = priceMapHF.get((c.asset || '').toLowerCase()) || 0n;
-          const usd = ((toBig(c.amount || 0) * price) / 10n ** 18n).toString();
-          return { ...c, usdValue: usd };
-        });
-
-        const hfVal = calcHF(loan);
-        return { ...entry, healthFactor: isFinite(hfVal) ? hfVal : null };
-      });
-
-      // remove redundant arrays now that assetConfigs exists
-      delete lp.ltv;
-      delete lp.liquidationBonus;
-    }
-
-    // ---------------------------------------------------------------------
-    // Derive legacy arrays (interestRate, ltv, liquidationBonus) from the
-    // new assetConfigs mapping so downstream logic keeps working.
-    // ---------------------------------------------------------------------
-
-    if (Array.isArray(lp.assetConfigs)) {
-      if (!lp.interestRate) {
-        lp.interestRate = lp.assetConfigs.map((row: any) => {
-          const rate = row.AssetConfig?.interestRate ?? row.AssetConfig?.rate ?? 0;
-          return { asset: row.asset, rate };
-        });
-      }
-      if (!lp.ltv) {
-        lp.ltv = lp.assetConfigs.map((row: any) => {
-          const ltvVal = row.AssetConfig?.ltv ?? 0;
-          return { asset: row.asset, ltv: ltvVal };
-        });
-      }
-      if (!lp.liquidationBonus) {
-        lp.liquidationBonus = lp.assetConfigs.map((row: any) => {
-          const bonus = row.AssetConfig?.liquidationBonus ?? 0;
-          return { asset: row.asset, bonus };
-        });
-      }
-    }
-
-    // Final clean-up: remove redundant arrays
-    delete lp.ltv;
-    delete lp.liquidationBonus;
-  } catch (err) {
-    // Silently swallow enrichment errors – better to return raw data than break API
-    console.error("[getPool] loan enrichment failed", err);
-  }
-
   return poolData;
 };
 
 export const depositLiquidity = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  amount: string,
 ) => {
-  try {
-    const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
-    if (!liquidityPool) {
-      throw new Error("Liquidity pool address not found");
-    }
+  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
+    accessToken,
+    undefined,
+    {
+      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset)`,
+    } as Record<string, string>
+  );
 
-    const tx: FunctionInput[] = [
-      {
-        contractName: extractContractName(Token),
-        contractAddress: body.asset || "",
-        method: "approve",
-        args: {
-          spender: liquidityPool,
-          value: body.amount || "",
-        },
-      },
-      {
-        contractName: extractContractName(LendingPool),
-        contractAddress: constants.lendingPool,
-        method: "depositLiquidity",
-        args: {
-          asset: body.asset,
-          amount: body.amount,
-        },
-      }
-    ];
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
-    );
-
-    return { status, hash };
-  } catch (error) {
-    throw error;
+  if (!liquidityPool || !lendingPool || !borrowableAsset) {
+    throw new Error("Liquidity pool, lending pool or borrowable asset address not found");
   }
+
+  const tx: FunctionInput[] = [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: borrowableAsset,
+      method: "approve",
+      args: { spender: liquidityPool, value: amount },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "depositLiquidity",
+      args: { amount },
+    },
+  ];
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
 };
 
 export const withdrawLiquidity = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  amount: string,
 ) => {
-  try {
-    const tx: FunctionInput[] = [{
-      contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: "withdrawLiquidity",
-      args: {
-        asset: body.asset,
-        amount: body.amount,
-      },
-    }];
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
-    );
-
-    return { status, hash };
-  } catch (error) {
-    throw error;
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
   }
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "withdrawLiquidity",
+      args: { amount },
+    }))
+  );
+};
+
+export const supplyCollateral = async (
+  accessToken: string,
+  asset: string,
+  amount: string,
+) => {
+  const { lendingPool, collateralVault } = await getPool(accessToken, undefined, { select: "lendingPool,collateralVault" });
+  if (!lendingPool || !collateralVault) {
+    throw new Error("Lending pool or collateral vault address not found");
+  }
+
+  const tx: FunctionInput[] = [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: asset,
+      method: "approve",
+      args: { spender: collateralVault, value: amount },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "supplyCollateral",
+      args: { asset, amount },
+    },
+  ];
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const withdrawCollateral = async (
+  accessToken: string,
+  asset: string,
+  amount: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "withdrawCollateral",
+      args: { asset, amount },
+    }))
+  );
 };
 
 export const borrow = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  amount: string,
 ) => {
-  try {
-    const lendingPool = await getPool(accessToken, {
-      select: "collateralVault",
-    });
-
-    if (!lendingPool.collateralVault) {
-      throw new Error("Collateral vault address not found");
-    }
-
-    const tx = buildFunctionTx([
-      {
-        contractName: extractContractName(Token),
-        contractAddress: body.collateralAsset || "",
-        method: "approve",
-        args: { spender: lendingPool.collateralVault, value: body.collateralAmount || "" },
-      },
-      {
-        contractName: extractContractName(LendingPool),
-        contractAddress: constants.lendingPool,
-        method: "borrow",
-        args: {
-          asset: body.asset,
-          amount: body.amount,
-          collateralAsset: body.collateralAsset,
-          collateralAmount: body.collateralAmount,
-        },
-      }
-    ]);
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return { status, hash };
-  } catch (error) {
-    throw error;
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
   }
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "borrow",
+      args: { amount },
+    }))
+  );
 };
 
 export const repay = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  amount: string,
 ) => {
-  try {
-    // Fetch liquidityPool address quickly (avoid heavy nested select)
-    const poolMeta = await getPool(accessToken, { select: "liquidityPool" });
-
-    // Separate full fetch to access loans & rate maps
-    const lendingPoolInfo = await getPool(accessToken);
-
-    if (!poolMeta?.liquidityPool) {
-      throw new Error("Liquidity pool address not found");
+  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
+    accessToken,
+    undefined,
+    {
+      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset)`,
     }
+  );
 
-    const loanEntry = (lendingPoolInfo.lendingPool.loans || []).find(
-      (e: any) => e.key === body.loanId
-    );
-    if (!loanEntry) {
-      throw new Error(`Loan ${body.loanId} not found`);
-    }
-    const loan = loanEntry.LoanInfo;
-
-    // Calculate up-to-date interest so we can determine the exact outstanding.
-    const now = Math.floor(Date.now() / 1000);
-    const { priceMap, ratioMap } = buildMaps(lendingPoolInfo);
-    const rateArray = lendingPoolInfo.lendingPool.interestRate || [];
-    const rateObj = rateArray.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
-    const rateNum = rateObj ? Number(rateObj.rate) : 0; // may be decimal percentage like 0.5
-    const rateScaled = Math.round(rateNum * 100); // scale to integer (percent *100) for 2-decimal precision
-    const durationSec = Math.max(0, now - Number(loan.lastUpdated));
-    const bufferSec = 600; // 10-min buffer
-    const hoursElapsed = BigInt(Math.floor((durationSec + bufferSec) / 3600)); // whole hours, ensures at least one hour after buffer
-    const interest =
-      (toBig(loan.amount) * BigInt(rateScaled) * hoursElapsed) /
-      BigInt(8760 * 100 * 100); // extra *100 due to scaling
-    const totalOwed = (toBig(loan.amount) + interest).toString();
-
-    // Allow partial repayments. If caller over-pays, clip to the exact amount owed.
-    let repayAmount = body.amount || totalOwed;
-    if (toBig(repayAmount) > toBig(totalOwed)) {
-      repayAmount = totalOwed;
-    }
-
-    const tx = buildFunctionTx([
-      {
-        contractName: extractContractName(Token),
-        contractAddress: body.asset || loan.asset,
-        method: "approve",
-        args: {
-          spender: poolMeta.liquidityPool,
-          value: repayAmount,
-        },
-      },
-      {
-        contractName: extractContractName(LendingPool),
-        contractAddress: constants.lendingPool,
-        method: "repayLoan",
-        args: {
-          loanId: body.loanId,
-          amount: repayAmount,
-        },
-      },
-    ]);
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return { status, hash };
-  } catch (error) {
-    throw error;
+  if (!liquidityPool || !lendingPool || !borrowableAsset) {
+    throw new Error("Liquidity pool, lending pool or borrowable asset address not found");
   }
-};
 
-export const getDepositableTokens = async (
-  accessToken: string,
-  address: string
-) => {
-  const [registry, userTokens] = await Promise.all([
-    getPool(accessToken),
-    getBalance(accessToken, address),
-  ]);
-
-  const userTokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
-  const oraclePriceMap = new Map(
-    (registry.oracle.prices || []).map(
-      ({ asset, price }: { asset: string; price: string }) => [asset, price]
-    )
-  );
-  const interestRateMap = new Map<string, number>(
-    (registry.lendingPool.interestRate || []).map((entry: any) => {
-      const assetAddr = (entry?.asset || "").toLowerCase();
-      return [assetAddr, Number(entry?.rate || 0)];
-    })
-  );
-  const liquidityMap = new Map(
-    (registry.liquidityPool.totalLiquidity || []).map(
-      ({ asset, amount }: { asset: string; amount: string }) => [asset, amount]
-    )
-  );
-  const collateralConfigs = registry.lendingPool.ltv || registry.lendingPool.collateralRatio || [];
-  return collateralConfigs
-    .filter(
-      ({ asset }: any) =>
-        oraclePriceMap.has(asset) !== undefined && userTokenMap.has(asset)
-    )
-    .map((entry: any) => {
-      const asset = entry.asset;
-      const ratioVal = entry.ratio ?? entry.ltv ?? 0;
-      const userToken = userTokenMap.get(asset) as any;
-      return {
-        address: asset,
-        _name: userToken?.token?._name || "",
-        _symbol: userToken?.token?._symbol || "",
-        value: userToken?.balance?.toString() || "0",
-        collateralRatio: ratioVal,
-        interestRate: interestRateMap.get(asset) || 0,
-        price: oraclePriceMap.get(asset) || "0",
-        liquidity: liquidityMap.get(asset) || "0",
-      };
-    });
-};
-
-export const getWithdrawableTokens = async (
-  accessToken: string,
-  address: string
-): Promise<
-  { address: string; _name: string; _symbol: string; value: string }[]
-> => {
-  const registry = await getPool(accessToken);
-
-  const userDeposits = Object.values(registry.liquidityPool?.deposited || {})
-    .map((entry: any) => entry.Deposit)
-    .filter((d: any) => d.user === address) as {
-    asset: string;
-    amount: string;
-    user: string;
-  }[];
-
-  if (!userDeposits.length) return [];
-
-  const tokenMetadata = await getTokens(accessToken, {
-    address: `in.(${userDeposits.map((d) => d.asset).join(",")})`,
-  });
-
-  const tokenMap = new Map(tokenMetadata.map((t: any) => [t.address, t]));
-
-  return userDeposits
-    .filter((d) => tokenMap.has(d.asset))
-    .map((d) => {
-      const token = tokenMap.get(d.asset) as any;
-      return {
-        address: d.asset,
-        _name: token?._name || "",
-        _symbol: token?._symbol || "",
-        value: d.amount || "0",
-      };
-    });
-};
-
-export const getLoans = async (
-  accessToken: string,
-  address: string
-): Promise<{ key: string; loan: any }[]> => {
-  const registry = await getPool(accessToken);
-
-  // Build quick lookup map for interest rates (percent per annum)
-  const interestRateMap = new Map<string, number>(
-    (registry.lendingPool.interestRate || []).map((entry: any) => {
-      const assetAddr = (entry?.asset || "").toLowerCase();
-      return [assetAddr, Number(entry?.rate || 0)];
-    })
-  );
-
-  // Filter user-specific loans
-  const userLoans = (registry.lendingPool.loans || []).filter(
-    (entry: any) => entry.LoanInfo.user.toLowerCase() === address.toLowerCase()
-  );
-
-  const combinedLoans = userLoans;
-
-  if (!combinedLoans.length) return [];
-
-  // Collect all unique token addresses used in loans
-  const tokenAddresses = [
-    ...new Set(
-      combinedLoans.flatMap((entry: any) => {
-        const base = [entry.LoanInfo.asset];
-        const collArr = entry.LoanInfo.collaterals || [];
-        if (collArr.length) {
-          return base.concat(collArr.map((c: any) => c.asset));
-        }
-        return base.concat(entry.LoanInfo.collateralAsset);
-      })
-    ),
+  const tx: FunctionInput[] = [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: borrowableAsset,
+      method: "approve",
+      args: { spender: liquidityPool, value: amount },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "repay",
+      args: { amount },
+    },
   ];
 
-  // Fetch token metadata and build a lookup map
-  const tokenRows = await getTokens(accessToken, {
-    address: `in.(${tokenAddresses.join(',')})`,
-  });
-  const tokenMap = new Map(tokenRows.map((t: any) => [t.address, t]));
-  const decimalsMap = new Map<string, number>(
-    tokenRows.map((t: any) => [t.address.toLowerCase(), Number(t.customDecimals ?? 18)])
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
   );
+};
 
-  const now = Math.floor(Date.now() / 1000);
-  const { priceMap, ratioMap } = buildMaps(registry);
+export const collateralAndBalance = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const registry = await getPool(accessToken, undefined, { 
+    select: `lendingPool:lendingPool_fkey(assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),borrowableAsset),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`,
+    "collateralVault.userCollaterals.key": `eq.${userAddress}`
+  });
 
-  // Return structured array of enriched loan objects
-  return combinedLoans.map((entry: any) => {
-    const loan = entry.LoanInfo;
-    const key = entry.key;
+  if (!registry.lendingPool || !registry.collateralVault) {
+    throw new Error("Lending pool or collateral vault not found");
+  }
 
-    const assetToken = tokenMap.get(loan.asset) as any;
-    const collateralToken = tokenMap.get(loan.collateralAsset) as any;
+  const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
+  const userCollaterals = registry.collateralVault.userCollaterals || [];
+  const userTokens = await getBalance(accessToken, userAddress, {
+    address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
+  });
 
-    const hf = calculateHealthFactor(loan, priceMap, ratioMap, decimalsMap);
+  const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
+  const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c]));
 
-    // Enrich collaterals with metadata & USD value
-    const collateralsEnriched = (loan.collaterals || []).map((c: any) => {
-      const tok = tokenMap.get(c.asset) || {};
-      const price = priceMap.get((c.asset || "").toLowerCase()) || 0n;
-      const dec = decimalsMap.get((c.asset || '').toLowerCase()) ?? 18;
-      const usd = valueInUsd(c.amount, price, dec).toString();
-      return {
-        asset: c.asset,
-        amount: c.amount,
-        symbol: tok?._symbol || "",
-        name: tok?._name || "",
-        usdValue: usd,
-      };
-    });
+  // Create maps for asset configs and prices
+  const assetConfigMap = new Map();
+  const priceMap = new Map();
+  
+  // Build asset config map
+  (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+    assetConfigMap.set(config.asset, config.AssetConfig);
+  });
 
-    // Backwards-compat collateralSymbol etc use first collateral
-    const firstColl = collateralsEnriched[0] || { symbol: "", name: "" };
+  // Build price map
+  (registry.oracle?.prices || []).forEach((price: any) => {
+    priceMap.set(price.asset, price.price);
+  });
 
-    const loanResp: any = {
-      ...loan,
-      assetName: assetToken?._name || "",
-      assetSymbol: assetToken?._symbol || "",
-      collateralName: firstColl.name,
-      collateralSymbol: firstColl.symbol,
-      collaterals: collateralsEnriched,
-      interest: loan.lastUpdated
-        ? (
-            (toBig(loan.amount) *
-              BigInt(interestRateMap.get(loan.asset.toLowerCase()) || 0) *
-              BigInt(Math.floor((Math.max(0, now - Number(loan.lastUpdated))) / 3600))) /
-            BigInt(8760 * 100)
-          ).toString()
-        : "0",
-      healthFactor: hf,
+  return assets.map((asset: string) => {
+    const token = tokenMap.get(asset) as any;
+    const collateral = collateralMap.get(asset) as any;
+    const assetConfig = assetConfigMap.get(asset);
+    const assetPrice = priceMap.get(asset) || "0";
+
+    const userBalance = token?.balance?.toString() || "0";
+    const collateralizedAmount = collateral?.amount || "0";
+    const ltv = assetConfig?.ltv || 0;
+    const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
+
+    // Calculate metrics using the helper function
+    const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      userBalance,
+      collateralizedAmount,
+      assetPrice,
+      ltv
+    );
+
+    return {
+      address: asset,
+      ...token?.token,
+      userBalance,
+      userBalanceValue,
+      collateralizedAmount,
+      collateralizedAmountValue,
+      isCollateralized: collateral?.amount > 0,
+      canSupply: BigInt(userBalance) > 0n,
+      maxBorrowingPower,
+      // Add additional context
+      assetPrice,
+      ltv,
+      liquidationThreshold,
     };
-    delete loanResp.collateralAsset;
-    delete loanResp.collateralAmount;
-
-    return { key, healthFactor: hf, loan: loanResp };
   });
 };
 
-// ---------------- Liquidation services ----------------
-
-/** Build quick lookup maps needed for HF calculation */
-const buildMaps = (registry: any) => {
-  const priceMap = new Map<string, bigint>(
-    (registry.oracle.prices || []).map((p: any) => [p.asset.toLowerCase(), toBig(p.price)])
-  );
-  const collateralEntries = registry.lendingPool.ltv || registry.lendingPool.collateralRatio || [];
-  const ratioMap = new Map<string, number>(
-    collateralEntries.map((r: any) => {
-      const assetAddr = (r.asset || "").toLowerCase();
-      const val = r.ltv ?? r.ratio ?? 0;
-      return [assetAddr, Number(val)];
-    })
-  );
-  return { priceMap, ratioMap };
-};
-
-/** Convert raw token amount to USD (18-dec price) respecting token decimals */
-const valueInUsd = (
-  amount: bigint | string | number,
-  price: bigint,
-  decimals: number = 18
+export const liquidityAndBalance = async (
+  accessToken: string,
+  userAddress: string,
 ) => {
-  const amt = toBig(amount);
-  return (amt * price) / 10n ** BigInt(decimals);
-};
-
-const calculateHealthFactor = (
-  loan: any,
-  priceMap: Map<string, bigint>,
-  ratioMap: Map<string, number>,
-  decimalsMap: Map<string, number> = new Map()
-) => {
-  const loanDecimals = decimalsMap.get(loan.asset.toLowerCase()) ?? 18;
-  const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
-  const loanValue = valueInUsd(toBig(loan.amount), loanPrice, loanDecimals);
-  if (loanValue === 0n) return Infinity;
-
-  // Handle multi-collateral
-  const collArr: { asset: string; amount: string }[] = loan.collaterals || [
-    { asset: loan.collateralAsset, amount: loan.collateralAmount },
-  ];
-
-  let thresholdValue = 0n;
-  for (const c of collArr) {
-    if (!c.asset) continue;
-    const p = priceMap.get(c.asset.toLowerCase()) || 0n;
-    const dec = decimalsMap.get(c.asset.toLowerCase()) ?? 18;
-    const val = valueInUsd(c.amount || 0, p, dec); // USD value
-    const ratio = BigInt(ratioMap.get(c.asset.toLowerCase()) || 0); // basis points
-    if (ratio === 0n) continue;
-    // Effective value before liquidation threshold: (coll * 100) / ratio
-    thresholdValue += (val * 100n) / ratio;
+  // Fetch pool data
+  const registry = await getPool(accessToken, undefined, { 
+    select: `lendingPool:lendingPool_fkey(borrowableAsset,mToken,assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`
+  });
+  
+  const { borrowableAsset, mToken, assetConfigs, userLoan } = registry.lendingPool || {};
+  const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  
+  if (!borrowableAsset || !mToken) {
+    throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  if (thresholdValue === 0n) return Infinity;
-  return Number((thresholdValue * 10000n) / loanValue) / 10000; // 4-dec precision
-};
+  // Get user balances
+  const [borrowableBalance, mTokenBalance] = await Promise.all([
+    getBalance(accessToken, userAddress, { 
+      address: `eq.${borrowableAsset}`,
+      select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
+    }),
+    getBalance(accessToken, userAddress, { 
+      address: `eq.${mToken}`,
+      select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
+    })
+  ]).then(balances => balances.map(b => b[0]));
 
-export const listLiquidatableLoans = async (accessToken: string) => {
-  const registry = await getPool(accessToken);
-  const { priceMap, ratioMap } = buildMaps(registry);
+  // Get borrowable asset config and price
+  const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
 
-  const loans = (registry.lendingPool.loans || []) as any[];
-
-  // Fetch token metadata for all unique addresses involved
-  const tokenAddresses = [
-    ...new Set(
-      loans.flatMap((e) => {
-        const base = [e.LoanInfo.asset];
-        const nodes = e.LoanInfo.collaterals?.map((c: any) => c.asset) || [];
-        return base.concat(nodes);
-      })
-    ),
-  ];
-
-  const tokenRows = await getTokens(accessToken, {
-    address: `in.(${tokenAddresses.join(',')})`,
-  });
-  const tokenMap = new Map(tokenRows.map((t: any) => [t.address, t]));
-  const decimalsMap = new Map<string, number>(
-    tokenRows.map((t: any) => [t.address.toLowerCase(), Number(t.customDecimals ?? 18)])
+  // Build price map for helper functions
+  const priceMap = new Map<string, string>(
+    registry.oracle?.prices?.map((price: any) => [price.asset, price.price]) || []
   );
 
-  return loans
-    .filter((e) => e.LoanInfo?.active)
-    .map((e) => {
-      const loan = e.LoanInfo;
-      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap, decimalsMap);
-
-      const primaryCollAsset = (loan.collaterals && loan.collaterals[0]?.asset) || loan.collateralAsset || "";
-
-      const assetToken = tokenMap.get(loan.asset) as any;
-      const collToken = primaryCollAsset ? tokenMap.get(primaryCollAsset) as any : {};
-
-      // Determine close factor: 1.0 if HF < 0.95, else 0.5
-      const closeFactorNum = hf < 0.95 ? 100n : 50n; // 100% or 50%
-      const maxRepayCloseFactor = (toBig(loan.amount) * closeFactorNum) / 100n;
-
-      // Store per-loan cap so the UI knows the global upper-bound
-      loan.maxRepay = maxRepayCloseFactor.toString();
-
-      const collateralsWithProfit = (loan.collaterals || []).map((c: any) => {
-        if (!c.asset) return { ...c, expectedProfit: "0" };
-
-        const tokenMeta = tokenMap.get(c.asset) as any;
-        const symbol = tokenMeta?._symbol || "";
-
-        const acEntry = registry.lendingPool.assetConfigs?.find?.((ac: any) => ac.asset === c.asset);
-        const bonusBp = acEntry ? BigInt(acEntry.AssetConfig?.liquidationBonus ?? 10500) : 10500n;
-
-        const collPrice = priceMap.get(c.asset.toLowerCase()) || 0n;
-        const loanPrice = priceMap.get(loan.asset.toLowerCase()) || 0n;
-        const dec = decimalsMap.get((c.asset || '').toLowerCase()) ?? 18;
-        const availableTokens = toBig(c.amount);
-
-        // --- Optimal repay so we seize *all* available collateral tokens ---
-        let repayOptimal = 0n;
-        if (collPrice > 0n && loanPrice > 0n) {
-          repayOptimal =
-            (availableTokens * collPrice * 10n ** BigInt(dec) * 10000n) /
-            (bonusBp * loanPrice * 10n ** BigInt(dec));
-        }
-
-        // Final repay is the lower of (close-factor cap) and (what inventory allows)
-        const repayEffective = repayOptimal > maxRepayCloseFactor ? maxRepayCloseFactor : repayOptimal;
-
-        // With repayEffective we seize all available tokens (by construction)
-        const seizeAmt = availableTokens;
-
-        const profitWei =
-          valueInUsd(seizeAmt, collPrice, dec) -
-          valueInUsd(repayEffective, loanPrice, dec);
-
-        const usdVal = valueInUsd(seizeAmt, collPrice, dec).toString();
-
-        return { ...c, symbol, usdValue: usdVal, expectedProfit: profitWei.toString(), maxRepay: repayEffective.toString() };
-      });
-
-      loan.collaterals = collateralsWithProfit;
-
-      return {
-        id: e.key,
-        healthFactor: hf,
-        assetSymbol: assetToken?._symbol || '',
-        collateralSymbol: collToken?._symbol || '',
-        ...loan,
-      };
-    })
-    .filter((l) => l.healthFactor < 1);
-};
-
-export const listNearUnhealthyLoans = async (
-  accessToken: string,
-  margin: number
-) => {
-  const registry = await getPool(accessToken);
-  const { priceMap, ratioMap } = buildMaps(registry);
-  const upper = 1 + margin;
-  const loans = (registry.lendingPool.loans || []) as any[];
-
-  const tokenAddresses = [
-    ...new Set(
-      loans.flatMap((e) => {
-        const arr = [e.LoanInfo.asset];
-        const collArr = e.LoanInfo.collaterals || [];
-        if (collArr.length) arr.push(...collArr.map((c: any) => c.asset));
-        else arr.push(e.LoanInfo.collateralAsset);
-        return arr;
-      })
-    ),
-  ];
-  const tokenRows = await getTokens(accessToken, {
-    address: `in.(${tokenAddresses.join(',')})`,
-  });
-  const tokenMap = new Map(tokenRows.map((t: any) => [t.address, t]));
-  const decimalsMap = new Map<string, number>(
-    tokenRows.map((t: any) => [t.address.toLowerCase(), Number(t.customDecimals ?? 18)])
+  // Calculate pool metrics using helper functions
+  const totalMTokenSupply = mTokenBalance?.token?._totalSupply || "0";
+  const actualUnderlying = borrowableBalance?.token?._totalSupply || "0";
+  
+  const exchangeRate = calculateExchangeRate(totalMTokenSupply, actualUnderlying);
+  const totalUSDSTSupplied = calculateTotalUSDSTSupplied(totalMTokenSupply, exchangeRate);
+  const totalBorrowed = calculateTotalBorrowed(
+    userLoan || [], 
+    borrowableAssetConfig?.interestRate || 0, 
+    Math.floor(Date.now() / 1000)
+  );
+  const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
+  const totalCollateralValue = calculateTotalCollateralValue(
+    assetConfigs || [], 
+    allCollaterals, 
+    priceMap, 
+    borrowableAsset
+  );
+  const { supplyAPY, borrowAPY } = calculateAPYs(
+    borrowableAssetConfig?.interestRate || 0,
+    borrowableAssetConfig?.reserveFactor || 1000
   );
 
-  return loans
-    .filter((e) => e.LoanInfo?.active)
-    .map((e) => {
-      const loan = e.LoanInfo;
-      const hf = e.healthFactor ?? calculateHealthFactor(loan, priceMap, ratioMap, decimalsMap);
-      const primaryCollAsset = (loan.collaterals && loan.collaterals[0]?.asset) || loan.collateralAsset || "";
+  // Calculate derived values
+  const availableLiquidity = BigInt(totalUSDSTSupplied) - BigInt(totalBorrowed);
+  const conversionRate = Number(exchangeRate) / Number(10n ** 18n);
 
-      const assetToken = tokenMap.get(loan.asset) as any;
-      const collToken = primaryCollAsset ? tokenMap.get(primaryCollAsset) as any : {};
-
-      return {
-        id: e.key,
-        healthFactor: hf,
-        assetSymbol: assetToken?._symbol || '',
-        collateralSymbol: collToken?._symbol || '',
-        ...loan,
-      };
-    })
-    .filter((l) => l.healthFactor >= 1 && l.healthFactor < upper);
+  return {
+    supplyable: {
+      ...borrowableBalance?.token,
+      userBalance: borrowableBalance?.balance?.toString() || "0",
+    },
+    withdrawable: {
+      ...mTokenBalance?.token,
+      userBalance: mTokenBalance?.balance?.toString() || "0",
+      canWithdraw: BigInt(mTokenBalance?.balance || "0") > 0n,
+    },
+    // Pool metrics
+    totalUSDSTSupplied,
+    totalBorrowed,
+    utilizationRate,
+    availableLiquidity: availableLiquidity.toString(),
+    totalCollateralValue,
+    supplyAPY,
+    borrowAPY,
+    conversionRate,
+  };
 };
 
-export const getLoanByIdDirect = async (
+export const getLoan = async (
   accessToken: string,
-  id: string
-) => {
-  const registry = await getPool(accessToken);
-  const found = (registry.lendingPool.loans || []).find((e: any) => e.key === id);
-  if (!found) return null;
-  return found.LoanInfo;
+  userAddress: string
+): Promise<any> => {
+  const registry = await getPool(accessToken, userAddress);
+  
+  // Find the user's loan from the array
+  const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
+  const userLoan = userLoanEntry?.LoanInfo;
+
+  if (!userLoan) return null;
+
+  const currentTime = Math.floor(Date.now() / 1000);
+  
+  // Get user's collaterals
+  const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
+    .filter((c: any) => c.user === userAddress)
+    .map((c: any) => ({
+      asset: c.asset,
+      amount: c.amount,
+    }));
+
+  // Build asset configs map from the actual mapping
+  const assetConfigs = new Map<string, AssetConfig>();
+  
+  // Add all asset configs from the mapping
+  (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+    const price = registry.oracle?.prices?.find((p: any) => p.asset === config.asset)?.price || "0";
+    assetConfigs.set(config.asset, {
+      interestRate: config.AssetConfig?.interestRate || 0,
+      liquidationThreshold: config.AssetConfig?.liquidationThreshold || 0,
+      ltv: config.AssetConfig?.ltv || 0,
+      price: price,
+    });
+  });
+
+  return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
 };
 
 export const executeLiquidation = async (
@@ -806,15 +429,14 @@ export const executeLiquidation = async (
   loanId: string,
   options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
-  // Fetch liquidityPool address directly to avoid accidentally passing the whole object
-  const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
+  const { liquidityPool } = await getPool(accessToken, undefined, { select: "liquidityPool" });
   if (!liquidityPool || typeof liquidityPool !== "string") {
     throw new Error("Liquidity pool address not found");
   }
   const liquidityPoolAddr = liquidityPool;
 
   // Fetch full registry to locate the loan details
-  const registry = await getPool(accessToken);
+  const registry = await getPool(accessToken, undefined);
   const found = (registry.lendingPool.loans || []).find((e: any) => e.key === loanId);
   if (!found) {
     throw new Error(`Loan ${loanId} not found`);
@@ -844,9 +466,36 @@ export const executeLiquidation = async (
     const totalOwed = toBig(loan.amount) + interestAcc;
 
     // health factor to choose close factor
-    const { priceMap, ratioMap } = buildMaps(registry);
-    const hf = calculateHealthFactor(loan, priceMap, ratioMap);
-    repayAmount = hf >= 0.95 ? totalOwed / 2n : totalOwed;
+    // Build price and ratio maps from registry data
+    const priceMap = new Map<string, string>();
+    const ratioMap = new Map<string, any>();
+    
+    // Build price map from oracle data
+    (registry.oracle?.prices || []).forEach((price: any) => {
+      priceMap.set(price.asset, price.price);
+    });
+    
+    // Build ratio map from asset configs
+    (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+      ratioMap.set(config.asset, config.AssetConfig);
+    });
+    
+    // Calculate health factor using total collateral value and total owed
+    const totalCollateralValue = calculateTotalCollateralValueForHealth(
+      loan.collaterals || [],
+      new Map(Array.from(ratioMap.entries()).map(([asset, config]) => [
+        asset, 
+        { 
+          price: priceMap.get(asset) || "0",
+          liquidationThreshold: config?.liquidationThreshold || 0,
+          interestRate: config?.interestRate || 0
+        }
+      ]))
+    );
+    
+    const hf = calculateHealthFactor(totalCollateralValue, totalOwed.toString());
+    const healthFactorPercentage = Number(hf) / Number(constants.DECIMALS);
+    repayAmount = healthFactorPercentage >= 0.95 ? totalOwed / 2n : totalOwed;
   }
 
   const tx = buildFunctionTx([
@@ -858,13 +507,9 @@ export const executeLiquidation = async (
     },
     {
       contractName: extractContractName(LendingPool),
-      contractAddress: constants.lendingPool,
-      method: "liquidationCall",
-      args: {
-        collateralAsset: chosenCollateral,
-        borrower: loan.user,
-        debtToCover: repayAmount.toString(),
-      },
+      contractAddress: constants.LendingPool,
+      method: "liquidate",
+      args: { loanId },
     },
   ]);
 
@@ -883,24 +528,6 @@ export const executeLiquidation = async (
   }
 };
 
-export const getLoanWithHealthFactor = async (
-  accessToken: string,
-  id: string
-) => {
-  const registry = await getPool(accessToken);
-  const found = (registry.lendingPool.loans || []).find((e: any) => e.key === id);
-  if (!found) return null;
-  const loan = found.LoanInfo;
-  const { priceMap, ratioMap } = buildMaps(registry);
-  const healthFactor = calculateHealthFactor(loan, priceMap, ratioMap);
-  return { id, healthFactor, ...loan };
-};
-
-const toBig = (v: string | number | bigint | undefined | null) => {
-  if (v === undefined || v === null) return 0n;
-  return BigInt(v);
-};
-
 export const setInterestRate = async (
   accessToken: string,
   body: Record<string, string | number>
@@ -914,9 +541,17 @@ export const setInterestRate = async (
     throw new Error("Interest rate must be a number between 0 and 100");
   }
 
+  // Get pool configurator address from lending registry
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = registry._owner;
+  
+  if (!poolConfiguratorAddress) {
+    throw new Error("Pool configurator address not found in lending registry");
+  }
+
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: constants.poolConfigurator,
+    contractAddress: poolConfiguratorAddress,
     method: "setInterestRate",
     args: { 
       asset: body.asset, 
@@ -944,9 +579,17 @@ export const setCollateralRatio = async (
     throw new Error("Collateral ratio must be a number between 100 and 1000");
   }
 
+  // Get pool configurator address from lending registry
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = registry._owner;
+  
+  if (!poolConfiguratorAddress) {
+    throw new Error("Pool configurator address not found in lending registry");
+  }
+
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: constants.poolConfigurator,
+    contractAddress: poolConfiguratorAddress,
     method: "setCollateralRatio",
     args: { 
       asset: body.asset, 
@@ -974,9 +617,17 @@ export const setLiquidationBonus = async (
     throw new Error("Liquidation bonus must be a number between 100 and 200");
   }
 
+  // Get pool configurator address from lending registry
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = registry._owner;
+  
+  if (!poolConfiguratorAddress) {
+    throw new Error("Pool configurator address not found in lending registry");
+  }
+
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: constants.poolConfigurator,
+    contractAddress: poolConfiguratorAddress,
     method: "setLiquidationBonus",
     args: { 
       asset: body.asset, 
