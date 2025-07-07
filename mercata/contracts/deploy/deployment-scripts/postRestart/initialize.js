@@ -1,11 +1,11 @@
-const { getEnvVar, callListAndWait } = require("../../util");
+const { getEnvVar, callListAndWait, cirrusSearch } = require("../../util");
 const { createPool } = require("../pool/createPool");
 
 // Contract addresses (update as needed)
-const poolFactoryAddress = "100a";
-const lendingPoolAddress = "1005";
-const liquidityPoolAddress = "1004";
-const onRampAddress = "1009";
+const poolFactoryAddress = "000000000000000000000000000000000000100a";
+const lendingPoolAddress = "0000000000000000000000000000000000001005";
+const liquidityPoolAddress = "0000000000000000000000000000000000001004";
+const onRampAddress = "0000000000000000000000000000000000001009";
 const USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 const GOLDST_ADDRESS = "cdc93d30182125e05eec985b631c7c61b3f63ff0";
 const DECIMALS = "000000000000000000";
@@ -28,22 +28,26 @@ async function initialize() {
     console.log("Created pool at:", poolAddr);
   } catch (error) {
     console.log("createPool failed, attempting to query existing pool...");
-    // Query poolFactory for an existing pool using a Cirrus call
-    const poolQueryResult = await callListAndWait([
-      {
-        contract: { address: poolFactoryAddress, name: "PoolFactory" },
-        method: "getPool", // or the appropriate view method name
-        args: {
-          tokenA: USDST_ADDRESS,
-          tokenB: GOLDST_ADDRESS,
-        },
-      },
-    ]);
-    // Assume the query response is in poolQueryResult[0].response
-    poolAddr = Array.isArray(poolQueryResult)
-      ? poolQueryResult[0].data.contents[0]
-      : poolQueryResult.data.contents[0];
-    console.log("Queried existing pool at:", poolAddr);
+    // Query Cirrus for an existing pool
+    try {
+      const data = await cirrusSearch("BlockApps-Mercata-Pool", {
+        _owner: `eq.${poolFactoryAddress}`,
+        tokenA: `in.(${USDST_ADDRESS},${GOLDST_ADDRESS})`,
+        tokenB: `in.(${USDST_ADDRESS},${GOLDST_ADDRESS})`,
+        select: "address",
+        limit: 1,
+      });
+      
+      if (data && data.length > 0) {
+        poolAddr = data[0].address;
+        console.log("Queried existing pool at:", poolAddr);
+      } else {
+        throw new Error("No existing pool found");
+      }
+    } catch (cirrusError) {
+      console.log("Cirrus query failed:", cirrusError.message);
+      throw new Error("Failed to find existing pool via Cirrus query");
+    }
   }
   return poolAddr;
 }
@@ -101,8 +105,8 @@ if (require.main === module) {
         contract: { address: poolAddr, name: "Pool" },
         method: "addLiquidity",
         args: {
-          tokenB_amount: TOKEN_B_AMOUNT + DECIMALS, // 2 GOLDST
-          max_tokenA_amount: MAX_TOKEN_A_AMOUNT + DECIMALS, // 10000 USDST
+          tokenBAmount: TOKEN_B_AMOUNT + DECIMALS, // 2 GOLDST
+          maxTokenAAmount: MAX_TOKEN_A_AMOUNT + DECIMALS, // 10000 USDST
         },
       },
       {

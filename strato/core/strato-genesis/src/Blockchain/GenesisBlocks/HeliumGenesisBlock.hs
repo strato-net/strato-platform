@@ -206,7 +206,7 @@ genesisBlock  =
         }
 
 createdByBlockApps :: Address -> [(B.ByteString, BasicValue)]
-createdByBlockApps originAddress = 
+createdByBlockApps originAddress =
   [ (".:creator", BString $ encodeUtf8 "BlockApps")
   , (".:creatorAddress", BAccount $ unspecifiedChain blockappsAddress)
   , (".:originAddress", BAccount $ unspecifiedChain originAddress)
@@ -217,7 +217,7 @@ ownedByBlockApps originAddress = ("._owner", BAccount $ unspecifiedChain blockap
 
 getDecimals :: Integer -> Text -> Integer
 getDecimals d n =
-  if d < 0 || d >= 18 || n == "CATA" || n == "ETHST"
+  if d < 0 || d >= 18 || n == "CATA" || n == "ETHST" || n == "USDTEMP" || n == "BETHTEMP"
     then 18
     else if n == "STRAT"
            then 4
@@ -294,7 +294,7 @@ collateralVault :: AccountInfo
 collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAccount mercataAddress "CollateralVault") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   ] ++ concatMap (\GE.Escrow{..} ->
-      [ (".collaterals<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">", BInteger collateralQuantity)
+      [ (".userCollaterals<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">", BInteger collateralQuantity)
       ]
   ) combinedEscrows
 
@@ -310,34 +310,23 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".poolConfigurator", BAccount $ unspecifiedChain poolConfiguratorAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
-  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
-  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.interestRate", BInteger 500)
-  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.reserveFactor", BInteger 1000)
-  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationBonus", BInteger 10500)
-  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationThreshold", BInteger 8000)
-  , (".assetConfigs<a:" <> addrBS goldstRoot <> ">.ltv", BInteger 7500)
-  , (".assetConfigs<a:" <> addrBS goldstRoot <> ">.interestRate", BInteger 500)
-  , (".assetConfigs<a:" <> addrBS goldstRoot <> ">.reserveFactor", BInteger 1000)
-  , (".assetConfigs<a:" <> addrBS goldstRoot <> ">.liquidationBonus", BInteger 10500)
-  , (".assetConfigs<a:" <> addrBS goldstRoot <> ">.liquidationThreshold", BInteger 8000)
-  , (".assetConfigs<a:" <> addrBS silvstRoot <> ">.ltv", BInteger 7500)
-  , (".assetConfigs<a:" <> addrBS silvstRoot <> ">.interestRate", BInteger 500)
-  , (".assetConfigs<a:" <> addrBS silvstRoot <> ">.reserveFactor", BInteger 1000)
-  , (".assetConfigs<a:" <> addrBS silvstRoot <> ">.liquidationBonus", BInteger 10500)
-  , (".assetConfigs<a:" <> addrBS silvstRoot <> ">.liquidationThreshold", BInteger 8000)
-  , (".configuredAssets[0]", BAccount $ unspecifiedChain usdstAddress)
-  , (".configuredAssets[1]", BAccount $ unspecifiedChain goldstRoot)
-  , (".configuredAssets[2]", BAccount $ unspecifiedChain silvstRoot)
   , (".borrowableAsset", BAccount $ unspecifiedChain usdstAddress)
   , (".mToken", BAccount $ unspecifiedChain mTokenAddress)
-  ] ++ concatMap (\GE.Escrow{..} -> case isActive && borrowedAmount > 0 of
-    True ->
-      [ (".userLoan<a:" <> addrBS borrower <> ">.principalBalance", BInteger borrowedAmount)
-      , (".userLoan<a:" <> addrBS borrower <> ">.interestOwed", BInteger 0)
-      , (".userLoan<a:" <> addrBS borrower <> ">.lastIntCalculated", BInteger 0)
-      , (".userLoan<a:" <> addrBS borrower <> ">.lastUpdated", BInteger 0)
-      ]
-    _ -> []
+  ] ++ concatMap (\(i, GR.Reserve{..}) ->
+  [ (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.ltv", BInteger 7500)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.interestRate", BInteger 500)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.reserveFactor", BInteger 1000)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationBonus", BInteger 10500)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationThreshold", BInteger 8000)
+  , (".configuredAssets[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain assetRootAddress)
+  ]
+  ) (zip [0 :: Integer ..] GR.reserves)
+    ++ concatMap (\GE.Escrow{..} -> (if isActive && borrowedAmount > 0 then
+  [ (".userLoan<a:" <> addrBS borrower <> ">.principalBalance", BInteger borrowedAmount)
+  , (".userLoan<a:" <> addrBS borrower <> ">.interestOwed", BInteger 0)
+  , (".userLoan<a:" <> addrBS borrower <> ">.lastIntCalculated", BInteger 1751860800) -- July 7th, 2025, 12:00:00 AM
+  , (".userLoan<a:" <> addrBS borrower <> ">.lastUpdated", BInteger 1751860800) -- July 7th, 2025, 12:00:00 AM
+  ] else [])
   ) combinedEscrows
 
 poolConfigurator :: AccountInfo
@@ -407,11 +396,12 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddres
      , ("._symbol", BString "MUSDST")
      , (".description", BString "MUSDST")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger 0)
+     , ("._totalSupply", BInteger . (`div` 100) . (*110) . sum $ GE.borrowedAmount <$> combinedEscrows)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".minters<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".burners<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger . (`div` 100) . (*110) . sum $ GE.borrowedAmount <$> combinedEscrows)
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
