@@ -22,6 +22,7 @@ import "../Tokens/Token.sol";
 /// @dev minimal interface exposing addMinter used during pool creation
 interface ITokenAccess {
     function addMinter(address accountAddress) external;
+    function removeMinter(address accountAddress) external;
 }
 
 /// @notice Pool factory contract
