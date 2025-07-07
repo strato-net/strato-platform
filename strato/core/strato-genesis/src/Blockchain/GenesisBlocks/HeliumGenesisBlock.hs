@@ -318,7 +318,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.reserveFactor", BInteger 1000)
   , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationBonus", BInteger 10500)
   , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationThreshold", BInteger 8000)
-  , (".configuredAssets[" <> show i <> "]", BAccount $ unspecifiedChain assetRootAddress)
+  , (".configuredAssets[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain assetRootAddress)
   ]
   ) (zip [0 :: Integer ..] GR.reserves)
     ++ concatMap (\GE.Escrow{..} -> (if isActive && borrowedAmount > 0 then
