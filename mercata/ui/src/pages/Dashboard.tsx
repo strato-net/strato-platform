@@ -12,13 +12,14 @@ import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
+import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { tokens, loading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens();
   const { 
     availableBorrowingPower, 
     currentBorrowed, 
@@ -100,7 +101,6 @@ const Dashboard = () => {
             <AssetSummary
               title="Total Balance"
               value={formatBalance(totalBalance)}
-              change={0}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
@@ -108,7 +108,6 @@ const Dashboard = () => {
             <AssetSummary
               title="CATA Rewards"
               value={formatBalance(cataBalance)}
-              change={0}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />
@@ -116,14 +115,13 @@ const Dashboard = () => {
             <AssetSummary
               title="Borrowing"
               value="N/A"
-              change={0}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />
           </div>
 
           <div className="mb-8">
-            <AssetsList loading={loading} tokens={tokens} />
+            <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} />
           </div>
 
           <div className="mb-8">
@@ -132,6 +130,10 @@ const Dashboard = () => {
               currentBorrowed={currentBorrowed}
               averageInterestRate={averageInterestRate}
             />
+          </div>
+
+          <div className="mb-8">
+            <MyPoolParticipationSection /> 
           </div>
 
           <div className="mb-8">

@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
-  const { tokens, loading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
   const {
     liquidityInfo,
     loadingLiquidity,

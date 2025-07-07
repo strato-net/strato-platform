@@ -44,9 +44,9 @@ const AssetDetail = () => {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<any[]>([]);
   const { userAddress } = useUser()
-  const { tokens: assets, loading, fetchTokens } = useUserTokens()
+  const { activeTokens: assets, inactiveTokens, loading, fetchTokens } = useUserTokens()
 
-
+  
   useEffect(() => {
     fetchTokens(userAddress)
   }, [userAddress])
@@ -54,6 +54,7 @@ const AssetDetail = () => {
   useEffect(() => {
     // Find the asset with the matching id
     const foundAsset = assets.find(a => a?.address === id);
+    const foundInActiveAsset = inactiveTokens.find(a => a?.address === id)
     if (foundAsset) {
       setAsset(foundAsset);
       document.title = `${foundAsset?.token?._name} | Asset Details`;
@@ -64,8 +65,18 @@ const AssetDetail = () => {
           setPriceData(generatePriceData(basePrice));
         }
       }
+    } else if (foundInActiveAsset){
+      setAsset(foundInActiveAsset);
+      document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
+
+      if (foundInActiveAsset?.price) {
+        const basePrice = parseFloat(foundInActiveAsset.price);
+        if (!isNaN(basePrice)) {
+          setPriceData(generatePriceData(basePrice));
+        }
+      }
     }
-  }, [id, assets]);
+  }, [id, assets]);  
 
   if (!asset) {
     return (
@@ -82,8 +93,8 @@ const AssetDetail = () => {
               <div className="text-center py-12">
                 <h2 className="text-2xl font-bold mb-4">Asset Not Found</h2>
                 <p className="text-gray-600 mb-6">The asset you are looking for does not exist or has been removed.</p>
-                <Link to="/dashboard/assets">
-                  <Button>Back to Assets</Button>
+                <Link to="/dashboard/deposits">
+                  <Button>Back to Deposits</Button>
                 </Link>
               </div>
             </main>
@@ -109,8 +120,8 @@ const AssetDetail = () => {
 
         <main className="p-6">
           <div className="mb-6">
-            <Link to="/dashboard/assets" className="inline-flex items-center text-blue-600 hover:text-blue-800">
-              <ChevronLeft size={16} className="mr-1" /> Back to Assets
+            <Link to="/dashboard/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800">
+              <ChevronLeft size={16} className="mr-1" /> Back to Deposits
             </Link>
           </div>
 

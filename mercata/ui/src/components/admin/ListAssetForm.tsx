@@ -41,7 +41,7 @@ const ListAssetForm = () => {
 
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
   const { get, sell } = useOnRampContext();
 
   const form = useForm<OnRampListingFormValues>({
