@@ -27,11 +27,11 @@ services:
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
       - POOL_FACTORY=${POOL_FACTORY}
-      - LENDING_POOL=${LENDING_POOL}
+      - LENDING_REGISTRY=${LENDING_REGISTRY}
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ONRAMP=${ONRAMP}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - POOL_CONFIGURATOR=${POOL_CONFIGURATOR}
+      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
     restart: unless-stopped
     logging:
       driver: "json-file"
