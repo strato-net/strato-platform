@@ -701,6 +701,4 @@ contract record LendingPool is Ownable {
         
         return (totalCollateralValue * 1e18) / borrowableAssetPrice;
     }
-
-
 } 

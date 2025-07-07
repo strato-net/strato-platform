@@ -2,7 +2,7 @@ import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
-import { getBalance } from "./tokens.service";
+import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { 
@@ -266,7 +266,7 @@ export const collateralAndBalance = async (
   return assets
     .filter((asset: string) => {
       const token = tokenMap.get(asset) as any;
-      return token && BigInt(token.balance || "0") > 0n;
+      return token;
     })
     .map((asset: string) => {
       const token = tokenMap.get(asset) as any;
@@ -333,6 +333,24 @@ export const liquidityAndBalance = async (
     })
   ]).then(balances => balances.map(b => b[0]));
 
+  // Get total supply - use from balance if available, otherwise fetch directly
+  let totalMTokenSupply = "0";
+  let actualUnderlying = "0";
+
+  if (mTokenBalance?.token?._totalSupply) {
+    totalMTokenSupply = mTokenBalance.token._totalSupply;
+  } else {
+    const mTokenInfo = await getTokens(accessToken, { address: `eq.${mToken}`, select: `_totalSupply::text` });
+    totalMTokenSupply = mTokenInfo[0]?._totalSupply || "0";
+  }
+
+  if (borrowableBalance?.token?._totalSupply) {
+    actualUnderlying = borrowableBalance.token._totalSupply;
+  } else {
+    const borrowableTokenInfo = await getTokens(accessToken, { address: `eq.${borrowableAsset}`, select: `_totalSupply::text` });
+    actualUnderlying = borrowableTokenInfo[0]?._totalSupply || "0";
+  }
+
   // Get borrowable asset config and price
   const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
 
@@ -342,8 +360,6 @@ export const liquidityAndBalance = async (
   );
 
   // Calculate pool metrics using helper functions
-  const totalMTokenSupply = mTokenBalance?.token?._totalSupply || "0";
-  const actualUnderlying = borrowableBalance?.token?._totalSupply || "0";
   
   const exchangeRate = calculateExchangeRate(totalMTokenSupply, actualUnderlying);
   const totalUSDSTSupplied = calculateTotalUSDSTSupplied(totalMTokenSupply, exchangeRate);
