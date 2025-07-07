@@ -103,8 +103,8 @@ const BorrowAssetModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Interest Rate</span>
               <span className="font-medium">
-                {loan.accruedInterest
-                  ? `${parseFloat(loan.accruedInterest).toFixed(2)}%`
+                {loan?.accruedInterest
+                  ? `${parseFloat(loan?.accruedInterest).toFixed(2)}%`
                   : "-"}
               </span>
             </div>
