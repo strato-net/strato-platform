@@ -58,11 +58,9 @@ export const constants = (() => {
   ];
   const registrySelectFields = [
     "lendingPool: lendingPool_fkey(" +
-      "address," +
-      `loans:${LendingPool}-loans(key,LoanInfo:value),` +
-      `interestRate:${LendingPool}-assetInterestRate(asset:key,rate:value),` +
-      `collateralRatio:${LendingPool}-assetCollateralRatio(asset:key,ratio:value),` +
-      `liquidationBonus:${LendingPool}-assetLiquidationBonus(asset:key,bonus:value))`,
+      "address,borrowableAsset," +
+      `userLoan:${LendingPool}-userLoan(key,LoanInfo:value),` +
+      `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`,
     "oracle:priceOracle_fkey(" +
       "address," +
       `prices:${PriceOracle}-prices(asset:key,price:value::text))`,
@@ -73,7 +71,7 @@ export const constants = (() => {
       `borrowed:${LiquidityPool}-borrowed(key,Borrow:value))`,
     "collateralVault:collateralVault_fkey(" +
       "address," +
-      `collaterals:${CollateralVault}-collaterals(key,Collateral:value))`,
+      `collaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value))`,
   ];
 
   const onRampSelectFields = [
