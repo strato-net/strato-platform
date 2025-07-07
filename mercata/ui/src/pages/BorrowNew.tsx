@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
@@ -19,8 +19,6 @@ import {
 } from "@/components/ui/table";
 
 import { DepositableToken } from "@/interface";
-import { usdstAddress } from "@/lib/contants";
-import isEqual from "lodash.isequal";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
@@ -40,11 +38,9 @@ const formatTokenAmount = (value: any) =>
 
 const BorrowNew = () => {
   const [selectedAsset, setSelectedAsset] = useState<DepositableToken | null>(null);
-  const [borrowAsset, setBorrowAsset] = useState<DepositableToken | null>(null);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [showRepayModal, setShowRepayModal] = useState(false)
-  const [loan, setLoan] = useState<any | null>(null);
   const [wrongAmount, setWrongAmount] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState([])
   const [suppliedCollateral, setSuppliedCollateral] = useState([])
@@ -79,30 +75,13 @@ const BorrowNew = () => {
 
   const {
     refreshLendingData,
-    loading: lendingLoading
   } = useLendingMetrics();
 
   useEffect(() => {
     refreshLendingData();
   }, []);
 
-  useEffect(() => {
-    if (!depositableTokens || depositableTokens.length === 0) return;
-
-    let usdtToken: DepositableToken | null = null;
-    const filteredTokens: DepositableToken[] = [];
-
-    for (const token of depositableTokens) {
-      if (token?.address === usdstAddress) {
-        usdtToken = token;
-      } else {
-        filteredTokens.push(token);
-      }
-    }
-    setBorrowAsset(usdtToken);
-  }, [depositableTokens]);
-
-  const handleBorrow = (asset?: DepositableToken) => {
+  const handleBorrow = () => {
     setIsBorrowModalOpen(true);
   };
   
@@ -152,8 +131,7 @@ const BorrowNew = () => {
     }
   };
   
-  const handleRepay = (asset?: DepositableToken) => {
-    setSelectedAsset(asset);
+  const handleRepay = () => {
     setShowRepayModal(true);
   };
 
@@ -434,8 +412,6 @@ const BorrowNew = () => {
       
         <BorrowAssetModal
           borrowLoading={borrowLoading}
-          borrowAsset={borrowAsset}
-          asset={selectedAsset}
           isOpen={isBorrowModalOpen}
           onClose={closeBorrowModal}
           onBorrow={(amount) => executeBorrow(amount)}
