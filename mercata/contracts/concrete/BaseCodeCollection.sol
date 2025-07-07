@@ -27,6 +27,9 @@ import "./OnRamp/OnRamp.sol";
 //import "Redemptions/CryptoRedemptionService.sol"; incomplete
 //import "Redemptions/PhysicalRedemptionService.sol"; doesn't compile
 
+//Rewards
+import "./Rewards/RewardsManager.sol";
+
 //Lending
 import "Lending/CollateralVault.sol";
 import "Lending/LendingPool.sol";
@@ -43,7 +46,7 @@ import "./Bridge/MercataEthBridge.sol";
 import "Admin/FeeCollector.sol";
 
 //TODO
-contract Mercata {
+contract record Mercata {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
     CollateralVault public collateralVault;
@@ -57,6 +60,7 @@ contract Mercata {
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
+    RewardsManager public rewardsManager;
 
     constructor() public {
         // Create AdminRegistry first
@@ -89,5 +93,7 @@ contract Mercata {
         // Create Services
         mercataEthBridge = new MercataEthBridge(msg.sender, address(tokenFactory));
         onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry));
+
+        rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
     }
 }
