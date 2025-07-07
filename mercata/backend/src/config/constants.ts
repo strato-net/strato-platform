@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { lendingPool, onRamp, poolFactory, tokenFactory, adminRegistry, poolConfigurator } from "./config";
 
 export enum StratoPaths {

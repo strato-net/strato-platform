@@ -14,4 +14,6 @@ require("dotenv").config();
     console.error("Initialization script failed:", err.message || err);
     process.exit(1);
   }
-})(); 
+})();
+
+// (collateral defaults & fallback price logic removed – handled in canonical script) 

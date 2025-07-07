@@ -26,12 +26,7 @@ export const getPool = async (
   const params = {
     ...cleanedFilters,
     select: select ?? registrySelectFields.join(","),
-    ...(select
-      ? {}
-      : {
-          "liquidityPool.deposited.value->>amount": "gt.0",
-          "liquidityPool.borrowed.value->>amount": "gt.0",
-        }),
+    ...(select ? {} : {}),
     lendingPool: `eq.${lendingPool}`,
   };
 

@@ -1,5 +1,5 @@
 const { util } = require("blockapps-rest");
-const { createContractArgs, saveCreateTXDataAsFile } = require("../../util");
+const { createContractArgs, saveCreateTXDataAsFile, getEnvVar } = require("../../util");
 
 async function createPoolFactory() {
   try {
@@ -13,7 +13,17 @@ async function createPoolFactory() {
     const source = `import <${process.env.BASE_CODE_COLLECTION}>;`;
 
     // Build the constructor arguments.
-    const constructorArgs = {};
+    const INITIAL_OWNER = getEnvVar("INITIAL_OWNER");
+    const TOKEN_FACTORY = getEnvVar("TOKEN_FACTORY");
+    const ADMIN_REGISTRY = getEnvVar("ADMIN_REGISTRY");
+    const FEE_COLLECTOR = getEnvVar("FEE_COLLECTOR");
+
+    const constructorArgs = {
+      initialOwner: INITIAL_OWNER,
+      _tokenFactory: TOKEN_FACTORY,
+      _adminRegistry: ADMIN_REGISTRY,
+      _feeCollector: FEE_COLLECTOR,
+    };
 
     const contractArgs = {
       name: contractName,
