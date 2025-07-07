@@ -17,6 +17,12 @@ import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Tokens/Token.sol";
+
+/// @dev minimal interface exposing addMinter used during pool creation
+interface ITokenAccess {
+    function addMinter(address accountAddress) external;
+}
 
 /// @notice Pool factory contract
 contract record PoolFactory is Ownable {
@@ -201,7 +207,7 @@ contract record PoolFactory is Ownable {
             18
         );
 
-        // deploy new pool
+        // deploy new pool first
         pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
         
         // NEW: allow the pool to mint its own LP tokens
