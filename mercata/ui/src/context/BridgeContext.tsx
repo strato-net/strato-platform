@@ -197,11 +197,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         ? tokenAddress
         : `0x${tokenAddress}`;
 
-      const response = await fetch(`/api/bridge/balance/${formattedTokenAddress}`, {
-        method: "GET",
+      const response = await fetch(`/api/bridge/stratoTokenBalance`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          tokenAddress: formattedTokenAddress
+        }),
       });
       
       const responseData = await response.json();
