@@ -31,6 +31,11 @@ export const getPools = async (
       _owner: "eq." + constants.poolFactory,
   };
 
+  // DEBUG: log Cirrus query parameters to verify filters
+  if (process.env.DEBUG_GET_POOLS === 'true') {
+    console.log('[getPools] params →', params);
+  }
+
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params,
   });

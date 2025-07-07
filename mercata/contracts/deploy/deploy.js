@@ -66,6 +66,31 @@ async function main() {
     // Return the deployed contract address for scripting
     console.log(`DEPLOYED_CONTRACT_ADDRESS=${deployedContract.address}`);
     
+    // Helpful .env snippet so the operator can paste straight into their environment
+    console.log('\n# ------------------------');
+    console.log('# Paste these into your .env');
+    console.log('# ------------------------');
+    const envLines = {
+      POOL_FACTORY: deployedContract.managers.poolFactory,
+      TOKEN_FACTORY: deployedContract.managers.tokenFactory,
+      ADMIN_REGISTRY: deployedContract.managers.adminRegistry,
+      FEE_COLLECTOR: deployedContract.managers.feeCollector,
+      PRICE_ORACLE: deployedContract.managers.priceOracle,
+      RATE_STRATEGY: deployedContract.managers.rateStrategy,
+      LIQUIDITY_POOL: deployedContract.managers.liquidityPool,
+      COLLATERAL_VAULT: deployedContract.managers.collateralVault,
+      LENDING_POOL: deployedContract.managers.lendingPool,
+      LENDING_REGISTRY: deployedContract.managers.lendingRegistry,
+      POOL_CONFIGURATOR: deployedContract.managers.poolConfigurator,
+      MERCATA_BRIDGE: deployedContract.managers.mercataEthBridge,
+      ON_RAMP: deployedContract.managers.onRamp,
+      MERCATA_CORE: deployedContract.address,
+    };
+    Object.entries(envLines).forEach(([k, v]) => {
+      console.log(`${k}=${v}`);
+    });
+    console.log('# ------------------------\n');
+    
     return deployedContract;
   } catch (error) {
     console.error('Deployment failed:', error);

@@ -113,6 +113,21 @@ require("dotenv").config();
 
   const E18 = 10n ** 18n;
 
+  /** Fetch token metadata (customDecimals) with memoization */
+  const decimalsCache = new Map();
+  const getDecimals = async (tokenAddr) => {
+    tokenAddr = tokenAddr.toLowerCase();
+    if (decimalsCache.has(tokenAddr)) return decimalsCache.get(tokenAddr);
+    const rows = await cirrusGet(`/BlockApps-Mercata-Token`, {
+      address: `eq.${tokenAddr}`,
+      select: "customDecimals",
+      limit: 1,
+    });
+    const dec = rows[0]?.customDecimals ? Number(rows[0].customDecimals) : 18;
+    decimalsCache.set(tokenAddr, dec);
+    return dec;
+  };
+
   /* ---------- STEP 1: ensure liquidity ---------- */
   const minLiquidity = 10000n * E18;
   const lpBal = await getBalance(cfg.USDST, cfg.LIQUIDITY_POOL);
@@ -155,11 +170,15 @@ require("dotenv").config();
     const addr = data.address.replace(/^0x/, "").toLowerCase();
 
     // ---------- ensure borrower owns required collateral ----------
-    const ensureToken = async (tokenAddr, amount) => {
+    const ensureToken = async (tokenAddr, tokensNeeded) => {
+      const dec = await getDecimals(tokenAddr);
+      const unit = 10n ** BigInt(dec);
+      const rawNeeded = BigInt(tokensNeeded) * unit;
       const bal = await getBalance(tokenAddr, addr);
-      if (bal < amount) {
-        const missing = amount - bal;
-        console.log(`    – topping up ${missing / E18} tokens of ${tokenAddr} to borrower ${addr}`);
+      if (bal < rawNeeded) {
+        const missing = rawNeeded - bal;
+        const human = Number(missing) / Number(unit);
+        console.log(`    – topping up ${human} tokens of ${tokenAddr} to borrower ${addr}`);
         await send(ADMIN_TOKEN, buildCall("Token", tokenAddr, "transfer", {
           to: addr,
           value: missing.toString(),
@@ -167,28 +186,31 @@ require("dotenv").config();
       }
     };
 
-    await ensureToken(cfg.GOLDST, 1n * E18);
-    await ensureToken(cfg.SILVST, 50n * E18);
+    await ensureToken(cfg.GOLDST, 1n); // 1 GOLD token
+    await ensureToken(cfg.SILVST, 50n); // 50 SILV tokens
 
-    // supply 1 GOLDST (1 * $2000) and 50 SILVST (50 * $25 = $1 250)
+    // compute raw amounts for approve & supply based on decimals
+    const goldUnit = 10n ** BigInt(await getDecimals(cfg.GOLDST));
+    const silvUnit = 10n ** BigInt(await getDecimals(cfg.SILVST));
+
     const txs = [
       // approve + supply GOLDST
       buildCall("Token", cfg.GOLDST, "approve", {
         spender: cfg.COLLATERAL_VAULT,
-        value: (1n * E18).toString(),
+        value: (1n * goldUnit).toString(),
       }),
       buildCall("LendingPool", cfg.LENDING_POOL, "supplyCollateral", {
         asset: cfg.GOLDST,
-        amount: (1n * E18).toString(),
+        amount: (1n * goldUnit).toString(),
       }),
       // approve + supply SILVST
       buildCall("Token", cfg.SILVST, "approve", {
         spender: cfg.COLLATERAL_VAULT,
-        value: (50n * E18).toString(),
+        value: (50n * silvUnit).toString(),
       }),
       buildCall("LendingPool", cfg.LENDING_POOL, "supplyCollateral", {
         asset: cfg.SILVST,
-        amount: (50n * E18).toString(),
+        amount: (50n * silvUnit).toString(),
       }),
       // borrow 2 500 USDST
       buildCall("LendingPool", cfg.LENDING_POOL, "borrow", {
