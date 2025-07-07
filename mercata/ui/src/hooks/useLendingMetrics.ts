@@ -7,8 +7,6 @@ export const useLendingMetrics = () => {
   const [loanList, setLoanList] = useState<any[]>([]);
   
   const {
-    depositableTokens,
-    refreshDepositTokens,
     loans,
     refreshLoans,
   } = useLendingContext();
@@ -47,6 +45,7 @@ export const useLendingMetrics = () => {
       fetchLoans();
     }
   }, [loans, fetchLoans]);
+  let depositableTokens = []
 
   // Calculate Available Borrowing Power
   const availableBorrowingPower = useMemo(() => {
@@ -219,9 +218,8 @@ export const useLendingMetrics = () => {
 
   // Function to refresh all lending data
   const refreshLendingData = useCallback(() => {
-    refreshDepositTokens();
     refreshLoans();
-  }, [refreshDepositTokens, refreshLoans]);
+  }, [ refreshLoans]);
 
   return {
     availableBorrowingPower,
