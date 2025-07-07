@@ -60,7 +60,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     }
 
     function setRewardsManager(address _rewardsManager) external onlyOwner {
-        rewardsManager = RewardsManager_1(_rewardsManager);
+        rewardsManager = RewardsManager(_rewardsManager);
     }
 
     function mint(address to, uint256 amount) external {
