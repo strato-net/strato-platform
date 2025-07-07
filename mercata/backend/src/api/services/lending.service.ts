@@ -263,41 +263,46 @@ export const collateralAndBalance = async (
     priceMap.set(price.asset, price.price);
   });
 
-  return assets.map((asset: string) => {
-    const token = tokenMap.get(asset) as any;
-    const collateral = collateralMap.get(asset) as any;
-    const assetConfig = assetConfigMap.get(asset);
-    const assetPrice = priceMap.get(asset) || "0";
+  return assets
+    .filter((asset: string) => {
+      const token = tokenMap.get(asset) as any;
+      return token && BigInt(token.balance || "0") > 0n;
+    })
+    .map((asset: string) => {
+      const token = tokenMap.get(asset) as any;
+      const collateral = collateralMap.get(asset) as any;
+      const assetConfig = assetConfigMap.get(asset);
+      const assetPrice = priceMap.get(asset) || "0";
 
-    const userBalance = token?.balance?.toString() || "0";
-    const collateralizedAmount = collateral?.amount || "0";
-    const ltv = assetConfig?.ltv || 0;
-    const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
+      const userBalance = token?.balance?.toString() || "0";
+      const collateralizedAmount = collateral?.amount || "0";
+      const ltv = assetConfig?.ltv || 0;
+      const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
-    // Calculate metrics using the helper function
-    const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
-      userBalance,
-      collateralizedAmount,
-      assetPrice,
-      ltv
-    );
+      // Calculate metrics using the helper function
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+        userBalance,
+        collateralizedAmount,
+        assetPrice,
+        ltv
+      );
 
-    return {
-      address: asset,
-      ...token?.token,
-      userBalance,
-      userBalanceValue,
-      collateralizedAmount,
-      collateralizedAmountValue,
-      isCollateralized: collateral?.amount > 0,
-      canSupply: BigInt(userBalance) > 0n,
-      maxBorrowingPower,
-      // Add additional context
-      assetPrice,
-      ltv,
-      liquidationThreshold,
-    };
-  });
+      return {
+        address: asset,
+        ...token?.token,
+        userBalance,
+        userBalanceValue,
+        collateralizedAmount,
+        collateralizedAmountValue,
+        isCollateralized: collateral?.amount > 0,
+        canSupply: BigInt(userBalance) > 0n,
+        maxBorrowingPower,
+        // Add additional context
+        assetPrice,
+        ltv,
+        liquidationThreshold,
+      };
+    });
 };
 
 export const liquidityAndBalance = async (
