@@ -5,6 +5,8 @@ import {
   depositLiquidity,
   withdrawLiquidity,
   borrow,
+  supplyCollateral as supplyCollateralSvc,
+  withdrawCollateral as withdrawCollateralSvc,
   repay,
   getDepositableTokens,
   getWithdrawableTokens,
@@ -19,7 +21,8 @@ import {
 } from "../services/lending.service";
 import {
   validateManageLiquidityArgs,
-  validateGetLoanArgs,
+  validateBorrowArgs,
+  validateCollateralArgs,
   validateRepayLoanArgs,
   validateLoanIdParam,
   validateMarginQuery,
@@ -74,6 +77,40 @@ class LendingController {
     }
   }
 
+  static async supplyCollateral(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateCollateralArgs(body);
+
+      const result = await supplyCollateralSvc(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async withdrawCollateral(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateCollateralArgs(body);
+
+      const result = await withdrawCollateralSvc(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async borrow(
     req: Request,
     res: Response,
@@ -81,7 +118,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      validateGetLoanArgs(body);
+      validateBorrowArgs(body);
 
       const result = await borrow(accessToken, body);
       res.status(RestStatus.OK).json(result);

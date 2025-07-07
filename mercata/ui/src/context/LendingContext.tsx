@@ -9,6 +9,7 @@ import isEqual from "lodash.isequal";
 import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
 import { DepositableToken, Loan, WithdrawableToken } from "@/interface";
+import { useUser } from "@/context/UserContext";
 
 interface LoanData {
   loans: Loan;
@@ -30,17 +31,10 @@ type LendingContextType = {
   setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
   setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
   refreshLendingData: () => Promise<void>;
-  borrowAsset: (args: {
-    asset: string;
-    amount: string;
-    collateralAsset: string;
-    collateralAmount: string;
-  }) => Promise<any>;
-  repayLoan: (args: {
-    loanId: string;
-    amount: string;
-    asset: string;
-  }) => Promise<any>;
+  supplyCollateral: (args: { asset: string; amount: string }) => Promise<any>;
+  withdrawCollateral: (args: { asset: string; amount: string }) => Promise<any>;
+  borrowAsset: (args: { amount: string }) => Promise<any>;
+  repayLoan: (args: { amount: string }) => Promise<any>;
   getLend: () => Promise<any>;
   depositLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
   withdrawLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
@@ -61,6 +55,8 @@ export const LendingProvider = ({
 
   const [withdrawableTokens, setWithdrawableTokens] = useState<WithdrawableToken[]>([]);
   const [loadingWithdrawableTokens, setLoadingWithdrawableTokens] = useState(true);
+
+  const { isLoggedIn } = useUser();
 
   const fetchDepositTokens = async (signal?: AbortSignal) => {
     setLoadingDepositTokens(true);
@@ -160,24 +156,29 @@ export const LendingProvider = ({
     }
   };
 
-  const borrowAsset = async ({
-    asset,
-    amount,
-    collateralAsset,
-    collateralAmount,
-  }: {
-    asset: string;
-    amount: string;
-    collateralAsset: string;
-    collateralAmount: string;
-  }) => {
+  const supplyCollateral = async ({ asset, amount }: { asset: string; amount: string }) => {
     try {
-      const res = await api.post("/lend/borrow", {
-        asset,
-        amount,
-        collateralAsset,
-        collateralAmount,
-      });
+      const res = await api.post("/lend/supplyCollateral", { asset, amount });
+      return res;
+    } catch (err: any) {
+      console.error("Supply collateral failed:", err);
+      throw err;
+    }
+  };
+
+  const withdrawCollateral = async ({ asset, amount }: { asset: string; amount: string }) => {
+    try {
+      const res = await api.post("/lend/withdrawCollateral", { asset, amount });
+      return res;
+    } catch (err: any) {
+      console.error("Withdraw collateral failed:", err);
+      throw err;
+    }
+  };
+
+  const borrowAsset = async ({ amount }: { amount: string }) => {
+    try {
+      const res = await api.post("/lend/borrow", { amount });
       return res;
     } catch (err: any) {
       console.error("Borrow failed:", err);
@@ -185,21 +186,9 @@ export const LendingProvider = ({
     }
   };
 
-  const repayLoan = async ({
-    loanId,
-    amount,
-    asset,
-  }: {
-    loanId: string;
-    amount: string;
-    asset: string;
-  }) => {
+  const repayLoan = async ({ amount }: { amount: string }) => {
     try {
-      const res = await api.post("/lend/repay", {
-        loanId,
-        amount,
-        asset,
-      });
+      const res = await api.post("/lend/repay", { amount });
       return res;
     } catch (err: any) {
       console.error("Repay failed:", err);
@@ -249,8 +238,8 @@ export const LendingProvider = ({
     }
   };
 
-
   const initialize = () => {
+    if (!isLoggedIn) return;
     fetchDepositTokens();
     fetchLoans();
     fetchWithdrawableTokens();
@@ -258,7 +247,7 @@ export const LendingProvider = ({
 
   useEffect(() => {
     initialize();
-  }, []);
+  }, [isLoggedIn]);
 
   const contextValue = useMemo(
     () => ({
@@ -277,6 +266,8 @@ export const LendingProvider = ({
       setCollateralRatio,
       setLiquidationBonus,
       refreshLendingData,
+      supplyCollateral,
+      withdrawCollateral,
       borrowAsset,
       repayLoan,
       getLend,

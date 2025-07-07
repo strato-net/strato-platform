@@ -55,6 +55,7 @@ const Borrow = () => {
     loans,
     loadingDepositTokens,
     borrowAsset: borrowAssetFn,
+    supplyCollateral,
   } = useLendingContext();
 
   const { 
@@ -105,16 +106,15 @@ const Borrow = () => {
   const executeBorrow = async (asset: DepositableToken, amount: number) => {
     try {
       setBorrowLoading(true);
-      const collateralAmount = formatUnits(BigInt(selectedAsset?.value || 0), 18);
+      const collateralAmountHuman = formatUnits(BigInt(selectedAsset?.value || 0), 18);
+      const collateralInWei = parseUnits(collateralAmountHuman, 18).toString();
       const amountInWei = parseUnits(amount.toString(), 18).toString();
-      const collateralInWei = parseUnits(collateralAmount, 18).toString();
 
-      await borrowAssetFn({
-        asset: borrowAsset?.address!,
-        amount: amountInWei,
-        collateralAsset: asset?.address!,
-        collateralAmount: collateralInWei,
-      });
+      // 1) move collateral into the vault
+      await supplyCollateral({ asset: asset.address, amount: collateralInWei });
+
+      // 2) borrow the requested USDST
+      await borrowAssetFn({ amount: amountInWei });
 
       toast({
         title: "Borrow Initiated",
@@ -415,7 +415,12 @@ const Borrow = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>${formatUnits(loan?.loan?.amount?.toString(), 18)}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const amt = loan?.loan?.amount ?? "0";
+                            return "$" + formatUnits(amt.toString(), 18);
+                          })()}
+                        </TableCell>
                         <TableCell>
                           {loan?.loan.collateralName || loan?.loan.collateralAsset} {formatEther(loan?.loan?.collateralAmount || 0)}
                         </TableCell>

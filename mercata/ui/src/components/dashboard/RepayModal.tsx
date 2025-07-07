@@ -79,9 +79,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
       }
 
       await repayLoanFn({
-        loanId: loan?.key,
         amount: amountInWei,
-        asset: loan?.loan?.asset,
       });
       
       toast({

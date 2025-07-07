@@ -284,41 +284,64 @@ export const withdrawLiquidity = async (
   }
 };
 
-export const borrow = async (
+export const supplyCollateral = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const lendingPool = await getPool(accessToken, {
-      select: "collateralVault",
-    });
-
-    if (!lendingPool.collateralVault) {
+    const { collateralVault } = await getPool(accessToken, { select: "collateralVault" });
+    if (!collateralVault) {
       throw new Error("Collateral vault address not found");
     }
 
-    const tx = buildFunctionTx([
+    const tx: FunctionInput[] = [
       {
         contractName: extractContractName(Token),
-        contractAddress: body.collateralAsset || "",
+        contractAddress: body.asset || "",
         method: "approve",
-        args: { spender: lendingPool.collateralVault, value: body.collateralAmount || "" },
+        args: {
+          spender: collateralVault,
+          value: body.amount || "",
+        },
       },
       {
         contractName: extractContractName(LendingPool),
         contractAddress: constants.lendingPool,
-        method: "borrow",
+        method: "supplyCollateral",
         args: {
           asset: body.asset,
           amount: body.amount,
-          collateralAsset: body.collateralAsset,
-          collateralAmount: body.collateralAmount,
         },
       }
-    ]);
+    ];
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const withdrawCollateral = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const tx: FunctionInput[] = [{
+      contractName: extractContractName(LendingPool),
+      contractAddress: constants.lendingPool,
+      method: "withdrawCollateral",
+      args: {
+        asset: body.asset,
+        amount: body.amount,
+      },
+    }];
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
     );
 
     return { status, hash };
@@ -384,9 +407,8 @@ export const repay = async (
       {
         contractName: extractContractName(LendingPool),
         contractAddress: constants.lendingPool,
-        method: "repayLoan",
+        method: "repay",
         args: {
-          loanId: body.loanId,
           amount: repayAmount,
         },
       },
@@ -411,44 +433,55 @@ export const getDepositableTokens = async (
     getBalance(accessToken, address),
   ]);
 
-  const userTokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
+  const userTokenMap = new Map(userTokens.map((t: any) => [t.address.toLowerCase(), t]));
+
   const oraclePriceMap = new Map(
     (registry.oracle.prices || []).map(
-      ({ asset, price }: { asset: string; price: string }) => [asset, price]
+      ({ asset, price }: { asset: string; price: string }) => [asset.toLowerCase(), price]
     )
   );
+
   const interestRateMap = new Map<string, number>(
-    (registry.lendingPool.interestRate || []).map((entry: any) => {
-      const assetAddr = (entry?.asset || "").toLowerCase();
-      return [assetAddr, Number(entry?.rate || 0)];
-    })
+    (registry.lendingPool.interestRate || []).map((entry: any) => [
+      (entry?.asset || "").toLowerCase(),
+      Number(entry?.rate || 0),
+    ])
   );
+
   const liquidityMap = new Map(
-    (registry.liquidityPool.totalLiquidity || []).map(
-      ({ asset, amount }: { asset: string; amount: string }) => [asset, amount]
-    )
+    (registry.liquidityPool.totalLiquidity || []).map(({ asset, amount }: { asset: string; amount: string }) => [
+      asset.toLowerCase(),
+      amount,
+    ])
   );
-  const collateralConfigs = registry.lendingPool.ltv || registry.lendingPool.collateralRatio || [];
-  return collateralConfigs
-    .filter(
-      ({ asset }: any) =>
-        oraclePriceMap.has(asset) !== undefined && userTokenMap.has(asset)
-    )
-    .map((entry: any) => {
-      const asset = entry.asset;
-      const ratioVal = entry.ratio ?? entry.ltv ?? 0;
-      const userToken = userTokenMap.get(asset) as any;
-      return {
-        address: asset,
-        _name: userToken?.token?._name || "",
-        _symbol: userToken?.token?._symbol || "",
-        value: userToken?.balance?.toString() || "0",
-        collateralRatio: ratioVal,
-        interestRate: interestRateMap.get(asset) || 0,
-        price: oraclePriceMap.get(asset) || "0",
-        liquidity: liquidityMap.get(asset) || "0",
-      };
-    });
+
+  const collateralConfigs = registry.lendingPool.assetConfigs || registry.lendingPool.ltv || registry.lendingPool.collateralRatio || [];
+
+  // Fetch metadata for all collateral assets in one query
+  const collateralAddrs = collateralConfigs.map((c: any) => c.asset).join(",");
+  const tokenMetaRows = await getTokens(accessToken, {
+    address: `in.(${collateralAddrs})`,
+  });
+  const tokenMetaMap = new Map(tokenMetaRows.map((t: any) => [t.address.toLowerCase(), t]));
+
+  return collateralConfigs.map((entry: any) => {
+    const asset = entry.asset.toLowerCase();
+    const ratioVal = entry.ratio ?? entry.ltv ?? 0;
+
+    const meta = tokenMetaMap.get(asset) || {};
+    const userTok = userTokenMap.get(asset) as any;
+
+    return {
+      address: entry.asset,
+      _name: meta._name || userTok?.token?._name || "",
+      _symbol: meta._symbol || userTok?.token?._symbol || "",
+      value: userTok?.balance?.toString() || "0",
+      collateralRatio: ratioVal,
+      interestRate: interestRateMap.get(asset) || 0,
+      price: oraclePriceMap.get(asset) || "0",
+      liquidity: liquidityMap.get(asset) || "0",
+    };
+  });
 };
 
 export const getWithdrawableTokens = async (
@@ -549,15 +582,15 @@ export const getLoans = async (
 
     // Enrich collaterals with metadata & USD value
     const collateralsEnriched = (loan.collaterals || []).map((c: any) => {
-      const tok = tokenMap.get(c.asset) || {};
+      const userTok = tokenMap.get(c.asset) as any;
       const price = priceMap.get((c.asset || "").toLowerCase()) || 0n;
       const dec = decimalsMap.get((c.asset || '').toLowerCase()) ?? 18;
       const usd = valueInUsd(c.amount, price, dec).toString();
       return {
         asset: c.asset,
         amount: c.amount,
-        symbol: tok?._symbol || "",
-        name: tok?._name || "",
+        symbol: userTok?._symbol || "",
+        name: userTok?._name || "",
         usdValue: usd,
       };
     });
@@ -989,4 +1022,30 @@ export const setLiquidationBonus = async (
   );
 
   return { status, hash };
+};
+
+export const borrow = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const tx: FunctionInput[] = [
+      {
+        contractName: extractContractName(LendingPool),
+        contractAddress: constants.lendingPool,
+        method: "borrow",
+        args: {
+          amount: body.amount,
+        },
+      },
+    ];
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
 };

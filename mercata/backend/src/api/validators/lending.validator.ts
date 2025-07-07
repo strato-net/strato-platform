@@ -5,12 +5,12 @@ const manageLiquiditySchema = Joi.object({
   amount: Joi.string().required(),
 });
 
-const getLoanArgsSchema = Joi.object({
-  asset: Joi.string().required(),
+const borrowArgsSchema = Joi.object({
   amount: Joi.string().required(),
-  collateralAsset: Joi.string().required(),
-  collateralAmount: Joi.string().required(),
 });
+
+// Schema for collateral supply/withdraw (asset + amount). reuse manageLiquiditySchema name for backwards compat.
+const collateralArgsSchema = manageLiquiditySchema;
 
 const repayLoanArgsSchema = Joi.object({
   loanId: Joi.string().required(),
@@ -39,10 +39,17 @@ export function validateManageLiquidityArgs(args: any) {
   }
 }
 
-export function validateGetLoanArgs(args: any) {
-  const { error } = getLoanArgsSchema.validate(args);
+export function validateBorrowArgs(args: any) {
+  const { error } = borrowArgsSchema.validate(args);
   if (error) {
-    throw new Error("Get Loan Argument Validation Error: " + error.message);
+    throw new Error("Borrow Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateCollateralArgs(args: any) {
+  const { error } = collateralArgsSchema.validate(args);
+  if (error) {
+    throw new Error("Collateral Argument Validation Error: " + error.message);
   }
 }
 

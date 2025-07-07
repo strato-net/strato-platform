@@ -1,17 +1,16 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { formatUnits } from "ethers";
+import { api } from "@/lib/axios";
 import { useLendingContext } from "@/context/LendingContext";
 import { usdstAddress } from "@/lib/contants";
 
 export const useLendingMetrics = () => {
+  // aggregated metrics returned by GET /lend
+  const [metrics, setMetrics] = useState<{ availableBorrowingPower: string; totalBorrowed: string; interestRate: string; healthFactor: number | null }>({ availableBorrowingPower: "$0.00", totalBorrowed: "$0.00", interestRate: "0.00%", healthFactor: null });
+
   const [loanList, setLoanList] = useState<any[]>([]);
-  
-  const {
-    depositableTokens,
-    refreshDepositTokens,
-    loans,
-    refreshLoans,
-  } = useLendingContext();
+
+  const { depositableTokens, loans, refreshDepositTokens, refreshLoans } = useLendingContext();
 
   // Fetch loans for the current user
   const fetchLoans = useCallback(async () => {
@@ -48,8 +47,29 @@ export const useLendingMetrics = () => {
     }
   }, [loans, fetchLoans]);
 
-  // Calculate Available Borrowing Power
+  // Fetch aggregated metrics from backend once & whenever refreshDepositTokens triggers
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const { data } = await api.get("/lend");
+      const lp = data?.lendingPool || {};
+      setMetrics({
+        availableBorrowingPower: "$" + Number(lp?.availableBorrowingPower || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        totalBorrowed: "$" + Number(lp?.totalBorrowed || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        interestRate: lp?.interestRate ? Number(lp.interestRate).toFixed(2) + "%" : "0.00%",
+        healthFactor: lp?.healthFactor ?? null,
+      });
+    } catch (err) {
+      console.error("Failed to fetch lending metrics", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
+
+  // Calculate Available Borrowing Power (fallback if backend metric missing)
   const availableBorrowingPower = useMemo(() => {
+    if (metrics.availableBorrowingPower !== "$0.00") return metrics.availableBorrowingPower;
     if (!depositableTokens || depositableTokens.length === 0) return "$0.00";
     
     let totalBorrowingPower = 0;
@@ -104,6 +124,7 @@ export const useLendingMetrics = () => {
 
   // Calculate Current Borrowed
   const currentBorrowed = useMemo(() => {
+    if (metrics.totalBorrowed !== "$0.00") return metrics.totalBorrowed;
     if (!loanList || loanList.length === 0) return "$0.00";
     
     let totalBorrowed = 0;
@@ -131,8 +152,9 @@ export const useLendingMetrics = () => {
     });
   }, [loanList]);
 
-  // Calculate Average Interest Rate
+  // Interest Rate (use backend if present)
   const averageInterestRate = useMemo(() => {
+    if (metrics.interestRate !== "0.00%") return metrics.interestRate;
     if (!loanList || loanList.length === 0) return "0.00%";
     
     let totalWeightedRate = 0;
@@ -221,7 +243,8 @@ export const useLendingMetrics = () => {
   const refreshLendingData = useCallback(() => {
     refreshDepositTokens();
     refreshLoans();
-  }, [refreshDepositTokens, refreshLoans]);
+    fetchMetrics();
+  }, [refreshDepositTokens, refreshLoans, fetchMetrics]);
 
   return {
     availableBorrowingPower,

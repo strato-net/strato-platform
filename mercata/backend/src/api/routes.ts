@@ -42,6 +42,8 @@ router.post("/lend/withdrawLiquidity", authHandler.authorizeRequest(), LendingCo
 router.post("/lend/repay", authHandler.authorizeRequest(), LendingController.repay);
 router.post("/lend/manageLiquidity", authHandler.authorizeRequest(), LendingController.manageLiquidity);
 router.post("/lend/borrow", authHandler.authorizeRequest(), LendingController.borrow);
+router.post("/lend/supplyCollateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
+router.post("/lend/withdrawCollateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
 
 // Liquidation routes
 router.get("/lend/liquidate", authHandler.authorizeRequest(true), LendingController.listLiquidatable);

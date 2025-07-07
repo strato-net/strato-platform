@@ -75,7 +75,7 @@ const BorrowingSection = ({
                 <span className="font-semibold">{currentBorrowed}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Average Interest Rate</span>
+                <span className="text-gray-600">Interest Rate</span>
                 <span className="font-semibold">{averageInterestRate}</span>
               </div>
             </div>

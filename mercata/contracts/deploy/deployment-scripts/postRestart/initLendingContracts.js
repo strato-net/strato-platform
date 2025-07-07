@@ -15,13 +15,47 @@ const constants = require("../../config");
  */
 
 async function main() {
-  // Helper: accept both POOL_CONFIGURATOR and POOL_CONFIGURATOR_ADDRESS env names
+  // ──────────────────────────────────────────────────────────────────────────
+  // Helper utilities
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Strips an optional "0x" prefix, lower-cases the value and asserts that the
+   * result is a 40-char hex string. All contract & token addresses MUST be fed
+   * through this normaliser before being sent to Mercata APIs which expect
+   * plain lowercase hex (see repo rules).
+   *
+   * @param {string} value Raw address (with/without 0x, mixed case)
+   * @param {string} [name] Optional human-readable label for clearer errors
+   * @returns {string} Sanitised 40-char lowercase hex string
+   */
+  const sanitiseAddress = (value, name = 'address') => {
+    if (!value) throw new Error(`Empty ${name}`);
+    const cleaned = String(value).toLowerCase().replace(/^0x/, '');
+    if (!/^[0-9a-f]{40}$/.test(cleaned)) {
+      throw new Error(`Invalid ${name}: ${value}`);
+    }
+    return cleaned;
+  };
+
+  /**
+   * Reads an env var supporting both FOO and FOO_ADDRESS naming conventions and
+   * returns the sanitised hex string.
+   *
+   * @param {string} base Base name (e.g. "POOL_CONFIGURATOR")
+   */
   const readAddr = (base) => {
     const short = process.env[base];
     const suffixed = process.env[`${base}_ADDRESS`];
     const val = short || suffixed;
     if (!val) throw new Error(`Missing env var: set ${base} (preferred) or ${base}_ADDRESS`);
-    return val;
+    return sanitiseAddress(val, base);
+  };
+
+  // Helper for optional addresses (supports BOTH NAME and NAME_ADDRESS env vars)
+  const readOptAddr = (base, fallback) => {
+    const raw = process.env[base] || process.env[`${base}_ADDRESS`] || fallback;
+    return sanitiseAddress(raw, base);
   };
 
   // Read mandatory env vars (either naming style works now)
@@ -30,23 +64,52 @@ async function main() {
   const LIQUIDITY_POOL = readAddr("LIQUIDITY_POOL");
   const COLLATERAL_VAULT = readAddr("COLLATERAL_VAULT");
 
-  const TOKEN_FACTORY = process.env.TOKEN_FACTORY_ADDRESS || "000000000000000000000000000000000000100b";
-  const USDST = process.env.USDST_ADDRESS || "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
-  const MUSDST = process.env.MUSDST_ADDRESS || "02672fbf704a1d173700ff40123e4af46c1e1457";
+  /* ─── Pre-flight: ensure all mandatory contracts exist ─────────────────────── */
+  const mandatoryContracts = [
+    { name: "PoolConfigurator", addr: POOL_CONFIGURATOR },
+    { name: "PriceOracle", addr: PRICE_ORACLE },
+    { name: "LiquidityPool", addr: LIQUIDITY_POOL },
+    { name: "CollateralVault", addr: COLLATERAL_VAULT },
+  ];
+
+  const axios = require("axios");
+  const NODE_URL = process.env.STRATO_NODE_URL || process.env.NODE_URL;
+  const ROOT = (NODE_URL || "").replace(/\/+$/, "");
+  const BASE = ROOT.includes("/strato/") ? ROOT : `${ROOT}/strato/v2.3`;
+
+  const missing = [];
+  for (const c of mandatoryContracts) {
+    const url = `${BASE}/contract/${c.name}/${c.addr}`;
+    try {
+      await axios.get(url);
+    } catch (_) {
+      missing.push(`${c.name}@${c.addr}`);
+    }
+  }
+  if (missing.length) {
+    throw new Error(`Pre-flight failed – contract(s) not found in node: ${missing.join(", ")}`);
+  }
+
+  // Optional addresses: fall back to well-known defaults, but always sanitise
+  const TOKEN_FACTORY = readOptAddr("TOKEN_FACTORY", "000000000000000000000000000000000000100b");
+  const USDST = readOptAddr("USDST", "937efa7e3a77e20bbdbd7c0d32b6514f368c1010");
+  const MUSDST = readOptAddr("MUSDST", "02672fbf704a1d173700ff40123e4af46c1e1457");
 
   // ─── Collateral tokens ────────────────────────────────────────────────
-  const ETHST = process.env.ETHST_ADDRESS || "93fb7295859b2d70199e0a4883b7c320cf874e6c";
-  const WBTCST = process.env.WBTCST_ADDRESS || "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9";
-  const GOLDST = process.env.GOLDST_ADDRESS || "cdc93d30182125e05eec985b631c7c61b3f63ff0";
-  const SILVST = process.env.SILVST_ADDRESS || "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94";
+  const ETHST = readOptAddr("ETHST", "93fb7295859b2d70199e0a4883b7c320cf874e6c");
+  const WBTCST = readOptAddr("WBTCST", "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9");
+  const GOLDST = readOptAddr("GOLDST", "cdc93d30182125e05eec985b631c7c61b3f63ff0");
+  const SILVST = readOptAddr("SILVST", "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94");
 
   const COLLATERAL_DEFAULTS = [ETHST, WBTCST, GOLDST, SILVST];
 
   // Allow env override list. Include defaults as well (avoid missing assets).
-  let envColls = (process.env.COLLATERAL_LIST || "").split(",").filter(Boolean);
+  let envCollsRaw = (process.env.COLLATERAL_LIST || "").split(",").filter(Boolean);
   // Support exclusion syntax: prefix address with '!' to exclude from defaults
-  const excludes = new Set(envColls.filter((a) => a.startsWith("!")).map((a) => a.slice(1).toLowerCase()));
-  envColls = envColls.filter((a) => !a.startsWith("!"));
+  const excludes = new Set(envCollsRaw.filter((a) => a.startsWith("!")).map((a) => sanitiseAddress(a.slice(1), 'excludedCollateral')));
+  const envColls = envCollsRaw
+    .filter((a) => !a.startsWith("!"))
+    .map((a) => sanitiseAddress(a, 'collateral'));
 
   const COLLATERALS = Array.from(
     new Set(
@@ -54,8 +117,49 @@ async function main() {
     )
   );
 
+  // ─── 0. Ensure all tokens are ACTIVE and registered in the TokenFactory ─────
+  const allTokens = [USDST, MUSDST, ...COLLATERALS];
+
+  const tokenSetupCalls = [];
+
+  // Helper to check token status via view call
+  const callContract = async (contractName, address, method, args = []) => {
+    const url = `${BASE}/contract/${contractName}/${address}/call`;
+    const params = { method, args: JSON.stringify(args) };
+    const { data } = await axios.get(url, { params });
+    return data;
+  };
+
+  for (const tok of allTokens) {
+    try {
+      const current = await callContract("Token", tok, "status");
+      const statusNum = Number(current);
+      if (statusNum !== 2) {
+        tokenSetupCalls.push({
+          contract: { address: tok, name: "Token" },
+          method: "setStatus",
+          args: { newStatus: 2 },
+        });
+      }
+    } catch (_) {
+      // if call fails, attempt setStatus anyway (token might exist but view reverted)
+      tokenSetupCalls.push({
+        contract: { address: tok, name: "Token" },
+        method: "setStatus",
+        args: { newStatus: 2 },
+      });
+    }
+  }
+
+  // register tokens with TokenFactory to mark as factory tokens
+  tokenSetupCalls.push({
+    contract: { address: TOKEN_FACTORY, name: "TokenFactory" },
+    method: "registerMigratedTokens",
+    args: { tokens: allTokens },
+  });
+
   // Build call list
-  const calls = [];
+  const calls = [...tokenSetupCalls];
 
   // 2. setTokenFactory
   calls.push({
@@ -163,7 +267,7 @@ async function main() {
   const resultArray = Array.isArray(results) ? results : [results];
 
   const isBenign = (msg = "") =>
-    /already\s+(?:a\s+)?(burner|minter)|already\s+approved|already\s+set/i.test(msg);
+    /already\s+(?:a\s+)?(burner|minter)|already\s+approved|already\s+set|same\s+as\s+the\s+current\s+status/i.test(msg);
 
   const formatCall = (idx) => {
     const c = calls[idx] || {};

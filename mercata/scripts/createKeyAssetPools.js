@@ -125,13 +125,19 @@ require("dotenv").config();
     }
   };
 
-  // detect whether the pool already holds liquidity by checking LP supply > 0
+  // detect whether the pool already holds liquidity by querying Cirrus balances
   const poolHasLiquidity = async (poolAddr) => {
     try {
-      const lp = await getLpTokenAddr(poolAddr);
-      if (!lp) return false;
-      const supply = await callContract("Token", lp, "totalSupply");
-      return BigInt(supply) > 0n;
+      const rows = await cirrusGet("/BlockApps-Mercata-Pool", {
+        address: `eq.${poolAddr.toLowerCase()}`,
+        select: "tokenABalance,tokenBBalance",
+        limit: 1,
+      });
+      if (!rows[0]) return false;
+
+      const aBal = parseFloat(rows[0].tokenABalance);
+      const bBal = parseFloat(rows[0].tokenBBalance);
+      return (aBal > 0 || bBal > 0);
     } catch (_) {
       return false;
     }
@@ -203,6 +209,36 @@ require("dotenv").config();
     if (await poolHasLiquidity(poolAddr)) {
       console.log("Pool already seeded – skipping liquidity add");
       continue;
+    }
+
+    // Ensure the pool can mint its own LP tokens – add minter role if missing
+    try {
+      const lpAddr = await getLpTokenAddr(poolAddr);
+      if (lpAddr) {
+        const isMinter = await callContract("Token", lpAddr, "isMinter", [poolAddr]);
+        if (!isMinter) {
+          console.log("  – Granting minter role to pool for LP token…");
+          const txAddMinter = buildCall("Token", lpAddr, "addMinter", { accountAddress: poolAddr });
+          const { data: resMinter } = await axios.post(
+            txEndpoint,
+            { txs: [txAddMinter], txParams: { gasPrice: 1, gasLimit: 32100000000 } },
+            { headers }
+          );
+
+          if (resMinter[0].status !== "Success") {
+            console.warn("  ! addMinter failed:", resMinter[0].error || resMinter[0]);
+          } else {
+            // verify role now present
+            const nowMinter = await callContract("Token", lpAddr, "isMinter", [poolAddr]);
+            if (!nowMinter) {
+              console.warn("  ! addMinter tx succeeded but pool still not minter – skipping seeding");
+              continue;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("  ! Could not ensure minter role:", err.response?.data || err.message || err);
     }
 
     console.log("Seeding liquidity:", DEP_USD / 1e18, "USDST vs", amounts[sym] / 1e18, sym);
