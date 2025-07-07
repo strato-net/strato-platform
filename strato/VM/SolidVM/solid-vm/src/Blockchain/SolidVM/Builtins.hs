@@ -23,8 +23,8 @@ push (SReference apt) _ (OrderedVals [av]) = do
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen
 push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
-  let newVar = Constant av
-      newArr = V.snoc vec newVar
+  newVar <- createVar av
+  let newArr = V.snoc vec newVar
   setVar (Variable ref) (SArray varType newArr)
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
 push _ _ argVals = do
