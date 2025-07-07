@@ -203,6 +203,10 @@ contract record PoolFactory is Ownable {
 
         // deploy new pool
         pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
+        
+        // NEW: allow the pool to mint its own LP tokens
+        ITokenAccess(lpTokenAddress).addMinter(pool);
+        ITokenAccess(lpTokenAddress).removeMinter(address(this));
         Ownable(lpTokenAddress).transferOwnership(pool);
 
         // update pool registry
