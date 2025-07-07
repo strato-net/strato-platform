@@ -248,7 +248,7 @@ const BorrowNew = () => {
 
         <main className="p-6">
           <div className="mb-8">
-            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} />
+            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={eligibleCollateral} />
           </div>
           <Card>
             <CardHeader>
@@ -291,9 +291,9 @@ const BorrowNew = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatTokenAmount(asset?.userBalance)}</TableCell>
+                        <TableCell>{formatUnits(asset?.userBalance,18)}</TableCell>
                         <TableCell>
-                          {formatTokenAmount(asset?.userBalanceValue)}
+                          ${formatTokenAmount(asset?.userBalanceValue)}
                         </TableCell>
                         <TableCell>
                           {formatTokenAmount(asset?.maxBorrowingPower)}
@@ -368,9 +368,9 @@ const BorrowNew = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>${formatUnits(loan?.collateralizedAmount, 18)}</TableCell>
+                        <TableCell>{formatUnits(loan?.collateralizedAmount, 18)}</TableCell>
                         <TableCell>
-                          {formatEther(loan?.collateralizedAmountValue || 0)}
+                          ${formatTokenAmount(loan?.collateralizedAmountValue || 0)}
                         </TableCell>
                         <TableCell>{formatEther(loan?.availableToWithdraw || 0)}</TableCell>
                         <TableCell>
