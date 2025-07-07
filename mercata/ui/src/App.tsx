@@ -36,6 +36,7 @@ import { OnRampProvider } from "./context/OnRampContext";
 import { TransactionProvider } from "@/context/TransactionContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
+import BorrowNew from "./pages/BorrowNew";
 
 const queryClient = new QueryClient();
 
@@ -121,7 +122,7 @@ const App = () => (
                                   path="/dashboard/borrow"
                                   element={
                                     <ProtectedRoute>
-                                      <Borrow />
+                                      <BorrowNew />
                                     </ProtectedRoute>
                                   }
                                 />
