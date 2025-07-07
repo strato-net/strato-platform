@@ -35,7 +35,6 @@ import qualified Data.Text                                       as T
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable
 import           Text.RawString.QQ
-import SolidVM.Model.Storable (BasicValue(BInteger))
 
 gramsToOz :: Integer -> Integer
 gramsToOz n = (10000 * n) `div` 283495
