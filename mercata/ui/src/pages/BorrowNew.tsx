@@ -52,8 +52,6 @@ const BorrowNew = () => {
 
   const { toast } = useToast();
   const {
-    depositableTokens,
-    refreshDepositTokens,
     refreshLoans,
     loans,
     borrowAsset: borrowAssetFn,
@@ -107,7 +105,6 @@ const BorrowNew = () => {
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
       await refreshLendingData();
-      await refreshDepositTokens();
 
       // Poll loans until list length changes (max 5 attempts)
       const pollLoans = async (attempt = 0) => {
@@ -169,7 +166,6 @@ const BorrowNew = () => {
       setSupplyLoading(false);
       setIsBorrowModalOpen(false);
       await refreshLendingData();
-      await refreshDepositTokens();
 
       // Poll loans until list length changes (max 5 attempts)
       const pollLoans = async (attempt = 0) => {
@@ -221,7 +217,6 @@ const BorrowNew = () => {
       setWithdrawLoading(false);
       setIsBorrowModalOpen(false);
       await refreshLendingData();
-      await refreshDepositTokens();
 
       // Poll loans until list length changes (max 5 attempts)
       const pollLoans = async (attempt = 0) => {
@@ -424,7 +419,6 @@ const BorrowNew = () => {
         loan={loans}
         onRepaySuccess={async () => {
           await refreshLoans();
-          await refreshDepositTokens();
         }}
       />
 

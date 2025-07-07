@@ -5,22 +5,14 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import isEqual from "lodash.isequal";
 import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
-import { DepositableToken, Loan, WithdrawableToken } from "@/interface";
+import { Loan, WithdrawableToken } from "@/interface";
 
-interface LoanData {
-  loans: Loan;
-}
 
 type LendingContextType = {
-  depositableTokens: DepositableToken[];
   loans: Loan[];
-  loadingDepositTokens: boolean;
   loadingLoans: boolean;
-  errorDepositTokens: string | null;
-  refreshDepositTokens: (signal?: AbortSignal) => Promise<void>;
   refreshLoans: (signal?: AbortSignal) => Promise<Loan[] | undefined>;
   liquidityInfo: any;
   refreshLiquidity: (signal?: AbortSignal) => void;
@@ -54,35 +46,13 @@ export const LendingProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [depositableTokens, setDepositableTokens] = useState<DepositableToken[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [loadingDepositTokens, setLoadingDepositTokens] = useState(true);
   const [loadingLoans, setLoadingLoans] = useState(true);
-  const [errorDepositTokens, setErrorDepositTokens] = useState<string | null>(null);
 
   const [liquidityInfo, setLiquidityInfo] = useState<any>()
   const [loadingLiquidity, setLoadingLiquidity] = useState(true);
   const [collateralInfo, setCollateralInfo] = useState<any>()
   const [loadingCollateral, setLoadingCollateral] = useState(true)
-
-  const fetchDepositTokens = async (signal?: AbortSignal) => {
-    setLoadingDepositTokens(true);
-    try {
-      const res = await api.get<DepositableToken[]>("/lend/depositableTokens", {
-        signal,
-      });
-      if (res.data) {
-        setDepositableTokens((prev) => (isEqual(prev, res.data) ? prev : res.data));
-      }
-      setErrorDepositTokens(null);
-    } catch (err: any) {
-      if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Error fetching depositable tokens:", err);
-      setErrorDepositTokens(err.message || "Failed to load depositable tokens.");
-    } finally {
-      setLoadingDepositTokens(false);
-    }
-  };
 
   const fetchLiquidityInfo = async (signal?: AbortSignal) => {
     setLoadingLiquidity(true);
@@ -258,7 +228,6 @@ export const LendingProvider = ({
   const refreshLendingData = async (): Promise<void> => {
     try {
       // Refresh all lending-related data
-      await fetchDepositTokens();
       await fetchLoans();
       await fetchLiquidityInfo()
       await fetchCollateralInfo()
@@ -270,7 +239,6 @@ export const LendingProvider = ({
 
 
   const initialize = () => {
-    fetchDepositTokens();
     fetchLoans();
     fetchLiquidityInfo()
     fetchCollateralInfo()
@@ -282,12 +250,8 @@ export const LendingProvider = ({
 
   const contextValue = useMemo(
     () => ({
-      depositableTokens,
       loans,
-      loadingDepositTokens,
       loadingLoans,
-      errorDepositTokens,
-      refreshDepositTokens: fetchDepositTokens,
       refreshLoans: fetchLoans,
       liquidityInfo,
       loadingLiquidity,
@@ -309,11 +273,8 @@ export const LendingProvider = ({
       withdrawCollateral,
     }),
     [
-      depositableTokens,
       loans,
-      loadingDepositTokens,
       loadingLoans,
-      errorDepositTokens,
       liquidityInfo,
       loadingLiquidity
     ]
