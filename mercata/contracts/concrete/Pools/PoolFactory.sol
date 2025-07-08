@@ -216,6 +216,7 @@ contract record PoolFactory is Ownable {
         ITokenAccess(lpTokenAddress).removeMinter(address(this));
         ITokenAccess(lpTokenAddress).addBurner(pool);
         ITokenAccess(lpTokenAddress).removeBurner(address(this));
+        ITokenAccess(lpTokenAddress).transferAdmin(pool);
         Ownable(lpTokenAddress).transferOwnership(pool);
 
         // update pool registry
