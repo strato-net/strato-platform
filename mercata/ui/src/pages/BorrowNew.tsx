@@ -419,6 +419,7 @@ const BorrowNew = () => {
       <SupplyCollateralModal 
           supplyLoading={supplyLoading}
           asset={selectedAsset}
+          loanData={loans}
           isOpen={isSupplyModalOpen}
           onClose={closeSupplyModal}
           onSupply={(amount) => executeSupply(selectedAsset, amount)}
