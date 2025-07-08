@@ -96,7 +96,7 @@ const FAQ = () => {
                   </button>
                   {openIndex === index && (
                     <div className={`${faq.gradient} transition-all duration-500 ease-out`}>
-                      <div className="p-6 text-gray-700 leading-relaxed animate-in slide-in-from-top duration-300">
+                      <div className="p-6 text-gray-700 leading-relaxed">
                         {faq.answer}
                       </div>
                     </div>
