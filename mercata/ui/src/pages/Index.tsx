@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
-import FeaturedAssets from '../components/FeaturedAssets';
 import HowItWorks from '../components/HowItWorks';
+import FAQ from '../components/FAQ';
 import MERCATALOGO from '@/assets/mercata.png';
 
 const Index = () => {
@@ -15,8 +15,8 @@ const Index = () => {
     <div className="min-h-screen relative bg-white">
       <Navbar />
       <Hero />
-      <FeaturedAssets />
       <HowItWorks />
+      <FAQ />
       
       <footer className="bg-strato-dark text-white py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">

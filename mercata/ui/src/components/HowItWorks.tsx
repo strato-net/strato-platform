@@ -1,100 +1,74 @@
-
-import { ArrowRight, Wallet, Coins, BadgePercent, ChartBar } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Shield } from 'lucide-react';
 
 const HowItWorks = () => {
   const steps = [
     {
-      id: 1,
-      title: 'Deposit',
-      description: 'Bridge crypto or buy vaulted metals with minimal fees',
-      icon: <Wallet className="h-6 w-6" />,
-      color: 'bg-blue-500'
+      icon: <Wallet className="h-8 w-8" />,
+      title: "Connect & Deposit",
+      description: "Connect your wallet and deposit gold, silver, or crypto assets into our secure vaults and pools.",
+      step: "01"
     },
     {
-      id: 2,
-      title: 'Auto-Earn',
-      description: 'Your assets automatically start earning CATA rewards',
-      icon: <Coins className="h-6 w-6" />,
-      color: 'bg-green-500'
+      icon: <TrendingUp className="h-8 w-8" />,
+      title: "Earn Yield",
+      description: "Your assets automatically start earning competitive yields through our institutional-grade lending protocols.",
+      step: "02"
     },
     {
-      id: 3,
-      title: 'Borrow',
-      description: 'Get instant credit lines against your vaulted assets',
-      icon: <BadgePercent className="h-6 w-6" />,
-      color: 'bg-purple-500'
+      icon: <DollarSign className="h-8 w-8" />,
+      title: "Get Instant Credit",
+      description: "Access instant credit against your deposited assets without selling your positions.",
+      step: "03"
     },
     {
-      id: 4,
-      title: 'Diversify',
-      description: 'Expand your portfolio with a variety of assets',
-      icon: <ChartBar className="h-6 w-6" />,
-      color: 'bg-orange-500'
+      icon: <Shield className="h-8 w-8" />,
+      title: "Secure & Withdraw",
+      description: "Monitor your earnings and withdraw your assets anytime with full transparency and security.",
+      step: "04"
     }
   ];
 
   return (
-    <div id="how-it-works" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
-      <div className="container mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">How It Works</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            STRATO Mercata simplifies the process of earning on vaulted assets while maintaining security and transparency.
-          </p>
-        </div>
-        
-        {/* Desktop view - horizontal steps */}
-        <div className="hidden md:block">
-          <div className="flex justify-between items-start relative">
-            {/* Progress bar */}
-            <div className="absolute top-8 left-0 right-0 h-1 bg-gray-200 z-0">
-              <div className="h-full bg-gradient-to-r from-blue-500 via-green-500 to-purple-500 w-3/4"></div>
-            </div>
-            
-            {/* Steps */}
+    <div className="bg-gray-50 py-20" id="how-it-works">
+      <div className="container mx-auto px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">How It Works</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Get started with STRATO Mercata in four simple steps and start earning on your assets today
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {steps.map((step, index) => (
-              <div key={step.id} className="relative z-10 flex flex-col items-center w-60">
-                <div className={`flex items-center justify-center w-16 h-16 rounded-full ${step.color} text-white mb-4`}>
-                  {step.icon}
+              <div key={index} className="relative">
+                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-md transition-shadow h-full">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-center w-16 h-16 bg-strato-blue/10 rounded-full text-strato-orange">
+                      {step.icon}
+                    </div>
+                    <div className="text-6xl font-bold text-gray-100 leading-none">
+                      {step.step}
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                    {step.title}
+                  </h3>
+                  
+                  <p className="text-gray-600 leading-relaxed">
+                    {step.description}
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold mb-2">{step.title}</h3>
-                <p className="text-sm text-gray-600 text-center">{step.description}</p>
                 
+                {/* Connecting line for desktop */}
                 {index < steps.length - 1 && (
-                  <ArrowRight className="absolute top-8 -right-7 transform translate-x-1/2 text-gray-400 h-4 w-4" />
+                  <div className="hidden lg:block absolute top-20 -right-4 w-8 h-0.5 bg-gray-300 z-10"></div>
                 )}
               </div>
             ))}
           </div>
-        </div>
-        
-        {/* Mobile view - vertical steps */}
-        <div className="md:hidden">
-          <div className="relative flex flex-col space-y-8">
-            {/* Vertical progress line */}
-            <div className="absolute top-0 left-8 bottom-0 w-1 bg-gray-200 z-0">
-              <div className="h-3/4 bg-gradient-to-b from-blue-500 via-green-500 to-purple-500"></div>
-            </div>
-            
-            {/* Steps */}
-            {steps.map((step) => (
-              <div key={step.id} className="relative z-10 flex items-start">
-                <div className={`flex-shrink-0 flex items-center justify-center w-16 h-16 rounded-full ${step.color} text-white mr-4`}>
-                  {step.icon}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold mb-1">{step.title}</h3>
-                  <p className="text-sm text-gray-600">{step.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div className="mt-16 text-center">
-          <a href="#marketplace" className="cta-button inline-flex items-center">
-            Open Wallet & Start Earning <ArrowRight className="ml-2 h-4 w-4" />
-          </a>
+          
         </div>
       </div>
     </div>
