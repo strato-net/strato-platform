@@ -60,7 +60,7 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
       const amountWei = parseUnits(withdrawAmount, 18);
-      const depositedBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance) ?? 0n;
+      const depositedBalanceWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST) ?? 0n;
       if (amountWei <= 0n) return false;
       if (amountWei > depositedBalanceWei) return false;
       return true;
@@ -314,14 +314,14 @@ const LendingPoolSection = () => {
                     </Button>
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
-                    Deposited:{" "}
+                    Max Withdrawable:{" "}
                     {loadingLiquidity ?
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                      : liquidityInfo?.withdrawable?.userBalance
+                      : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
                         ? Number(
-                          formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)
+                          formatUnits(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || 0, 18)
                         ).toLocaleString(undefined, {
                           minimumFractionDigits: 1,
                           maximumFractionDigits: 4,
