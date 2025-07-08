@@ -84,7 +84,7 @@ class Dashboard extends Component {
     mixpanelWrapper.track("dashboard_page_load");
     ReactGA.send({
       hitType: "pageview",
-      page: "/dashboard",
+      page: "/smd",
       title: "Dashboard",
     });
   }

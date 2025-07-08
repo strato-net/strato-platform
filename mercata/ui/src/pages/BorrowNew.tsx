@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
-import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
@@ -71,12 +70,8 @@ const BorrowNew = () => {
   }, [collateralInfo])
 
 
-  const {
-    refreshLendingData,
-  } = useLendingMetrics();
-
   useEffect(() => {
-    refreshLendingData();
+    refreshLoans();
   }, []);
 
   const handleBorrow = () => {
@@ -104,17 +99,7 @@ const BorrowNew = () => {
 
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      await refreshLendingData();
-
-      // Poll loans until list length changes (max 5 attempts)
-      const pollLoans = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans();
-        const updatedLoans = (await refreshLoans() as unknown) as any[];
-        if (updatedLoans.length > 0) return; // at least one loan now visible
-        setTimeout(() => pollLoans(attempt + 1), 2000);
-      };
-      pollLoans();
+      await refreshLoans();
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
@@ -164,21 +149,13 @@ const BorrowNew = () => {
       });
 
       setSupplyLoading(false);
-      setIsBorrowModalOpen(false);
-      await refreshLendingData();
-
-      // Poll loans until list length changes (max 5 attempts)
-      const pollLoans = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans()
-        await refreshCollateral();
-        setTimeout(() => pollLoans(attempt + 1), 2000);
-      };
-      pollLoans();
+      setIsSupplyModalOpen(false);
+      await refreshLoans()
+      await refreshCollateral();
     } catch (error: any) {
       console.log(error, "error");
       setSupplyLoading(false);
-      setIsBorrowModalOpen(false);
+      setIsSupplyModalOpen(false);
       toast({
         title: "Supply Error",
         description: `Something went wrong - ${error?.message || "Please try again later."
@@ -215,21 +192,13 @@ const BorrowNew = () => {
       });
 
       setWithdrawLoading(false);
-      setIsBorrowModalOpen(false);
-      await refreshLendingData();
-
-      // Poll loans until list length changes (max 5 attempts)
-      const pollLoans = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans()
-        await refreshCollateral();
-        setTimeout(() => pollLoans(attempt + 1), 2000);
-      };
-      pollLoans();
+      setIsWithdrawModalOpen(false);
+      await refreshLoans()
+      await refreshCollateral();
     } catch (error: any) {
       console.log(error, "error");
       setWithdrawLoading(false);
-      setIsBorrowModalOpen(false);
+      setIsWithdrawModalOpen(false);
       toast({
         title: "Withdraw Error",
         description: `Something went wrong - ${error?.message || "Please try again later."
@@ -248,7 +217,7 @@ const BorrowNew = () => {
 
         <main className="p-6">
           <div className="mb-8">
-            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} />
+            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={eligibleCollateral} />
           </div>
           <Card>
             <CardHeader>
@@ -261,7 +230,6 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Wallet Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>Borrowing Power if Supplied</TableHead>
                     <TableHead>LTV</TableHead>
                     <TableHead>Liquidation Threshold</TableHead>
                     <TableHead>Action</TableHead>
@@ -291,12 +259,9 @@ const BorrowNew = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatTokenAmount(asset?.userBalance)}</TableCell>
+                        <TableCell>{formatUnits(asset?.userBalance,18)}</TableCell>
                         <TableCell>
-                          {formatTokenAmount(asset?.userBalanceValue)}
-                        </TableCell>
-                        <TableCell>
-                          {formatTokenAmount(asset?.maxBorrowingPower)}
+                          ${formatTokenAmount(asset?.userBalanceValue)}
                         </TableCell>
                         <TableCell>
                           {asset?.ltv ? asset?.ltv/100 : 0}%
@@ -338,7 +303,6 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Supplied Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>Available to Withdraw</TableHead>
                     <TableHead>LTV</TableHead>
                     <TableHead>Liquidation Threshold</TableHead>
                     <TableHead>Actions</TableHead>
@@ -368,11 +332,10 @@ const BorrowNew = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>${formatUnits(loan?.collateralizedAmount, 18)}</TableCell>
+                        <TableCell>{formatUnits(loan?.collateralizedAmount, 18)}</TableCell>
                         <TableCell>
-                          {formatEther(loan?.collateralizedAmountValue || 0)}
+                          ${formatTokenAmount(loan?.collateralizedAmountValue || 0)}
                         </TableCell>
-                        <TableCell>{formatEther(loan?.availableToWithdraw || 0)}</TableCell>
                         <TableCell>
                           {loan?.ltv ? loan?.ltv/100 : 0}%
                         </TableCell>
@@ -425,6 +388,7 @@ const BorrowNew = () => {
       <SupplyCollateralModal 
           supplyLoading={supplyLoading}
           asset={selectedAsset}
+          loanData={loans}
           isOpen={isSupplyModalOpen}
           onClose={closeSupplyModal}
           onSupply={(amount) => executeSupply(selectedAsset, amount)}
@@ -433,6 +397,7 @@ const BorrowNew = () => {
        <WithdrawCollateralModal 
           withdrawLoading={withdrawLoading}
           asset={selectedAsset}
+          loanData={loans}
           isOpen={isWithdrawModalOpen}
           onClose={closeWithdrawModal}
           onWithdraw={(amount) => executeWithdraw(selectedAsset, amount)}

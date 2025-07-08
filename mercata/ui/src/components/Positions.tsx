@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUnits } from "ethers";
 
 interface BorrowingSectionProps {
-  loanData: any
+  userCollaterals: any[];
+  loanData: any;
   handleBorrow: () => void;
   handleRepay: () => void;
 }
 
-const PositionSection = ({ loanData, handleBorrow, handleRepay }: BorrowingSectionProps) => {
+const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay }: BorrowingSectionProps) => {
 
   function getTextColor(value: number, maxValue = 10) {
   const clamped = Math.min(Math.max(value, 1), maxValue);
@@ -19,6 +20,12 @@ const PositionSection = ({ loanData, handleBorrow, handleRepay }: BorrowingSecti
 
   return `rgb(${red}, ${green}, 0)`;
 }
+
+  // Calculate total maxBorrowingPower from user collaterals
+  const totalMaxBorrowingPower = userCollaterals?.reduce((total, collateral) => {
+    const borrowingPower = parseFloat(formatUnits(collateral?.maxBorrowingPower || 0, 18));
+    return total + borrowingPower;
+  }, 0) || 0;
   
   return (
     <Card className="border border-gray-100 shadow-sm">
@@ -59,13 +66,13 @@ const PositionSection = ({ loanData, handleBorrow, handleRepay }: BorrowingSecti
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-600">Total Borrowing Power</span>
-                {loanData?.totalBorrowingPowerUSD
-                  ? formatUnits(loanData.totalBorrowingPowerUSD.toString(), 18)
-                  : "0"}
+                <span className="font-semibold">
+                  {totalMaxBorrowingPower.toFixed(2)}
+                </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-600">Interest Owed</span>
-                <span className="font-semibold">{loanData?.accruedInterest || 0}%</span>
+                <span className="font-semibold">{formatUnits(loanData?.accruedInterest || 0, 18)}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-600">Avg. Interest Rate</span>
