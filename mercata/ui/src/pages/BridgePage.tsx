@@ -13,12 +13,16 @@ import 'antd/dist/reset.css';
 import './BridgePage.css';
 import BridgeIn from '@/components/bridge/BridgeIn';
 import BridgeOut from '@/components/bridge/BridgeOut';
+import { useChainId } from 'wagmi';
 
 const BridgePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const [showTestnet] = useState(import.meta.env.VITE_SHOW_TESTNET === "true");
+  const chainId = useChainId();
+  
+  // Auto-detect testnet based on connected network or environment variable
+  const showTestnet = import.meta.env.VITE_SHOW_TESTNET === "true" || chainId === 11155111; // Sepolia
 
   return (
     <div className="flex h-screen bg-gray-50">
