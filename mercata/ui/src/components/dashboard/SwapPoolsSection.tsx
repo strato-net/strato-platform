@@ -214,9 +214,9 @@ const SwapPoolsSection = () => {
       const tokenBAmount = parseUnits(token2Amount, 18);
 
       await addLiquidity({
-        address: selectedPool.address,
-        max_tokenA_amount: tokenAAmount.toString(),
-        tokenB_amount: tokenBAmount.toString(),
+        poolAddress: selectedPool.address,
+        maxTokenAAmount: tokenAAmount.toString(),
+        tokenBAmount: tokenBAmount.toString(),
       });
 
       // Wait for transaction to be mined
@@ -279,8 +279,8 @@ const SwapPoolsSection = () => {
       const calculatedAmount = (value * percentScaled) / BigInt(10000);
 
       await removeLiquidity({
-        address: selectedPool.address,
-        amount: calculatedAmount.toString(),
+        poolAddress: selectedPool.address,
+        lpTokenAmount: calculatedAmount.toString(),
       });
 
       // Wait for transaction to be mined

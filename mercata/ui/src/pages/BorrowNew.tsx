@@ -230,7 +230,6 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Wallet Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>Borrowing Power if Supplied</TableHead>
                     <TableHead>LTV</TableHead>
                     <TableHead>Liquidation Threshold</TableHead>
                     <TableHead>Action</TableHead>
@@ -263,9 +262,6 @@ const BorrowNew = () => {
                         <TableCell>{formatUnits(asset?.userBalance,18)}</TableCell>
                         <TableCell>
                           ${formatTokenAmount(asset?.userBalanceValue)}
-                        </TableCell>
-                        <TableCell>
-                          {formatTokenAmount(asset?.maxBorrowingPower)}
                         </TableCell>
                         <TableCell>
                           {asset?.ltv ? asset?.ltv/100 : 0}%
@@ -307,7 +303,6 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Supplied Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>Available to Withdraw</TableHead>
                     <TableHead>LTV</TableHead>
                     <TableHead>Liquidation Threshold</TableHead>
                     <TableHead>Actions</TableHead>
@@ -341,7 +336,6 @@ const BorrowNew = () => {
                         <TableCell>
                           ${formatTokenAmount(loan?.collateralizedAmountValue || 0)}
                         </TableCell>
-                        <TableCell>{formatEther(loan?.availableToWithdraw || 0)}</TableCell>
                         <TableCell>
                           {loan?.ltv ? loan?.ltv/100 : 0}%
                         </TableCell>
@@ -394,6 +388,7 @@ const BorrowNew = () => {
       <SupplyCollateralModal 
           supplyLoading={supplyLoading}
           asset={selectedAsset}
+          loanData={loans}
           isOpen={isSupplyModalOpen}
           onClose={closeSupplyModal}
           onSupply={(amount) => executeSupply(selectedAsset, amount)}
@@ -402,6 +397,7 @@ const BorrowNew = () => {
        <WithdrawCollateralModal 
           withdrawLoading={withdrawLoading}
           asset={selectedAsset}
+          loanData={loans}
           isOpen={isWithdrawModalOpen}
           onClose={closeWithdrawModal}
           onWithdraw={(amount) => executeWithdraw(selectedAsset, amount)}
