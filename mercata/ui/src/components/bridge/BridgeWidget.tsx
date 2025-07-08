@@ -5,7 +5,7 @@ import BridgeOut from './BridgeOut';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const showTestnet = import.meta.env.VITE_SHOW_TESTNET === 'true';
+  const showTestnet = true;
 
   return (
     <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">

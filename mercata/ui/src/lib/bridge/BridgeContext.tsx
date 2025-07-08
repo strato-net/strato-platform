@@ -21,14 +21,14 @@ interface BridgeContextType {
   swapChains: () => void;
 }
 
-const SHOW_TESTNET = import.meta.env.VITE_SHOW_TESTNET;
+const SHOW_TESTNET = true;
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [showTestnet] = useState(SHOW_TESTNET === "true");
+  const [showTestnet] = useState(true);
   const [fromChain, setFromChain] = useState(
     showTestnet ? "Sepolia" : "Ethereum"
   );

@@ -18,7 +18,7 @@ const BridgePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const [showTestnet] = useState(import.meta.env.VITE_SHOW_TESTNET === "true");
+  const [showTestnet] = useState(true);
 
   return (
     <div className="flex h-screen bg-gray-50">
