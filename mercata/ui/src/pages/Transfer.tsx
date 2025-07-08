@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
 import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/contants";
@@ -18,6 +19,7 @@ import { ChevronDown } from "lucide-react";
 
 const Transfer = () => {
   const { userAddress } = useUser();
+  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const { toast } = useToast();
   useEffect(() => {
     document.title = "Transfer Assets | STRATO Mercata";
@@ -30,13 +32,12 @@ const Transfer = () => {
   const [swapLoading, setSwapLoading] = useState<boolean>(false);
   const [wrongAmount, setWrongAmount] = useState(false);
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
-  const [usdstBalance, setUsdstBalance] = useState("0");
 
   const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
 
   const fetchUserTokens = useCallback(async () => {
     try {
-      const res = await api.get(`/tokens/balance?key=eq.${userAddress}&value=gt.0`);
+      const res = await api.get(`/tokens/balance?value=gt.0`);
       setTokens(res.data);
       return res.data;
     } catch (err) {
@@ -45,22 +46,11 @@ const Transfer = () => {
     }
   }, [userAddress]);
 
-  const fetchUsdstBalance = useCallback(async () => {
-    try {
-      const res = await api.get(
-        `/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`
-      );
-      setUsdstBalance(res?.data?.[0]?.balance || "0");
-    } catch (error) {
-      console.error('Error fetching USDST balance:', error);
-    }
-  }, [userAddress]);
-
   // Fetch USDST balance when user changes
   useEffect(() => {
     if (userAddress) {
       fetchUserTokens();
-      fetchUsdstBalance();
+      fetchUsdstBalance(userAddress);
     }
   }, [userAddress, fetchUserTokens, fetchUsdstBalance]);
 

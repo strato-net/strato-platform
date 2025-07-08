@@ -9,6 +9,7 @@ import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { SwappableToken } from "@/interface";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -365,6 +366,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 const SwapWidget = () => {
   const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
   const { userAddress } = useUser();
+  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const { toast } = useToast();
 
   // State
@@ -385,7 +387,6 @@ const SwapWidget = () => {
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
-  const [usdstBalance, setUsdstBalance] = useState("0");
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
@@ -393,8 +394,8 @@ const SwapWidget = () => {
 
   // Fetch USDST balance when user changes
   useEffect(() => {
-    if (userAddress) fetchUsdstBalance();
-  }, [userAddress]);
+    if (userAddress) fetchUsdstBalance(userAddress);
+  }, [userAddress, fetchUsdstBalance]);
 
   useEffect(()=>{
     if(swappableTokens){
@@ -406,7 +407,7 @@ const SwapWidget = () => {
     try {
       setFromBalanceLoading(true)
       const res = await api.get(
-         `/tokens/balance?key=eq.${userAddress}&address=eq.${swappableTokens[0].address}`
+         `/tokens/balance?address=eq.${swappableTokens[0].address}`
        );
  
        const balance = res?.data?.[0]?.balance || "0";
@@ -524,17 +525,6 @@ const SwapWidget = () => {
   }, []);
 
   // Helper functions
-  const fetchUsdstBalance = async () => {
-    try {
-      const res = await api.get(
-        `/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`
-      );
-      setUsdstBalance(res?.data?.[0]?.balance || "0");
-    } catch (error) {
-      console.error('Error fetching USDST balance:', error);
-    }
-  };
-
   const getTokenBalance = async (asset: SwappableToken, isFrom: boolean) => {
     try {
       if (isFrom) {
@@ -544,7 +534,7 @@ const SwapWidget = () => {
       }
 
       const res = await api.get(
-        `/tokens/balance?key=eq.${userAddress}&address=eq.${asset.address}`
+        `/tokens/balance?address=eq.${asset.address}`
       );
 
       const balance = res?.data?.[0]?.balance || "0";
@@ -557,7 +547,7 @@ const SwapWidget = () => {
         setToBalanceLoading(false);
       }
 
-      await fetchUsdstBalance();
+      await fetchUsdstBalance(userAddress);
     } catch (err) {
       console.error(err);
       if (isFrom) {
