@@ -427,6 +427,7 @@ const BorrowNew = () => {
        <WithdrawCollateralModal 
           withdrawLoading={withdrawLoading}
           asset={selectedAsset}
+          loanData={loans}
           isOpen={isWithdrawModalOpen}
           onClose={closeWithdrawModal}
           onWithdraw={(amount) => executeWithdraw(selectedAsset, amount)}
