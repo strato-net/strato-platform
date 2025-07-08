@@ -261,7 +261,6 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Wallet Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>Borrowing Power if Supplied</TableHead>
                     <TableHead>LTV</TableHead>
                     <TableHead>Liquidation Threshold</TableHead>
                     <TableHead>Action</TableHead>
@@ -294,9 +293,6 @@ const BorrowNew = () => {
                         <TableCell>{formatUnits(asset?.userBalance,18)}</TableCell>
                         <TableCell>
                           ${formatTokenAmount(asset?.userBalanceValue)}
-                        </TableCell>
-                        <TableCell>
-                          {formatTokenAmount(asset?.maxBorrowingPower)}
                         </TableCell>
                         <TableCell>
                           {asset?.ltv ? asset?.ltv/100 : 0}%

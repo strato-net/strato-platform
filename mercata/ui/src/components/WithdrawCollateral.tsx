@@ -75,18 +75,11 @@ const WithdrawCollateralModal = ({
                 {formatUnits(asset?.collateralizedAmount || 0,18)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Ltv</span>
-              <span className="font-medium">
-                {asset?.ltv ? asset?.ltv/100 : 0}%
-              </span>
-            </div>
           </div>
 
           <div className="space-y-3">
             <label className="text-sm font-medium">Withdraw Amount</label>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Min: 0.01</span>
               <span>Max: {formatUnits(asset?.collateralizedAmount || 0,18)}</span>
             </div>
             <div className="relative">
@@ -96,7 +89,7 @@ const WithdrawCollateralModal = ({
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{asset?._symbol || ""}</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{asset?._symbol}</span>
             </div>
           </div>
         </div>
