@@ -215,8 +215,8 @@ const SwapPoolsSection = () => {
 
       await addLiquidity({
         address: selectedPool.address,
-        max_tokenA_amount: tokenAAmount.toString(),
-        tokenB_amount: tokenBAmount.toString(),
+        maxTokenAAmount: tokenAAmount.toString(),
+        tokenBAmount: tokenBAmount.toString(),
       });
 
       // Wait for transaction to be mined
