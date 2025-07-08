@@ -6,34 +6,28 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { WithdrawableToken } from "@/interface";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { usdstAddress } from "@/lib/contants";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
-  const { tokens, loading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
   const {
-    withdrawableTokens,
-    loadingWithdrawableTokens,
-    refreshWithdrawableTokens,
+    liquidityInfo,
+    loadingLiquidity,
+    refreshLiquidity,
     depositLiquidity,
     withdrawLiquidity,
   } = useLendingContext();
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
-  const [usdstAvailableBalance, setUsdstAvailableBalance] =
-    useState<string>("0");
-  const [depositedUsdstToken, setDepositedUsdstToken] =
-    useState<WithdrawableToken | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
   const refreshLendingData = (signal?: AbortSignal) => {
     if (!userAddress) return;
     fetchTokens(userAddress, signal);
-    refreshWithdrawableTokens(signal);
+    refreshLiquidity(signal);
   };
 
   // 1. Fetch on userAddress change only, with abort controller
@@ -46,31 +40,13 @@ const LendingPoolSection = () => {
     };
   }, [userAddress]);
 
-  // 2. Update component-local state when context changes
-  useEffect(() => {
-    if (withdrawableTokens) {
-      const usdst = tokens.find(
-        (token) => token?.address === usdstAddress
-      );
-      setUsdstAvailableBalance(formatUnits(BigInt(usdst?.balance ?? "0"), 18));
-
-      const depositedToken = withdrawableTokens.find(
-        (token) => token._symbol === "USDST" && token.address === usdstAddress
-      );
-      if (depositedToken) {
-        setDepositedUsdstToken(depositedToken);
-      } else {
-        setDepositedUsdstToken(null);
-      }
-    }
-  }, [tokens, withdrawableTokens, usdstAddress]);
 
   const isDepositAmountValid = () => {
     if (!depositAmount) return false;
     if (!/^\d+(\.\d{1,18})?$/.test(depositAmount)) return false;
     try {
       const amountWei = parseUnits(depositAmount, 18);
-      const availableWei = parseUnits(usdstAvailableBalance, 18);
+      const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");      
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
       return true;
@@ -84,7 +60,7 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
       const amountWei = parseUnits(withdrawAmount, 18);
-      const depositedBalanceWei = BigInt(depositedUsdstToken?.value) ?? 0n;
+      const depositedBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance) ?? 0n;
       if (amountWei <= 0n) return false;
       if (amountWei > depositedBalanceWei) return false;
       return true;
@@ -99,7 +75,6 @@ const LendingPoolSection = () => {
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
       const amountWei = parseUnits(amount, 18).toString();
       await (type === "deposit" ? depositLiquidity : withdrawLiquidity)({
-        asset: usdstAddress,
         amount: amountWei,
       });
 
@@ -144,15 +119,15 @@ const LendingPoolSection = () => {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Your Deposit</span>
+                  <span className="text-gray-500">Total USDST Supplied</span>
                   <span className="font-medium">
-                    {loadingWithdrawableTokens ? (
+                    {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                    ) : depositedUsdstToken ? (
+                    ) : liquidityInfo ? (
                       `$${Number(
-                        formatUnits(depositedUsdstToken.value || 0, 18)
+                        formatUnits(liquidityInfo.totalUSDSTSupplied || 0, 18)
                       ).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -163,8 +138,96 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">APY</span>
-                  <span className="font-medium">-</span>
+                  <span className="text-gray-500">Total USDST Borrowed</span>
+                  <span className="font-medium">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.totalBorrowed ? (
+                      `$${Number(
+                        formatUnits(liquidityInfo.totalBorrowed || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Utilization Rate</span>
+                  <span className="font-medium">{liquidityInfo?.utilizationRate || '0'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Available Liquidity</span>
+                  <span className="font-medium">
+                     {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.availableLiquidity ? (
+                      `$${Number(
+                        formatUnits(liquidityInfo?.availableLiquidity || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total Collateral Value</span>
+                  <span className="font-medium">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.totalCollateralValue ? (
+                      `$${Number(
+                        formatUnits(liquidityInfo?.totalCollateralValue || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Supply APY</span>
+                  <span className="font-medium">{liquidityInfo?.supplyAPY || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Borrow APY</span>
+                  <span className="font-medium">{liquidityInfo?.borrowAPY || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Your mUSDST</span>
+                  <span className="font-medium">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.withdrawable?.userBalance ? (
+                      `$${Number(
+                        formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Conversion Rate</span>
+                  <span className="font-medium">{liquidityInfo?.conversionRate ? "1 mUSDST = " + liquidityInfo?.conversionRate + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>
@@ -180,7 +243,7 @@ const LendingPoolSection = () => {
                         placeholder="0.00"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
-                        className="pl-8"
+                        className={`pl-8 ${!isDepositAmountValid() ? 'text-red-600' : ''}`}
                       />
                       <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     </div>
@@ -201,16 +264,18 @@ const LendingPoolSection = () => {
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
                     Available:{" "}
-                    {loading ? (
+                    {loadingLiquidity ?
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                    ) : (
-                      Number(usdstAvailableBalance).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 4,
-                      })
-                    )}{" "}
+                      : liquidityInfo?.supplyable?.userBalance
+                        ? Number(
+                          formatUnits(liquidityInfo?.supplyable?.userBalance || 0, 18)
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 4,
+                        })
+                        : "0.00"}{" "}
                     USDST
                   </div>
                 </div>
@@ -224,7 +289,7 @@ const LendingPoolSection = () => {
                         placeholder="0.00"
                         value={withdrawAmount}
                         onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className="pl-8"
+                        className={`pl-8 ${!isWithdrawAmountValid() ? 'text-red-600' : ''}`}
                       />
                       <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     </div>
@@ -233,7 +298,7 @@ const LendingPoolSection = () => {
                       variant="outline"
                       className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                       disabled={
-                        loadingWithdrawableTokens ||
+                        loadingLiquidity ||
                         isProcessing ||
                         !isWithdrawAmountValid()
                       }
@@ -250,14 +315,18 @@ const LendingPoolSection = () => {
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
                     Deposited:{" "}
-                    {depositedUsdstToken
-                      ? Number(
-                        formatUnits(depositedUsdstToken.value || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 4,
-                      })
-                      : "0.00"}{" "}
+                    {loadingLiquidity ?
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                      : liquidityInfo?.withdrawable?.userBalance
+                        ? Number(
+                          formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 4,
+                        })
+                        : "0.00"}{" "}
                     USDST
                   </div>
                 </div>

@@ -41,7 +41,7 @@ export const getPools = async (
   });
 
   // Fetch oracle prices
-  const { oracle: { prices } } = await getLendingRegistry(accessToken, {
+  const { oracle: { prices } } = await getLendingRegistry(accessToken, undefined, {
     select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
   });
   

@@ -13,7 +13,7 @@ export const getPrice = async (
   accessToken: string,
   asset?: string
 ) => {
-  const registry = await getPool(accessToken, { select: "priceOracle" });
+  const registry = await getPool(accessToken, undefined, { select: "priceOracle" });
 
   const prices: { asset: string; price: string }[] = registry.priceOracle
     ? registry.priceOracle.prices || []
@@ -37,7 +37,7 @@ export const setPrice = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const registry = await getPool(accessToken, {
+    const registry = await getPool(accessToken, undefined, {
       select: "priceOracle",
     });
     const priceOracle = registry.priceOracle;

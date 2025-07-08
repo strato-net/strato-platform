@@ -1,68 +1,106 @@
 import Joi from "@hapi/joi";
 
-const manageLiquiditySchema = Joi.object({
-  asset: Joi.string().required(),
-  amount: Joi.string().required(),
-});
-
-const getLoanArgsSchema = Joi.object({
-  asset: Joi.string().required(),
-  amount: Joi.string().required(),
-  collateralAsset: Joi.string().required(),
-  collateralAmount: Joi.string().required(),
-});
-
-const repayLoanArgsSchema = Joi.object({
-  loanId: Joi.string().required(),
-  asset: Joi.string().required(),
-  amount: Joi.string().required(),
-});
-
-const loanIdParamSchema = Joi.object({
-  // allow plain numeric IDs (legacy) or 40-byte hex strings (current)
-  id: Joi.string()
-        .pattern(/^(\d+|[0-9a-fA-F]{40})$/)
-        .required(),
-});
-
-const marginQuerySchema = Joi.object({
-  margin: Joi.number().min(0).max(1).optional(),
-});
-
-// Validator functions
-export function validateManageLiquidityArgs(args: any) {
-  const { error } = manageLiquiditySchema.validate(args);
+// Validator functions with inline schemas
+export function validateDepositLiquidityArgs(args: any) {
+  const schema = Joi.object({
+    amount: Joi.string().pattern(/^\d+$/).required(),
+  });
+  
+  const { error } = schema.validate(args);
   if (error) {
-    throw new Error(
-      "Manage Liquidity Argument Validation Error: " + error.message
-    );
+    throw new Error("Deposit Liquidity Argument Validation Error: " + error.message);
   }
 }
 
-export function validateGetLoanArgs(args: any) {
-  const { error } = getLoanArgsSchema.validate(args);
+export function validateWithdrawLiquidityArgs(args: any) {
+  const schema = Joi.object({
+    amount: Joi.string().pattern(/^\d+$/).required(),
+  });
+  
+  const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Get Loan Argument Validation Error: " + error.message);
+    throw new Error("Withdraw Liquidity Argument Validation Error: " + error.message);
   }
 }
 
-export function validateRepayLoanArgs(args: any) {
-  const { error } = repayLoanArgsSchema.validate(args);
+export function validateBorrowArgs(args: any) {
+  const schema = Joi.object({
+    amount: Joi.string().pattern(/^\d+$/).required(),
+  });
+  
+  const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Repay Loan Argument Validation Error: " + error.message);
+    throw new Error("Borrow Argument Validation Error: " + error.message);
   }
 }
 
-export function validateLoanIdParam(params: any) {
-  const { error } = loanIdParamSchema.validate(params);
+export function validateRepayArgs(args: any) {
+  const schema = Joi.object({
+    amount: Joi.string().pattern(/^\d+$/).required(),
+  });
+  
+  const { error } = schema.validate(args);
   if (error) {
-    throw new Error("LoanId Validation Error: " + error.message);
+    throw new Error("Repay Argument Validation Error: " + error.message);
   }
 }
 
-export function validateMarginQuery(query: any) {
-  const { error } = marginQuerySchema.validate(query);
+export function validateSupplyCollateralArgs(args: any) {
+  const schema = Joi.object({
+    asset: Joi.string().required(),
+    amount: Joi.string().pattern(/^\d+$/).required(),
+  });
+  
+  const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Margin Query Validation Error: " + error.message);
+    throw new Error("Supply Collateral Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateWithdrawCollateralArgs(args: any) {
+  const schema = Joi.object({
+    asset: Joi.string().required(),
+    amount: Joi.string().pattern(/^\d+$/).required(),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Withdraw Collateral Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSetInterestRateArgs(args: any) {
+  const schema = Joi.object({
+    asset: Joi.string().required(),
+    rate: Joi.number().min(0).max(100).required(),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Set Interest Rate Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSetCollateralRatioArgs(args: any) {
+  const schema = Joi.object({
+    asset: Joi.string().required(),
+    ratio: Joi.number().min(100).max(1000).required(),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Set Collateral Ratio Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSetLiquidationBonusArgs(args: any) {
+  const schema = Joi.object({
+    asset: Joi.string().required(),
+    bonus: Joi.number().min(100).max(200).required(),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Set Liquidation Bonus Argument Validation Error: " + error.message);
   }
 }

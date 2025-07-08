@@ -5,45 +5,38 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import isEqual from "lodash.isequal";
 import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
-import { DepositableToken, Loan, WithdrawableToken } from "@/interface";
+import { Loan, WithdrawableToken } from "@/interface";
 
-interface LoanData {
-  loans: Loan;
-}
 
 type LendingContextType = {
-  depositableTokens: DepositableToken[];
   loans: Loan[];
-  loadingDepositTokens: boolean;
   loadingLoans: boolean;
-  errorDepositTokens: string | null;
-  refreshDepositTokens: (signal?: AbortSignal) => Promise<void>;
   refreshLoans: (signal?: AbortSignal) => Promise<Loan[] | undefined>;
-  withdrawableTokens: WithdrawableToken[];
-  refreshWithdrawableTokens: (signal?: AbortSignal) => void;
-  loadingWithdrawableTokens: boolean;
+  liquidityInfo: any;
+  refreshLiquidity: (signal?: AbortSignal) => void;
+  loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
   setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
   setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
   setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
-    asset: string;
     amount: string;
-    collateralAsset: string;
-    collateralAmount: string;
   }) => Promise<any>;
   repayLoan: (args: {
-    loanId: string;
     amount: string;
-    asset: string;
   }) => Promise<any>;
   getLend: () => Promise<any>;
-  depositLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
-  withdrawLiquidity: (args: { asset: string; amount: string }) => Promise<any>;
+  depositLiquidity: (args: { amount: string }) => Promise<any>;
+  withdrawLiquidity: (args: { amount: string }) => Promise<any>;
+
+  collateralInfo: any;
+  refreshCollateral: (signal?: AbortSignal) => void;
+  loadingCollateral: boolean;
+  supplyCollateral: (args: { asset: string; amount: string }) => Promise<any>;
+  withdrawCollateral: (args: { asset: string; amount: string }) => Promise<any>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -53,66 +46,54 @@ export const LendingProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [depositableTokens, setDepositableTokens] = useState<DepositableToken[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [loadingDepositTokens, setLoadingDepositTokens] = useState(true);
   const [loadingLoans, setLoadingLoans] = useState(true);
-  const [errorDepositTokens, setErrorDepositTokens] = useState<string | null>(null);
 
-  const [withdrawableTokens, setWithdrawableTokens] = useState<WithdrawableToken[]>([]);
-  const [loadingWithdrawableTokens, setLoadingWithdrawableTokens] = useState(true);
+  const [liquidityInfo, setLiquidityInfo] = useState<any>()
+  const [loadingLiquidity, setLoadingLiquidity] = useState(true);
+  const [collateralInfo, setCollateralInfo] = useState<any>()
+  const [loadingCollateral, setLoadingCollateral] = useState(true)
 
-  const fetchDepositTokens = async (signal?: AbortSignal) => {
-    setLoadingDepositTokens(true);
+  const fetchLiquidityInfo = async (signal?: AbortSignal) => {
+    setLoadingLiquidity(true);
     try {
-      const res = await api.get<DepositableToken[]>("/lend/depositableTokens", {
+      const res = await api.get<WithdrawableToken[]>("/lending/liquidity", {
         signal,
       });
       if (res.data) {
-        setDepositableTokens((prev) => (isEqual(prev, res.data) ? prev : res.data));
-      }
-      setErrorDepositTokens(null);
-    } catch (err: any) {
-      if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Error fetching depositable tokens:", err);
-      setErrorDepositTokens(err.message || "Failed to load depositable tokens.");
-    } finally {
-      setLoadingDepositTokens(false);
-    }
-  };
-
-  const fetchWithdrawableTokens = async (signal?: AbortSignal) => {
-    setLoadingWithdrawableTokens(true);
-    try {
-      const res = await api.get<WithdrawableToken[]>("/lend/withdrawableTokens", {
-        signal,
-      });
-      if (res.data) {
-        const changed = JSON.stringify(withdrawableTokens.map(t => ({ ...t, value: BigInt(t.value).toString() })))
-          !== JSON.stringify(res.data.map(t => ({ ...t, value: BigInt(t.value).toString() })));
-
-        if (changed) {
-          setWithdrawableTokens(res.data);
-        }
+          setLiquidityInfo(res.data);
       }
     } catch (err: any) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
-      setLoadingWithdrawableTokens(false);
+      setLoadingLiquidity(false);
     }
   };
+
+  const fetchCollateralInfo = async (signal?: AbortSignal) => {
+    setLoadingCollateral(true);
+    try {
+      const res = await api.get<WithdrawableToken[]>("/lending/collateral", {
+        signal,
+      });
+      if (res.data) {
+          setCollateralInfo(res.data);
+      }
+    } catch (err: any) {
+      if (err.name === "CanceledError" || err.name === "AbortError") return;
+      console.error("Failed to fetch withdrawable tokens:", err);
+    } finally {
+      setLoadingCollateral(false);
+    }
+  }; 
 
   const fetchLoans = async (signal?: AbortSignal) => {
     setLoadingLoans(true);
     try {
-      const res = await api.get("/lend/loans", { signal });
-
-      const loanEntries: Loan[] = Array.isArray(res.data)
-        ? res.data
-        : Object.values((res.data as LoanData)?.loans || {});
-      setLoans(loanEntries);
-      return loanEntries;
+      const res = await api.get("/lending/loans", { signal });
+      setLoans(res.data);
+      return res.data;
     } catch (err: any) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch loans:", err);
@@ -161,22 +142,13 @@ export const LendingProvider = ({
   };
 
   const borrowAsset = async ({
-    asset,
     amount,
-    collateralAsset,
-    collateralAmount,
   }: {
-    asset: string;
     amount: string;
-    collateralAsset: string;
-    collateralAmount: string;
   }) => {
     try {
-      const res = await api.post("/lend/borrow", {
-        asset,
+      const res = await api.post("/lending/loans", {
         amount,
-        collateralAsset,
-        collateralAmount,
       });
       return res;
     } catch (err: any) {
@@ -186,19 +158,15 @@ export const LendingProvider = ({
   };
 
   const repayLoan = async ({
-    loanId,
     amount,
-    asset,
   }: {
     loanId: string;
     amount: string;
     asset: string;
   }) => {
     try {
-      const res = await api.post("/lend/repay", {
-        loanId,
+      const res = await api.patch("/lending/loans", {
         amount,
-        asset,
       });
       return res;
     } catch (err: any) {
@@ -217,9 +185,9 @@ export const LendingProvider = ({
     }
   };
 
-  const depositLiquidity = async (args: { asset: string; amount: string }) => {
+  const depositLiquidity = async (args: { amount: string }) => {
     try {
-      const res = await api.post("/lend/depositLiquidity", args);
+      const res = await api.post("/lending/pools/liquidity", args);
       return res;
     } catch (err: any) {
       console.error("Deposit liquidity failed:", err);
@@ -227,9 +195,29 @@ export const LendingProvider = ({
     }
   };
 
-  const withdrawLiquidity = async (args: { asset: string; amount: string }) => {
+  const withdrawLiquidity = async (args: { amount: string }) => {
     try {
-      const res = await api.post("/lend/withdrawLiquidity", args);
+      const res = await api.delete("/lending/pools/liquidity", {data: args});
+      return res;
+    } catch (err: any) {
+      console.error("Withdraw liquidity failed:", err);
+      throw err;
+    }
+  };
+
+  const supplyCollateral = async (args: { asset: string, amount: string }) => {
+    try {
+      const res = await api.post("/lending/collateral", args);
+      return res;
+    } catch (err: any) {
+      console.error("Withdraw liquidity failed:", err);
+      throw err;
+    }
+  };
+
+  const withdrawCollateral = async (args: { asset: string, amount: string }) => {
+    try {
+      const res = await api.delete("/lending/collateral", {data: args});
       return res;
     } catch (err: any) {
       console.error("Withdraw liquidity failed:", err);
@@ -240,9 +228,9 @@ export const LendingProvider = ({
   const refreshLendingData = async (): Promise<void> => {
     try {
       // Refresh all lending-related data
-      await fetchDepositTokens();
       await fetchLoans();
-      await fetchWithdrawableTokens();
+      await fetchLiquidityInfo()
+      await fetchCollateralInfo()
     } catch (err: any) {
       console.error("Failed to refresh lending data:", err);
       throw err;
@@ -251,9 +239,9 @@ export const LendingProvider = ({
 
 
   const initialize = () => {
-    fetchDepositTokens();
     fetchLoans();
-    fetchWithdrawableTokens();
+    fetchLiquidityInfo()
+    fetchCollateralInfo()
   };
 
   useEffect(() => {
@@ -262,16 +250,12 @@ export const LendingProvider = ({
 
   const contextValue = useMemo(
     () => ({
-      depositableTokens,
       loans,
-      loadingDepositTokens,
       loadingLoans,
-      errorDepositTokens,
-      refreshDepositTokens: fetchDepositTokens,
       refreshLoans: fetchLoans,
-      withdrawableTokens,
-      refreshWithdrawableTokens: fetchWithdrawableTokens,
-      loadingWithdrawableTokens,
+      liquidityInfo,
+      loadingLiquidity,
+      refreshLiquidity : fetchLiquidityInfo,
       setPrice,
       setInterestRate,
       setCollateralRatio,
@@ -282,15 +266,17 @@ export const LendingProvider = ({
       getLend,
       depositLiquidity,
       withdrawLiquidity,
+      collateralInfo,
+      loadingCollateral,
+      refreshCollateral: fetchCollateralInfo,
+      supplyCollateral,
+      withdrawCollateral,
     }),
     [
-      depositableTokens,
       loans,
-      loadingDepositTokens,
       loadingLoans,
-      errorDepositTokens,
-      withdrawableTokens,
-      loadingWithdrawableTokens,
+      liquidityInfo,
+      loadingLiquidity
     ]
   );
 

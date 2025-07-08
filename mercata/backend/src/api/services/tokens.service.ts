@@ -36,7 +36,7 @@ export const getTokens = async (
     }
 
     // Enrich with oracle prices so UI can display current price
-    const lendingInfo = await getLendingRegistry(accessToken, {
+    const lendingInfo = await getLendingRegistry(accessToken, undefined, {
       select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
     });
 
@@ -86,7 +86,7 @@ export const getBalance = async (
       throw new Error("Balance data is empty");
     }
 
-    const lendingInfo = await getLendingRegistry(accessToken, {
+    const lendingInfo = await getLendingRegistry(accessToken, undefined, {
       select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
     });
   

@@ -3,6 +3,7 @@ const { rest, util } = require('blockapps-rest');
 const auth = require('./auth');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 
 const getTokenFromNameAndPassword = async () => {
     const GLOBAL_ADMIN_NAME = getEnvVar('GLOBAL_ADMIN_NAME');
@@ -176,4 +177,40 @@ function getEnvVar(name) {
   return value;
 }
 
-module.exports = { callListAndWait, createContractArgs, getEnvVar, saveCreateTXDataAsFile, saveCallListTXDataAsFile };
+/**
+ * Performs a Cirrus search query using username/password authentication.
+ * 
+ * @param {string} tableName - The Cirrus table name to query (e.g., 'BlockApps-Mercata-Pool')
+ * @param {Object} params - Query parameters for the Cirrus search
+ * @returns {Promise<Array>} - The search results
+ */
+const cirrusSearch = async (tableName, params = {}) => {
+  const tokenString = await getTokenFromNameAndPassword();
+  
+  if (!tokenString) {
+    throw new Error('Failed to acquire token for Cirrus search.');
+  }
+
+  // Get the base URL from config
+  const baseUrl = config.nodes[0].url;
+  const cirrusUrl = `${baseUrl}/cirrus/search/${tableName}`;
+  console.log('Cirrus URL:', cirrusUrl);
+  const headers = { 
+    Authorization: `Bearer ${tokenString}`, 
+    "Content-Type": "application/json" 
+  };
+
+  try {
+    const { data } = await axios.get(cirrusUrl, { headers, params });
+    return data;
+  } catch (error) {
+    console.error('Cirrus search failed:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw new Error(`Cirrus search failed: ${error.message}`);
+  }
+};
+
+module.exports = { callListAndWait, createContractArgs, getEnvVar, saveCreateTXDataAsFile, saveCallListTXDataAsFile, cirrusSearch };
