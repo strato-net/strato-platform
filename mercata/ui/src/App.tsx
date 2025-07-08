@@ -19,7 +19,6 @@ import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
-import Borrow from "./pages/Borrow";
 import Pools from "./pages/Pools";
 import NotFound from "./pages/NotFound";
 

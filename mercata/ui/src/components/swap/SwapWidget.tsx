@@ -111,6 +111,7 @@ interface TokenInputProps {
   usdstBalance: string;
   isFromInput: boolean;
   pool: any;
+  fromAsset?: any;
 }
 
 const TokenInput = ({
@@ -129,7 +130,8 @@ const TokenInput = ({
   onFocus,
   usdstBalance,
   isFromInput,
-  pool
+  pool,
+  fromAsset
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -182,6 +184,10 @@ const TokenInput = ({
             value={amount}
             onChange={(e) => {
               const value = e.target.value;
+              const isEditable =
+                isFromInput || (!isFromInput && fromAsset && asset); // fromAsset && toAsset (toAsset = asset here)
+
+              if (!isEditable) return;
               if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
                 onChange(value);
               }
@@ -390,6 +396,30 @@ const SwapWidget = () => {
   useEffect(() => {
     if (userAddress) fetchUsdstBalance();
   }, [userAddress]);
+
+  useEffect(()=>{
+    if(swappableTokens){
+      initialTokenSetup()
+    }
+  },[])
+  
+  const initialTokenSetup = async () => {
+    try {
+      setFromBalanceLoading(true)
+      const res = await api.get(
+         `/tokens/balance?key=eq.${userAddress}&address=eq.${swappableTokens[0].address}`
+       );
+ 
+       const balance = res?.data?.[0]?.balance || "0";
+       setFromAsset({...swappableTokens[0], balance})
+       setFromBalanceLoading(false)
+    } catch (error) {
+      setFromBalanceLoading(false)
+      console.log(error);
+      
+    }
+  }
+  
 
   // Fetch pairable tokens when from asset changes
   useEffect(() => {
@@ -781,6 +811,12 @@ const SwapWidget = () => {
     return false;
   };
 
+useEffect(() => {
+  if (fromAmount && fromAsset && toAsset && pool) {
+    calculateSwapAmount(fromAmount, true);
+  }
+}, [fromAsset, toAsset, fromAmount, pool]);
+
   return (
     <div className="space-y-6">
       <TokenInput
@@ -800,6 +836,7 @@ const SwapWidget = () => {
         usdstBalance={usdstBalance}
         isFromInput={true}
         pool={pool}
+        fromAsset={fromAsset}
       />
 
       <div className="flex justify-center">
@@ -830,6 +867,7 @@ const SwapWidget = () => {
         usdstBalance={usdstBalance}
         isFromInput={false}
         pool={pool}
+        fromAsset={fromAsset}
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">

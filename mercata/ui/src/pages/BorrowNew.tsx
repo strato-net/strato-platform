@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { formatEther, formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
-import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
@@ -71,12 +70,8 @@ const BorrowNew = () => {
   }, [collateralInfo])
 
 
-  const {
-    refreshLendingData,
-  } = useLendingMetrics();
-
   useEffect(() => {
-    refreshLendingData();
+    refreshLoans();
   }, []);
 
   const handleBorrow = () => {
@@ -104,17 +99,7 @@ const BorrowNew = () => {
 
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      await refreshLendingData();
-
-      // Poll loans until list length changes (max 5 attempts)
-      const pollLoans = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans();
-        const updatedLoans = (await refreshLoans() as unknown) as any[];
-        if (updatedLoans.length > 0) return; // at least one loan now visible
-        setTimeout(() => pollLoans(attempt + 1), 2000);
-      };
-      pollLoans();
+      await refreshLoans();
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
@@ -164,21 +149,13 @@ const BorrowNew = () => {
       });
 
       setSupplyLoading(false);
-      setIsBorrowModalOpen(false);
-      await refreshLendingData();
-
-      // Poll loans until list length changes (max 5 attempts)
-      const pollLoans = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans()
-        await refreshCollateral();
-        setTimeout(() => pollLoans(attempt + 1), 2000);
-      };
-      pollLoans();
+      setIsSupplyModalOpen(false);
+      await refreshLoans()
+      await refreshCollateral();
     } catch (error: any) {
       console.log(error, "error");
       setSupplyLoading(false);
-      setIsBorrowModalOpen(false);
+      setIsSupplyModalOpen(false);
       toast({
         title: "Supply Error",
         description: `Something went wrong - ${error?.message || "Please try again later."
@@ -215,21 +192,13 @@ const BorrowNew = () => {
       });
 
       setWithdrawLoading(false);
-      setIsBorrowModalOpen(false);
-      await refreshLendingData();
-
-      // Poll loans until list length changes (max 5 attempts)
-      const pollLoans = async (attempt = 0) => {
-        if (attempt >= 5) return;
-        await refreshLoans()
-        await refreshCollateral();
-        setTimeout(() => pollLoans(attempt + 1), 2000);
-      };
-      pollLoans();
+      setIsWithdrawModalOpen(false);
+      await refreshLoans()
+      await refreshCollateral();
     } catch (error: any) {
       console.log(error, "error");
       setWithdrawLoading(false);
-      setIsBorrowModalOpen(false);
+      setIsWithdrawModalOpen(false);
       toast({
         title: "Withdraw Error",
         description: `Something went wrong - ${error?.message || "Please try again later."

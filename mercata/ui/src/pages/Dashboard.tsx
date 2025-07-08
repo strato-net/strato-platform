@@ -13,6 +13,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
+import { useLendingContext } from "@/context/LendingContext";
+import { useSwapContext } from "@/context/SwapContext";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -24,17 +26,19 @@ const Dashboard = () => {
     availableBorrowingPower, 
     currentBorrowed, 
     averageInterestRate, 
-    refreshLendingData 
   } = useLendingMetrics();
   const [totalBalance, setTotalBalance] = useState<number>(0)
   const [cataBalance, setCataBalance] = useState<number>(0);
+  const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
+  const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
 
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     setTimeout(() => {
       fetchTokens(userAddress || "");
     }, 500);
-    refreshLendingData();
+    refreshLoans();
+    fetchLpTokensPositions();
   }, [userAddress]);
 
   useEffect(() => {
@@ -133,7 +137,7 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <MyPoolParticipationSection /> 
+            <MyPoolParticipationSection loadingLpTokens={loadingLpTokens} loadingLiquidity={loadingLiquidity} liquidityInfo={liquidityInfo} lpTokens={lpTokens} /> 
           </div>
 
           <div className="mb-8">

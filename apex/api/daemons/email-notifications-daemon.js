@@ -65,8 +65,8 @@ async function executeCheck() {
       const _ = await emailer.sendEmail(
           to=process.env['ADMIN_EMAIL'], 
           subject="STRATO Mercata node requires attention",
-          text=`Your STRATO Mercata node is unhealthy or has warnings. ${healthIssues}. Please visit Dashboard at '/dashboard' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.`,
-          html=`<p>Your STRATO Mercata node is unhealthy or has warnings.<br/>${healthIssues}.<br/>Please visit Dashboard at '/dashboard' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.</p>`
+          text=`Your STRATO Mercata node is unhealthy or has warnings. ${healthIssues}. Please visit STRATO Management Dashboard at '/smd' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.`,
+          html=`<p>Your STRATO Mercata node is unhealthy or has warnings.<br/>${healthIssues}.<br/>Please visit STRATO Management Dashboard at '/smd' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.</p>`
       )
       winston.warn(`Email notification about node health was successfully sent to ${process.env['ADMIN_EMAIL']}`)
       // 
