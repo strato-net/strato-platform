@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
+import { usdstAddress, TRANSFER_FEE } from "@/lib/contants";
 
 import {
   Popover,
@@ -29,10 +30,11 @@ const Transfer = () => {
   const [swapLoading, setSwapLoading] = useState<boolean>(false);
   const [wrongAmount, setWrongAmount] = useState(false);
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
+  const [usdstBalance, setUsdstBalance] = useState("0");
 
-  const maxAmount = fromAsset ? Number(formatUnits(BigInt(fromAsset.balance.toLocaleString('fullwide', { useGrouping: false })), 18)) : 0;
+  const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
 
-  const fetchUserTokens = async () => {
+  const fetchUserTokens = useCallback(async () => {
     try {
       const res = await api.get(`/tokens/balance?key=eq.${userAddress}&value=gt.0`);
       setTokens(res.data);
@@ -41,13 +43,26 @@ const Transfer = () => {
       console.error("Failed to fetch tokens:", err);
       return [];
     }
-  };
+  }, [userAddress]);
 
+  const fetchUsdstBalance = useCallback(async () => {
+    try {
+      const res = await api.get(
+        `/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`
+      );
+      setUsdstBalance(res?.data?.[0]?.balance || "0");
+    } catch (error) {
+      console.error('Error fetching USDST balance:', error);
+    }
+  }, [userAddress]);
+
+  // Fetch USDST balance when user changes
   useEffect(() => {
     if (userAddress) {
       fetchUserTokens();
+      fetchUsdstBalance();
     }
-  }, [userAddress]);
+  }, [userAddress, fetchUserTokens, fetchUsdstBalance]);
 
   const handleTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;
@@ -159,7 +174,7 @@ const Transfer = () => {
               <label className="text-sm text-gray-600">
                 Amount
                 {fromAsset
-                  ? ` (Max: ${maxAmount.toLocaleString(undefined, {
+                  ? ` (Max: ${Number(formatUnits(maxAmount, 18)).toLocaleString(undefined, {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 4,
                   })})`
@@ -171,8 +186,12 @@ const Transfer = () => {
                 onChange={(e) => {
                   const v = e.target.value;
                   setFromAmount(v);
-                  const num = Number(v);
-                  setWrongAmount(num <= 0 || num > maxAmount);
+                  if (v && maxAmount > 0n) {
+                    const inputWei = parseUnits(v, 18);
+                    setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
+                  } else {
+                    setWrongAmount(false);
+                  }
                 }}
                 placeholder="0.00"
                 className={`w-full p-2 border rounded ${wrongAmount ? "border-red-500" : ""
@@ -184,6 +203,44 @@ const Transfer = () => {
                   available balance.
                 </p>
               )}
+              {/* Fee validation warnings */}
+              {(() => {
+                const feeAmount = parseUnits(TRANSFER_FEE, 18);
+                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                const inputAmountWei = fromAmount ? parseUnits(fromAmount, 18) : 0n;
+
+                // Check if transferring USDST and leaving enough for fee
+                const isUsdstMaxIssue = fromAsset?.address === usdstAddress &&
+                  inputAmountWei > usdstBalanceBigInt - feeAmount &&
+                  inputAmountWei <= usdstBalanceBigInt;
+
+                // Check if insufficient USDST for fee
+                const isInsufficientUsdstForFee = fromAsset?.address !== usdstAddress &&
+                  usdstBalanceBigInt < feeAmount;
+
+                return (
+                  <>
+                    {isUsdstMaxIssue && (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Insufficient balance for transaction fee ({TRANSFER_FEE} USDST)
+                      </p>
+                    )}
+                    {isInsufficientUsdstForFee && (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Insufficient USDST balance for transaction fee ({TRANSFER_FEE} USDST)
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Transaction Fee Display */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Transaction Fee</span>
+                <span className="font-medium">{TRANSFER_FEE} USDST</span>
+              </div>
             </div>
 
             <Button
@@ -194,7 +251,28 @@ const Transfer = () => {
                 !recipient ||
                 !fromAmount ||
                 wrongAmount ||
-                swapLoading
+                swapLoading ||
+                (() => {
+                  const feeAmount = parseUnits(TRANSFER_FEE, 18);
+                  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                  
+                  // Check if user has enough USDST for fee
+                  if (usdstBalanceBigInt < feeAmount) {
+                    return true;
+                  }
+                  
+                  // Check if transferring USDST and leaving enough for fee
+                  if (fromAsset?.address === usdstAddress) {
+                    const fromAmountWei = fromAmount ? parseUnits(fromAmount, 18) : 0n;
+                    const balance = BigInt(fromAsset.balance || "0");
+                    
+                    if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
+                      return true;
+                    }
+                  }
+                  
+                  return false;
+                })()
               }
             >
               {swapLoading ? <span>Processing…</span> : "Transfer"}

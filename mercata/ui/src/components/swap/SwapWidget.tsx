@@ -13,7 +13,7 @@ import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress } from "@/lib/contants";
+import { usdstAddress, SWAP_FEE } from "@/lib/contants";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog";
 
 // Constants
-const SWAP_FEE = "0.2"; // USDST
 const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
 const DECIMALS = 18;
