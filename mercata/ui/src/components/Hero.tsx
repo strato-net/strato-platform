@@ -1,6 +1,5 @@
-import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
+import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 import { cn } from "@/lib/utils";
 
 const Hero = () => {
@@ -42,7 +41,7 @@ const Hero = () => {
             <div className="text-gray-600">Average APY</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center shadow-sm">
-            <div className="text-3xl font-bold text-gray-900 mb-2">60,000</div>
+            <div className="text-3xl font-bold text-gray-900 mb-2">60,000+</div>
             <div className="text-gray-600">Rewards Issued (Cata)</div>
           </div>
         </div>

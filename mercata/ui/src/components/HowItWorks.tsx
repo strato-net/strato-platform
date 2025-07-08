@@ -5,26 +5,38 @@ const HowItWorks = () => {
     {
       icon: <Wallet className="h-8 w-8" />,
       title: "Connect & Deposit",
-      description: "Connect your wallet and deposit gold, silver, or crypto assets into our secure vaults and pools.",
-      step: "01"
+      description: "Signup and deposit gold, silver, or crypto assets into our secure vaults and pools.",
+      step: "01",
+      gradient: "bg-gradient-to-br from-blue-50 to-blue-100",
+      iconBg: "bg-blue-500/10",
+      iconColor: "text-blue-600"
     },
     {
       icon: <TrendingUp className="h-8 w-8" />,
       title: "Earn Yield",
       description: "Your assets automatically start earning competitive yields through our institutional-grade lending protocols.",
-      step: "02"
+      step: "02",
+      gradient: "bg-gradient-to-br from-orange-50 to-orange-100",
+      iconBg: "bg-orange-500/10",
+      iconColor: "text-orange-600"
     },
     {
       icon: <DollarSign className="h-8 w-8" />,
       title: "Get Instant Credit",
       description: "Access instant credit against your deposited assets without selling your positions.",
-      step: "03"
+      step: "03",
+      gradient: "bg-gradient-to-br from-purple-50 to-purple-100",
+      iconBg: "bg-purple-500/10",
+      iconColor: "text-purple-600"
     },
     {
       icon: <Shield className="h-8 w-8" />,
       title: "Secure & Withdraw",
       description: "Monitor your earnings and withdraw your assets anytime with full transparency and security.",
-      step: "04"
+      step: "04",
+      gradient: "bg-gradient-to-br from-green-50 to-green-100",
+      iconBg: "bg-green-500/10",
+      iconColor: "text-green-600"
     }
   ];
 
@@ -41,13 +53,13 @@ const HowItWorks = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {steps.map((step, index) => (
-              <div key={index} className="relative">
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-md transition-shadow h-full">
+              <div key={index} className="relative group">
+                <div className={`${step.gradient} rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-lg hover:-translate-y-2 transition-all duration-300 ease-out h-full`}>
                   <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center justify-center w-16 h-16 bg-strato-blue/10 rounded-full text-strato-orange">
+                    <div className={`flex items-center justify-center w-16 h-16 ${step.iconBg} rounded-full ${step.iconColor} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                       {step.icon}
                     </div>
-                    <div className="text-6xl font-bold text-gray-100 leading-none">
+                    <div className="text-6xl font-bold text-gray-200 leading-none group-hover:text-gray-300 transition-colors duration-300">
                       {step.step}
                     </div>
                   </div>
@@ -63,7 +75,7 @@ const HowItWorks = () => {
                 
                 {/* Connecting line for desktop */}
                 {index < steps.length - 1 && (
-                  <div className="hidden lg:block absolute top-20 -right-4 w-8 h-0.5 bg-gray-300 z-10"></div>
+                  <div className="hidden lg:block absolute top-20 -right-4 w-8 h-0.5 bg-gray-300 group-hover:bg-gray-400 transition-colors duration-300 z-10"></div>
                 )}
               </div>
             ))}

@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
+import FeaturedAssets from '../components/FeaturedAssets';
 import HowItWorks from '../components/HowItWorks';
 import FAQ from '../components/FAQ';
 import MERCATALOGO from '@/assets/mercata.png';
@@ -15,6 +16,7 @@ const Index = () => {
     <div className="min-h-screen relative bg-white">
       <Navbar />
       <Hero />
+      <FeaturedAssets />
       <HowItWorks />
       <FAQ />
       
