@@ -23,7 +23,7 @@ ifndef VERSION
     VERSION = `cat VERSION`
     $(info Using version tag from VERSION file)
   else
-    VERSION = `cat VERSION`-`git rev-parse --short HEAD`
+    VERSION = `cat VERSION`-`git rev-parse --short=7 HEAD`
   endif
 else
   $(info VERSION is "${VERSION}" (overriden with env var))
