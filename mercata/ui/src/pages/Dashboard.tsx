@@ -30,7 +30,7 @@ const Dashboard = () => {
   const [totalBalance, setTotalBalance] = useState<number>(0)
   const [cataBalance, setCataBalance] = useState<number>(0);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
-  const { lpTokens, fetchLpTokensPositions } = useSwapContext();
+  const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
 
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
@@ -137,7 +137,7 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <MyPoolParticipationSection loadingLiquidity={loadingLiquidity} liquidityInfo={liquidityInfo} lpTokens={lpTokens} /> 
+            <MyPoolParticipationSection loadingLpTokens={loadingLpTokens} loadingLiquidity={loadingLiquidity} liquidityInfo={liquidityInfo} lpTokens={lpTokens} /> 
           </div>
 
           <div className="mb-8">

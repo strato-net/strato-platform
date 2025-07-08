@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/card";
 import { formatUnits } from "ethers";
 
-export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens }: any) {
+export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }: any) {
 
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
@@ -24,7 +24,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
           <div className="text-right">Value</div>
         </div>
 
-        {loadingLiquidity ? (
+        {loadingLiquidity || loadingLpTokens ? (
           <div className="flex justify-center items-center h-12">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
           </div>
