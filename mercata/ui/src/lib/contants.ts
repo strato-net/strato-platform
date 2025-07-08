@@ -7,3 +7,7 @@ export const BORROW_FEE = "0.01"; // USDST fee for borrow transactions
 export const REPAY_FEE = "0.02"; // USDST fee for repay transactions
 export const SUPPLY_COLLATERAL_FEE = "0.02"; // USDST fee for supply collateral transactions
 export const WITHDRAW_COLLATERAL_FEE = "0.01"; // USDST fee for withdraw collateral transactions
+export const DEPOSIT_FEE = "0.03"; // USDST fee for deposit transactions
+export const WITHDRAW_FEE = "0.01"; // USDST fee for withdraw transactions
+export const LENDING_DEPOSIT_FEE = "0.02"; // USDST fee for lending pool deposit transactions
+export const LENDING_WITHDRAW_FEE = "0.01"; // USDST fee for lending pool withdraw transactions
