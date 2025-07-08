@@ -334,7 +334,6 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Supplied Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>Available to Withdraw</TableHead>
                     <TableHead>LTV</TableHead>
                     <TableHead>Liquidation Threshold</TableHead>
                     <TableHead>Actions</TableHead>
@@ -368,7 +367,6 @@ const BorrowNew = () => {
                         <TableCell>
                           ${formatTokenAmount(loan?.collateralizedAmountValue || 0)}
                         </TableCell>
-                        <TableCell>{formatEther(loan?.availableToWithdraw || 0)}</TableCell>
                         <TableCell>
                           {loan?.ltv ? loan?.ltv/100 : 0}%
                         </TableCell>
