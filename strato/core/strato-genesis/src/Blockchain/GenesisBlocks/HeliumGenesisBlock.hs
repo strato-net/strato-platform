@@ -269,9 +269,9 @@ assetToAccountInfos GA.Asset{..} =
           , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
           , (".admin", BAccount $ unspecifiedChain blockappsAddress)
           , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
-          , (".images.length", BInteger $ length images)
-          , (".files.length", BInteger $ length files)
-          , (".fileNames.length", BInteger $ length fileNames)
+          , (".images.length", BInteger . fromIntegral $ length images)
+          , (".files.length", BInteger . fromIntegral $ length files)
+          , (".fileNames.length", BInteger . fromIntegral $ length fileNames)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
@@ -898,7 +898,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationBonus", BInteger 10500)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationThreshold", BInteger 8000)
   , (".configuredAssets[0]", BAccount $ unspecifiedChain usdstAddress)
-  , (".configuredAssets.length", BInteger $ 1 + length GR.reserves)
+  , (".configuredAssets.length", BInteger . fromIntegral $ 1 + length GR.reserves)
   ] ++ concatMap (\(i, GR.Reserve{..}) ->
   [ (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.ltv", BInteger 7500)
   , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.interestRate", BInteger 500)
@@ -958,8 +958,8 @@ tokenFactory :: AccountInfo
 tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount mercataAddress "TokenFactory") $ ownedByBlockApps mercataAddress
   ++ [ (".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)
      , (".isFactoryToken<a:" <> addrBS mTokenAddress <> ">", BBool True)
-     , (".allTokens[0]", BAccount mTokenAddress)
-     , (".allTokens.length", BInteger $ 1 + length GA.assets)
+     , (".allTokens[0]", BAccount $ unspecifiedChain mTokenAddress)
+     , (".allTokens.length", BInteger . fromIntegral $ 1 + length GA.assets)
      ]
   ++ ((\GA.Asset{..} -> (".isFactoryToken<a:" <> addrBS root <> ">", BBool True)) <$> GA.assets)
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(1 :: Integer)..] GA.assets)
@@ -1005,7 +1005,7 @@ rewardsManager = SolidVMContractWithStorage rewardsManagerAddress 0 (CodeAtAccou
      , (".rewardTokens.length", BInteger 1)
      , (".rewardTokenMap<a:" <> addrBS cataAddress <> ">", BInteger 1)
      , (".rewardDelegate", BAccount $ unspecifiedChain 0x0)
-     , (".eligibleTokens.length", BInteger $ length GR.reserves)
+     , (".eligibleTokens.length", BInteger . fromIntegral $ length GR.reserves)
      ]
   ++ concatMap (\(i, GR.Reserve{..}) ->
     [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain assetRootAddress)
