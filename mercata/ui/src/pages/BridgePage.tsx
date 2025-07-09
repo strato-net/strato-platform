@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -13,12 +13,22 @@ import 'antd/dist/reset.css';
 import './BridgePage.css';
 import BridgeIn from '@/components/bridge/BridgeIn';
 import BridgeOut from '@/components/bridge/BridgeOut';
+import { useBridgeContext } from '@/context/BridgeContext';
 
 const BridgePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const [showTestnet] = useState(import.meta.env.VITE_SHOW_TESTNET === "true");
+  const { config, fetchBridgeConfig } = useBridgeContext();
+  
+  useEffect(() => {
+    // Fetch bridge config on component mount
+    fetchBridgeConfig().catch((error) => {
+      console.error('Failed to fetch bridge config:', error);
+    });
+  }, [fetchBridgeConfig]);
+
+  const showTestnet = config?.showTestnet ?? false;
 
   return (
     <div className="flex h-screen bg-gray-50">

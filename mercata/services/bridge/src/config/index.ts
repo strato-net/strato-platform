@@ -38,8 +38,11 @@ export const config = {
     safeOwnerAddress: process.env.SAFE_OWNER_ADDRESS,
     safeOwnerPrivateKey: process.env.SAFE_OWNER_PRIVATE_KEY,
   },
+  voucher: {
+    contractAddress: process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e",
+  },
   polling: {
-    bridgeInInterval: 5 * 60 * 1000, // 5 minutes for bridge-in
+    bridgeInInterval: 100 * 1000, // 100 seconds for bridge-in (dev/testing)
     bridgeOutInterval: 3 * 60 * 1000, // 3 minutes for bridge-out
   },
 } as const;
@@ -109,14 +112,14 @@ export const TESTNET_STRATO_TOKENS = [
   {
     name: "STRATO Ether",
     symbol: "ETHST",
-    tokenAddress: "0x581ee622fb866f3c2076d4260824ce681b15b715" , // Native token address
+    tokenAddress: "0x93fb7295859b2d70199e0a4883b7c320cf874e6c" ,
     decimals: 18,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
   {
     name: "STRATO USDC",
     symbol: "USDCST",
-    tokenAddress: "0x500fb797b0be4ce0edf070a9b17bae56d22a2131",
+    tokenAddress: "0x3d351a4a339f6eef7371b0b1b025b3a434ad0399",
     decimals: 6,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
   }
@@ -140,8 +143,8 @@ export const MAINNET_STRATO_TOKENS = [
 ];
 
 export const TESTNET_ETH_STRATO_TOKEN_MAPPING = {
-  '0x0000000000000000000000000000000000000000': '0x581ee622fb866f3c2076d4260824ce681b15b715', // ETH        
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x500fb797b0be4ce0edf070a9b17bae56d22a2131' // USDC
+  '0x0000000000000000000000000000000000000000': '0x93fb7295859b2d70199e0a4883b7c320cf874e6c', // ETH        
+  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x3d351a4a339f6eef7371b0b1b025b3a434ad0399' // USDC
 }
   
 export const MAINNET_ETH_STRATO_TOKEN_MAPPING = {

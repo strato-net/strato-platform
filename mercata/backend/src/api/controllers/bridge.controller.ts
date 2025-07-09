@@ -126,6 +126,23 @@ export class BridgeController {
     }
   }
 
+  public getBridgeConfig = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const result = await this.bridgeService.getBridgeConfig();
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  };
+
   public userDepositStatus = async (
     req: AuthenticatedRequest,
     res: Response,

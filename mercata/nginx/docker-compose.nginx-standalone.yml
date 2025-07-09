@@ -7,11 +7,16 @@ services:
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - ssl=${ssl:-false}
     - DOCKERIZED_APP=false
-    - HOST_IP=${HOST_IP}
+    - HOST_IP=${HOST_IP:-host.docker.internal}
     build:
       context: .
       extra_hosts:
       - "openresty.org=3.125.51.27"
+    # This is a workaround to ensure "host.docker.internal" works for command-line Docker
+    # on Linux. Requires Docker 20.10 (released Dec 2020) and newer. Details here:
+    # https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     image: mercata-nginx
     ports:
     - 80:80
