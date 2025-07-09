@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 import { ChevronRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -19,13 +18,6 @@ const Hero = () => {
       
       {/* Bottom fade gradient */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent" />
-      
-      <InteractiveGridPattern
-        className={cn(
-          "[mask-image:radial-gradient(400px_circle_at_center,white,transparent)]",
-          "inset-x-0 inset-y-[-30%] h-[200%] skew-y-12 opacity-20",
-        )}
-      />
       <div className="container mx-auto px-4 py-20 relative z-10">
         {/* Hero Header */}
         <div className="max-w-4xl mx-auto text-center mb-16">
