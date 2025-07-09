@@ -162,7 +162,7 @@ export async function buy(
     amount,
     paymentProviderAddress,
   }: { token: string; amount: string; paymentProviderAddress: string }
-): Promise<{ sessionId: string; url: string }> {
+): Promise<void> {
   try {
     const ramp = await get(accessToken);
     
@@ -191,17 +191,6 @@ export async function buy(
         throw new Error("Invalid provider session response");
       }
 
-      try {
-        const mintUrl = paymentProvider.endpoint.replace("/checkout", "/mint-vouchers");
-        axios.post(mintUrl, { sessionId: data.sessionId }).catch(() => {});
-      } catch (e) {
-        console.warn("Unable to trigger voucher minting: ", e);
-      }
-
-      return {
-        sessionId: data.sessionId,
-        url: data.url,
-      };
     } catch (stripeError: any) {
       console.error("STRIPE: Error making request:", stripeError.response?.data || stripeError.message);
       throw stripeError;

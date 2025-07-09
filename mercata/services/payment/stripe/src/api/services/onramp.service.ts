@@ -71,11 +71,56 @@ export async function checkout(
     });
 
     addLock(token, amount, sessionId);
+
+    // Start polling for session completion in background
+    pollSessionUntilComplete(sessionId).catch(error => {
+      console.error(`Polling failed for session ${sessionId}:`, error);
+      removeLock(token, amount, sessionId);
+    });
+
     return { sessionId, url };
   } catch (error) {
     removeLock(token, amount);
     throw error;
   }
+}
+
+async function pollSessionUntilComplete(sessionId: string): Promise<void> {
+  const maxAttempts = 30;
+  const delayMs = 5000;
+
+  console.log(`Starting to poll session ${sessionId}...`);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      console.log(`Attempt ${attempt}/${maxAttempts} - Status: ${session.status}, Payment: ${session.payment_status}`);
+
+      if (session.payment_status === "paid" && session.status === "complete") {
+        console.log(`Session completed! Processing payment...`);
+        await handleStripeSession(session as unknown as Stripe.Checkout.Session);
+        return;
+      }
+
+      if (session.status === "expired") {
+        console.log(`Session expired`);
+        return;
+      }
+
+      if (attempt < maxAttempts) {
+        console.log(`Waiting 5 seconds before next check...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    } catch (error) {
+      console.error(`Error polling session attempt ${attempt}:`, error);
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+    }
+  }
+
+  console.warn(`Session did not complete after ${maxAttempts} attempts`);
 }
 
 export async function handleStripeSession(session: Stripe.Checkout.Session): Promise<void> {
@@ -92,20 +137,28 @@ export async function handleStripeSession(session: Stripe.Checkout.Session): Pro
   }
 
   try {
-
     const accessToken = await getServiceToken();
     const tokenAddress: string = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 
     console.log(`Processing payment for token ${tokenAddress}, buyer ${buyerAddress}, amount ${tokenAmount}`);
+    
+    const fulfillTx = {
+      txs: [{
+        type: "FUNCTION" as const,
+        payload: { 
+          contractName: OnRamp,
+          contractAddress,
+          method: "fulfillListing",
+          args: { token: tokenAddress, buyer: buyerAddress, amount: tokenAmount }
+        }
+      }],
+      // txParams: {
+      //   gasLimit: 32_100_000_000,
+      //   gasPrice: 1,
+      // }
+    };
 
-    const fulfillTx = buildFunctionTx({
-      contractName: OnRamp,
-      contractAddress,
-      method: "fulfillListing",
-      args: { token: tokenAddress, buyer: buyerAddress, amount: tokenAmount },
-    });
-
-    console.log("Submitting fulfillListing…");
+    console.log("Submitting fulfillListing...");
     const { status: st2, hash: hash2 } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
     );
@@ -113,17 +166,26 @@ export async function handleStripeSession(session: Stripe.Checkout.Session): Pro
     if (st2 === "Success") {
       console.log(`Order ${tokenAddress} confirmed on-chain: ${hash2}`);
 
-      const voucherContractAddress = process.env.VOUCHER_CONTRACT_ADDRESS || "A96c02a13b558fbcf923af1d586967cf7f55c753"; // TODO: move to config
-
-      const mintTx = buildFunctionTx({
-        contractName: "Voucher",
-        contractAddress: voucherContractAddress,
-        method: "mint",
-        args: {
-          to: buyerAddress,
-          amount: (10000000000000000000).toString(), // 10 vouchers (10 * 10^18)
-        },
-      });
+      const voucherContractAddress = process.env.VOUCHER_CONTRACT_ADDRESS || "A96c02a13b558fbcf923af1d586967cf7f55c753";
+      
+      const mintTx = {
+        txs: [{
+          type: "FUNCTION" as const,
+          payload: { 
+            contractName: "Voucher",
+            contractAddress: voucherContractAddress,
+            method: "mint",
+            args: {
+              to: buyerAddress,
+              amount: (10000000000000000000).toString(), // 10 vouchers (10 * 10^18)
+            }
+          }
+        }],
+        // txParams: {
+        //   gasLimit: 32_100_000_000,
+        //   gasPrice: 1,
+        // }
+      };
 
       console.log("Submitting Voucher.mint…");
       const { status: st3, hash: hash3 } = await postAndWaitForTx(accessToken, () =>
@@ -131,9 +193,11 @@ export async function handleStripeSession(session: Stripe.Checkout.Session): Pro
       );
 
       if (st3 === "Success") {
-        console.log(`10 Vouchers minted: ${hash3}`);
+        console.log(`10 Vouchers minted successfully: ${hash3}`);
+        console.log(`Payment flow completed: fulfillListing + voucher minting`);
       } else {
         console.error(`Voucher mint failed (${st3}): ${hash3}`);
+        console.log(`Token transfer completed but voucher minting failed`);
       }
     } else {
       console.error(`On-chain confirmation failed (${st2}): ${hash2}`);
@@ -142,32 +206,5 @@ export async function handleStripeSession(session: Stripe.Checkout.Session): Pro
     console.error("Error confirming order on-chain:", err);
   } finally {
     removeLock(tokenMeta ?? '', tokenAmount ?? '', stripeSessionId);
-  }
-}
-
-export async function mintVouchers(sessionId: string): Promise<void> {
-  const MAX_ATTEMPTS = 6;
-  const DELAY_MS = 5_000;
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    if (session.payment_status === "paid" && session.status === "complete") {
-      await handleStripeSession(session as unknown as Stripe.Checkout.Session);
-      return;
-    }
-
-    console.log(
-      `Session ${sessionId} not complete yet (attempt ${attempt}/${MAX_ATTEMPTS}) – ` +
-      `status=${session.status}, payment_status=${session.payment_status}`
-    );
-
-    if (attempt < MAX_ATTEMPTS) {
-      await new Promise(res => setTimeout(res, DELAY_MS));
-    } else {
-      throw new Error(
-        `Session ${sessionId} did not reach paid/complete after ${MAX_ATTEMPTS} attempts`
-      );
-    }
   }
 }

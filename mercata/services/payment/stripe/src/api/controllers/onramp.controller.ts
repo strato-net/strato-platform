@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { checkout, mintVouchers } from "../services/onramp.service";
+import { checkout } from "../services/onramp.service";
 
 class OnRampController {
   static async checkout(
@@ -13,25 +13,6 @@ class OnRampController {
 
       const result = await checkout(token, buyerAddress, amount, baseUrl);
       res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async mintVouchers(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { sessionId } = req.body;
-      if (!sessionId) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "sessionId is required" });
-        return;
-      }
-
-      await mintVouchers(sessionId);
-      res.status(RestStatus.OK).json({ success: true });
     } catch (error) {
       next(error);
     }
