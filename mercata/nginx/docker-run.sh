@@ -34,11 +34,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   if [ "$DOCKERIZED_APP" = true ]; then
     sed -i "s|__BACKEND_HOST__|backend|g" /tmp/nginx.conf
     sed -i "s|__UI_HOST__|ui|g" /tmp/nginx.conf
-    sed -i "s|__FRONTEND_HOST__|frontend|g" /tmp/nginx.conf  # LEGACY FRONTEND
   else
     sed -i "s|__BACKEND_HOST__|$HOST_IP|g" /tmp/nginx.conf
     sed -i "s|__UI_HOST__|$HOST_IP|g" /tmp/nginx.conf
-    sed -i "s|__FRONTEND_HOST__|$HOST_IP|g" /tmp/nginx.conf  # LEGACY FRONTEND
   fi
 
   ########

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { formatEther, formatUnits, parseUnits } from "ethers";
+import { formatUnits, parseUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
+import { useUser } from "@/context/UserContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
@@ -36,6 +38,8 @@ const formatTokenAmount = (value: any) =>
 
 
 const BorrowNew = () => {
+  const { userAddress } = useUser();
+  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<DepositableToken | null>(null);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [borrowLoading, setBorrowLoading] = useState(false);
@@ -62,6 +66,10 @@ const BorrowNew = () => {
   } = useLendingContext();
 
   useEffect(() => {
+    document.title = "Borrow Assets | STRATO Mercata";
+  }, []);
+
+  useEffect(() => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
       const filtered = collateralInfo.filter((item) => item.collateralizedAmount > 0);
       setSuppliedCollateral(filtered);
@@ -69,10 +77,12 @@ const BorrowNew = () => {
     }
   }, [collateralInfo])
 
-
   useEffect(() => {
     refreshLoans();
-  }, []);
+    if (userAddress) {
+      fetchUsdstBalance(userAddress);
+    }
+  }, [userAddress, fetchUsdstBalance]);
 
   const handleBorrow = () => {
     setIsBorrowModalOpen(true);
@@ -85,29 +95,23 @@ const BorrowNew = () => {
   const executeBorrow = async (amount: number) => {
     try {
       setBorrowLoading(true);
-      const amountInWei = parseUnits(amount.toString(), 18).toString();
-
-      await borrowAssetFn({
-        amount: amountInWei,
-      });
-
+      await borrowAssetFn({ amount: parseUnits(amount.toString(), 18).toString() });
       toast({
         title: "Borrow Initiated",
-        description: `You borrowed ${amount} USDT.`,
+        description: `You borrowed ${amount} USDST`,
         variant: "success",
       });
-
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
       await refreshLoans();
+      await fetchUsdstBalance(userAddress);
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
       toast({
         title: "Borrow Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."
-          }`,
+        description: `Something went wrong - ${error?.message || "Please try again later."}`,
         variant: "destructive",
       });
     }
@@ -135,31 +139,27 @@ const BorrowNew = () => {
   const executeSupply = async (asset: DepositableToken, amount: number) => {
     try {
       setSupplyLoading(true);
-      const amountInWei = parseUnits(amount.toString(), 18).toString();
-
       await supplyCollateral({
-        amount: amountInWei,
-        asset: asset?.address,
+        asset: asset.address,
+        amount: parseUnits(amount.toString(), 18).toString(),
       });
-
       toast({
         title: "Supply Initiated",
-        description: `You supplied ${amount}`,
+        description: `You supplied ${amount} ${asset._symbol}`,
         variant: "success",
       });
-
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
-      await refreshLoans()
+      await refreshLoans();
       await refreshCollateral();
+      await fetchUsdstBalance(userAddress);
     } catch (error: any) {
       console.log(error, "error");
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
       toast({
         title: "Supply Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."
-          }`,
+        description: `Something went wrong - ${error?.message || "Please try again later."}`,
         variant: "destructive",
       });
     }
@@ -178,13 +178,10 @@ const BorrowNew = () => {
   const executeWithdraw = async (asset: DepositableToken, amount: number) => {
     try {
       setWithdrawLoading(true);
-      const amountInWei = parseUnits(amount.toString(), 18).toString();
-
       await withdrawCollateral({
-        amount: amountInWei,
-        asset: asset?.address,
+        asset: asset.address,
+        amount: parseUnits(amount.toString(), 18).toString(),
       });
-
       toast({
         title: "Withdraw Initiated",
         description: `You withdraw ${amount}`,
@@ -193,16 +190,16 @@ const BorrowNew = () => {
 
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
-      await refreshLoans()
+      await refreshLoans();
       await refreshCollateral();
+      await fetchUsdstBalance(userAddress);
     } catch (error: any) {
       console.log(error, "error");
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
       toast({
         title: "Withdraw Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."
-          }`,
+        description: `Something went wrong - ${error?.message || "Please try again later."}`,
         variant: "destructive",
       });
     }
@@ -374,6 +371,7 @@ const BorrowNew = () => {
           onClose={closeBorrowModal}
           onBorrow={(amount) => executeBorrow(amount)}
           loan={loans}
+          usdstBalance={usdstBalance}
         />
 
       <RepayModal
@@ -382,7 +380,9 @@ const BorrowNew = () => {
         loan={loans}
         onRepaySuccess={async () => {
           await refreshLoans();
+          await fetchUsdstBalance(userAddress);
         }}
+        usdstBalance={usdstBalance}
       />
 
       <SupplyCollateralModal 
@@ -392,6 +392,7 @@ const BorrowNew = () => {
           isOpen={isSupplyModalOpen}
           onClose={closeSupplyModal}
           onSupply={(amount) => executeSupply(selectedAsset, amount)}
+          usdstBalance={usdstBalance}
       />
 
        <WithdrawCollateralModal 
@@ -401,6 +402,7 @@ const BorrowNew = () => {
           isOpen={isWithdrawModalOpen}
           onClose={closeWithdrawModal}
           onWithdraw={(amount) => executeWithdraw(selectedAsset, amount)}
+          usdstBalance={usdstBalance}
       />
 
     </div>

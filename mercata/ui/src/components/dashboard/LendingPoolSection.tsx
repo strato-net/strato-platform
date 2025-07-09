@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/contants";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
@@ -46,9 +47,12 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(depositAmount)) return false;
     try {
       const amountWei = parseUnits(depositAmount, 18);
-      const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");      
+      const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+      const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
+      
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
+      if (amountWei + feeWei > availableWei) return false;
       return true;
     } catch {
       return false;
@@ -61,8 +65,12 @@ const LendingPoolSection = () => {
     try {
       const amountWei = parseUnits(withdrawAmount, 18);
       const depositedBalanceWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST) ?? 0n;
+      const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
+      const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+      
       if (amountWei <= 0n) return false;
       if (amountWei > depositedBalanceWei) return false;
+      if (usdstBalanceWei < feeWei) return false;
       return true;
     } catch {
       return false;
@@ -278,6 +286,37 @@ const LendingPoolSection = () => {
                         : "0.00"}{" "}
                     USDST
                   </div>
+                  {/* Fee Display */}
+                  <div className="text-sm text-gray-500 mt-1">
+                    Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
+                  </div>
+                  {/* Fee Warning */}
+                  {(() => {
+                    const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+                    const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
+                    const depositAmountWei = depositAmount ? parseUnits(depositAmount, 18) : 0n;
+                    
+                    // Check if user has enough USDST for fee
+                    const isInsufficientUsdstForFee = availableWei < feeWei;
+                    
+                    // Check if deposit amount + fee exceeds available balance
+                    const isInsufficientBalanceForDepositAndFee = depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
+                    
+                    return (
+                      <>
+                        {isInsufficientUsdstForFee && (
+                          <p className="text-yellow-600 text-sm mt-1">
+                            Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
+                          </p>
+                        )}
+                        {isInsufficientBalanceForDepositAndFee && (
+                          <p className="text-yellow-600 text-sm mt-1">
+                            Insufficient balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <div className="bg-white rounded-lg p-4 border">
@@ -329,6 +368,28 @@ const LendingPoolSection = () => {
                         : "0.00"}{" "}
                     USDST
                   </div>
+                  {/* Fee Display */}
+                  <div className="text-sm text-gray-500 mt-1">
+                    Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
+                  </div>
+                  {/* Fee Warning */}
+                  {(() => {
+                    const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+                    const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
+                    
+                    // Check if user has enough USDST for fee
+                    const isInsufficientUsdstForFee = usdstBalanceWei < feeWei;
+                    
+                    return (
+                      <>
+                        {isInsufficientUsdstForFee && (
+                          <p className="text-yellow-600 text-sm mt-1">
+                            Insufficient USDST balance for transaction fee ({LENDING_WITHDRAW_FEE} USDST)
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

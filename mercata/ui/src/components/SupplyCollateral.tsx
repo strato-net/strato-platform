@@ -9,6 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
+import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
 
 interface SupplyModalProps {
   supplyLoading: boolean;
@@ -17,6 +18,7 @@ interface SupplyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSupply: (amount: number) => void;
+  usdstBalance?: string;
 }
 
 const addCommasToInput = (value: string) => {
@@ -105,6 +107,7 @@ const SupplyCollateralModal = ({
   isOpen,
   onClose,
   onSupply,
+  usdstBalance = "0",
 }: SupplyModalProps) => {
   const [supplyAmount, setSupplyAmount] = useState(0);
   const [displayAmount, setDisplayAmount] = useState("");
@@ -206,6 +209,32 @@ const SupplyCollateralModal = ({
               </div>
             </div>
           )}
+
+          {/* Transaction Fee Display */}
+          <div className="px-4 py-3 bg-gray-50 rounded-md">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-600">Transaction Fee</span>
+              <span className="font-medium">{SUPPLY_COLLATERAL_FEE} USDST</span>
+            </div>
+            {/* Fee validation warnings */}
+            {(() => {
+              const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
+              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+              
+              // Check if insufficient USDST for fee
+              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+              
+              return (
+                <>
+                  {isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
         </div>
 
         <DialogFooter>
@@ -213,7 +242,16 @@ const SupplyCollateralModal = ({
             Cancel
           </Button>
           <Button
-            disabled={supplyAmount === 0 || supplyLoading || supplyAmount > parseFloat(formatUnits(asset?.userBalance || 0,18))}
+            disabled={
+              supplyAmount === 0 || 
+              supplyLoading || 
+              supplyAmount > parseFloat(formatUnits(asset?.userBalance || 0,18)) ||
+              (() => {
+                const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
+                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                return usdstBalanceBigInt < feeAmount;
+              })()
+            }
             onClick={handleBorrow}
             className="px-6"
           >

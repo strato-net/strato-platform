@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs } from 'antd';
 import BridgeIn from './BridgeIn';
 import BridgeOut from './BridgeOut';
+import { useBridgeContext } from '@/context/BridgeContext';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const showTestnet = import.meta.env.VITE_SHOW_TESTNET === 'true';
+  const { config, fetchBridgeConfig } = useBridgeContext();
+  
+  useEffect(() => {
+    // Fetch bridge config on component mount
+    fetchBridgeConfig().catch((error) => {
+      console.error('Failed to fetch bridge config:', error);
+    });
+  }, [fetchBridgeConfig]);
+
+  const showTestnet = config?.showTestnet ?? false;
 
   return (
     <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
