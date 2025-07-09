@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Minus, Shield, HelpCircle, Wallet, TrendingUp, Users, Smartphone, Zap, PlayCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
 const FAQ = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
