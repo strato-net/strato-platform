@@ -1,10 +1,10 @@
 
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import Hero from '../components/Hero';
-import FeaturedAssets from '../components/FeaturedAssets';
-import HowItWorks from '../components/HowItWorks';
-import FAQ from '../components/FAQ';
+import Hero from '../components/home/Hero';
+import FeaturedAssets from '../components/home/FeaturedAssets';
+import HowItWorks from '../components/home/HowItWorks';
+import FAQ from '../components/home/FAQ';
 import MERCATALOGO from '@/assets/mercata.png';
 
 const Index = () => {
