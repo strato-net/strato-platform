@@ -21,11 +21,10 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
   return `rgb(${red}, ${green}, 0)`;
 }
 
-  // Calculate total maxBorrowingPower from user collaterals
-  const totalMaxBorrowingPower = userCollaterals?.reduce((total, collateral) => {
-    const borrowingPower = parseFloat(formatUnits(collateral?.maxBorrowingPower || 0, 18));
-    return total + borrowingPower;
-  }, 0) || 0;
+  // Use the available borrowing power from loanData (which is calculated correctly in backend)
+  const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
+    ? parseFloat(formatUnits(loanData.maxAvailableToBorrowUSD, 18))
+    : 0;
   
   return (
     <Card className="border border-gray-100 shadow-sm">
@@ -65,9 +64,9 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Total Borrowing Power</span>
+                <span className="text-gray-600">Available Borrowing Power</span>
                 <span className="font-semibold">
-                  {totalMaxBorrowingPower.toFixed(2)}
+                  {availableBorrowingPower.toFixed(2)}
                 </span>
               </div>
               <div className="flex flex-col">
