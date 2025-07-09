@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { formatUnits, parseUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
-import { usdstAddress } from "@/lib/contants";
+import { usdstAddress, DEPOSIT_FEE, WITHDRAW_FEE } from "@/lib/contants";
 
 // Helper function to safely format numbers
 const formatNumber = (value: string | number): string => {
@@ -214,9 +214,9 @@ const SwapPoolsSection = () => {
       const tokenBAmount = parseUnits(token2Amount, 18);
 
       await addLiquidity({
-        address: selectedPool.address,
-        max_tokenA_amount: tokenAAmount.toString(),
-        tokenB_amount: tokenBAmount.toString(),
+        poolAddress: selectedPool.address,
+        maxTokenAAmount: tokenAAmount.toString(),
+        tokenBAmount: tokenBAmount.toString(),
       });
 
       // Wait for transaction to be mined
@@ -279,8 +279,8 @@ const SwapPoolsSection = () => {
       const calculatedAmount = (value * percentScaled) / BigInt(10000);
 
       await removeLiquidity({
-        address: selectedPool.address,
-        amount: calculatedAmount.toString(),
+        poolAddress: selectedPool.address,
+        lpTokenAmount: calculatedAmount.toString(),
       });
 
       // Wait for transaction to be mined
@@ -535,14 +535,14 @@ const SwapPoolsSection = () => {
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
                 {selectedPool?.tokenA.address === usdstAddress && 
-                 parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") - parseUnits("0.3", 18) && 
+                 parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
                  parseUnits(token1Amount || "0", 18) <= BigInt(tokenABalance || "0") && (
-                  <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee (0.3 USDST)</p>
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
                 {selectedPool?.tokenA.address !== usdstAddress && 
                  selectedPool?.tokenB.address !== usdstAddress && 
-                 BigInt(usdstBalance || "0") < parseUnits("0.3", 18) && (
-                  <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee (0.3 USDST)</p>
+                 BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
               </div>
 
@@ -597,14 +597,14 @@ const SwapPoolsSection = () => {
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
                 {selectedPool?.tokenB.address === usdstAddress && 
-                 parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") - parseUnits("0.3", 18) && 
+                 parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
                  parseUnits(token2Amount || "0", 18) <= BigInt(tokenBBalance || "0") && (
-                  <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee (0.3 USDST)</p>
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
                 {selectedPool?.tokenA.address !== usdstAddress && 
                  selectedPool?.tokenB.address !== usdstAddress && 
-                 BigInt(usdstBalance || "0") < parseUnits("0.3", 18) && (
-                  <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee (0.3 USDST)</p>
+                 BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
               </div>
             </div>
@@ -622,7 +622,7 @@ const SwapPoolsSection = () => {
               </div>
               <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
                 <span>Transaction fee</span>
-                <span>0.3 USDST</span>
+                <span>{DEPOSIT_FEE} USDST</span>
               </div>
               {selectedPool && BigInt(selectedPool.lpToken._totalSupply) === BigInt(0) && (
                 <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
@@ -721,6 +721,15 @@ const SwapPoolsSection = () => {
                     (Number(BigInt(selectedPool?.lpToken?.balances?.[0]?.balance || "0") * BigInt(selectedPool?.tokenBBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
                 </span>
               </div>
+              {/* Withdraw Fee Display */}
+              <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
+                <span>Transaction fee</span>
+                <span>{WITHDRAW_FEE} USDST</span>
+              </div>
+              {/* Withdraw Fee Warning */}
+              {BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
+                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
+              )}
               {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                 <>
                   <div className="w-full flex justify-between">
@@ -744,7 +753,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading} type="submit" className="w-full bg-strato-purple hover:bg-strato-purple/90">
+              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-purple hover:bg-strato-purple/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>

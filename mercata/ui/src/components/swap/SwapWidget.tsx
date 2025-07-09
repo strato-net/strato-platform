@@ -9,11 +9,12 @@ import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { SwappableToken } from "@/interface";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress } from "@/lib/contants";
+import { usdstAddress, SWAP_FEE } from "@/lib/contants";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui/dialog";
 
 // Constants
-const SWAP_FEE = "0.2"; // USDST
 const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
 const DECIMALS = 18;
@@ -111,6 +111,7 @@ interface TokenInputProps {
   usdstBalance: string;
   isFromInput: boolean;
   pool: any;
+  fromAsset?: any;
 }
 
 const TokenInput = ({
@@ -129,7 +130,8 @@ const TokenInput = ({
   onFocus,
   usdstBalance,
   isFromInput,
-  pool
+  pool,
+  fromAsset
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -182,6 +184,10 @@ const TokenInput = ({
             value={amount}
             onChange={(e) => {
               const value = e.target.value;
+              const isEditable =
+                isFromInput || (!isFromInput && fromAsset && asset); // fromAsset && toAsset (toAsset = asset here)
+
+              if (!isEditable) return;
               if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
                 onChange(value);
               }
@@ -360,6 +366,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 const SwapWidget = () => {
   const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
   const { userAddress } = useUser();
+  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const { toast } = useToast();
 
   // State
@@ -380,7 +387,6 @@ const SwapWidget = () => {
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
-  const [usdstBalance, setUsdstBalance] = useState("0");
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
@@ -388,8 +394,32 @@ const SwapWidget = () => {
 
   // Fetch USDST balance when user changes
   useEffect(() => {
-    if (userAddress) fetchUsdstBalance();
-  }, [userAddress]);
+    if (userAddress) fetchUsdstBalance(userAddress);
+  }, [userAddress, fetchUsdstBalance]);
+
+  useEffect(()=>{
+    if(swappableTokens){
+      initialTokenSetup()
+    }
+  },[])
+  
+  const initialTokenSetup = async () => {
+    try {
+      setFromBalanceLoading(true)
+      const res = await api.get(
+         `/tokens/balance?address=eq.${swappableTokens[0].address}`
+       );
+ 
+       const balance = res?.data?.[0]?.balance || "0";
+       setFromAsset({...swappableTokens[0], balance})
+       setFromBalanceLoading(false)
+    } catch (error) {
+      setFromBalanceLoading(false)
+      console.log(error);
+      
+    }
+  }
+  
 
   // Fetch pairable tokens when from asset changes
   useEffect(() => {
@@ -495,17 +525,6 @@ const SwapWidget = () => {
   }, []);
 
   // Helper functions
-  const fetchUsdstBalance = async () => {
-    try {
-      const res = await api.get(
-        `/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`
-      );
-      setUsdstBalance(res?.data?.[0]?.balance || "0");
-    } catch (error) {
-      console.error('Error fetching USDST balance:', error);
-    }
-  };
-
   const getTokenBalance = async (asset: SwappableToken, isFrom: boolean) => {
     try {
       if (isFrom) {
@@ -515,7 +534,7 @@ const SwapWidget = () => {
       }
 
       const res = await api.get(
-        `/tokens/balance?key=eq.${userAddress}&address=eq.${asset.address}`
+        `/tokens/balance?address=eq.${asset.address}`
       );
 
       const balance = res?.data?.[0]?.balance || "0";
@@ -528,7 +547,7 @@ const SwapWidget = () => {
         setToBalanceLoading(false);
       }
 
-      await fetchUsdstBalance();
+      await fetchUsdstBalance(userAddress);
     } catch (err) {
       console.error(err);
       if (isFrom) {
@@ -781,6 +800,12 @@ const SwapWidget = () => {
     return false;
   };
 
+useEffect(() => {
+  if (fromAmount && fromAsset && toAsset && pool) {
+    calculateSwapAmount(fromAmount, true);
+  }
+}, [fromAsset, toAsset, fromAmount, pool]);
+
   return (
     <div className="space-y-6">
       <TokenInput
@@ -800,6 +825,7 @@ const SwapWidget = () => {
         usdstBalance={usdstBalance}
         isFromInput={true}
         pool={pool}
+        fromAsset={fromAsset}
       />
 
       <div className="flex justify-center">
@@ -830,6 +856,7 @@ const SwapWidget = () => {
         usdstBalance={usdstBalance}
         isFromInput={false}
         pool={pool}
+        fromAsset={fromAsset}
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">

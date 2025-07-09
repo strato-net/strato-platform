@@ -20,7 +20,7 @@ import {
 } from "wagmi";
 import { parseEther, createPublicClient, http, parseUnits } from "viem";
 import { mainnet, sepolia } from "viem/chains";
-import { NATIVE_TOKEN_ADDRESS, SAFE_ADDRESS } from "@/lib/bridge/constants";
+import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
 import { useBridgeContext } from "@/context/BridgeContext";
 import BridgeWalletStatus from './BridgeWalletStatus';
 
@@ -53,6 +53,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     bridgeIn: bridgeInAPI,
     formatBalance
   } = useBridgeContext();
+
+  const { config } = useBridgeContext();
+  const safeAddress = config?.safeAddress;
 
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [amount, setAmount] = useState("");
@@ -248,7 +251,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
       if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
         const txHash = await sendTransactionAsync({
-          to: SAFE_ADDRESS as `0x${string}`,
+          to: safeAddress as `0x${string}`,
           value: parseEther(amount),
         });
         hash = txHash as `0x${string}`;
@@ -268,7 +271,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             },
           ],
           functionName: "transfer",
-          args: [SAFE_ADDRESS as `0x${string}`, parseUnits(amount, 6)],
+          args: [safeAddress as `0x${string}`, parseUnits(amount, 6)],
           chain: showTestnet ? sepolia : mainnet,
           account: address as `0x${string}`,
         });

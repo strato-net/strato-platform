@@ -309,9 +309,9 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  // Fetch pool data
+  // Fetch pool data with optimized query
   const registry = await getPool(accessToken, undefined, { 
-    select: `lendingPool:lendingPool_fkey(borrowableAsset,mToken,assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`
+    select: `lendingPool:lendingPool_fkey(borrowableAsset,mToken,assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text))`
   });
   
   const { borrowableAsset, mToken, assetConfigs, userLoan } = registry.lendingPool || {};
@@ -321,78 +321,85 @@ export const liquidityAndBalance = async (
     throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  // Get user balances
-  const [borrowableBalance, mTokenBalance] = await Promise.all([
-    getBalance(accessToken, userAddress, { 
-      address: `eq.${borrowableAsset}`,
-      select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
-    }),
-    getBalance(accessToken, userAddress, { 
-      address: `eq.${mToken}`,
-      select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
-    })
-  ]).then(balances => balances.map(b => b[0]));
+  // Fetch token metadata with user balances included
+  const tokenData = await getTokens(accessToken, { 
+    address: `in.(${borrowableAsset},${mToken})`, 
+    select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
+    "balances.key": `eq.${userAddress}`
+  });
 
-  // Get total supply - use from balance if available, otherwise fetch directly
-  let totalMTokenSupply = "0";
-  let actualUnderlying = "0";
+  // Extract token data and user balances
+  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
+  const mTokenInfo = tokenData.find(token => token.address === mToken);
 
-  if (mTokenBalance?.token?._totalSupply) {
-    totalMTokenSupply = mTokenBalance.token._totalSupply;
-  } else {
-    const mTokenInfo = await getTokens(accessToken, { address: `eq.${mToken}`, select: `_totalSupply::text` });
-    totalMTokenSupply = mTokenInfo[0]?._totalSupply || "0";
-  }
+  // Extract user balance from token metadata
+  const borrowableBalance = borrowableToken?.balances?.[0]?.balance || "0";
+  const mTokenBalance = mTokenInfo?.balances?.[0]?.balance || "0";
 
-  if (borrowableBalance?.token?._totalSupply) {
-    actualUnderlying = borrowableBalance.token._totalSupply;
-  } else {
-    const borrowableTokenInfo = await getTokens(accessToken, { address: `eq.${borrowableAsset}`, select: `_totalSupply::text` });
-    actualUnderlying = borrowableTokenInfo[0]?._totalSupply || "0";
-  }
+  // Extract total supply values with fallbacks
+  const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
+  const actualUnderlying = borrowableToken?._totalSupply || "0";
 
-  // Get borrowable asset config and price
+  // Get borrowable asset config
   const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
 
-  // Build price map for helper functions
-  const priceMap = new Map<string, string>(
-    registry.oracle?.prices?.map((price: any) => [price.asset, price.price]) || []
-  );
+  // Build price map from token data (getTokens already includes prices)
+  const priceMap = new Map<string, string>([
+    [borrowableAsset, borrowableToken?.price?.toString() || "0"],
+    [mToken, mTokenInfo?.price?.toString() || "0"]
+  ]);
 
-  // Calculate pool metrics using helper functions
-  
-  const exchangeRate = calculateExchangeRate(totalMTokenSupply, actualUnderlying);
+  // Calculate all pool metrics in parallel
+  const currentTime = Math.floor(Date.now() / 1000);
+  const [
+    exchangeRate,
+    totalBorrowed,
+    totalCollateralValue,
+    apyData
+  ] = await Promise.all([
+    Promise.resolve(calculateExchangeRate(totalMTokenSupply, actualUnderlying)),
+    Promise.resolve(calculateTotalBorrowed(
+      userLoan || [], 
+      borrowableAssetConfig?.interestRate || 0, 
+      currentTime
+    )),
+    Promise.resolve(calculateTotalCollateralValue(
+      assetConfigs || [], 
+      allCollaterals, 
+      priceMap, 
+      borrowableAsset
+    )),
+    Promise.resolve(calculateAPYs(
+      borrowableAssetConfig?.interestRate || 0,
+      borrowableAssetConfig?.reserveFactor || 1000
+    ))
+  ]);
+
+  // Calculate derived metrics
   const totalUSDSTSupplied = calculateTotalUSDSTSupplied(totalMTokenSupply, exchangeRate);
-  const totalBorrowed = calculateTotalBorrowed(
-    userLoan || [], 
-    borrowableAssetConfig?.interestRate || 0, 
-    Math.floor(Date.now() / 1000)
-  );
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
-  const totalCollateralValue = calculateTotalCollateralValue(
-    assetConfigs || [], 
-    allCollaterals, 
-    priceMap, 
-    borrowableAsset
-  );
-  const { supplyAPY, borrowAPY } = calculateAPYs(
-    borrowableAssetConfig?.interestRate || 0,
-    borrowableAssetConfig?.reserveFactor || 1000
-  );
-
-  // Calculate derived values
   const availableLiquidity = BigInt(totalUSDSTSupplied) - BigInt(totalBorrowed);
   const conversionRate = Number(exchangeRate) / Number(10n ** 18n);
 
+  // Calculate max withdrawable amount
+  const userMTokenBalance = BigInt(mTokenBalance.balance || "0");
+  const maxWithdrawableUSDST = userMTokenBalance > 0n 
+    ? ((userMTokenBalance * BigInt(Math.floor(conversionRate * 1e6))) / BigInt(1e6)).toString()
+    : "0";
+
+  // Destructure token data to exclude balances array
+  const { balances: _, ...borrowableTokenClean } = borrowableToken || {};
+  const { balances: __, ...mTokenInfoClean } = mTokenInfo || {};
+
   return {
     supplyable: {
-      ...borrowableBalance?.token,
-      userBalance: borrowableBalance?.balance?.toString() || "0",
+      ...borrowableTokenClean,
+      userBalance: borrowableBalance,
     },
     withdrawable: {
-      ...mTokenBalance?.token,
-      userBalance: mTokenBalance?.balance?.toString() || "0",
-      canWithdraw: BigInt(mTokenBalance?.balance || "0") > 0n,
+      ...mTokenInfoClean,
+      userBalance: mTokenBalance,
+      maxWithdrawableUSDST,
     },
     // Pool metrics
     totalUSDSTSupplied,
@@ -400,34 +407,25 @@ export const liquidityAndBalance = async (
     utilizationRate,
     availableLiquidity: availableLiquidity.toString(),
     totalCollateralValue,
-    supplyAPY,
-    borrowAPY,
+    supplyAPY: apyData.supplyAPY,
+    borrowAPY: apyData.borrowAPY,
     conversionRate,
   };
 };
 
 export const getLoan = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string | undefined
 ): Promise<any> => {
-  const registry = await getPool(accessToken, userAddress);
+  // If userAddress is undefined, get all data without filtering by user
+  const registry = await getPool(
+    accessToken, 
+    userAddress, 
+    userAddress ? {} : { select: registrySelectFields.join(",") }
+  );
   
-  // Find the user's loan from the array
-  const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
-  const userLoan = userLoanEntry?.LoanInfo;
-
-  if (!userLoan) return null;
-
   const currentTime = Math.floor(Date.now() / 1000);
   
-  // Get user's collaterals
-  const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
-    .filter((c: any) => c.user === userAddress)
-    .map((c: any) => ({
-      asset: c.asset,
-      amount: c.amount,
-    }));
-
   // Build asset configs map from the actual mapping
   const assetConfigs = new Map<string, AssetConfig>();
   
@@ -442,7 +440,56 @@ export const getLoan = async (
     });
   });
 
-  return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+  // If userAddress is provided, return loan for specific user
+  if (userAddress) {
+    // Find the user's loan from the array
+    const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
+    const userLoan = userLoanEntry?.LoanInfo;
+
+    if (!userLoan) return {};
+
+    // Get user's collaterals
+    const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
+      .filter((c: any) => c.user === userAddress)
+      .map((c: any) => ({
+        asset: c.asset,
+        amount: c.amount,
+      }));
+
+    return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+  }
+
+  // If userAddress is undefined, return simulated loans for all users
+  const allLoans: any[] = [];
+  
+  // Get all user loans
+  const allUserLoans = registry.lendingPool?.userLoan || [];
+  
+  for (const loanEntry of allUserLoans) {
+    const userLoan = loanEntry.LoanInfo;
+    const userAddr = loanEntry.user;
+    
+    if (!userLoan || !userAddr) continue;
+
+    // Get user's collaterals
+    const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
+      .filter((c: any) => c.user === userAddr)
+      .map((c: any) => ({
+        asset: c.asset,
+        amount: c.amount,
+      }));
+
+    // Simulate loan for this user
+    const simulatedLoan = simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+    
+    // Add user address to the result
+    allLoans.push({
+      user: userAddr,
+      ...simulatedLoan,
+    });
+  }
+
+  return allLoans;
 };
 
 export const executeLiquidation = async (

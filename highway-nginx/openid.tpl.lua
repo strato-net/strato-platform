@@ -8,7 +8,7 @@
 --    the token is being verified and we either authorize the request or exit with 403
 -- 2. Nginx session-based OAuth2 (for SMD and API calls from browser; uses STRATO client id and secret):
 --    if no session provided in request OR session is expired OR access token in session is expired on invalid:
---      - if UI call (SMD, i.e. "/dashboard/..") - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
+--      - if UI call - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
 --      - if API call - return 401 Unauthorized with WWW-Authenticate header
 --    if valid session is in request and has valid access token - request is authorized
 --

@@ -25,6 +25,7 @@ import {
   TESTNET_STRATO_TOKENS,
   MAINNET_STRATO_TOKENS,
 } from "../config";
+import { mintVouchersForDeposits } from "../utils/voucherMinting";
 
 const showTestnet = process.env.SHOW_TESTNET === "true";
 
@@ -165,12 +166,49 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
 
   console.log("depositStatus....", depositStatus);
 
-  // depositedInitiated in query
+  // ⚠️ TEMPORARY FIX: Filter out deposits with invalid token addresses from previous testnet deployment
+  const INVALID_TOKEN_ADDRESSES = [
+    "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
+    "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
+  ];
+  
+  const validDeposits = depositStatus.filter((deposit: any) => {
+    const tokenAddress = deposit.token.toLowerCase().replace("0x", "");
+    const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
+    
+    if (isInvalid) {
+      console.warn(`Skipping deposit with invalid token address: ${deposit.txHash} (token: ${tokenAddress})`);
+    }
+    
+    return !isInvalid;
+  });
+
+  console.log("validDeposits after filtering....", validDeposits);
+
+  if (validDeposits.length === 0) {
+    console.log("No valid deposits to process");
+    return;
+  }
+
   try {
     const bridgeContract = new BridgeContractCall();
-    await bridgeContract.batchConfirmDeposits({
-      deposits: depositStatus,
+    const result = await bridgeContract.batchConfirmDeposits({
+      deposits: validDeposits,
     });
+
+    console.log("batchConfirmDeposits result:", result);
+
+    if (result && result.status === "Success") {
+      console.log("✅ Bridge deposits confirmed successfully, minting vouchers...");
+      
+      try {
+        await mintVouchersForDeposits(validDeposits);
+      } catch (voucherError) {
+        console.error("Failed to mint vouchers (bridge deposits still succeeded):", voucherError);
+      }
+    } else {
+      console.error("Bridge deposits failed:", result?.status || "Unknown error");
+    }
   } catch (error) {
     console.error("Error in BatchconfirmDeposit for tx:", error);
   }
@@ -189,6 +227,20 @@ export const confirmBridgeIn = async (tx: any) => {
   console.log("depositStatus checked ...", depositStatus);
 
   if (!depositStatus) {
+    return null;
+  }
+
+  // ⚠️ TEMPORARY FIX: Skip deposits with invalid token addresses from previous testnet deployment
+  const INVALID_TOKEN_ADDRESSES = [
+    "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
+    "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
+  ];
+  
+  const tokenAddress = depositStatus.token.toLowerCase().replace("0x", "");
+  const isInvalidToken = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
+  
+  if (isInvalidToken) {
+    console.warn(`Skipping single deposit with invalid token address: ${depositStatus.txHash} (token: ${tokenAddress})`);
     return null;
   }
 

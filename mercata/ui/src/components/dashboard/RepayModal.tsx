@@ -5,12 +5,14 @@ import { useLendingContext } from "@/context/LendingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { REPAY_FEE } from "@/lib/contants";
 
 interface RepayModalProps {
   isOpen: boolean;
   onClose: () => void;
   loan: any | null;
   onRepaySuccess: () => void;
+  usdstBalance?: string;
 }
 
 const formatCurrency = (value: string | number) => {
@@ -35,7 +37,7 @@ const addCommasToInput = (value: string) => {
   return integerPart;
 };
 
-const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) => {  
+const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" }: RepayModalProps) => {  
   const [repayAmount, setRepayAmount] = useState('');
   const [displayAmount, setDisplayAmount] = useState('');
   const [repayLoading, setRepayLoading] = useState(false);
@@ -242,6 +244,32 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
           </div>
         </div>
 
+        {/* Transaction Fee Display */}
+        <div className="px-4 py-3 bg-gray-50 rounded-md">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">Transaction Fee</span>
+            <span className="font-medium">{REPAY_FEE} USDST</span>
+          </div>
+          {/* Fee validation warnings */}
+          {(() => {
+            const feeAmount = parseUnits(REPAY_FEE, 18);
+            const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+            
+            // Check if insufficient USDST for fee
+            const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+            
+            return (
+              <>
+                {isInsufficientUsdstForFee && (
+                  <p className="text-yellow-600 text-sm mt-1">
+                    Insufficient USDST balance for transaction fee ({REPAY_FEE} USDST)
+                  </p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
         <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
           <p className="text-gray-600">
             Repaying your loan will reduce your debt and may free up collateral. Full repayment will close the loan and unlock all collateral.
@@ -263,7 +291,12 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess }: RepayModalProps) 
               !repayAmount ||
               isNaN(Number(repayAmount)) ||
               Number(repayAmount) <= 0 ||
-              Number(repayAmount) > Number((loan?.totalAmountOwed || "0").toString().replace(/,/g, ""))
+              Number(repayAmount) > Number((loan?.totalAmountOwed || "0").toString().replace(/,/g, "")) ||
+              (() => {
+                const feeAmount = parseUnits(REPAY_FEE, 18);
+                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                return usdstBalanceBigInt < feeAmount;
+              })()
             }
             className="px-6"
           >

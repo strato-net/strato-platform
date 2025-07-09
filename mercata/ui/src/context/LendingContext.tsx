@@ -72,8 +72,8 @@ export const LendingProvider = ({
   };
 
   const fetchCollateralInfo = async (signal?: AbortSignal) => {
-    setLoadingCollateral(true);
     try {
+      setLoadingCollateral(true);
       const res = await api.get<WithdrawableToken[]>("/lending/collateral", {
         signal,
       });
@@ -276,7 +276,8 @@ export const LendingProvider = ({
       loans,
       loadingLoans,
       liquidityInfo,
-      loadingLiquidity
+      loadingLiquidity,
+      loadingCollateral
     ]
   );
 

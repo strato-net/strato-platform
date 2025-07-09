@@ -33,10 +33,15 @@ class SwappingController {
       const { accessToken, params, address } = req;
       validatePoolAddressArgs(params);
 
-      const token = await getPools(accessToken, address, {
+      const pools = await getPools(accessToken, address, {
         address: "eq." + params.poolAddress,
       });
-      res.status(RestStatus.OK).json(token);
+
+      if (!pools || pools.length === 0) {
+        throw new Error("Pool not found");
+      }
+
+      res.status(RestStatus.OK).json(pools[0]);
     } catch (error) {
       next(error);
     }

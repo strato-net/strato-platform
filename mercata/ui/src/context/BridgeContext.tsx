@@ -33,12 +33,18 @@ interface BridgeResponse {
   data?: any;
 }
 
+interface BridgeConfig {
+  showTestnet: boolean;
+  safeAddress: string;
+}
+
 type BridgeContextType = {
   // State
   bridgeInTokens: Token[];
   bridgeOutTokens: Token[];
   loading: boolean;
   error: string | null;
+  config: BridgeConfig | null;
   
   // Bridge In Functions
   fetchBridgeInTokens: () => Promise<Token[]>;
@@ -48,6 +54,9 @@ type BridgeContextType = {
   fetchBridgeOutTokens: () => Promise<Token[]>;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
+  
+  // Bridge Config Functions
+  fetchBridgeConfig: () => Promise<BridgeConfig>;
   
   // Utility Functions
   formatBalance: (value: bigint | string, decimals: number) => string;
@@ -60,6 +69,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<BridgeConfig | null>(null);
 
   const formatBalance = useCallback((value: bigint | string, decimals: number): string => {
     if (typeof value === 'bigint') {
@@ -69,6 +79,31 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const numericValue = parseFloat(value);
       if (isNaN(numericValue)) return "0";
       return numericValue.toFixed(decimals);
+    }
+  }, []);
+
+  const fetchBridgeConfig = useCallback(async (): Promise<BridgeConfig> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/bridge/config`);
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to fetch bridge config');
+      }
+      
+      const bridgeConfig = responseData.data.data;
+      setConfig(bridgeConfig);
+      return bridgeConfig;
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge config';
+      setError(errorMessage);
+      console.error('Error fetching bridge config:', err);
+      throw err;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -197,11 +232,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         ? tokenAddress
         : `0x${tokenAddress}`;
 
-      const response = await fetch(`/api/bridge/balance/${formattedTokenAddress}`, {
-        method: "GET",
+      const response = await fetch(`/api/bridge/stratoTokenBalance`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          tokenAddress: formattedTokenAddress
+        }),
       });
       
       const responseData = await response.json();
@@ -228,11 +266,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         bridgeOutTokens,
         loading,
         error,
+        config,
         fetchBridgeInTokens,
         bridgeIn,
         fetchBridgeOutTokens,
         bridgeOut,
         getBalance,
+        fetchBridgeConfig,
         formatBalance,
       }}
     >
