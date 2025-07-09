@@ -2,8 +2,7 @@
 
 The app consists of multiple parts:
 - backend (ExpressJS-based API server)
-- ui (Vite/React-based UI) 
-  - with legacy next.js-based UI in `frontend/` dir
+- ui (Vite/React-based UI)
 - nginx
   - The purpose of the Nginx in the app:
     - Handle OAuth2 authentication and authorization
@@ -14,16 +13,6 @@ The app consists of multiple parts:
   - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
   - Currently there is only the Stripe service for token on ramping.
   - Look at the individual services read me for further details.
-
-## Global Project Prerequisites
-- Git submodules
-  - Fetch the git submodules code:
-    ```shell
-    git submodule update --init --recursive
-    ```
-    - `ui/` is a git submodule from https://github.com/blockapps/mercata-ui repo
-    - To work with ui/ codebase, please learn how git submodules work.
-
 
 ---
 
@@ -63,14 +52,23 @@ npm run dev
 cd ../nginx
 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
   OAUTH_CLIENT_ID=localhost \
-  OAUTH_CLIENT_SECRET=client-secret-here \
+  OAUTH_CLIENT_SECRET=client-secret-here  
   ssl=false \
   HOST_IP=host.docker.internal \
   docker compose -f docker-compose.nginx-standalone.yml up -d --build
 ```
-- On Linux, use `HOST_IP=172.17.0.1 \` (the default Docker host IP), or use any static local IP of your host machine.
+
+- BEWARE! Disable any VPN on your host machine.  It can interfere with the Docker network bridge and cause a hang on http://localhost.
+- In most Linux scenarios 'host.docker.internal' will work just fine.  If it is not working then you can drop-back to a hardcoded IP address - usually `HOST_IP=172.17.0.1 \` (the default Docker host IP), or any static local IP of your host machine.  More details here: https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
+- You may also need to explicitly open ports in your Linux host's firewall configuration to allow Docker to communicate with the node processes running on your host.  See iptables example below.
 - Nginx also supports the live updates of the Next.js app during development, when it is deployed with `npm run dev`.
 
+iptables example for Docker network bridge port setup:
+
+    0     0 ACCEPT     6    --  *      *       172.17.0.0/16        0.0.0.0/0            tcp dpt:8080
+    0     0 ACCEPT     17   --  *      *       172.17.0.0/16        0.0.0.0/0            udp dpt:8080
+    0     0 ACCEPT     6    --  *      *       172.17.0.0/16        0.0.0.0/0            tcp dpt:3001
+    0     0 ACCEPT     17   --  *      *       172.17.0.0/16        0.0.0.0/0            udp dpt:3001
 ---
 
 ## PROD MODE - DOCKERIZED
