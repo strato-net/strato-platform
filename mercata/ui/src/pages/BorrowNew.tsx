@@ -97,10 +97,10 @@ const BorrowNew = () => {
     setIsBorrowModalOpen(false);
   };
 
-  const executeBorrow = async (amount: number) => {
+  const executeBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
-      await borrowAssetFn({ amount: parseUnits(amount.toString(), 18).toString() });
+      await borrowAssetFn({ amount: parseUnits(amount, 18).toString() });
       toast({
         title: "Borrow Initiated",
         description: `You borrowed ${amount} USDST`,
@@ -219,7 +219,7 @@ const BorrowNew = () => {
 
         <main className="p-6">
           <div className="mb-8">
-            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={eligibleCollateral} />
+            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={collateralInfo} />
           </div>
           <Card>
             <CardHeader>

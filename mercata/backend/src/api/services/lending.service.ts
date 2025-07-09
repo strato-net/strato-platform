@@ -446,8 +446,6 @@ export const getLoan = async (
     const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
     const userLoan = userLoanEntry?.LoanInfo;
 
-    if (!userLoan) return {};
-
     // Get user's collaterals
     const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
       .filter((c: any) => c.user === userAddress)
