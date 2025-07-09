@@ -82,12 +82,23 @@ const BorrowNew = () => {
     }
   }, [collateralInfo])
 
+  // Refresh data when page loads and when userAddress changes
   useEffect(() => {
-    refreshLoans();
     if (userAddress) {
-      fetchUsdstBalance(userAddress);
+      const refreshData = async () => {
+        try {
+          await Promise.all([
+            refreshLoans(),
+            refreshCollateral(),
+            fetchUsdstBalance(userAddress),
+          ]);
+        } catch (error) {
+          console.error("Error refreshing data:", error);
+        }
+      };
+      refreshData();
     }
-  }, [userAddress, fetchUsdstBalance]);
+  }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
   const handleBorrow = () => {
     setIsBorrowModalOpen(true);
@@ -108,8 +119,12 @@ const BorrowNew = () => {
       });
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      await refreshLoans();
-      await fetchUsdstBalance(userAddress);
+      // Refresh all data after successful borrow
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
@@ -155,9 +170,12 @@ const BorrowNew = () => {
       });
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
-      await refreshLoans();
-      await refreshCollateral();
-      await fetchUsdstBalance(userAddress);
+      // Refresh all data after successful supply
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
     } catch (error: any) {
       console.log(error, "error");
       setSupplyLoading(false);
@@ -189,15 +207,17 @@ const BorrowNew = () => {
       });
       toast({
         title: "Withdraw Initiated",
-        description: `You withdraw ${amount}`,
+        description: `You withdrew ${amount} ${asset._symbol}`,
         variant: "success",
       });
-
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
-      await refreshLoans();
-      await refreshCollateral();
-      await fetchUsdstBalance(userAddress);
+      // Refresh all data after successful withdraw
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
     } catch (error: any) {
       console.log(error, "error");
       setWithdrawLoading(false);
@@ -384,8 +404,15 @@ const BorrowNew = () => {
         onClose={closeRepayModal}
         loan={loans}
         onRepaySuccess={async () => {
-          await refreshLoans();
-          await fetchUsdstBalance(userAddress);
+          try {
+            await Promise.all([
+              refreshLoans(),
+              refreshCollateral(),
+              fetchUsdstBalance(userAddress || ""),
+            ]);
+          } catch (error) {
+            console.error("Error refreshing data:", error);
+          }
         }}
         usdstBalance={usdstBalance}
       />
