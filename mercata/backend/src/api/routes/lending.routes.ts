@@ -39,8 +39,17 @@ router.post("/loans", authHandler.authorizeRequest(), LendingController.borrow);
 // Repay loan
 router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
 
+// ----- Liquidation Data (Listing) -----
+// Get currently liquidatable loans
+router.get("/liquidate", authHandler.authorizeRequest(), LendingController.listLiquidatable);
+
+// Get near-unhealthy loans (query param margin=x)
+router.get("/liquidate/near-unhealthy", authHandler.authorizeRequest(), LendingController.listNearUnhealthy);
+
 // ----- Liquidation Management -----
-// Execute liquidation on a specific loan
+// Execute liquidation on a specific loan (singular alias for UI compatibility)
+router.post("/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
+// Existing plural route retained for backward compatibility
 router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
 
 // ----- Admin Configuration -----

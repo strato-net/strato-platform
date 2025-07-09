@@ -15,6 +15,8 @@ import {
   collateralAndBalance,
   liquidityAndBalance,
   getLoan,
+  listLiquidatableLoans,
+  listNearUnhealthyLoans,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -267,6 +269,35 @@ class LendingController {
       return next();
     } catch (error) {
       return next(error);
+    }
+  }
+
+  static async listLiquidatable(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await listLiquidatableLoans(accessToken);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listNearUnhealthy(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const marginParam = query.margin ? Number(query.margin as string) : 0.2;
+      const result = await listNearUnhealthyLoans(accessToken, marginParam);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
     }
   }
 }
