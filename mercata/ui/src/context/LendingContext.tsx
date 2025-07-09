@@ -9,6 +9,7 @@ import React, {
 import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
 import { Loan, WithdrawableToken } from "@/interface";
+import { useUser } from "@/context/UserContext";
 
 
 type LendingContextType = {
@@ -54,6 +55,9 @@ export const LendingProvider = ({
   const [loadingLiquidity, setLoadingLiquidity] = useState(true);
   const [collateralInfo, setCollateralInfo] = useState<any>()
   const [loadingCollateral, setLoadingCollateral] = useState(true)
+
+  // Access authentication status
+  const { isLoggedIn } = useUser();
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
     setLoadingLiquidity(true);
@@ -241,13 +245,16 @@ export const LendingProvider = ({
 
   const initialize = () => {
     fetchLoans();
-    fetchLiquidityInfo()
-    fetchCollateralInfo()
+    fetchLiquidityInfo();
+    fetchCollateralInfo();
   };
 
+  // Run initialization only when the user is logged in
   useEffect(() => {
-    initialize();
-  }, []);
+    if (isLoggedIn) {
+      initialize();
+    }
+  }, [isLoggedIn]);
 
   const contextValue = useMemo(
     () => ({
