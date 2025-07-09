@@ -9,14 +9,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formatUnits } from "ethers";
+import { formatUnits, parseUnits } from "ethers";
+import { BORROW_FEE } from "@/lib/contants";
 
 interface BorrowAssetModalProps {
   borrowLoading: boolean;
   isOpen: boolean;
   onClose: () => void;
-  onBorrow: (amount: number) => void;
+  onBorrow: (amount: string) => void;
   loan?: any;
+  usdstBalance?: string;
 }
 
 const addCommasToInput = (value: string) => {
@@ -37,20 +39,38 @@ const BorrowAssetModal = ({
   isOpen,
   onClose,
   onBorrow,
-  loan
+  loan,
+  usdstBalance = "0"
 }: BorrowAssetModalProps) => {
   const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0,18)
   const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0,18))
-  const [borrowAmount, setBorrowAmount] = useState(0);
+  const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [displayAmount, setDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
 
   // Calculate risk level based on borrowed amount (0-100)
   useEffect(() => {
-    const denom = collateralValueFormatted === 0 ? 1 : collateralValueFormatted;
-    const risk = ((borrowAmount * 10 ** 18) / (denom * 10 ** 18)) * 100;
-    setRiskLevel(risk);
-  }, [borrowAmount, collateralValueFormatted]);
+    try {
+      if (!borrowAmount) {
+        setRiskLevel(0);
+        return;
+      }
+      
+      const borrowAmountBigInt = parseUnits(borrowAmount, 18);
+      const collateralValueBigInt = BigInt(loan?.totalCollateralValueUSD || 0);
+      
+      if (collateralValueBigInt === 0n) {
+        setRiskLevel(0);
+        return;
+      }
+      
+      // Calculate risk percentage using BigInt math
+      const risk = Number((borrowAmountBigInt * 10000n) / collateralValueBigInt) / 100;
+      setRiskLevel(Math.min(risk, 100)); // Cap at 100%
+    } catch {
+      setRiskLevel(0);
+    }
+  }, [borrowAmount, loan?.totalCollateralValueUSD]);
 
   const getRiskColor = () => {
     if (riskLevel < 30) return "bg-green-500";
@@ -66,16 +86,26 @@ const BorrowAssetModal = ({
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
+    // Clear the input after borrow
+    setBorrowAmount("");
+    setDisplayAmount("");
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
+    const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
-      const numValue = parseFloat(value) || 0;
-      setBorrowAmount(numValue);
+      setBorrowAmount(value);
     }
   };
+
+  // Clear input when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setBorrowAmount("");
+      setDisplayAmount("");
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,8 +133,8 @@ const BorrowAssetModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Interest Rate</span>
               <span className="font-medium">
-                {loan?.accruedInterest
-                  ? `${parseFloat(loan?.accruedInterest).toFixed(2)}%`
+                {loan?.interestRate
+                  ? `${loan.interestRate.toFixed(2)}%`
                   : "-"}
               </span>
             </div>
@@ -119,7 +149,7 @@ const BorrowAssetModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${borrowAmount > parseFloat(availableToBorrowFormatted) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${(() => { try { return parseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -161,6 +191,32 @@ const BorrowAssetModal = ({
             </div>
           </div>
 
+          {/* Transaction Fee Display */}
+          <div className="px-4 py-3 bg-gray-50 rounded-md">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-600">Transaction Fee</span>
+              <span className="font-medium">{BORROW_FEE} USDST</span>
+            </div>
+            {/* Fee validation warnings */}
+            {(() => {
+              const feeAmount = parseUnits(BORROW_FEE, 18);
+              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+              
+              // Check if insufficient USDST for fee
+              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+              
+              return (
+                <>
+                  {isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
           <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
             <p className="text-gray-600">
               Borrowing against your assets allows you to access liquidity
@@ -176,7 +232,16 @@ const BorrowAssetModal = ({
             Cancel
           </Button>
           <Button
-            disabled={borrowAmount === 0 || borrowLoading || borrowAmount > parseFloat(availableToBorrowFormatted)}
+            disabled={
+              !borrowAmount || 
+              borrowLoading || 
+              (() => { try { return parseUnits(borrowAmount, 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0); } catch { return true; } })() ||
+              (() => {
+                const feeAmount = parseUnits(BORROW_FEE, 18);
+                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                return usdstBalanceBigInt < feeAmount;
+              })()
+            }
             onClick={handleBorrow}
             className="px-6"
           >

@@ -4,6 +4,7 @@ import React, {
   useState,
   useMemo,
   useEffect,
+  useCallback,
 } from "react";
 import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
@@ -58,7 +59,7 @@ export const LendingProvider = ({
   // Access authentication status
   const { isLoggedIn } = useUser();
 
-  const fetchLiquidityInfo = async (signal?: AbortSignal) => {
+  const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
     setLoadingLiquidity(true);
     try {
       const res = await api.get<WithdrawableToken[]>("/lending/liquidity", {
@@ -73,9 +74,9 @@ export const LendingProvider = ({
     } finally {
       setLoadingLiquidity(false);
     }
-  };
+  }, []);
 
-  const fetchCollateralInfo = async (signal?: AbortSignal) => {
+  const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoadingCollateral(true);
       const res = await api.get<WithdrawableToken[]>("/lending/collateral", {
@@ -90,9 +91,9 @@ export const LendingProvider = ({
     } finally {
       setLoadingCollateral(false);
     }
-  }; 
+  }, []); 
 
-  const fetchLoans = async (signal?: AbortSignal) => {
+  const fetchLoans = useCallback(async (signal?: AbortSignal) => {
     setLoadingLoans(true);
     try {
       const res = await api.get("/lending/loans", { signal });
@@ -106,7 +107,7 @@ export const LendingProvider = ({
     } finally {
       setLoadingLoans(false);
     }
-  };
+  }, []);
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
     const weiPrice = parseUnits(payload.price, 18).toString();

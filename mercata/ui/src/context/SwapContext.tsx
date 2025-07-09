@@ -212,9 +212,9 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const fetchTokenBalances = useCallback(async (pool: any, userAddress: string, usdstAddress: string) => {
     try {
       const [balanceA, balanceB, balanceUsdst] = await Promise.all([
-        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${pool.tokenA.address}`),
-        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${pool.tokenB.address}`),
-        api.get(`/tokens/balance?key=eq.${userAddress}&address=eq.${usdstAddress}`)
+        api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
+        api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
+        api.get(`/tokens/balance?address=eq.${usdstAddress}`)
       ]);
       
       return {
