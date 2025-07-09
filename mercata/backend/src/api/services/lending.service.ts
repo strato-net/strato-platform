@@ -130,7 +130,7 @@ export const supplyCollateral = async (
   if (!lendingPool || !collateralVault) {
     throw new Error("Lending pool or collateral vault address not found");
   }
-  console.log("supplyCollateral", asset, amount);
+
   const tx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
