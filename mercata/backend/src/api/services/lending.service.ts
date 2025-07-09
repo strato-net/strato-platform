@@ -415,26 +415,17 @@ export const liquidityAndBalance = async (
 
 export const getLoan = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string | undefined
 ): Promise<any> => {
-  const registry = await getPool(accessToken, userAddress);
+  // If userAddress is undefined, get all data without filtering by user
+  const registry = await getPool(
+    accessToken, 
+    userAddress, 
+    userAddress ? {} : { select: registrySelectFields.join(",") }
+  );
   
-  // Find the user's loan from the array
-  const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
-  const userLoan = userLoanEntry?.LoanInfo;
-
-  if (!userLoan) return null;
-
   const currentTime = Math.floor(Date.now() / 1000);
   
-  // Get user's collaterals
-  const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
-    .filter((c: any) => c.user === userAddress)
-    .map((c: any) => ({
-      asset: c.asset,
-      amount: c.amount,
-    }));
-
   // Build asset configs map from the actual mapping
   const assetConfigs = new Map<string, AssetConfig>();
   
@@ -449,7 +440,56 @@ export const getLoan = async (
     });
   });
 
-  return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+  // If userAddress is provided, return loan for specific user
+  if (userAddress) {
+    // Find the user's loan from the array
+    const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
+    const userLoan = userLoanEntry?.LoanInfo;
+
+    if (!userLoan) return {};
+
+    // Get user's collaterals
+    const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
+      .filter((c: any) => c.user === userAddress)
+      .map((c: any) => ({
+        asset: c.asset,
+        amount: c.amount,
+      }));
+
+    return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+  }
+
+  // If userAddress is undefined, return simulated loans for all users
+  const allLoans: any[] = [];
+  
+  // Get all user loans
+  const allUserLoans = registry.lendingPool?.userLoan || [];
+  
+  for (const loanEntry of allUserLoans) {
+    const userLoan = loanEntry.LoanInfo;
+    const userAddr = loanEntry.user;
+    
+    if (!userLoan || !userAddr) continue;
+
+    // Get user's collaterals
+    const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
+      .filter((c: any) => c.user === userAddr)
+      .map((c: any) => ({
+        asset: c.asset,
+        amount: c.amount,
+      }));
+
+    // Simulate loan for this user
+    const simulatedLoan = simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+    
+    // Add user address to the result
+    allLoans.push({
+      user: userAddr,
+      ...simulatedLoan,
+    });
+  }
+
+  return allLoans;
 };
 
 export const executeLiquidation = async (
