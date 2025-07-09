@@ -38,10 +38,9 @@ const addCommasToInput = (value: string) => {
 };
 
 const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" }: RepayModalProps) => {  
-  const [repayAmount, setRepayAmount] = useState('');
+  const [repayAmount, setRepayAmount] = useState<string>('');
   const [displayAmount, setDisplayAmount] = useState('');
   const [repayLoading, setRepayLoading] = useState(false);
-  const [wrongAmount, setWrongAmount] = useState(false);
 
   const { toast } = useToast();
   const { repayLoan: repayLoanFn } = useLendingContext();
@@ -51,57 +50,45 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
     if (!isOpen) {
       setRepayAmount('');
       setDisplayAmount('');
-      setWrongAmount(false);
     }
   }, [isOpen]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
+    const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
-      const numValue = parseFloat(value || "0");
-      const maxValue = parseFloat(formatUnits(loan?.totalAmountOwed || 0,18))
-      
-      // Cap the input at the maximum loan balance
-      if (numValue <= maxValue || value === "") {
-        setRepayAmount(value);
-        setDisplayAmount(addCommasToInput(value));
-        const totalOwedWei = BigInt(loan?.totalAmountOwed || 0) + BigInt(loan?.interestRate || 0);
-        setWrongAmount(parseUnits(value === "" ? "0" : value, 18) > totalOwedWei);
-      }
+      setRepayAmount(value);
+      setDisplayAmount(addCommasToInput(value));
     }
   };
 
   const repayLoan = async () => {
     try {
       setRepayLoading(true);
-      const totalOwedWei = (BigInt(loan?.totalAmountOwed || 0) + BigInt(loan?.interestRate || 0)).toString();
-      let amountInWei = parseUnits(repayAmount === "" ? "0" : repayAmount, 18).toString();
-      if (BigInt(amountInWei) > BigInt(totalOwedWei)) {
-        amountInWei = totalOwedWei; // clip to full repay
+      const totalOwedWei = BigInt(loan?.totalAmountOwed || 0);
+      let amountInWei = parseUnits(repayAmount || "0", 18);
+      
+      // Cap at total owed amount
+      if (amountInWei > totalOwedWei) {
+        amountInWei = totalOwedWei;
       }
 
       await repayLoanFn({
-        amount: amountInWei,
+        amount: amountInWei.toString(),
       });
       
       toast({
         title: "Success",
-        description: `Successfully Repaid $${formatCurrency(repayAmount)} USDST`,
+        description: `Successfully Repaid ${repayAmount} USDST`,
         variant: "success",
       });
       
-      // Close modal and reset state immediately for better UX
-      onClose();
+      // Clear inputs after successful repay
       setRepayAmount("");
       setDisplayAmount("");
       setRepayLoading(false);
       
-      toast({
-        title: "Success",
-        description: `Successfully Repaid ${repayAmount} ${loan?.loan.assetSymbol}`,
-        variant: "success",
-      });
-      
+      // Close modal and call success callback
+      onClose();
       onRepaySuccess();
     } catch (error) {
       console.error("Error repaying loan:", error);
@@ -136,18 +123,18 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
         
         <div className="space-y-2 py-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Original Loan Amount</span>
-            <span className="font-medium">${loan?.totalAmountOwed != null ? formatCurrency(formatUnits(loan.totalAmountOwed.toString(), 18)) : "0.00"}</span>
+            <span className="text-sm text-gray-500">Principal Balance</span>
+            <span className="font-medium">${formatUnits(loan?.principalBalance || 0, 18)}</span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Accrued Interest</span>
-            <span className="font-medium">${formatCurrency(formatUnits(loan?.interestRate || 0, 18))}</span>
+            <span className="font-medium">${formatUnits(loan?.accruedInterest || 0, 18)}</span>
           </div>
           
           <div className="flex justify-between items-center font-bold pt-2 border-t">
             <span>Total Amount Due</span>
-            <span className="text-lg">${formatCurrency(loan?.balanceHuman)}</span>
+            <span className="text-lg">${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
           </div>
         </div>
 
@@ -155,28 +142,24 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           <label className="text-sm font-medium">Repay Amount (USDST)</label>
           <div className="flex justify-between text-xs text-gray-500">
             <span>Min: $0.01</span>
-            <span>Max: ${formatCurrency(loan?.balanceHuman)}</span>
+            <span>Max: ${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
           </div>
           <div className="relative">
             <Input
-              placeholder={formatCurrency(loan?.balanceHuman)}
-              className=""
+              placeholder="0.00"
+              className={`pr-8 ${(() => { try { return parseUnits(repayAmount || "0", 18) > BigInt(loan?.totalAmountOwed || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
               value={displayAmount}
               onChange={handleAmountChange}
             />
-            {wrongAmount && (
-              <p className="text-red-600 text-sm mt-1">
-                Insufficient balance
-              </p>
-            )}
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
           </div>
           
           <div className="flex gap-2">
             <Button
-              variant={repayAmount === (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.1).toFixed(4) ? "default" : "outline"}
+              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                const amount = (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.1).toFixed(4);
+                const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n, 18);
                 setRepayAmount(amount);
                 setDisplayAmount(addCommasToInput(amount));
               }}
@@ -185,10 +168,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               10%
             </Button>
             <Button
-              variant={repayAmount === (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.25).toFixed(4) ? "default" : "outline"}
+              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                const amount = (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.25).toFixed(4);
+                const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n, 18);
                 setRepayAmount(amount);
                 setDisplayAmount(addCommasToInput(amount));
               }}
@@ -197,10 +180,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               25%
             </Button>
             <Button
-              variant={repayAmount === (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.5).toFixed(4) ? "default" : "outline"}
+              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                const amount = (parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) * 0.5).toFixed(4);
+                const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n, 18);
                 setRepayAmount(amount);
                 setDisplayAmount(addCommasToInput(amount));
               }}
@@ -209,11 +192,12 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               50%
             </Button>
             <Button
-              variant={repayAmount === loan?.balanceHuman ? "default" : "outline"}
+              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === BigInt(loan?.totalAmountOwed || 0); } catch { return false; } })() ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                setRepayAmount((loan?.balanceHuman || "0").toString().replace(/,/g, ""));
-                setDisplayAmount(addCommasToInput((loan?.balanceHuman || "0").toString().replace(/,/g, "")));
+                const amount = formatUnits(BigInt(loan?.totalAmountOwed || 0), 18);
+                setRepayAmount(amount);
+                setDisplayAmount(addCommasToInput(amount));
               }}
               className="flex-1"
             >
@@ -226,20 +210,23 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Payment Amount</span>
             <span className="font-medium">
-              {repayAmount ? 
-                (parseFloat(repayAmount) < 0 ? 
-                  `-$${formatCurrency(Math.abs(parseFloat(repayAmount)))}` : 
-                  `$${formatCurrency(repayAmount)}`
-                ) : 
-                "$0.00"
-              }
+              {repayAmount ? `$${formatCurrency(repayAmount)}` : "$0.00"}
             </span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Remaining Balance</span>
             <span className="font-medium">
-              ${repayAmount ? formatCurrency((parseFloat((loan?.balanceHuman || "0").toString().replace(/,/g, "")) - parseFloat(repayAmount))) : formatCurrency(loan?.balanceHuman)}
+              {(() => {
+                try {
+                  const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+                  const repayAmountWei = parseUnits(repayAmount || "0", 18);
+                  const remaining = totalOwed - repayAmountWei;
+                  return `$${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))}`;
+                } catch {
+                  return `$${formatCurrency(formatUnits(loan?.totalAmountOwed || 0, 18))}`;
+                }
+              })()}
             </span>
           </div>
         </div>
@@ -289,9 +276,8 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             disabled={
               repayLoading ||
               !repayAmount ||
-              isNaN(Number(repayAmount)) ||
-              Number(repayAmount) <= 0 ||
-              Number(repayAmount) > Number((loan?.totalAmountOwed || "0").toString().replace(/,/g, "")) ||
+              (() => { try { return parseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
+              (() => { try { return parseUnits(repayAmount || "0", 18) > BigInt(loan?.totalAmountOwed || 0); } catch { return true; } })() ||
               (() => {
                 const feeAmount = parseUnits(REPAY_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -303,7 +289,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             {repayLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
             ) : (
-              `Repay $${repayAmount ? formatCurrency(repayAmount) : "0.00"}`
+              `Repay ${repayAmount ? `$${formatCurrency(repayAmount)}` : "$0.00"}`
             )}
           </Button>
         </div>

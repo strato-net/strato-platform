@@ -119,7 +119,7 @@ export const calculateHealthFactor = (
  * @returns Complete loan simulation with all calculated values
  */
 export const simulateLoan = (
-  loan: LoanInfo,
+  loan: LoanInfo | null,
   collaterals: CollateralInfo[],
   assetConfigs: Map<string, AssetConfig>,
   currentTime: number
@@ -130,9 +130,19 @@ export const simulateLoan = (
     throw new Error("No borrowable asset configuration found");
   }
 
+  // If no loan exists, create a default empty loan
+  const defaultLoan: LoanInfo = {
+    principalBalance: "0",
+    interestOwed: "0",
+    lastIntCalculated: currentTime.toString(),
+    lastUpdated: currentTime.toString(),
+  };
+
+  const actualLoan = loan || defaultLoan;
+
   // Calculate interest and total owed
   const { accruedInterest, newTotalOwed } = calculateAccruedInterest(
-    loan,
+    actualLoan,
     borrowableAssetConfig.interestRate,
     currentTime
   );
@@ -166,10 +176,10 @@ export const simulateLoan = (
 
   return {
     // Original loan data from contract
-    principalBalance: loan.principalBalance,
-    interestOwed: loan.interestOwed,
-    lastIntCalculated: loan.lastIntCalculated,
-    lastUpdated: loan.lastUpdated,
+    principalBalance: actualLoan.principalBalance,
+    interestOwed: actualLoan.interestOwed,
+    lastIntCalculated: actualLoan.lastIntCalculated,
+    lastUpdated: actualLoan.lastUpdated,
     
     // Calculated values
     healthFactor: healthFactorToPercentage(healthFactor),
