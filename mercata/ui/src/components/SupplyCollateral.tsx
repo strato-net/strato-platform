@@ -17,7 +17,7 @@ interface SupplyModalProps {
   loanData: any;
   isOpen: boolean;
   onClose: () => void;
-  onSupply: (amount: number) => void;
+  onSupply: (amount: string) => void;
   usdstBalance?: string;
 }
 
@@ -62,6 +62,16 @@ const calculateHealthImpact = (
   
   // Current health factor from loan data
   const currentHealthFactor = loanData?.healthFactor || 0;
+  
+  // If there's no outstanding loan, supply is always healthy
+  if (currentTotalBorrowValue === 0n) {
+    return {
+      currentHealthFactor: 0,
+      newHealthFactor: 0,
+      healthImpact: 0,
+      isHealthy: true,
+    };
+  }
   
   // Calculate the value being supplied (with liquidation threshold applied)
   // Convert USD amount to token amount first
@@ -109,7 +119,7 @@ const SupplyCollateralModal = ({
   onSupply,
   usdstBalance = "0",
 }: SupplyModalProps) => {
-  const [supplyAmount, setSupplyAmount] = useState(0);
+  const [supplyAmount, setSupplyAmount] = useState<string>("");
   const [displayAmount, setDisplayAmount] = useState("");
   const [healthImpact, setHealthImpact] = useState({
     currentHealthFactor: 0,
@@ -118,24 +128,34 @@ const SupplyCollateralModal = ({
     isHealthy: true,
   });
 
-  // Calculate health impact when supply amount changes
   useEffect(() => {
-    const impact = calculateHealthImpact(supplyAmount, asset, loanData);
+    const numValue = supplyAmount ? parseFloat(supplyAmount) : 0;
+    const impact = calculateHealthImpact(numValue, asset, loanData);
     setHealthImpact(impact);
   }, [supplyAmount, asset, loanData]);
 
-  const handleBorrow = () => {
+  const handleSupply = () => {
     onSupply(supplyAmount);
+    // Clear the input after supply
+    setSupplyAmount("");
+    setDisplayAmount("");
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
+    const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
-      const numValue = parseFloat(value) || 0;
-      setSupplyAmount(numValue);
+      setSupplyAmount(value);
     }
   };
+
+  // Clear input when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSupplyAmount("");
+      setDisplayAmount("");
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -170,7 +190,7 @@ const SupplyCollateralModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${supplyAmount > parseFloat(formatUnits(asset?.userBalance || 0,18)) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${(() => { try { return parseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -179,7 +199,7 @@ const SupplyCollateralModal = ({
           </div>
 
           {/* Health Impact Section */}
-          {supplyAmount > 0 && (
+          {(() => { try { return parseUnits(supplyAmount || "0", 18) !== 0n; } catch { return false; } })() && (
             <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
               <h4 className="text-sm font-medium text-gray-700">Health Impact</h4>
               <div className="space-y-2">
@@ -216,24 +236,11 @@ const SupplyCollateralModal = ({
               <span className="text-gray-600">Transaction Fee</span>
               <span className="font-medium">{SUPPLY_COLLATERAL_FEE} USDST</span>
             </div>
-            {/* Fee validation warnings */}
-            {(() => {
-              const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
-              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-              
-              // Check if insufficient USDST for fee
-              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-              
-              return (
-                <>
-                  {isInsufficientUsdstForFee && (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
-                    </p>
-                  )}
-                </>
-              );
-            })()}
+            {(() => { try { return BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18); } catch { return false; } })() && (
+              <p className="text-yellow-600 text-sm mt-1">
+                Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
+              </p>
+            )}
           </div>
         </div>
 
@@ -243,21 +250,17 @@ const SupplyCollateralModal = ({
           </Button>
           <Button
             disabled={
-              supplyAmount === 0 || 
-              supplyLoading || 
-              supplyAmount > parseFloat(formatUnits(asset?.userBalance || 0,18)) ||
-              (() => {
-                const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
-                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                return usdstBalanceBigInt < feeAmount;
-              })()
+              (() => { try { return parseUnits(supplyAmount || "0", 18) === 0n; } catch { return true; } })() ||
+              supplyLoading ||
+              (() => { try { return parseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0); } catch { return false; } })() ||
+              (() => { try { return BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18); } catch { return false; } })()
             }
-            onClick={handleBorrow}
+            onClick={handleSupply}
             className="px-6"
           >
             {supplyLoading && (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
-            )}{" "}
+            )} {" "}
             Supply
           </Button>
         </DialogFooter>

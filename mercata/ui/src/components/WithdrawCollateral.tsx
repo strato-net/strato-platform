@@ -17,7 +17,7 @@ interface WithdrawModalProps {
   loanData: any;
   isOpen: boolean;
   onClose: () => void;
-  onWithdraw: (amount: number) => void;
+  onWithdraw: (amount: string) => void;
   usdstBalance?: string;
 }
 
@@ -62,6 +62,16 @@ const calculateHealthImpact = (
   
   // Current health factor from loan data
   const currentHealthFactor = loanData?.healthFactor || 0;
+  
+  // If there's no outstanding loan, allow withdrawal without health checks
+  if (currentTotalBorrowValue === 0n) {
+    return {
+      currentHealthFactor: 0,
+      newHealthFactor: 0,
+      healthImpact: 0,
+      isHealthy: true,
+    };
+  }
   
   // Calculate the value being withdrawn (with liquidation threshold applied)
   // Convert USD amount to token amount first
@@ -109,7 +119,7 @@ const WithdrawCollateralModal = ({
   onWithdraw,
   usdstBalance = "0",
 }: WithdrawModalProps) => {
-  const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [displayAmount, setDisplayAmount] = useState("");
   const [healthImpact, setHealthImpact] = useState({
     currentHealthFactor: 0,
@@ -120,22 +130,33 @@ const WithdrawCollateralModal = ({
 
   // Calculate health impact when withdraw amount changes
   useEffect(() => {
-    const impact = calculateHealthImpact(withdrawAmount, asset, loanData);
+    const numValue = withdrawAmount ? parseFloat(withdrawAmount) : 0;
+    const impact = calculateHealthImpact(numValue, asset, loanData);
     setHealthImpact(impact);
   }, [withdrawAmount, asset, loanData]);
 
   const handleWithdraw = () => {
     onWithdraw(withdrawAmount);
+    // Clear the input after withdraw
+    setWithdrawAmount("");
+    setDisplayAmount("");
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
+    const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
-      const numValue = parseFloat(value) || 0;
-      setWithdrawAmount(numValue);
+      setWithdrawAmount(value);
     }
   };
+
+  // Clear input when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setWithdrawAmount("");
+      setDisplayAmount("");
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -170,7 +191,7 @@ const WithdrawCollateralModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${withdrawAmount > parseFloat(formatUnits(asset?.collateralizedAmount || 0,18)) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${(() => { try { return parseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -179,7 +200,7 @@ const WithdrawCollateralModal = ({
           </div>
 
           {/* Health Impact Section */}
-          {withdrawAmount > 0 && (
+          {(() => { try { return parseUnits(withdrawAmount || "0", 18) !== 0n; } catch { return false; } })() && (
             <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
               <h4 className="text-sm font-medium text-gray-700">Health Impact</h4>
               <div className="space-y-2">
@@ -243,9 +264,9 @@ const WithdrawCollateralModal = ({
           </Button>
           <Button
             disabled={
-              withdrawAmount === 0 || 
+              (() => { try { return parseUnits(withdrawAmount || "0", 18) === 0n; } catch { return true; } })() ||
               withdrawLoading || 
-              withdrawAmount > parseFloat(formatUnits(asset?.collateralizedAmount || 0,18)) ||
+              (() => { try { return parseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0); } catch { return false; } })() ||
               !healthImpact.isHealthy ||
               (() => {
                 const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);

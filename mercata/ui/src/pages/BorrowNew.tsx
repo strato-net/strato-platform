@@ -73,7 +73,12 @@ const BorrowNew = () => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
       const filtered = collateralInfo.filter((item) => item.collateralizedAmount > 0);
       setSuppliedCollateral(filtered);
-      setEligibleCollateral(collateralInfo)
+      
+      // Only show assets that have a balance > 0
+      const eligibleWithBalance = collateralInfo.filter((item) => 
+        BigInt(item.userBalance || 0) > 0n
+      );
+      setEligibleCollateral(eligibleWithBalance);
     }
   }, [collateralInfo])
 
@@ -136,12 +141,12 @@ const BorrowNew = () => {
     setIsSupplyModalOpen(false);
   };
 
-  const executeSupply = async (asset: DepositableToken, amount: number) => {
+  const executeSupply = async (asset: DepositableToken, amount: string) => {
     try {
       setSupplyLoading(true);
       await supplyCollateral({
         asset: asset.address,
-        amount: parseUnits(amount.toString(), 18).toString(),
+        amount: parseUnits(amount, 18).toString(),
       });
       toast({
         title: "Supply Initiated",
@@ -175,12 +180,12 @@ const BorrowNew = () => {
     setIsWithdrawModalOpen(false);
   };
 
-  const executeWithdraw = async (asset: DepositableToken, amount: number) => {
+  const executeWithdraw = async (asset: DepositableToken, amount: string) => {
     try {
       setWithdrawLoading(true);
       await withdrawCollateral({
         asset: asset.address,
-        amount: parseUnits(amount.toString(), 18).toString(),
+        amount: parseUnits(amount, 18).toString(),
       });
       toast({
         title: "Withdraw Initiated",
