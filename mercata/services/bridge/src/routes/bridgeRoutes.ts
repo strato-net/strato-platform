@@ -9,6 +9,7 @@ router.post('/bridgeOut',verifyAccessToken(), BridgeController.bridgeOut);
 router.post('/stratoTokenBalance',verifyAccessToken(), BridgeController.stratoTokenBalance);
 router.get('/bridgeInTokens', BridgeController.getBridgeInTokens);
 router.get('/bridgeOutTokens', BridgeController.getBridgeOutTokens);
+router.get('/config', BridgeController.getBridgeConfig);
 router.get('/userDepositStatus/:status',verifyAccessToken(), BridgeController.userDepositStatus);
 router.get('/userWithdrawalStatus/:status',verifyAccessToken(), BridgeController.userWithdrawalStatus);
 
