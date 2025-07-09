@@ -53,13 +53,11 @@ cd ../nginx
 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
   OAUTH_CLIENT_ID=localhost \
   OAUTH_CLIENT_SECRET=client-secret-here \
-  ssl=false \
-  HOST_IP=host.docker.internal \
   docker compose -f docker-compose.nginx-standalone.yml up -d --build
 ```
 
-- BEWARE! Disable any VPN on your host machine.  It can interfere with the Docker network bridge and cause a hang on http://localhost.
-- In most Linux scenarios 'host.docker.internal' will work just fine.  If it is not working then you can drop back to a hardcoded IP address - usually `HOST_IP=172.17.0.1 \` (the default Docker host IP), or any static local IP of your host machine.  More details here: https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
+- BEWARE! Disable any VPN on your host machine.  It can interfere with Docker networking and cause a hang on http://localhost.
+- In most Linux scenarios 'host.docker.internal' will work just fine and there is no need to pass an explicit `HOST_IP` parameter into Docker Compose.  If there are network issues then you can drop back to a hardcoded IP address - usually `HOST_IP=172.17.0.1 \` (the gateway IP of the default Docker bridge interface), or any static local IP of your host machine.  More details here: https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
 - You may also need to explicitly open ports in your Linux host's firewall configuration to allow Docker to communicate with the node processes running on your host.  See iptables example below.
 - Nginx also supports the live updates of the Next.js app during development, when it is deployed with `npm run dev`.
 
