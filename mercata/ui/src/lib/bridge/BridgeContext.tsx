@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useAccount, useBalance } from "wagmi";
 import { TOKEN_ADDRESSES } from "./constants";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
+import { useBridgeContext } from "@/context/BridgeContext";
 
 interface BridgeContextType {
   fromChain: string;
@@ -21,14 +22,13 @@ interface BridgeContextType {
   swapChains: () => void;
 }
 
-const SHOW_TESTNET = import.meta.env.VITE_SHOW_TESTNET;
-
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [showTestnet] = useState(SHOW_TESTNET === "true");
+  const { config } = useBridgeContext();
+  const showTestnet = config?.showTestnet ?? false;
   const [fromChain, setFromChain] = useState(
     showTestnet ? "Sepolia" : "Ethereum"
   );

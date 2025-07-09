@@ -195,4 +195,15 @@ export class BridgeService {
     }
   }
 
+  public async getBridgeConfig(): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${BRIDGE_API_BASE_URL}/api/bridge/config`
+      );
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
 }

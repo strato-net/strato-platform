@@ -221,6 +221,27 @@ class BridgeController {
       next(error);
     }
   }
+
+  static async getBridgeConfig(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const config = {
+        showTestnet: process.env.SHOW_TESTNET === 'true',
+        safeAddress: process.env.SAFE_ADDRESS
+      };
+
+      res.json({
+        success: true,
+        data: config,
+      });
+    } catch (error: any) {
+      logger.error("Error in fetching bridge config:", error?.message);
+      next(error);
+    }
+  }
 }
 
 export default BridgeController;
