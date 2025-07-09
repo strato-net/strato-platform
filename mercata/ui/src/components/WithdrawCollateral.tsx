@@ -46,25 +46,7 @@ const calculateHealthImpact = (
   asset: any,
   loanData: any
 ) => {
-  if (!asset || !loanData || withdrawAmount === 0) {
-    return {
-      currentHealthFactor: loanData?.healthFactor || 0,
-      newHealthFactor: loanData?.healthFactor || 0,
-      healthImpact: 0,
-      isHealthy: true,
-    };
-  }
-
-  const DECIMALS = 18n;
-  
-  // Current total borrow value (principal + interest)
-  const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
-  
-  // Current health factor from loan data
-  const currentHealthFactor = loanData?.healthFactor || 0;
-  
-  // If there's no outstanding loan, allow withdrawal without health checks
-  if (currentTotalBorrowValue === 0n) {
+  if (!asset || !loanData) {
     return {
       currentHealthFactor: 0,
       newHealthFactor: 0,
@@ -72,32 +54,38 @@ const calculateHealthImpact = (
       isHealthy: true,
     };
   }
-  
-  // Calculate the value being withdrawn (with liquidation threshold applied)
-  // Convert USD amount to token amount first
+
+  // Current values from backend
+  const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
+  const currentHealthFactor = loanData?.healthFactor || 0;
+  const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
+
+  // If there's no outstanding loan, withdrawal is always healthy
+  if (currentTotalBorrowValue === 0n) {
+    return {
+      currentHealthFactor: Infinity,
+      newHealthFactor: Infinity,
+      healthImpact: 0,
+      isHealthy: true,
+    };
+  }
+
+  // Calculate the USD value of the withdrawn amount
   const assetPrice = BigInt(asset?.assetPrice || 0);
   const liquidationThreshold = BigInt(asset?.liquidationThreshold || 0);
   
-  // Calculate token amount from USD amount
-  const tokenAmount = assetPrice > 0n 
-    ? BigInt(Math.round(withdrawAmount * Math.pow(10, 18))) / (assetPrice / DECIMALS)
-    : 0n;
-  const withdrawAmountWei = tokenAmount * DECIMALS;
+  // Convert withdraw amount to wei and calculate USD value
+  const withdrawAmountWei = BigInt(Math.round(withdrawAmount * Math.pow(10, 18)));
+  const withdrawnValueUSD = (withdrawAmountWei * assetPrice) / (10n ** 18n);
   
-  // Value being withdrawn with liquidation threshold: (amount * price * liquidationThreshold) / (1e18 * 10000)
-  const withdrawnValue = (withdrawAmountWei * assetPrice * liquidationThreshold) / (DECIMALS * 10000n);
+  // Apply liquidation threshold to get health factor value
+  const withdrawnValueWithThreshold = (withdrawnValueUSD * liquidationThreshold) / 10000n;
   
-  // Calculate new health factor based on the reduction in collateral value
-  // Health factor is proportional to collateral value, so:
-  // New HF = Current HF * (1 - withdrawnValue / totalCollateralValue)
-  // But we need to calculate the total collateral value first
-  const totalCollateralValue = currentTotalBorrowValue > 0n 
-    ? (BigInt(Math.round(currentHealthFactor * Number(DECIMALS))) * currentTotalBorrowValue) / DECIMALS
-    : 0n;
+  // Subtract from current collateral value
+  const newCollateralValue = currentCollateralValue - withdrawnValueWithThreshold;
   
-  const newHealthFactor = totalCollateralValue > 0n
-    ? currentHealthFactor * (1 - Number(withdrawnValue) / Number(totalCollateralValue))
-    : currentHealthFactor;
+  // Calculate new health factor
+  const newHealthFactor = Number(newCollateralValue) / Number(currentTotalBorrowValue);
   
   const healthImpact = newHealthFactor - currentHealthFactor;
   const isHealthy = newHealthFactor >= 1.0;
@@ -207,13 +195,13 @@ const WithdrawCollateralModal = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Current Health Factor:</span>
                   <span className={`font-medium ${getHealthFactorColor(healthImpact.currentHealthFactor)}`}>
-                    {healthImpact.currentHealthFactor.toFixed(2)}
+                    {healthImpact.currentHealthFactor === Infinity ? "No Loan" : healthImpact.currentHealthFactor.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">New Health Factor:</span>
                   <span className={`font-medium ${getHealthFactorColor(healthImpact.newHealthFactor)}`}>
-                    {healthImpact.newHealthFactor.toFixed(2)}
+                    {healthImpact.newHealthFactor === Infinity ? "No Loan" : healthImpact.newHealthFactor.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
