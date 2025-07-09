@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { api } from '@/lib/axios';
 import { toast } from '@/components/ui/use-toast';
+import { useUser } from "@/context/UserContext";
 
 interface LiquidationEntry {
   id: string;
@@ -40,6 +41,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
   const [watchlist, setWatchlist] = useState<LiquidationEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isLoggedIn } = useUser();
 
   const fetchLiquidatable = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -100,8 +102,10 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchLiquidatable, fetchWatchlist]);
 
   useEffect(() => {
-    refreshData();
-  }, [refreshData]);
+    if (isLoggedIn) {
+      refreshData();
+    }
+  }, [refreshData, isLoggedIn]);
 
   return (
     <LiquidationContext.Provider
