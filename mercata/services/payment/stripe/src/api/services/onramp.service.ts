@@ -166,39 +166,39 @@ export async function handleStripeSession(session: Stripe.Checkout.Session): Pro
     if (st2 === "Success") {
       console.log(`Order ${tokenAddress} confirmed on-chain: ${hash2}`);
 
-      const voucherContractAddress = process.env.VOUCHER_CONTRACT_ADDRESS || "A96c02a13b558fbcf923af1d586967cf7f55c753";
+      // const voucherContractAddress = process.env.VOUCHER_CONTRACT_ADDRESS || "A96c02a13b558fbcf923af1d586967cf7f55c753";
       
-      const mintTx = {
-        txs: [{
-          type: "FUNCTION" as const,
-          payload: { 
-            contractName: "Voucher",
-            contractAddress: voucherContractAddress,
-            method: "mint",
-            args: {
-              to: buyerAddress,
-              amount: (10000000000000000000).toString(), // 10 vouchers (10 * 10^18)
-            }
-          }
-        }],
-        // txParams: {
-        //   gasLimit: 32_100_000_000,
-        //   gasPrice: 1,
-        // }
-      };
+      // const mintTx = {
+      //   txs: [{
+      //     type: "FUNCTION" as const,
+      //     payload: { 
+      //       contractName: "Voucher",
+      //       contractAddress: voucherContractAddress,
+      //       method: "mint",
+      //       args: {
+      //         to: buyerAddress,
+      //         amount: (10000000000000000000).toString(), // 10 vouchers (10 * 10^18)
+      //       }
+      //     }
+      //   }],
+      //   // txParams: {
+      //   //   gasLimit: 32_100_000_000,
+      //   //   gasPrice: 1,
+      //   // }
+      // };
 
-      console.log("Submitting Voucher.mint…");
-      const { status: st3, hash: hash3 } = await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, mintTx)
-      );
+      // console.log("Submitting Voucher.mint…");
+      // const { status: st3, hash: hash3 } = await postAndWaitForTx(accessToken, () =>
+      //   strato.post(accessToken, StratoPaths.transactionParallel, mintTx)
+      // );
 
-      if (st3 === "Success") {
-        console.log(`10 Vouchers minted successfully: ${hash3}`);
-        console.log(`Payment flow completed: fulfillListing + voucher minting`);
-      } else {
-        console.error(`Voucher mint failed (${st3}): ${hash3}`);
-        console.log(`Token transfer completed but voucher minting failed`);
-      }
+      // if (st3 === "Success") {
+      //   console.log(`10 Vouchers minted successfully: ${hash3}`);
+      //   console.log(`Payment flow completed: fulfillListing + voucher minting`);
+      // } else {
+      //   console.error(`Voucher mint failed (${st3}): ${hash3}`);
+      //   console.log(`Token transfer completed but voucher minting failed`);
+      // }
     } else {
       console.error(`On-chain confirmation failed (${st2}): ${hash2}`);
     }

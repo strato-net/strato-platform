@@ -162,7 +162,7 @@ export async function buy(
     amount,
     paymentProviderAddress,
   }: { token: string; amount: string; paymentProviderAddress: string }
-): Promise<void> {
+): Promise<{ sessionId: string; url: string }> {
   try {
     const ramp = await get(accessToken);
     
@@ -190,6 +190,8 @@ export async function buy(
       if (!data?.sessionId || !data?.url) {
         throw new Error("Invalid provider session response");
       }
+
+      return { sessionId: data.sessionId, url: data.url };
 
     } catch (stripeError: any) {
       console.error("STRIPE: Error making request:", stripeError.response?.data || stripeError.message);
