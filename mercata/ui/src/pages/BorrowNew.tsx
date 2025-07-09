@@ -377,6 +377,7 @@ const BorrowNew = () => {
           onBorrow={(amount) => executeBorrow(amount)}
           loan={loans}
           usdstBalance={usdstBalance}
+          eligibleCollateralTokens={eligibleCollateral.map(asset => asset?._symbol || asset?._name || "")}
         />
 
       <RepayModal

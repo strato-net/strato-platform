@@ -19,6 +19,7 @@ interface BorrowAssetModalProps {
   onBorrow: (amount: string) => void;
   loan?: any;
   usdstBalance?: string;
+  eligibleCollateralTokens?: string[]; // NEW PROP
 }
 
 const addCommasToInput = (value: string) => {
@@ -40,7 +41,8 @@ const BorrowAssetModal = ({
   onClose,
   onBorrow,
   loan,
-  usdstBalance = "0"
+  usdstBalance = "0",
+  eligibleCollateralTokens = []
 }: BorrowAssetModalProps) => {
   const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0,18)
   const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0,18))
@@ -107,6 +109,8 @@ const BorrowAssetModal = ({
     }
   }, [isOpen]);
 
+  const isZeroAvailable = parseFloat(availableToBorrowFormatted) === 0;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
@@ -130,95 +134,114 @@ const BorrowAssetModal = ({
                 USDST {availableToBorrowFormatted}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Interest Rate</span>
-              <span className="font-medium">
-                {loan?.interestRate
-                  ? `${loan.interestRate.toFixed(2)}%`
-                  : "-"}
-              </span>
-            </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Min: $0.01</span>
-              <span>Max: ${availableToBorrowFormatted}</span>
-            </div>
-            <div className="relative">
-              <Input
-                placeholder="0.00"
-                className={`pr-8 ${(() => { try { return parseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
-                value={displayAmount}
-                onChange={handleAmountChange}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span>Risk Level:</span>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                    riskLevel < 30
-                    ? "bg-green-50 text-green-700"
-                    : riskLevel < 70
-                      ? "bg-yellow-50 text-yellow-700"
-                      : "bg-red-50 text-red-700"
-                    }`}
-                >
-                  {getRiskText()}
+          {!isZeroAvailable && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Interest Rate</span>
+                <span className="font-medium">
+                  {loan?.interestRate
+                    ? `${loan.interestRate.toFixed(2)}%`
+                    : "-"}
                 </span>
               </div>
-            </div>
-
-            <div className="relative">
-              <Progress value={riskLevel} className="h-2">
-                <div
-                  className={`absolute inset-0 ${getRiskColor()} h-full rounded-full`}
-                  style={{ width: `${riskLevel}%` }}
-                />
-              </Progress>
-
-              <div className="flex justify-between mt-1 text-xs text-gray-500">
-                <span>Safe</span>
-                <span>Risk Increases →</span>
-                <span>Liquidation</span>
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Borrow Amount (USDST)</label>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Min: $0.01</span>
+                  <span>Max: ${availableToBorrowFormatted}</span>
+                </div>
+                <div className="relative">
+                  <Input
+                    placeholder="0.00"
+                    className={`pr-8 ${(() => { try { return parseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
+                    value={displayAmount}
+                    onChange={handleAmountChange}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Transaction Fee Display */}
-          <div className="px-4 py-3 bg-gray-50 rounded-md">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600">Transaction Fee</span>
-              <span className="font-medium">{BORROW_FEE} USDST</span>
-            </div>
-            {/* Fee validation warnings */}
-            {(() => {
-              const feeAmount = parseUnits(BORROW_FEE, 18);
-              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-              
-              // Check if insufficient USDST for fee
-              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-              
-              return (
-                <>
-                  {isInsufficientUsdstForFee && (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-          </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span>Risk Level:</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        riskLevel < 30
+                        ? "bg-green-50 text-green-700"
+                        : riskLevel < 70
+                          ? "bg-yellow-50 text-yellow-700"
+                          : "bg-red-50 text-red-700"
+                        }`}
+                    >
+                      {getRiskText()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Progress value={riskLevel} className="h-2">
+                    <div
+                      className={`absolute inset-0 ${getRiskColor()} h-full rounded-full`}
+                      style={{ width: `${riskLevel}%` }}
+                    />
+                  </Progress>
+
+                  <div className="flex justify-between mt-1 text-xs text-gray-500">
+                    <span>Safe</span>
+                    <span>Risk Increases →</span>
+                    <span>Liquidation</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction Fee Display */}
+              <div className="px-4 py-3 bg-gray-50 rounded-md">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">Transaction Fee</span>
+                  <span className="font-medium">{BORROW_FEE} USDST</span>
+                </div>
+                {/* Fee validation warnings */}
+                {(() => {
+                  const feeAmount = parseUnits(BORROW_FEE, 18);
+                  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                  
+                  // Check if insufficient USDST for fee
+                  const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+                  
+                  return (
+                    <>
+                      {isInsufficientUsdstForFee && (
+                        <p className="text-yellow-600 text-sm mt-1">
+                          Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </>
+          )}
 
           <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
-            <p className="text-gray-600">
+            {isZeroAvailable && (
+              <>
+                {Array.isArray(eligibleCollateralTokens) && eligibleCollateralTokens.length === 0 ? (
+                  <p className="font-bold">
+                    ⚠️ You cannot currently borrow any USDST because you do not have any eligible collateral to borrow against.
+                    You will need to buy or swap other assets for ETH, BTC, GOLDST or SILVST which you can borrow against. ⚠️
+                  </p>
+                ) : (
+                  <p className="font-bold">
+                    ⚠️ You cannot currently borrow any USDST because you have not made any of your collateral available to borrow against.
+                    Return to the main Borrow page and click on Supply for some of your collateral ⚠️
+                  </p>
+                )}
+              </>
+            )}
+            <p className="text-gray-600 mt-2">
               Borrowing against your assets allows you to access liquidity
               without selling your holdings. Be mindful of the risk level, as
               high borrowing increases liquidation risk during market
@@ -228,28 +251,36 @@ const BorrowAssetModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="mr-2">
-            Cancel
-          </Button>
-          <Button
-            disabled={
-              !borrowAmount || 
-              borrowLoading || 
-              (() => { try { return parseUnits(borrowAmount, 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0); } catch { return true; } })() ||
-              (() => {
-                const feeAmount = parseUnits(BORROW_FEE, 18);
-                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                return usdstBalanceBigInt < feeAmount;
-              })()
-            }
-            onClick={handleBorrow}
-            className="px-6"
-          >
-            {borrowLoading && (
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
-            )}{" "}
-            Borrow
-          </Button>
+          {isZeroAvailable ? (
+            <Button variant="outline" onClick={onClose} className="w-full">
+              OK
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} className="mr-2">
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  !borrowAmount || 
+                  borrowLoading || 
+                  (() => { try { return parseUnits(borrowAmount, 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0); } catch { return true; } })() ||
+                  (() => {
+                    const feeAmount = parseUnits(BORROW_FEE, 18);
+                    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                    return usdstBalanceBigInt < feeAmount;
+                  })()
+                }
+                onClick={handleBorrow}
+                className="px-6"
+              >
+                {borrowLoading && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
+                )}{" "}
+                Borrow
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
