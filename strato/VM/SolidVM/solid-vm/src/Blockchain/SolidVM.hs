@@ -1250,7 +1250,7 @@ runStatement (CC.Return maybeExpression pos) = do
   case maybeExpression of
     Just e -> do
       var <- expToVar e Nothing
-      var' <- getVar var
+      var' <- returnVar =<< getVar var
       onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
       return $ Just var'
     Nothing -> return $ Just SNULL

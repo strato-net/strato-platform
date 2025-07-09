@@ -13,6 +13,7 @@ module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
     getVar,
+    returnVar,
     getInt,
     getRealNum,
     getBool,
@@ -28,6 +29,7 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
 import Blockchain.Strato.Model.Account
+import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -68,7 +70,7 @@ findDefault = \case
   TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n "" 0x0
-  TStruct n fs -> todo "findDefault/struct" (n, fs)
+  TStruct n fs -> SStruct n . M.fromList $ (BC.unpack *** Constant . findDefault) <$> fs
   TComplex -> todo "finddefault/complex" TComplex
   Todo msg -> todo "findDefault/todo" msg
 
@@ -209,6 +211,17 @@ getVar (Constant (SPush v (Just var))) = do
   return $ SPush v (Just $ Constant resolved)
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
+
+returnVar :: MonadSM m => Value -> m Value
+returnVar (SReference a) = do
+  typeHint <- getValueType a
+  case typeHint of
+    TStruct n ts -> do
+      vs <- traverse (\(t,_) -> (BC.unpack t,) . Constant <$> (returnVar . SReference . apSnoc a $ MS.Field t)) ts
+      return . SStruct n $ M.fromList vs
+    TComplex -> typeError "returnVar" (SReference a)
+    _ -> pure $ findDefault typeHint
+returnVar v = pure v
 
 getInt :: MonadSM m => Variable -> m Integer
 getInt p = do
