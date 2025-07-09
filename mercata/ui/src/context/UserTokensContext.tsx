@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useMemo, useCallback } from
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
+import { usdstAddress } from "@/lib/contants";
 
 type UserTokensContextType = {
   activeTokens: Token[];
@@ -13,6 +14,11 @@ type UserTokensContextType = {
   error: string | null;
   fetchTokens: (userAddress: string, signal?: AbortSignal) => Promise<void>;
   fetchAllActiveTokens: (signal?: AbortSignal) => Promise<void>;
+  
+  // USDST balance
+  usdstBalance: string;
+  loadingUsdstBalance: boolean;
+  fetchUsdstBalance: (userAddress: string, signal?: AbortSignal) => Promise<void>;
 };
 
 const UserTokensContext = createContext<UserTokensContextType | undefined>(
@@ -28,13 +34,47 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(false);
   const [allActiveLoading, setAllActiveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // USDST balance state
+  const [usdstBalance, setUsdstBalance] = useState("0");
+  const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
+
+  const fetchUsdstBalance = useCallback(async (userAddress: string, signal?: AbortSignal) => {
+    if (!userAddress) return;
+    
+    setLoadingUsdstBalance(true);
+    try {
+      const res = await api.get(
+        `/tokens/balance?address=eq.${usdstAddress}`,
+        { signal }
+      );
+      
+      if (signal?.aborted) return;
+      
+      setUsdstBalance(res?.data?.[0]?.balance || "0");
+    } catch (err: any) {
+      if (
+        axios.isCancel?.(err) ||
+        err?.name === "CanceledError" ||
+        err?.code === "ERR_CANCELED" ||
+        err?.message === "canceled"
+      ) {
+        return;
+      }
+      console.error('Error fetching USDST balance:', err);
+    } finally {
+      if (!signal?.aborted) {
+        setLoadingUsdstBalance(false);
+      }
+    }
+  }, []);
 
   const fetchTokens = useCallback(async (userAddress: string, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get(
-        `/tokens/balance?key=eq.${userAddress}`,
+        `/tokens/balance`,
         { signal }
       );
       // Only update state if not aborted and data has actually changed
@@ -106,8 +146,13 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       error,
       fetchTokens,
       fetchAllActiveTokens,
+      
+      // USDST balance
+      usdstBalance,
+      loadingUsdstBalance,
+      fetchUsdstBalance,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens]
+    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, loadingUsdstBalance, fetchUsdstBalance]
   );
 
   return (

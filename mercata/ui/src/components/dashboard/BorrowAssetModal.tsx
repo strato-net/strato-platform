@@ -9,7 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formatUnits } from "ethers";
+import { formatUnits, parseUnits } from "ethers";
+import { BORROW_FEE } from "@/lib/contants";
 
 interface BorrowAssetModalProps {
   borrowLoading: boolean;
@@ -17,6 +18,7 @@ interface BorrowAssetModalProps {
   onClose: () => void;
   onBorrow: (amount: number) => void;
   loan?: any;
+  usdstBalance?: string;
 }
 
 const addCommasToInput = (value: string) => {
@@ -37,7 +39,8 @@ const BorrowAssetModal = ({
   isOpen,
   onClose,
   onBorrow,
-  loan
+  loan,
+  usdstBalance = "0"
 }: BorrowAssetModalProps) => {
   const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0,18)
   const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0,18))
@@ -161,6 +164,32 @@ const BorrowAssetModal = ({
             </div>
           </div>
 
+          {/* Transaction Fee Display */}
+          <div className="px-4 py-3 bg-gray-50 rounded-md">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-600">Transaction Fee</span>
+              <span className="font-medium">{BORROW_FEE} USDST</span>
+            </div>
+            {/* Fee validation warnings */}
+            {(() => {
+              const feeAmount = parseUnits(BORROW_FEE, 18);
+              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+              
+              // Check if insufficient USDST for fee
+              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+              
+              return (
+                <>
+                  {isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
           <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
             <p className="text-gray-600">
               Borrowing against your assets allows you to access liquidity
@@ -176,7 +205,16 @@ const BorrowAssetModal = ({
             Cancel
           </Button>
           <Button
-            disabled={borrowAmount === 0 || borrowLoading || borrowAmount > parseFloat(availableToBorrowFormatted)}
+            disabled={
+              borrowAmount === 0 || 
+              borrowLoading || 
+              borrowAmount > parseFloat(availableToBorrowFormatted) ||
+              (() => {
+                const feeAmount = parseUnits(BORROW_FEE, 18);
+                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                return usdstBalanceBigInt < feeAmount;
+              })()
+            }
             onClick={handleBorrow}
             className="px-6"
           >

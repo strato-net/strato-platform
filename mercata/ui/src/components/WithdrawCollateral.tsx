@@ -9,6 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
+import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
@@ -17,6 +18,7 @@ interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   onWithdraw: (amount: number) => void;
+  usdstBalance?: string;
 }
 
 const addCommasToInput = (value: string) => {
@@ -105,6 +107,7 @@ const WithdrawCollateralModal = ({
   isOpen,
   onClose,
   onWithdraw,
+  usdstBalance = "0",
 }: WithdrawModalProps) => {
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [displayAmount, setDisplayAmount] = useState("");
@@ -206,6 +209,32 @@ const WithdrawCollateralModal = ({
               </div>
             </div>
           )}
+
+          {/* Transaction Fee Display */}
+          <div className="px-4 py-3 bg-gray-50 rounded-md">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-600">Transaction Fee</span>
+              <span className="font-medium">{WITHDRAW_COLLATERAL_FEE} USDST</span>
+            </div>
+            {/* Fee validation warnings */}
+            {(() => {
+              const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+              
+              // Check if insufficient USDST for fee
+              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+              
+              return (
+                <>
+                  {isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Insufficient USDST balance for transaction fee ({WITHDRAW_COLLATERAL_FEE} USDST)
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
         </div>
 
         <DialogFooter>
@@ -217,7 +246,12 @@ const WithdrawCollateralModal = ({
               withdrawAmount === 0 || 
               withdrawLoading || 
               withdrawAmount > parseFloat(formatUnits(asset?.collateralizedAmount || 0,18)) ||
-              !healthImpact.isHealthy
+              !healthImpact.isHealthy ||
+              (() => {
+                const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                return usdstBalanceBigInt < feeAmount;
+              })()
             }
             onClick={handleWithdraw}
             className="px-6"
