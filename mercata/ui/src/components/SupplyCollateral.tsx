@@ -21,11 +21,37 @@ interface SupplyModalProps {
   usdstBalance?: string;
 }
 
+function safeParseUnits(value: string, decimals = 18): bigint {
+  if (!value || isNaN(Number(value))) {
+    return 0n;
+  }
+
+  // Prevent scientific notation from crashing parseUnits
+  if (value.includes('e') || value.includes('E')) {
+    const [num, exp] = value.toLowerCase().split('e');
+    const fixed = Number(num) * Math.pow(10, Number(exp || 0));
+    return BigInt(Math.floor(fixed * Math.pow(10, decimals)));
+  }
+
+  // Normal case, handled directly
+  return parseUnits(value, decimals);
+}
+
+function normalizeDecimalInput(value: string): string {
+  // Prevent scientific notation and trim extra zeros
+  const num = Number(value);
+  if (!isFinite(num)) return '0';
+
+  // Convert to fixed format and trim unnecessary trailing zeros
+  const fixed = num.toFixed(18);
+  return fixed.replace(/\.?0+$/, ''); // remove trailing zeroes and optional dot
+}
+
 const addCommasToInput = (value: string) => {
   if (!value) return '';
   const parts = value.split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
+
   if (parts.length === 2) {
     return integerPart + '.' + parts[1];
   }
@@ -73,20 +99,20 @@ const calculateHealthImpact = (
   // Calculate the USD value of the supplied amount
   const assetPrice = BigInt(asset?.assetPrice || 0);
   const liquidationThreshold = BigInt(asset?.liquidationThreshold || 0);
-  
+
   // Convert supply amount to wei and calculate USD value
   const supplyAmountWei = BigInt(Math.round(supplyAmount * Math.pow(10, 18)));
   const suppliedValueUSD = (supplyAmountWei * assetPrice) / (10n ** 18n);
-  
+
   // Apply liquidation threshold to get health factor value
   const suppliedValueWithThreshold = (suppliedValueUSD * liquidationThreshold) / 10000n;
-  
+
   // Add to current collateral value
   const newCollateralValue = currentCollateralValue + suppliedValueWithThreshold;
-  
+
   // Calculate new health factor
   const newHealthFactor = Number(newCollateralValue) / Number(currentTotalBorrowValue);
-  
+
   const healthImpact = newHealthFactor - currentHealthFactor;
   const isHealthy = newHealthFactor >= 1.0;
 
@@ -132,8 +158,9 @@ const SupplyCollateralModal = ({
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
-      setDisplayAmount(addCommasToInput(value));
-      setSupplyAmount(value);
+      const normalized = normalizeDecimalInput(value);
+      setDisplayAmount(addCommasToInput(normalized));
+      setSupplyAmount(normalized || '0');
     }
   };
 
@@ -145,8 +172,26 @@ const SupplyCollateralModal = ({
     }
   }, [isOpen]);
 
+  const handlePercentageClick = (percent?: number) => {
+    const total = (formatUnits(asset?.userBalance || "0", 18));
+    const amount = percent
+      ? (parseFloat(total) * percent).toString()
+      : total;
+
+    const normalized = normalizeDecimalInput(amount);
+    setSupplyAmount(normalized || '0');
+    setDisplayAmount(addCommasToInput(normalized));
+  };
+
+  const handleClose = () => {
+    setDisplayAmount('')
+    setSupplyAmount('0')
+    onClose()
+  }
+
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -183,6 +228,40 @@ const SupplyCollateralModal = ({
                 onChange={handleAmountChange}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{asset?._symbol}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={supplyAmount === (parseFloat(formatUnits(asset?.userBalance || "0", 18).toString().replace(/,/g, "")) * 0.1).toString() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(0.1)}
+                className="flex-1"
+              >
+                10%
+              </Button>
+              <Button
+                variant={supplyAmount === (parseFloat(formatUnits(asset?.userBalance || "0", 18).toString().replace(/,/g, "")) * 0.25).toString() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(0.25)}
+                className="flex-1"
+              >
+                25%
+              </Button>
+              <Button
+                variant={supplyAmount === (parseFloat(formatUnits(asset?.userBalance || "0", 18).toString().replace(/,/g, "")) * 0.5).toString() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(0.5)}
+                className="flex-1"
+              >
+                50%
+              </Button>
+              <Button
+                variant={supplyAmount === formatUnits(asset?.userBalance || 0, 18) ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick()}
+                className="flex-1"
+              >
+                100%
+              </Button>
             </div>
           </div>
 
@@ -233,7 +312,7 @@ const SupplyCollateralModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="mr-2">
+          <Button variant="outline" onClick={handleClose} className="mr-2">
             Cancel
           </Button>
           <Button
