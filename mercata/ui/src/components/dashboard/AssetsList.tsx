@@ -25,25 +25,6 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
     }
   };
 
-  const getTokenName = (token: Token) => {
-    return token["BlockApps-Mercata-ERC20"]?._name || "";
-  };
-
-  const getTokenSymbol = (token: Token) => {
-    return token["BlockApps-Mercata-ERC20"]?._symbol || "";
-  };
-
-  const getTokenValue = (token: Token) => {
-    return token.value || "-";
-  };
-
-  const getTokenTotalSupply = (token: Token) => {
-    return token["BlockApps-Mercata-ERC20"]?._totalSupply || "-";
-  };
-
-  // Ensure tokens is an array and has items
-  const validTokens = Array.isArray(tokens) ? tokens : [];
-
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
       <div className="p-5 border-b border-gray-100">
@@ -53,10 +34,14 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
             <Button
               size="sm"
               className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
-              onClick={() => setIsOptionsModalOpen(true)}
             >
               <Plus size={16} />
-              Add Deposits
+              <a
+                href="/dashboard/deposits"
+                className="text-sm text-white flex items-center justify-end"
+              >
+                Add Deposits
+              </a>
             </Button>
           )}
         </div>

@@ -106,6 +106,12 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
     setRepayAmount("");
     setDisplayAmount("");
   };
+
+  const handlePercentageClick = (percent?: bigint) => {
+    const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * percent) / 100n, 18);
+    setRepayAmount(amount);
+    setDisplayAmount(addCommasToInput(amount));
+  };
   
   if (!loan) return null;
 
@@ -158,11 +164,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             <Button
               variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n, 18);
-                setRepayAmount(amount);
-                setDisplayAmount(addCommasToInput(amount));
-              }}
+              onClick={() => handlePercentageClick(10n)}
               className="flex-1"
             >
               10%
@@ -170,11 +172,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             <Button
               variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n, 18);
-                setRepayAmount(amount);
-                setDisplayAmount(addCommasToInput(amount));
-              }}
+              onClick={() => handlePercentageClick(25n)}
               className="flex-1"
             >
               25%
@@ -182,11 +180,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             <Button
               variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n, 18);
-                setRepayAmount(amount);
-                setDisplayAmount(addCommasToInput(amount));
-              }}
+              onClick={() => handlePercentageClick(50n)}              
               className="flex-1"
             >
               50%
@@ -194,11 +188,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             <Button
               variant={(() => { try { return parseUnits(repayAmount || "0", 18) === BigInt(loan?.totalAmountOwed || 0); } catch { return false; } })() ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                const amount = formatUnits(BigInt(loan?.totalAmountOwed || 0), 18);
-                setRepayAmount(amount);
-                setDisplayAmount(addCommasToInput(amount));
-              }}
+              onClick={() => handlePercentageClick(100n)}
               className="flex-1"
             >
               100%

@@ -73,20 +73,20 @@ const calculateHealthImpact = (
   // Calculate the USD value of the supplied amount
   const assetPrice = BigInt(asset?.assetPrice || 0);
   const liquidationThreshold = BigInt(asset?.liquidationThreshold || 0);
-  
+
   // Convert supply amount to wei and calculate USD value
   const supplyAmountWei = BigInt(Math.round(supplyAmount * Math.pow(10, 18)));
   const suppliedValueUSD = (supplyAmountWei * assetPrice) / (10n ** 18n);
-  
+
   // Apply liquidation threshold to get health factor value
   const suppliedValueWithThreshold = (suppliedValueUSD * liquidationThreshold) / 10000n;
-  
+
   // Add to current collateral value
   const newCollateralValue = currentCollateralValue + suppliedValueWithThreshold;
-  
+
   // Calculate new health factor
   const newHealthFactor = Number(newCollateralValue) / Number(currentTotalBorrowValue);
-  
+
   const healthImpact = newHealthFactor - currentHealthFactor;
   const isHealthy = newHealthFactor >= 1.0;
 
@@ -145,8 +145,21 @@ const SupplyCollateralModal = ({
     }
   }, [isOpen]);
 
+  const handlePercentageClick = (percent?: bigint) => {
+    const amount = formatUnits((BigInt(asset?.userBalance || 0) * percent) / 100n, 18);
+    setSupplyAmount(amount);
+    setDisplayAmount(addCommasToInput(amount));
+  };
+
+  const handleClose = () => {
+    setDisplayAmount("")
+    setSupplyAmount("")
+    onClose()
+  }
+  
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -183,6 +196,40 @@ const SupplyCollateralModal = ({
                 onChange={handleAmountChange}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{asset?._symbol}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(10n)}
+                className="flex-1"
+              >
+                10%
+              </Button>
+              <Button
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(25n)}
+                className="flex-1"
+              >
+                25%
+              </Button>
+              <Button
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(50n)}
+                className="flex-1"
+              >
+                50%
+              </Button>
+              <Button
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 100n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(100n)}
+                className="flex-1"
+              >
+                100%
+              </Button>
             </div>
           </div>
 
@@ -233,7 +280,7 @@ const SupplyCollateralModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="mr-2">
+          <Button variant="outline" onClick={handleClose} className="mr-2">
             Cancel
           </Button>
           <Button
