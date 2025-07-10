@@ -265,9 +265,9 @@ const AssetDetail = () => {
                   <CardTitle>Price History</CardTitle>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="overflow-hidden">
                   {priceData.length > 0 ? (
-                    <div className="h-80">
+                    <div className="h-80 w-full">
                       <ChartContainer
                         config={{
                           price: {
@@ -283,11 +283,12 @@ const AssetDetail = () => {
                             }
                           }
                         }}
+                        className="w-full h-full"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={priceData}
-                            margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
                           >
                             <defs>
                               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -302,7 +303,7 @@ const AssetDetail = () => {
                               tick={{ fontSize: 12 }}
                               tickFormatter={(value) => {
                                 const date = new Date(value);
-                                return `${date.getDate()}/${date.getMonth() + 1}`;
+                                return `${date.getMonth() + 1}/${date.getDate()}`;
                               }}
                             />
                             <YAxis
