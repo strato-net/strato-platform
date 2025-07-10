@@ -33,6 +33,8 @@ router.use(swapRoutes);
 
 // ----- Lending Routes -----
 router.use("/lending", lendingRoutes);
+// UI compatibility alias
+router.use("/lend", lendingRoutes);
 
 // ----- Oracle Routes -----
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);

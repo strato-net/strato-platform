@@ -758,8 +758,11 @@ const SwapWidget = () => {
 
       await Promise.all([
         getTokenBalance(fromAsset, true),
-        getTokenBalance(toAsset, false)
+        getTokenBalance(toAsset, false),
       ]);
+      
+      // Refresh USDST balance after swap
+      await fetchUsdstBalance(userAddress);
     } catch (error) {
       console.error("Swap error:", error);
       toast({

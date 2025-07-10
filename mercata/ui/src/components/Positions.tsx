@@ -58,9 +58,18 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
               <div className="flex flex-col">
                 <span className="text-gray-600">Health Factor</span>
                 <span className="font-semibold text-green-500" style={{ color: getTextColor(parseFloat(loanData?.healthFactor)) }}>
-                  {loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor))
-                    ? parseFloat(loanData.healthFactor).toFixed(2)
-                    : "N/A"}
+                  {(() => {
+                    // Check if there's no outstanding debt
+                    const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
+                    if (totalAmountOwed === 0) {
+                      return "No Loan";
+                    }
+                    // Check if health factor is valid
+                    if (loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor))) {
+                      return parseFloat(loanData.healthFactor).toFixed(2);
+                    }
+                    return "N/A";
+                  })()}
                 </span>
               </div>
               <div className="flex flex-col">
