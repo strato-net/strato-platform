@@ -77,7 +77,7 @@ export const getTokens = async (
           if (collateralAmount) {
             return {
               ...balance,
-              collateral: collateralAmount
+              collateralBalance: collateralAmount
             };
           }
         }

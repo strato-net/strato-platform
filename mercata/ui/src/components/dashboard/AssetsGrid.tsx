@@ -17,6 +17,13 @@ const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
     return entry ? entry.balance : '0';
   }
 
+  // Helper to get user collateral from balances array
+  function getUserCollateral(token: Token, userAddress: string | null): string {
+    if (!userAddress) return '0';
+    const entry = token.balances?.find(b => b.user.toLowerCase() === userAddress.toLowerCase());
+    return entry?.collateralBalance || '0';
+  }
+
   return (
     loading ?
       <div className="flex justify-center items-center h-12">
@@ -35,6 +42,7 @@ const AssetsGrid = ({ assets, loading }: AssetsGridProps) => {
               symbol={asset?._symbol || ''}
               price={asset?.price?.toString() || '0'}
               deposit={getUserBalance(asset, userAddress)}
+              collateralBalance={getUserCollateral(asset, userAddress)}
               image={asset.images?.[0]?.value}
               customDecimals={asset?.customDecimals || 18}
             />
