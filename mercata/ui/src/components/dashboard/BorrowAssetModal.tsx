@@ -16,21 +16,21 @@ interface BorrowAssetModalProps {
   borrowLoading: boolean;
   isOpen: boolean;
   onClose: () => void;
-  onBorrow: (amount: number) => void;
+  onBorrow: (amount: string) => void;
   loan?: any;
   usdstBalance?: string;
 }
 
 const addCommasToInput = (value: string) => {
   if (!value) return '';
-  
+
   const parts = value.split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
+
   if (parts.length === 2) {
     return integerPart + '.' + parts[1];
   }
-  
+
   return integerPart;
 };
 
@@ -44,16 +44,33 @@ const BorrowAssetModal = ({
 }: BorrowAssetModalProps) => {
   const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0,18)
   const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0,18))
-  const [borrowAmount, setBorrowAmount] = useState(0);
+  const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [displayAmount, setDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
 
   // Calculate risk level based on borrowed amount (0-100)
   useEffect(() => {
-    const denom = collateralValueFormatted === 0 ? 1 : collateralValueFormatted;
-    const risk = ((borrowAmount * 10 ** 18) / (denom * 10 ** 18)) * 100;
-    setRiskLevel(risk);
-  }, [borrowAmount, collateralValueFormatted]);
+    try {
+      if (!borrowAmount) {
+        setRiskLevel(0);
+        return;
+      }
+
+      const borrowAmountBigInt = parseUnits(borrowAmount, 18);
+      const collateralValueBigInt = BigInt(loan?.totalCollateralValueUSD || 0);
+
+      if (collateralValueBigInt === 0n) {
+        setRiskLevel(0);
+        return;
+      }
+
+      // Calculate risk percentage using BigInt math
+      const risk = Number((borrowAmountBigInt * 10000n) / collateralValueBigInt) / 100;
+      setRiskLevel(Math.min(risk, 100)); // Cap at 100%
+    } catch {
+      setRiskLevel(0);
+    }
+  }, [borrowAmount, loan?.totalCollateralValueUSD]);
 
   const getRiskColor = () => {
     if (riskLevel < 30) return "bg-green-500";
@@ -69,19 +86,44 @@ const BorrowAssetModal = ({
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
+    // Clear the input after borrow
+    setBorrowAmount("");
+    setDisplayAmount("");
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, ''); // Remove existing commas
+    const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
-      const numValue = parseFloat(value) || 0;
-      setBorrowAmount(numValue);
+      setBorrowAmount(value);
     }
   };
 
+  // Clear input when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setBorrowAmount("");
+      setDisplayAmount("");
+    }
+  }, [isOpen]);
+
+  const handlePercentageClick = (percent?: number) => {
+    const total = availableToBorrowFormatted;
+    const amount = percent
+      ? (parseFloat(total) * percent).toString()
+      : total;
+    setBorrowAmount(amount);
+    setDisplayAmount(addCommasToInput(amount));
+  };
+
+  const handleClose = () => {
+    setDisplayAmount('')
+    setBorrowAmount('0')
+    onClose()
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -106,8 +148,8 @@ const BorrowAssetModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Interest Rate</span>
               <span className="font-medium">
-                {loan?.accruedInterest
-                  ? `${parseFloat(loan?.accruedInterest).toFixed(2)}%`
+                {loan?.interestRate
+                  ? `${loan.interestRate.toFixed(2)}%`
                   : "-"}
               </span>
             </div>
@@ -122,11 +164,45 @@ const BorrowAssetModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${borrowAmount > parseFloat(availableToBorrowFormatted) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${(() => { try { return parseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={borrowAmount?.toString() === (parseFloat(availableToBorrowFormatted.toString().replace(/,/g, "")) * 0.1).toString() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(0.1)}
+                className="flex-1"
+              >
+                10%
+              </Button>
+              <Button
+                variant={borrowAmount?.toString() === (parseFloat(availableToBorrowFormatted.toString().replace(/,/g, "")) * 0.25).toString() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(0.25)}
+                className="flex-1"
+              >
+                25%
+              </Button>
+              <Button
+                variant={borrowAmount?.toString() === (parseFloat(availableToBorrowFormatted.toString().replace(/,/g, "")) * 0.5).toString() ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick(0.5)}
+                className="flex-1"
+              >
+                50%
+              </Button>
+              <Button
+                variant={borrowAmount?.toString() === availableToBorrowFormatted ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePercentageClick()}
+                className="flex-1"
+              >
+                100%
+              </Button>
             </div>
           </div>
 
@@ -137,10 +213,10 @@ const BorrowAssetModal = ({
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                     riskLevel < 30
-                    ? "bg-green-50 text-green-700"
-                    : riskLevel < 70
-                      ? "bg-yellow-50 text-yellow-700"
-                      : "bg-red-50 text-red-700"
+                      ? "bg-green-50 text-green-700"
+                      : riskLevel < 70
+                        ? "bg-yellow-50 text-yellow-700"
+                        : "bg-red-50 text-red-700"
                     }`}
                 >
                   {getRiskText()}
@@ -174,10 +250,10 @@ const BorrowAssetModal = ({
             {(() => {
               const feeAmount = parseUnits(BORROW_FEE, 18);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-              
+
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-              
+
               return (
                 <>
                   {isInsufficientUsdstForFee && (
@@ -201,14 +277,14 @@ const BorrowAssetModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="mr-2">
+          <Button variant="outline" onClick={handleClose} className="mr-2">
             Cancel
           </Button>
           <Button
             disabled={
-              borrowAmount === 0 || 
-              borrowLoading || 
-              borrowAmount > parseFloat(availableToBorrowFormatted) ||
+              !borrowAmount ||
+              borrowLoading ||
+              (() => { try { return parseUnits(borrowAmount, 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0); } catch { return true; } })() ||
               (() => {
                 const feeAmount = parseUnits(BORROW_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");

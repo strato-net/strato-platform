@@ -8,6 +8,19 @@ import { formatUnits } from "ethers";
 
 export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }: any) {
 
+  const formatBalance = (balance: any) =>
+    balance ? Number(formatUnits(balance, 18)).toFixed(2) : "0.00";
+
+  
+  const formatValue = (rawBalance: any, price: any): string => {
+    if (!rawBalance || !price) return "0.00";
+
+    const balance = parseFloat(formatUnits(rawBalance, 18));
+    const value = balance * parseFloat(price);
+
+    return value.toFixed(2);
+  };
+
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
       <CardHeader>
@@ -25,8 +38,9 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
         </div>
 
         {loadingLiquidity || loadingLpTokens ? (
-          <div className="flex justify-center items-center h-12">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
+          <div className="flex items-center justify-center gap-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+            <span className="text-sm text-gray-600">Loading...</span>
           </div>
         ) : (
           <>
@@ -37,12 +51,12 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                 <div className="text-center font-medium text-gray-900">
                   {/* {formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)} */}
                   {liquidityInfo?.withdrawable?.userBalance
-                      ? Number(formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)).toFixed(2)
+                      ? formatBalance(liquidityInfo?.withdrawable?.userBalance)
                       : "0.00"}
                 </div>
                 <div className="text-right font-semibold text-gray-900">
                   {liquidityInfo?.withdrawable?._totalSupply
-                      ? Number(formatUnits(liquidityInfo?.withdrawable?._totalSupply || 0, 18)).toFixed(2)
+                      ? formatValue(liquidityInfo?.withdrawable?.userBalance,liquidityInfo?.withdrawable?.price)
                       : "0.00"}
                 </div>
               </div>
@@ -52,23 +66,23 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
             {lpTokens.length > 0 ? (
               lpTokens.map((lpToken, idx) => (
                 <div
-                  key={idx}
+                  key={lpToken?.lpToken?.address || idx}
                   className="grid grid-cols-3 items-center bg-gray-50 px-4 py-3 rounded-md mb-2"
                 >
                   <div className="font-semibold text-gray-700">{lpToken.lpToken._name}</div>
                   <div className="text-center font-medium text-gray-900">
                     {lpToken?.lpToken?.balances[0]?.balance
-                      ? Number(formatUnits(lpToken.lpToken.balances[0].balance || 0, 18)).toFixed(2)
+                      ? formatBalance(lpToken?.lpToken?.balances[0]?.balance)
                       : "0.00"}
                   </div>
                   <div className="text-right font-semibold text-gray-900">
                     {lpToken?.lpToken?._totalSupply
-                      ? Number(formatUnits(lpToken?.lpToken?.balances[0].balance * lpToken?.lpTokenPrice || 0, 18)).toFixed(2)
+                      ? formatValue(lpToken?.lpToken?.balances[0].balance,lpToken?.lpTokenPrice)
                       : "0.00"}
                   </div>
                 </div>
               ))
-            ) : !liquidityInfo?.withdrawable && lpTokens.length === 0 ? (
+            ) : !liquidityInfo?.withdrawable && Array.isArray(lpTokens) && lpTokens.length > 0 ? (
               <div className="p-2 flex justify-center">No data to show</div>
             ) : null}
           </>

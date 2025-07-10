@@ -36,10 +36,14 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
             <Button
               size="sm"
               className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
-              onClick={() => setIsOptionsModalOpen(true)}
             >
               <Plus size={16} />
-              Add Deposits
+              <a
+                href="/dashboard/deposits"
+                className="text-sm text-white flex items-center justify-end"
+              >
+                Add Deposits
+              </a>
             </Button>
           )}
         </div>

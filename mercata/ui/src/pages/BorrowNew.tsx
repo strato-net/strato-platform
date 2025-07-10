@@ -73,16 +73,32 @@ const BorrowNew = () => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
       const filtered = collateralInfo.filter((item) => item.collateralizedAmount > 0);
       setSuppliedCollateral(filtered);
-      setEligibleCollateral(collateralInfo)
+      
+      // Only show assets that have a balance > 0
+      const eligibleWithBalance = collateralInfo.filter((item) => 
+        BigInt(item.userBalance || 0) > 0n
+      );
+      setEligibleCollateral(eligibleWithBalance);
     }
   }, [collateralInfo])
 
+  // Refresh data when page loads and when userAddress changes
   useEffect(() => {
-    refreshLoans();
     if (userAddress) {
-      fetchUsdstBalance(userAddress);
+      const refreshData = async () => {
+        try {
+          await Promise.all([
+            refreshLoans(),
+            refreshCollateral(),
+            fetchUsdstBalance(userAddress),
+          ]);
+        } catch (error) {
+          console.error("Error refreshing data:", error);
+        }
+      };
+      refreshData();
     }
-  }, [userAddress, fetchUsdstBalance]);
+  }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
   const handleBorrow = () => {
     setIsBorrowModalOpen(true);
@@ -92,10 +108,10 @@ const BorrowNew = () => {
     setIsBorrowModalOpen(false);
   };
 
-  const executeBorrow = async (amount: number) => {
+  const executeBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
-      await borrowAssetFn({ amount: parseUnits(amount.toString(), 18).toString() });
+      await borrowAssetFn({ amount: parseUnits(amount, 18).toString() });
       toast({
         title: "Borrow Initiated",
         description: `You borrowed ${amount} USDST`,
@@ -103,8 +119,12 @@ const BorrowNew = () => {
       });
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      await refreshLoans();
-      await fetchUsdstBalance(userAddress);
+      // Refresh all data after successful borrow
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
     } catch (error: any) {
       console.log(error, "error");
       setBorrowLoading(false);
@@ -136,12 +156,12 @@ const BorrowNew = () => {
     setIsSupplyModalOpen(false);
   };
 
-  const executeSupply = async (asset: DepositableToken, amount: number) => {
+  const executeSupply = async (asset: DepositableToken, amount: string) => {
     try {
       setSupplyLoading(true);
       await supplyCollateral({
         asset: asset.address,
-        amount: parseUnits(amount.toString(), 18).toString(),
+        amount: parseUnits(amount, 18).toString(),
       });
       toast({
         title: "Supply Initiated",
@@ -150,9 +170,12 @@ const BorrowNew = () => {
       });
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
-      await refreshLoans();
-      await refreshCollateral();
-      await fetchUsdstBalance(userAddress);
+      // Refresh all data after successful supply
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
     } catch (error: any) {
       console.log(error, "error");
       setSupplyLoading(false);
@@ -175,24 +198,26 @@ const BorrowNew = () => {
     setIsWithdrawModalOpen(false);
   };
 
-  const executeWithdraw = async (asset: DepositableToken, amount: number) => {
+  const executeWithdraw = async (asset: DepositableToken, amount: string) => {
     try {
       setWithdrawLoading(true);
       await withdrawCollateral({
         asset: asset.address,
-        amount: parseUnits(amount.toString(), 18).toString(),
+        amount: parseUnits(amount, 18).toString(),
       });
       toast({
         title: "Withdraw Initiated",
-        description: `You withdraw ${amount}`,
+        description: `You withdrew ${amount} ${asset._symbol}`,
         variant: "success",
       });
-
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
-      await refreshLoans();
-      await refreshCollateral();
-      await fetchUsdstBalance(userAddress);
+      // Refresh all data after successful withdraw
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
     } catch (error: any) {
       console.log(error, "error");
       setWithdrawLoading(false);
@@ -214,7 +239,7 @@ const BorrowNew = () => {
 
         <main className="p-6">
           <div className="mb-8">
-            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={eligibleCollateral} />
+            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={collateralInfo} />
           </div>
           <Card>
             <CardHeader>
@@ -379,8 +404,15 @@ const BorrowNew = () => {
         onClose={closeRepayModal}
         loan={loans}
         onRepaySuccess={async () => {
-          await refreshLoans();
-          await fetchUsdstBalance(userAddress);
+          try {
+            await Promise.all([
+              refreshLoans(),
+              refreshCollateral(),
+              fetchUsdstBalance(userAddress || ""),
+            ]);
+          } catch (error) {
+            console.error("Error refreshing data:", error);
+          }
         }}
         usdstBalance={usdstBalance}
       />

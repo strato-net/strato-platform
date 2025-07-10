@@ -446,8 +446,6 @@ export const getLoan = async (
     const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
     const userLoan = userLoanEntry?.LoanInfo;
 
-    if (!userLoan) return {};
-
     // Get user's collaterals
     const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
       .filter((c: any) => c.user === userAddress)
@@ -708,4 +706,143 @@ export const setLiquidationBonus = async (
   );
 
   return { status, hash };
+};
+
+// ---------------- Liquidation Listing Helpers ----------------
+export interface LiquidationCollateralInfo {
+  asset: string;
+  symbol?: string;
+  amount: string;
+  usdValue: string;
+  expectedProfit: string; // placeholder for now
+}
+
+export interface LiquidationEntry {
+  id: string; // unique loan id (same as map key from Cirrus)
+  user: string;
+  asset: string;
+  assetSymbol?: string;
+  amount: string; // total debt (principal + interest)
+  healthFactor: number; // as percentage 1.0 == 100%
+  collaterals: LiquidationCollateralInfo[];
+}
+
+/**
+ * Fetch all loans and calculate health factors so the UI can display liquidatable positions.
+ * If margin is provided (>0), this returns loans whose HF is between 1 and 1+margin.
+ * If margin is undefined, returns loans with HF < 1 (i.e. can be liquidated right now).
+ */
+export const listLoansForLiquidation = async (
+  accessToken: string,
+  margin?: number
+): Promise<LiquidationEntry[]> => {
+  // Build an expanded select so we get ALL loans / collaterals in one shot
+  const select =
+    `lendingPool:lendingPool_fkey(` +
+      `address,` +
+      `borrowableAsset,` +
+      `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
+      /* alias the existing userLoan mapping as "loans" so we can iterate over all */
+      `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
+    `),` +
+    `collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),` +
+    `oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`;
+
+  const registry = await getPool(accessToken, undefined, { select });
+
+  const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
+  const assetConfigsArr = registry.lendingPool?.assetConfigs || [];
+  const loansArr = registry.lendingPool?.loans || [];
+  const collateralsArr = registry.collateralVault?.userCollaterals || [];
+  const pricesArr = registry.oracle?.prices || [];
+
+  // Build helper maps
+  const priceMap = new Map<string, string>(pricesArr.map((p: any) => [p.asset, p.price]));
+  
+  // Group collaterals by user for quick lookup
+  const collMap = new Map<string, CollateralInfo[]>();
+  for (const c of collateralsArr) {
+    const list = collMap.get(c.user) || [];
+    list.push({ asset: c.asset, amount: c.amount });
+    collMap.set(c.user, list);
+  }
+
+  const currentTime = Math.floor(Date.now() / 1000);
+
+  // Collect unique token addresses for symbol lookup (borrow asset + all collaterals)
+  const tokenSet = new Set<string>([borrowableAsset]);
+  collateralsArr.forEach((c: any) => tokenSet.add(c.asset));
+  const tokenAddrList = Array.from(tokenSet);
+  let tokenInfoMap = new Map<string, any>();
+  try {
+    const tokenRows = await getTokens(accessToken, { address: `in.(${tokenAddrList.join(',')})`, select: "address,_symbol,_name" });
+    tokenInfoMap = new Map<string, any>(tokenRows.map((t: any) => [t.address, t]));
+  } catch {
+    // swallow – symbols are optional
+  }
+
+  const results: LiquidationEntry[] = [];
+
+  for (const entry of loansArr) {
+    const loanId = entry.key;
+    const loan: any = entry.LoanInfo;
+    if (!loan) continue;
+
+    const userAddr: string = entry.user || loan.user || loanId; // Cirrus often stores borrower in key field
+
+    // Build assetConfigs map with price for simulateLoan helper
+    const acMap = new Map<string, AssetConfig>();
+    assetConfigsArr.forEach((cfg: any) => {
+      const p = priceMap.get(cfg.asset) || "0";
+      acMap.set(cfg.asset, {
+        interestRate: cfg.AssetConfig?.interestRate || 0,
+        liquidationThreshold: cfg.AssetConfig?.liquidationThreshold || 0,
+        ltv: cfg.AssetConfig?.ltv || 0,
+        price: p,
+      });
+    });
+
+    const userColls = collMap.get(userAddr) || [];
+    const sim = simulateLoan(loan, userColls, acMap, currentTime);
+    const hf = sim.healthFactor; // already percentage (e.g. 0.85)
+
+    const include = margin === undefined ? hf < 1 : hf >= 1 && hf < 1 + margin;
+    if (!include) continue;
+
+    // Prepare collateral display info
+    const collateralDisplay: LiquidationCollateralInfo[] = userColls.map((col) => {
+      const price = priceMap.get(col.asset) || "0";
+      const usdVal = ((toBig(col.amount) * toBig(price)) / constants.DECIMALS).toString();
+      const tokenInfo = tokenInfoMap.get(col.asset);
+      return {
+        asset: col.asset,
+        symbol: tokenInfo?._symbol || tokenInfo?._name,
+        amount: col.amount,
+        usdValue: usdVal,
+        expectedProfit: "0", // simple placeholder
+      };
+    });
+
+    const tokenBorrowInfo = tokenInfoMap.get(borrowableAsset);
+
+    results.push({
+      id: loanId,
+      user: userAddr,
+      asset: borrowableAsset,
+      assetSymbol: tokenBorrowInfo?._symbol || tokenBorrowInfo?._name,
+      amount: (toBig(loan.principalBalance) + toBig(loan.interestOwed || "0")).toString(),
+      healthFactor: hf,
+      collaterals: collateralDisplay,
+    });
+  }
+
+  return results;
+};
+
+export const listLiquidatableLoans = async (accessToken: string): Promise<LiquidationEntry[]> => {
+  return listLoansForLiquidation(accessToken);
+};
+
+export const listNearUnhealthyLoans = async (accessToken: string, margin: number): Promise<LiquidationEntry[]> => {
+  return listLoansForLiquidation(accessToken, margin);
 };
