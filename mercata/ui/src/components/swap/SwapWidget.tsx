@@ -767,7 +767,9 @@ const SwapWidget = () => {
       console.error("Swap error:", error);
       toast({
         title: "Error",
-        description: "Swap failed. Please try again.",
+        description: error.message === "Slippage check failed"
+          ? "Your slippage tolerance was exceeded, so the swap was reverted to protect you from a worse-than-expected price."
+          : error.message || "Swap failed. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -904,4 +906,4 @@ useEffect(() => {
   );
 };
 
-export default SwapWidget; 
+export default SwapWidget;

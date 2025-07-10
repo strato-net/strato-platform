@@ -151,7 +151,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       const res = await api.post("/swap", data);
       return res.data;
     } catch (err: any) {
-      throw new Error(err.response?.data?.message || err.message || "Swap transaction failed");
+      throw new Error(
+        err.response?.data?.error?.message ||
+        err.response?.data?.message ||
+        err.message ||
+        "Swap transaction failed"
+      );
     }
   }, []);
 
