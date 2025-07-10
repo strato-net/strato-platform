@@ -35,7 +35,7 @@ const Dashboard = () => {
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
     setTimeout(() => {
-      fetchTokens(userAddress || "");
+      fetchTokens();
     }, 500);
     refreshLoans();
     fetchLpTokensPositions();

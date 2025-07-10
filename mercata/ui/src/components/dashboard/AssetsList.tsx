@@ -76,20 +76,23 @@ const AssetsList = ({
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50">
-                <th className="w-[28%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="w-[25%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                   Asset
                 </th>
-                <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                   Change
                 </th>
-                <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                   Holdings
                 </th>
-                <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                   Value
+                </th>
+                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                  Collateral
                 </th>
               </tr>
             </thead>
@@ -97,7 +100,7 @@ const AssetsList = ({
               {loading ? (
                 <tr className="hover:bg-gray-50 transition-colors">
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -198,13 +201,25 @@ const AssetsList = ({
                               })}`}
                         </p>
                       </td>
+                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-gray-900">
+                          {!asset?.collateralBalance
+                            ? "-"
+                            : parseFloat(
+                                formatUnits(BigInt(asset.collateralBalance), 18)
+                              ).toLocaleString(undefined, {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 4,
+                              })}
+                        </p>
+                      </td>
                     </tr>
                   )
                 )
               ) : (
                 <tr className="hover:bg-gray-50 transition-colors">
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -248,20 +263,11 @@ const AssetsList = ({
               <table className="w-full table-fixed">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="w-[28%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                    <th className="w-[50%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                       Asset
                     </th>
-                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Price
-                    </th>
-                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Change
-                    </th>
-                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                    <th className="w-[50%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
                       Holdings
-                    </th>
-                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Value
                     </th>
                   </tr>
                 </thead>
@@ -315,33 +321,6 @@ const AssetsList = ({
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
                           <p className="font-medium text-gray-900">
-                            {!asset?.["price"]
-                              ? "-"
-                              : `$${parseFloat(
-                                  formatUnits(BigInt(asset.price), 18)
-                                ).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}`}
-                          </p>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap text-right">
-                          <div
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              asset?.["change"] >= 0
-                                ? "bg-green-50 text-green-600"
-                                : "bg-red-50 text-red-600"
-                            }`}
-                          >
-                            {asset?.["change"] !== undefined
-                              ? `${asset?.["change"] >= 0 ? "+" : ""}${
-                                  asset?.["change"]
-                                }%`
-                              : "-"}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap text-right">
-                          <p className="font-medium text-gray-900">
                             {!asset?.balance
                               ? "-"
                               : parseFloat(
@@ -350,23 +329,6 @@ const AssetsList = ({
                                   minimumFractionDigits: 1,
                                   maximumFractionDigits: 4,
                                 })}
-                          </p>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap text-right">
-                          <p className="font-medium text-gray-900">
-                            {!asset?.["price"] || !asset?.balance
-                              ? "-"
-                              : `$${(
-                                  parseFloat(
-                                    formatUnits(BigInt(asset.price), 18)
-                                  ) *
-                                  parseFloat(
-                                    formatUnits(BigInt(asset.balance), 18)
-                                  )
-                                ).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}`}
                           </p>
                         </td>
                       </tr>
