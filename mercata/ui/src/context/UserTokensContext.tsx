@@ -12,7 +12,7 @@ type UserTokensContextType = {
   loading: boolean;
   allActiveLoading: boolean;
   error: string | null;
-  fetchTokens: (userAddress: string, signal?: AbortSignal) => Promise<void>;
+  fetchTokens: (signal?: AbortSignal) => Promise<void>;
   fetchAllActiveTokens: (signal?: AbortSignal) => Promise<void>;
   
   // USDST balance
@@ -69,7 +69,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const fetchTokens = useCallback(async (userAddress: string, signal?: AbortSignal) => {
+  const fetchTokens = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {

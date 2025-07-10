@@ -27,7 +27,7 @@ const LendingPoolSection = () => {
 
   const refreshLendingData = (signal?: AbortSignal) => {
     if (!userAddress) return;
-    fetchTokens(userAddress, signal);
+    fetchTokens(signal);
     refreshLiquidity(signal);
   };
 
