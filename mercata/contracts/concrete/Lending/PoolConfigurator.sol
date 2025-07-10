@@ -169,6 +169,24 @@ contract record PoolConfigurator is Ownable {
         lendingPool.setFeeCollector(_feeCollector);
     }
 
+    /**
+     * @notice Set supply collateral fee
+     * @param _supplyFee The supply collateral fee in wei (18 decimals)
+     */
+    function setSupplyCollateralFee(uint256 _supplyFee) external onlyOwner {
+        LendingPool lendingPool = LendingPool(registry.getLendingPool());
+        lendingPool.setSupplyCollateralFee(_supplyFee);
+    }
+
+    /**
+     * @notice Set withdraw collateral fee
+     * @param _withdrawFee The withdraw collateral fee in wei (18 decimals)
+     */
+    function setWithdrawCollateralFee(uint256 _withdrawFee) external onlyOwner {
+        LendingPool lendingPool = LendingPool(registry.getLendingPool());
+        lendingPool.setWithdrawCollateralFee(_withdrawFee);
+    }
+
      // Setter function for borrowable asset
     function setBorrowableAsset(address asset) external onlyOwner {
         require(asset != address(0), "Invalid asset address");

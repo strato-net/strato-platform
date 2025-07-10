@@ -71,6 +71,10 @@ contract record LendingPool is Ownable {
     TokenFactory public tokenFactory;
     address public poolConfigurator;
     FeeCollector public feeCollector;
+    
+    // Fee Configuration
+    uint256 public supplyCollateralFee;   // Fee for supplying collateral in wei (18 decimals)
+    uint256 public withdrawCollateralFee; // Fee for withdrawing collateral in wei (18 decimals)
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
@@ -179,6 +183,11 @@ contract record LendingPool is Ownable {
         require(config.liquidationThreshold > 0, "Asset missing liquidation threshold");
         require(config.liquidationBonus >= 10000, "Asset missing liquidation bonus");
         
+        // Charge supply collateral fee in USDST
+        if (supplyCollateralFee > 0) {
+            _payTransactionFee(supplyCollateralFee);
+        }
+        
         // The CollateralVault will handle the token transfer from msg.sender
         // User must have approved CollateralVault to spend their tokens
         CollateralVault(_collateralVault()).addCollateral(msg.sender, asset, amount);
@@ -202,6 +211,11 @@ contract record LendingPool is Ownable {
         uint256 currentBorrow = _getTotalBorrowValue(msg.sender); // in USD
         uint256 newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amount); // in USD
         require(currentBorrow <= newMaxBorrow, "Withdrawal would exceed existing loan");
+        
+        // Charge withdraw collateral fee in USDST
+        if (withdrawCollateralFee > 0) {
+            _payTransactionFee(withdrawCollateralFee);
+        }
         
         CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, amount);
 
@@ -493,6 +507,14 @@ contract record LendingPool is Ownable {
         return (config.ltv, config.liquidationThreshold, config.liquidationBonus, config.interestRate, config.reserveFactor);
     }
 
+    /**
+     * @notice Get collateral fees
+     * @return supplyFee, withdrawFee Both fees in wei (18 decimals)
+     */
+    function getCollateralFees() external view returns (uint256, uint256) {
+        return (supplyCollateralFee, withdrawCollateralFee);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // mToken MANAGEMENT & EXCHANGE RATES
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -565,6 +587,22 @@ contract record LendingPool is Ownable {
 
     function setFeeCollector(address _feeCollector) external onlyPoolConfigurator {
         feeCollector = FeeCollector(_feeCollector);
+    }
+
+    /**
+     * @notice Set supply collateral fee
+     * @param _supplyFee The supply collateral fee in wei (18 decimals)
+     */
+    function setSupplyCollateralFee(uint256 _supplyFee) external onlyPoolConfigurator {
+        supplyCollateralFee = _supplyFee;
+    }
+
+    /**
+     * @notice Set withdraw collateral fee
+     * @param _withdrawFee The withdraw collateral fee in wei (18 decimals)
+     */
+    function setWithdrawCollateralFee(uint256 _withdrawFee) external onlyPoolConfigurator {
+        withdrawCollateralFee = _withdrawFee;
     }
     /**
      * @notice Set the single borrowable asset
@@ -700,5 +738,14 @@ contract record LendingPool is Ownable {
         }
         
         return (totalCollateralValue * 1e18) / borrowableAssetPrice;
+    }
+
+    /**
+     * @notice Internal function to pay transaction fees in USDST
+     * @param feeAmount Fee amount in wei (18 decimals)
+     */
+    function _payTransactionFee(uint256 feeAmount) internal {
+        address USDST = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+        require(IERC20(USDST).transferFrom(msg.sender, address(feeCollector), feeAmount), "Fee payment failed");
     }
 } 

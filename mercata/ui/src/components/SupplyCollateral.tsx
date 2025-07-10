@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
-import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
+import { useFees } from "@/context/FeeContext";
 
 interface SupplyModalProps {
   supplyLoading: boolean;
@@ -110,6 +110,7 @@ const SupplyCollateralModal = ({
   usdstBalance = "0",
 }: SupplyModalProps) => {
   const [supplyAmount, setSupplyAmount] = useState(0);
+  const { supplyFee } = useFees();
   const [displayAmount, setDisplayAmount] = useState("");
   const [healthImpact, setHealthImpact] = useState({
     currentHealthFactor: 0,
@@ -214,11 +215,11 @@ const SupplyCollateralModal = ({
           <div className="px-4 py-3 bg-gray-50 rounded-md">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-600">Transaction Fee</span>
-              <span className="font-medium">{SUPPLY_COLLATERAL_FEE} USDST</span>
+              <span className="font-medium">{formatUnits(supplyFee, 18)} USDST</span>
             </div>
             {/* Fee validation warnings */}
             {(() => {
-              const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
+              const feeAmount = BigInt(supplyFee || "0");
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
               
               // Check if insufficient USDST for fee
@@ -228,7 +229,7 @@ const SupplyCollateralModal = ({
                 <>
                   {isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
+                      Insufficient USDST balance for transaction fee ({formatUnits(supplyFee, 18)} USDST)
                     </p>
                   )}
                 </>
@@ -247,7 +248,7 @@ const SupplyCollateralModal = ({
               supplyLoading || 
               supplyAmount > parseFloat(formatUnits(asset?.userBalance || 0,18)) ||
               (() => {
-                const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
+                const feeAmount = BigInt(supplyFee || "0");
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
                 return usdstBalanceBigInt < feeAmount;
               })()

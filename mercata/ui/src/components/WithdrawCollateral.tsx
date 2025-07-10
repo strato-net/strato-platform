@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatUnits, parseUnits } from "ethers";
-import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { formatUnits } from "ethers";
+import { useFees } from "@/context/FeeContext";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
@@ -110,6 +110,7 @@ const WithdrawCollateralModal = ({
   usdstBalance = "0",
 }: WithdrawModalProps) => {
   const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const { withdrawFee } = useFees();
   const [displayAmount, setDisplayAmount] = useState("");
   const [healthImpact, setHealthImpact] = useState({
     currentHealthFactor: 0,
@@ -214,11 +215,11 @@ const WithdrawCollateralModal = ({
           <div className="px-4 py-3 bg-gray-50 rounded-md">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-600">Transaction Fee</span>
-              <span className="font-medium">{WITHDRAW_COLLATERAL_FEE} USDST</span>
+              <span className="font-medium">{formatUnits(withdrawFee, 18)} USDST</span>
             </div>
             {/* Fee validation warnings */}
             {(() => {
-              const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+              const feeAmount = BigInt(withdrawFee || "0");
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
               
               // Check if insufficient USDST for fee
@@ -228,7 +229,7 @@ const WithdrawCollateralModal = ({
                 <>
                   {isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee ({WITHDRAW_COLLATERAL_FEE} USDST)
+                      Insufficient USDST balance for transaction fee ({formatUnits(withdrawFee, 18)} USDST)
                     </p>
                   )}
                 </>
@@ -248,7 +249,7 @@ const WithdrawCollateralModal = ({
               withdrawAmount > parseFloat(formatUnits(asset?.collateralizedAmount || 0,18)) ||
               !healthImpact.isHealthy ||
               (() => {
-                const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+                const feeAmount = BigInt(withdrawFee || "0");
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
                 return usdstBalanceBigInt < feeAmount;
               })()

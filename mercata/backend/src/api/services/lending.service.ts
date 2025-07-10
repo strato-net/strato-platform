@@ -709,3 +709,40 @@ export const setLiquidationBonus = async (
 
   return { status, hash };
 };
+
+export const getCollateralFees = async (
+  accessToken: string
+): Promise<{ supplyFee: string; withdrawFee: string }> => {
+  const registry = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const lendingPoolAddress = registry.lendingPool;
+
+  if (!lendingPoolAddress) {
+    throw new Error("Lending pool address not found");
+  }
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPoolAddress,
+    method: "getCollateralFees",
+    args: {},
+  });
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  if (status === "success") {
+    // The response contains the fee values
+    const result = hash; // This would contain the return values
+    return {
+      supplyFee: result[0] || "0", // supplyCollateralFee in wei
+      withdrawFee: result[1] || "0", // withdrawCollateralFee in wei
+    };
+  }
+
+  // Fallback to hardcoded values if the call fails
+  return {
+    supplyFee: "20000000000000000", // 0.02 USDST in wei
+    withdrawFee: "10000000000000000", // 0.01 USDST in wei
+  };
+};

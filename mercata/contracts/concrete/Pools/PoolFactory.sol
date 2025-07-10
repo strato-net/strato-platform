@@ -19,10 +19,13 @@ import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 
-/// @dev minimal interface exposing addMinter used during pool creation
+/// @dev minimal interface exposing TokenAccess functions used during pool creation
 interface ITokenAccess {
     function addMinter(address accountAddress) external;
     function removeMinter(address accountAddress) external;
+    function addBurner(address accountAddress) external;
+    function removeBurner(address accountAddress) external;
+    function transferAdmin(address newAdmin) external;
 }
 
 /// @notice Pool factory contract
