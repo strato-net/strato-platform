@@ -185,7 +185,7 @@ pipeline {
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
-                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.highway.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.highway.ecr.yml, k8s/**"
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.highway.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.highway.ecr.yml"
                 withCredentials([
                     usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                 ]) {
@@ -203,12 +203,13 @@ pipeline {
               }
             }
             
+            // TODO: run the next 2 stages in parallel
             stage('Deploy to Testnet') {
               // only deploy if building develop branch
               when {
                 beforeAgent true
                 allOf {
-                  branch "develop-deployed" //TODO: change to develop when ready
+                  branch "develop"
                 }
               }
               agent { label "testnet-build1" }
