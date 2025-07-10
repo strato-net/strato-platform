@@ -69,7 +69,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const fetchTokens = useCallback(async (signal?: AbortSignal) => {
+  const fetchTokens = useCallback(async (userAddress: string, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
