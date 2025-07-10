@@ -64,13 +64,13 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				strato: {
-					blue: '#1F42AC',
-					lightblue: '#3C7DFF',
+					blue: '#001B70',
+					lightblue: '#3452FE',
 					gold: '#FFD700',
 					silver: '#C0C0C0',
 					dark: '#0A0F29',
 					purple: '#7E57C2',
-					orange: '#FF7A00'
+					orange: '#FF3200'
 				}
 			},
 			borderRadius: {
