@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import DepositModal from "./DepositModal";
 import DepositOptionsModal from "./DepositOptionsModal";
 import { Token } from "../../interface";
@@ -24,7 +25,6 @@ const AssetsList = ({
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
   const [showAllEarningAssets, setShowAllEarningAssets] = useState(false);
-  const [showAllNonEarningAssets, setShowAllNonEarningAssets] = useState(false);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
@@ -112,15 +112,33 @@ const AssetsList = ({
                       key={index}
                       className="hover:bg-gray-50 transition-colors"
                     >
-                      <td className="py-4 px-4 whitespace-nowrap">
+                      <td className="py-4 px-4">
                         <div className="flex items-center">
-                          <div className="ml-3">
-                            <p className="font-medium text-gray-900">
-                              {asset?.token?._name || ""}
-                            </p>
-                            <p className="text-gray-500 text-xs">
-                              {asset?.token?._symbol || ""}
-                            </p>
+                          <div className="ml-3 min-w-0 flex-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="font-medium text-gray-900 truncate">
+                                    {asset?.token?._name || ""}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{asset?.token?._name || ""}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-gray-500 text-xs truncate">
+                                    {asset?.token?._symbol || ""}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{asset?.token?._symbol || ""}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
                       </td>
@@ -205,25 +223,6 @@ const AssetsList = ({
           <div className="p-4 text-right border-t border-gray-100 flex justify-between">
             <span className="font-bold">Non earning Assets</span>
             <div className="flex gap-4">
-              {showNonEarningAssetsTable && (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      setShowAllNonEarningAssets(!showAllNonEarningAssets)
-                    }
-                  >
-                    <span>
-                      {showAllNonEarningAssets ? "Show Less" : "View All"}
-                    </span>
-                    {showAllNonEarningAssets ? (
-                      <ArrowUp size={20} />
-                    ) : (
-                      <ArrowDown size={20} />
-                    )}
-                  </Button>
-                </>
-              )}
               <Button
                 size="sm"
                 onClick={() => setShowNonEarningAssetsTable((prev) => !prev)}
@@ -241,12 +240,12 @@ const AssetsList = ({
           <div
             className={`transition-all duration-300 ease-in-out overflow-hidden ${
               showNonEarningAssetsTable
-                ? "max-h-[2000px] opacity-100"
+                ? "max-h-[400px] opacity-100"
                 : "max-h-0 opacity-0"
             }`}
           >
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-y-auto max-h-[400px]">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="w-[28%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
@@ -279,23 +278,38 @@ const AssetsList = ({
                       </td>
                     </tr>
                   ) : inActiveTokens.length > 0 ? (
-                    (showAllNonEarningAssets
-                      ? inActiveTokens
-                      : inActiveTokens.slice(0, 4)
-                    ).map((asset, index) => (
+                    inActiveTokens.map((asset, index) => (
                       <tr
                         key={index}
                         className="hover:bg-gray-50 transition-colors"
                       >
-                        <td className="py-4 px-4 whitespace-nowrap">
+                        <td className="py-4 px-4">
                           <div className="flex items-center">
-                            <div className="ml-3">
-                              <p className="font-medium text-gray-900">
-                                {asset?.token?._name || ""}
-                              </p>
-                              <p className="text-gray-500 text-xs">
-                                {asset?.token?._symbol || ""}
-                              </p>
+                            <div className="ml-3 min-w-0 flex-1">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="font-medium text-gray-900 truncate">
+                                      {asset?.token?._name || ""}
+                                    </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{asset?.token?._name || ""}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="text-gray-500 text-xs truncate">
+                                      {asset?.token?._symbol || ""}
+                                    </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{asset?.token?._symbol || ""}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                           </div>
                         </td>
