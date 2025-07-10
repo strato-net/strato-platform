@@ -20,10 +20,10 @@ const Hero = () => {
       <div className="container mx-auto px-4 py-20 relative z-10">
         {/* Hero Header */}
         <div className="max-w-4xl mx-auto text-center mb-16">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white drop-shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-gray-300 drop-shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
             Where Stability Meets Opportunity
           </h1>
-          <p className="text-xl md:text-2xl mb-8 text-gray-300 drop-shadow-md animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-100">
+          <p className="text-xl md:text-2xl mb-8 text-gray-400 drop-shadow-md animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-100">
             Easily earn on vaulted gold, silver & crypto. Get instant credit. Built by ETH veterans.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
