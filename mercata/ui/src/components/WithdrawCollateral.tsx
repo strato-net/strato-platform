@@ -11,32 +11,6 @@ import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
 
-function safeParseUnits(value: string, decimals = 18): bigint {
-  if (!value || isNaN(Number(value))) {
-    return 0n;
-  }
-
-  // Prevent scientific notation from crashing parseUnits
-  if (value.includes('e') || value.includes('E')) {
-    const [num, exp] = value.toLowerCase().split('e');
-    const fixed = Number(num) * Math.pow(10, Number(exp || 0));
-    return BigInt(Math.floor(fixed * Math.pow(10, decimals)));
-  }
-
-  // Normal case, handled directly
-  return parseUnits(value, decimals);
-}
-
-function normalizeDecimalInput(value: string): string {
-  // Prevent scientific notation and trim extra zeros
-  const num = Number(value);
-  if (!isFinite(num)) return '0';
-
-  // Convert to fixed format and trim unnecessary trailing zeros
-  const fixed = num.toFixed(18);
-  return fixed.replace(/\.?0+$/, ''); // remove trailing zeroes and optional dot
-}
-
 interface WithdrawModalProps {
   withdrawLoading: boolean;
   asset: any;
@@ -115,7 +89,7 @@ const calculateHealthImpact = (
 
   const healthImpact = newHealthFactor - currentHealthFactor;
   const isHealthy = newHealthFactor >= 1.0;
-
+  
   return {
     currentHealthFactor,
     newHealthFactor,
@@ -159,9 +133,8 @@ const WithdrawCollateralModal = ({
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
-      const normalized = normalizeDecimalInput(value);
-      setDisplayAmount(addCommasToInput(normalized));
-      setWithdrawAmount(normalized || '0');
+      setDisplayAmount(addCommasToInput(value));
+      setWithdrawAmount(value || '0');
     }
   };
 
@@ -173,14 +146,10 @@ const WithdrawCollateralModal = ({
     }
   }, [isOpen]);
 
-  const handlePercentageClick = (percent?: number) => {
-    const total = (formatUnits(asset?.collateralizedAmount || "0", 18));
-    const amount = percent
-      ? (parseFloat(total) * percent).toString()
-      : total;
-    const normalized = normalizeDecimalInput(amount);
-    setDisplayAmount(addCommasToInput(normalized));
-    setWithdrawAmount(normalized || '0');
+  const handlePercentageClick = (percent?: bigint) => {
+    const amount = formatUnits((BigInt(asset?.collateralizedAmount || 0) * percent) / 100n, 18);
+    setWithdrawAmount(amount);
+    setDisplayAmount(addCommasToInput(amount));
   };
 
   const handleClose = () => {
@@ -230,33 +199,33 @@ const WithdrawCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={withdrawAmount === (parseFloat(formatUnits(asset?.collateralizedAmount || "0", 18).toString().replace(/,/g, "")) * 0.1).toString() ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick(0.1)}
+                onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
               >
                 10%
               </Button>
               <Button
-                variant={withdrawAmount === (parseFloat(formatUnits(asset?.collateralizedAmount || "0", 18).toString().replace(/,/g, "")) * 0.25).toString() ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick(0.25)}
+                onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
               >
                 25%
               </Button>
               <Button
-                variant={withdrawAmount === (parseFloat(formatUnits(asset?.collateralizedAmount || "0", 18).toString().replace(/,/g, "")) * 0.5).toString() ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick(0.5)}
+                onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
               >
                 50%
               </Button>
               <Button
-                variant={withdrawAmount === formatUnits(asset?.collateralizedAmount || 0, 18) ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 100n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick()}
+                onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
               >
                 100%

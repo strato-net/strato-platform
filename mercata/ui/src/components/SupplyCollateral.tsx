@@ -21,37 +21,10 @@ interface SupplyModalProps {
   usdstBalance?: string;
 }
 
-function safeParseUnits(value: string, decimals = 18): bigint {
-  if (!value || isNaN(Number(value))) {
-    return 0n;
-  }
-
-  // Prevent scientific notation from crashing parseUnits
-  if (value.includes('e') || value.includes('E')) {
-    const [num, exp] = value.toLowerCase().split('e');
-    const fixed = Number(num) * Math.pow(10, Number(exp || 0));
-    return BigInt(Math.floor(fixed * Math.pow(10, decimals)));
-  }
-
-  // Normal case, handled directly
-  return parseUnits(value, decimals);
-}
-
-function normalizeDecimalInput(value: string): string {
-  // Prevent scientific notation and trim extra zeros
-  const num = Number(value);
-  if (!isFinite(num)) return '0';
-
-  // Convert to fixed format and trim unnecessary trailing zeros
-  const fixed = num.toFixed(18);
-  return fixed.replace(/\.?0+$/, ''); // remove trailing zeroes and optional dot
-}
-
 const addCommasToInput = (value: string) => {
   if (!value) return '';
   const parts = value.split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
   if (parts.length === 2) {
     return integerPart + '.' + parts[1];
   }
@@ -158,9 +131,8 @@ const SupplyCollateralModal = ({
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
-      const normalized = normalizeDecimalInput(value);
-      setDisplayAmount(addCommasToInput(normalized));
-      setSupplyAmount(normalized || '0');
+      setDisplayAmount(addCommasToInput(value));
+      setSupplyAmount(value || '0');
     }
   };
 
@@ -172,15 +144,10 @@ const SupplyCollateralModal = ({
     }
   }, [isOpen]);
 
-  const handlePercentageClick = (percent?: number) => {
-    const total = (formatUnits(asset?.userBalance || "0", 18));
-    const amount = percent
-      ? (parseFloat(total) * percent).toString()
-      : total;
-
-    const normalized = normalizeDecimalInput(amount);
-    setSupplyAmount(normalized || '0');
-    setDisplayAmount(addCommasToInput(normalized));
+  const handlePercentageClick = (percent?: bigint) => {
+    const amount = formatUnits((BigInt(asset?.userBalance || 0) * percent) / 100n, 18);
+    setSupplyAmount(amount);
+    setDisplayAmount(addCommasToInput(amount));
   };
 
   const handleClose = () => {
@@ -188,7 +155,7 @@ const SupplyCollateralModal = ({
     setSupplyAmount('0')
     onClose()
   }
-
+  
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -210,7 +177,7 @@ const SupplyCollateralModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Available balance</span>
               <span className="font-medium">
-                {formatUnits(asset?.userBalance || 0,18)}
+                {formatUnits(asset?.userBalance || 0, 18)}
               </span>
             </div>
           </div>
@@ -218,7 +185,7 @@ const SupplyCollateralModal = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Supply Amount ({asset?._name})</label>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Max: {formatUnits(asset?.userBalance || 0,18)}</span>
+              <span>Max: {formatUnits(asset?.userBalance || 0, 18)}</span>
             </div>
             <div className="relative">
               <Input
@@ -231,33 +198,33 @@ const SupplyCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={supplyAmount === (parseFloat(formatUnits(asset?.userBalance || "0", 18).toString().replace(/,/g, "")) * 0.1).toString() ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick(0.1)}
+                onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
               >
                 10%
               </Button>
               <Button
-                variant={supplyAmount === (parseFloat(formatUnits(asset?.userBalance || "0", 18).toString().replace(/,/g, "")) * 0.25).toString() ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick(0.25)}
+                onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
               >
                 25%
               </Button>
               <Button
-                variant={supplyAmount === (parseFloat(formatUnits(asset?.userBalance || "0", 18).toString().replace(/,/g, "")) * 0.5).toString() ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick(0.5)}
+                onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
               >
                 50%
               </Button>
               <Button
-                variant={supplyAmount === formatUnits(asset?.userBalance || 0, 18) ? "default" : "outline"}
+                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 100n) / 100n; } catch { return false; } })() ? "default" : "outline"}
                 size="sm"
-                onClick={() => handlePercentageClick()}
+                onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
               >
                 100%
