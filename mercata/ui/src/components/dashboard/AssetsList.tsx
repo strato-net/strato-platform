@@ -17,6 +17,8 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [showTable, setShowTable] = useState(false);
+  const [showAllEarningAssets, setShowAllEarningAssets] = useState(false);
+  const [showAllNonEarningAssets, setShowAllNonEarningAssets] = useState(false);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
@@ -24,25 +26,6 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
       setIsDepositModalOpen(true);
     }
   };
-
-  const getTokenName = (token: Token) => {
-    return token["BlockApps-Mercata-ERC20"]?._name || "";
-  };
-
-  const getTokenSymbol = (token: Token) => {
-    return token["BlockApps-Mercata-ERC20"]?._symbol || "";
-  };
-
-  const getTokenValue = (token: Token) => {
-    return token.value || "-";
-  };
-
-  const getTokenTotalSupply = (token: Token) => {
-    return token["BlockApps-Mercata-ERC20"]?._totalSupply || "-";
-  };
-
-  // Ensure tokens is an array and has items
-  const validTokens = Array.isArray(tokens) ? tokens : [];
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
@@ -65,12 +48,15 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
       <div>
         <div className="p-4 text-right border-t border-gray-100 flex justify-between">
           <span className="font-bold">Earning Assets</span>
-          <a
-            href="/dashboard/deposits"
-            className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end"
+          <button
+            onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
+            className="text-sm bg-strato-blue hover:bg-strato-blue/90 text-white px-3 py-1 rounded"
           >
-            View All <ArrowUpRight size={14} className="ml-1" />
-          </a>
+            <div className="flex gap-1 justify-center items-center">
+              {showAllEarningAssets ? <ArrowUp size={20}/> : <ArrowDown size={20} />}
+              <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
+            </div>
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -103,7 +89,7 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
                   </td>
                 </tr>
                 : tokens.length > 0 ? (
-                  tokens.slice(0, 4).map((asset, index) => (
+                  (showAllEarningAssets ? tokens : tokens.slice(0, 4)).map((asset, index) => (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="py-4 px-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -192,12 +178,17 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
                 <span>{showTable ? "Hide" : "Show"}</span>
               </div>
             </button>
-            <a
-              href="/dashboard/deposits"
-              className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-end"
-            >
-              View All <ArrowUpRight size={14} className="ml-1" />
-            </a>
+            {showTable && (
+              <button
+                onClick={() => setShowAllNonEarningAssets(!showAllNonEarningAssets)}
+                className="text-sm bg-strato-blue hover:bg-strato-blue/90 text-white px-3 py-1 rounded"
+              >
+                <div className="flex gap-1 justify-center items-center">
+                  {showAllNonEarningAssets ? <ArrowUp size={20}/> : <ArrowDown size={20} />}
+                  <span>{showAllNonEarningAssets ? "Show Less" : "View All"}</span>
+                </div>
+              </button>
+            )}
           </div>
         </div>
         <div
@@ -235,7 +226,7 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
                     </td>
                   </tr>
                   : inActiveTokens.length > 0 ? (
-                    inActiveTokens.slice(0, 4).map((asset, index) => (
+                    (showAllNonEarningAssets ? inActiveTokens : inActiveTokens.slice(0, 4)).map((asset, index) => (
                       <tr key={index} className="hover:bg-gray-50 transition-colors">
                         <td className="py-4 px-4 whitespace-nowrap">
                           <div className="flex items-center">
