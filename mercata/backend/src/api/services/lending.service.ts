@@ -49,8 +49,8 @@ export const getPool = async (
       : {
           ...(userAddress
             ? {
-                "lendingPool.userLoan.user": `eq.${userAddress}`,
-                "collateralVault.userCollaterals.user": `eq.${userAddress}`,
+                "lendingPool.userLoan.key": `eq.${userAddress}`,
+                "collateralVault.userCollaterals.key": `eq.${userAddress}`,
               }
             : {}),
         }),
