@@ -216,7 +216,7 @@ const AssetsList = ({
                     <span>
                       {showAllNonEarningAssets ? "Show Less" : "View All"}
                     </span>
-                    {showAllEarningAssets ? (
+                    {showAllNonEarningAssets ? (
                       <ArrowUp size={20} />
                     ) : (
                       <ArrowDown size={20} />
@@ -230,9 +230,9 @@ const AssetsList = ({
               >
                 <div className="flex gap-1 justify-center items-center">
                   {showNonEarningAssetsTable ? (
-                    <ChevronDown size={20} />
-                  ) : (
                     <ChevronUp size={20} />
+                  ) : (
+                    <ChevronDown size={20} />
                   )}
                 </div>
               </Button>
