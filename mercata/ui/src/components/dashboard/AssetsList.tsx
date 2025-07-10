@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpRight, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import DepositModal from "./DepositModal";
 import DepositOptionsModal from "./DepositOptionsModal";
@@ -13,10 +13,16 @@ interface AssetsProps {
   inActiveTokens: Token[];
 }
 
-const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: AssetsProps) => {
+const AssetsList = ({
+  loading,
+  tokens,
+  inActiveTokens,
+  isDashboard = true,
+}: AssetsProps) => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [showTable, setShowTable] = useState(false);
+  const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
+    useState(false);
   const [showAllEarningAssets, setShowAllEarningAssets] = useState(false);
   const [showAllNonEarningAssets, setShowAllNonEarningAssets] = useState(false);
 
@@ -35,7 +41,6 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
           {isDashboard && (
             <Button
               size="sm"
-              className="bg-strato-blue hover:bg-strato-blue/90 text-white rounded-md flex items-center gap-1"
             >
               <Plus size={16} />
               <a
@@ -52,15 +57,20 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
       <div>
         <div className="p-4 text-right border-t border-gray-100 flex justify-between">
           <span className="font-bold">Earning Assets</span>
-          <button
+          <Button
+            size="sm"
+            className="flex items-center gap-1"
             onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
-            className="text-sm bg-strato-blue hover:bg-strato-blue/90 text-white px-3 py-1 rounded"
           >
             <div className="flex gap-1 justify-center items-center">
-              {showAllEarningAssets ? <ArrowUp size={20}/> : <ArrowDown size={20} />}
               <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
+              {showAllEarningAssets ? (
+                <ArrowUp size={20} />
+              ) : (
+                <ArrowDown size={20} />
+              )}
             </div>
-          </button>
+          </Button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -84,17 +94,24 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading ?
+              {loading ? (
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td colSpan={5} className="py-4 px-4 whitespace-nowrap w-full">
+                  <td
+                    colSpan={5}
+                    className="py-4 px-4 whitespace-nowrap w-full"
+                  >
                     <div className="w-full flex justify-center items-center h-16">
                       <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
                     </div>
                   </td>
                 </tr>
-                : tokens.length > 0 ? (
-                  (showAllEarningAssets ? tokens : tokens.slice(0, 4)).map((asset, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors">
+              ) : tokens.length > 0 ? (
+                (showAllEarningAssets ? tokens : tokens.slice(0, 4)).map(
+                  (asset, index) => (
+                    <tr
+                      key={index}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
                       <td className="py-4 px-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="ml-3">
@@ -109,129 +126,167 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.["price"] ? "-" :
-                            `$${parseFloat(formatUnits(BigInt(asset.price), 18)).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}`
-                          }
+                          {!asset?.["price"]
+                            ? "-"
+                            : `$${parseFloat(
+                                formatUnits(BigInt(asset.price), 18)
+                              ).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <div
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${asset?.["change"] >= 0
-                            ? "bg-green-50 text-green-600"
-                            : "bg-red-50 text-red-600"
-                            }`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            asset?.["change"] >= 0
+                              ? "bg-green-50 text-green-600"
+                              : "bg-red-50 text-red-600"
+                          }`}
                         >
                           {asset?.["change"] !== undefined
-                            ? `${asset?.["change"] >= 0 ? "+" : ""}${asset?.["change"]
-                            }%`
+                            ? `${asset?.["change"] >= 0 ? "+" : ""}${
+                                asset?.["change"]
+                              }%`
                             : "-"}
                         </div>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.balance ? "-" :
-                            parseFloat(formatUnits(BigInt(asset.balance), 18)).toLocaleString(undefined, {
-                              minimumFractionDigits: 1,
-                              maximumFractionDigits: 4,
-                            })
-                          }
+                          {!asset?.balance
+                            ? "-"
+                            : parseFloat(
+                                formatUnits(BigInt(asset.balance), 18)
+                              ).toLocaleString(undefined, {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 4,
+                              })}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.["price"] || !asset?.balance ? "-" :
-                            `$${(parseFloat(formatUnits(BigInt(asset.price), 18)) *
-                              parseFloat(formatUnits(BigInt(asset.balance), 18))
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}`
-                          }
+                          {!asset?.["price"] || !asset?.balance
+                            ? "-"
+                            : `$${(
+                                parseFloat(
+                                  formatUnits(BigInt(asset.price), 18)
+                                ) *
+                                parseFloat(
+                                  formatUnits(BigInt(asset.balance), 18)
+                                )
+                              ).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`}
                         </p>
                       </td>
                     </tr>
-                  ))) :
-                  (
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td colSpan={5} className="py-4 px-4 whitespace-nowrap w-full">
-                        <div className="w-full flex justify-center items-center h-16">
-                          <div>No data to show</div>
-                        </div>
-                      </td>
-                    </tr>
                   )
-              }
+                )
+              ) : (
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td
+                    colSpan={5}
+                    className="py-4 px-4 whitespace-nowrap w-full"
+                  >
+                    <div className="w-full flex justify-center items-center h-16">
+                      <div>No data to show</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {isDashboard && <div>
-        <div className="p-4 text-right border-t border-gray-100 flex justify-between">
-          <span className="font-bold">Non earning Assets</span>
-          <div className="flex gap-4">
-            <button
-              onClick={() => setShowTable((prev) => !prev)}
-              className="text-sm bg-strato-blue hover:bg-strato-blue/90 text-white px-3 py-1 rounded"
-            >
-              <div className="flex gap-1 justify-center items-center">
-                {showTable ? <ArrowUp size={20}/> : <ArrowDown size={20} />}
-                <span>{showTable ? "Hide" : "Show"}</span>
-              </div>
-            </button>
-            {showTable && (
-              <button
-                onClick={() => setShowAllNonEarningAssets(!showAllNonEarningAssets)}
-                className="text-sm bg-strato-blue hover:bg-strato-blue/90 text-white px-3 py-1 rounded"
+      {isDashboard && (
+        <div>
+          <div className="p-4 text-right border-t border-gray-100 flex justify-between">
+            <span className="font-bold">Non earning Assets</span>
+            <div className="flex gap-4">
+              {showNonEarningAssetsTable && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      setShowAllNonEarningAssets(!showAllNonEarningAssets)
+                    }
+                  >
+                    <span>
+                      {showAllNonEarningAssets ? "Show Less" : "View All"}
+                    </span>
+                    {showAllEarningAssets ? (
+                      <ArrowUp size={20} />
+                    ) : (
+                      <ArrowDown size={20} />
+                    )}
+                  </Button>
+                </>
+              )}
+              <Button
+                size="sm"
+                onClick={() => setShowNonEarningAssetsTable((prev) => !prev)}
               >
                 <div className="flex gap-1 justify-center items-center">
-                  {showAllNonEarningAssets ? <ArrowUp size={20}/> : <ArrowDown size={20} />}
-                  <span>{showAllNonEarningAssets ? "Show Less" : "View All"}</span>
+                  {showNonEarningAssetsTable ? (
+                    <ChevronDown size={20} />
+                  ) : (
+                    <ChevronUp size={20} />
+                  )}
                 </div>
-              </button>
-            )}
+              </Button>
+            </div>
           </div>
-        </div>
-        <div
-          className={`transition-all duration-300 ease-in-out overflow-hidden ${showTable ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
+          <div
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              showNonEarningAssetsTable
+                ? "max-h-[2000px] opacity-100"
+                : "max-h-0 opacity-0"
             }`}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="w-[28%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                    Asset
-                  </th>
-                  <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                    Price
-                  </th>
-                  <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                    Change
-                  </th>
-                  <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                    Holdings
-                  </th>
-                  <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                    Value
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ?
-                  <tr className="hover:bg-gray-50 transition-colors">
-                    <td colSpan={5} className="py-4 px-4 whitespace-nowrap w-full">
-                      <div className="w-full flex justify-center items-center h-16">
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-                      </div>
-                    </td>
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="w-[28%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                      Asset
+                    </th>
+                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                      Price
+                    </th>
+                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                      Change
+                    </th>
+                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                      Holdings
+                    </th>
+                    <th className="w-[18%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                      Value
+                    </th>
                   </tr>
-                  : inActiveTokens.length > 0 ? (
-                    (showAllNonEarningAssets ? inActiveTokens : inActiveTokens.slice(0, 4)).map((asset, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td
+                        colSpan={5}
+                        className="py-4 px-4 whitespace-nowrap w-full"
+                      >
+                        <div className="w-full flex justify-center items-center h-16">
+                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : inActiveTokens.length > 0 ? (
+                    (showAllNonEarningAssets
+                      ? inActiveTokens
+                      : inActiveTokens.slice(0, 4)
+                    ).map((asset, index) => (
+                      <tr
+                        key={index}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="py-4 px-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="ml-3">
@@ -246,66 +301,80 @@ const AssetsList = ({ loading, tokens, inActiveTokens, isDashboard = true }: Ass
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
                           <p className="font-medium text-gray-900">
-                            {!asset?.["price"] ? "-" :
-                              `$${parseFloat(formatUnits(BigInt(asset.price), 18)).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            }
+                            {!asset?.["price"]
+                              ? "-"
+                              : `$${parseFloat(
+                                  formatUnits(BigInt(asset.price), 18)
+                                ).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`}
                           </p>
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
                           <div
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${asset?.["change"] >= 0
-                              ? "bg-green-50 text-green-600"
-                              : "bg-red-50 text-red-600"
-                              }`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              asset?.["change"] >= 0
+                                ? "bg-green-50 text-green-600"
+                                : "bg-red-50 text-red-600"
+                            }`}
                           >
                             {asset?.["change"] !== undefined
-                              ? `${asset?.["change"] >= 0 ? "+" : ""}${asset?.["change"]
-                              }%`
+                              ? `${asset?.["change"] >= 0 ? "+" : ""}${
+                                  asset?.["change"]
+                                }%`
                               : "-"}
                           </div>
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
                           <p className="font-medium text-gray-900">
-                            {!asset?.balance ? "-" :
-                              parseFloat(formatUnits(BigInt(asset.balance), 18)).toLocaleString(undefined, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 4,
-                              })
-                            }
+                            {!asset?.balance
+                              ? "-"
+                              : parseFloat(
+                                  formatUnits(BigInt(asset.balance), 18)
+                                ).toLocaleString(undefined, {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 4,
+                                })}
                           </p>
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap text-right">
                           <p className="font-medium text-gray-900">
-                            {!asset?.["price"] || !asset?.balance ? "-" :
-                              `$${(parseFloat(formatUnits(BigInt(asset.price), 18)) *
-                                parseFloat(formatUnits(BigInt(asset.balance), 18))
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            }
+                            {!asset?.["price"] || !asset?.balance
+                              ? "-"
+                              : `$${(
+                                  parseFloat(
+                                    formatUnits(BigInt(asset.price), 18)
+                                  ) *
+                                  parseFloat(
+                                    formatUnits(BigInt(asset.balance), 18)
+                                  )
+                                ).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`}
                           </p>
                         </td>
                       </tr>
-                    ))) :
-                    (
-                      <tr className="hover:bg-gray-50 transition-colors">
-                        <td colSpan={5} className="py-4 px-4 whitespace-nowrap w-full">
-                          <div className="w-full flex justify-center items-center h-16">
-                            <div>No data to show</div>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                }
-              </tbody>
-            </table>
+                    ))
+                  ) : (
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td
+                        colSpan={5}
+                        className="py-4 px-4 whitespace-nowrap w-full"
+                      >
+                        <div className="w-full flex justify-center items-center h-16">
+                          <div>No data to show</div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>}
+      )}
 
       <DepositOptionsModal
         isOpen={isOptionsModalOpen}
