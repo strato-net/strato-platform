@@ -17,7 +17,7 @@ interface WithdrawModalProps {
   loanData: any;
   isOpen: boolean;
   onClose: () => void;
-  onWithdraw: (amount: string) => Promise<void>;
+  onWithdraw: (amount: string) => void;
   usdstBalance?: string;
 }
 
@@ -89,7 +89,7 @@ const calculateHealthImpact = (
 
   const healthImpact = newHealthFactor - currentHealthFactor;
   const isHealthy = newHealthFactor >= 1.0;
-  
+
   return {
     currentHealthFactor,
     newHealthFactor,
@@ -134,7 +134,7 @@ const WithdrawCollateralModal = ({
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
-      setWithdrawAmount(value || '0');
+      setWithdrawAmount(value);
     }
   };
 
@@ -153,8 +153,8 @@ const WithdrawCollateralModal = ({
   };
 
   const handleClose = () => {
-    setDisplayAmount('')
-    setWithdrawAmount('0')
+    setDisplayAmount("")
+    setWithdrawAmount("")
     onClose()
   }
 

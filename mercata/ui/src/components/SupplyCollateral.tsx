@@ -25,6 +25,7 @@ const addCommasToInput = (value: string) => {
   if (!value) return '';
   const parts = value.split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
   if (parts.length === 2) {
     return integerPart + '.' + parts[1];
   }
@@ -132,7 +133,7 @@ const SupplyCollateralModal = ({
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
-      setSupplyAmount(value || '0');
+      setSupplyAmount(value);
     }
   };
 
@@ -151,8 +152,8 @@ const SupplyCollateralModal = ({
   };
 
   const handleClose = () => {
-    setDisplayAmount('')
-    setSupplyAmount('0')
+    setDisplayAmount("")
+    setSupplyAmount("")
     onClose()
   }
   
@@ -177,7 +178,7 @@ const SupplyCollateralModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Available balance</span>
               <span className="font-medium">
-                {formatUnits(asset?.userBalance || 0, 18)}
+                {formatUnits(asset?.userBalance || 0,18)}
               </span>
             </div>
           </div>
@@ -185,7 +186,7 @@ const SupplyCollateralModal = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Supply Amount ({asset?._name})</label>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Max: {formatUnits(asset?.userBalance || 0, 18)}</span>
+              <span>Max: {formatUnits(asset?.userBalance || 0,18)}</span>
             </div>
             <div className="relative">
               <Input
