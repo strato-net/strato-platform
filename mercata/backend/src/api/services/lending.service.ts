@@ -47,8 +47,12 @@ export const getPool = async (
     ...(select
       ? {}
       : {
-          "lendingPool.userLoan.key": `eq.${userAddress}`,
-          "collateralVault.userCollaterals.key": `eq.${userAddress}`,
+          ...(userAddress
+            ? {
+                "lendingPool.userLoan.user": `eq.${userAddress}`,
+                "collateralVault.userCollaterals.user": `eq.${userAddress}`,
+              }
+            : {}),
         }),
     address: `eq.${lendingRegistry}`,
   };
@@ -310,22 +314,20 @@ export const liquidityAndBalance = async (
   userAddress: string,
 ) => {
   // Fetch pool data with optimized query
-  const registry = await getPool(accessToken, undefined, { 
-    select: `lendingPool:lendingPool_fkey(borrowableAsset,mToken,assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text))`
-  });
+  const registry = await getPool(accessToken, undefined);
   
   const { borrowableAsset, mToken, assetConfigs, userLoan } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
-  
+
   if (!borrowableAsset || !mToken) {
     throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  // Fetch token metadata with user balances included
+  // Fetch token metadata with balances included
   const tokenData = await getTokens(accessToken, { 
     address: `in.(${borrowableAsset},${mToken})`, 
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": `eq.${userAddress}`
+    "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
   });
 
   // Extract token data and user balances
@@ -333,21 +335,30 @@ export const liquidityAndBalance = async (
   const mTokenInfo = tokenData.find(token => token.address === mToken);
 
   // Extract user balance from token metadata
-  const borrowableBalance = borrowableToken?.balances?.[0]?.balance || "0";
-  const mTokenBalance = mTokenInfo?.balances?.[0]?.balance || "0";
+  const borrowableBalance = borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
+  const mTokenBalance = mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
 
   // Extract total supply values with fallbacks
   const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
-  const actualUnderlying = borrowableToken?._totalSupply || "0";
-
+  const actualUnderlying = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0";
   // Get borrowable asset config
   const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
 
-  // Build price map from token data (getTokens already includes prices)
-  const priceMap = new Map<string, string>([
-    [borrowableAsset, borrowableToken?.price?.toString() || "0"],
-    [mToken, mTokenInfo?.price?.toString() || "0"]
-  ]);
+  // Build price map from oracle data
+  const priceMap = new Map<string, string>();
+  
+  // Add prices from oracle data
+  (registry.oracle?.prices || []).forEach((price: any) => {
+    priceMap.set(price.asset, price.price);
+  });
+  
+  // Add fallback prices for borrowable asset and mToken from token data
+  if (!priceMap.has(borrowableAsset)) {
+    priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
+  }
+  if (!priceMap.has(mToken)) {
+    priceMap.set(mToken, mTokenInfo?.price?.toString() || "0");
+  }
 
   // Calculate all pool metrics in parallel
   const currentTime = Math.floor(Date.now() / 1000);
@@ -379,12 +390,11 @@ export const liquidityAndBalance = async (
   const totalUSDSTSupplied = calculateTotalUSDSTSupplied(totalMTokenSupply, exchangeRate);
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
   const availableLiquidity = BigInt(totalUSDSTSupplied) - BigInt(totalBorrowed);
-  const conversionRate = Number(exchangeRate) / Number(10n ** 18n);
 
-  // Calculate max withdrawable amount
-  const userMTokenBalance = BigInt(mTokenBalance.balance || "0");
+  // Calculate max withdrawable amount using exchange rate directly
+  const userMTokenBalance = BigInt(mTokenBalance);
   const maxWithdrawableUSDST = userMTokenBalance > 0n 
-    ? ((userMTokenBalance * BigInt(Math.floor(conversionRate * 1e6))) / BigInt(1e6)).toString()
+    ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n)).toString()
     : "0";
 
   // Destructure token data to exclude balances array
@@ -409,7 +419,7 @@ export const liquidityAndBalance = async (
     totalCollateralValue,
     supplyAPY: apyData.supplyAPY,
     borrowAPY: apyData.borrowAPY,
-    conversionRate,
+    exchangeRate,
   };
 };
 

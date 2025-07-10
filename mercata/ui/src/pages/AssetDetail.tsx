@@ -48,7 +48,9 @@ const AssetDetail = () => {
 
   
   useEffect(() => {
-    fetchTokens(userAddress)
+    if (userAddress) {
+      fetchTokens(userAddress)
+    }
   }, [userAddress])
 
   useEffect(() => {

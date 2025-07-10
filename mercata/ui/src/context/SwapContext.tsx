@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { SwappableToken } from '@/interface';
 import {api} from '@/lib/axios';
+import { useUser } from '@/context/UserContext';
 
 type SwapContextType = {
   swappableTokens: SwappableToken[];
@@ -53,6 +54,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lpTokens, setLpTokens] = useState<any>([])
+  const { isLoggedIn } = useUser();
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -251,8 +253,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    fetchSwappableTokens();
-  }, [fetchSwappableTokens]);
+    if (isLoggedIn) {
+      fetchSwappableTokens();
+    }
+  }, [isLoggedIn, fetchSwappableTokens]);
 
   return (
     <SwapContext.Provider

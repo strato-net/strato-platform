@@ -64,12 +64,15 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
       const amountWei = parseUnits(withdrawAmount, 18);
-      const depositedBalanceWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST) ?? 0n;
+      const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
+      const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000"); // Default 1:1 if not available
       const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
       const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
       
+      // Calculate how many mUSDST would be burned for this withdrawal
+      const mTokensToBurn = (amountWei * (10n ** 18n)) / exchangeRateWei;
       if (amountWei <= 0n) return false;
-      if (amountWei > depositedBalanceWei) return false;
+      if (mTokensToBurn > userMTokenBalanceWei) return false; // Check if user has enough mUSDST
       if (usdstBalanceWei < feeWei) return false;
       return true;
     } catch {
@@ -222,20 +225,20 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      `$${Number(
+                      `${Number(
                         formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)
                       ).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}`
                     ) : (
-                      "$0.00"
+                      "0.00"
                     )}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Conversion Rate</span>
-                  <span className="font-medium">{liquidityInfo?.conversionRate ? "1 mUSDST = " + liquidityInfo?.conversionRate + " USDST" : "N/A"}</span>
+                  <span className="font-medium">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>
@@ -359,14 +362,9 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                       : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
-                        ? Number(
-                          formatUnits(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || 0, 18)
-                        ).toLocaleString(undefined, {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 4,
-                        })
+                        ? formatUnits(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || 0, 18)
                         : "0.00"}{" "}
-                    USDST
+                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18) : "0.00"} mUSDST)
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
