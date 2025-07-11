@@ -1,14 +1,21 @@
-import React from "react";
+import React, { useState } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
+import MobileSidebar from "../components/dashboard/MobileSidebar";
 import SwapWidget from "@/components/swap/SwapWidget";
 
 const SwapAsset = () => {
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
-      <div className="flex-1 ml-64">
-        <DashboardHeader title="Swap Assets" />
+      <MobileSidebar 
+        isOpen={isMobileSidebarOpen} 
+        onClose={() => setIsMobileSidebarOpen(false)} 
+      />
+      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
+        <DashboardHeader title="Swap Assets" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="p-6">
           <div className="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>

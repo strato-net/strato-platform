@@ -6,6 +6,7 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
+import MobileSidebar from "../components/dashboard/MobileSidebar";
 import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
 import RepayModal from "@/components/dashboard/RepayModal";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ const BorrowNew = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [supplyLoading, setSupplyLoading] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
 
   const { toast } = useToast();
@@ -231,11 +233,14 @@ const BorrowNew = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
-
-      <div className="flex-1 ml-64">
-        <DashboardHeader title="Borrow" />
+      <MobileSidebar 
+        isOpen={isMobileSidebarOpen} 
+        onClose={() => setIsMobileSidebarOpen(false)} 
+      />
+      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
+        <DashboardHeader title="Borrow" onMenuClick={() => setIsMobileSidebarOpen(true)} />
 
         <main className="p-6">
           <div className="mb-8">
@@ -243,7 +248,7 @@ const BorrowNew = () => {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Elligible Collateral</CardTitle>
+              <CardTitle>Eligible Collateral</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>

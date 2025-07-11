@@ -58,8 +58,10 @@ export const constants = (() => {
   ];
   const registrySelectFields = [
     "address",
-    "lendingPool: lendingPool_fkey(" +
+    "lendingPool:lendingPool_fkey(" +
       "address," +
+      "borrowableAsset," +
+      "mToken," +
       `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value),` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`,
     "oracle:priceOracle_fkey(" +

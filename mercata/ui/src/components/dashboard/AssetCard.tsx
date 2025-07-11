@@ -12,19 +12,24 @@ interface AssetCardProps {
   symbol: string;
   price: string;
   deposit: string;
+  collateralBalance?: string;
   image?: string;
   customDecimals: number;
 }
 
-const AssetCard = ({ id, name, symbol, price, deposit, image, customDecimals }: AssetCardProps) => {
+const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image, customDecimals }: AssetCardProps) => {
   // Safely handle price and deposit as BigInt for formatUnits
   let formattedPrice = "0.00";
   let formattedDeposit = "0.00";
+  let formattedCollateral = "0.00";
   try {
     formattedPrice = formatUnits(BigInt(price || "0"), customDecimals);
   } catch {}
   try {
     formattedDeposit = formatUnits(BigInt(deposit || "0"), customDecimals);
+  } catch {}
+  try {
+    formattedCollateral = formatUnits(BigInt(collateralBalance || "0"), customDecimals);
   } catch {}
 
   return (
@@ -61,6 +66,10 @@ const AssetCard = ({ id, name, symbol, price, deposit, image, customDecimals }: 
           <div className="flex justify-between">
             <span className="text-sm text-gray-500">Asset Deposits</span>
             <span className="font-medium">{formattedDeposit}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Collateral</span>
+            <span className="font-medium">{formattedCollateral}</span>
           </div>
         </div>
 

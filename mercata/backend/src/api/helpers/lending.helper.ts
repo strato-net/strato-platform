@@ -42,21 +42,26 @@ export const calculateAccruedInterest = (
   const timeElapsed = Math.max(0, currentTime - Number(loan.lastIntCalculated));
   const hoursElapsed = BigInt(Math.floor(timeElapsed / 3600)); // Convert to hours
 
-  // Calculate accrued interest: (principal * rate * hours) / (8760 * 10000)
+  // Calculate NEW interest since last calculation: (principal * rate * hours) / (8760 * 10000)
   // 8760 hours per year, 10000 for basis points
-  const accruedInterest = (
+  const newInterest = (
     (toBig(loan.principalBalance) * BigInt(interestRate) * hoursElapsed) /
     BigInt(8760 * 10000)
-  ).toString();
+  );
+
+  // Calculate TOTAL accrued interest (existing interestOwed + new interest)
+  const totalAccruedInterest = toBig(loan.interestOwed) + newInterest;
 
   // Calculate new total owed
   const newTotalOwed = (
     toBig(loan.principalBalance) + 
-    toBig(loan.interestOwed) + 
-    toBig(accruedInterest)
+    totalAccruedInterest
   ).toString();
 
-  return { accruedInterest, newTotalOwed };
+  return { 
+    accruedInterest: totalAccruedInterest.toString(), 
+    newTotalOwed 
+  };
 };
 
 /**

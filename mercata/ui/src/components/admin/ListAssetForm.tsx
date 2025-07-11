@@ -56,7 +56,7 @@ const ListAssetForm = () => {
   useEffect(() => {
     fetchData();
     if (userAddress) {
-      fetchTokens(userAddress);
+      fetchTokens();
     }
   }, [userAddress]);
 
