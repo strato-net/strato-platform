@@ -108,7 +108,10 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
   };
 
   const handlePercentageClick = (percent?: bigint) => {
-    const amount = formatUnits((BigInt(loan?.totalAmountOwed || 0) * percent) / 100n, 18);
+    const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+    const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
+    const maxAmount = available < totalOwed ? available : totalOwed;
+    const amount = formatUnits((maxAmount * percent) / 100n, 18);
     setRepayAmount(amount);
     setDisplayAmount(addCommasToInput(amount));
   };
@@ -148,17 +151,45 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           <label className="text-sm font-medium">Repay Amount (USDST)</label>
           <div className="flex justify-between text-xs text-gray-500">
             <span>Min: $0.01</span>
-            <span>Max: ${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
+            <span>Max: ${(() => {
+              const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+              const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
+              const max = available < totalOwed ? available : totalOwed;
+              return formatCurrency(formatUnits(max > 0n ? max : 0n, 18));
+            })()}</span>
           </div>
           <div className="relative">
             <Input
               placeholder="0.00"
-              className={`pr-8 ${(() => { try { return parseUnits(repayAmount || "0", 18) > BigInt(loan?.totalAmountOwed || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
+              className={`pr-8 ${(() => { 
+                const repayAmountWei = parseUnits(repayAmount || "0", 18);
+                const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+                const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
+                return repayAmountWei > totalOwed || repayAmountWei > available ? 'text-red-600' : ''; 
+              })()}`}
               value={displayAmount}
               onChange={handleAmountChange}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
           </div>
+          
+          {/* USDST Balance Display */}
+          <div className="text-xs text-gray-500">
+            Your USDST Balance: ${formatCurrency(formatUnits(usdstBalance || "0", 18))} (${formatCurrency(formatUnits(BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18), 18))} available for repayment)
+          </div>
+          
+          {/* Balance validation warnings */}
+          {(() => {
+            const repayAmountWei = parseUnits(repayAmount || "0", 18);
+            const totalNeeded = repayAmountWei + parseUnits(REPAY_FEE, 18);
+            const balance = BigInt(usdstBalance || "0");
+            
+            return repayAmount && totalNeeded > balance ? (
+              <p className="text-red-600 text-sm mt-1">
+                Insufficient USDST balance. You need ${formatCurrency(formatUnits(totalNeeded, 18))} USDST (${formatCurrency(formatUnits(repayAmountWei, 18))} + ${REPAY_FEE} fee) but have ${formatCurrency(formatUnits(balance, 18))} USDST.
+              </p>
+            ) : null;
+          })()}
           
           <div className="flex gap-2">
             <Button
@@ -269,9 +300,9 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               (() => { try { return parseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
               (() => { try { return parseUnits(repayAmount || "0", 18) > BigInt(loan?.totalAmountOwed || 0); } catch { return true; } })() ||
               (() => {
-                const feeAmount = parseUnits(REPAY_FEE, 18);
-                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                return usdstBalanceBigInt < feeAmount;
+                const repayAmountWei = parseUnits(repayAmount || "0", 18);
+                const totalNeeded = repayAmountWei + parseUnits(REPAY_FEE, 18);
+                return BigInt(usdstBalance || "0") < totalNeeded;
               })()
             }
             className="px-6"
