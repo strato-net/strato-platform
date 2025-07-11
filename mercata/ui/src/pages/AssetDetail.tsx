@@ -80,9 +80,9 @@ const AssetDetail = () => {
 
   if (!asset) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-gray-50">
         <DashboardSidebar />
-        <div className="flex-1 ml-64">
+        <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
           <DashboardHeader title="Asset Not Found" />
           {loading ?
             <div className="flex justify-center items-center h-40">
@@ -112,10 +112,10 @@ const AssetDetail = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
 
-      <div className="flex-1 ml-64">
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
         <DashboardHeader title={`${asset?.token?._symbol} Details`} />
 
         <main className="p-6">
