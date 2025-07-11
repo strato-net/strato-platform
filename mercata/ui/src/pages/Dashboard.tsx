@@ -116,14 +116,14 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <AssetSummary
               title="Net Balance"
-              value={formatBalance(totalBalance)}
+              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
 
             <AssetSummary
               title="CATA Rewards"
-              value={formatBalance(cataBalance)}
+              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />
@@ -131,8 +131,8 @@ const Dashboard = () => {
             <AssetSummary
               title="Borrowed"
               value={(loans as any)?.totalAmountOwed 
-                ? `$${parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18)).toFixed(2)}`
-                : "$0.00"
+                ? `${parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18)).toFixed(2)} USDST`
+                : "0.00 USDST"
               }
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
