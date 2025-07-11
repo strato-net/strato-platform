@@ -60,7 +60,7 @@ const AssetsList = ({
           <span className="font-bold">Earning Assets</span>
           <Button
             size="sm"
-            className="flex items-center gap-1"
+            className="hidden sm:flex items-center gap-1"
             onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
           >
             <div className="flex gap-1 justify-center items-center">
@@ -234,6 +234,24 @@ const AssetsList = ({
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Mobile View All button - shown at bottom */}
+        <div className="sm:hidden p-4 border-t border-gray-100">
+          <Button
+            size="sm"
+            className="w-full flex items-center justify-center gap-1"
+            onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
+          >
+            <div className="flex gap-1 justify-center items-center">
+              <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
+              {showAllEarningAssets ? (
+                <ArrowUp size={20} />
+              ) : (
+                <ArrowDown size={20} />
+              )}
+            </div>
+          </Button>
         </div>
       </div>
 
