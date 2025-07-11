@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
@@ -121,9 +122,12 @@ const AssetsList = ({
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <p className="font-medium text-gray-900 truncate">
+                                  <Link
+                                    to={`/dashboard/deposits/${asset?.token?.address || ''}`}
+                                    className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                  >
                                     {asset?.token?._name || ""}
-                                  </p>
+                                  </Link>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>{asset?.token?._name || ""}</p>
@@ -295,9 +299,12 @@ const AssetsList = ({
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <p className="font-medium text-gray-900 truncate">
+                                    <Link
+                                      to={`/dashboard/deposits/${asset?.token?.address || ''}`}
+                                      className="font-medium text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    >
                                       {asset?.token?._name || ""}
-                                    </p>
+                                    </Link>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>{asset?.token?._name || ""}</p>
