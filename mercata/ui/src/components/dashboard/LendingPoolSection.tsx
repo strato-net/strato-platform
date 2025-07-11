@@ -323,7 +323,7 @@ const LendingPoolSection = () => {
                   {/* Mobile Button */}
                   <Button
                     onClick={() => handleLiquidityAction("deposit")}
-                    className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-3 sm:hidden"
+                    className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4 sm:hidden"
                     disabled={loading || isProcessing || !isDepositAmountValid()}
                   >
                     {isProcessing ? (
@@ -407,7 +407,7 @@ const LendingPoolSection = () => {
                   <Button
                     onClick={() => handleLiquidityAction("withdraw")}
                     variant="outline"
-                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-3 sm:hidden"
+                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-4 sm:hidden"
                     disabled={
                       loadingLiquidity ||
                       isProcessing ||

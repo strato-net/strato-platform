@@ -35,6 +35,8 @@ const LiquidationsSection: React.FC = () => {
       <h3 className="font-semibold mb-2">Liquidatable Positions</h3>
       {loading ? (
         <div>Loading...</div>
+      ) : liquidatable.length === 0 ? (
+        <div className="text-gray-500 text-center py-8">No liquidatable positions found.</div>
       ) : (
         <div className="space-y-4">
           {/* Desktop Table View */}
@@ -109,7 +111,7 @@ const LiquidationsSection: React.FC = () => {
           </div>
 
           {/* Mobile Card View */}
-          <div className="md:hidden space-y-4">
+          <div className="block md:hidden space-y-4">
             {liquidatable.map((ln: any) => (
               <div key={ln.id} className="border rounded-lg bg-white shadow-sm">
                 <div 
