@@ -40,27 +40,14 @@ export const getTokens = async (
       throw new Error("Tokens data is empty");
     }
 
-    // Extract user addresses from the balances array
-    const userAddresses = new Set<string>();
-    (response.data as any[]).forEach((token) => {
-      (token.balances || []).forEach((balance: any) => {
-        if (balance.user && typeof balance.user === 'string' && balance.user.trim()) {
-          userAddresses.add(balance.user);
-        }
-      });
-    });
-
     // Process collateral data
     const collateralMap = new Map<string, string>();
-    if (userAddresses.size > 0) {
-      const userAddressesSet = new Set(userAddresses);
-      const userCollaterals = lendingResponse.collateralVault?.userCollaterals || [];
-      userCollaterals
-        .filter((c: any) => c.user && c.asset && c.amount && userAddressesSet.has(c.user)) // Filter by user on backend
-        .forEach((c: any) => {
-          collateralMap.set(`${c.user}-${c.asset}`, c.amount);
-        });
-    }
+    const userCollaterals = lendingResponse.collateralVault?.userCollaterals || [];
+    userCollaterals
+      .filter((c: any) => c.user && c.asset && c.amount && c.amount !== "0")
+      .forEach((c: any) => {
+        collateralMap.set(`${c.user}-${c.asset}`, c.amount);
+      });
 
     // Process price data
     const rawPrices = lendingResponse.oracle?.prices || [];
@@ -106,7 +93,6 @@ export const getBalance = async (
       ...(rawParams.select
         ? {}
         : {
-            value: "gt.0",
             "token.balances.key": `eq.${address}`
           }),
     };
@@ -141,11 +127,13 @@ export const getBalance = async (
       rawPrices.map((p: any) => [p.key, p.value])
     );
 
-    return response.data.map((token: any) => ({
-      ...token,
-      price: priceMap.get(token.address) || "0",
-      collateralBalance: collateralMap.get(token.address) || "0",
-    }));
+    return response.data
+      .map((token: any) => ({
+        ...token,
+        price: priceMap.get(token.address) || "0",
+        collateralBalance: collateralMap.get(token.address) || "0",
+      }))
+      .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
   } catch (error) {
     throw error;
   }
