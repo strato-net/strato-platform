@@ -5,6 +5,7 @@ import {
 } from '@/components/ui/card';
 import { ArrowUpRight } from 'lucide-react';
 import { formatUnits } from 'ethers';
+import { formatNumberForMobile } from '@/lib/utils';
 
 interface AssetCardProps {
   id: string;
@@ -23,13 +24,13 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
   let formattedDeposit = "0.00";
   let formattedCollateral = "0.00";
   try {
-    formattedPrice = formatUnits(BigInt(price || "0"), customDecimals);
+    formattedPrice = formatNumberForMobile(formatUnits(BigInt(price || "0"), customDecimals));
   } catch {}
   try {
-    formattedDeposit = formatUnits(BigInt(deposit || "0"), customDecimals);
+    formattedDeposit = formatNumberForMobile(formatUnits(BigInt(deposit || "0"), customDecimals));
   } catch {}
   try {
-    formattedCollateral = formatUnits(BigInt(collateralBalance || "0"), customDecimals);
+    formattedCollateral = formatNumberForMobile(formatUnits(BigInt(collateralBalance || "0"), customDecimals));
   } catch {}
 
   return (
@@ -60,16 +61,16 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
 
         <div className="space-y-2 mb-4">
           <div className="flex justify-between">
-            <span className="text-sm text-gray-500">Price</span>
-            <span className="font-medium">{formattedPrice}</span>
+            <span className="text-xs sm:text-sm text-gray-500">Price</span>
+            <span className="font-medium text-xs sm:text-sm">{formattedPrice}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sm text-gray-500">Asset Deposits</span>
-            <span className="font-medium">{formattedDeposit}</span>
+            <span className="text-xs sm:text-sm text-gray-500">Asset Deposits</span>
+            <span className="font-medium text-xs sm:text-sm">{formattedDeposit}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sm text-gray-500">Collateral</span>
-            <span className="font-medium">{formattedCollateral}</span>
+            <span className="text-xs sm:text-sm text-gray-500">Collateral</span>
+            <span className="font-medium text-xs sm:text-sm">{formattedCollateral}</span>
           </div>
         </div>
 
