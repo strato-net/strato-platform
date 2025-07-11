@@ -418,7 +418,7 @@ const SwapPoolsSection = () => {
           filteredPools.map((pool, id) => (
             <Card key={id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center">
                     <div className="flex items-center -space-x-2 mr-3">
                       <div
@@ -441,8 +441,8 @@ const SwapPoolsSection = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
+                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                    <div className="text-left sm:text-right">
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">-</div>
                     </div>
@@ -453,7 +453,8 @@ const SwapPoolsSection = () => {
                         onClick={() => handleOpenDepositModal(pool)}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
-                        Deposit
+                        <span className="hidden sm:inline">Deposit</span>
+                        <span className="sm:hidden">+</span>
                       </Button>
                       <Button
                         size="sm"
@@ -464,7 +465,8 @@ const SwapPoolsSection = () => {
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
                       >
                         <BanknoteIcon className="mr-1 h-4 w-4" />
-                        Withdraw
+                        <span className="hidden sm:inline">Withdraw</span>
+                        <span className="sm:hidden">-</span>
                       </Button>
                     </div>
                   </div>
