@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -8,6 +8,14 @@ import MERCATAICON from '@/assets/icon.png';
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { logout, isAdmin } = useUser();
+
+  useEffect(() => {
+    // Update CSS variable when collapsed state changes
+    document.documentElement.style.setProperty(
+      '--sidebar-width',
+      collapsed ? '4rem' : '16rem'
+    );
+  }, [collapsed]);
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },

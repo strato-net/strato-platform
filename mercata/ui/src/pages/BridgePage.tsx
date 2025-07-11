@@ -31,9 +31,9 @@ const BridgePage = () => {
   const showTestnet = config?.showTestnet ?? false;
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50">
       <DashboardSidebar />
-      <div className="flex-1 flex flex-col ml-64">
+      <div className="flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)', height: '100vh' }}>
         <DashboardHeader title="Bridge" />
         <div className="flex-1 p-8">
           <div className="max-w-4xl mx-auto">

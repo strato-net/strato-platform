@@ -12,10 +12,10 @@ const Pools = () => {
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations">("lending");
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
       
-      <div className="flex-1 ml-64">
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
         <DashboardHeader title="Pools" />
         
         <main className="p-6">

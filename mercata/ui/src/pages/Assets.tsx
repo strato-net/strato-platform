@@ -55,17 +55,19 @@ const Assets = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 overflow-hidden">
       <DashboardSidebar />
-      <div className="flex-1 ml-64">
+      <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
         <DashboardHeader title="Deposits" />
-        <main className="p-6">
+        <main className="flex-1 p-6 overflow-y-auto">
           {/* Asset Summary */}
-          <div className="mb-8 flex gap-6 items-stretch">
-            <div className="flex-1 max-w-[700px]">
+          <div className="mb-8 flex gap-6 items-start">
+            <div className="flex-1">
               <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
             </div>
-            <ExchangeCart />
+            <div className="w-[40%] min-w-[400px] max-w-[600px] sticky top-0">
+              <ExchangeCart />
+            </div>
           </div>
           <div className="mb-8">
             <AssetSummary 
