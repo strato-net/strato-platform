@@ -190,10 +190,90 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
     return;
   }
 
+  // Verify transaction details against deposit records
+  const verifiedDeposits = [];
+  
+  for (const deposit of validDeposits) {
+    const transactionData = txList.find(tx => tx.result.transactionHash.replace('0x', '') === deposit.txHash);
+    
+    if (!transactionData?.result) {
+      console.log(`❌ No transaction details found for ${deposit.txHash}`);
+      continue;
+    }
+
+    const txDetails = transactionData.result;
+    
+    try {
+      // Check if transaction was mined
+      if (!txDetails.blockNumber) {
+        console.log(`❌ Transaction ${deposit.txHash} not yet mined`);
+        continue;
+      }
+
+      // Verify transaction details match deposit record
+      const verifiedFromAddress = txDetails.from?.toLowerCase();
+      const verifiedToAddress = txDetails.to?.toLowerCase();
+      const expectedFromAddress = deposit.from?.toLowerCase();
+      const expectedToAddress = config.safe.address?.toLowerCase();
+
+      // Handle amount verification
+      let verifiedAmount = null;
+      let expectedAmount = deposit.amount;
+
+      if (deposit.token !== '0x0000000000000000000000000000000000000000') {
+        // ERC20 token transfer - decode input data
+        const inputData = txDetails.input;
+        if (inputData && inputData.startsWith('0xa9059cbb')) {
+          const amount = inputData.slice(74, 138); // 32 bytes for amount
+          verifiedAmount = amount;
+        } else {
+          console.log(`❌ Invalid ERC20 transfer data for ${deposit.txHash}`);
+          continue;
+        }
+      } else {
+        // Native ETH transfer
+        verifiedAmount = txDetails.value || '0x0';
+      }
+
+      // Convert amounts for comparison
+      const expectedAmountDecimal = parseInt(expectedAmount);
+      const verifiedAmountDecimal = parseInt(verifiedAmount, 16);
+
+      // Verify all parameters match
+      const isValid = 
+        verifiedFromAddress === expectedFromAddress &&
+        verifiedToAddress === expectedToAddress &&
+        verifiedAmountDecimal === expectedAmountDecimal;
+
+      if (isValid) {
+        console.log(`✅ Transaction ${deposit.txHash} verified successfully`);
+        verifiedDeposits.push(deposit);
+      } else {
+        console.log(`❌ Transaction ${deposit.txHash} verification failed:`, {
+          fromMatch: verifiedFromAddress === expectedFromAddress,
+          toMatch: verifiedToAddress === expectedToAddress,
+          amountMatch: verifiedAmountDecimal === expectedAmountDecimal,
+          expectedAmount: expectedAmountDecimal,
+          verifiedAmount: verifiedAmountDecimal
+        });
+      }
+
+    } catch (error: any) {
+      console.error(`❌ Error verifying transaction ${deposit.txHash}:`, error.message);
+    }
+  }
+
+  if (verifiedDeposits.length === 0) {
+    console.log('⚠️ No verified deposits to process');
+    return;
+  }
+
+  console.log(`✅ Processing ${verifiedDeposits.length} verified deposits`);
+
   try {
     const bridgeContract = new BridgeContractCall();
     const result = await bridgeContract.batchConfirmDeposits({
-      deposits: validDeposits,
+      deposits: verifiedDeposits,
     });
 
     console.log("batchConfirmDeposits result:", result);
@@ -202,7 +282,7 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
       console.log("✅ Bridge deposits confirmed successfully, minting vouchers...");
       
       try {
-        await mintVouchersForDeposits(validDeposits);
+        await mintVouchersForDeposits(verifiedDeposits);
       } catch (voucherError) {
         console.error("Failed to mint vouchers (bridge deposits still succeeded):", voucherError);
       }

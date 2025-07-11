@@ -43,7 +43,7 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       const batch = txHashes.map((hash, i) => ({
         jsonrpc: '2.0',
         id: hash,
-        method: 'eth_getTransactionReceipt',
+        method: 'eth_getTransactionByHash',
         params: [hash],
       }));
 
@@ -54,7 +54,7 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       console.log("🚀 batchResponses: step3", batchResponses);
 
       // Step 3: Extract valid transactionHashes from receipts
-      const completedTxHashes = batchResponses.filter((res: any) => res?.result?.status === "0x1");
+      const completedTxHashes = batchResponses.filter((res: any) => res?.result?.blockNumber);
       console.log("🚀 validTxHashes: step4", completedTxHashes);
 
       if (!completedTxHashes.length) {
@@ -62,7 +62,14 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
         return;
       }
 
-      await confirmBridgeinSafePolling(completedTxHashes);
+      // Step 4: Pass transaction details to bridge service for verification
+      const transactionsWithDetails = completedTxHashes.map((txResponse: any, i: number) => ({
+        txHash: txResponse.result.transactionHash,
+        txDetails: txResponse.result
+      }));
+      
+      console.log(`🚀 Processing ${transactionsWithDetails.length} transactions with Alchemy data`);
+      await confirmBridgeinSafePolling(transactionsWithDetails);
     } catch (e: any) {
       console.error('❌ Polling error:', e.message);
       // Don't stop polling on errors, let it retry on next interval
