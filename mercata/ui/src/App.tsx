@@ -21,6 +21,7 @@ import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
 import NotFound from "./pages/NotFound";
+import History from "./pages/History";
 
 // Import dashboard components
 import BridgePage from "./pages/BridgePage";
@@ -90,6 +91,14 @@ const App = () => (
                                   element={
                                     <ProtectedRoute>
                                       <Dashboard />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/history"
+                                  element={
+                                    <ProtectedRoute>
+                                      <History />
                                     </ProtectedRoute>
                                   }
                                 />
@@ -180,4 +189,3 @@ const App = () => (
 );
 
 export default App;
-

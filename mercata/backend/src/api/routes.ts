@@ -11,6 +11,7 @@ import OracleController from "./controllers/oracle.controller";
 import userRoutes from "./routes/user.routes";
 import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
+import TransactionsController from "./controllers/transactions.controller";
 
 const router = Router();
 const bridgeController = new BridgeController();
@@ -54,6 +55,9 @@ router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(), bridgeCont
 router.get("/bridge/config", bridgeController.getBridgeConfig);
 router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(), bridgeController.userDepositStatus);
 router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(), bridgeController.userWithdrawalStatus);
+
+// ----- Transaction/History Routes -----
+router.get("/transactions", authHandler.authorizeRequest(true), TransactionsController.get);
 
 // ----- Health Check -----
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
