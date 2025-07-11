@@ -48,7 +48,7 @@ const AssetDetail = () => {
 
   
   useEffect(() => {
-    fetchTokens(userAddress)
+    fetchTokens()
   }, [userAddress])
 
   useEffect(() => {
@@ -60,7 +60,7 @@ const AssetDetail = () => {
       document.title = `${foundAsset?.token?._name} | Asset Details`;
 
       if (foundAsset?.price) {
-        const basePrice = parseFloat(foundAsset.price);
+        const basePrice = parseFloat(foundAsset.price.toString());
         if (!isNaN(basePrice)) {
           setPriceData(generatePriceData(basePrice));
         }
@@ -70,7 +70,7 @@ const AssetDetail = () => {
       document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
 
       if (foundInActiveAsset?.price) {
-        const basePrice = parseFloat(foundInActiveAsset.price);
+        const basePrice = parseFloat(foundInActiveAsset.price.toString());
         if (!isNaN(basePrice)) {
           setPriceData(generatePriceData(basePrice));
         }
@@ -80,9 +80,9 @@ const AssetDetail = () => {
 
   if (!asset) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-gray-50">
         <DashboardSidebar />
-        <div className="flex-1 ml-64">
+        <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
           <DashboardHeader title="Asset Not Found" />
           {loading ?
             <div className="flex justify-center items-center h-40">
@@ -112,10 +112,10 @@ const AssetDetail = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
 
-      <div className="flex-1 ml-64">
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
         <DashboardHeader title={`${asset?.token?._symbol} Details`} />
 
         <main className="p-6">
@@ -174,7 +174,7 @@ const AssetDetail = () => {
 
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Asset Deposits:</span>
-                      <span className="font-medium">{formatUnits(asset?.balance?.toLocaleString("fullwide", { useGrouping: false }), 18)}</span>
+                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
                     {asset?.available ? (
@@ -265,9 +265,9 @@ const AssetDetail = () => {
                   <CardTitle>Price History</CardTitle>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="overflow-hidden">
                   {priceData.length > 0 ? (
-                    <div className="h-80">
+                    <div className="h-80 w-full">
                       <ChartContainer
                         config={{
                           price: {
@@ -283,11 +283,12 @@ const AssetDetail = () => {
                             }
                           }
                         }}
+                        className="w-full h-full"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={priceData}
-                            margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
                           >
                             <defs>
                               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -302,7 +303,7 @@ const AssetDetail = () => {
                               tick={{ fontSize: 12 }}
                               tickFormatter={(value) => {
                                 const date = new Date(value);
-                                return `${date.getDate()}/${date.getMonth() + 1}`;
+                                return `${date.getMonth() + 1}/${date.getDate()}`;
                               }}
                             />
                             <YAxis

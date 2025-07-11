@@ -10,6 +10,7 @@ import { SwappableToken } from "@/interface";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useLendingContext } from "@/context/LendingContext";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -366,7 +367,8 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 const SwapWidget = () => {
   const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
   // State
@@ -756,13 +758,15 @@ const SwapWidget = () => {
       setEditingField(null);
       lastCalculatedFromRef.current = "";
 
+      // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
         getTokenBalance(fromAsset, true),
         getTokenBalance(toAsset, false),
+        fetchUsdstBalance(userAddress),
+        fetchTokens(),           // Refresh UserTokensContext
+        refreshLoans(),          // Refresh LendingContext
+        refreshCollateral(),     // Refresh LendingContext
       ]);
-      
-      // Refresh USDST balance after swap
-      await fetchUsdstBalance(userAddress);
     } catch (error) {
       console.error("Swap error:", error);
       toast({

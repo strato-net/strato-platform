@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, LogOut, ArrowLeft, ArrowRight, Book, ArrowRightLeft, Send, Shield } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -8,6 +8,25 @@ import MERCATAICON from '@/assets/icon.png';
 const DashboardSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { logout, isAdmin } = useUser();
+
+  useEffect(() => {
+    // Update CSS variable when collapsed state changes - only on desktop
+    const updateSidebarWidth = () => {
+      if (window.innerWidth >= 768) { // md breakpoint
+        document.documentElement.style.setProperty(
+          '--sidebar-width',
+          collapsed ? '4rem' : '16rem'
+        );
+      } else {
+        document.documentElement.style.setProperty('--sidebar-width', '0rem');
+      }
+    };
+
+    updateSidebarWidth();
+    window.addEventListener('resize', updateSidebarWidth);
+    
+    return () => window.removeEventListener('resize', updateSidebarWidth);
+  }, [collapsed]);
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
@@ -23,7 +42,7 @@ const DashboardSidebar = () => {
 
   return (
     <div 
-      className={`h-screen flex flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border ${
+      className={`h-screen flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border hidden md:flex ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >

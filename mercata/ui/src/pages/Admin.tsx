@@ -48,32 +48,40 @@ const Admin = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-6xl">
-            <TabsTrigger value="tokens" className="flex items-center space-x-2">
-              <Coins className="h-4 w-4" />
-              <span>Create Tokens</span>
-            </TabsTrigger>
-            <TabsTrigger value="pools" className="flex items-center space-x-2">
-              <Droplets className="h-4 w-4" />
-              <span>Create Pools</span>
-            </TabsTrigger>
-            <TabsTrigger value="pricing" className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4" />
-              <span>Set Prices</span>
-            </TabsTrigger>
-            <TabsTrigger value="configs" className="flex items-center space-x-2">
-              <Cog className="h-4 w-4" />
-              <span>Token Configs</span>
-            </TabsTrigger>
-            <TabsTrigger value="status" className="flex items-center space-x-2">
-              <ToggleLeft className="h-4 w-4" />
-              <span>Token Status</span>
-            </TabsTrigger>
-            <TabsTrigger value="listing" className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span>List Assets</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="w-full overflow-x-auto">
+            <TabsList className="grid grid-cols-6 w-full max-w-6xl min-w-[800px] md:min-w-0">
+              <TabsTrigger value="tokens" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Coins className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Create Tokens</span>
+                <span className="sm:hidden">Tokens</span>
+              </TabsTrigger>
+              <TabsTrigger value="pools" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Droplets className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Create Pools</span>
+                <span className="sm:hidden">Pools</span>
+              </TabsTrigger>
+              <TabsTrigger value="pricing" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Set Prices</span>
+                <span className="sm:hidden">Prices</span>
+              </TabsTrigger>
+              <TabsTrigger value="configs" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Cog className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Token Configs</span>
+                <span className="sm:hidden">Configs</span>
+              </TabsTrigger>
+              <TabsTrigger value="status" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <ToggleLeft className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Token Status</span>
+                <span className="sm:hidden">Status</span>
+              </TabsTrigger>
+              <TabsTrigger value="listing" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Settings className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">List Assets</span>
+                <span className="sm:hidden">Assets</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="tokens" className="space-y-6">
             <Card>

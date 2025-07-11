@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { formatUnits } from "ethers";
 import { useLendingContext } from "@/context/LendingContext";
+import { useUser } from "@/context/UserContext";
 import { usdstAddress } from "@/lib/contants";
 
 export const useLendingMetrics = () => {
@@ -10,15 +11,16 @@ export const useLendingMetrics = () => {
     loans,
     refreshLoans,
   } = useLendingContext();
+  
+  const { userAddress } = useUser();
 
   // Fetch loans for the current user
   const fetchLoans = useCallback(async () => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
-    const addr = userData.userAddress;
+    if (!userAddress) return;
     try {
       const userLoans = Object.entries(loans)
         .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-        .filter((loan: any) => loan?.loan?.user === addr && loan?.loan?.active === true);
+        .filter((loan: any) => loan?.loan?.user === userAddress && loan?.loan?.active === true);
 
       const enrichedLoans = await Promise.all(
         userLoans.map(async (loan: any) => {
@@ -41,10 +43,10 @@ export const useLendingMetrics = () => {
   }, [loans]);
 
   useEffect(() => {
-    if (Object.keys(loans || {}).length > 0) {
+    if (Object.keys(loans || {}).length > 0 && userAddress) {
       fetchLoans();
     }
-  }, [loans, fetchLoans]);
+  }, [loans, fetchLoans, userAddress]);
   let depositableTokens = []
 
   // Calculate Available Borrowing Power
