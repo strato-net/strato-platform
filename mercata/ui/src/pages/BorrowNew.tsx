@@ -243,7 +243,7 @@ const BorrowNew = () => {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Elligible Collateral</CardTitle>
+              <CardTitle>Eligible Collateral</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
