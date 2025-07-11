@@ -159,7 +159,11 @@ export const bridgeOut = async (
 export const confirmBridgeinSafePolling = async (txList: any[]) => {
   if (!config.safe?.address) return;
 
-  const txBatch = txList.map((tx) => tx.result.transactionHash);
+  // Filter out invalid responses and extract transaction hashes
+  const txBatch = txList
+    .filter((tx) => tx?.result?.transactionHash) // Only include responses with valid transaction hash
+    .map((tx) => tx.result.transactionHash);
+  
   console.log("txBatch....", txBatch);
 
   const depositStatus = await fetchDepositInitiatedTransactions(txBatch);
@@ -194,7 +198,10 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
   const verifiedDeposits = [];
   
   for (const deposit of validDeposits) {
-    const transactionData = txList.find(tx => tx.result.transactionHash.replace('0x', '') === deposit.txHash);
+    const transactionData = txList.find(tx => 
+      tx?.result?.transactionHash && 
+      tx.result.transactionHash.replace('0x', '') === deposit.txHash
+    );
     
     if (!transactionData?.result) {
       console.log(`❌ No transaction details found for ${deposit.txHash}`);

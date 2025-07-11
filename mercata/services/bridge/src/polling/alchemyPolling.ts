@@ -54,7 +54,18 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       console.log("🚀 batchResponses: step3", batchResponses);
 
       // Step 3: Extract valid transactionHashes from receipts
-      const completedTxHashes = batchResponses.filter((res: any) => res?.result?.blockNumber);
+      const completedTxHashes = batchResponses.filter((res: any) => {
+        // Check if response has result and blockNumber (mined transaction)
+        if (!res?.result) {
+          console.log(`⚠️ Skipping response without result:`, res);
+          return false;
+        }
+        if (!res.result.blockNumber) {
+          console.log(`⚠️ Skipping unmined transaction:`, res.result.hash);
+          return false;
+        }
+        return true;
+      });
       console.log("🚀 validTxHashes: step4", completedTxHashes);
 
       if (!completedTxHashes.length) {
@@ -63,15 +74,17 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
       }
 
       // Step 4: Pass transaction details to bridge service for verification
-      const transactionsWithDetails = completedTxHashes.map((txResponse: any, i: number) => ({
-        txHash: txResponse.result.transactionHash,
-        txDetails: txResponse.result
-      }));
-      
-      console.log(`🚀 Processing ${transactionsWithDetails.length} transactions with Alchemy data`);
-      await confirmBridgeinSafePolling(transactionsWithDetails);
+      console.log(`🚀 Processing ${completedTxHashes.length} transactions with Alchemy data`);
+      await confirmBridgeinSafePolling(completedTxHashes);
     } catch (e: any) {
       console.error('❌ Polling error:', e.message);
+      console.error('❌ Polling error details:', {
+        message: e.message,
+        stack: e.stack,
+        NODE_URL: process.env.NODE_URL,
+        ALCHEMY_API_KEY: process.env.ALCHEMY_API_KEY ? 'SET' : 'NOT_SET',
+        BRIDGE_ADDRESS: config.bridge.address
+      });
       // Don't stop polling on errors, let it retry on next interval
     }
   };
