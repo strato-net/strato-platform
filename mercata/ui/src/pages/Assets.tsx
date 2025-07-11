@@ -67,11 +67,11 @@ const Assets = () => {
         <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="flex-1 p-6 overflow-y-auto">
           {/* Asset Summary */}
-          <div className="mb-8 flex gap-6 items-start">
-            <div className="flex-1">
+          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
+            <div className="flex-1 min-w-0 max-w-full">
               <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
             </div>
-            <div className="w-[40%] min-w-[400px] max-w-[600px] sticky top-0">
+            <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
               <ExchangeCart />
             </div>
           </div>
