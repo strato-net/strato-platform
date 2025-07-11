@@ -122,7 +122,7 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <AssetSummary
               title="Net Balance"
               value={formatBalance(totalBalance)}
@@ -130,22 +130,24 @@ const Dashboard = () => {
               color="bg-blue-500"
             />
 
-            <AssetSummary
-              title="CATA Rewards"
-              value={formatBalance(cataBalance)}
-              icon={<Coins className="text-white" size={18} />}
-              color="bg-purple-500"
-            />
+            <div className="grid grid-cols-2 gap-6 lg:col-span-2">
+              <AssetSummary
+                title="CATA Rewards"
+                value={formatBalance(cataBalance)}
+                icon={<Coins className="text-white" size={18} />}
+                color="bg-purple-500"
+              />
 
-            <AssetSummary
-              title="Borrowed"
-              value={(loans as any)?.totalAmountOwed 
-                ? `$${parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18)).toFixed(2)}`
-                : "$0.00"
-              }
-              icon={<Shield className="text-white" size={18} />}
-              color="bg-orange-500"
-            />
+              <AssetSummary
+                title="Borrowed"
+                value={(loans as any)?.totalAmountOwed 
+                  ? `$${parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18)).toFixed(2)}`
+                  : "$0.00"
+                }
+                icon={<Shield className="text-white" size={18} />}
+                color="bg-orange-500"
+              />
+            </div>
           </div>
 
           <div className="mb-8">

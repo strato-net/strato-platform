@@ -46,7 +46,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
           <div className="space-y-6">
 
             {/* Added extra spacing with mt-8 to separate indicators from data */}
-            <div className="flex justify-between mt-8">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6 mt-8">
               <div className="flex flex-col">
                 <span className="text-gray-600">Total Borrowed</span>
                 <span className="font-semibold">
