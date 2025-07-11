@@ -2,16 +2,18 @@ import { Request, Response, NextFunction } from "express";
 import axios from "axios";
 
 class TransactionsController {
-  static async get(req: Request, res: Response, next: NextFunction) {
+  static async get(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { address } = req.query;
       if (!address || typeof address !== "string") {
-        return res.status(400).json({ error: "Missing or invalid address" });
+        res.status(400).json({ error: "Missing or invalid address" });
+        return;
       }
       // Use NODE_URL for Strato node API endpoint
       const stratoUrl = process.env.NODE_URL;
       if (!stratoUrl) {
-        return res.status(500).json({ error: "NODE_URL environment variable not set" });
+        res.status(500).json({ error: "NODE_URL environment variable not set" });
+        return;
       }
       const apiUrl = `${stratoUrl}/strato-api/eth/v1.2/transaction/last/100`;
       console.log("[/transactions] Fetching from Strato node URL:", apiUrl);
@@ -37,6 +39,7 @@ class TransactionsController {
       return;
     } catch (error) {
       next(error);
+      return;
     }
   }
 }
