@@ -19,3 +19,7 @@ export function calculateLTV(token) {
   const ltv = (loanValue * 10000n) / collateralValue; // Multiplied by 10000 for 2 decimal precision
   return Number(ltv) / 100;
 }
+
+export function truncateToTwoDecimals(num: number): number {
+  return Math.floor(num * 100) / 100;
+}

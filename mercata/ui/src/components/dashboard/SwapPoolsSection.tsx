@@ -449,7 +449,7 @@ const SwapPoolsSection = () => {
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
-                        className="bg-strato-purple hover:bg-strato-purple/90"
+                        className="bg-strato-blue hover:bg-strato-blue/90"
                         onClick={() => handleOpenDepositModal(pool)}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
@@ -459,7 +459,7 @@ const SwapPoolsSection = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-strato-purple text-strato-purple hover:bg-strato-purple/10"
+                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={!pool.lpToken.balances?.length}
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
@@ -651,7 +651,7 @@ const SwapPoolsSection = () => {
                   BigInt(usdstBalance || "0") < parseUnits("0.3", 18)
                 } 
                 type="submit" 
-                className="w-full bg-strato-purple hover:bg-strato-purple/90"
+                className="w-full bg-strato-blue hover:bg-strato-blue/90"
               >
                 {depositLoading ? (
                   <div className="flex justify-center items-center h-12">
@@ -755,7 +755,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-purple hover:bg-strato-purple/90">
+              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>

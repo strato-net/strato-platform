@@ -293,7 +293,7 @@ const SwapDialog = ({
         <Button variant="outline" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button disabled={isLoading} onClick={onConfirm}>
+        <Button disabled={isLoading} onClick={onConfirm} className="bg-strato-blue hover:bg-strato-blue/90">
           {isLoading && <LoadingSpinner />} Confirm Swap
         </Button>
       </DialogFooter>
@@ -888,7 +888,7 @@ useEffect(() => {
       </div>
 
       <Button
-        className="w-full bg-blue-600 hover:bg-blue-700"
+        className="w-full bg-strato-blue hover:bg-strato-blue/90"
         onClick={() => setIsDialogOpen(true)}
         disabled={isSwapDisabled()}
       >
