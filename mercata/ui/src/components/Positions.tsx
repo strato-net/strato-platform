@@ -51,8 +51,11 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                 <span className="text-gray-600">Total Borrowed</span>
                 <span className="font-semibold">
                   {loanData?.totalAmountOwed != null
-                    ? formatUnits(loanData.totalAmountOwed.toString(), 18)
-                    : "0"}
+                    ? `${parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)).toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })} USDST`
+                    : "0 USDST"}
                 </span>
               </div>
               <div className="flex flex-col">
@@ -75,15 +78,23 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
               <div className="flex flex-col">
                 <span className="text-gray-600">Available Borrowing Power</span>
                 <span className="font-semibold">
-                  {availableBorrowingPower.toFixed(2)}
+                  {availableBorrowingPower.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} USDST
                 </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-600">Interest Owed</span>
-                <span className="font-semibold">{formatUnits(loanData?.accruedInterest || 0, 18)}</span>
+                <span className="font-semibold">
+                  {parseFloat(formatUnits(loanData?.accruedInterest || 0, 18)).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} USDST
+                </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Avg. Interest Rate</span>
+                <span className="text-gray-600">Interest Rate</span>
                 <span className="font-semibold">{loanData?.interestRate || 0}%</span>
               </div>
             </div>
