@@ -89,6 +89,17 @@ const Transfer = () => {
     }
   };
 
+  const addCommasToInput = (value: string) => {
+    if (!value) return '';
+    const parts = value.split('.');
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    if (parts.length === 2) {
+      return integerPart + '.' + parts[1];
+    }
+    return integerPart;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <DashboardSidebar />
@@ -163,20 +174,41 @@ const Transfer = () => {
             <div className="space-y-2">
               <label className="text-sm text-gray-600">
                 Amount
-                {fromAsset
-                  ? ` (Max: ${Number(formatUnits(maxAmount, 18)).toLocaleString(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 4,
-                  })})`
-                  : ""}
+                {fromAsset && (
+                  <>{" ("}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        let raw = formatUnits(maxAmount, 18);    // e.g. "12.3456789012345678901"
+                        // clamp to 18 decimals
+                        const [w, f = ""] = raw.split(".");
+                        if (f.length > 18) raw = `${w}.${f.slice(0, 18)}`;
+                        setFromAmount(raw);
+                      }}
+                      className="font-medium text-blue-600 hover:underline focus:outline-none"
+                    >
+                      Max: {Number(formatUnits(maxAmount, 18)).toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 4,
+                      })}
+                    </button>
+                    {")"}</>
+                )}
               </label>
               <input
-                type="number"
-                value={fromAmount}
+                type="text"
+                inputMode="decimal"
+                pattern="^\\d*(\\.\\d*)?$"
+                value={addCommasToInput(fromAmount)}
                 onChange={(e) => {
-                  const v = e.target.value;
+                  // 1. Strip commas
+                  let v = e.target.value.replace(/,/g, "");
+                  if (!/^\d*\.?\d*$/.test(v)) return;
+                  // 2. Clamp to 18 decimals
+                  const [whole, frac = ""] = v.split(".");
+                  if (frac.length > 18) v = `${whole}.${frac.slice(0, 18)}`;
                   setFromAmount(v);
-                  if (v && maxAmount > 0n) {
+                  if (v) {
                     const inputWei = parseUnits(v, 18);
                     setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
                   } else {
@@ -245,22 +277,22 @@ const Transfer = () => {
                 (() => {
                   const feeAmount = parseUnits(TRANSFER_FEE, 18);
                   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                  
+
                   // Check if user has enough USDST for fee
                   if (usdstBalanceBigInt < feeAmount) {
                     return true;
                   }
-                  
+
                   // Check if transferring USDST and leaving enough for fee
                   if (fromAsset?.address === usdstAddress) {
                     const fromAmountWei = fromAmount ? parseUnits(fromAmount, 18) : 0n;
                     const balance = BigInt(fromAsset.balance || "0");
-                    
+
                     if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
                       return true;
                     }
                   }
-                  
+
                   return false;
                 })()
               }

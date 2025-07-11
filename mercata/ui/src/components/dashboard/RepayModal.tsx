@@ -146,9 +146,21 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
 
         <div className="space-y-3">
           <label className="text-sm font-medium">Repay Amount (USDST)</label>
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between items-center text-xs text-gray-500">
             <span>Min: $0.01</span>
-            <span>Max: ${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
+             <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRepayAmount(formatUnits(loan?.totalAmountOwed || 0, 18));
+                    setDisplayAmount(addCommasToInput(formatUnits(loan?.totalAmountOwed || 0, 18)));
+                  }}
+                  className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                >
+                  Max :
+                </button>
+                <span>${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
+              </div>
           </div>
           <div className="relative">
             <Input
