@@ -1,0 +1,92 @@
+import { Link } from 'react-router-dom';
+import { LayoutDashboard, Wallet, Database, LogOut, Book, ArrowRightLeft, Send, Shield, X } from 'lucide-react';
+import { useUser } from '@/context/UserContext';
+import MERCATALOGO from '@/assets/mercata.png';
+
+interface MobileSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
+  const { logout, isAdmin } = useUser();
+
+  const allNavItems = [
+    { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
+    { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
+    { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
+    { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
+    { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
+    { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
+    { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
+  ];
+
+  const navItems = allNavItems.filter(item => item.label !== 'Admin' || isAdmin);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className={`fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity duration-300 ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
+      />
+      
+      {/* Mobile Sidebar */}
+      <div className={`fixed left-0 top-0 h-full w-64 bg-white text-gray-900 z-50 md:hidden transform transition-transform duration-300 ease-in-out border-r border-gray-200 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="border-b border-gray-200">
+          <div className="p-4 flex items-center justify-between">
+            <img 
+              src={MERCATALOGO} 
+              alt="STRATO mercata" 
+              className="h-12" 
+            />
+            <button
+              onClick={onClose}
+              className="rounded-md p-1 hover:bg-gray-100 text-gray-700"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col flex-1 overflow-y-auto py-4">
+          <nav className="flex-1">
+            <ul className="space-y-1">
+              {navItems.map((item, index) => (
+                <li key={index}>
+                  <Link
+                    to={item.path}
+                    onClick={onClose}
+                    className="flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md mx-2"
+                  >
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    <span className="ml-3">{item.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <div className="mt-auto">
+            <button
+              onClick={() => {
+                logout();
+                onClose();
+              }}
+              className="flex items-center text-red-600 hover:bg-red-50 w-full rounded-md px-4 py-2.5"
+            >
+              <LogOut size={20} />
+              <span className="ml-3">Log Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default MobileSidebar;

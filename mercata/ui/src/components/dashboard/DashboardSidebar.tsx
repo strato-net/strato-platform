@@ -10,11 +10,22 @@ const DashboardSidebar = () => {
   const { logout, isAdmin } = useUser();
 
   useEffect(() => {
-    // Update CSS variable when collapsed state changes
-    document.documentElement.style.setProperty(
-      '--sidebar-width',
-      collapsed ? '4rem' : '16rem'
-    );
+    // Update CSS variable when collapsed state changes - only on desktop
+    const updateSidebarWidth = () => {
+      if (window.innerWidth >= 768) { // md breakpoint
+        document.documentElement.style.setProperty(
+          '--sidebar-width',
+          collapsed ? '4rem' : '16rem'
+        );
+      } else {
+        document.documentElement.style.setProperty('--sidebar-width', '0rem');
+      }
+    };
+
+    updateSidebarWidth();
+    window.addEventListener('resize', updateSidebarWidth);
+    
+    return () => window.removeEventListener('resize', updateSidebarWidth);
   }, [collapsed]);
 
   const allNavItems = [
@@ -31,7 +42,7 @@ const DashboardSidebar = () => {
 
   return (
     <div 
-      className={`h-screen flex flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border ${
+      className={`h-screen flex-col bg-sidebar-background text-sidebar-foreground fixed left-0 top-0 z-40 transition-all duration-300 border-r border-sidebar-border hidden md:flex ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >

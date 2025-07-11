@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
+import MobileSidebar from '../components/dashboard/MobileSidebar';
 import { 
   Card, 
   CardContent,  
@@ -19,7 +20,8 @@ import ExchangeCart from './ExchangeCart';
 const Assets = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens } = useUserTokens();
-  const [totalBalance, setTotalBalance] = useState<number>(0)
+  const [totalBalance, setTotalBalance] = useState<number>(0);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchTokens();
@@ -57,8 +59,12 @@ const Assets = () => {
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
       <DashboardSidebar />
-      <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
-        <DashboardHeader title="Deposits" />
+      <MobileSidebar 
+        isOpen={isMobileSidebarOpen} 
+        onClose={() => setIsMobileSidebarOpen(false)} 
+      />
+      <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
+        <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="flex-1 p-6 overflow-y-auto">
           {/* Asset Summary */}
           <div className="mb-8 flex gap-6 items-start">
