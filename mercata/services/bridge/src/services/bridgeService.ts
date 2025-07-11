@@ -161,8 +161,8 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
 
   // Filter out invalid responses and extract transaction hashes
   const txBatch = txList
-    .filter((tx) => tx?.result?.transactionHash) // Only include responses with valid transaction hash
-    .map((tx) => tx.result.transactionHash);
+    .filter((tx) => tx?.result?.hash) // Only include responses with valid transaction hash
+    .map((tx) => tx.result.hash);
   
   console.log("txBatch....", txBatch);
 
@@ -199,8 +199,8 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
   
   for (const deposit of validDeposits) {
     const transactionData = txList.find(tx => 
-      tx?.result?.transactionHash && 
-      tx.result.transactionHash.replace('0x', '') === deposit.txHash
+      tx?.result?.hash && 
+      tx.result.hash.replace('0x', '') === deposit.txHash
     );
     
     if (!transactionData?.result) {

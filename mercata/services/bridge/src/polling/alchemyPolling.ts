@@ -75,6 +75,7 @@ export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1
 
       // Step 4: Pass transaction details to bridge service for verification
       console.log(`🚀 Processing ${completedTxHashes.length} transactions with Alchemy data`);
+      console.log(`🚀 Sample transaction data:`, completedTxHashes[0]?.result);
       await confirmBridgeinSafePolling(completedTxHashes);
     } catch (e: any) {
       console.error('❌ Polling error:', e.message);
@@ -120,9 +121,19 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
         try {
           const safeTransaction = await apiKit.getTransaction(txHash);
           console.log("🚀 safeTransaction: step2", safeTransaction);
-          if(safeTransaction.isExecuted === true){
+          
+          // Check if transaction is executed
+          if (safeTransaction.isExecuted === true) {
+            console.log(`✅ Safe transaction ${txHash} is executed`);
             approvedTxHashes.push(txHash);
+          } else {
+            console.log(`⏳ Safe transaction ${txHash} is not yet executed (isExecuted: ${safeTransaction.isExecuted})`);
+            // Log additional details for debugging
+            console.log(`   - Execution date: ${safeTransaction.executionDate}`);
+            console.log(`   - Transaction hash: ${safeTransaction.transactionHash}`);
+            console.log(`   - Block number: ${safeTransaction.blockNumber}`);
           }
+          
           console.log("🚀 approvedTxHashes: step3", approvedTxHashes);
         } catch (err) {
           console.error(`❌ Failed to process transaction ${txHash}:`, err);
