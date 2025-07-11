@@ -48,7 +48,7 @@ const AssetDetail = () => {
 
   
   useEffect(() => {
-    fetchTokens(userAddress)
+    fetchTokens()
   }, [userAddress])
 
   useEffect(() => {
@@ -60,7 +60,7 @@ const AssetDetail = () => {
       document.title = `${foundAsset?.token?._name} | Asset Details`;
 
       if (foundAsset?.price) {
-        const basePrice = parseFloat(foundAsset.price);
+        const basePrice = parseFloat(foundAsset.price.toString());
         if (!isNaN(basePrice)) {
           setPriceData(generatePriceData(basePrice));
         }
@@ -70,7 +70,7 @@ const AssetDetail = () => {
       document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
 
       if (foundInActiveAsset?.price) {
-        const basePrice = parseFloat(foundInActiveAsset.price);
+        const basePrice = parseFloat(foundInActiveAsset.price.toString());
         if (!isNaN(basePrice)) {
           setPriceData(generatePriceData(basePrice));
         }
@@ -174,7 +174,7 @@ const AssetDetail = () => {
 
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Asset Deposits:</span>
-                      <span className="font-medium">{formatUnits(asset?.balance?.toLocaleString("fullwide", { useGrouping: false }), 18)}</span>
+                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
                     {asset?.available ? (

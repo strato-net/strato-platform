@@ -9,7 +9,7 @@ export interface Token {
   status?: string;
   images?: Array<{ value: string }>;
   attributes?: Array<{ key: string; value: string }>;
-  balances?: Array<{ user: string; balance: string }>;
+  balances?: Array<{ user: string; balance: string; collateralBalance?: string }>;
   minters?: Array<{ user: string; value: boolean }>;
   burners?: Array<{ user: string; value: boolean }>;
   price?: number;
@@ -39,6 +39,7 @@ export interface Token {
   vaulter?: string;
   color?: string;
   balance?: string;
+  collateralBalance?: string;
   key?: string;
   value?: string;
   "BlockApps-Mercata-ERC20"?: {

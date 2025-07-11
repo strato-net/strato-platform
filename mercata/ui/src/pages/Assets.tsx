@@ -22,7 +22,7 @@ const Assets = () => {
   const [totalBalance, setTotalBalance] = useState<number>(0)
 
   useEffect(() => {
-    fetchTokens(userAddress);
+    fetchTokens();
     fetchAllActiveTokens();
   }, [userAddress]);
 
