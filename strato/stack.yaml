@@ -141,16 +141,17 @@ compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
 - /usr/include
+- /opt/homebrew/include
 
 extra-lib-dirs:
 - /usr/local/lib
 - /usr/lib
+- /opt/homebrew/lib
 
 allow-newer: true
 allow-different-user: true
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints
-
 
 # Increase the number of ticks the simplifier is allowed to use by passing the flag -fsimpl-tick-factor=N (where N is a larger number) to GHC when building your project
 # Adjust the -funfolding-case-threshold and -funfolding-case-scaling flags to break any inlining loops
@@ -160,7 +161,7 @@ ghc-options:
 
 
 docker:
-  enable: true
+  enable: false
   image: "strato-buildbase:lts-22.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
