@@ -26,8 +26,158 @@ import {
   MAINNET_STRATO_TOKENS,
 } from "../config";
 import { mintVouchersForDeposits } from "../utils/voucherMinting";
+import { ethers } from "ethers";
+import axios from "axios";
 
 const showTestnet = process.env.SHOW_TESTNET === "true";
+
+// ERC-20 Transfer event signature
+const TRANSFER_EVENT_SIG = ethers.id("Transfer(address,address,uint256)");
+
+const ALCHEMY_URL = process.env.SHOW_TESTNET === 'true' ? 'https://eth-sepolia.g.alchemy.com/v2' : 'https://eth-mainnet.g.alchemy.com/v2';
+
+// Wait for transaction to be mined
+const waitForTransactionMined = async (txHash: string, maxAttempts: number = 10): Promise<boolean> => {
+  console.log(`Waiting for transaction ${txHash} to be mined...`);
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await axios.post(`${ALCHEMY_URL}/${config.alchemy.apiKey}`, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      });
+
+      const receipt = response.data?.result;
+      
+      if (receipt && receipt.status === '0x1') {
+        console.log(`✅ Transaction ${txHash} mined successfully on attempt ${attempt}`);
+        return true;
+      } else if (receipt && receipt.status === '0x0') {
+        console.log(`❌ Transaction ${txHash} failed on attempt ${attempt}`);
+        return false;
+      } else {
+        console.log(`⏳ Transaction ${txHash} not yet mined, attempt ${attempt}/${maxAttempts}`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      }
+    } catch (error: any) {
+      console.error(`Error checking transaction status on attempt ${attempt}:`, error.message);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  
+  console.log(`⏰ Transaction ${txHash} not mined after ${maxAttempts} attempts`);
+  return false;
+};
+
+// Validate transaction details using Alchemy
+const validateTransactionWithAlchemy = async (
+  txHash: string,
+  stratoTokenAddress: string,
+  stratoAmount: string,
+): Promise<{ isValid: boolean; error?: string }> => {
+  try {
+    console.log(`Validating transaction ${txHash} with Alchemy...`);
+    
+    // Wait for transaction to be mined first
+    const isMined = await waitForTransactionMined(txHash);
+    if (!isMined) {
+      return { isValid: false, error: 'Transaction not mined or failed' };
+    }
+    
+    // Map Strato token address to Ethereum token address
+    const isTestnet = process.env.SHOW_TESTNET === "true";
+    const tokenMapping = isTestnet
+      ? TESTNET_ETH_STRATO_TOKEN_MAPPING
+      : MAINNET_ETH_STRATO_TOKEN_MAPPING;
+    
+    const ethTokenAddress = Object.entries(tokenMapping).find(
+      ([_, stratoAddr]) => stratoAddr.toLowerCase() === stratoTokenAddress.toLowerCase()
+    )?.[0];
+    
+    if (!ethTokenAddress) {
+      return { isValid: false, error: `No Ethereum mapping found for Strato token: ${stratoTokenAddress}` };
+    }
+    
+    console.log(`Mapped Strato token ${stratoTokenAddress} to Ethereum token ${ethTokenAddress}`);
+    
+    const [receiptRes, txRes] = await Promise.all([
+      axios.post(`${ALCHEMY_URL}/${config.alchemy.apiKey}`, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      }),
+      axios.post(`${ALCHEMY_URL}/${config.alchemy.apiKey}`, {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'eth_getTransactionByHash',
+        params: [txHash],
+      }),
+    ]);
+
+    const receipt = receiptRes.data?.result;
+    const tx = txRes.data?.result;
+
+    if (!receipt || !tx) {
+      return { isValid: false, error: 'Transaction not found' };
+    }
+
+    const lowerEthToken = ethTokenAddress.toLowerCase();
+    const logs = receipt?.logs ?? [];
+
+    // Check for ETH transfer
+    const isETHTransfer = 
+      lowerEthToken === "0x0000000000000000000000000000000000000000" &&
+      BigInt(tx.value).toString() === stratoAmount &&
+      tx.to?.toLowerCase() === config.safe.address?.toLowerCase();
+
+    // Check for ERC-20 transfer
+    const matchedERC20Log = logs
+      .map(decodeERC20TransferLog)
+      .find((log: any) =>
+        log &&
+        log.tokenAddress.toLowerCase() === lowerEthToken &&
+        log.amount === stratoAmount &&
+        log.to.toLowerCase() === config.safe.address?.toLowerCase()
+      );
+
+    if (isETHTransfer || matchedERC20Log) {
+      console.log(`✅ Transaction ${txHash} validation successful`);
+      console.log(`  - Expected amount: ${stratoAmount}`);
+      console.log(`  - Expected token: ${ethTokenAddress}`);
+      return { isValid: true };
+    } else {
+      console.warn(`❌ Transaction ${txHash} validation failed`);
+      console.log(`  - Expected amount: ${stratoAmount}`);
+      console.log(`  - Expected token: ${ethTokenAddress}`);
+      return { 
+        isValid: false, 
+        error: 'Transaction details do not match expected values' 
+      };
+    }
+  } catch (error: any) {
+    console.error(`Error validating transaction ${txHash}:`, error.message);
+    return { isValid: false, error: error.message };
+  }
+};
+
+// ERC-20 Transfer event decoder
+const decodeERC20TransferLog = (log: any) => {
+  try {
+    if (log.topics[0] !== TRANSFER_EVENT_SIG) return null;
+
+    const from = ethers.getAddress("0x" + log.topics[1].slice(26));
+    const to = ethers.getAddress("0x" + log.topics[2].slice(26));
+    const amount = BigInt(log.data).toString();
+
+    return { from, to, amount, tokenAddress: log.address };
+  } catch (e) {
+    console.error("Failed to decode log:", e);
+    return null;
+  }
+};
 
 const checkDepositStatus = async (txHash: string): Promise<any | null> => {
   console.log("checking deposit status for .......", txHash);
@@ -65,6 +215,18 @@ export const bridgeIn = async (
   toAddress: string,
   userAddress: string
 ) => {
+
+  // Validate transaction with Alchemy before proceeding
+  const validation = await validateTransactionWithAlchemy(
+    ethHash,
+    tokenAddress,
+    amount,
+  );
+
+  if (!validation.isValid) {
+    throw new Error(`Transaction validation failed: ${validation.error}`);
+  }
+
   const bridgeContract = new BridgeContractCall();
 
   console.log("bridgeIn contract call 1st step", {
