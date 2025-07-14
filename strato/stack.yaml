@@ -176,6 +176,6 @@ ghc-options:
 
 docker:
   enable: true # set to false for MacOS
-  image: "strato-buildbase:lts-23.14"
+  image: "strato-buildbase:lts-23.14" #if changing - also update the docker image base in Dockerfile.buildbase with corresponding GHC version
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

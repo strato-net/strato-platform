@@ -109,11 +109,11 @@ eks:
 
 build_buildbase:
 	@echo building buildbase...
-	docker --debug build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f Dockerfile.buildbase .
+	docker build --tag=strato-buildbase:${STACK_RESOLVER} -f Dockerfile.buildbase .
 
 build_formatter:
 	@echo building code formatter...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} -f Dockerfile.buildbase .
+	docker build --tag=strato-formatter:${STACK_RESOLVER} -f Dockerfile.buildbase .
 
 build_common: build_buildbase
 	@echo building haskell libraries and creating directories
