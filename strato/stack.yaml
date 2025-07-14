@@ -179,3 +179,4 @@ docker:
   image: "strato-buildbase:lts-23.14" #if changing - also update the docker image base in Dockerfile.buildbase with corresponding GHC version
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
+  # stack-exe: image  # uncomment when building on arm-based Linux, if getting 'exec /opt/host/bin/stack: exec format error'
