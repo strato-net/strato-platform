@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
+import MobileSidebar from "../components/dashboard/MobileSidebar";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
@@ -27,8 +28,10 @@ const Dashboard = () => {
     currentBorrowed, 
     averageInterestRate, 
   } = useLendingMetrics();
+  const { loans } = useLendingContext();
   const [totalBalance, setTotalBalance] = useState<number>(0)
   const [cataBalance, setCataBalance] = useState<number>(0);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
   const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
 
@@ -67,22 +70,33 @@ const Dashboard = () => {
       const token = tokens[i];
       const rawPrice = token?.price || "0";
       const rawBalance = token?.balance || "0";
+      const rawCollateralBalance = token?.collateralBalance || "0";
 
       const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
       const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
+      const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance), 18));
       const name = token?._name || "";
       const symbol = token?._symbol || "";
 
-      const tokenValue = balance * price;
-      total += tokenValue;
+      // Calculate total value including both balance and collateral
+      const totalTokenValue = (balance + collateralBalance) * price;
+      total += totalTokenValue;
 
       if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
-        cataTotal += tokenValue;
+        cataTotal += totalTokenValue;
       }
     }
-    setTotalBalance(total);
+
+    // Get USDST borrowed from loans data
+    const usdstBorrowed = (loans as any)?.totalAmountOwed 
+      ? parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18))
+      : 0;
+
+    // Net Balance = All deposits (including supplied) - USDST Borrowed
+    const netBalance = total - usdstBorrowed;
+    setTotalBalance(netBalance);
     setCataBalance(cataTotal);
-  }, [tokens]);
+  }, [tokens, loans]);
 
   function formatBalance(value: number): string {
     if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
@@ -94,31 +108,41 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
+      <MobileSidebar 
+        isOpen={isMobileSidebarOpen} 
+        onClose={() => setIsMobileSidebarOpen(false)} 
+      />
 
-      <div className="flex-1 ml-64">
-        <DashboardHeader title="Overview" />
+      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
+        <DashboardHeader 
+          title="Overview" 
+          onMenuClick={() => setIsMobileSidebarOpen(true)}
+        />
 
         <main className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <AssetSummary
-              title="Total Balance"
-              value={formatBalance(totalBalance)}
+              title="Net Balance"
+              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
 
             <AssetSummary
               title="CATA Rewards"
-              value={formatBalance(cataBalance)}
+              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />
 
             <AssetSummary
-              title="Borrowing"
-              value="N/A"
+              title="Borrowed"
+              value={(loans as any)?.totalAmountOwed 
+                ? `${parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18)).toFixed(2)} USDST`
+                : "0.00 USDST"
+              }
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />
@@ -150,3 +174,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

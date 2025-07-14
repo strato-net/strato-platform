@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
+import MobileSidebar from '../components/dashboard/MobileSidebar';
 import { 
   Card, 
   CardContent,  
@@ -19,7 +20,8 @@ import ExchangeCart from './ExchangeCart';
 const Assets = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens } = useUserTokens();
-  const [totalBalance, setTotalBalance] = useState<number>(0)
+  const [totalBalance, setTotalBalance] = useState<number>(0);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchTokens();
@@ -55,17 +57,23 @@ const Assets = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 overflow-hidden">
       <DashboardSidebar />
-      <div className="flex-1 ml-64">
-        <DashboardHeader title="Deposits" />
-        <main className="p-6">
+      <MobileSidebar 
+        isOpen={isMobileSidebarOpen} 
+        onClose={() => setIsMobileSidebarOpen(false)} 
+      />
+      <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
+        <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
+        <main className="flex-1 p-6 overflow-y-auto">
           {/* Asset Summary */}
-          <div className="mb-8 flex gap-6 items-stretch">
-            <div className="flex-1 max-w-[700px]">
+          <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
+            <div className="flex-1 min-w-0 max-w-full">
               <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
             </div>
-            <ExchangeCart />
+            <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
+              <ExchangeCart />
+            </div>
           </div>
           <div className="mb-8">
             <AssetSummary 

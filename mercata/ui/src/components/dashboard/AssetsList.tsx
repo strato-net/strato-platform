@@ -34,7 +34,7 @@ const AssetsList = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm w-full overflow-hidden">
       <div className="p-5 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <h2 className="font-bold text-lg">My Deposits</h2>
@@ -72,26 +72,26 @@ const AssetsList = ({
             </div>
           </Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ minWidth: '700px', width: '100%' }}>
             <thead>
               <tr className="bg-gray-50">
-                <th className="w-[25%] text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[140px]">
                   Asset
                 </th>
-                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[80px]">
                   Price
                 </th>
-                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[80px]">
                   Change
                 </th>
-                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Holdings
                 </th>
-                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Value
                 </th>
-                <th className="w-[15%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Collateral
                 </th>
               </tr>
