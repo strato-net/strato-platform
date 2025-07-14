@@ -1,6 +1,6 @@
 ARG STACK_RESOLVER
 
-FROM arm64v8/haskell:9.8.4-bullseye
+FROM haskell:9.8.4-bullseye
 
 # Install basic dependencies and add PostgreSQL official repository for version 14+
 RUN apt-get update && \
