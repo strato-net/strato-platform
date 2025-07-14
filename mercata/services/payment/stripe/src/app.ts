@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import routes from "./api/routes";
 import { Request, Response } from "express";
-// import { handleStripeWebhook } from "./api/services/onramp.service";
+import { handleStripeWebhook } from "./api/services/onramp.service";
 import { stripe } from "./utils/stripeClient";
 import { stripeWebhookKey } from "./config/config";
 import { initOpenIdConfig } from "./config/config";
@@ -11,14 +11,14 @@ const PORT = process.env.PORT || 3002;
 
 const app = express();
 
-// Stripe webhook endpoint for payment confirmations
-// app.post(
-//   "/webhook",
-//   express.raw({ type: "application/json" }),
-//   (request: Request, response: Response) => {
-//     // console.log("=== WEBHOOK ENDPOINT HIT ===");
-//     let event: any;
-//     const signature = request.headers["stripe-signature"] as string;
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  (request: Request, response: Response) => {
+    // console.log("=== WEBHOOK ENDPOINT HIT ===");
+
+    let event: any;
+  //   const signature = request.headers["stripe-signature"] as string;
     
   // try {
   //   event = stripe.webhooks.constructEvent(
@@ -32,32 +32,29 @@ const app = express();
   //   return;
   // }
     
-//     // For testing - parse request body from Buffer to JSON
-//     try {
-//       event = JSON.parse(request.body.toString());
-//     } catch (err) {
-//       console.error("Failed to parse request body:", err);
-//       response.sendStatus(400);
-//       return;
-//     }
-//     console.log("Parsed event:", JSON.stringify(event, null, 2));
-//     // Handle the event
-//     switch (event.type) {
-//       case "checkout.session.completed":
-//         const paymentIntent = event.data.object;
-//         handleStripeWebhook(paymentIntent).then(() => {
-//           console.log("PaymentIntent was successful!");
-//         });
-//         break;
-//       // ... handle other event types as needed ...
-//       default:
-//         console.log(`Unhandled event type ${event.type}`);
-//     }
-//     // Acknowledge receipt of the event
-//     response.sendStatus(200);
-//     return;
-//   }
-// );
+  try {
+    event = JSON.parse(request.body.toString());
+  } catch (err) {
+    console.error("Failed to parse request body:", err);
+    response.sendStatus(400);
+    return;
+  }
+  console.log("Parsed event:", JSON.stringify(event, null, 2));
+  switch (event.type) {
+    case "checkout.session.completed":
+      const paymentIntent = event.data.object;
+      handleStripeWebhook(paymentIntent).then(() => {
+        console.log("PaymentIntent was successful!");
+      });
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  response.sendStatus(200);
+  return;
+  }
+);
 
 app.use(cors(), express.json(), express.urlencoded({ extended: true }));
 

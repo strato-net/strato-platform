@@ -1,4 +1,4 @@
-import { onRamp } from "./config";
+import { onRamp, voucher } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -10,4 +10,5 @@ export enum StratoPaths {
 
 export const constants = {
   onRamp,
+  voucher,
 };

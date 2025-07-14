@@ -7,6 +7,9 @@ if (process.env.NODE_ENV !== "production") {
 if (!process.env.ONRAMP) {
   throw new Error("ONRAMP is not defined");
 }
+if (!process.env.VOUCHER) {
+  throw new Error("VOUCHER is not defined");
+}
 
 export let openIdTokenEndpoint: string | undefined;
 /**
@@ -22,3 +25,4 @@ export const nodeUrl = process.env.NODE_URL;
 export const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 export const stripeWebhookKey = process.env.STRIPE_WEBHOOK_SECRET || "";
 export const onRamp = process.env.ONRAMP;
+export const voucher = process.env.VOUCHER;
