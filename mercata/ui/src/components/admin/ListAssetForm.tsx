@@ -38,7 +38,7 @@ interface OnRampListingFormValues {
 const ListAssetForm = () => {
   const [loading, setLoading] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProviderValue[]>([]);
-  const [approvedTokens, setApprovedTokens] = useState<any[]>([]);
+  const [approvedTokens, setApprovedTokens] = useState<ApprovedToken[]>([]);
 
   const { toast } = useToast();
   const { userAddress } = useUser();
