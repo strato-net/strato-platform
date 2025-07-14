@@ -147,16 +147,36 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     return true;
   };
 
-  // Helper function to round down amount to token's decimal places
+  // Helper function to round down amount to token's decimal places using string manipulation
   const roundToTokenDecimals = (value: string, decimals: number): string => {
     if (!value || !decimals) return value;
     
-    const numericValue = parseFloat(value);
-    if (isNaN(numericValue)) return value;
+    // Split by decimal point
+    const parts = value.split('.');
+    const integerPart = parts[0];
+    const decimalPart = parts[1] || '';
     
-    // Always round down to the token's decimal places to prevent insufficient balance
-    const roundedValue = Math.floor(numericValue * Math.pow(10, decimals)) / Math.pow(10, decimals);
-    return roundedValue.toString();
+    // Ensure proper decimal format (add 0 if integer part is empty)
+    const normalizedIntegerPart = integerPart || '0';
+    
+    // If no decimal part, return just the integer part
+    if (!decimalPart) {
+      return normalizedIntegerPart;
+    }
+    
+    // If decimal part is shorter than required decimals, return normalized value
+    if (decimalPart.length < decimals) {
+      return `${normalizedIntegerPart}.${decimalPart}`;
+    }
+    
+    // If decimal part is longer than required decimals, truncate
+    if (decimalPart.length > decimals) {
+      const truncatedDecimal = decimalPart.substring(0, decimals);
+      return `${normalizedIntegerPart}.${truncatedDecimal}`;
+    }
+    
+    // If decimal part is exactly the right length, return normalized value
+    return `${normalizedIntegerPart}.${decimalPart}`;
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
