@@ -571,7 +571,10 @@ export const executeLiquidation = async (
     
     const hf = calculateHealthFactor(totalCollateralValue, totalOwed.toString());
     const healthFactorPercentage = Number(hf) / Number(constants.DECIMALS);
-    repayAmount = healthFactorPercentage >= 0.95 ? totalOwed / 2n : totalOwed;
+    // Corrected close factor logic:
+    // HF <= 0.95: 100% liquidation allowed
+    // 0.95 < HF < 1: 50% liquidation allowed
+    repayAmount = healthFactorPercentage <= 0.95 ? totalOwed : totalOwed / 2n;
   }
 
   const tx = buildFunctionTx([
@@ -724,7 +727,9 @@ export interface LiquidationCollateralInfo {
   symbol?: string;
   amount: string;
   usdValue: string;
-  expectedProfit: string; // placeholder for now
+  expectedProfit: string;
+  maxRepay?: string;
+  liquidationBonus?: number;
 }
 
 export interface LiquidationEntry {
@@ -735,6 +740,7 @@ export interface LiquidationEntry {
   amount: string; // total debt (principal + interest)
   healthFactor: number; // as percentage 1.0 == 100%
   collaterals: LiquidationCollateralInfo[];
+  maxRepay?: string; // maximum amount that can be repaid
 }
 
 /**
@@ -769,6 +775,12 @@ export const listLoansForLiquidation = async (
   // Build helper maps
   const priceMap = new Map<string, string>(pricesArr.map((p: any) => [p.asset, p.price]));
   
+  // Build asset config map
+  const assetConfigMap = new Map<string, any>();
+  assetConfigsArr.forEach((cfg: any) => {
+    assetConfigMap.set(cfg.asset, cfg.AssetConfig);
+  });
+  
   // Group collaterals by user for quick lookup
   const collMap = new Map<string, CollateralInfo[]>();
   for (const c of collateralsArr) {
@@ -794,11 +806,9 @@ export const listLoansForLiquidation = async (
   const results: LiquidationEntry[] = [];
 
   for (const entry of loansArr) {
-    const loanId = entry.key;
+    const userAddr: string = entry.key || entry.user; // The key in the mapping IS the user address
     const loan: any = entry.LoanInfo;
     if (!loan) continue;
-
-    const userAddr: string = entry.user || loan.user || loanId; // Cirrus often stores borrower in key field
 
     // Build assetConfigs map with price for simulateLoan helper
     const acMap = new Map<string, AssetConfig>();
@@ -819,30 +829,60 @@ export const listLoansForLiquidation = async (
     const include = margin === undefined ? hf < 1 : hf >= 1 && hf < 1 + margin;
     if (!include) continue;
 
+    // Calculate total owed amount with interest
+    const totalOwed = toBig(sim.totalAmountOwed);
+    
+    // Determine close factor based on health factor
+    // HF <= 0.95: 100% liquidation allowed (position is in danger)
+    // 0.95 < HF < 1: 50% liquidation allowed (position is less risky)
+    const closeFactor = hf <= 0.95 ? 1.0 : 0.5;
+    const debtLimit = (totalOwed * BigInt(Math.floor(closeFactor * 1e18))) / constants.DECIMALS;
+
     // Prepare collateral display info
     const collateralDisplay: LiquidationCollateralInfo[] = userColls.map((col) => {
       const price = priceMap.get(col.asset) || "0";
-      const usdVal = ((toBig(col.amount) * toBig(price)) / constants.DECIMALS).toString();
+      const collateralValueWei = (toBig(col.amount) * toBig(price)) / constants.DECIMALS;
+      const usdVal = collateralValueWei.toString();
       const tokenInfo = tokenInfoMap.get(col.asset);
+      
+      // Get liquidation bonus from asset config (default 5% = 10500 basis points)
+      const assetConfig = assetConfigMap.get(col.asset);
+      const liquidationBonus = assetConfig?.liquidationBonus || 10500;
+      
+      // Calculate collateral-specific limit: how much debt can be repaid with this collateral
+      // collateral_limit = collateral_value / liquidation_bonus_factor
+      const bonusFactor = BigInt(liquidationBonus); // e.g., 10500 for 105%
+      const collateralLimit = (collateralValueWei * 10000n) / bonusFactor;
+      
+      // The actual max repay is the minimum of debt limit and collateral limit
+      const effectiveMaxRepay = debtLimit < collateralLimit ? debtLimit : collateralLimit;
+      
+      // Calculate expected profit: (liquidation_bonus - 1) × effective_max_repay
+      const profitFactor = BigInt(liquidationBonus - 10000); // e.g., 500 for 5% bonus
+      const expectedProfit = (effectiveMaxRepay * profitFactor) / 10000n;
+      
       return {
         asset: col.asset,
         symbol: tokenInfo?._symbol || tokenInfo?._name,
         amount: col.amount,
         usdValue: usdVal,
-        expectedProfit: "0", // simple placeholder
+        expectedProfit: expectedProfit.toString(),
+        maxRepay: effectiveMaxRepay.toString(),
+        liquidationBonus: liquidationBonus,
       };
     });
 
     const tokenBorrowInfo = tokenInfoMap.get(borrowableAsset);
 
     results.push({
-      id: loanId,
+      id: userAddr, // Use user address as unique ID since each user has only one loan
       user: userAddr,
       asset: borrowableAsset,
       assetSymbol: tokenBorrowInfo?._symbol || tokenBorrowInfo?._name,
       amount: (toBig(loan.principalBalance) + toBig(loan.interestOwed || "0")).toString(),
       healthFactor: hf,
       collaterals: collateralDisplay,
+      maxRepay: debtLimit.toString(), // Add to loan level as well
     });
   }
 
