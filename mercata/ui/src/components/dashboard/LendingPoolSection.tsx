@@ -274,6 +274,23 @@ const LendingPoolSection = () => {
                     </Button>
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+                        const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
+                        const maxDepositableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
+                        const formatted = formatUnits(maxDepositableWei, 18);
+
+                        // Clamp to 18 decimals
+                        const [whole, frac = ""] = formatted.split(".");
+                        const clamped = `${whole}.${frac.slice(0, 18)}`;
+                        setDepositAmount(clamped);
+                      }}
+                      className="text-blue-600 hover:underline mr-2"
+                    >
+                      Max
+                    </button>
                     Available:{" "}
                     {loadingLiquidity ?
                       <span className="text-gray-400 animate-pulse">
@@ -356,7 +373,22 @@ const LendingPoolSection = () => {
                     </Button>
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
-                    Max Withdrawable:{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const raw = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
+                        if (raw) {
+                          const formatted = formatUnits(raw, 18);
+                          const [w, f = ""] = formatted.split(".");
+                          const clamped = f.length > 18 ? `${w}.${f.slice(0, 18)}` : formatted;
+                          setWithdrawAmount(clamped);
+                        }
+                      }}
+                      className="text-blue-600 hover:underline mr-2"
+                    >
+                      Max
+                    </button>
+                    Withdrawable:{" "}
                     {loadingLiquidity ?
                       <span className="text-gray-400 animate-pulse">
                         Loading...
