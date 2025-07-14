@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { roundToDecimals } from "@/utils/numberUtils";
 
 interface Token {
   name: string;
@@ -147,38 +148,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     return true;
   };
 
-  // Helper function to round down amount to token's decimal places using string manipulation
-  const roundToTokenDecimals = (value: string, decimals: number): string => {
-    if (!value || !decimals) return value;
-    
-    // Split by decimal point
-    const parts = value.split('.');
-    const integerPart = parts[0];
-    const decimalPart = parts[1] || '';
-    
-    // Ensure proper decimal format (add 0 if integer part is empty)
-    const normalizedIntegerPart = integerPart || '0';
-    
-    // If no decimal part, return just the integer part
-    if (!decimalPart) {
-      return normalizedIntegerPart;
-    }
-    
-    // If decimal part is shorter than required decimals, return normalized value
-    if (decimalPart.length < decimals) {
-      return `${normalizedIntegerPart}.${decimalPart}`;
-    }
-    
-    // If decimal part is longer than required decimals, truncate
-    if (decimalPart.length > decimals) {
-      const truncatedDecimal = decimalPart.substring(0, decimals);
-      return `${normalizedIntegerPart}.${truncatedDecimal}`;
-    }
-    
-    // If decimal part is exactly the right length, return normalized value
-    return `${normalizedIntegerPart}.${decimalPart}`;
-  };
-
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (/^\d*\.?\d*$/.test(value)) {
@@ -213,7 +182,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
 
     try {
       // Round amount to token's decimal places before sending
-      const roundedAmount = roundToTokenDecimals(amount, selectedToken.decimals);
+      const roundedAmount = roundToDecimals(amount, selectedToken.decimals);
       
       const response = await bridgeOutAPI({
         amount: roundedAmount,
@@ -342,7 +311,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
                 {selectedToken?.exchangeTokenSymbol && (
                   <div className="text-sm">
                     <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                      You will receive {amount ? `${selectedToken ? roundToTokenDecimals(amount, selectedToken.decimals) : amount} ` : ''} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
+                      You will receive {amount ? `${selectedToken ? roundToDecimals(amount, selectedToken.decimals) : amount} ` : ''} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
                     </p>
                   </div>
                 )}
@@ -394,10 +363,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
             <div className="mt-2 space-y-2">
               <p>From: {fromChain}</p>
               <p>To: {toChain}</p>
-              <p>Amount: {selectedToken ? roundToTokenDecimals(amount, selectedToken.decimals) : amount} {selectedToken?.symbol}</p>
+              <p>Amount: {selectedToken ? roundToDecimals(amount, selectedToken.decimals) : amount} {selectedToken?.symbol}</p>
               {selectedToken?.exchangeTokenSymbol && (
                 <p className="text-blue-600">
-                  You will receive {selectedToken ? roundToTokenDecimals(amount, selectedToken.decimals) : amount} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
+                  You will receive {selectedToken ? roundToDecimals(amount, selectedToken.decimals) : amount} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
                 </p>
               )}
             </div>
