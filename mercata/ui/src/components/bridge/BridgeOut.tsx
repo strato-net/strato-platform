@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
+import PercentageButtons from "@/components/ui/PercentageButtons";
 
 interface Token {
   name: string;
@@ -155,6 +156,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     }
   };
 
+  const handlePercentageClick = (percentageAmount: string) => {
+    setAmount(percentageAmount);
+    validateAmount(percentageAmount);
+  };
+
   const showConfirmModal = () => {
     if (!selectedToken?.tokenAddress || !address) {
       toast({
@@ -189,7 +195,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       if (response?.success) {
         toast({
           title: "Transaction Proposed Successfully",
-          description: "Your transaction has been proposed and is waiting for approval",
+           description: `Your tokens have been burned and ${amount} ${selectedToken?.symbol} will be transferred to ${address}. Withdrawal is pending approval. Please wait for some time.`,
         });
 
         // Refresh balance after successful transaction
@@ -285,6 +291,12 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         {amountError && (
           <p className="text-sm text-red-500">{amountError}</p>
         )}
+        <PercentageButtons
+          currentAmount={amount}
+          maxAmount={tokenBalance}
+          onPercentageClick={handlePercentageClick}
+          className="mt-2"
+        />
         <div className="flex items-center gap-2 mt-1">
           {isBalanceLoading ? (
             <div className="flex items-center gap-2">

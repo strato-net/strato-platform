@@ -23,6 +23,7 @@ import { mainnet, sepolia } from "viem/chains";
 import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
 import { useBridgeContext } from "@/context/BridgeContext";
 import BridgeWalletStatus from './BridgeWalletStatus';
+import PercentageButtons from "@/components/ui/PercentageButtons";
 
 interface Token {
   name: string;
@@ -227,6 +228,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     }
   };
 
+  const handlePercentageClick = (percentageAmount: string) => {
+    setAmount(percentageAmount);
+    validateAmount(percentageAmount);
+  };
+
   const handleBridgeIn = async () => {
     const tokenAddress = selectedToken?.tokenAddress;
     const tokenChainId = selectedToken?.chainId;
@@ -406,6 +412,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         {amountError && (
           <p className="text-sm text-red-500">{amountError}</p>
         )}
+        <PercentageButtons
+          currentAmount={amount}
+          maxAmount={tokenBalance}
+          onPercentageClick={handlePercentageClick}
+          className="mt-2"
+        />
         <div className="flex items-center gap-2 mt-1">
           {isBalanceLoading ? (
             <div className="flex items-center gap-2">
