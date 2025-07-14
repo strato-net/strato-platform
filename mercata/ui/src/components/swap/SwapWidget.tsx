@@ -158,6 +158,18 @@ const TokenInput = ({
     );
   }, [isFromInput, asset, usdstBalanceBigInt, feeAmount]);
 
+  // Check if input amount is within 0.10 of USDST balance (low balance warning)
+  const isLowBalanceWarning = useMemo(() => {
+    if (!isFromInput || !asset || asset?.address !== usdstAddress || !inputAmountWei) return false;
+    
+    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
+    const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
+    
+    return inputAmountWei > 0n && 
+           remainingBalance >= 0n && 
+           remainingBalance <= lowBalanceThreshold;
+  }, [isFromInput, asset, inputAmountWei, usdstBalanceBigInt, feeAmount]);
+
   // Get pool balance
   const getPoolBalance = () => {
     if (!pool || !asset) return "0";
@@ -214,6 +226,11 @@ const TokenInput = ({
           {isInsufficientUsdstForFee && (
             <p className="text-yellow-600 text-sm mt-1">
               Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+            </p>
+          )}
+          {isLowBalanceWarning && (
+            <p className="text-yellow-600 text-sm mt-1">
+              Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
             </p>
           )}
         </div>

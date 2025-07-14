@@ -546,6 +546,27 @@ const SwapPoolsSection = () => {
                  BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
+                {(() => {
+                  // Low balance warning for token A when it's USDST
+                  if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
+                    const inputAmountWei = parseUnits(token1Amount || "0", 18);
+                    const balanceWei = BigInt(tokenABalance || "0");
+                    const feeWei = parseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n && 
+                                             remainingBalance >= 0n && 
+                                             remainingBalance <= lowBalanceThreshold &&
+                                             inputAmountWei <= balanceWei - feeWei;
+                    
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Second Token */}
@@ -608,6 +629,27 @@ const SwapPoolsSection = () => {
                  BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
+                {(() => {
+                  // Low balance warning for token B when it's USDST
+                  if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
+                    const inputAmountWei = parseUnits(token2Amount || "0", 18);
+                    const balanceWei = BigInt(tokenBBalance || "0");
+                    const feeWei = parseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n && 
+                                             remainingBalance >= 0n && 
+                                             remainingBalance <= lowBalanceThreshold &&
+                                             inputAmountWei <= balanceWei - feeWei;
+                    
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 
@@ -732,6 +774,20 @@ const SwapPoolsSection = () => {
               {BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
               )}
+              {(() => {
+                // Low balance warning for withdraw
+                const usdstBalanceWei = BigInt(usdstBalance || "0");
+                const feeWei = parseUnits(WITHDRAW_FEE, 18);
+                const lowBalanceThreshold = parseUnits("0.10", 18);
+                const remainingBalance = usdstBalanceWei - feeWei;
+                const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+                
+                return isLowBalanceWarning && usdstBalanceWei >= feeWei ? (
+                  <p className="text-yellow-600 text-sm mt-1">
+                    Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                  </p>
+                ) : null;
+              })()}
               {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                 <>
                   <div className="w-full flex justify-between">
