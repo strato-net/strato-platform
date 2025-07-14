@@ -16,7 +16,7 @@ const BorrowingSection = ({
 }: BorrowingSectionProps) => {
   const navigate = useNavigate()
 
-  const ltvRatio = parseFloat(availableBorrowingPower.split('$')[1].replace(/,/g, '')) > 0 ? parseFloat(currentBorrowed.split('$')[1].replace(/,/g, '')) / parseFloat(availableBorrowingPower.split('$')[1].replace(/,/g, '')) : 0;
+  const ltvRatio = parseFloat(availableBorrowingPower.replace(/,/g, '')) > 0 ? parseFloat(currentBorrowed.replace(/,/g, '')) / parseFloat(availableBorrowingPower.replace(/,/g, '')) : 0;
   const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%  
 
   // Risk level mapping
@@ -88,7 +88,7 @@ const BorrowingSection = ({
             <div className="flex flex-col gap-1 mt-8">
               <div className="flex justify-between">
                 <span className="text-gray-600">Available Borrowing Power</span>
-                <span className="font-semibold">{availableBorrowingPower}</span>
+                <span className="font-semibold">{parseFloat(availableBorrowingPower).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Current Borrowed</span>

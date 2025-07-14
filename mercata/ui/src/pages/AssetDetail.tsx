@@ -20,6 +20,11 @@ import {
 } from "recharts";
 import CopyButton from '@/components/ui/copy';
 
+type PricePoint = {
+  date: string;
+  price: string; // since you're using `formatUnits`, it's a string
+};
+
 const generatePriceData = (basePrice: number, days: number = 30) => {
   const data = [];
   let currentPrice = basePrice;
@@ -42,7 +47,7 @@ const AssetDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [asset, setAsset] = useState<Token | null>(null);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [priceData, setPriceData] = useState<any[]>([]);
+  const [priceData, setPriceData] = useState<PricePoint[]>([]);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens } = useUserTokens()
 

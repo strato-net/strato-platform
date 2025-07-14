@@ -11,13 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatUnits, parseUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
+import { NewLoanData } from "@/interface";
 
 interface BorrowAssetModalProps {
   borrowLoading: boolean;
   isOpen: boolean;
   onClose: () => void;
   onBorrow: (amount: string) => void;
-  loan?: any;
+  loan?: NewLoanData;
   usdstBalance?: string;
 }
 

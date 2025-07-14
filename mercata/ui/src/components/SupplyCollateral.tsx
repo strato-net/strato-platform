@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
+import { CollateralData, NewLoanData } from "@/interface";
 
 interface SupplyModalProps {
   supplyLoading: boolean;
-  asset: any;
-  loanData: any;
+  asset: CollateralData;
+  loanData: NewLoanData;
   isOpen: boolean;
   onClose: () => void;
   onSupply: (amount: string) => void;
@@ -43,8 +44,8 @@ const getHealthFactorColor = (healthFactor: number) => {
 // Calculate health impact of supply
 const calculateHealthImpact = (
   supplyAmount: number,
-  asset: any,
-  loanData: any
+  asset: CollateralData,
+  loanData: NewLoanData
 ) => {
   if (!asset || !loanData) {
     return {

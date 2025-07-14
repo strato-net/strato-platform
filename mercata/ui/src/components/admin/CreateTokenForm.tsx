@@ -175,7 +175,7 @@ const CreateTokenForm = () => {
       form.reset();
       setImagePreview('');
       setUploadedFiles([]);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error Creating Token',
         description: error?.message || 'Failed to create token. Please try again.',

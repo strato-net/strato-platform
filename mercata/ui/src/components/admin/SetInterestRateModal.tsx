@@ -9,6 +9,7 @@ import { Loader2, Info, Settings, TrendingUp } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
+import { ApiErrorResponse } from '@/interface';
 
 interface SetInterestRateFormValues {
   rate: string;
@@ -78,7 +79,7 @@ const SetInterestRateModal = ({ open, onOpenChange, token, currentRate, onSucces
         setTimeout(() => onSuccess(), 100);
       }
     } catch (error: unknown) {
-      const axiosError = error as AxiosError<any>;
+      const axiosError = error as AxiosError<ApiErrorResponse>;
       console.error('Interest rate error:', axiosError);
       
       toast({

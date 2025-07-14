@@ -795,7 +795,7 @@ export const listLoansForLiquidation = async (
 
   for (const entry of loansArr) {
     const loanId = entry.key;
-    const loan: any = entry.LoanInfo;
+    const loan = entry.LoanInfo;
     if (!loan) continue;
 
     const userAddr: string = entry.user || loan.user || loanId; // Cirrus often stores borrower in key field

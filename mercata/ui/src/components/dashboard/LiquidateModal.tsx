@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
+import { CollateralData } from "@/interface";
+import { LiquidationEntry } from "@/context/LiquidationContext";
 
 interface LiquidateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  loan: any; // loan entry object (from listLiquidatableLoans)
-  collateral: any; // collateral entry object with maxRepay & expectedProfit
+  loan: LiquidationEntry; // loan entry object (from listLiquidatableLoans)
+  collateral: CollateralData; // collateral entry object with maxRepay & expectedProfit
   onSuccess: () => void;
 }
 
@@ -42,21 +44,22 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   collateral,
   onSuccess,
 }) => {
-  const { toast } = useToast();
-
-  // Guard – nothing to render if data missing
-  if (!loan || !collateral) return null;
 
   // max repay from backend (wei) → ether
   const maxRepayEth = weiToEth(collateral.maxRepay || loan.maxRepay || "0");
 
-  // Controlled string state so user can freely type
+   // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
-
+  
   // Reset when collateral changes or modal opens anew
   useEffect(() => {
     setRepayStr(maxRepayEth.toString());
   }, [maxRepayEth]);
+
+  const { toast } = useToast();
+
+  // Guard – nothing to render if data missing
+  if (!loan || !collateral) return null;
 
   // Derived numeric value (safe)
   const repayEth = (() => {
@@ -114,7 +117,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
       toast({ title: "Liquidation submitted", variant: "success" });
       onSuccess();
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err) {
       const msg = err?.response?.data?.message || err.message || "Liquidation failed";
       toast({ title: "Liquidation failed", description: msg, variant: "destructive" });
     }

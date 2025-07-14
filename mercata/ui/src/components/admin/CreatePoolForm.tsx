@@ -58,7 +58,7 @@ const CreatePoolForm = () => {
       });
 
       form.reset();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error Creating Pool',
         description: error?.message || 'Failed to create pool. Please try again.',

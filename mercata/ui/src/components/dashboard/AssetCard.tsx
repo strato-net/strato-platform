@@ -18,19 +18,17 @@ interface AssetCardProps {
 }
 
 const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image, customDecimals }: AssetCardProps) => {
-  // Safely handle price and deposit as BigInt for formatUnits
-  let formattedPrice = "0.00";
-  let formattedDeposit = "0.00";
-  let formattedCollateral = "0.00";
-  try {
-    formattedPrice = formatUnits(BigInt(price || "0"), customDecimals);
-  } catch {}
-  try {
-    formattedDeposit = formatUnits(BigInt(deposit || "0"), customDecimals);
-  } catch {}
-  try {
-    formattedCollateral = formatUnits(BigInt(collateralBalance || "0"), customDecimals);
-  } catch {}
+  const safeFormatUnits = (value: string | number | undefined, decimals: number): string => {
+    try {
+      return formatUnits(BigInt(value || "0"), decimals);
+    } catch (e) {
+      return "0.00";
+    }
+  };
+
+  const formattedPrice = safeFormatUnits(price, customDecimals);
+  const formattedDeposit = safeFormatUnits(deposit, customDecimals);
+  const formattedCollateral = safeFormatUnits(collateralBalance, customDecimals);
 
   return (
     <Card className="h-full">

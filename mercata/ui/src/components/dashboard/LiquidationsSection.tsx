@@ -1,8 +1,9 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import CopyButton from "../ui/copy";
-import { useLiquidationContext } from "@/context/LiquidationContext";
+import { LiquidationEntry, useLiquidationContext } from "@/context/LiquidationContext";
 import LiquidateModal from "./LiquidateModal";
+import { CollateralData } from "@/interface";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -18,11 +19,11 @@ const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
 
   const [modalData, setModalData] = React.useState<{
-    loan: any;
-    collateral: any;
+    loan: LiquidationEntry;
+    collateral: CollateralData;
   } | null>(null);
 
-  const openModal = (loan: any, collateral: any) => setModalData({ loan, collateral });
+  const openModal = (loan: LiquidationEntry, collateral: CollateralData) => setModalData({ loan, collateral });
   const closeModal = () => setModalData(null);
 
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
@@ -46,7 +47,7 @@ const LiquidationsSection: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {liquidatable.map((ln: any) => (
+            {liquidatable.map((ln: LiquidationEntry) => (
               <React.Fragment key={ln.id}>
                 <tr className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => toggle(ln.id)}>
                   <td className="text-center">{expanded[ln.id] ? "▾" : "▸"}</td>
@@ -73,7 +74,7 @@ const LiquidationsSection: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {ln.collaterals.map((c: any, idx: number) => {
+                          {ln.collaterals.map((c: CollateralData, idx: number) => {
                             const usdVal = weiToEther(c.usdValue).toFixed(2);
                             const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                             const positive = profitNum > 0;

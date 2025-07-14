@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
-import { SwappableToken } from "@/interface";
+import { LiquidityPool, SwappableToken, Token } from "@/interface";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -110,8 +110,9 @@ interface TokenInputProps {
   onFocus: () => void;
   usdstBalance: string;
   isFromInput: boolean;
-  pool: any;
-  fromAsset?: any;
+  pool: LiquidityPool;
+  fromAsset?: Token;
+  onMaxClick?: () => void;
 }
 
 const TokenInput = ({
@@ -131,7 +132,7 @@ const TokenInput = ({
   usdstBalance,
   isFromInput,
   pool,
-  fromAsset
+  fromAsset,
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -379,7 +380,7 @@ const SwapWidget = () => {
   const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
-  const [pool, setPool] = useState<any>(null);
+  const [pool, setPool] = useState<LiquidityPool>(null);
   const [exchangeRate, setExchangeRate] = useState("0");
   const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
   const [toBalanceLoading, setToBalanceLoading] = useState(false);
@@ -481,7 +482,7 @@ const SwapWidget = () => {
           setToAmount("");
           setExchangeRate("0");
         }
-      } catch (error: any) {
+      } catch (error) {
         // Don't handle aborted requests as errors
         if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
 
@@ -644,7 +645,7 @@ const SwapWidget = () => {
           setInsufficientPoolBalance(calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       console.error("Conversion error:", err);
     }
@@ -652,7 +653,11 @@ const SwapWidget = () => {
 
   const handleAmountChange = async (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
-    isFromInput ? setFromAmount(value) : setToAmount(value);
+    if (isFromInput) {
+      setFromAmount(value);
+    } else {
+      setToAmount(value);
+    }
 
     // Reset validation states
     setWrongAmount(false);
@@ -661,7 +666,11 @@ const SwapWidget = () => {
     if (pool && value && Number(value) !== 0) {
       await calculateSwapAmount(value, isFromInput);
     } else {
-      isFromInput ? setToAmount('') : setFromAmount('');
+      if (isFromInput) {
+        setFromAmount('');
+      } else {
+        setToAmount('');
+      }
     }
   };
 
@@ -808,6 +817,29 @@ useEffect(() => {
     calculateSwapAmount(fromAmount, true);
   }
 }, [fromAsset, toAsset, fromAmount, pool]);
+
+const handleMaxClick = (isFrom: boolean) => {
+  const selectedAsset = isFrom ? fromAsset : toAsset;
+  if (!selectedAsset || !selectedAsset.balance) return;
+
+  // Use the raw balance, convert to readable format
+  const maxAmount = formatUnits(selectedAsset.balance, DECIMALS);
+  handleAmountChange(isFrom, maxAmount);
+
+  const rate = parseFloat(exchangeRate || "0");
+  if (isNaN(rate) || rate <= 0) return;
+
+  if (fromAsset && toAsset) {
+    if (isFrom) {
+      const toAmountCalc = parseFloat(maxAmount) * rate;
+      setToAmount(toAmountCalc.toString());
+    } else {
+      const fromAmountCalc = parseFloat(maxAmount) / rate;
+      setFromAmount(fromAmountCalc.toString());
+    }
+  }
+};
+
 
   return (
     <div className="space-y-6">
