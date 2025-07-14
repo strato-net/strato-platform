@@ -106,7 +106,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
     Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
-    Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
+    Just f@TFNonceMismatch {} -> recoverable f -- error $ "mineTransactions' we messed up: " ++ format f -- TODO: figure out why this happens when a user runs out of USDST
     Just f@TFCodeCollectionNotFound {} -> recoverable f
     Just f@TFInvalidPragma {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f

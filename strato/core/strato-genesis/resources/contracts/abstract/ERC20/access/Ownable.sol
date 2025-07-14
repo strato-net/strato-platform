@@ -46,6 +46,19 @@ abstract contract Ownable is Context {
     }
 
     /**
+     * @dev Throws if called by any account other than the owner, but allows ownership check to be bypassed internally
+     */
+    bool internal _ownershipGranted;
+    modifier onlyOwnerExternal() {
+        if(!_ownershipGranted) {
+            _checkOwner();
+        }
+        _ownershipGranted = true;
+        _;
+        _ownershipGranted = false;
+    }
+
+    /**
      * @dev Returns the address of the current owner.
      */
     function owner() public view virtual returns (address) {
