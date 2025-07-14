@@ -79,14 +79,14 @@ export const TESTNET_ETH_TOKENS = [
     chainId: 11155111,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
-  // {
-  //   name: "USD Coin",
-  //   symbol: "USDC",
-  //   tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  //   chainId: 11155111,
-  //   decimals: 6,
-  //   icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  // }
+  {
+    name: "USD Coin",
+    symbol: "USDC",
+    tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    chainId: 11155111,
+    decimals: 6,
+    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
+  }
 ];
 
 export const MAINNET_ETH_TOKENS = [
@@ -98,14 +98,14 @@ export const MAINNET_ETH_TOKENS = [
     chainId: 1,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
-  // {
-  //   name: "USD Coin",
-  //   symbol: "USDC",
-  //   tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  //   decimals: 6,
-  //   chainId: 1,
-  //   icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  // }
+  {
+    name: "USD Coin",
+    symbol: "USDC",
+    tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    decimals: 6,
+    chainId: 1,
+    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
+  }
 ];
 
 export const TESTNET_STRATO_TOKENS = [
@@ -116,13 +116,13 @@ export const TESTNET_STRATO_TOKENS = [
     decimals: 18,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
-  // {
-  //   name: "STRATO USDC",
-  //   symbol: "USDCST",
-  //   tokenAddress: "0x3d351a4a339f6eef7371b0b1b025b3a434ad0399",
-  //   decimals: 6,
-  //   icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  // }
+  {
+    name: "STRATO USDC",
+    symbol: "USDCST",
+    tokenAddress: "0x3d351a4a339f6eef7371b0b1b025b3a434ad0399",
+    decimals: 6,
+    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
+  }
 ];
 
 export const MAINNET_STRATO_TOKENS = [
@@ -133,13 +133,13 @@ export const MAINNET_STRATO_TOKENS = [
     decimals: 18,
     icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
   },
-  // {
-  //   name: "STRATO USD Coin",
-  //   symbol: "USDCST",
-  //   tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  //   decimals: 6,
-  //   icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  // }
+  {
+    name: "STRATO USD Coin",
+    symbol: "USDCST",
+    tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    decimals: 6,
+    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
+  }
 ];
 
 export const TESTNET_ETH_STRATO_TOKEN_MAPPING = {

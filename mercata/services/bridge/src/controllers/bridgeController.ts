@@ -260,9 +260,8 @@ class BridgeController {
   
       const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
       
-      const decimals = getTokenDecimals(stratoTokenAddress);
-      
-      const amountInWei = new BigNumber(amount).multipliedBy(10 ** decimals).toString();
+      // Convert to 18 decimal places regardless of token's native decimals
+      const amountInWei = new BigNumber(amount).multipliedBy(10 ** 18).toString();
     
       const bridgeInResponse = await bridgeIn(
         ethHash,
@@ -298,14 +297,13 @@ class BridgeController {
         return;
       }
 
-      const decimals = getTokenDecimals(tokenAddress);
-
       const fromAddress = config.safe.address || '';
       
+      // Convert to 18 decimal places regardless of token's native decimals
       const bridgeOutResponse = await bridgeOut(
         tokenAddress,
         fromAddress,
-        new BigNumber(amount).multipliedBy(10 ** decimals).toString(),
+        new BigNumber(amount).multipliedBy(10 ** 18).toString(),
         toAddress,
         userAddress
       );
@@ -336,8 +334,7 @@ class BridgeController {
 
       const balanceData = await stratoTokenBalance(userAddress, tokenAddress);
 
-      const decimals = getTokenDecimals(tokenAddress);
-      const balance = new BigNumber(balanceData.balance).div(10**decimals);
+      const balance = new BigNumber(balanceData.balance).div(10**18);
 
       res.json({
         success: true,
