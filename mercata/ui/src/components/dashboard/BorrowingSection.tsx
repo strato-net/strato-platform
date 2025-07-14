@@ -55,12 +55,12 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
 
   return (
     <Card className="border border-gray-100 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-2 sm:space-y-0">
         <div>
           <CardTitle className="text-xl font-bold">My Borrowing</CardTitle>
           <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
         </div>
-        <div>
+        <div className="hidden sm:block">
           <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center gap-2">
             <ArrowUpRight size={16} /> Start Borrowing
           </Button>
@@ -72,13 +72,14 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
             {/* Bar graph now appears first */}
             <div className="mb-2">
               {/* Dynamic risk bar */}
-              <div className="w-4/5 mx-auto bg-gray-200 rounded-full h-2 relative mb-3">
+              <div className="w-full bg-gray-200 rounded-full h-2 relative mb-3">
                 <div className="h-2 rounded-full" style={{ width: `${riskPercentage}%`, backgroundColor: riskColor,}}></div>
 
                 {/* Collateral Value Marker */}
                 <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
                   <div className="h-4 w-0.5 bg-blue-500"></div>
-                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap">Collateral Value</div>
+                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap hidden sm:block">Collateral Value</div>
+                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap sm:hidden">Collateral</div>
                 </div>
 
                 {/* Liquidation Marker */}
@@ -89,9 +90,9 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
               </div>
 
               {/* Risk Level Label */}
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 space-y-2 sm:space-y-0">
                 <div className="flex items-center">
-                  <span className="text-gray-600 mr-2">Risk Level:</span>
+                  <span className="text-gray-600 mr-2 text-sm sm:text-base">Risk Level:</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>
                     {riskLevel}
                   </span>
@@ -100,41 +101,41 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
             </div>
 
             {/* Added extra spacing with mt-8 to separate indicators from data */}
-            <div className="flex flex-col gap-1 mt-8">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Available Borrowing Power</span>
-                <span className="font-semibold">
+            <div className="flex flex-col gap-2 mt-8">
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-gray-600 text-sm sm:text-base">Available Borrowing Power</span>
+                <span className="font-semibold text-sm sm:text-base">
                   {availableBorrowingPower.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })} USDST
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Current Borrowed</span>
-                <span className="font-semibold">
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-gray-600 text-sm sm:text-base">Current Borrowed</span>
+                <span className="font-semibold text-sm sm:text-base">
                   {currentBorrowed.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })} USDST
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Interest Rate</span>
-                <span className="font-semibold">{loanData?.interestRate || 0}%</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-gray-600 text-sm sm:text-base">Interest Rate</span>
+                <span className="font-semibold text-sm sm:text-base">{loanData?.interestRate || 0}%</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Interest Owed</span>
-                <span className="font-semibold">
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-gray-600 text-sm sm:text-base">Interest Owed</span>
+                <span className="font-semibold text-sm sm:text-base">
                   {parseFloat(formatUnits(loanData?.accruedInterest || 0, 18)).toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })} USDST
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Health Factor</span>
-                <span className="font-semibold" style={{ color: getTextColor(parseFloat(loanData?.healthFactor || 0)) }}>
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-gray-600 text-sm sm:text-base">Health Factor</span>
+                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor(parseFloat(loanData?.healthFactor || 0)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     if (currentBorrowed === 0) {
@@ -148,6 +149,13 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
                   })()}
                 </span>
               </div>
+            </div>
+            
+            {/* Mobile Button */}
+            <div className="sm:hidden mt-6">
+              <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center justify-center gap-2 w-full">
+                <ArrowUpRight size={16} /> Start Borrowing
+              </Button>
             </div>
           </div>
         </div>
