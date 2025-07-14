@@ -278,19 +278,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         hash = txHash as `0x${string}`;
       }
 
-      await bridgeInAPI({
-        amount,
-        fromAddress: address as string,
-        tokenAddress: tokenAddress || "",
-        ethHash: hash,
-      });
-
       const client = createPublicClient({
         chain: showTestnet ? sepolia : mainnet,
         transport: http(),
       });
       
+      // Wait for transaction to be mined first
       const receipt = await client.waitForTransactionReceipt({ hash });
+
+      // Only call bridgeInAPI after transaction is mined
+      if (receipt.status === "success") {
+        await bridgeInAPI({
+          amount,
+          fromAddress: address as string,
+          tokenAddress: tokenAddress || "",
+          ethHash: hash,
+        });
+      }
 
       if (receipt.status === "success") {
         
