@@ -3090,7 +3090,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
               let mReturnVar = M.lookup name $ localVariables currentCallInfo
               case mReturnVar of
                 Nothing -> unknownVariable "findNamedReturns" name
-                Just returnVar -> Just <$> getVar (snd returnVar)
+                Just returnVar -> fmap Just . forceLoadVar =<< getVar (snd returnVar)
             xs ->
               Just . STuple . V.fromList <$> do
                 currentCallInfo <- getCurrentCallInfo
@@ -3098,11 +3098,11 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
                   let mReturnVar = M.lookup name $ localVariables currentCallInfo
                   case mReturnVar of
                     Nothing -> unknownVariable "findNamedReturns" name
-                    Just returnVar -> Constant <$> getVar (snd returnVar)
+                    Just returnVar -> fmap Constant . forceLoadVar =<< getVar (snd returnVar)
     val' <- case val of
       Nothing -> findNamedReturns
       Just SNULL -> findNamedReturns
-      Just {} -> return val
+      Just {} -> traverse forceLoadVar val
     pure val'
 
   return val'
@@ -3170,6 +3170,11 @@ encodeForReturn' (STuple items) = do
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
 encodeForReturn' (SDecimal d) = return $ show d 
+encodeForReturn' (SStruct _ vs) = do
+  let encodePair k v = fmap (\v' -> show (labelToString k) ++ ": " ++ v')
+                     . encodeForReturn' =<< forceLoadVar =<< getVar v
+  encodedItems <- mapM (uncurry encodePair) $ M.toList vs
+  pure $ "{" ++ intercalate "," encodedItems ++ "}"
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes

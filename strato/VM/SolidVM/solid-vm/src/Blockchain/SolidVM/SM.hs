@@ -840,8 +840,13 @@ hintFromType = \case
         let upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString, BasicType)
             upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
         TStruct s <$> mapM upgrade fs
-  SVMType.Array {} -> return TComplex
-  SVMType.Mapping {} -> return TComplex
+  SVMType.Array t ml -> do
+    t' <- hintFromType t
+    pure $ TArray t' ml
+  SVMType.Mapping _ k v -> do
+    k' <- hintFromType k
+    v' <- hintFromType v
+    pure $ TMapping k' v'
   tt'' -> todo "hintFromType" tt''
 
 getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type
