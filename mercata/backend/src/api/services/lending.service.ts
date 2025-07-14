@@ -511,16 +511,19 @@ export const executeLiquidation = async (
   }
   const liquidityPoolAddr = liquidityPool;
 
-  // Fetch full registry to locate the loan details
-  const registry = await getPool(accessToken, undefined);
-  const found = (registry.lendingPool.loans || []).find((e: any) => e.key === loanId);
-  if (!found) {
+  // Fetch full registry for the borrower only
+  const registry = await getPool(accessToken, loanId);
+  const userLoanData = registry.lendingPool?.userLoan?.[0];
+  if (!userLoanData || !userLoanData.LoanInfo) {
     throw new Error(`Loan ${loanId} not found`);
   }
-  const loan = found.LoanInfo;
+  const loan = userLoanData.LoanInfo;
 
+  // User's collaterals from CollateralVault mapping
+  const userCollaterals = (registry.collateralVault?.userCollaterals || []).map((c: any) => ({ asset: c.asset, amount: c.amount }));
+ 
   // choose collateral asset: if client supplied via body use it, else first collateral
-  const chosenCollateral = options.collateralAsset || (loan.collaterals?.[0]?.asset) || loan.collateralAsset;
+  const chosenCollateral = options.collateralAsset || userCollaterals[0]?.asset;
 
   if (!chosenCollateral) {
     throw new Error("Unable to determine collateral asset for liquidation");
@@ -531,61 +534,23 @@ export const executeLiquidation = async (
   if (options.repayAmount !== undefined) {
     repayAmount = toBig(options.repayAmount);
   } else {
-    // Default logic: up-to-date owed amount (subject to close factor)
-    const now = Math.floor(Date.now() / 1000);
-    const rateArr = registry.lendingPool.interestRate || [];
-    const rateObj = rateArr.find((r: any) => r.asset?.toLowerCase() === loan.asset.toLowerCase());
-    const rateNum = rateObj ? Number(rateObj.rate) : 0;
-    const rateScaled = Math.round(rateNum * 100);
-    const durationSec = Math.max(0, now - Number(loan.lastUpdated));
-    const interestAcc = (toBig(loan.amount) * BigInt(rateScaled) * BigInt(Math.floor(durationSec / 3600))) / BigInt(8760 * 100 * 100);
-    const totalOwed = toBig(loan.amount) + interestAcc;
-
-    // health factor to choose close factor
-    // Build price and ratio maps from registry data
-    const priceMap = new Map<string, string>();
-    const ratioMap = new Map<string, any>();
-    
-    // Build price map from oracle data
-    (registry.oracle?.prices || []).forEach((price: any) => {
-      priceMap.set(price.asset, price.price);
-    });
-    
-    // Build ratio map from asset configs
-    (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
-      ratioMap.set(config.asset, config.AssetConfig);
-    });
-    
-    // Calculate health factor using total collateral value and total owed
-    const totalCollateralValue = calculateTotalCollateralValueForHealth(
-      loan.collaterals || [],
-      new Map(Array.from(ratioMap.entries()).map(([asset, config]) => [
-        asset, 
-        { 
-          price: priceMap.get(asset) || "0",
-          liquidationThreshold: config?.liquidationThreshold || 0,
-          interestRate: config?.interestRate || 0
-        }
-      ]))
-    );
-    
-    const hf = calculateHealthFactor(totalCollateralValue, totalOwed.toString());
-    const healthFactorPercentage = Number(hf) / Number(constants.DECIMALS);
-    repayAmount = healthFactorPercentage >= 0.95 ? totalOwed / 2n : totalOwed;
+    // Default logic not used when frontend sends amount; fallback to total owed
+    const totalOwed = toBig(loan.principalBalance) + toBig(loan.interestOwed || 0);
+    repayAmount = totalOwed; // default to full (backend will clamp in contract)
   }
 
   const tx = buildFunctionTx([
     {
       contractName: extractContractName(Token),
-      contractAddress: loan.asset,
+      contractAddress: registry.lendingPool?.borrowableAsset || loan.asset,
       method: "approve",
       args: { spender: liquidityPoolAddr, value: repayAmount.toString() },
     },
     {
       contractName: extractContractName(LendingPool),
-      contractAddress: constants.LendingPool,
-      method: "liquidate",
-      args: { loanId },
+      contractAddress: registry.lendingPool?.address,
+      method: "liquidationCall",
+      args: { collateralAsset: chosenCollateral, borrower: loanId, debtToCover: repayAmount.toString() },
     },
   ]);
 
@@ -724,7 +689,9 @@ export interface LiquidationCollateralInfo {
   symbol?: string;
   amount: string;
   usdValue: string;
-  expectedProfit: string; // placeholder for now
+  expectedProfit: string;
+  maxRepay?: string;
+  liquidationBonus?: number;
 }
 
 export interface LiquidationEntry {
@@ -735,6 +702,7 @@ export interface LiquidationEntry {
   amount: string; // total debt (principal + interest)
   healthFactor: number; // as percentage 1.0 == 100%
   collaterals: LiquidationCollateralInfo[];
+  maxRepay?: string; // maximum amount that can be repaid
 }
 
 /**
@@ -769,6 +737,12 @@ export const listLoansForLiquidation = async (
   // Build helper maps
   const priceMap = new Map<string, string>(pricesArr.map((p: any) => [p.asset, p.price]));
   
+  // Build asset config map
+  const assetConfigMap = new Map<string, any>();
+  assetConfigsArr.forEach((cfg: any) => {
+    assetConfigMap.set(cfg.asset, cfg.AssetConfig);
+  });
+  
   // Group collaterals by user for quick lookup
   const collMap = new Map<string, CollateralInfo[]>();
   for (const c of collateralsArr) {
@@ -794,11 +768,9 @@ export const listLoansForLiquidation = async (
   const results: LiquidationEntry[] = [];
 
   for (const entry of loansArr) {
-    const loanId = entry.key;
+    const userAddr: string = entry.key || entry.user; // The key in the mapping IS the user address
     const loan: any = entry.LoanInfo;
     if (!loan) continue;
-
-    const userAddr: string = entry.user || loan.user || loanId; // Cirrus often stores borrower in key field
 
     // Build assetConfigs map with price for simulateLoan helper
     const acMap = new Map<string, AssetConfig>();
@@ -819,30 +791,67 @@ export const listLoansForLiquidation = async (
     const include = margin === undefined ? hf < 1 : hf >= 1 && hf < 1 + margin;
     if (!include) continue;
 
+    // Calculate total owed amount with interest
+    const totalOwed = toBig(sim.totalAmountOwed);
+    
+    // Determine close factor based on health factor
+    // HF <= 0.95: 100% liquidation allowed (position is in danger)
+    // 0.95 < HF < 1: 50% liquidation allowed (position is less risky)
+    const closeFactor = hf <= 0.95 ? 1.0 : 0.5;
+    const debtLimit = (totalOwed * BigInt(Math.floor(closeFactor * 1e18))) / constants.DECIMALS;
+
     // Prepare collateral display info
     const collateralDisplay: LiquidationCollateralInfo[] = userColls.map((col) => {
       const price = priceMap.get(col.asset) || "0";
-      const usdVal = ((toBig(col.amount) * toBig(price)) / constants.DECIMALS).toString();
+      const collateralValueWei = (toBig(col.amount) * toBig(price)) / constants.DECIMALS;
+      const usdVal = collateralValueWei.toString();
       const tokenInfo = tokenInfoMap.get(col.asset);
+      
+      // Get liquidation bonus from asset config (default 5% = 10500 basis points)
+      const assetConfig = assetConfigMap.get(col.asset);
+      const liquidationBonus = assetConfig?.liquidationBonus || 10500;
+      
+      // Calculate collateral-specific limit: how much debt can be repaid with this collateral
+      // Contract formula rearranged:
+      // maxDebtToCover = (collateralAmount * priceCollateral * 10000) / (priceDebt * liquidationBonus)
+      const priceDebtStr = priceMap.get(borrowableAsset) || "0";
+      const priceDebt = toBig(priceDebtStr);
+      const priceCollBig = toBig(price);
+      const collateralAmtBig = toBig(col.amount);
+      let collateralLimit = 0n;
+      if (priceDebt > 0n && priceCollBig > 0n) {
+        collateralLimit = (collateralAmtBig * priceCollBig * 10000n) / (priceDebt * BigInt(liquidationBonus));
+      }
+       
+      // The actual max repay is the minimum of debt limit and collateral limit
+      const effectiveMaxRepay = debtLimit < collateralLimit ? debtLimit : collateralLimit;
+      
+      // Calculate expected profit: (liquidation_bonus - 1) × effective_max_repay
+      const profitFactor = BigInt(liquidationBonus - 10000); // e.g., 500 for 5% bonus
+      const expectedProfit = (effectiveMaxRepay * profitFactor) / 10000n;
+      
       return {
         asset: col.asset,
         symbol: tokenInfo?._symbol || tokenInfo?._name,
         amount: col.amount,
         usdValue: usdVal,
-        expectedProfit: "0", // simple placeholder
+        expectedProfit: expectedProfit.toString(),
+        maxRepay: effectiveMaxRepay.toString(),
+        liquidationBonus: liquidationBonus,
       };
     });
 
     const tokenBorrowInfo = tokenInfoMap.get(borrowableAsset);
 
     results.push({
-      id: loanId,
+      id: userAddr, // Use user address as unique ID since each user has only one loan
       user: userAddr,
       asset: borrowableAsset,
       assetSymbol: tokenBorrowInfo?._symbol || tokenBorrowInfo?._name,
       amount: (toBig(loan.principalBalance) + toBig(loan.interestOwed || "0")).toString(),
       healthFactor: hf,
       collaterals: collateralDisplay,
+      maxRepay: debtLimit.toString(), // Add to loan level as well
     });
   }
 
