@@ -233,7 +233,7 @@ sigma :: Integer
 sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
 
 omega :: Integer
-omega = round $ 10000000 * 1e18 -- ten million is a large number
+omega = 10000000 * 1000000000000000000 -- ten million is a large number (GHC is making me be masochistic with these numbers)
 
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
 assetToAccountInfos GA.Asset{..} =
