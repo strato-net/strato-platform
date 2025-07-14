@@ -229,13 +229,19 @@ correctQuantity d n q =
       decs = getDecimals d n
    in q `times10ToThe` (fromIntegral $ 18 - decs)
 
+sigma :: Integer
+sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
+
+omega :: Integer
+omega = 10000000 * 1e18 -- ten million is a large number
+
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
 assetToAccountInfos GA.Asset{..} =
   let accountBalances' = concatMap
         (\case
           (GA.Balance _ o c q)
             | root == usdstAddress &&  c == "mercata_usdst" ->
-                [(liquidityPoolAddress, correctQuantity decimals name q),
+                [(liquidityPoolAddress, omega - sigma),
                  (blockappsAddress, correctQuantity decimals name q)]
             | root == goldstRoot ->
                 let goldstBalance = correctQuantity decimals name q
@@ -412,12 +418,12 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddres
      , ("._symbol", BString "MUSDST")
      , (".description", BString "MUSDST")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger . (`div` 100) . (*110) . sum $ GE.borrowedAmount <$> combinedEscrows)
+     , ("._totalSupply", BInteger omega)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".minters<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".burners<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger . (`div` 100) . (*110) . sum $ GE.borrowedAmount <$> combinedEscrows)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger omega)
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
