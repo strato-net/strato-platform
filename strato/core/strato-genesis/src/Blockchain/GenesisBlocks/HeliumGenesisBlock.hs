@@ -407,6 +407,8 @@ voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddr
   ++ [ ("._name", BString "Voucher")
      , ("._symbol", BString "VOUCHER")
      , ("._totalSupply", BInteger 0)
+     , (".admin", BAccount $ unspecifiedChain blockappsAddress)
+     , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)
      , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger 1000000000000000000000000)
