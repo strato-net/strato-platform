@@ -65,7 +65,7 @@ class BridgeController {
       console.log("bridgeOut called.....",req.body);
       const {  amount, tokenAddress, toAddress } = req.body;
 
-        const { userAddress } = req.user || {};
+      const { userAddress } = req.user || {};
       if (!userAddress) {
         res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
         return;
@@ -75,10 +75,15 @@ class BridgeController {
 
       const fromAddress = config.safe.address || '';
       
+      // Convert the decimal amount to a whole number by removing the decimal point
+      const amountWithoutDecimals = amount.replace('.', '');
+      // Pad with zeros if needed to match the token's decimals
+      const paddedAmount = amountWithoutDecimals.padEnd(decimals, '0');
+      
       const bridgeOutResponse = await bridgeOut(
         tokenAddress,
         fromAddress,
-        new BigNumber(amount).multipliedBy(10 ** decimals).toString(),
+        paddedAmount,
         toAddress,
         userAddress
       );
