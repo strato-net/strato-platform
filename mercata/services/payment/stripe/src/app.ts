@@ -18,19 +18,19 @@ app.post(
     // console.log("=== WEBHOOK ENDPOINT HIT ===");
 
     let event: any;
-  //   const signature = request.headers["stripe-signature"] as string;
+    const signature = request.headers["stripe-signature"] as string;
     
-  // try {
-  //   event = stripe.webhooks.constructEvent(
-  //     request.body,
-  //     signature,
-  //     stripeWebhookKey
-  //   );
-  // } catch (err: any) {
-  //   console.error("Webhook signature verification failed.", err.message);
-  //   response.sendStatus(400);
-  //   return;
-  // }
+  try {
+    event = stripe.webhooks.constructEvent(
+      request.body,
+      signature,
+      stripeWebhookKey
+    );
+  } catch (err: any) {
+    console.error("Webhook signature verification failed.", err.message);
+    response.sendStatus(400);
+    return;
+  }
     
   try {
     event = JSON.parse(request.body.toString());
