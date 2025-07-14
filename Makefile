@@ -121,7 +121,7 @@ build_common: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack --verbose build ${ARCH_FLAG} \
+	cd strato && stack build ${ARCH_FLAG} \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_with_tests: build_buildbase
@@ -130,7 +130,7 @@ build_common_with_tests: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack --verbose build ${ARCH_FLAG} \
+	cd strato && stack build ${ARCH_FLAG} \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -140,7 +140,7 @@ build_common_profiled: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack --verbose build ${ARCH_FLAG} \
+	cd strato && stack build ${ARCH_FLAG} \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
