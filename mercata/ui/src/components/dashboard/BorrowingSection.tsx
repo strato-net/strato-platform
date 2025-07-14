@@ -2,22 +2,38 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { formatUnits } from "ethers";
 
 interface BorrowingSectionProps {
-  availableBorrowingPower?: string;
-  currentBorrowed?: string;
-  averageInterestRate?: string;
+  loanData?: any;
 }
 
-const BorrowingSection = ({ 
-  availableBorrowingPower = "$0.00", 
-  currentBorrowed = "$0.00", 
-  averageInterestRate = "0.00%" 
-}: BorrowingSectionProps) => {
+const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
   const navigate = useNavigate()
 
-  const ltvRatio = parseFloat(availableBorrowingPower.split('$')[1].replace(/,/g, '')) > 0 ? parseFloat(currentBorrowed.split('$')[1].replace(/,/g, '')) / parseFloat(availableBorrowingPower.split('$')[1].replace(/,/g, '')) : 0;
-  const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%  
+  function getTextColor(value: number, maxValue = 10) {
+    const clamped = Math.min(Math.max(value, 1), maxValue);
+    const ratio = (clamped - 1) / (maxValue - 1);
+
+    const red = Math.round(255 * (1 - ratio));
+    const green = Math.round(255 * ratio);
+
+    return `rgb(${red}, ${green}, 0)`;
+  }
+
+  // Calculate available borrowing power from loanData
+  const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
+    ? parseFloat(formatUnits(loanData.maxAvailableToBorrowUSD, 18))
+    : 0;
+
+  // Calculate current borrowed amount
+  const currentBorrowed = loanData?.totalAmountOwed 
+    ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18))
+    : 0;
+
+  // Calculate LTV ratio for risk assessment
+  const ltvRatio = availableBorrowingPower > 0 ? currentBorrowed / availableBorrowingPower : 0;
+  const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%
 
   // Risk level mapping
   let riskLevel = 'Low';
@@ -80,7 +96,6 @@ const BorrowingSection = ({
                     {riskLevel}
                   </span>
                 </div>
-                {/* Removed the percentage display that was here */}
               </div>
             </div>
 
@@ -88,15 +103,50 @@ const BorrowingSection = ({
             <div className="flex flex-col gap-1 mt-8">
               <div className="flex justify-between">
                 <span className="text-gray-600">Available Borrowing Power</span>
-                <span className="font-semibold">{availableBorrowingPower}</span>
+                <span className="font-semibold">
+                  {availableBorrowingPower.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} USDST
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Current Borrowed</span>
-                <span className="font-semibold">{currentBorrowed}</span>
+                <span className="font-semibold">
+                  {currentBorrowed.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} USDST
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Interest Rate</span>
-                <span className="font-semibold">{averageInterestRate}</span>
+                <span className="font-semibold">{loanData?.interestRate || 0}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Interest Owed</span>
+                <span className="font-semibold">
+                  {parseFloat(formatUnits(loanData?.accruedInterest || 0, 18)).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} USDST
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Health Factor</span>
+                <span className="font-semibold" style={{ color: getTextColor(parseFloat(loanData?.healthFactor || 0)) }}>
+                  {(() => {
+                    // Check if there's no outstanding debt
+                    if (currentBorrowed === 0) {
+                      return "No Loan";
+                    }
+                    // Check if health factor is valid
+                    if (loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor))) {
+                      return parseFloat(loanData.healthFactor).toFixed(2);
+                    }
+                    return "N/A";
+                  })()}
+                </span>
               </div>
             </div>
           </div>

@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
+import PercentageButtons from "@/components/ui/PercentageButtons";
+import TokenIcon from "@/components/ui/TokenIcon";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +36,16 @@ const ethToWei = (eth: number): string => {
   return BigInt(Math.round(eth * 1e18)).toString();
 };
 
+const addCommasToInput = (value: string) => {
+  if (!value) return '';
+  const parts = value.split('.');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (parts.length === 2) {
+    return integerPart + '.' + parts[1];
+  }
+  return integerPart;
+};
+
 const LiquidateModal: React.FC<LiquidateModalProps> = ({
   open,
   onOpenChange,
@@ -52,10 +63,12 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
+  const [displayAmount, setDisplayAmount] = useState<string>(addCommasToInput(maxRepayEth.toString()));
 
   // Reset when collateral changes or modal opens anew
   useEffect(() => {
     setRepayStr(maxRepayEth.toString());
+    setDisplayAmount(addCommasToInput(maxRepayEth.toString()));
   }, [maxRepayEth]);
 
   // Derived numeric value (safe)
@@ -76,19 +89,19 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const bonusPct = (bonusBp - 10000) / 10000; // e.g. 0.05 for 10500
 
   const profitUsd = repayEth * bonusPct;
-
   const seizedTokensEth = collPriceUsd > 0 ? (repayEth + profitUsd) / collPriceUsd : 0;
 
-  // Slider step – avoid 0 and avoid tiny numbers
-  const sliderStep = maxRepayEth > 0 ? Math.max(maxRepayEth / 100, 0.000001) : 0.000001;
-
-  const handleSliderChange = (val: number[]) => {
-    if (!val || !val.length) return;
-    setRepayStr(val[0].toString());
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/,/g, '');
+    if (/^\d*\.?\d*$/.test(value)) {
+      setDisplayAmount(addCommasToInput(value));
+      setRepayStr(value);
+    }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setRepayStr(e.target.value);
+  const handlePercentageChange = (value: string) => {
+    setRepayStr(value);
+    setDisplayAmount(addCommasToInput(value));
   };
 
   // Determine loan token USD price. For now assume 1 if symbol contains "USD", else use collPriceUsd / bonus to approximate
@@ -102,8 +115,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const handleConfirm = async () => {
     const repayWei = ethToWei(repayEth);
-    if (repayWei === "0") {
-      toast({ title: "Repay amount must be greater than 0", variant: "destructive" });
+    if (!repayWei || repayWei === "0") {
+      toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
     try {
@@ -121,58 +134,81 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} key={`${loan.id}-${collateral.asset}`}> {/* unique key resets state */}
-      <DialogContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Quick Liquidation Calculator</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div>
+        <div className="space-y-6 py-4">
+          <div className="space-y-3">
             <label className="text-sm font-medium">Repay Amount ({loan.assetSymbol})</label>
-            <Input
-              type="number"
-              step={sliderStep}
-              min={0}
-              max={maxRepayEth}
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Min: 0.01</span>
+              <span>Max: {maxRepayEth.toFixed(2)}</span>
+            </div>
+            <div className="relative">
+              <Input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
+                placeholder="0.00"
+                className={`${repayEth > maxRepayEth ? 'text-red-600' : ''}`}
+                value={displayAmount}
+                onChange={handleAmountChange}
+              />
+            </div>
+            <PercentageButtons
               value={repayStr}
-              onChange={handleInputChange}
+              maxValue={maxRepayEth.toString()}
+              onChange={handlePercentageChange}
             />
           </div>
 
-          <Slider
-            min={0}
-            max={maxRepayEth}
-            step={sliderStep}
-            value={[repayEth]}
-            onValueChange={handleSliderChange}
-          />
-
           <div className="grid grid-cols-2 gap-4 text-sm pt-2">
             <div>
-              <span className="text-muted-foreground">Seized Collateral</span>
-              <div className="font-medium">
-                {seizedTokensEth.toFixed(4)} {collateral.symbol || "COLL"}
+              <span className="text-gray-500">Seized Collateral</span>
+              <div className="font-medium flex items-center gap-2 mt-1">
+                <TokenIcon symbol={collateral.symbol || "COLL"} size="sm" />
+                <span>{seizedTokensEth.toFixed(4)} {collateral.symbol || "COLL"}</span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Value: ${(seizedTokensEth * collPriceUsd).toFixed(2)} (includes {(bonusPct * 100).toFixed(0)}% bonus)
               </div>
             </div>
             <div>
-              <span className="text-muted-foreground">Cost (USD)</span>
-              <div className="font-medium">${repayUsdCost.toFixed(2)}</div>
+              <span className="text-gray-500">Repay Amount (USDST)</span>
+              <div className="font-medium">{repayUsdCost.toFixed(2)}</div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Estimated Profit</span>
-              <div className={profitUsd >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+          </div>
+
+          <div className="p-4 bg-gray-50 rounded-md">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Estimated Profit</span>
+              <span className={profitUsd >= 0 ? "text-green-600 font-semibold text-lg" : "text-red-600 font-semibold text-lg"}>
                 ${profitUsd.toFixed(2)}
-              </div>
+              </span>
             </div>
+          </div>
+
+          <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
+            <p className="text-gray-600">
+              Liquidating this position will allow you to repay part of the debt in exchange for collateral at a discount. 
+              The profit shown is based on current market prices.
+            </p>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="mr-2">
             Cancel
           </Button>
-          <Button variant="destructive" onClick={handleConfirm} disabled={repayEth <= 0}>
+          <Button 
+            variant="destructive" 
+            onClick={handleConfirm} 
+            disabled={repayEth <= 0}
+            className="px-6"
+          >
             Confirm Liquidation
           </Button>
         </DialogFooter>

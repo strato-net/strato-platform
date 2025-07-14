@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
+import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface SupplyModalProps {
   supplyLoading: boolean;
@@ -117,7 +118,7 @@ const SupplyCollateralModal = ({
   });
 
   useEffect(() => {
-    const numValue = supplyAmount ? parseFloat(supplyAmount) : 0;
+    const numValue = safeParseFloat(supplyAmount);
     const impact = calculateHealthImpact(numValue, asset, loanData);
     setHealthImpact(impact);
   }, [supplyAmount, asset, loanData]);
@@ -191,7 +192,7 @@ const SupplyCollateralModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${(() => { try { return parseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
+                className={`pr-8 ${safeParseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -199,7 +200,7 @@ const SupplyCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 10n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
@@ -207,7 +208,7 @@ const SupplyCollateralModal = ({
                 10%
               </Button>
               <Button
-                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 25n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
@@ -215,7 +216,7 @@ const SupplyCollateralModal = ({
                 25%
               </Button>
               <Button
-                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 50n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
@@ -223,7 +224,7 @@ const SupplyCollateralModal = ({
                 50%
               </Button>
               <Button
-                variant={(() => { try { return parseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 100n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 100n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
@@ -234,7 +235,7 @@ const SupplyCollateralModal = ({
           </div>
 
           {/* Health Impact Section */}
-          {(() => { try { return parseUnits(supplyAmount || "0", 18) !== 0n; } catch { return false; } })() && (
+          {safeParseUnits(supplyAmount || "0", 18) !== 0n && (
             <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
               <h4 className="text-sm font-medium text-gray-700">Health Impact</h4>
               <div className="space-y-2">
@@ -271,7 +272,7 @@ const SupplyCollateralModal = ({
               <span className="text-gray-600">Transaction Fee</span>
               <span className="font-medium">{SUPPLY_COLLATERAL_FEE} USDST</span>
             </div>
-            {(() => { try { return BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18); } catch { return false; } })() && (
+            {BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18) && (
               <p className="text-yellow-600 text-sm mt-1">
                 Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
               </p>
@@ -285,10 +286,10 @@ const SupplyCollateralModal = ({
           </Button>
           <Button
             disabled={
-              (() => { try { return parseUnits(supplyAmount || "0", 18) === 0n; } catch { return true; } })() ||
+              safeParseUnits(supplyAmount || "0", 18) === 0n ||
               supplyLoading ||
-              (() => { try { return parseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0); } catch { return false; } })() ||
-              (() => { try { return BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18); } catch { return false; } })()
+              safeParseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ||
+              BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18)
             }
             onClick={handleSupply}
             className="px-6"
