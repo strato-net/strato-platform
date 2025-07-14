@@ -154,9 +154,7 @@ const Dashboard = () => {
 
           <div className="mb-8">
             <BorrowingSection 
-              availableBorrowingPower={availableBorrowingPower}
-              currentBorrowed={currentBorrowed}
-              averageInterestRate={averageInterestRate}
+              loanData={loans}
             />
           </div>
 
