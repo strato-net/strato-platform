@@ -7,7 +7,7 @@ const ExchangeCart = () => {
   const [tab, setTab] = useState<'buy' | 'bridge' | 'swap'>('buy');
 
   return (
-    <div className="w-[600px] bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
+    <div className="w-full bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
       {/* Toggle Buy/Bridge/Swap */}
       <div className="flex justify-between items-center">
         <div className="flex space-x-2">

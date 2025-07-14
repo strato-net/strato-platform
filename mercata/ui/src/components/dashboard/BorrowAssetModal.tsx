@@ -49,15 +49,18 @@ const BorrowAssetModal = ({
   const [displayAmount, setDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
 
-  // Calculate risk level based on borrowed amount (0-100)
+  // Calculate risk level based on total borrowed amount (existing + new) (0-100)
   useEffect(() => {
     try {
-      if (!borrowAmount) {
-        setRiskLevel(0);
-        return;
-      }
-
-      const borrowAmountBigInt = parseUnits(borrowAmount, 18);
+      // Get existing borrowed amount (including accrued interest)
+      const existingBorrowedBigInt = BigInt(loan?.totalAmountOwed || 0);
+      
+      // Get new borrow amount
+      const newBorrowAmountBigInt = borrowAmount ? parseUnits(borrowAmount, 18) : 0n;
+      
+      // Calculate total borrowed amount (existing + new)
+      const totalBorrowedBigInt = existingBorrowedBigInt + newBorrowAmountBigInt;
+      
       const collateralValueBigInt = BigInt(loan?.totalCollateralValueUSD || 0);
 
       if (collateralValueBigInt === 0n) {
@@ -66,12 +69,12 @@ const BorrowAssetModal = ({
       }
 
       // Calculate risk percentage using BigInt math
-      const risk = Number((borrowAmountBigInt * 10000n) / collateralValueBigInt) / 100;
+      const risk = Number((totalBorrowedBigInt * 10000n) / collateralValueBigInt) / 100;
       setRiskLevel(Math.min(risk, 100)); // Cap at 100%
     } catch {
       setRiskLevel(0);
     }
-  }, [borrowAmount, loan?.totalCollateralValueUSD]);
+  }, [borrowAmount, loan?.totalCollateralValueUSD, loan?.totalAmountOwed]);
 
   const getRiskColor = () => {
     if (riskLevel < 30) return "bg-green-500";
@@ -144,6 +147,12 @@ const BorrowAssetModal = ({
               <span className="text-sm text-gray-500">Available to borrow</span>
               <span className="font-medium">
                 USDST {availableToBorrowFormatted}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Currently borrowed</span>
+              <span className="font-medium">
+                USDST {loan?.totalAmountOwed ? formatUnits(loan.totalAmountOwed, 18) : "0.00"}
               </span>
             </div>
             <div className="flex justify-between">
