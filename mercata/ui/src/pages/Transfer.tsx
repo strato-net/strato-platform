@@ -186,7 +186,15 @@ const Transfer = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        let raw = formatUnits(maxAmount, 18);    // e.g. "12.3456789012345678901"
+                        let max = maxAmount;
+                        const feeAmount = parseUnits(TRANSFER_FEE, 18);
+
+                        // If transferring USDST, subtract the fee
+                        if (fromAsset?.address === usdstAddress) {
+                          max = max > feeAmount ? max - feeAmount : 0n;
+                        }
+
+                        let raw = formatUnits(max, 18);
                         // clamp to 18 decimals
                         const [w, f = ""] = raw.split(".");
                         if (f.length > 18) raw = `${w}.${f.slice(0, 18)}`;
