@@ -115,8 +115,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const handleConfirm = async () => {
     const repayWei = ethToWei(repayEth);
-    if (repayWei === "0") {
-      toast({ title: "Repay amount must be greater than 0", variant: "destructive" });
+    if (!repayWei || repayWei === "0") {
+      toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
     try {
@@ -144,8 +144,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Repay Amount ({loan.assetSymbol})</label>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Min: $0.01</span>
-              <span>Max: ${maxRepayEth.toFixed(2)}</span>
+              <span>Min: 0.01</span>
+              <span>Max: {maxRepayEth.toFixed(2)}</span>
             </div>
             <div className="relative">
               <Input
@@ -153,11 +153,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
                 inputMode="decimal"
                 pattern="[0-9]*\.?[0-9]*"
                 placeholder="0.00"
-                className={`pr-8 ${repayEth > maxRepayEth ? 'text-red-600' : ''}`}
+                className={`${repayEth > maxRepayEth ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
             </div>
             <PercentageButtons
               value={repayStr}
@@ -173,10 +172,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
                 <TokenIcon symbol={collateral.symbol || "COLL"} size="sm" />
                 <span>{seizedTokensEth.toFixed(4)} {collateral.symbol || "COLL"}</span>
               </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Value: ${(seizedTokensEth * collPriceUsd).toFixed(2)} (includes {(bonusPct * 100).toFixed(0)}% bonus)
+              </div>
             </div>
             <div>
-              <span className="text-gray-500">Cost (USD)</span>
-              <div className="font-medium">${repayUsdCost.toFixed(2)}</div>
+              <span className="text-gray-500">Repay Amount (USDST)</span>
+              <div className="font-medium">{repayUsdCost.toFixed(2)}</div>
             </div>
           </div>
 
