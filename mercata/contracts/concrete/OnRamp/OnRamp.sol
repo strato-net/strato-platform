@@ -36,6 +36,7 @@ contract record OnRamp is Ownable {
 
     // Approval management
     uint256 public listingIdCounter;
+    uint256 public voucher;
     mapping(address => bool) public record approvedSellers;
     mapping(address => PaymentProviderInfo) public record paymentProviders;
     TokenFactory public tokenFactory;
@@ -50,14 +51,14 @@ contract record OnRamp is Ownable {
     IVoucher public voucher;
 
     // Constructor
-    constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry) Ownable(_owner) {
+    constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry, address _voucher) Ownable(_owner) {
         require(_oracle != address(0), "Invalid oracle");
         require(_adminRegistry != address(0), "Invalid admin registry");
         require(_tokenFactory != address(0), "Invalid token factory");
         priceOracle = PriceOracle(_oracle);
         adminRegistry = AdminRegistry(_adminRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
-        voucher = IVoucher(address(0x000000000000000000000000000000000000100e));
+        voucher = IVoucher(_voucher);
     }
 
     // Modifiers
@@ -90,6 +91,10 @@ contract record OnRamp is Ownable {
     
     function isPaymentProvider(address provider) public view returns (bool) {
         return paymentProviders[provider].exists;
+    }
+
+    function setVoucher(address _voucher) external onlyOwnerOrAdmin {
+        voucher = IVoucher(_voucher);
     }
 
     function addPaymentProvider(address provider, string name, string endpoint) external onlyOwnerOrAdmin {
