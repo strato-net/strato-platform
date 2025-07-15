@@ -1,15 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { NewLoanData } from "@/interface";
+import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 
 interface BorrowingSectionProps {
+  userCollaterals: CollateralData[];
   loanData: NewLoanData;
   handleBorrow: () => void;
   handleRepay: () => void;
 }
 
-const PositionSection = ({ loanData, handleBorrow, handleRepay }: BorrowingSectionProps) => {
+const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay }: BorrowingSectionProps) => {
 
   function getTextColor(value: number, maxValue = 10) {
   const clamped = Math.min(Math.max(value, 1), maxValue);
@@ -60,7 +61,7 @@ const PositionSection = ({ loanData, handleBorrow, handleRepay }: BorrowingSecti
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-600">Health Factor</span>
-                <span className="font-semibold text-green-500" style={{ color: getTextColor(parseFloat(loanData?.healthFactor.toString())) }}>
+                <span className="font-semibold text-green-500" style={{ color: getTextColor((loanData?.healthFactor)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
@@ -68,8 +69,8 @@ const PositionSection = ({ loanData, handleBorrow, handleRepay }: BorrowingSecti
                       return "No Loan";
                     }
                     // Check if health factor is valid
-                    if (loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor.toString()))) {
-                      return parseFloat(loanData.healthFactor.toString()).toFixed(2);
+                    if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {
+                      return (loanData.healthFactor).toFixed(2);
                     }
                     return "N/A";
                   })()}
