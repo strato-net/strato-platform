@@ -2,10 +2,7 @@ import "./../abstract/ERC20/IERC20.sol";
 import "../Lending/PriceOracle.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
-
-interface IVoucher {
-    function mint(address to, uint256 amount) external;
-}
+import "../Voucher/Voucher.sol";
 
 contract record OnRamp is Ownable {
     event SellerApprovalUpdated(address seller, bool approved);
@@ -36,7 +33,6 @@ contract record OnRamp is Ownable {
 
     // Approval management
     uint256 public listingIdCounter;
-    uint256 public voucher;
     mapping(address => bool) public record approvedSellers;
     mapping(address => PaymentProviderInfo) public record paymentProviders;
     TokenFactory public tokenFactory;
@@ -48,7 +44,7 @@ contract record OnRamp is Ownable {
     mapping(address => Listing) public record listings;
     
     // Voucher contract
-    IVoucher public voucher;
+    Voucher public voucher;
 
     // Constructor
     constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry, address _voucher) Ownable(_owner) {
@@ -58,7 +54,7 @@ contract record OnRamp is Ownable {
         priceOracle = PriceOracle(_oracle);
         adminRegistry = AdminRegistry(_adminRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
-        voucher = IVoucher(_voucher);
+        voucher = Voucher(_voucher);
     }
 
     // Modifiers
@@ -94,7 +90,7 @@ contract record OnRamp is Ownable {
     }
 
     function setVoucher(address _voucher) external onlyOwnerOrAdmin {
-        voucher = IVoucher(_voucher);
+        voucher = Voucher(_voucher);
     }
 
     function addPaymentProvider(address provider, string name, string endpoint) external onlyOwnerOrAdmin {
