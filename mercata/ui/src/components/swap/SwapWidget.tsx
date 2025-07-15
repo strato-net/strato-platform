@@ -65,12 +65,12 @@ interface TokenSelectorProps {
 const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-2">
-        <span>{asset?._symbol || "Select Token"}</span>
-        <ChevronDown className="h-4 w-4" />
+      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
+        <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        <ChevronDown className="h-4 w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
-    <PopoverContent className="w-56 p-0">
+    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0" align="end">
       <div className="flex flex-col">
         {tokens.length > 0 ? (
           tokens.map((token) => (
@@ -176,9 +176,9 @@ const TokenInput = ({
 
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
-      <div className="flex justify-between mb-2">
-        <label className="text-sm text-gray-600">{label}</label>
-        <span className="text-sm text-gray-600 flex gap-1">
+      <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
+        <label className="text-sm text-gray-600 font-semibold">{label}</label>
+        <span className="text-sm text-gray-600 mt-1 sm:mt-0">
           User Balance: 
           {isLoading 
             ? <LoadingSpinner /> 
@@ -195,8 +195,8 @@ const TokenInput = ({
           )}
         </span>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="w-full flex flex-col">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 flex flex-col">
           <input
             type="text"
             value={amount}
@@ -234,13 +234,15 @@ const TokenInput = ({
             </p>
           )}
         </div>
-        <TokenSelector
-          asset={asset}
-          onSelect={onSelect}
-          tokens={tokens}
-          isOpen={isOpen}
-          onOpenChange={onOpenChange}
-        />
+        <div className="flex-shrink-0">
+          <TokenSelector
+            asset={asset}
+            onSelect={onSelect}
+            tokens={tokens}
+            isOpen={isOpen}
+            onOpenChange={onOpenChange}
+          />
+        </div>
       </div>
       {pool && asset && (
         <div className="mt-2 flex justify-end">
@@ -308,7 +310,7 @@ const SwapDialog = ({
         <Button variant="outline" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button disabled={isLoading} onClick={onConfirm}>
+        <Button disabled={isLoading} onClick={onConfirm} className="bg-strato-blue hover:bg-strato-blue/90">
           {isLoading && <LoadingSpinner />} Confirm Swap
         </Button>
       </DialogFooter>
@@ -929,7 +931,7 @@ const handleMaxClick = (isFrom: boolean) => {
       </div>
 
       <Button
-        className="w-full bg-blue-600 hover:bg-blue-700"
+        className="w-full bg-strato-blue hover:bg-strato-blue/90"
         onClick={() => setIsDialogOpen(true)}
         disabled={isSwapDisabled()}
       >

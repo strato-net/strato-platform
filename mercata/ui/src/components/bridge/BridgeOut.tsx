@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { roundToDecimals } from "@/utils/numberUtils";
 
 interface Token {
   name: string;
@@ -180,8 +181,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     });
 
     try {
+      // Round amount to token's decimal places before sending
+      const roundedAmount = roundToDecimals(amount, selectedToken.decimals);
+      
       const response = await bridgeOutAPI({
-        amount,
+        amount: roundedAmount,
         toAddress: address,
         tokenAddress: selectedToken.tokenAddress,
       });
@@ -285,6 +289,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         {amountError && (
           <p className="text-sm text-red-500">{amountError}</p>
         )}
+        {amount && selectedToken && (
+          <p className="text-sm text-gray-500">
+            Amount will be rounded down to {selectedToken.decimals} decimal places
+          </p>
+        )}
         <div className="flex items-center gap-2 mt-1">
           {isBalanceLoading ? (
             <div className="flex items-center gap-2">
@@ -302,7 +311,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
                 {selectedToken?.exchangeTokenSymbol && (
                   <div className="text-sm">
                     <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                      You will receive {amount ? `${amount} ` : ''} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
+                      You will receive {amount ? `${selectedToken ? roundToDecimals(amount, selectedToken.decimals) : amount} ` : ''} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
                     </p>
                   </div>
                 )}
@@ -354,10 +363,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
             <div className="mt-2 space-y-2">
               <p>From: {fromChain}</p>
               <p>To: {toChain}</p>
-              <p>Amount: {amount} {selectedToken?.symbol}</p>
+              <p>Amount: {selectedToken ? roundToDecimals(amount, selectedToken.decimals) : amount} {selectedToken?.symbol}</p>
               {selectedToken?.exchangeTokenSymbol && (
                 <p className="text-blue-600">
-                  You will receive {amount} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
+                  You will receive {selectedToken ? roundToDecimals(amount, selectedToken.decimals) : amount} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on {toChain} network
                 </p>
               )}
             </div>

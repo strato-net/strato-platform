@@ -40,7 +40,7 @@ const Hero = () => {
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <div className="group relative bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-8 text-center shadow-2xl hover:shadow-3xl hover:-translate-y-3 hover:bg-white/20 transition-all duration-500 before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-br before:from-white/20 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-300">
-            <div className="relative z-10 text-4xl font-bold bg-gradient-to-r from-strato-blue to-strato-purple bg-clip-text text-transparent mb-3">
+            <div className="relative z-10 text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent mb-3">
               $5 Million
             </div>
             <div className="relative z-10 text-gray-300 font-medium">Total Value Locked</div>

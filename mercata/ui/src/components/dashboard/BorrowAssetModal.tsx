@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatUnits, parseUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
+import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
 
 interface BorrowAssetModalProps {
   borrowLoading: boolean;
@@ -20,19 +21,6 @@ interface BorrowAssetModalProps {
   loan?: any;
   usdstBalance?: string;
 }
-
-const addCommasToInput = (value: string) => {
-  if (!value) return '';
-
-  const parts = value.split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-  if (parts.length === 2) {
-    return integerPart + '.' + parts[1];
-  }
-
-  return integerPart;
-};
 
 const BorrowAssetModal = ({
   borrowLoading,
@@ -55,7 +43,7 @@ const BorrowAssetModal = ({
       const existingBorrowedBigInt = BigInt(loan?.totalAmountOwed || 0);
       
       // Get new borrow amount
-      const newBorrowAmountBigInt = borrowAmount ? parseUnits(borrowAmount, 18) : 0n;
+      const newBorrowAmountBigInt = safeParseUnits(borrowAmount || "0", 18);
       
       // Calculate total borrowed amount (existing + new)
       const totalBorrowedBigInt = existingBorrowedBigInt + newBorrowAmountBigInt;
@@ -185,7 +173,7 @@ const BorrowAssetModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${(() => { try { return parseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
+                className={`pr-8 ${safeParseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -304,7 +292,7 @@ const BorrowAssetModal = ({
             disabled={
               !borrowAmount ||
               borrowLoading ||
-              (() => { try { return parseUnits(borrowAmount, 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0); } catch { return true; } })() ||
+              safeParseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ||
               (() => {
                 const feeAmount = parseUnits(BORROW_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");

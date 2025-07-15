@@ -116,22 +116,22 @@ const LendingPoolSection = () => {
 
   return (
     <div>
-      <Card className="mb-6">
-        <CardHeader>
+      <Card className="mb-6 border-0 md:border shadow-none md:shadow-sm">
+        <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
             <CardTitle>USDST Lending Pool</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CardContent className="px-2 py-2 md:px-6 md:py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg p-4 border">
               <div className="flex justify-between mb-4">
                 <h3 className="font-medium">Pool Stats</h3>
               </div>
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Total USDST Supplied</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Supplied</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
@@ -148,9 +148,9 @@ const LendingPoolSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Total USDST Borrowed</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Borrowed</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
@@ -167,13 +167,13 @@ const LendingPoolSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Utilization Rate</span>
-                  <span className="font-medium">{liquidityInfo?.utilizationRate || '0'}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Utilization Rate</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Available Liquidity</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Available Liquidity</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
                      {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
@@ -190,9 +190,9 @@ const LendingPoolSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Total Collateral Value</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Total Collateral Value</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
@@ -209,17 +209,17 @@ const LendingPoolSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Supply APY</span>
-                  <span className="font-medium">{liquidityInfo?.supplyAPY || "N/A"}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Supply APY</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Borrow APY</span>
-                  <span className="font-medium">{liquidityInfo?.borrowAPY || "N/A"}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Borrow APY</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Your mUSDST</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Your mUSDST</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
@@ -236,9 +236,9 @@ const LendingPoolSection = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Conversion Rate</span>
-                  <span className="font-medium">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Conversion Rate</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>
@@ -247,7 +247,7 @@ const LendingPoolSection = () => {
               <div className="flex flex-col space-y-4">
                 <div className="bg-white rounded-lg p-4 border">
                   <h3 className="font-medium mb-3">Deposit</h3>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                     <div className="relative flex-1">
                       <Input
                         type="number"
@@ -260,7 +260,7 @@ const LendingPoolSection = () => {
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
-                      className="bg-strato-blue hover:bg-strato-blue/90"
+                      className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-auto hidden sm:flex sm:items-center sm:justify-center"
                       disabled={loading || isProcessing || !isDepositAmountValid()}
                     >
                       {isProcessing ? (
@@ -337,11 +337,26 @@ const LendingPoolSection = () => {
                       </>
                     );
                   })()}
+                  {/* Mobile Button */}
+                  <Button
+                    onClick={() => handleLiquidityAction("deposit")}
+                    className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4 sm:hidden"
+                    disabled={loading || isProcessing || !isDepositAmountValid()}
+                  >
+                    {isProcessing ? (
+                      "Processing..."
+                    ) : (
+                      <>
+                        <ArrowDown className="mr-2 h-4 w-4" />
+                        Deposit
+                      </>
+                    )}
+                  </Button>
                 </div>
 
                 <div className="bg-white rounded-lg p-4 border">
                   <h3 className="font-medium mb-3">Withdraw</h3>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                     <div className="relative flex-1">
                       <Input
                         type="number"
@@ -355,7 +370,7 @@ const LendingPoolSection = () => {
                     <Button
                       onClick={() => handleLiquidityAction("withdraw")}
                       variant="outline"
-                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
+                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full sm:w-auto hidden sm:flex sm:items-center sm:justify-center"
                       disabled={
                         loadingLiquidity ||
                         isProcessing ||
@@ -420,6 +435,26 @@ const LendingPoolSection = () => {
                       </>
                     );
                   })()}
+                  {/* Mobile Button */}
+                  <Button
+                    onClick={() => handleLiquidityAction("withdraw")}
+                    variant="outline"
+                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-4 sm:hidden"
+                    disabled={
+                      loadingLiquidity ||
+                      isProcessing ||
+                      !isWithdrawAmountValid()
+                    }
+                  >
+                    {isProcessing ? (
+                      "Processing..."
+                    ) : (
+                      <>
+                        <ArrowUp className="mr-2 h-4 w-4" />
+                        Withdraw
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
