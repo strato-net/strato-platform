@@ -3,12 +3,17 @@ import "../Lending/PriceOracle.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 
+interface IVoucher {
+    function mint(address to, uint256 amount) external;
+}
+
 contract record OnRamp is Ownable {
     event SellerApprovalUpdated(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
     event ListingCanceled(uint256 listingId);
     event ListingFulfilled(uint256 listingId, address buyer, uint256 amount, uint256 totalFiat);
+    event VoucherMinted(address indexed buyer, uint256 amount, bool success);
     event PaymentProviderStatusUpdated(address provider, bool enabled);
     event AdminRegistryUpdated(address oldRegistry, address newRegistry);
     event TokenFactoryUpdated(address oldFactory, address newFactory);
@@ -40,6 +45,9 @@ contract record OnRamp is Ownable {
     PriceOracle public priceOracle;
     // Listing management
     mapping(address => Listing) public record listings;
+    
+    // Voucher contract
+    IVoucher public voucher;
 
     // Constructor
     constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry) Ownable(_owner) {
@@ -49,6 +57,7 @@ contract record OnRamp is Ownable {
         priceOracle = PriceOracle(_oracle);
         adminRegistry = AdminRegistry(_adminRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
+        voucher = IVoucher(address(0x000000000000000000000000000000000000100e));
     }
 
     // Modifiers
@@ -209,6 +218,14 @@ contract record OnRamp is Ownable {
 
         if (listings[token].amount == 0) {
             delete listings[token];
+        }
+
+        try {
+            uint256 vouchers_10 = 10000000000000000000;
+            voucher.mint(buyer, vouchers_10);
+            emit VoucherMinted(buyer, vouchers_10, true);
+        } catch {
+            emit VoucherMinted(buyer, 0, false);
         }
     }
 
