@@ -178,7 +178,7 @@ const TokenInput = ({
     <div className="bg-gray-50 p-4 rounded-lg">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-gray-600 font-semibold">{label}</label>
-        <span className="text-sm text-gray-600 mt-1 sm:mt-0">
+        <span className="text-sm text-gray-600 mt-1 sm:mt-0 flex gap-1">
           User Balance: 
           {isLoading 
             ? <LoadingSpinner /> 
@@ -189,6 +189,7 @@ const TokenInput = ({
               type="button"
               className="text-blue-600 text-xs ml-2 underline"
               onClick={onMaxClick}
+              disabled={isLoading}
             >
               Max
             </button>
