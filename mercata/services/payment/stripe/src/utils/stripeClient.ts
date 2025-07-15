@@ -21,8 +21,8 @@ export async function createCheckoutSession({
         price_data: {
           currency: "usd",
           product_data: {
-            name: `Token Purchase - ${token}`,
-            description: `Purchase of tokens for order ${token}`,
+            name: `Token Purchase - USDST`,
+            description: `Purchase of USDST tokens to be used on BlockApps Mercata Testnet.`,
           },
           unit_amount: amount,
         },
