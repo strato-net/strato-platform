@@ -817,11 +817,11 @@ const SwapWidget = () => {
     return false;
   };
 
-  useEffect(() => {
-    if (fromAmount && fromAsset && toAsset && pool) {
-      calculateSwapAmount(fromAmount, true);
-    }
-  }, [fromAsset, toAsset, fromAmount, pool]);
+useEffect(() => {
+  if (fromAmount && fromAsset && toAsset && pool) {
+    calculateSwapAmount(fromAmount, true);
+  }
+}, [fromAsset, toAsset, fromAmount, pool]);
 
   return (
     <div className="space-y-6">
