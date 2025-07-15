@@ -51,12 +51,26 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
     return Math.abs(current - expected) < tolerance ? "default" : "outline";
   };
 
+  // Helper function to handle button clicks with toggle behavior
+  const handlePercentageClick = (expectedAmount: string) => {
+    const current = parseFloat(currentAmount || "0");
+    const expected = parseFloat(expectedAmount);
+    
+    // Use a smaller tolerance for higher precision amounts
+    const tolerance = Math.max(0.000001, Math.pow(10, -(maxAmount.toString().split('.')[1] || '').length));
+    const isCurrentlySelected = Math.abs(current - expected) < tolerance;
+    
+    // If already selected, deselect (set to 0), otherwise select the amount
+    const newAmount = isCurrentlySelected ? "0" : expectedAmount;
+    onPercentageClick(newAmount);
+  };
+
   return (
     <div className={`flex gap-2 ${className}`}>
       <Button
         variant={getButtonVariant(percentageAmounts.ten)}
         size="sm"
-        onClick={() => onPercentageClick(percentageAmounts.ten)}
+        onClick={() => handlePercentageClick(percentageAmounts.ten)}
         className="flex-1"
       >
         10%
@@ -64,7 +78,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
       <Button
         variant={getButtonVariant(percentageAmounts.quarter)}
         size="sm"
-        onClick={() => onPercentageClick(percentageAmounts.quarter)}
+        onClick={() => handlePercentageClick(percentageAmounts.quarter)}
         className="flex-1"
       >
         25%
@@ -72,7 +86,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
       <Button
         variant={getButtonVariant(percentageAmounts.half)}
         size="sm"
-        onClick={() => onPercentageClick(percentageAmounts.half)}
+        onClick={() => handlePercentageClick(percentageAmounts.half)}
         className="flex-1"
       >
         50%
@@ -80,7 +94,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
       <Button
         variant={getButtonVariant(percentageAmounts.full)}
         size="sm"
-        onClick={() => onPercentageClick(percentageAmounts.full)}
+        onClick={() => handlePercentageClick(percentageAmounts.full)}
         className="flex-1"
       >
         100%
