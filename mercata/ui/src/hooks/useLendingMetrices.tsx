@@ -5,7 +5,7 @@ import { useUser } from "@/context/UserContext";
 import { usdstAddress } from "@/lib/contants";
 
 export const useLendingMetrics = () => {
-  const [loanList, setLoanList] = useState<any[]>([]);
+  const [loanList, setLoanList] = useState([]);
   
   const {
     loans,
@@ -18,12 +18,26 @@ export const useLendingMetrics = () => {
   const fetchLoans = useCallback(async () => {
     if (!userAddress) return;
     try {
-      const userLoans = Object.entries(loans)
-        .map(([loanId, loan]: [string, any]) => ({ loanId, ...loan }))
-        .filter((loan: any) => loan?.loan?.user === userAddress && loan?.loan?.active === true);
+      const userLoans = Object.entries(loans || {})
+        .map(([loanId, loan]) => ({loanId,
+          ...(loan as unknown as {
+            loan: {
+              user: string;
+              active: boolean;
+              amount: string;
+              interest: string;
+              lastUpdated?: string;
+              asset?: string;
+              collateralAsset?: string;
+            };
+            assetName?: string;
+            assetSymbol?: string;
+            [key: string]: unknown;
+          }),}))
+        .filter((loan) => loan?.loan?.user === userAddress && loan?.loan?.active === true);
 
       const enrichedLoans = await Promise.all(
-        userLoans.map(async (loan: any) => {
+        userLoans.map(async (loan) => {
           const balanceHuman = formatUnits(
             BigInt(loan?.loan?.amount || 0) + BigInt(loan?.loan?.interest || 0),
             18
@@ -47,7 +61,7 @@ export const useLendingMetrics = () => {
       fetchLoans();
     }
   }, [loans, fetchLoans, userAddress]);
-  let depositableTokens = []
+  const depositableTokens = []
 
   // Calculate Available Borrowing Power
   const availableBorrowingPower = useMemo(() => {
