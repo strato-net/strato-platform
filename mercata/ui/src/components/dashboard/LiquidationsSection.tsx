@@ -60,7 +60,7 @@ const LiquidationsSection: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
-            {liquidatable.map((ln: any) => (
+            {liquidatable.map((ln: LiquidationEntry) => (
               <div key={ln.id} className="border rounded-lg overflow-hidden">
                 {/* Main row */}
                 <div 
@@ -127,7 +127,7 @@ const LiquidationsSection: React.FC = () => {
                   <div className="bg-gray-50 p-4">
                     {/* Mobile layout */}
                     <div className="block md:hidden space-y-3">
-                      {ln.collaterals.map((c: any, idx: number) => {
+                      {ln.collaterals.map((c: CollateralData, idx: number) => {
                         const usdVal = weiToEther(c.usdValue).toFixed(2);
                         const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                         const positive = profitNum > 0;
@@ -188,7 +188,7 @@ const LiquidationsSection: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {ln.collaterals.map((c: any, idx: number) => {
+                          {ln.collaterals.map((c: CollateralData, idx: number) => {
                             const usdVal = weiToEther(c.usdValue).toFixed(2);
                             const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                             const positive = profitNum > 0;

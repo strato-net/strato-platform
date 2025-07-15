@@ -15,7 +15,6 @@ import { formatUnits } from "viem";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
-import { NewLoanData } from "@/interface";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -23,10 +22,11 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, loading, fetchTokens } = useUserTokens();
+  const { loans } = useLendingContext();
   const [totalBalance, setTotalBalance] = useState<number>(0)
   const [cataBalance, setCataBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { loadingLiquidity, liquidityInfo, refreshLoans, loans: loanData } = useLendingContext();
+  const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
   const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
 
   useEffect(() => {
@@ -82,15 +82,15 @@ const Dashboard = () => {
     }
 
     // Get USDST borrowed from loans data
-    const usdstBorrowed = loanData?.totalAmountOwed 
-      ? parseFloat(formatUnits(BigInt(loanData.totalAmountOwed), 18))
+    const usdstBorrowed = loans?.totalAmountOwed 
+      ? parseFloat(formatUnits(BigInt(loans.totalAmountOwed), 18))
       : 0;
 
     // Net Balance = All deposits (including supplied) - USDST Borrowed
     const netBalance = total - usdstBorrowed;
     setTotalBalance(netBalance);
     setCataBalance(cataTotal);
-  }, [tokens, loanData]);
+  }, [tokens, loans]);
 
   function formatBalance(value: number): string {
     if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
@@ -133,8 +133,8 @@ const Dashboard = () => {
 
             <AssetSummary
               title="Borrowed"
-              value={loanData?.totalAmountOwed 
-                ? `${parseFloat(formatUnits(BigInt(loanData.totalAmountOwed), 18)).toFixed(2)} USDST`
+              value={loans?.totalAmountOwed 
+                ? `${parseFloat(formatUnits(BigInt(loans.totalAmountOwed), 18)).toFixed(2)} USDST`
                 : "0.00 USDST"
               }
               icon={<Shield className="text-white" size={18} />}
