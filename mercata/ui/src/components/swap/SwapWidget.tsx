@@ -136,7 +136,18 @@ const TokenInput = ({
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-  const inputAmountWei = parseUnits(amount || "0", DECIMALS);
+  
+  // Safely parse input amount to prevent errors with invalid inputs like "."
+  const inputAmountWei = (() => {
+    try {
+      if (!amount || amount === "." || amount === "0." || isNaN(Number(amount))) {
+        return 0n;
+      }
+      return parseUnits(amount, DECIMALS);
+    } catch {
+      return 0n;
+    }
+  })();
 
   // Validation checks
   const isUsdstMaxIssue = isFromInput &&
