@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import {api} from "@/lib/axios";
 import { 
+  BuyPayload,
+  OnrampApiResponse,
   OnRampContextType 
 } from "@/interface";
 import { parseUnits } from "ethers";
@@ -13,7 +15,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
 
 
-  const get = async (): Promise<any> => {
+  const get = async (): Promise<OnrampApiResponse> => {
     try {
       const res = await api.get("/onramp");
       return res.data;
@@ -23,7 +25,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const buy = async (payload: any, userAddress: string): Promise<{ url: string }> => {
+  const buy = async (payload: BuyPayload, userAddress: string): Promise<{ url: string }> => {
     try {
       const weiAmount = parseUnits(payload.amount, 18).toString();
       const buyPayload = {
@@ -44,7 +46,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const sell = async (payload: any): Promise<any> => {
+  const sell = async (payload) => {
     try {
     const weiAmount = parseUnits(payload.amount, 18).toString() ;
       const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
@@ -55,7 +57,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const lock = async (body: any): Promise<{ url: string }> => {
+  const lock = async (body): Promise<{ url: string }> => {
     try {
       const res = await api.post("/onramp/lock", body);
       return res.data;
@@ -65,7 +67,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const unlockTokens = async (listingId: string): Promise<any> => {
+  const unlockTokens = async (listingId: string) => {
     try {
       const res = await api.post("/onramp/unlock", { listingId });
       return res.data;

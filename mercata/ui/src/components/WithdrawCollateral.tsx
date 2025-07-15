@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
-  asset: any;
-  loanData: any;
+  asset: CollateralData;
+  loanData: NewLoanData;
   isOpen: boolean;
   onClose: () => void;
   onWithdraw: (amount: string) => void;
@@ -44,8 +45,8 @@ const getHealthFactorColor = (healthFactor: number) => {
 // Calculate health impact of withdrawal
 const calculateHealthImpact = (
   withdrawAmount: number,
-  asset: any,
-  loanData: any
+  asset: CollateralData,
+  loanData: NewLoanData
 ) => {
   if (!asset || !loanData) {
     return {

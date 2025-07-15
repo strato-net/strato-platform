@@ -26,6 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useOnRampContext } from "@/context/OnRampContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
+import { ApprovedToken, PaymentProvider, PaymentProviderValue, Token } from "@/interface";
 
 interface OnRampListingFormValues {
   tokenAddress: string;
@@ -36,8 +37,8 @@ interface OnRampListingFormValues {
 
 const ListAssetForm = () => {
   const [loading, setLoading] = useState(false);
-  const [paymentProviders, setPaymentProviders] = useState<any[]>([]);
-  const [approvedTokens, setApprovedTokens] = useState<any[]>([]);
+  const [paymentProviders, setPaymentProviders] = useState<PaymentProviderValue[]>([]);
+  const [approvedTokens, setApprovedTokens] = useState<ApprovedToken[]>([]);
 
   const { toast } = useToast();
   const { userAddress } = useUser();
@@ -66,17 +67,13 @@ const ListAssetForm = () => {
       // Extract and flatten payment providers from the onramp data
       if (data.paymentProviders) {
         const flattenedProviders = data.paymentProviders
-          .flatMap((p: any) =>
-            Array.isArray(p.PaymentProviderInfo)
-              ? p.PaymentProviderInfo
-              : [p.PaymentProviderInfo]
-          )
-          .filter((info: any) => info && info.providerAddress);
+          .map((p: PaymentProvider) => p.value)
+          .filter((info: PaymentProviderValue) => info && info.providerAddress);
         setPaymentProviders(flattenedProviders);
       }
       // Set approved tokens from onramp data
       if (data.approvedTokens) {
-        setApprovedTokens(data.approvedTokens.filter((token: any) => token.value));
+        setApprovedTokens(data.approvedTokens);
       }
     } catch (error) {
       console.error("Error fetching data:", error);

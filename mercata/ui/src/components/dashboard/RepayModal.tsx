@@ -6,13 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
+import { NewLoanData } from "@/interface";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RepayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  loan: any | null;
+  loan: NewLoanData | null;
   onRepaySuccess: () => void;
   usdstBalance?: string;
 }

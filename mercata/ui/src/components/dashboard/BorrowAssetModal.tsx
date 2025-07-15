@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatUnits, parseUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
+import { NewLoanData } from "@/interface";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,7 +21,7 @@ interface BorrowAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onBorrow: (amount: string) => void;
-  loan?: any;
+  loan?: NewLoanData;
   usdstBalance?: string;
 }
 
