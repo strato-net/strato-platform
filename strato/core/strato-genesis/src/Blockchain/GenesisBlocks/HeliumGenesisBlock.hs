@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -126,9 +127,6 @@ mTokenAddress = 0x100f
 rewardsManagerAddress :: Address
 rewardsManagerAddress = 0x1010
 
--- baseContractAddresses :: [Address]
--- baseContractAddresses = [mercataAddress..mTokenAddress]
-
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
                 . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
@@ -233,7 +231,7 @@ sigma :: Integer
 sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
 
 omega :: Integer
-omega = 2000000 * 1000000000000000000 -- 2 million
+omega = 2_000_000 * 1_000_000_000_000_000_000
 
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
 assetToAccountInfos GA.Asset{..} =
@@ -263,9 +261,7 @@ assetToAccountInfos GA.Asset{..} =
             | otherwise ->
                 [(o, correctQuantity decimals name q)]
         ) . filter ((>0) . GA.quantity) $ M.elems balances
-      accountBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
-      contractBalances = [] -- if root == usdstAddress then (\a -> ("._balances<a:" <> addrBS a <> ">", BInteger $ correctQuantity 0 name $ omega - sigma)) <$> baseContractAddresses else []
-      allBalances = accountBalances ++ contractBalances
+      allBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
    in case allBalances of
         [] -> Nothing
@@ -290,8 +286,7 @@ assetToAccountInfos GA.Asset{..} =
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
             ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
-            ++ accountBalances
-            ++ contractBalances
+            ++ allBalances
             ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)] else []
 
 rateStrategy :: AccountInfo
