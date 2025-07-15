@@ -230,8 +230,11 @@ correctQuantity d n q =
 sigma :: Integer
 sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
 
+oneE18 :: Integer
+oneE18 = 1_000_000_000_000_000_000
+
 omega :: Integer
-omega = 2_000_000 * 1_000_000_000_000_000_000
+omega = 2_000_000 * oneE18
 
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
 assetToAccountInfos GA.Asset{..} =
@@ -279,7 +282,6 @@ assetToAccountInfos GA.Asset{..} =
           , (".images.length", BInteger . fromIntegral $ length images)
           , (".files.length", BInteger . fromIntegral $ length files)
           , (".fileNames.length", BInteger . fromIntegral $ length fileNames)
-          , ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
@@ -288,13 +290,19 @@ assetToAccountInfos GA.Asset{..} =
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
             ++ allBalances
             ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)] else []
+            ++ (if root == usdstAddress
+                  then [ ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
+                       , ("._balances<a:c7f483b3ddb99d510570a8b7760aebda941c766d>", BInteger $ 1000 * oneE18) -- bob
+                       , ("._balances<a:a0ad0dc4c754d507ca7964246fa9590d6a3df8d4>", BInteger $ 100_000 * oneE18) -- jaime and victor
+                       ]
+                  else [])
 
 rateStrategy :: AccountInfo
 rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount mercataAddress "RateStrategy") $ createdByBlockApps mercataAddress
 
 priceOracle :: AccountInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
-  (".prices<a:" <> addrBS usdstAddress <> ">", BInteger 1000000000000000000)
+  (".prices<a:" <> addrBS usdstAddress <> ">", BInteger oneE18)
   : (".authorizedOracles<a:" <> addrBS usdstAddress <> ">", BBool True)
   : ownedByBlockApps mercataAddress
   ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
@@ -323,6 +331,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
   , (".borrowableAsset", BAccount $ unspecifiedChain usdstAddress)
   , (".mToken", BAccount $ unspecifiedChain mTokenAddress)
+  , (".totalBorrowPrincipal", BInteger sigma)
   ] ++
   [ (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.interestRate", BInteger 500)
@@ -409,12 +418,12 @@ voucher :: AccountInfo
 voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddress "Voucher") $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "Voucher")
      , ("._symbol", BString "VOUCHER")
-     , ("._totalSupply", BInteger 0)
+     , ("._totalSupply", BInteger $ 1_000_000 * oneE18)
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger 1000000000000000000000000)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 1_000_000 * oneE18)
      ]
 
 mToken :: AccountInfo
