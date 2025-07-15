@@ -57,10 +57,11 @@ export const createContract = function(payload) {
   }
 }
 
-export const createContractSuccess = function(response) {
+export const createContractSuccess = function(response, contractAddress) {
   return {
     type: CREATE_CONTRACT_SUCCESS,
     response: response,
+    contractAddress: contractAddress,
     spinning: false,
     isOpen: true,
     toasts: true,

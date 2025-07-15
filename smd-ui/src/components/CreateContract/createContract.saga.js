@@ -141,7 +141,12 @@ export function* createContract(action) {
     if (typeof response === "string") {
       yield put(createContractFailure(response));
     } else {
-      yield put(createContractSuccess(response[0] || response));
+      const resp = response[0] || response;
+      // TRACE: Log the full response and extracted contract address
+      const contractAddress = resp && resp.data && resp.data.contents && resp.data.contents.address;
+      // eslint-disable-next-line no-console
+      console.log('[TRACE] createContractSuccess: response =', resp, 'contractAddress =', contractAddress);
+      yield put(createContractSuccess(resp, contractAddress));
       yield put(updateToast());
       yield put(fetchContracts(action.payload.chainId, 10, 0));
       yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));
