@@ -10,13 +10,6 @@ import { api } from '@/lib/axios';
 import { useUser } from "@/context/UserContext";
 import { CollateralData } from '@/interface';
 
-export interface LiquidationCollateralInfo {
-  asset: string;
-  symbol?: string;
-  amount: string;
-  usdValue: string;
-  expectedProfit: string; // placeholder for now
-}
 
 export interface LiquidationEntry {
   id: string;
