@@ -7,9 +7,6 @@ if (process.env.NODE_ENV !== "production") {
 if (!process.env.ONRAMP) {
   throw new Error("ONRAMP is not defined");
 }
-if (!process.env.VOUCHER) {
-  throw new Error("VOUCHER is not defined");
-}
 
 export let openIdTokenEndpoint: string | undefined;
 /**

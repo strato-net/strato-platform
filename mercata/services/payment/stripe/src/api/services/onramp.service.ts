@@ -10,9 +10,7 @@ import { RampData } from "../../types/types";
 import { canLockAmount, addLock, removeLock, calculatePaymentAmount } from "../helpers/onramp.helper";
 
 const contractAddress = constants.onRamp!;
-const voucherAddress = constants.voucher!;
 const OnRamp = "OnRamp";
-const Voucher = "Voucher";
 
 export const get = async (accessToken: string): Promise<RampData> => {
   try {
