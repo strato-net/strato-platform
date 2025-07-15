@@ -158,7 +158,8 @@ peerToNeighbor p = do
 
 getHostAddress :: SockAddr -> Either DiscoverException IAddr
 getHostAddress (SockAddrInet _ x) = Right $ IPV4Addr x
-getHostAddress x = Left $ IPFormatException $ "Unsupported case in sockAddrToHostAddr: " ++ show x
+getHostAddress (SockAddrInet6 _ _ x _) = Right $ IPV6Addr x
+getHostAddress (SockAddrUnix x) = Left $ IPFormatException $ "Unix socket unsupported in sockAddrToHostAddr: " ++ show x
 
 ndPacketToRLP :: NodeDiscoveryPacket -> (Word8, RLPObject)
 ndPacketToRLP
