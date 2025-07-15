@@ -380,6 +380,7 @@ onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddres
   , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
+  , (".voucher", BContract "Voucher" $ unspecifiedChain voucherAddress)
   ]
 
 poolFactory :: AccountInfo

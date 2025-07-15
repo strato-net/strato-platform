@@ -6,13 +6,13 @@ import {
 } from "@/components/ui/card";
 import { formatUnits } from "ethers";
 
-export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }: any) {
+export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }) {
 
-  const formatBalance = (balance: any) =>
+  const formatBalance = (balance: string) =>
     balance ? Number(formatUnits(balance, 18)).toFixed(2) : "0.00";
 
   
-  const formatValue = (rawBalance: any, price: any): string => {
+  const formatValue = (rawBalance: string, price: string): string => {
     if (!rawBalance || !price) return "0.00";
 
     const balance = parseFloat(formatUnits(rawBalance, 18));

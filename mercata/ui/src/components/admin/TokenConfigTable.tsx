@@ -17,11 +17,12 @@ import { Loader2, MoreVertical } from 'lucide-react';
 import SetCollateralRatioModal from './SetCollateralRatioModal';
 import SetInterestRateModal from './SetInterestRateModal';
 import SetLiquidationBonusModal from './SetLiquidationBonusModal';
+import { CollateralRatioItem, InterestRateItem, LendData, LiquidationBonusItem, Token } from '@/interface';
 
 const TokenConfigTable = () => {
   const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
   const { getLend } = useLendingContext();
-  const [lendData, setLendData] = useState<any>(null);
+  const [lendData, setLendData] = useState<LendData>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [collateralRatioModalOpen, setCollateralRatioModalOpen] = useState(false);
   const [interestRateModalOpen, setInterestRateModalOpen] = useState(false);
@@ -31,7 +32,7 @@ const TokenConfigTable = () => {
   const fetchActiveTokens = useCallback(async () => {
     try {
       await getActiveTokens();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching active tokens:', error);
     }
   }, [getActiveTokens]);
@@ -67,7 +68,7 @@ const TokenConfigTable = () => {
   const getCollateralRatio = (address: string) => {
     if (!lendData?.lendingPool?.collateralRatio) return '-';
     const collateralData = lendData.lendingPool.collateralRatio.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+      (item: CollateralRatioItem) => item.asset.toLowerCase() === address.toLowerCase()
     );
     return collateralData ? `${collateralData.ratio}%` : '-';
   };
@@ -75,7 +76,7 @@ const TokenConfigTable = () => {
   const getInterestRate = (address: string) => {
     if (!lendData?.lendingPool?.interestRate) return '-';
     const interestData = lendData.lendingPool.interestRate.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+      (item: InterestRateItem) => item.asset.toLowerCase() === address.toLowerCase()
     );
     return interestData ? `${interestData.rate}%` : '-';
   };
@@ -83,7 +84,7 @@ const TokenConfigTable = () => {
   const getLiquidationBonus = (address: string) => {
     if (!lendData?.lendingPool?.liquidationBonus) return '-';
     const bonusData = lendData.lendingPool.liquidationBonus.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+      (item: LiquidationBonusItem) => item.asset.toLowerCase() === address.toLowerCase()
     );
     return bonusData ? `${bonusData.bonus}%` : '-';
   };
@@ -176,7 +177,7 @@ const TokenConfigTable = () => {
               </TableHeader>
               <TableBody>
                 {(activeTokens || []).map((token, index) => {
-                  const tokenData = token as any;
+                  const tokenData = token as Token;
                   const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
                   const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
                   const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';

@@ -16,6 +16,7 @@ import { useUser } from '@/context/UserContext';
 import { formatUnits, parseUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, WITHDRAW_FEE } from "@/lib/contants";
+import { LiquidityPool } from '@/interface';
 
 // Helper function to safely format numbers
 const formatNumber = (value: string | number): string => {
@@ -30,33 +31,6 @@ const formatNumber = (value: string | number): string => {
   }
 };
 
-interface Pool {
-  address: string;
-  aToBRatio: string;
-  bToARatio: string;
-  tokenABalance: string;
-  tokenBBalance: string;
-  lpToken: {
-    _name: string;
-    _symbol: string;
-    address: string;
-    _totalSupply: string;
-    balances?: Array<{ balance: string }>;
-  };
-  tokenA: {
-    _name: string;
-    _symbol: string;
-    address: string;
-  };
-  tokenB: {
-    _name: string;
-    _symbol: string;
-    address: string;
-  };
-  _name?: string;
-  _symbol?: string;
-}
-
 interface DepositFormValues {
   amount: string;
   token: string;
@@ -64,14 +38,14 @@ interface DepositFormValues {
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const [selectedPool, setSelectedPool] = useState<LiquidityPool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [token1Amount, setToken1Amount] = useState('');
   const [token2Amount, setToken2Amount] = useState('');
   const [withdrawPercent, setWithdrawPercent] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [pools, setPools] = useState<Pool[]>([]);
+  const [pools, setPools] = useState<LiquidityPool[]>([]);
   const [loading, setLoading] = useState(false);
   const [depositLoading, setDepositLoading] = useState(false);
   const [tokenABalance, setTokenABalance] = useState('');
@@ -144,7 +118,7 @@ const SwapPoolsSection = () => {
     }
   };
 
-  const handleOpenDepositModal = async (pool: Pool) => {
+  const handleOpenDepositModal = async (pool: LiquidityPool) => {
     if (operationInProgressRef.current) return;
     
     setSelectedPool(pool);
@@ -165,7 +139,7 @@ const SwapPoolsSection = () => {
     setToken2Amount('');
   };
 
-  const handleOpenWithdrawModal = (pool: Pool) => {
+  const handleOpenWithdrawModal = (pool: LiquidityPool) => {
     if (operationInProgressRef.current) return;
     
     setSelectedPool(pool);
@@ -418,7 +392,7 @@ const SwapPoolsSection = () => {
           filteredPools.map((pool, id) => (
             <Card key={id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center">
                     <div className="flex items-center -space-x-2 mr-3">
                       <div
@@ -441,30 +415,32 @@ const SwapPoolsSection = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
+                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                    <div className="text-left sm:text-right">
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">-</div>
                     </div>
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
-                        className="bg-strato-purple hover:bg-strato-purple/90"
+                        className="bg-strato-blue hover:bg-strato-blue/90"
                         onClick={() => handleOpenDepositModal(pool)}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
-                        Deposit
+                        <span className="hidden sm:inline">Deposit</span>
+                        <span className="sm:hidden">+</span>
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-strato-purple text-strato-purple hover:bg-strato-purple/10"
+                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={!pool.lpToken.balances?.length}
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
                       >
                         <BanknoteIcon className="mr-1 h-4 w-4" />
-                        Withdraw
+                        <span className="hidden sm:inline">Withdraw</span>
+                        <span className="sm:hidden">-</span>
                       </Button>
                     </div>
                   </div>
@@ -544,6 +520,27 @@ const SwapPoolsSection = () => {
                  BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
+                {(() => {
+                  // Low balance warning for token A when it's USDST
+                  if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
+                    const inputAmountWei = parseUnits(token1Amount || "0", 18);
+                    const balanceWei = BigInt(tokenABalance || "0");
+                    const feeWei = parseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n && 
+                                             remainingBalance >= 0n && 
+                                             remainingBalance <= lowBalanceThreshold &&
+                                             inputAmountWei <= balanceWei - feeWei;
+                    
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Second Token */}
@@ -606,6 +603,27 @@ const SwapPoolsSection = () => {
                  BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
+                {(() => {
+                  // Low balance warning for token B when it's USDST
+                  if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
+                    const inputAmountWei = parseUnits(token2Amount || "0", 18);
+                    const balanceWei = BigInt(tokenBBalance || "0");
+                    const feeWei = parseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n && 
+                                             remainingBalance >= 0n && 
+                                             remainingBalance <= lowBalanceThreshold &&
+                                             inputAmountWei <= balanceWei - feeWei;
+                    
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 
@@ -649,7 +667,7 @@ const SwapPoolsSection = () => {
                   BigInt(usdstBalance || "0") < parseUnits("0.3", 18)
                 } 
                 type="submit" 
-                className="w-full bg-strato-purple hover:bg-strato-purple/90"
+                className="w-full bg-strato-blue hover:bg-strato-blue/90"
               >
                 {depositLoading ? (
                   <div className="flex justify-center items-center h-12">
@@ -730,6 +748,20 @@ const SwapPoolsSection = () => {
               {BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
               )}
+              {(() => {
+                // Low balance warning for withdraw
+                const usdstBalanceWei = BigInt(usdstBalance || "0");
+                const feeWei = parseUnits(WITHDRAW_FEE, 18);
+                const lowBalanceThreshold = parseUnits("0.10", 18);
+                const remainingBalance = usdstBalanceWei - feeWei;
+                const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+                
+                return isLowBalanceWarning && usdstBalanceWei >= feeWei ? (
+                  <p className="text-yellow-600 text-sm mt-1">
+                    Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                  </p>
+                ) : null;
+              })()}
               {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                 <>
                   <div className="w-full flex justify-between">
@@ -753,7 +785,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-purple hover:bg-strato-purple/90">
+              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>

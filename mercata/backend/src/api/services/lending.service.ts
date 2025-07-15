@@ -534,9 +534,42 @@ export const executeLiquidation = async (
   if (options.repayAmount !== undefined) {
     repayAmount = toBig(options.repayAmount);
   } else {
-    // Default logic not used when frontend sends amount; fallback to total owed
+    // --- Calculate total owed (principal + stored interest) ---
     const totalOwed = toBig(loan.principalBalance) + toBig(loan.interestOwed || 0);
-    repayAmount = totalOwed; // default to full (backend will clamp in contract)
+
+    // Determine close-factor debt limit (100 % or 50 %) based on latest health factor
+    const priceMap = new Map<string, string>();
+    (registry.oracle?.prices || []).forEach((p: any) => priceMap.set(p.asset, p.price));
+
+    const ratioMap = new Map<string, any>();
+    (registry.lendingPool?.assetConfigs || []).forEach((cfg: any) => ratioMap.set(cfg.asset, cfg.AssetConfig));
+
+    const totalCollateralValue = calculateTotalCollateralValueForHealth(
+      userCollaterals,
+      new Map(Array.from(ratioMap.entries()).map(([asset, cfg]) => [
+        asset,
+        { price: priceMap.get(asset) || "0", liquidationThreshold: cfg?.liquidationThreshold || 0, interestRate: cfg?.interestRate || 0 }
+      ]))
+    );
+
+    const hf = calculateHealthFactor(totalCollateralValue, totalOwed.toString());
+    const hfPct = Number(toBig(hf)) / Number(constants.DECIMALS);
+    const debtLimit = hfPct <= 0.95 ? totalOwed : totalOwed / 2n;
+
+    // --- Ceil-based collateral limit to eliminate dust ---
+    const priceDebt = toBig(priceMap.get(registry.lendingPool?.borrowableAsset) || "0");
+    const priceColl = toBig(priceMap.get(chosenCollateral) || "0");
+    const collateralAmt = toBig((userCollaterals.find((c: any) => c.asset === chosenCollateral) as any)?.amount || "0");
+    const liqBonus = BigInt((registry.lendingPool?.assetConfigs || []).find((c:any)=>c.asset===chosenCollateral)?.AssetConfig?.liquidationBonus || 10500);
+
+    let ceilCollateralCover = debtLimit; // default
+    if (priceDebt > 0n && priceColl > 0n) {
+      const num = collateralAmt * priceColl * 10000n;
+      const den = priceDebt * liqBonus;
+      ceilCollateralCover = (num + den - 1n) / den; // ceil division
+    }
+
+    repayAmount = ceilCollateralCover <= debtLimit ? ceilCollateralCover : debtLimit;
   }
 
   const tx = buildFunctionTx([
@@ -769,7 +802,7 @@ export const listLoansForLiquidation = async (
 
   for (const entry of loansArr) {
     const userAddr: string = entry.key || entry.user; // The key in the mapping IS the user address
-    const loan: any = entry.LoanInfo;
+    const loan = entry.LoanInfo;
     if (!loan) continue;
 
     // Build assetConfigs map with price for simulateLoan helper
