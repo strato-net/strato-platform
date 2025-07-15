@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTokenContext } from '@/context/TokenContext';
 import { Loader2, Filter, Search, RefreshCw } from 'lucide-react';
 import SetTokenStatusModal from './SetTokenStatusForm';
+import { Token } from '@/interface';
 
 const getStatusLabel = (status?: string | number) => {
   switch (String(status)) {
@@ -54,7 +55,7 @@ const TokenStatusTable = () => {
   };
 
   const filteredTokens = tokens.filter(token => {
-    const tokenData = token as any;
+    const tokenData = token as Token;
     const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
     const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
     const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';
@@ -205,7 +206,7 @@ const TokenStatusTable = () => {
               </TableHeader>
               <TableBody>
                 {filteredTokens.map((token, index) => {
-                  const tokenData = token as any;
+                  const tokenData = token as Token;
                   const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
                   const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
                   const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';

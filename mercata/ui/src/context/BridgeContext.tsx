@@ -30,6 +30,7 @@ interface BalanceResponse {
 
 interface BridgeResponse {
   success: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
 }
 
@@ -97,7 +98,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const bridgeConfig = responseData.data.data;
       setConfig(bridgeConfig);
       return bridgeConfig;
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge config';
       setError(errorMessage);
       console.error('Error fetching bridge config:', err);
@@ -122,7 +123,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const tokens = responseData.data.data.bridgeInTokens;
       setBridgeInTokens(tokens);
       return tokens;
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge in tokens';
       setError(errorMessage);
       console.error('Error fetching bridge in tokens:', err);
@@ -155,7 +156,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         success: true,
         data: responseData.data
       };
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Bridge transaction failed";
       setError(errorMessage);
       console.error("Bridge API error:", err);
@@ -180,7 +181,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const tokens = responseData.data.data.bridgeOutTokens;
       setBridgeOutTokens(tokens);
       return tokens;
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge out tokens';
       setError(errorMessage);
       console.error('Error fetching bridge out tokens:', err);
@@ -213,7 +214,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         success: true,
         data: responseData.data
       };
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Bridge transaction failed";
       setError(errorMessage);
       console.error("Bridge API error:", err);
@@ -245,7 +246,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       }
       
       return responseData.data;
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Failed to fetch balance";
       setError(errorMessage);
       console.error("Balance API error:", err);

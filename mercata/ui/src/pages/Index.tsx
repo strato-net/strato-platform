@@ -1,5 +1,6 @@
 
 import { useEffect } from 'react';
+import Link from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
 import FeaturedAssets from '../components/home/FeaturedAssets';
@@ -46,10 +47,10 @@ const Index = () => {
               <div>
                 <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Connect</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="text-gray-400 hover:text-white">Twitter</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white">Discord</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white">Medium</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white">GitHub</a></li>
+                  <li><a href="https://x.com/STRATO_MERCATA" className="text-gray-400 hover:text-white">Twitter</a></li>
+                  <li><a href="https://discord.gg/z5jwzD6x" className="text-gray-400 hover:text-white">Discord</a></li>
+                  <li><a href="https://t.me/mercatamarket" className="text-gray-400 hover:text-white">Telegram</a></li>
+                  <li><a href="https://github.com/blockapps" className="text-gray-400 hover:text-white">GitHub</a></li>
                 </ul>
               </div>
             </div>

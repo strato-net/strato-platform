@@ -9,6 +9,7 @@ import { Loader2, Info, Settings, Percent } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
+import { ApiErrorResponse } from '@/interface';
 
 interface SetCollateralRatioFormValues {
   ratio: string;
@@ -78,7 +79,7 @@ const SetCollateralRatioModal = ({ open, onOpenChange, token, currentRatio, onSu
         setTimeout(() => onSuccess(), 100);
       }
     } catch (error: unknown) {
-      const axiosError = error as AxiosError<any>;
+      const axiosError = error as AxiosError<ApiErrorResponse>;
       console.error('Collateral ratio error:', axiosError);
       
       toast({

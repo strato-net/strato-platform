@@ -6,12 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
+import { NewLoanData } from "@/interface";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RepayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  loan: any | null;
+  loan: NewLoanData | null;
   onRepaySuccess: () => void;
   usdstBalance?: string;
 }
@@ -38,7 +40,8 @@ const addCommasToInput = (value: string) => {
   return integerPart;
 };
 
-const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" }: RepayModalProps) => {  
+const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" }: RepayModalProps) => {
+  const isMobile = useIsMobile();
   const [repayAmount, setRepayAmount] = useState<string>('');
   const [displayAmount, setDisplayAmount] = useState('');
   const [repayLoading, setRepayLoading] = useState(false);
@@ -121,7 +124,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={`${isMobile ? 'max-w-[95vw] h-[90vh] overflow-y-auto p-4' : 'sm:max-w-lg'}`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
@@ -131,20 +134,20 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-2 py-4">
-          <div className="flex justify-between items-center">
+        <div className={`space-y-${isMobile ? '3' : '2'} py-4`}>
+          <div className={`flex ${isMobile ? 'flex-col space-y-1' : 'justify-between'} items-${isMobile ? 'start' : 'center'}`}>
             <span className="text-sm text-gray-500">Principal Balance</span>
-            <span className="font-medium">${formatUnits(loan?.principalBalance || 0, 18)}</span>
+            <span className={`font-medium ${isMobile ? 'text-base' : ''}`}>${formatUnits(loan?.principalBalance || 0, 18)}</span>
           </div>
           
-          <div className="flex justify-between items-center">
+          <div className={`flex ${isMobile ? 'flex-col space-y-1' : 'justify-between'} items-${isMobile ? 'start' : 'center'}`}>
             <span className="text-sm text-gray-500">Accrued Interest</span>
-            <span className="font-medium">${formatUnits(loan?.accruedInterest || 0, 18)}</span>
+            <span className={`font-medium ${isMobile ? 'text-base' : ''}`}>${formatUnits(loan?.accruedInterest || 0, 18)}</span>
           </div>
           
-          <div className="flex justify-between items-center font-bold pt-2 border-t">
+          <div className={`flex ${isMobile ? 'flex-col space-y-1' : 'justify-between'} items-${isMobile ? 'start' : 'center'} font-bold pt-2 border-t`}>
             <span>Total Amount Due</span>
-            <span className="text-lg">${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
+            <span className={`${isMobile ? 'text-base' : 'text-lg'}`}>${formatUnits(loan?.totalAmountOwed || 0, 18)}</span>
           </div>
         </div>
 
@@ -192,12 +195,12 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             ) : null;
           })()}
           
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <Button
               variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(10n)}
-              className="flex-1"
+              className="flex-1 text-xs px-2"
             >
               10%
             </Button>
@@ -205,7 +208,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(25n)}
-              className="flex-1"
+              className="flex-1 text-xs px-2"
             >
               25%
             </Button>
@@ -213,7 +216,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(50n)}              
-              className="flex-1"
+              className="flex-1 text-xs px-2"
             >
               50%
             </Button>
@@ -221,7 +224,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               variant={safeParseUnits(repayAmount || "0", 18) === BigInt(loan?.totalAmountOwed || 0) ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(100n)}
-              className="flex-1"
+              className="flex-1 text-xs px-2"
             >
               100%
             </Button>
@@ -279,17 +282,19 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           })()}
         </div>
 
-        <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
-          <p className="text-gray-600">
-            Repaying your loan will reduce your debt and may free up collateral. Full repayment will close the loan and unlock all collateral.
-          </p>
-        </div>
+        {!isMobile && (
+          <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
+            <p className="text-gray-600">
+              Repaying your loan will reduce your debt and may free up collateral. Full repayment will close the loan and unlock all collateral.
+            </p>
+          </div>
+        )}
 
-        <div className="flex justify-end gap-2">
+        <div className={`${isMobile ? 'flex flex-col space-y-2 pt-4' : 'flex justify-end gap-2'}`}>
           <Button
             variant="outline"
             onClick={handleClose}
-            className="mr-2"
+            className={isMobile ? 'w-full order-2' : 'mr-2'}
           >
             Cancel
           </Button>
@@ -306,7 +311,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
                 return BigInt(usdstBalance || "0") < totalNeeded;
               })()
             }
-            className="px-6"
+            className={isMobile ? 'w-full px-6 order-1' : 'px-6'}
           >
             {repayLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>

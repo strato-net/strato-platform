@@ -19,6 +19,7 @@ import SetTokenStatusModal from './SetTokenStatusForm';
 import SetCollateralRatioModal from './SetCollateralRatioModal';
 import SetInterestRateModal from './SetInterestRateModal';
 import SetLiquidationBonusModal from './SetLiquidationBonusModal';
+import { CollateralRatioItem, InterestRateItem, LendData, LiquidationBonusItem, Token } from '@/interface';
 
 const getStatusLabel = (status?: string | number) => {
   switch (String(status)) {
@@ -37,7 +38,7 @@ const AllTokensTable = () => {
   const { tokens, loading, error, getAllTokens } = useTokenContext();
   const { getLend, refreshLendingData } = useLendingContext();
   const [statusFilter, setStatusFilter] = useState<string>('2');
-  const [lendData, setLendData] = useState<any>(null);
+  const [lendData, setLendData] = useState<LendData>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [collateralRatioModalOpen, setCollateralRatioModalOpen] = useState(false);
@@ -77,7 +78,7 @@ const AllTokensTable = () => {
   const getCollateralRatio = (address: string) => {
     if (!lendData?.lendingPool?.collateralRatio) return '-';
     const collateralData = lendData.lendingPool.collateralRatio.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+      (item: CollateralRatioItem) => item.asset.toLowerCase() === address.toLowerCase()
     );
     return collateralData ? `${collateralData.ratio}%` : '-';
   };
@@ -85,7 +86,7 @@ const AllTokensTable = () => {
   const getInterestRate = (address: string) => {
     if (!lendData?.lendingPool?.interestRate) return '-';
     const interestData = lendData.lendingPool.interestRate.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+      (item: InterestRateItem) => item.asset.toLowerCase() === address.toLowerCase()
     );
     return interestData ? `${interestData.rate}%` : '-';
   };
@@ -93,7 +94,7 @@ const AllTokensTable = () => {
   const getLiquidationBonus = (address: string) => {
     if (!lendData?.lendingPool?.liquidationBonus) return '-';
     const bonusData = lendData.lendingPool.liquidationBonus.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+      (item: LiquidationBonusItem) => item.asset.toLowerCase() === address.toLowerCase()
     );
     return bonusData ? `${bonusData.bonus}%` : '-';
   };
@@ -120,7 +121,7 @@ const AllTokensTable = () => {
 
   const filteredTokens = tokens.filter(token => {
     if (statusFilter === 'all') return true;
-    const tokenData = token as any;
+    const tokenData = token as Token;
     const tokenStatus = String(tokenData.status || '');
     if (statusFilter === 'unknown') {
       return !tokenStatus || !['1', '2', '3'].includes(tokenStatus);
@@ -218,7 +219,7 @@ const AllTokensTable = () => {
               </TableHeader>
               <TableBody>
                 {filteredTokens.map((token, index) => {
-                  const tokenData = token as any;
+                  const tokenData = token as Token;
                   const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
                   const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
                   const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';

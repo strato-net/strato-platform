@@ -7,7 +7,7 @@ import {
   ReactNode,
 } from 'react';
 import { api } from '@/lib/axios';
-import { Token, CreateTokenValues } from '@/interface';
+import { Token, CreateTokenPayload } from '@/interface';
 
 type TokenContextType = {
   tokens: Token[];
@@ -17,7 +17,7 @@ type TokenContextType = {
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
   getActiveTokens: () => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
-  createToken: (token: CreateTokenValues) => Promise<void>;
+  createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
   transferFromToken: (payload: { address: string; from: string; to: string; value: string }) => Promise<void>;
@@ -38,7 +38,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<Token[]>('/tokens', { params: query });
       setTokens(res.data || []);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch tokens');
     } finally {
       setLoading(false);
@@ -51,7 +51,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
       setActiveTokens(res.data || []);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch active tokens');
     } finally {
       setLoading(false);
@@ -64,7 +64,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<Token>(`/tokens/${address}`);
       return res.data;
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch token');
       return null;
     } finally {
@@ -72,7 +72,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const createToken = useCallback(async (token: CreateTokenValues) => {
+  const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
     setError(null);
     try {
@@ -87,7 +87,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         fileNames: JSON.stringify(token.fileNames || []),
       };
       await api.post('/tokens', payload);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to create token');
       throw err;
     } finally {
@@ -100,7 +100,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.post('/tokens/transfer', payload);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to transfer token');
       throw err;
     } finally {
@@ -113,7 +113,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.post('/tokens/approve', payload);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to approve token');
       throw err;
     } finally {
@@ -126,7 +126,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.post('/tokens/transferFrom', payload);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to transfer from token');
       throw err;
     } finally {
@@ -141,7 +141,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       await api.post('/tokens/setStatus', payload);
       // Refresh tokens to reflect the status change immediately
       await getAllTokens();
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to set token status');
       throw err;
     } finally {

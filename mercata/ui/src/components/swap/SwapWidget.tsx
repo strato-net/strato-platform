@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
-import { SwappableToken } from "@/interface";
+import { LiquidityPool, SwappableToken, Token } from "@/interface";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -111,8 +111,8 @@ interface TokenInputProps {
   onFocus: () => void;
   usdstBalance: string;
   isFromInput: boolean;
-  pool: any;
-  fromAsset?: any;
+  pool: LiquidityPool;
+  fromAsset?: Token;
 }
 
 const TokenInput = ({
@@ -136,7 +136,18 @@ const TokenInput = ({
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-  const inputAmountWei = parseUnits(amount || "0", DECIMALS);
+  
+  // Safely parse input amount to prevent errors with invalid inputs like "."
+  const inputAmountWei = (() => {
+    try {
+      if (!amount || amount === "." || amount === "0." || isNaN(Number(amount))) {
+        return 0n;
+      }
+      return parseUnits(amount, DECIMALS);
+    } catch {
+      return 0n;
+    }
+  })();
 
   // Validation checks
   const isUsdstMaxIssue = isFromInput &&
@@ -157,6 +168,18 @@ const TokenInput = ({
       usdstBalanceBigInt < feeAmount
     );
   }, [isFromInput, asset, usdstBalanceBigInt, feeAmount]);
+
+  // Check if input amount is within 0.10 of USDST balance (low balance warning)
+  const isLowBalanceWarning = useMemo(() => {
+    if (!isFromInput || !asset || asset?.address !== usdstAddress || !inputAmountWei) return false;
+    
+    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
+    const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
+    
+    return inputAmountWei > 0n && 
+           remainingBalance >= 0n && 
+           remainingBalance <= lowBalanceThreshold;
+  }, [isFromInput, asset, inputAmountWei, usdstBalanceBigInt, feeAmount]);
 
   // Get pool balance
   const getPoolBalance = () => {
@@ -214,6 +237,11 @@ const TokenInput = ({
           {isInsufficientUsdstForFee && (
             <p className="text-yellow-600 text-sm mt-1">
               Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+            </p>
+          )}
+          {isLowBalanceWarning && (
+            <p className="text-yellow-600 text-sm mt-1">
+              Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
             </p>
           )}
         </div>
@@ -383,7 +411,7 @@ const SwapWidget = () => {
   const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
-  const [pool, setPool] = useState<any>(null);
+  const [pool, setPool] = useState<LiquidityPool>(null);
   const [exchangeRate, setExchangeRate] = useState("0");
   const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
   const [toBalanceLoading, setToBalanceLoading] = useState(false);
@@ -485,7 +513,7 @@ const SwapWidget = () => {
           setToAmount("");
           setExchangeRate("0");
         }
-      } catch (error: any) {
+      } catch (error) {
         // Don't handle aborted requests as errors
         if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
 
@@ -596,7 +624,17 @@ const SwapWidget = () => {
     }
 
     try {
-      const parsedValue = parseUnits(inputAmount || "0", DECIMALS);
+      // Validate input before parsing to prevent parseUnits errors
+      if (!inputAmount || inputAmount === "." || inputAmount === "0." || isNaN(Number(inputAmount))) {
+        if (isFromInput) {
+          setToAmount("");
+        } else {
+          setFromAmount("");
+        }
+        return;
+      }
+      
+      const parsedValue = parseUnits(inputAmount, DECIMALS);
 
       if (isFromInput) {
         // Forward calculation: input -> output
@@ -648,7 +686,7 @@ const SwapWidget = () => {
           setInsufficientPoolBalance(calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       console.error("Conversion error:", err);
     }
@@ -656,16 +694,34 @@ const SwapWidget = () => {
 
   const handleAmountChange = async (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
-    isFromInput ? setFromAmount(value) : setToAmount(value);
+    if (isFromInput) {
+      setFromAmount(value);
+    } else {
+      setToAmount(value);
+    }
 
     // Reset validation states
     setWrongAmount(false);
     setInsufficientPoolBalance(false);
 
+    // Handle invalid inputs (like just a decimal point)
+    if (!value || value === "." || value === "0." || isNaN(Number(value))) {
+      if (isFromInput) {
+        setToAmount("");
+      } else {
+        setFromAmount("");
+      }
+      return;
+    }
+
     if (pool && value && Number(value) !== 0) {
       await calculateSwapAmount(value, isFromInput);
     } else {
-      isFromInput ? setToAmount('') : setFromAmount('');
+      if (isFromInput) {
+        setToAmount("");
+      } else {
+        setFromAmount("");
+      }
     }
   };
 
@@ -700,6 +756,11 @@ const SwapWidget = () => {
 
     setTimeout(async () => {
       if (!pool || !newEditingField || !preservedAmount || Number(preservedAmount) === 0) return;
+
+      // Validate preservedAmount before parsing
+      if (preservedAmount === "." || preservedAmount === "0." || isNaN(Number(preservedAmount))) {
+        return;
+      }
 
       const parsed = parseUnits(preservedAmount, DECIMALS);
       const isAToB = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? true : false;
@@ -737,14 +798,19 @@ const SwapWidget = () => {
         ? true
         : false;
 
-      const toAmountInWei = parseUnits(toAmount || "0", DECIMALS);
+      // Validate amounts before parsing
+      if (!fromAmount || !toAmount || isNaN(Number(fromAmount)) || isNaN(Number(toAmount))) {
+        throw new Error("Invalid amount values");
+      }
+
+      const toAmountInWei = parseUnits(toAmount, DECIMALS);
       const slippageBps = Math.round(slippage * 100);
       const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
         poolAddress: pool.address,
         isAToB,
-        amountIn: parseUnits(fromAmount || "0", DECIMALS).toString(),
+        amountIn: parseUnits(fromAmount, DECIMALS).toString(),
         minAmountOut: minTokens.toString(),
       });
 
@@ -798,7 +864,12 @@ const SwapWidget = () => {
 
     // Check if swapping USDST and leaving enough for fee
     if (fromAsset.address === usdstAddress) {
-      const fromAmountWei = parseUnits(fromAmount || "0", DECIMALS);
+      // Validate fromAmount before parsing
+      if (!fromAmount || isNaN(Number(fromAmount))) {
+        return true;
+      }
+      
+      const fromAmountWei = parseUnits(fromAmount, DECIMALS);
       const balance = BigInt(fromAsset.balance || "0");
 
       if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
