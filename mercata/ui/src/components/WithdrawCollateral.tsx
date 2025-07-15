@@ -292,11 +292,21 @@ const WithdrawCollateralModal = ({
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
+              // Check if USDST balance is running low after fee
+              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const remainingBalance = usdstBalanceBigInt - feeAmount;
+              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+
               return (
                 <>
                   {isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
                       Insufficient USDST balance for transaction fee ({WITHDRAW_COLLATERAL_FEE} USDST)
+                    </p>
+                  )}
+                  {isLowBalanceWarning && !isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                     </p>
                   )}
                 </>

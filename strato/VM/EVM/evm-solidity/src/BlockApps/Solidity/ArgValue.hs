@@ -182,7 +182,7 @@ argValueToSimpleValue theType argVal = case theType of
   TypeAddress -> case argVal of
     ArgString str ->
       ValueAddress <$> case stringAddress (Text.unpack str) of
-        Nothing -> Left $ "argValueToSimpleValue: could not decode as address: " <> str
+        Nothing -> Left $ "argValueToSimpleValue: provided argument '" <> str <> "' is not a valid address"
         Just x -> return x
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string, but got " ++ show o
   TypeAccount -> case argVal of
