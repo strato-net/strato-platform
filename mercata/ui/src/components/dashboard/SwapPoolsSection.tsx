@@ -418,7 +418,7 @@ const SwapPoolsSection = () => {
           filteredPools.map((pool, id) => (
             <Card key={id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center">
                     <div className="flex items-center -space-x-2 mr-3">
                       <div
@@ -441,30 +441,32 @@ const SwapPoolsSection = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
+                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                    <div className="text-left sm:text-right">
                       <div className="text-sm text-gray-500">APY</div>
                       <div className="font-medium">-</div>
                     </div>
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
-                        className="bg-strato-purple hover:bg-strato-purple/90"
+                        className="bg-strato-blue hover:bg-strato-blue/90"
                         onClick={() => handleOpenDepositModal(pool)}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
-                        Deposit
+                        <span className="hidden sm:inline">Deposit</span>
+                        <span className="sm:hidden">+</span>
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-strato-purple text-strato-purple hover:bg-strato-purple/10"
+                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={!pool.lpToken.balances?.length}
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
                       >
                         <BanknoteIcon className="mr-1 h-4 w-4" />
-                        Withdraw
+                        <span className="hidden sm:inline">Withdraw</span>
+                        <span className="sm:hidden">-</span>
                       </Button>
                     </div>
                   </div>
@@ -649,7 +651,7 @@ const SwapPoolsSection = () => {
                   BigInt(usdstBalance || "0") < parseUnits("0.3", 18)
                 } 
                 type="submit" 
-                className="w-full bg-strato-purple hover:bg-strato-purple/90"
+                className="w-full bg-strato-blue hover:bg-strato-blue/90"
               >
                 {depositLoading ? (
                   <div className="flex justify-center items-center h-12">
@@ -753,7 +755,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-purple hover:bg-strato-purple/90">
+              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>

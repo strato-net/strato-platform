@@ -129,6 +129,8 @@ spec = do
     prop "has inverse Form Url decode/encode" $ formProp @Address
     prop "has inverse String decode/encode" $ \address ->
       stringAddress (formatAddressWithoutColor address) === Just address
+    prop "has inverse String decode/encode (even if encoded prefixed with 0x)" $ \address ->
+      stringAddress ("0x" <> formatAddressWithoutColor address) === Just address
 
   describe "Keccak256" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @Keccak256

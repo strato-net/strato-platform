@@ -21,6 +21,16 @@ interface LiquidationEntry {
   collateralAmount: string;
   healthFactor: number;
   expectedProfit?: string;
+  maxRepay?: string;
+  collaterals?: Array<{
+    asset: string;
+    symbol?: string;
+    amount: string;
+    usdValue: string;
+    expectedProfit?: string;
+    maxRepay?: string;
+    liquidationBonus?: number;
+  }>;
 }
 
 type LiquidationContextType = {

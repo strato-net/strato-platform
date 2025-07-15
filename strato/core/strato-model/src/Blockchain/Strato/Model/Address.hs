@@ -169,8 +169,27 @@ instance PersistFieldSql Address where
 
 --  sqlType _ = SqlOther "varchar(64)"
 
+-- | Parse a hexadecimal string into an 'Address'.
+--
+-- The input string can be either:
+--
+-- * A 40-character hexadecimal string without "0x" prefix (e.g., "deadbeef00000000000000000000000000000000")
+-- * A 42-character hexadecimal string with "0x" prefix (e.g., "0xdeadbeef00000000000000000000000000000000")
+--
+-- Returns 'Nothing' if the string is not valid hexadecimal or has incorrect length.
+--
+-- >>> stringAddress "deadbeef00000000000000000000000000000000"
+-- Just (Address 0xdeadbeef00000000000000000000000000000000)
+--
+-- >>> stringAddress "0xdeadbeef00000000000000000000000000000000"
+-- Just (Address 0xdeadbeef00000000000000000000000000000000)
+--
+-- >>> stringAddress "invalid"
+-- Nothing
 stringAddress :: String -> Maybe Address
-stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
+stringAddress string =
+  let prefixedString = if take 2 string == "0x" then string else "0x" ++ string
+  in Address . fromInteger <$> readMaybe prefixedString
 
 ------------------------------------
 

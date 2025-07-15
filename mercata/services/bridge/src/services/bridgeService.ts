@@ -286,6 +286,12 @@ export const confirmBridgeOut = async (tx: any) => {
 
 export const confirmBridgeOutSafePolling = async (txs: string[]) => {
   console.log("confirmBridgeOutSafePolling ", txs);
+  
+  if (!txs || txs.length === 0) {
+    console.log("No withdrawal transactions to process");
+    return;
+  }
+  
   const bridgeContract = new BridgeContractCall();
   await bridgeContract.batchConfirmWithdrawals({
     txHashes: txs,
