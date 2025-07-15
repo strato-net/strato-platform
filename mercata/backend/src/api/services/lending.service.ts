@@ -802,7 +802,7 @@ export const listLoansForLiquidation = async (
 
   for (const entry of loansArr) {
     const userAddr: string = entry.key || entry.user; // The key in the mapping IS the user address
-    const loan: any = entry.LoanInfo;
+    const loan = entry.LoanInfo;
     if (!loan) continue;
 
     // Build assetConfigs map with price for simulateLoan helper

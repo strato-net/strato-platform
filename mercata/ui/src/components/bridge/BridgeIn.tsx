@@ -334,7 +334,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           description: `Successfully transferred ${amount} ${selectedToken?.symbol}`,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Bridge transaction failed:", error);
       toast({
         title: "Failed to initiate transfer",

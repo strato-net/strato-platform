@@ -5,13 +5,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PriceFormValues } from '@/interface';
+import { PriceFormValues, Token } from '@/interface';
 import { Loader2, Info, DollarSign} from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { formatUnits } from "ethers";
+
+interface ApiErrorResponse {
+  message: string;
+}
 
 
 const SetAssetPriceForm = () => {
@@ -27,7 +31,7 @@ const SetAssetPriceForm = () => {
     },
   });
 
-  const selectedToken = Array.isArray(activeTokens) ? activeTokens.find(t => t.address === form.watch('tokenAddress')) : null;
+  const selectedToken: Token = Array.isArray(activeTokens) ? activeTokens.find(t => t.address === form.watch('tokenAddress')) : null;
 
   useEffect(() => {
     getActiveTokens();
@@ -54,7 +58,7 @@ const SetAssetPriceForm = () => {
       form.reset();
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
-      const errMsg = (axiosError.response?.data as any)?.message;
+      const errMsg = (axiosError.response?.data as ApiErrorResponse)?.message;
       toast({
         title: 'Error Setting Price',
         description: errMsg || 'Failed to set price. Please try again.',

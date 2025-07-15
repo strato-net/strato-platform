@@ -103,7 +103,7 @@ const LendingPoolSection = () => {
       }
 
       refreshLendingData();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: type === "deposit" ? "Deposit Error" : "Withdrawal Error",
         description: `Something went wrong - ${error?.message || "Please try again later."}`,

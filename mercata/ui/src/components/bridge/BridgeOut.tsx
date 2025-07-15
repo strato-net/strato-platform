@@ -214,7 +214,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       } else {
         throw new Error("Failed to initiate transfer");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Bridge transaction failed:", error);
       toast({
         title: "Failed to initiate transfer",
