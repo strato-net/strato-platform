@@ -52,7 +52,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     loading: contextLoading,
     fetchBridgeInTokens,
     bridgeIn: bridgeInAPI,
-    formatBalance
+    formatBalance,
   } = useBridgeContext();
 
   const { config } = useBridgeContext();
@@ -64,7 +64,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
-  const [fromChain, setFromChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
+  const [fromChain, setFromChain] = useState<string>(
+    showTestnet ? "Sepolia" : "Ethereum"
+  );
   const [toChain, setToChain] = useState<string>("STRATO");
 
   // Fetch network tokens
@@ -76,7 +78,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           setSelectedToken(tokens[0]);
         }
       } catch (error) {
-        console.error('Error fetching bridge in tokens:', error);
+        console.error("Error fetching bridge in tokens:", error);
       }
     };
 
@@ -284,22 +286,24 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         hash = txHash as `0x${string}`;
       }
 
-      await bridgeInAPI({
-        amount,
-        fromAddress: address as string,
-        tokenAddress: tokenAddress || "",
-        ethHash: hash,
-      });
-
       const client = createPublicClient({
         chain: showTestnet ? sepolia : mainnet,
         transport: http(),
       });
-      
+
       const receipt = await client.waitForTransactionReceipt({ hash });
 
+      // Only call bridgeInAPI after transaction is mined
       if (receipt.status === "success") {
-        
+        await bridgeInAPI({
+          amount,
+          fromAddress: address as string,
+          tokenAddress: tokenAddress || "",
+          ethHash: hash,
+        });
+      }
+
+      if (receipt.status === "success") {
         if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
           const balance = await client.getBalance({
             address: address as `0x${string}`,
@@ -413,18 +417,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           <p className="text-sm text-red-500">{amountError}</p>
         )}
         <PercentageButtons
-          currentAmount={amount}
-          maxAmount={tokenBalance}
-          onPercentageClick={handlePercentageClick}
+          value={amount}
+          maxValue={tokenBalance}
+          onChange={handlePercentageClick}
           className="mt-2"
         />
         <div className="flex items-center gap-2 mt-1">
           {isBalanceLoading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">
-                Fetching balance...
-              </p>
+              <p className="text-sm text-gray-500">Fetching balance...</p>
             </div>
           ) : (
             tokenBalance && (
@@ -435,7 +437,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
                 {selectedToken?.exchangeTokenSymbol && (
                   <div className="text-sm">
                     <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                      You will receive {amount ? `${amount} ` : ''} {selectedToken?.exchangeTokenName} ({selectedToken?.exchangeTokenSymbol}) on STRATO network
+                      You will receive {amount ? `${amount} ` : ""}{" "}
+                      {selectedToken?.exchangeTokenName} (
+                      {selectedToken?.exchangeTokenSymbol}) on STRATO network
                     </p>
                   </div>
                 )}
@@ -446,23 +450,22 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       </div>
 
       <div className="bg-gray-50 p-4 rounded-md space-y-2">
-  <div className="flex justify-between text-sm">
-    <span className="text-gray-500">Bridge Fee:</span>
-    <span>0.1%</span>
-  </div>
-  <div className="flex justify-between text-sm">
-    <span className="text-gray-500">Estimated Time:</span>
-    <span>2-5 minutes</span>
-  </div>
-</div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Bridge Fee:</span>
+          <span>0.1%</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Estimated Time:</span>
+          <span>2-5 minutes</span>
+        </div>
+      </div>
 
-<div className="text-sm text-gray-500">
-  <p>• Bridge assets between Ethereum and STRATO networks</p>
-  <p>• Small bridge fee applies</p>
-  <p>• Transaction time varies by network congestion</p>
-  {/* <p>• STRATO to Ethereum transfers require approval</p> */}
-</div>
-
+      <div className="text-sm text-gray-500">
+        <p>• Bridge assets between Ethereum and STRATO networks</p>
+        <p>• Small bridge fee applies</p>
+        <p>• Transaction time varies by network congestion</p>
+        {/* <p>• STRATO to Ethereum transfers require approval</p> */}
+      </div>
 
       <div className="flex justify-end gap-4">
         <Button
@@ -479,4 +482,4 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   );
 };
 
-export default BridgeIn; 
+export default BridgeIn;

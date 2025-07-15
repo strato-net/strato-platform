@@ -329,7 +329,8 @@ data BasicType
   | TEnumVal SolidString
   | TContract SolidString
   | TStruct SolidString [(B.ByteString, BasicType)]
-  | TComplex
+  | TArray BasicType (Maybe Word)
+  | TMapping BasicType BasicType
   | Todo String
   deriving (Show, Eq)
 
