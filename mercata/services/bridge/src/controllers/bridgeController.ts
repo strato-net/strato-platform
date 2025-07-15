@@ -299,11 +299,12 @@ class BridgeController {
 
       const fromAddress = config.safe.address || '';
       
-      // Convert to 18 decimal places regardless of token's native decimals
+      // Convert to destination token's native decimals
+      const tokenDecimals = getTokenDecimals(tokenAddress);
       const bridgeOutResponse = await bridgeOut(
         tokenAddress,
         fromAddress,
-        new BigNumber(amount).multipliedBy(10 ** 18).toString(),
+        new BigNumber(amount).multipliedBy(10 ** tokenDecimals).toString(),
         toAddress,
         userAddress
       );
