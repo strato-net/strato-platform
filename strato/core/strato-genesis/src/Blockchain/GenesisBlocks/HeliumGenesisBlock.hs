@@ -409,7 +409,7 @@ voucher :: AccountInfo
 voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddress "Voucher") $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "Voucher")
      , ("._symbol", BString "VOUCHER")
-     , ("._totalSupply", BInteger 0)
+     , ("._totalSupply", BInteger 1000000000000000000000000)
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
