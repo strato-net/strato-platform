@@ -113,7 +113,6 @@ interface TokenInputProps {
   isFromInput: boolean;
   pool: LiquidityPool;
   fromAsset?: Token;
-  onMaxClick?: () => void;
 }
 
 const TokenInput = ({
@@ -133,7 +132,7 @@ const TokenInput = ({
   usdstBalance,
   isFromInput,
   pool,
-  fromAsset,
+  fromAsset
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -818,34 +817,11 @@ const SwapWidget = () => {
     return false;
   };
 
-useEffect(() => {
-  if (fromAmount && fromAsset && toAsset && pool) {
-    calculateSwapAmount(fromAmount, true);
-  }
-}, [fromAsset, toAsset, fromAmount, pool]);
-
-const handleMaxClick = (isFrom: boolean) => {
-  const selectedAsset = isFrom ? fromAsset : toAsset;
-  if (!selectedAsset || !selectedAsset.balance) return;
-
-  // Use the raw balance, convert to readable format
-  const maxAmount = formatUnits(selectedAsset.balance, DECIMALS);
-  handleAmountChange(isFrom, maxAmount);
-
-  const rate = parseFloat(exchangeRate || "0");
-  if (isNaN(rate) || rate <= 0) return;
-
-  if (fromAsset && toAsset) {
-    if (isFrom) {
-      const toAmountCalc = parseFloat(maxAmount) * rate;
-      setToAmount(toAmountCalc.toString());
-    } else {
-      const fromAmountCalc = parseFloat(maxAmount) / rate;
-      setFromAmount(fromAmountCalc.toString());
+  useEffect(() => {
+    if (fromAmount && fromAsset && toAsset && pool) {
+      calculateSwapAmount(fromAmount, true);
     }
-  }
-};
-
+  }, [fromAsset, toAsset, fromAmount, pool]);
 
   return (
     <div className="space-y-6">
