@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
+import { safeParseUnits } from "@/utils/numberUtils";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -163,7 +164,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             <Input
               placeholder="0.00"
               className={`pr-8 ${(() => { 
-                const repayAmountWei = parseUnits(repayAmount || "0", 18);
+                const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
                 const totalOwed = BigInt(loan?.totalAmountOwed || 0);
                 const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
                 return repayAmountWei > totalOwed || repayAmountWei > available ? 'text-red-600' : ''; 
@@ -181,7 +182,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           
           {/* Balance validation warnings */}
           {(() => {
-            const repayAmountWei = parseUnits(repayAmount || "0", 18);
+            const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
             const totalNeeded = repayAmountWei + parseUnits(REPAY_FEE, 18);
             const balance = BigInt(usdstBalance || "0");
             
@@ -194,7 +195,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           
           <div className="flex gap-2">
             <Button
-              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+              variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 10n) / 100n ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(10n)}
               className="flex-1"
@@ -202,7 +203,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               10%
             </Button>
             <Button
-              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+              variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 25n) / 100n ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(25n)}
               className="flex-1"
@@ -210,7 +211,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               25%
             </Button>
             <Button
-              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+              variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loan?.totalAmountOwed || 0) * 50n) / 100n ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(50n)}              
               className="flex-1"
@@ -218,7 +219,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               50%
             </Button>
             <Button
-              variant={(() => { try { return parseUnits(repayAmount || "0", 18) === BigInt(loan?.totalAmountOwed || 0); } catch { return false; } })() ? "default" : "outline"}
+              variant={safeParseUnits(repayAmount || "0", 18) === BigInt(loan?.totalAmountOwed || 0) ? "default" : "outline"}
               size="sm"
               onClick={() => handlePercentageClick(100n)}
               className="flex-1"
@@ -242,7 +243,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               {(() => {
                 try {
                   const totalOwed = BigInt(loan?.totalAmountOwed || 0);
-                  const repayAmountWei = parseUnits(repayAmount || "0", 18);
+                  const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
                   const remaining = totalOwed - repayAmountWei;
                   return `$${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))}`;
                 } catch {

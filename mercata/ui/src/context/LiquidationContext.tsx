@@ -29,8 +29,8 @@ export interface LiquidationEntry {
   collateralAmount: string;
   healthFactor: number;
   expectedProfit?: string;
-  collaterals: CollateralData[];
   maxRepay?: string;
+  collaterals: CollateralData[];
 }
 
 type LiquidationContextType = {

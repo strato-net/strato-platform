@@ -19,3 +19,27 @@ export function calculateLTV(token) {
   const ltv = (loanValue * 10000n) / collateralValue; // Multiplied by 10000 for 2 decimal precision
   return Number(ltv) / 100;
 }
+
+export function truncateToTwoDecimals(num: number): number {
+  return Math.floor(num * 100) / 100;
+}
+
+export function formatNumberForMobile(numStr: string): string {
+  const num = parseFloat(numStr);
+  
+  if (isNaN(num)) return "0.00";
+  
+  // For very small numbers, show in exponential format with first 2 digits
+  if (num < 0.01 && num > 0) {
+    return num.toExponential(1);
+  }
+  
+  // For larger numbers, truncate to 2 decimal places
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + "M";
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + "K";
+  } else {
+    return num.toFixed(2);
+  }
+}

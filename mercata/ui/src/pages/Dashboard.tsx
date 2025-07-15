@@ -116,7 +116,7 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
@@ -148,11 +148,7 @@ const Dashboard = () => {
 
           <div className="mb-8">
             <BorrowingSection 
-              availableBorrowingPower={loanData?.maxAvailableToBorrowUSD 
-                  ? (formatUnits(BigInt(loanData.maxAvailableToBorrowUSD), 18))
-                  : '0'}
-              currentBorrowed={loanData?.totalAmountOwed || '0'}
-              averageInterestRate={loanData?.interestRate.toString() || '0'}
+              loanData={loans}
             />
           </div>
 
