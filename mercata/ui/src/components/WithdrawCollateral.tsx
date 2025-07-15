@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
-  asset: any;
-  loanData: any;
+  asset: CollateralData;
+  loanData: NewLoanData;
   isOpen: boolean;
   onClose: () => void;
   onWithdraw: (amount: string) => void;
@@ -44,8 +45,8 @@ const getHealthFactorColor = (healthFactor: number) => {
 // Calculate health impact of withdrawal
 const calculateHealthImpact = (
   withdrawAmount: number,
-  asset: any,
-  loanData: any
+  asset: CollateralData,
+  loanData: NewLoanData
 ) => {
   if (!asset || !loanData) {
     return {
@@ -280,11 +281,21 @@ const WithdrawCollateralModal = ({
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
+              // Check if USDST balance is running low after fee
+              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const remainingBalance = usdstBalanceBigInt - feeAmount;
+              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+
               return (
                 <>
                   {isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
                       Insufficient USDST balance for transaction fee ({WITHDRAW_COLLATERAL_FEE} USDST)
+                    </p>
+                  )}
+                  {isLowBalanceWarning && !isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                     </p>
                   )}
                 </>

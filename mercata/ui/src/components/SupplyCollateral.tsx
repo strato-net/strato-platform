@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
+import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface SupplyModalProps {
   supplyLoading: boolean;
-  asset: any;
-  loanData: any;
+  asset: CollateralData;
+  loanData: NewLoanData;
   isOpen: boolean;
   onClose: () => void;
   onSupply: (amount: string) => void;
@@ -44,8 +45,8 @@ const getHealthFactorColor = (healthFactor: number) => {
 // Calculate health impact of supply
 const calculateHealthImpact = (
   supplyAmount: number,
-  asset: any,
-  loanData: any
+  asset: CollateralData,
+  loanData: NewLoanData
 ) => {
   if (!asset || !loanData) {
     return {
@@ -272,11 +273,33 @@ const SupplyCollateralModal = ({
               <span className="text-gray-600">Transaction Fee</span>
               <span className="font-medium">{SUPPLY_COLLATERAL_FEE} USDST</span>
             </div>
-            {BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18) && (
-              <p className="text-yellow-600 text-sm mt-1">
-                Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
-              </p>
-            )}
+            {(() => {
+              const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
+              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+
+              // Check if insufficient USDST for fee
+              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+
+              // Check if USDST balance is running low after fee
+              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const remainingBalance = usdstBalanceBigInt - feeAmount;
+              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+
+              return (
+                <>
+                  {isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
+                    </p>
+                  )}
+                  {isLowBalanceWarning && !isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
 

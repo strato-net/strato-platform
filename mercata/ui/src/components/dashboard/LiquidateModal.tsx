@@ -12,12 +12,14 @@ import PercentageButtons from "@/components/ui/PercentageButtons";
 import TokenIcon from "@/components/ui/TokenIcon";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
+import { CollateralData } from "@/interface";
+import { LiquidationEntry } from "@/context/LiquidationContext";
 
 interface LiquidateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  loan: any; // loan entry object (from listLiquidatableLoans)
-  collateral: any; // collateral entry object with maxRepay & expectedProfit
+  loan: LiquidationEntry; // loan entry object (from listLiquidatableLoans)
+  collateral: CollateralData; // collateral entry object with maxRepay & expectedProfit
   onSuccess: () => void;
 }
 
@@ -33,7 +35,8 @@ const weiToEth = (v?: string | number | bigint | null): number => {
 
 const ethToWei = (eth: number): string => {
   if (!isFinite(eth) || eth <= 0) return "0";
-  return BigInt(Math.round(eth * 1e18)).toString();
+  // Use floor to convert without rounding up (no safety buffer)
+  return BigInt(Math.floor(eth * 1e18)).toString();
 };
 
 const addCommasToInput = (value: string) => {
@@ -53,10 +56,6 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   collateral,
   onSuccess,
 }) => {
-  const { toast } = useToast();
-
-  // Guard – nothing to render if data missing
-  if (!loan || !collateral) return null;
 
   // max repay from backend (wei) → ether
   const maxRepayEth = weiToEth(collateral.maxRepay || loan.maxRepay || "0");
@@ -71,6 +70,11 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     setDisplayAmount(addCommasToInput(maxRepayEth.toString()));
   }, [maxRepayEth]);
 
+  const { toast } = useToast();
+
+  // Guard – nothing to render if data missing
+  if (!loan || !collateral) return null;
+
   // Derived numeric value (safe)
   const repayEth = (() => {
     const num = parseFloat(repayStr);
@@ -78,6 +82,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     if (num > maxRepayEth) return maxRepayEth;
     return num;
   })();
+
+  // Helper to decide if user selected the exact max value (string comparison tolerant of rounding)
+  const isMaxSelected = (): boolean => {
+    const num = parseFloat(repayStr);
+    if (isNaN(num)) return false;
+    return Math.abs(num - maxRepayEth) < 1e-9; // within 1 wei at 18 decimals
+  };
 
   // Collateral price in USD (heuristic) using usdValue / amount
   const collAmountEth = weiToEth(collateral.amount);
@@ -114,7 +125,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const repayUsdCost = repayEth * loanPriceUsd;
 
   const handleConfirm = async () => {
-    const repayWei = ethToWei(repayEth);
+    // If 100 % selected, use backend-supplied exact wei string to avoid JS rounding
+    const repayWei = isMaxSelected() ? (collateral.maxRepay || loan.maxRepay) : ethToWei(repayEth);
     if (!repayWei || repayWei === "0") {
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
@@ -127,7 +139,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
       toast({ title: "Liquidation submitted", variant: "success" });
       onSuccess();
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err) {
       const msg = err?.response?.data?.message || err.message || "Liquidation failed";
       toast({ title: "Liquidation failed", description: msg, variant: "destructive" });
     }

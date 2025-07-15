@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { DepositableToken } from "@/interface";
+import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
@@ -31,7 +31,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const formatTokenAmount = (value: any) =>
+const formatTokenAmount = (value: string) =>
   parseFloat(formatUnits(value || 0, 18)).toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 2,
@@ -41,7 +41,7 @@ const formatTokenAmount = (value: any) =>
 const BorrowNew = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance } = useUserTokens();
-  const [selectedAsset, setSelectedAsset] = useState<DepositableToken | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [showRepayModal, setShowRepayModal] = useState(false)
@@ -73,7 +73,7 @@ const BorrowNew = () => {
 
   useEffect(() => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
-      const filtered = collateralInfo.filter((item) => item.collateralizedAmount > 0);
+      const filtered = collateralInfo.filter((item) => parseFloat(item.collateralizedAmount) > 0);
       setSuppliedCollateral(filtered);
       
       // Only show assets that have a balance > 0
@@ -127,7 +127,7 @@ const BorrowNew = () => {
         refreshCollateral(),
         fetchUsdstBalance(userAddress || ""),
       ]);
-    } catch (error: any) {
+    } catch (error) {
       console.log(error, "error");
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
@@ -158,7 +158,7 @@ const BorrowNew = () => {
     setIsSupplyModalOpen(false);
   };
 
-  const executeSupply = async (asset: DepositableToken, amount: string) => {
+  const executeSupply = async (asset: CollateralData, amount: string) => {
     try {
       setSupplyLoading(true);
       await supplyCollateral({
@@ -178,7 +178,7 @@ const BorrowNew = () => {
         refreshCollateral(),
         fetchUsdstBalance(userAddress || ""),
       ]);
-    } catch (error: any) {
+    } catch (error) {
       console.log(error, "error");
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
@@ -200,7 +200,7 @@ const BorrowNew = () => {
     setIsWithdrawModalOpen(false);
   };
 
-  const executeWithdraw = async (asset: DepositableToken, amount: string) => {
+  const executeWithdraw = async (asset: CollateralData, amount: string) => {
     try {
       setWithdrawLoading(true);
       await withdrawCollateral({
@@ -220,7 +220,7 @@ const BorrowNew = () => {
         refreshCollateral(),
         fetchUsdstBalance(userAddress || ""),
       ]);
-    } catch (error: any) {
+    } catch (error) {
       console.log(error, "error");
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
