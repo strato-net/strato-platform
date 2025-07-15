@@ -33,7 +33,8 @@ const weiToEth = (v?: string | number | bigint | null): number => {
 
 const ethToWei = (eth: number): string => {
   if (!isFinite(eth) || eth <= 0) return "0";
-  return BigInt(Math.round(eth * 1e18)).toString();
+  // Use floor to convert without rounding up (no safety buffer)
+  return BigInt(Math.floor(eth * 1e18)).toString();
 };
 
 const addCommasToInput = (value: string) => {
@@ -79,6 +80,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     return num;
   })();
 
+  // Helper to decide if user selected the exact max value (string comparison tolerant of rounding)
+  const isMaxSelected = (): boolean => {
+    const num = parseFloat(repayStr);
+    if (isNaN(num)) return false;
+    return Math.abs(num - maxRepayEth) < 1e-9; // within 1 wei at 18 decimals
+  };
+
   // Collateral price in USD (heuristic) using usdValue / amount
   const collAmountEth = weiToEth(collateral.amount);
   const collUsdTotal = weiToEth(collateral.usdValue);
@@ -114,7 +122,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const repayUsdCost = repayEth * loanPriceUsd;
 
   const handleConfirm = async () => {
-    const repayWei = ethToWei(repayEth);
+    // If 100 % selected, use backend-supplied exact wei string to avoid JS rounding
+    const repayWei = isMaxSelected() ? (collateral.maxRepay || loan.maxRepay) : ethToWei(repayEth);
     if (!repayWei || repayWei === "0") {
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;

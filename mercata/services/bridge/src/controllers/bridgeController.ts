@@ -291,7 +291,7 @@ class BridgeController {
     try {
       const {  amount, tokenAddress, toAddress } = req.body;
 
-        const { userAddress } = req.user || {};
+      const { userAddress } = req.user || {};
       if (!userAddress) {
         res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
         return;
