@@ -90,7 +90,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             amount: item.amount
               ? (
                   Number(item.amount) /
-                  (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)
+                   ( 10 ** 18)
                 ).toLocaleString("fullwide", {
                   useGrouping: false,
                   maximumFractionDigits: 20,
