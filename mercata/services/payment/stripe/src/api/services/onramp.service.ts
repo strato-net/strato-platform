@@ -86,7 +86,6 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
   const stripeSessionId = session.id;
-  // console.log("HIT WEBHOOK ------------------------------")
   
   if (!token || !buyerAddress || !amount || !tokenAmount) {
     console.error("Missing required metadata in session");
@@ -119,25 +118,6 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
     console.error("Error confirming order on-chain:", err);
   } finally {
     removeLock(token, tokenAmount, stripeSessionId);
-  }
-
-  try {
-    const accessToken = await getServiceToken();
-    const {status, hash} = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-        contractName: Voucher,
-        contractAddress: voucherAddress,
-        method: "mint",
-        args: { to: buyerAddress, amount: 10000000000000000000 },
-      }))
-    );
-    if (status === "Success") {
-      console.log(`10 Vouchers minted: ${hash}`);
-    } else {
-      console.error(`Voucher mint failed (${status}): ${hash}`);
-    }
-  } catch (err) {
-    console.error("Error minting vouchers:", err);
   }
 
 }
