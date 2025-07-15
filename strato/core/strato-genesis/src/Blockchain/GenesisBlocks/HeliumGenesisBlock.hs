@@ -230,8 +230,11 @@ correctQuantity d n q =
 sigma :: Integer
 sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
 
+oneE18 :: Integer
+oneE18 = 1_000_000_000_000_000_000
+
 omega :: Integer
-omega = 2_000_000 * 1_000_000_000_000_000_000
+omega = 2_000_000 * oneE18
 
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
 assetToAccountInfos GA.Asset{..} =
@@ -294,7 +297,7 @@ rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount m
 
 priceOracle :: AccountInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
-  (".prices<a:" <> addrBS usdstAddress <> ">", BInteger 1000000000000000000)
+  (".prices<a:" <> addrBS usdstAddress <> ">", BInteger oneE18)
   : (".authorizedOracles<a:" <> addrBS usdstAddress <> ">", BBool True)
   : ownedByBlockApps mercataAddress
   ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
@@ -409,12 +412,12 @@ voucher :: AccountInfo
 voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddress "Voucher") $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "Voucher")
      , ("._symbol", BString "VOUCHER")
-     , ("._totalSupply", BInteger 1000000000000000000000000)
+     , ("._totalSupply", BInteger $ 1_000_000 * oneE18)
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger 1000000000000000000000000)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 1_000_000 * oneE18)
      ]
 
 mToken :: AccountInfo
