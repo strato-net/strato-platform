@@ -305,6 +305,11 @@ const LendingPoolSection = () => {
                     // Check if deposit amount + fee exceeds available balance
                     const isInsufficientBalanceForDepositAndFee = depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
                     
+                    // Check if remaining balance after deposit and fee is low
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = availableWei - depositAmountWei - feeWei;
+                    const isLowBalanceWarning = depositAmountWei > 0n && remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+                    
                     return (
                       <>
                         {isInsufficientUsdstForFee && (
@@ -315,6 +320,11 @@ const LendingPoolSection = () => {
                         {isInsufficientBalanceForDepositAndFee && (
                           <p className="text-yellow-600 text-sm mt-1">
                             Insufficient balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
+                          </p>
+                        )}
+                        {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForDepositAndFee && (
+                          <p className="text-yellow-600 text-sm mt-1">
+                            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                           </p>
                         )}
                       </>
@@ -393,11 +403,21 @@ const LendingPoolSection = () => {
                     // Check if user has enough USDST for fee
                     const isInsufficientUsdstForFee = usdstBalanceWei < feeWei;
                     
+                    // Check if remaining balance after fee is low
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = usdstBalanceWei - feeWei;
+                    const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+                    
                     return (
                       <>
                         {isInsufficientUsdstForFee && (
                           <p className="text-yellow-600 text-sm mt-1">
                             Insufficient USDST balance for transaction fee ({LENDING_WITHDRAW_FEE} USDST)
+                          </p>
+                        )}
+                        {isLowBalanceWarning && !isInsufficientUsdstForFee && (
+                          <p className="text-yellow-600 text-sm mt-1">
+                            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                           </p>
                         )}
                       </>

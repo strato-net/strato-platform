@@ -215,6 +215,14 @@ const Transfer = () => {
                 const isInsufficientUsdstForFee = fromAsset?.address !== usdstAddress &&
                   usdstBalanceBigInt < feeAmount;
 
+                // Check if input amount is within 0.10 of USDST balance (low balance warning)
+                const lowBalanceThreshold = parseUnits("0.10", 18);
+                const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
+                const isLowBalanceWarning = fromAsset?.address === usdstAddress &&
+                  inputAmountWei > 0n &&
+                  remainingBalance >= 0n &&
+                  remainingBalance <= lowBalanceThreshold;
+
                 return (
                   <>
                     {isUsdstMaxIssue && (
@@ -225,6 +233,11 @@ const Transfer = () => {
                     {isInsufficientUsdstForFee && (
                       <p className="text-yellow-600 text-sm mt-1">
                         Insufficient USDST balance for transaction fee ({TRANSFER_FEE} USDST)
+                      </p>
+                    )}
+                    {isLowBalanceWarning && (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                       </p>
                     )}
                   </>
