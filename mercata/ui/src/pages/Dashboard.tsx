@@ -9,7 +9,7 @@ import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
-import { useLendingMetrics } from "@/hooks/useLendingMetrices";
+import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
