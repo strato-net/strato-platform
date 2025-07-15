@@ -10,11 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { CollateralData, NewLoanData } from "@/interface";
+import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
-  asset: any;
-  loanData: any;
+  asset: CollateralData;
+  loanData: NewLoanData;
   isOpen: boolean;
   onClose: () => void;
   onWithdraw: (amount: string) => void;
@@ -43,8 +45,8 @@ const getHealthFactorColor = (healthFactor: number) => {
 // Calculate health impact of withdrawal
 const calculateHealthImpact = (
   withdrawAmount: number,
-  asset: any,
-  loanData: any
+  asset: CollateralData,
+  loanData: NewLoanData
 ) => {
   if (!asset || !loanData) {
     return {
@@ -118,7 +120,7 @@ const WithdrawCollateralModal = ({
 
   // Calculate health impact when withdraw amount changes
   useEffect(() => {
-    const numValue = withdrawAmount ? parseFloat(withdrawAmount) : 0;
+    const numValue = safeParseFloat(withdrawAmount);
     const impact = calculateHealthImpact(numValue, asset, loanData);
     setHealthImpact(impact);
   }, [withdrawAmount, asset, loanData]);
@@ -191,7 +193,7 @@ const WithdrawCollateralModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${(() => { try { return parseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ? 'text-red-600' : ''; } catch { return ''; } })()}`}
+                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -199,7 +201,7 @@ const WithdrawCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 10n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 10n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
@@ -207,7 +209,7 @@ const WithdrawCollateralModal = ({
                 10%
               </Button>
               <Button
-                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 25n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 25n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
@@ -215,7 +217,7 @@ const WithdrawCollateralModal = ({
                 25%
               </Button>
               <Button
-                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 50n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 50n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
@@ -223,7 +225,7 @@ const WithdrawCollateralModal = ({
                 50%
               </Button>
               <Button
-                variant={(() => { try { return parseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 100n) / 100n; } catch { return false; } })() ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 100n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
@@ -234,7 +236,7 @@ const WithdrawCollateralModal = ({
           </div>
 
           {/* Health Impact Section */}
-          {(() => { try { return parseUnits(withdrawAmount || "0", 18) !== 0n; } catch { return false; } })() && (
+          {safeParseUnits(withdrawAmount || "0", 18) !== 0n && (
             <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
               <h4 className="text-sm font-medium text-gray-700">Health Impact</h4>
               <div className="space-y-2">
@@ -279,11 +281,21 @@ const WithdrawCollateralModal = ({
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
+              // Check if USDST balance is running low after fee
+              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const remainingBalance = usdstBalanceBigInt - feeAmount;
+              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+
               return (
                 <>
                   {isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
                       Insufficient USDST balance for transaction fee ({WITHDRAW_COLLATERAL_FEE} USDST)
+                    </p>
+                  )}
+                  {isLowBalanceWarning && !isInsufficientUsdstForFee && (
+                    <p className="text-yellow-600 text-sm mt-1">
+                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                     </p>
                   )}
                 </>
@@ -298,9 +310,9 @@ const WithdrawCollateralModal = ({
           </Button>
           <Button
             disabled={
-              (() => { try { return parseUnits(withdrawAmount || "0", 18) === 0n; } catch { return true; } })() ||
+              safeParseUnits(withdrawAmount || "0", 18) === 0n ||
               withdrawLoading ||
-              (() => { try { return parseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0); } catch { return false; } })() ||
+              safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ||
               !healthImpact.isHealthy ||
               (() => {
                 const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);

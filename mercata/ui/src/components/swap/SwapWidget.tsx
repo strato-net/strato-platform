@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
-import { SwappableToken } from "@/interface";
+import { LiquidityPool, SwappableToken, Token } from "@/interface";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -65,12 +65,12 @@ interface TokenSelectorProps {
 const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-2">
-        <span>{asset?._symbol || "Select Token"}</span>
-        <ChevronDown className="h-4 w-4" />
+      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
+        <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        <ChevronDown className="h-4 w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
-    <PopoverContent className="w-56 p-0">
+    <PopoverContent className="w-56 max-w-[calc(100vw-2rem)] p-0" align="end">
       <div className="flex flex-col">
         {tokens.length > 0 ? (
           tokens.map((token) => (
@@ -111,8 +111,8 @@ interface TokenInputProps {
   onFocus: () => void;
   usdstBalance: string;
   isFromInput: boolean;
-  pool: any;
-  fromAsset?: any;
+  pool: LiquidityPool;
+  fromAsset?: Token;
 }
 
 const TokenInput = ({
@@ -158,6 +158,18 @@ const TokenInput = ({
     );
   }, [isFromInput, asset, usdstBalanceBigInt, feeAmount]);
 
+  // Check if input amount is within 0.10 of USDST balance (low balance warning)
+  const isLowBalanceWarning = useMemo(() => {
+    if (!isFromInput || !asset || asset?.address !== usdstAddress || !inputAmountWei) return false;
+    
+    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
+    const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
+    
+    return inputAmountWei > 0n && 
+           remainingBalance >= 0n && 
+           remainingBalance <= lowBalanceThreshold;
+  }, [isFromInput, asset, inputAmountWei, usdstBalanceBigInt, feeAmount]);
+
   // Get pool balance
   const getPoolBalance = () => {
     if (!pool || !asset) return "0";
@@ -172,14 +184,14 @@ const TokenInput = ({
 
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
-      <div className="flex justify-between mb-2">
-        <label className="text-sm text-gray-600">{label}</label>
-        <span className="text-sm text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
+        <label className="text-sm text-gray-600 font-semibold">{label}</label>
+        <span className="text-sm text-gray-600 mt-1 sm:mt-0">
           User Balance: {isLoading ? <LoadingSpinner /> : formatBalance(balance, asset?._symbol || "")}
         </span>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="w-full flex flex-col">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 flex flex-col">
           <input
             type="text"
             value={amount}
@@ -216,14 +228,21 @@ const TokenInput = ({
               Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
             </p>
           )}
+          {isLowBalanceWarning && (
+            <p className="text-yellow-600 text-sm mt-1">
+              Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+            </p>
+          )}
         </div>
-        <TokenSelector
-          asset={asset}
-          onSelect={onSelect}
-          tokens={tokens}
-          isOpen={isOpen}
-          onOpenChange={onOpenChange}
-        />
+        <div className="flex-shrink-0">
+          <TokenSelector
+            asset={asset}
+            onSelect={onSelect}
+            tokens={tokens}
+            isOpen={isOpen}
+            onOpenChange={onOpenChange}
+          />
+        </div>
       </div>
       {pool && asset && (
         <div className="mt-2 flex justify-end">
@@ -291,7 +310,7 @@ const SwapDialog = ({
         <Button variant="outline" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button disabled={isLoading} onClick={onConfirm}>
+        <Button disabled={isLoading} onClick={onConfirm} className="bg-strato-blue hover:bg-strato-blue/90">
           {isLoading && <LoadingSpinner />} Confirm Swap
         </Button>
       </DialogFooter>
@@ -381,7 +400,7 @@ const SwapWidget = () => {
   const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
-  const [pool, setPool] = useState<any>(null);
+  const [pool, setPool] = useState<LiquidityPool>(null);
   const [exchangeRate, setExchangeRate] = useState("0");
   const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
   const [toBalanceLoading, setToBalanceLoading] = useState(false);
@@ -483,7 +502,7 @@ const SwapWidget = () => {
           setToAmount("");
           setExchangeRate("0");
         }
-      } catch (error: any) {
+      } catch (error) {
         // Don't handle aborted requests as errors
         if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
 
@@ -646,7 +665,7 @@ const SwapWidget = () => {
           setInsufficientPoolBalance(calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       console.error("Conversion error:", err);
     }
@@ -654,7 +673,11 @@ const SwapWidget = () => {
 
   const handleAmountChange = async (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
-    isFromInput ? setFromAmount(value) : setToAmount(value);
+    if (isFromInput) {
+      setFromAmount(value);
+    } else {
+      setToAmount(value);
+    }
 
     // Reset validation states
     setWrongAmount(false);
@@ -663,7 +686,11 @@ const SwapWidget = () => {
     if (pool && value && Number(value) !== 0) {
       await calculateSwapAmount(value, isFromInput);
     } else {
-      isFromInput ? setToAmount('') : setFromAmount('');
+      if (isFromInput) {
+        setFromAmount('');
+      } else {
+        setToAmount('');
+      }
     }
   };
 
@@ -886,7 +913,7 @@ useEffect(() => {
       </div>
 
       <Button
-        className="w-full bg-blue-600 hover:bg-blue-700"
+        className="w-full bg-strato-blue hover:bg-strato-blue/90"
         onClick={() => setIsDialogOpen(true)}
         disabled={isSwapDisabled()}
       >

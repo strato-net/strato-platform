@@ -7,10 +7,11 @@ import React, {
   ReactNode,
 } from 'react';
 import { api } from '@/lib/axios';
-import { toast } from '@/components/ui/use-toast';
 import { useUser } from "@/context/UserContext";
+import { CollateralData } from '@/interface';
 
-interface LiquidationEntry {
+
+export interface LiquidationEntry {
   id: string;
   user: string;
   asset: string;
@@ -21,6 +22,8 @@ interface LiquidationEntry {
   collateralAmount: string;
   healthFactor: number;
   expectedProfit?: string;
+  maxRepay?: string;
+  collaterals: CollateralData[];
 }
 
 type LiquidationContextType = {
@@ -49,7 +52,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<LiquidationEntry[]>('/lend/liquidate', { signal });
       setLiquidatable(res.data || []);
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       console.error('Error fetching liquidatable loans:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch liquidatable loans');
@@ -64,7 +67,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<LiquidationEntry[]>('/lend/liquidate/near-unhealthy?margin=0.2', { signal });
       setWatchlist(res.data || []);
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       console.error('Error fetching watchlist loans:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch watchlist loans');
@@ -80,7 +83,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       await api.post(`/lend/liquidate/${id}`);
       // Refresh data after successful liquidation
       await refreshData();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Liquidation failed:', err);
       const backendMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message;
       // rethrow a clean Error so the UI layer can surface it
@@ -96,7 +99,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
         fetchLiquidatable(),
         fetchWatchlist(),
       ]);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error refreshing liquidation data:', err);
     }
   }, [fetchLiquidatable, fetchWatchlist]);

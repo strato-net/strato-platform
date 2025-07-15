@@ -32,10 +32,19 @@ const Pools = () => {
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "lending" | "swap" | "liquidations")} className="w-full">
-                <TabsList className="grid w-full md:w-[600px] grid-cols-3 mb-4">
-                  <TabsTrigger value="lending">Lending Pools</TabsTrigger>
-                  <TabsTrigger value="swap">Swap Pools</TabsTrigger>
-                  <TabsTrigger value="liquidations">Liquidations</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="lending" className="text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Lending Pools</span>
+                    <span className="sm:hidden">Lending</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="swap" className="text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Swap Pools</span>
+                    <span className="sm:hidden">Swap</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="liquidations" className="text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Liquidations</span>
+                    <span className="sm:hidden">Liquidations</span>
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="lending">
                   <LendingPoolSection />

@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 
 interface BorrowingSectionProps {
-  userCollaterals: any[];
-  loanData: any;
+  userCollaterals: CollateralData[];
+  loanData: NewLoanData;
   handleBorrow: () => void;
   handleRepay: () => void;
 }
@@ -46,7 +47,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
           <div className="space-y-6">
 
             {/* Added extra spacing with mt-8 to separate indicators from data */}
-            <div className="flex justify-between mt-8">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-x-8 gap-y-6 mt-8">
               <div className="flex flex-col">
                 <span className="text-gray-600">Total Borrowed</span>
                 <span className="font-semibold">
@@ -60,7 +61,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-600">Health Factor</span>
-                <span className="font-semibold text-green-500" style={{ color: getTextColor(parseFloat(loanData?.healthFactor)) }}>
+                <span className="font-semibold text-green-500" style={{ color: getTextColor((loanData?.healthFactor)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
@@ -68,8 +69,8 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                       return "No Loan";
                     }
                     // Check if health factor is valid
-                    if (loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor))) {
-                      return parseFloat(loanData.healthFactor).toFixed(2);
+                    if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {
+                      return (loanData.healthFactor).toFixed(2);
                     }
                     return "N/A";
                   })()}

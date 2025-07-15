@@ -88,8 +88,8 @@ const Dashboard = () => {
     }
 
     // Get USDST borrowed from loans data
-    const usdstBorrowed = (loans as any)?.totalAmountOwed 
-      ? parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18))
+    const usdstBorrowed = loans?.totalAmountOwed 
+      ? parseFloat(formatUnits(BigInt(loans.totalAmountOwed), 18))
       : 0;
 
     // Net Balance = All deposits (including supplied) - USDST Borrowed
@@ -122,7 +122,7 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
@@ -139,8 +139,8 @@ const Dashboard = () => {
 
             <AssetSummary
               title="Borrowed"
-              value={(loans as any)?.totalAmountOwed 
-                ? `${parseFloat(formatUnits(BigInt((loans as any).totalAmountOwed), 18)).toFixed(2)} USDST`
+              value={loans?.totalAmountOwed 
+                ? `${parseFloat(formatUnits(BigInt(loans.totalAmountOwed), 18)).toFixed(2)} USDST`
                 : "0.00 USDST"
               }
               icon={<Shield className="text-white" size={18} />}
@@ -154,9 +154,7 @@ const Dashboard = () => {
 
           <div className="mb-8">
             <BorrowingSection 
-              availableBorrowingPower={availableBorrowingPower}
-              currentBorrowed={currentBorrowed}
-              averageInterestRate={averageInterestRate}
+              loanData={loans}
             />
           </div>
 

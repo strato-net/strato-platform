@@ -30,10 +30,6 @@ interface ListingInfo {
   providers: PaymentProvider[];
 }
 
-interface Listing {
-  ListingInfo: ListingInfo;
-}
-
 interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -65,7 +61,7 @@ export const DepositForm = () => {
           setSelectedListing(listingInfo);
           const providers = (listingInfo.providers || [])
             .filter(
-              (p): p is PaymentProvider =>
+              (p) =>
                 p &&
                 typeof p.providerAddress === "string" &&
                 typeof p.name === "string"
