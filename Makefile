@@ -11,6 +11,11 @@ REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
 REPO_AWS_ECR_URL_MERCATA=406773134706.dkr.ecr.us-east-1.amazonaws.com/mercata/
 $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
+# Detect architecture and set ARCH_FLAG for ARM platforms
+UNAME_M := $(shell uname -m)
+ARCH_FLAG := $(if $(filter aarch64 arm64 arm,$(UNAME_M)),--arch=aarch64,)
+$(info Architecture detected: ${UNAME_M}, ARCH_FLAG: "${ARCH_FLAG}")
+
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
 HIGHWAYDIR=${FAKEROOT}/highway
@@ -39,7 +44,7 @@ build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vaul
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled eks mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx build_buildbase build_common build_common_profiled build_common_with_tests eks mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
 apex:
 	@echo Now building apex...
@@ -65,7 +70,6 @@ mercata-backend:
 	@echo Now building mercata-backend...
 	docker build -t ${REPO_URL}mercata-backend:${VERSION} ./mercata/backend
 	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
-    	
 mercata-ui:
 	@echo Now building mercata-ui...
 	docker build -t ${REPO_URL}mercata-ui:${VERSION} ./mercata/ui
@@ -105,11 +109,11 @@ eks:
 
 build_buildbase:
 	@echo building buildbase...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} - < Dockerfile.buildbase
+	docker build --tag=strato-buildbase:${STACK_RESOLVER} -f Dockerfile.buildbase .
 
 build_formatter:
 	@echo building code formatter...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
+	docker build --tag=strato-formatter:${STACK_RESOLVER} -f Dockerfile.buildbase .
 
 build_common: build_buildbase
 	@echo building haskell libraries and creating directories
@@ -117,7 +121,16 @@ build_common: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack build \
+	cd strato && stack build ${ARCH_FLAG} \
+		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+build_common_with_tests: build_buildbase
+	@echo building haskell libraries and creating directories
+	mkdir -p ${HIGHWAYDIR}
+	mkdir -p ${STRATODIR}
+	mkdir -p ${VAULTDIR}
+	mkdir -p ${IDENTITYDIR}
+	cd strato && stack build ${ARCH_FLAG} \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -127,7 +140,7 @@ build_common_profiled: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack build \
+	cd strato && stack build ${ARCH_FLAG} \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -136,7 +149,7 @@ build_common_fast: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack build \
+	cd strato && stack build ${ARCH_FLAG} \
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 

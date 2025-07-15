@@ -293,7 +293,7 @@ services:
         max-size: "100m"
         max-file: "3"
   zookeeper:
-    image: zookeeper:3.4.14
+    image: zookeeper:3.5
     restart: unless-stopped
     volumes:
       - zookeeperdata:/data
