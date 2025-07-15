@@ -60,9 +60,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   // max repay from backend (wei) → ether
   const maxRepayEth = weiToEth(collateral.maxRepay || loan.maxRepay || "0");
 
-   // Controlled string state so user can freely type
+  // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
-  
   const [displayAmount, setDisplayAmount] = useState<string>(addCommasToInput(maxRepayEth.toString()));
 
   // Reset when collateral changes or modal opens anew
