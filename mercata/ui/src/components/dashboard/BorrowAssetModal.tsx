@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatUnits, parseUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
+import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
 
 interface BorrowAssetModalProps {
@@ -107,6 +108,11 @@ const BorrowAssetModal = ({
     setDisplayAmount(addCommasToInput(amount));
   };
 
+  const handlePercentageButtonClick = (percentageAmount: string) => {
+    setBorrowAmount(percentageAmount);
+    setDisplayAmount(addCommasToInput(percentageAmount));
+  };
+
   const handleClose = () => {
     setDisplayAmount('')
     setBorrowAmount('0')
@@ -167,40 +173,11 @@ const BorrowAssetModal = ({
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant={borrowAmount?.toString() === (parseFloat(availableToBorrowFormatted.toString().replace(/,/g, "")) * 0.1).toString() ? "default" : "outline"}
-                size="sm"
-                onClick={() => handlePercentageClick(0.1)}
-                className="flex-1"
-              >
-                10%
-              </Button>
-              <Button
-                variant={borrowAmount?.toString() === (parseFloat(availableToBorrowFormatted.toString().replace(/,/g, "")) * 0.25).toString() ? "default" : "outline"}
-                size="sm"
-                onClick={() => handlePercentageClick(0.25)}
-                className="flex-1"
-              >
-                25%
-              </Button>
-              <Button
-                variant={borrowAmount?.toString() === (parseFloat(availableToBorrowFormatted.toString().replace(/,/g, "")) * 0.5).toString() ? "default" : "outline"}
-                size="sm"
-                onClick={() => handlePercentageClick(0.5)}
-                className="flex-1"
-              >
-                50%
-              </Button>
-              <Button
-                variant={borrowAmount?.toString() === availableToBorrowFormatted ? "default" : "outline"}
-                size="sm"
-                onClick={() => handlePercentageClick()}
-                className="flex-1"
-              >
-                100%
-              </Button>
-            </div>
+            <PercentageButtons
+              value={borrowAmount}
+              maxValue={availableToBorrowFormatted}
+              onChange={handlePercentageButtonClick}
+            />
           </div>
 
           <div className="space-y-3">
