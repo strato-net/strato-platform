@@ -282,7 +282,6 @@ assetToAccountInfos GA.Asset{..} =
           , (".images.length", BInteger . fromIntegral $ length images)
           , (".files.length", BInteger . fromIntegral $ length files)
           , (".fileNames.length", BInteger . fromIntegral $ length fileNames)
-          , ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
           ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
@@ -291,6 +290,12 @@ assetToAccountInfos GA.Asset{..} =
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
             ++ allBalances
             ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)] else []
+            ++ (if root == usdstAddress
+                  then [ ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
+                       , ("._balances<a:c7f483b3ddb99d510570a8b7760aebda941c766d>", BInteger $ 1000 * oneE18) -- bob
+                       , ("._balances<a:a0ad0dc4c754d507ca7964246fa9590d6a3df8d4>", BInteger $ 100_000 * oneE18) -- jaime and victor
+                       ]
+                  else [])
 
 rateStrategy :: AccountInfo
 rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount mercataAddress "RateStrategy") $ createdByBlockApps mercataAddress
