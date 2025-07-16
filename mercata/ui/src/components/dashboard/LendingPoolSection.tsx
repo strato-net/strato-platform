@@ -317,11 +317,6 @@ const LendingPoolSection = () => {
                             Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
                           </p>
                         )}
-                        {isInsufficientBalanceForDepositAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
-                          </p>
-                        )}
                         {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForDepositAndFee && (
                           <p className="text-yellow-600 text-sm mt-1">
                             Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
