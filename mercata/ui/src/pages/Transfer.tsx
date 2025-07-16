@@ -76,9 +76,11 @@ const Transfer = () => {
       setFromAmount("");
       setRecipient("");
       const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find(t => t.address === fromAsset?.address);
+      const updatedToken = updatedTokens.find(t => t.address === fromAsset?.address);      
       if (updatedToken) {
         setFromAsset(updatedToken); // triggers re-render with updated balance
+      } else {
+        setFromAsset(null)
       }
     } catch (error) {
       const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
