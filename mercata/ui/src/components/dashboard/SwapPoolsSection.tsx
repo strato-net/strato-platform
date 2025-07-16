@@ -150,11 +150,14 @@ const SwapPoolsSection = () => {
     setIsWithdrawModalOpen(true);
 
     try {
+      setBalanceLoading(true)
       const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
       setTokenABalance(balances.tokenABalance);
       setTokenBBalance(balances.tokenBBalance);
       setUsdstBalance(balances.usdstBalance);
+      setBalanceLoading(false)
     } catch (error) {
+      setBalanceLoading(false)
       toast({
         title: "Error",
         description: "Failed to fetch token balances",
@@ -637,7 +640,7 @@ const SwapPoolsSection = () => {
                 {parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") && (
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
-                {selectedPool?.tokenB.address === usdstAddress && 
+                {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
                  parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
                  parseUnits(token2Amount || "0", 18) <= BigInt(tokenBBalance || "0") && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
@@ -789,7 +792,7 @@ const SwapPoolsSection = () => {
                 <span>{WITHDRAW_FEE} USDST</span>
               </div>
               {/* Withdraw Fee Warning */}
-              {BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
+              {!balanceLoading && BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
               )}
               {(() => {
