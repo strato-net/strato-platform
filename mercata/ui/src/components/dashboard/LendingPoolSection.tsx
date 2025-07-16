@@ -317,10 +317,10 @@ const LendingPoolSection = () => {
                     const depositAmountWei = depositAmount ? parseUnits(depositAmount, 18) : 0n;
                     
                     // Check if user has enough USDST for fee
-                    const isInsufficientUsdstForFee = availableWei < feeWei;
+                    const isInsufficientUsdstForFee = !loadingLiquidity && availableWei < feeWei;
                     
                     // Check if deposit amount + fee exceeds available balance
-                    const isInsufficientBalanceForDepositAndFee = depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
+                    const isInsufficientBalanceForDepositAndFee = !loadingLiquidity && depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
                     
                     // Check if remaining balance after deposit and fee is low
                     const lowBalanceThreshold = parseUnits("0.10", 18);
@@ -433,7 +433,7 @@ const LendingPoolSection = () => {
                     const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
                     
                     // Check if user has enough USDST for fee
-                    const isInsufficientUsdstForFee = usdstBalanceWei < feeWei;
+                    const isInsufficientUsdstForFee = !loadingLiquidity && usdstBalanceWei < feeWei;
                     
                     // Check if remaining balance after fee is low
                     const lowBalanceThreshold = parseUnits("0.10", 18);
