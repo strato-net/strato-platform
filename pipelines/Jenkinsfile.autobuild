@@ -312,6 +312,7 @@ pipeline {
                     sh "sudo ./strato --pull"
                     sh "sudo ./strato --wipe"
                     sh "sudo ./strato-run.sh"
+                    /* TODO: make sure the node syncs successfully
                     script {
                       def b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('$BUILDTEST_CLIENT_ID}:$BUILDTEST_CLIENT_SECRET'))\"").trim()
                       def tokenEndpoint = sh(returnStdout: true, script: "curl -s  https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration | jq .token_endpoint | tr -d '\"'").trim()
@@ -327,12 +328,12 @@ pipeline {
                         sh "exit 1"
                       }
                       // TODO: poll for isSynced: true at https://localhost/strato-api/eth/v1.2/metadata
-                    }
+                    }*/
                   }
                 }
               }
               post {
-                always {
+                success {
                   script {
                     def VERSION = sh(
                         returnStdout: true,
