@@ -64,15 +64,12 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
       const amountWei = parseUnits(withdrawAmount, 18);
-      const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
-      const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000"); // Default 1:1 if not available
+      const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
       const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
       const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
       
-      // Calculate how many mUSDST would be burned for this withdrawal
-      const mTokensToBurn = (amountWei * (10n ** 18n)) / exchangeRateWei;
       if (amountWei <= 0n) return false;
-      if (mTokensToBurn > userMTokenBalanceWei) return false; // Check if user has enough mUSDST
+      if (amountWei > maxWithdrawableWei) return false; // Check against max withdrawable (considers both user balance and pool liquidity)
       if (usdstBalanceWei < feeWei) return false;
       return true;
     } catch {
@@ -274,6 +271,23 @@ const LendingPoolSection = () => {
                     </Button>
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+                        const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
+                        const maxDepositableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
+                        const formatted = formatUnits(maxDepositableWei, 18);
+
+                        // Clamp to 18 decimals
+                        const [whole, frac = ""] = formatted.split(".");
+                        const clamped = `${whole}.${frac.slice(0, 18)}`;
+                        setDepositAmount(clamped);
+                      }}
+                      className="text-blue-600 hover:underline mr-2"
+                    >
+                      Max
+                    </button>
                     Available:{" "}
                     {loadingLiquidity ?
                       <span className="text-gray-400 animate-pulse">
@@ -300,10 +314,10 @@ const LendingPoolSection = () => {
                     const depositAmountWei = depositAmount ? parseUnits(depositAmount, 18) : 0n;
                     
                     // Check if user has enough USDST for fee
-                    const isInsufficientUsdstForFee = availableWei < feeWei;
+                    const isInsufficientUsdstForFee = !loadingLiquidity && availableWei < feeWei;
                     
                     // Check if deposit amount + fee exceeds available balance
-                    const isInsufficientBalanceForDepositAndFee = depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
+                    const isInsufficientBalanceForDepositAndFee = !loadingLiquidity && depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
                     
                     // Check if remaining balance after deposit and fee is low
                     const lowBalanceThreshold = parseUnits("0.10", 18);
@@ -312,14 +326,9 @@ const LendingPoolSection = () => {
                     
                     return (
                       <>
-                        {isInsufficientUsdstForFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
-                          </p>
-                        )}
                         {isInsufficientBalanceForDepositAndFee && (
                           <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
+                            Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
                           </p>
                         )}
                         {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForDepositAndFee && (
@@ -381,7 +390,35 @@ const LendingPoolSection = () => {
                     </Button>
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
-                    Max Withdrawable:{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rawMax = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
+                        const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000");
+                        const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
+                        const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
+                        const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
+
+                        if (!rawMax || usdstBalanceWei < feeWei) return;
+
+                        const maxWithdrawableViaMToken = (userMTokenBalanceWei * exchangeRateWei) / (10n ** 18n);
+                        const rawMaxWei = BigInt(rawMax);
+                        const safeMaxWei = rawMaxWei < maxWithdrawableViaMToken ? rawMaxWei : maxWithdrawableViaMToken;
+
+                        if (safeMaxWei <= 0n) return;
+
+                        const formatted = formatUnits(safeMaxWei, 18);
+                        const [w, f = ""] = formatted.split(".");
+                        const clamped = f.length > 18 ? `${w}.${f.slice(0, 18)}` : formatted;
+                        const clampedClean = clamped.replace(/\.?0+$/, "");
+
+                        setWithdrawAmount(clampedClean);
+                      }}
+                      className="text-blue-600 hover:underline mr-2"
+                    >
+                      Max
+                    </button>
+                    Withdrawable:{" "}
                     {loadingLiquidity ?
                       <span className="text-gray-400 animate-pulse">
                         Loading...
@@ -401,7 +438,7 @@ const LendingPoolSection = () => {
                     const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
                     
                     // Check if user has enough USDST for fee
-                    const isInsufficientUsdstForFee = usdstBalanceWei < feeWei;
+                    const isInsufficientUsdstForFee = !loadingLiquidity && usdstBalanceWei < feeWei;
                     
                     // Check if remaining balance after fee is low
                     const lowBalanceThreshold = parseUnits("0.10", 18);

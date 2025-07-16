@@ -300,12 +300,36 @@ export interface LiquidationBonusItem {
   bonus: string;
 }
 
+export interface AssetConfig {
+  interestRate: string;
+  liquidationBonus: string;
+  liquidationThreshold: string;
+  ltv: string;
+  reserveFactor: string;
+}
+
 export interface LendData {
   lendingPool: {
-    collateralRatio: CollateralRatioItem[];
-    interestRate: InterestRateItem[];
-    liquidationBonus: LiquidationBonusItem[];
+    assetConfigs: Record<string, AssetConfig>;
   }
+}
+
+// Backend response structure for lending pool data
+// This is the actual structure returned by the API which may differ from LendData
+export interface LendingPoolResponse {
+  registry?: unknown;
+  pool?: {
+    assetConfigs: Array<{
+      asset: string;
+      AssetConfig: AssetConfig;
+    }> | Record<string, AssetConfig>;
+  };
+  lendingPool?: {
+    assetConfigs: Array<{
+      asset: string;
+      AssetConfig: AssetConfig;
+    }> | Record<string, AssetConfig>;
+  };
 }
 
 export interface LiquidityPool {
