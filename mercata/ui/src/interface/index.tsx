@@ -314,6 +314,24 @@ export interface LendData {
   }
 }
 
+// Backend response structure for lending pool data
+// This is the actual structure returned by the API which may differ from LendData
+export interface LendingPoolResponse {
+  registry?: unknown;
+  pool?: {
+    assetConfigs: Array<{
+      asset: string;
+      AssetConfig: AssetConfig;
+    }> | Record<string, AssetConfig>;
+  };
+  lendingPool?: {
+    assetConfigs: Array<{
+      asset: string;
+      AssetConfig: AssetConfig;
+    }> | Record<string, AssetConfig>;
+  };
+}
+
 export interface LiquidityPool {
   address: string;
   _owner: string;

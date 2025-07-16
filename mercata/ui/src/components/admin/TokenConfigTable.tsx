@@ -15,12 +15,13 @@ import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, MoreVertical } from 'lucide-react';
 import ConfigureAssetModal from './ConfigureAssetModal';
-import { Token } from '@/interface';
+import { Token, LendingPoolResponse } from '@/interface';
+
 
 const TokenConfigTable = () => {
   const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
   const { getLend } = useLendingContext();
-  const [lendData, setLendData] = useState<any>(null); // TODO: Update type when backend response is confirmed
+  const [lendData, setLendData] = useState<LendingPoolResponse | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [configureAssetModalOpen, setConfigureAssetModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
@@ -37,13 +38,14 @@ const TokenConfigTable = () => {
     try {
       setLendLoading(true);
       const data = await getLend();
-      if (data?.registry) {
-        console.log('Registry data present:', data.registry);
+      const responseData = data as unknown as LendingPoolResponse;
+      if (responseData?.registry) {
+        console.log('Registry data present:', responseData.registry);
       }
-      if (data?.pool) {
-        console.log('Pool data present:', data.pool);
+      if (responseData?.pool) {
+        console.log('Pool data present:', responseData.pool);
       }
-      setLendData(data);
+      setLendData(responseData);
     } catch (error) {
       console.error('Error fetching lend data:', error);
     } finally {
@@ -82,7 +84,7 @@ const TokenConfigTable = () => {
       // Handle array structure
       if (Array.isArray(poolData.assetConfigs)) {
         const config = poolData.assetConfigs.find(
-          (item: any) => item.asset?.toLowerCase() === address.toLowerCase()
+          (item) => item.asset?.toLowerCase() === address.toLowerCase()
         );
         if (config) {
           console.log(`Found config for ${address}:`, config.AssetConfig);
