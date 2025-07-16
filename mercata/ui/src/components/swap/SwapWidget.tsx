@@ -111,6 +111,8 @@ interface TokenInputProps {
   onFocus: () => void;
   usdstBalance: string;
   isFromInput: boolean;
+  showMaxButton: boolean;
+  onMaxClick: () => void;
   pool: LiquidityPool;
   fromAsset?: Token;
 }
@@ -132,7 +134,9 @@ const TokenInput = ({
   usdstBalance,
   isFromInput,
   pool,
-  fromAsset
+  fromAsset,
+  showMaxButton,
+  onMaxClick
 }: TokenInputProps) => {
   const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -197,8 +201,22 @@ const TokenInput = ({
     <div className="bg-gray-50 p-4 rounded-lg">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-gray-600 font-semibold">{label}</label>
-        <span className="text-sm text-gray-600 mt-1 sm:mt-0">
-          User Balance: {isLoading ? <LoadingSpinner /> : formatBalance(balance, asset?._symbol || "")}
+        <span className="text-sm text-gray-600 mt-1 sm:mt-0 flex gap-1">
+          User Balance: 
+          {isLoading 
+            ? <LoadingSpinner /> 
+            : formatBalance(balance, asset?._symbol || "")
+          }
+          {showMaxButton && (
+            <button
+              type="button"
+              className="text-blue-600 text-xs ml-2 underline"
+              onClick={onMaxClick}
+              disabled={isLoading}
+            >
+              Max
+            </button>
+          )}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -886,6 +904,28 @@ useEffect(() => {
   }
 }, [fromAsset, toAsset, fromAmount, pool]);
 
+const handleMaxClick = (isFrom: boolean) => {
+  const asset = isFrom ? fromAsset : toAsset;
+  if (!asset) return;
+
+  let balance = BigInt(asset.balance) || 0n;
+
+
+   if (asset?.address === usdstAddress) {
+    const fee = parseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
+    if (balance > fee) {
+      balance -= fee;
+    } else {
+      balance = 0n;
+    }
+  }
+
+  const formatted = formatUnits(balance.toString() || 0,18);
+  
+
+  handleAmountChange(isFrom, formatted); // will auto-calculate the other amount
+};
+
   return (
     <div className="space-y-6">
       <TokenInput
@@ -906,6 +946,8 @@ useEffect(() => {
         isFromInput={true}
         pool={pool}
         fromAsset={fromAsset}
+        showMaxButton={!!fromAsset?.balance}
+        onMaxClick={() => handleMaxClick(true)}
       />
 
       <div className="flex justify-center">
@@ -937,6 +979,8 @@ useEffect(() => {
         isFromInput={false}
         pool={pool}
         fromAsset={fromAsset}
+        showMaxButton={!!toAsset?.balance}
+        onMaxClick={() => handleMaxClick(false)}
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
