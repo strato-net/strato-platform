@@ -608,17 +608,45 @@ export const executeLiquidation = async (
   }
 };
 
-export const setInterestRate = async (
+
+export const configureAsset = async (
   accessToken: string,
   body: Record<string, string | number>
 ) => {
-  if (!body.asset || body.rate === undefined) {
-    throw new Error("Missing required parameters: asset and rate");
+  // Validate required parameters
+  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
+      body.liquidationBonus === undefined || body.interestRate === undefined || 
+      body.reserveFactor === undefined) {
+    throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor");
   }
 
-  const rateValue = Number(body.rate);
-  if (isNaN(rateValue) || rateValue < 0 || rateValue > 100) {
-    throw new Error("Interest rate must be a number between 0 and 100");
+  // Convert and validate parameters
+  const ltv = Number(body.ltv);
+  const liquidationThreshold = Number(body.liquidationThreshold);
+  const liquidationBonus = Number(body.liquidationBonus);
+  const interestRate = Number(body.interestRate);
+  const reserveFactor = Number(body.reserveFactor);
+
+  // Validate ranges (values should be in basis points)
+  if (isNaN(ltv) || ltv < 100 || ltv > 9500) {
+    throw new Error("LTV must be between 100 and 9500 basis points (1% to 95%)");
+  }
+  if (isNaN(liquidationThreshold) || liquidationThreshold < 100 || liquidationThreshold > 9500) {
+    throw new Error("Liquidation threshold must be between 100 and 9500 basis points (1% to 95%)");
+  }
+  if (isNaN(liquidationBonus) || liquidationBonus < 10000 || liquidationBonus > 12500) {
+    throw new Error("Liquidation bonus must be between 10000 and 12500 basis points (100% to 125%)");
+  }
+  if (isNaN(interestRate) || interestRate < 0 || interestRate > 10000) {
+    throw new Error("Interest rate must be between 0 and 10000 basis points (0% to 100%)");
+  }
+  if (isNaN(reserveFactor) || reserveFactor < 0 || reserveFactor > 5000) {
+    throw new Error("Reserve factor must be between 0 and 5000 basis points (0% to 50%)");
+  }
+
+  // Validate relationships
+  if (ltv > liquidationThreshold) {
+    throw new Error("LTV cannot be higher than liquidation threshold");
   }
 
   // Get pool configurator address from lending registry
@@ -632,86 +660,14 @@ export const setInterestRate = async (
   const tx = buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: poolConfiguratorAddress,
-    method: "setInterestRate",
-    args: { 
-      asset: body.asset, 
-      newRate: rateValue
-    },
-  });
-
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
-
-  return { status, hash };
-};
-
-export const setCollateralRatio = async (
-  accessToken: string,
-  body: Record<string, string | number>
-) => {
-  if (!body.asset || body.ratio === undefined) {
-    throw new Error("Missing required parameters: asset and ratio");
-  }
-
-  const ratioValue = Number(body.ratio);
-  if (isNaN(ratioValue) || ratioValue < 100 || ratioValue > 1000) {
-    throw new Error("Collateral ratio must be a number between 100 and 1000");
-  }
-
-  // Get pool configurator address from lending registry
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = registry._owner;
-  
-  if (!poolConfiguratorAddress) {
-    throw new Error("Pool configurator address not found in lending registry");
-  }
-
-  const tx = buildFunctionTx({
-    contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
-    method: "setCollateralRatio",
-    args: { 
-      asset: body.asset, 
-      newRatio: ratioValue
-    },
-  });
-
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
-
-  return { status, hash };
-};
-
-export const setLiquidationBonus = async (
-  accessToken: string,
-  body: Record<string, string | number>
-) => {
-  if (!body.asset || body.bonus === undefined) {
-    throw new Error("Missing required parameters: asset and bonus");
-  }
-
-  const bonusValue = Number(body.bonus);
-  if (isNaN(bonusValue) || bonusValue < 100 || bonusValue > 200) {
-    throw new Error("Liquidation bonus must be a number between 100 and 200");
-  }
-
-  // Get pool configurator address from lending registry
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = registry._owner;
-  
-  if (!poolConfiguratorAddress) {
-    throw new Error("Pool configurator address not found in lending registry");
-  }
-
-  const tx = buildFunctionTx({
-    contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
-    method: "setLiquidationBonus",
-    args: { 
-      asset: body.asset, 
-      newBonus: bonusValue
+    method: "configureAsset",
+    args: {
+      asset: body.asset,
+      ltv: ltv,
+      liquidationThreshold: liquidationThreshold,
+      liquidationBonus: liquidationBonus,
+      interestRate: interestRate,
+      reserveFactor: reserveFactor,
     },
   });
 
