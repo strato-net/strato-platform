@@ -136,7 +136,7 @@ function* pollTransactionResult(txHash, maxAttempts = 30) {
       if (response && response[0] && response[0].status === 'Success') {
         return response[0];
       } else if (response && response[0] && response[0].status === 'Failure') {
-        throw new Error(`Transaction failed: ${response[0].txResult?.message || 'Unknown error'}`);
+        throw new Error(`Transaction failed: ${(response[0].txResult && response[0].txResult.message) || 'Unknown error'}`);
       }
       
       // Wait 2 seconds before next attempt
