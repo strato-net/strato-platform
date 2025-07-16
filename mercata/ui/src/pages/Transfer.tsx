@@ -20,7 +20,7 @@ import { ChevronDown } from "lucide-react";
 
 const Transfer = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -76,9 +76,11 @@ const Transfer = () => {
       setFromAmount("");
       setRecipient("");
       const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find(t => t.address === fromAsset?.address);
+      const updatedToken = updatedTokens.find(t => t.address === fromAsset?.address);      
       if (updatedToken) {
         setFromAsset(updatedToken); // triggers re-render with updated balance
+      } else {
+        setFromAsset(null)
       }
     } catch (error) {
       const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
@@ -90,6 +92,17 @@ const Transfer = () => {
     } finally {
       setSwapLoading(false);
     }
+  };
+
+  const addCommasToInput = (value: string) => {
+    if (!value) return '';
+    const parts = value.split('.');
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    if (parts.length === 2) {
+      return integerPart + '.' + parts[1];
+    }
+    return integerPart;
   };
 
   return (
@@ -170,20 +183,49 @@ const Transfer = () => {
             <div className="space-y-2">
               <label className="text-sm text-gray-600">
                 Amount
-                {fromAsset
-                  ? ` (Max: ${Number(formatUnits(maxAmount, 18)).toLocaleString(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 4,
-                  })})`
-                  : ""}
+                {fromAsset && (
+                  <>{" ("}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        let max = maxAmount;
+                        const feeAmount = parseUnits(TRANSFER_FEE, 18);
+
+                        // If transferring USDST, subtract the fee
+                        if (fromAsset?.address === usdstAddress) {
+                          max = max > feeAmount ? max - feeAmount : 0n;
+                        }
+
+                        let raw = formatUnits(max, 18);
+                        // clamp to 18 decimals
+                        const [w, f = ""] = raw.split(".");
+                        if (f.length > 18) raw = `${w}.${f.slice(0, 18)}`;
+                        setFromAmount(raw);
+                      }}
+                      className="font-medium text-blue-600 hover:underline focus:outline-none"
+                    >
+                      Max: {Number(formatUnits(maxAmount, 18)).toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 4,
+                      })}
+                    </button>
+                    {")"}</>
+                )}
               </label>
               <input
-                type="number"
-                value={fromAmount}
+                type="text"
+                inputMode="decimal"
+                pattern="^\\d*(\\.\\d*)?$"
+                value={addCommasToInput(fromAmount)}
                 onChange={(e) => {
-                  const v = e.target.value;
+                  // 1. Strip commas
+                  let v = e.target.value.replace(/,/g, "");
+                  if (!/^\d*\.?\d*$/.test(v)) return;
+                  // 2. Clamp to 18 decimals
+                  const [whole, frac = ""] = v.split(".");
+                  if (frac.length > 18) v = `${whole}.${frac.slice(0, 18)}`;
                   setFromAmount(v);
-                  if (v && maxAmount > 0n) {
+                  if (v) {
                     const inputWei = parseUnits(v, 18);
                     setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
                   } else {
@@ -207,13 +249,21 @@ const Transfer = () => {
                 const inputAmountWei = fromAmount ? parseUnits(fromAmount, 18) : 0n;
 
                 // Check if transferring USDST and leaving enough for fee
-                const isUsdstMaxIssue = fromAsset?.address === usdstAddress &&
+                const isUsdstMaxIssue = !loadingUsdstBalance && fromAsset?.address === usdstAddress &&
                   inputAmountWei > usdstBalanceBigInt - feeAmount &&
                   inputAmountWei <= usdstBalanceBigInt;
 
                 // Check if insufficient USDST for fee
-                const isInsufficientUsdstForFee = fromAsset?.address !== usdstAddress &&
+                const isInsufficientUsdstForFee = !loadingUsdstBalance && fromAsset?.address !== usdstAddress &&
                   usdstBalanceBigInt < feeAmount;
+                
+                // Check if input amount is within 0.10 of USDST balance (low balance warning)
+                const lowBalanceThreshold = parseUnits("0.10", 18);
+                const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
+                const isLowBalanceWarning = fromAsset?.address === usdstAddress &&
+                  inputAmountWei > 0n &&
+                  remainingBalance >= 0n &&
+                  remainingBalance <= lowBalanceThreshold;
 
                 return (
                   <>
@@ -225,6 +275,11 @@ const Transfer = () => {
                     {isInsufficientUsdstForFee && (
                       <p className="text-yellow-600 text-sm mt-1">
                         Insufficient USDST balance for transaction fee ({TRANSFER_FEE} USDST)
+                      </p>
+                    )}
+                    {isLowBalanceWarning && (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                       </p>
                     )}
                   </>
@@ -252,22 +307,22 @@ const Transfer = () => {
                 (() => {
                   const feeAmount = parseUnits(TRANSFER_FEE, 18);
                   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                  
+
                   // Check if user has enough USDST for fee
                   if (usdstBalanceBigInt < feeAmount) {
                     return true;
                   }
-                  
+
                   // Check if transferring USDST and leaving enough for fee
                   if (fromAsset?.address === usdstAddress) {
                     const fromAmountWei = fromAmount ? parseUnits(fromAmount, 18) : 0n;
                     const balance = BigInt(fromAsset.balance || "0");
-                    
+
                     if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
                       return true;
                     }
                   }
-                  
+
                   return false;
                 })()
               }

@@ -6,7 +6,7 @@ export const isAuthenticated = async (): Promise<boolean> => {
     // Make a request to check auth status - the cookie will be sent automatically
     await api.get('/user/me');
     return true;
-  } catch (error: any) {
+  } catch (error) {
     // If we get a 401, the user is not authenticated
     if (error.response?.status === 401) {
       return false;

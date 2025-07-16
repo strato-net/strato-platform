@@ -11,15 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatUnits, parseUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
+import { NewLoanData } from "@/interface";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BorrowAssetModalProps {
   borrowLoading: boolean;
   isOpen: boolean;
   onClose: () => void;
   onBorrow: (amount: string) => void;
-  loan?: any;
+  loan?: NewLoanData;
   usdstBalance?: string;
 }
 
@@ -31,8 +33,9 @@ const BorrowAssetModal = ({
   loan,
   usdstBalance = "0"
 }: BorrowAssetModalProps) => {
-  const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0,18)
-  const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0,18))
+  const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0, 18)
+  const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0, 18))
+  const isMobile = useIsMobile();
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [displayAmount, setDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
@@ -121,7 +124,10 @@ const BorrowAssetModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent aria-describedby={null} className="sm:max-w-lg">
+      <DialogContent 
+        aria-describedby={null} 
+        className={`${isMobile ? 'max-w-[95vw] h-[90vh] overflow-y-auto p-4' : 'sm:max-w-lg'}`}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div
@@ -134,23 +140,23 @@ const BorrowAssetModal = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <div className="flex justify-between">
+        <div className={`space-y-${isMobile ? '4' : '6'} py-4`}>
+          <div className={`space-y-${isMobile ? '3' : '2'}`}>
+            <div className={`flex ${isMobile ? 'flex-col space-y-1' : 'justify-between'}`}>
               <span className="text-sm text-gray-500">Available to borrow</span>
-              <span className="font-medium">
+              <span className={`font-medium ${isMobile ? 'text-base' : ''}`}>
                 USDST {availableToBorrowFormatted}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className={`flex ${isMobile ? 'flex-col space-y-1' : 'justify-between'}`}>
               <span className="text-sm text-gray-500">Currently borrowed</span>
-              <span className="font-medium">
+              <span className={`font-medium ${isMobile ? 'text-base' : ''}`}>
                 USDST {loan?.totalAmountOwed ? formatUnits(loan.totalAmountOwed, 18) : "0.00"}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className={`flex ${isMobile ? 'flex-col space-y-1' : 'justify-between'}`}>
               <span className="text-sm text-gray-500">Interest Rate</span>
-              <span className="font-medium">
+              <span className={`font-medium ${isMobile ? 'text-base' : ''}`}>
                 {loan?.interestRate
                   ? `${loan.interestRate.toFixed(2)}%`
                   : "-"}
@@ -160,9 +166,21 @@ const BorrowAssetModal = ({
 
           <div className="space-y-3">
             <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex justify-between items-center text-xs text-gray-500">
               <span>Min: $0.01</span>
-              <span>Max: ${availableToBorrowFormatted}</span>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBorrowAmount(availableToBorrowFormatted);
+                    setDisplayAmount(addCommasToInput(availableToBorrowFormatted));
+                  }}
+                  className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                >
+                  Max :
+                </button>
+                <span>${availableToBorrowFormatted}</span>
+              </div>
             </div>
             <div className="relative">
               <Input
@@ -185,8 +203,7 @@ const BorrowAssetModal = ({
               <span>Risk Level:</span>
               <div className="flex items-center gap-2">
                 <span
-                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                    riskLevel < 30
+                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${riskLevel < 30
                       ? "bg-green-50 text-green-700"
                       : riskLevel < 70
                         ? "bg-yellow-50 text-yellow-700"
@@ -240,18 +257,24 @@ const BorrowAssetModal = ({
             })()}
           </div>
 
-          <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
-            <p className="text-gray-600">
-              Borrowing against your assets allows you to access liquidity
-              without selling your holdings. Be mindful of the risk level, as
-              high borrowing increases liquidation risk during market
-              volatility.
-            </p>
-          </div>
+          {!isMobile && (
+            <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
+              <p className="text-gray-600">
+                Borrowing against your assets allows you to access liquidity
+                without selling your holdings. Be mindful of the risk level, as
+                high borrowing increases liquidation risk during market
+                volatility.
+              </p>
+            </div>
+          )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} className="mr-2">
+        <DialogFooter className={isMobile ? 'flex-col space-y-2 pt-4' : ''}>
+          <Button 
+            variant="outline" 
+            onClick={handleClose} 
+            className={isMobile ? 'w-full order-2' : 'mr-2'}
+          >
             Cancel
           </Button>
           <Button
@@ -266,7 +289,7 @@ const BorrowAssetModal = ({
               })()
             }
             onClick={handleBorrow}
-            className="px-6"
+            className={isMobile ? 'w-full px-6 order-1' : 'px-6'}
           >
             {borrowLoading && (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
+import { RawDepositData, RawWithdrawData } from '@/interface/index'
 
 interface Transaction {
   transaction_hash: string;
@@ -78,7 +79,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
       const depositData = response.data?.data?.data.data || [];
       
       const transformedData = Array.isArray(depositData)
-        ? depositData.map((item: any) => ({
+        ? depositData.map((item: RawDepositData) => ({
             transaction_hash: item.transaction_hash,
             block_timestamp: item.block_timestamp,
             from: item.from,
@@ -89,7 +90,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             amount: item.amount
               ? (
                   Number(item.amount) /
-                  (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)
+                   ( 10 ** 18)
                 ).toLocaleString("fullwide", {
                   useGrouping: false,
                   maximumFractionDigits: 20,
@@ -110,7 +111,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         data: transformedData,
         totalCount
       };
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch deposit transactions';
       setError(errorMessage);
       console.error('Error fetching deposit transactions:', err);
@@ -148,7 +149,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
       const withdrawalData = response.data?.data?.data.data || [];
       
       const transformedData = Array.isArray(withdrawalData)
-        ? withdrawalData.map((item: any) => ({
+        ? withdrawalData.map((item: RawWithdrawData) => ({
             transaction_hash: item.transaction_hash,
             block_timestamp: item.block_timestamp,
             from: item.from,
@@ -180,7 +181,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         data: transformedData,
         totalCount
       };
-    } catch (err: any) {
+    } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch withdraw transactions';
       setError(errorMessage);
       console.error('Error fetching withdraw transactions:', err);

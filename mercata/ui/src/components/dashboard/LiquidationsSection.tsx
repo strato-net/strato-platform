@@ -1,8 +1,9 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import CopyButton from "../ui/copy";
-import { useLiquidationContext } from "@/context/LiquidationContext";
+import { LiquidationEntry, useLiquidationContext } from "@/context/LiquidationContext";
 import LiquidateModal from "./LiquidateModal";
+import { CollateralData } from "@/interface";
 import TokenDisplay from "@/components/ui/TokenDisplay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -29,11 +30,11 @@ const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
 
   const [modalData, setModalData] = React.useState<{
-    loan: any;
-    collateral: any;
+    loan: LiquidationEntry;
+    collateral: CollateralData;
   } | null>(null);
 
-  const openModal = (loan: any, collateral: any) => setModalData({ loan, collateral });
+  const openModal = (loan: LiquidationEntry, collateral: CollateralData) => setModalData({ loan, collateral });
   const closeModal = () => setModalData(null);
 
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
@@ -59,7 +60,7 @@ const LiquidationsSection: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
-            {liquidatable.map((ln: any) => (
+            {liquidatable.map((ln: LiquidationEntry) => (
               <div key={ln.id} className="border rounded-lg overflow-hidden">
                 {/* Main row */}
                 <div 
@@ -126,7 +127,7 @@ const LiquidationsSection: React.FC = () => {
                   <div className="bg-gray-50 p-4">
                     {/* Mobile layout */}
                     <div className="block md:hidden space-y-3">
-                      {ln.collaterals.map((c: any, idx: number) => {
+                      {ln.collaterals.map((c: CollateralData, idx: number) => {
                         const usdVal = weiToEther(c.usdValue).toFixed(2);
                         const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                         const positive = profitNum > 0;
@@ -187,7 +188,7 @@ const LiquidationsSection: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {ln.collaterals.map((c: any, idx: number) => {
+                          {ln.collaterals.map((c: CollateralData, idx: number) => {
                             const usdVal = weiToEther(c.usdValue).toFixed(2);
                             const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                             const positive = profitNum > 0;
