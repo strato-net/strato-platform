@@ -138,8 +138,13 @@ contract record LendingPool is Ownable {
         require(config.interestRate > 0, "Interest rate not configured");
         require(config.reserveFactor > 0, "Reserve factor not configured"); 
         
-        // LiquidityPool handles token transfer and mToken minting based on current exchange rate
-        LiquidityPool(_liquidityPool()).deposit(amount, msg.sender);
+        // Calculate current exchange rate and corresponding mToken amount to mint
+        uint256 exchangeRate = getExchangeRate();
+        uint256 mTokenAmount = (amount * 1e18) / exchangeRate;
+        require(mTokenAmount > 0, "Deposit too small");
+
+        // Transfer underlying and mint mTokens via LiquidityPool
+        LiquidityPool(_liquidityPool()).deposit(amount, mTokenAmount, msg.sender);
         
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Deposited(msg.sender, borrowableAsset, amount);
