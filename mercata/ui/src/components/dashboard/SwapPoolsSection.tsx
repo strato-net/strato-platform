@@ -51,6 +51,7 @@ const SwapPoolsSection = () => {
   const [tokenABalance, setTokenABalance] = useState('');
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [usdstBalance, setUsdstBalance] = useState('');
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const operationInProgressRef = useRef(false);
 
@@ -121,22 +122,25 @@ const SwapPoolsSection = () => {
   const handleOpenDepositModal = async (pool: LiquidityPool) => {
     if (operationInProgressRef.current) return;
     
+    setToken1Amount('');
+    setToken2Amount('');
     setSelectedPool(pool);
     setIsDepositModalOpen(true);
     try {
+      setBalanceLoading(true)
       const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
       setTokenABalance(balances.tokenABalance);
       setTokenBBalance(balances.tokenBBalance);
       setUsdstBalance(balances.usdstBalance);
+      setBalanceLoading(false)
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to fetch token balances",
         variant: "destructive",
       });
+      setBalanceLoading(false)
     }
-    setToken1Amount('');
-    setToken2Amount('');
   };
 
   const handleOpenWithdrawModal = async (pool: LiquidityPool): Promise<void> => {
@@ -146,11 +150,14 @@ const SwapPoolsSection = () => {
     setIsWithdrawModalOpen(true);
 
     try {
+      setBalanceLoading(true)
       const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
       setTokenABalance(balances.tokenABalance);
       setTokenBBalance(balances.tokenBBalance);
       setUsdstBalance(balances.usdstBalance);
+      setBalanceLoading(false)
     } catch (error) {
+      setBalanceLoading(false)
       toast({
         title: "Error",
         description: "Failed to fetch token balances",
@@ -229,6 +236,7 @@ const SwapPoolsSection = () => {
         setPools(enrichedPools);
 
         // Refresh balances
+        setBalanceLoading(true)
         const balances = await fetchTokenBalances(updatedPool, userAddress, usdstAddress);
         setTokenABalance(balances.tokenABalance);
         setTokenBBalance(balances.tokenBBalance);
@@ -248,6 +256,7 @@ const SwapPoolsSection = () => {
         variant: "destructive",
       });
     } finally {
+      setBalanceLoading(false)
       setDepositLoading(false);
       operationInProgressRef.current = false;
     }
@@ -293,6 +302,7 @@ const SwapPoolsSection = () => {
         setPools(enrichedPools);
 
         // Refresh balances
+        setBalanceLoading(true)
         const balances = await fetchTokenBalances(updatedPool, userAddress, usdstAddress);
         setTokenABalance(balances.tokenABalance);
         setTokenBBalance(balances.tokenBBalance);
@@ -312,14 +322,30 @@ const SwapPoolsSection = () => {
         variant: "destructive",
       });
     } finally {
+      setBalanceLoading(false)
       setWithdrawLoading(false);
       operationInProgressRef.current = false;
     }
   };
 
   const handleMaxClick = (isFirstToken: boolean) => {
-    const maxVal = formatUnits(isFirstToken ? tokenABalance : tokenBBalance || "0", 18);
-    
+    const balance = isFirstToken ? tokenABalance : tokenBBalance;
+    const token = isFirstToken ? selectedPool.tokenA : selectedPool.tokenB;
+    const isUSDST = token.address.toLowerCase() === usdstAddress.toLowerCase();
+
+    let maxBigInt = BigInt(balance || "0");
+
+    if (isUSDST) {
+      const fee = parseUnits(DEPOSIT_FEE, 18);
+      if (maxBigInt > fee) {
+        maxBigInt = maxBigInt - fee;
+      } else {
+        maxBigInt = BigInt(0);
+      }
+    }
+
+    const maxVal = formatUnits(maxBigInt, 18);
+
     if (isFirstToken) {
       setToken1Amount(maxVal);
       handleInputChange(maxVal, 'token1');
@@ -480,6 +506,7 @@ const SwapPoolsSection = () => {
                 <span className="text-sm text-gray-500">Amount</span>
                 <div className="flex items-center gap-2">
                   <Input
+                    disabled={balanceLoading}
                     placeholder="0.0"
                     className={`border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                       parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
@@ -506,16 +533,19 @@ const SwapPoolsSection = () => {
                     )}
                   </div>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500">
-                    Balance: {formatUnits(tokenABalance || "0", 18)}
+                <div className='flex items-center'>
+                  <span className="text-sm text-gray-500 flex gap-1">
+                    Balance: {balanceLoading ?
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      : formatUnits(tokenABalance || "0", 18)}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-gray-500 mt-1"
+                    className="text-xs text-blue-500"
                     onClick={() => handleMaxClick(true)}
+                    disabled={balanceLoading}
                   >
                     Max
                   </Button>
@@ -523,7 +553,7 @@ const SwapPoolsSection = () => {
                 {parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") && (
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
-                {selectedPool?.tokenA.address === usdstAddress && 
+                {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
                  parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
                  parseUnits(token1Amount || "0", 18) <= BigInt(tokenABalance || "0") && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
@@ -563,6 +593,7 @@ const SwapPoolsSection = () => {
                 </div>
                 <div className="flex items-center">
                   <Input
+                    disabled={balanceLoading}
                     placeholder="0.0"
                     className={`border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                       parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
@@ -589,16 +620,19 @@ const SwapPoolsSection = () => {
                     )}
                   </div>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500">
-                    Balance: {formatUnits(tokenBBalance || "0", 18)}
+                <div className='flex items-center'>
+                  <span className="text-sm text-gray-500 flex gap-1">
+                    Balance: {balanceLoading ?
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      : formatUnits(tokenBBalance || "0", 18)}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-gray-500 mt-1"
+                    className="text-xs text-blue-500"
                     onClick={() => handleMaxClick(false)}
+                    disabled={balanceLoading}
                   >
                     Max
                   </Button>
@@ -606,7 +640,7 @@ const SwapPoolsSection = () => {
                 {parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") && (
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
-                {selectedPool?.tokenB.address === usdstAddress && 
+                {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
                  parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
                  parseUnits(token2Amount || "0", 18) <= BigInt(tokenBBalance || "0") && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
@@ -758,7 +792,7 @@ const SwapPoolsSection = () => {
                 <span>{WITHDRAW_FEE} USDST</span>
               </div>
               {/* Withdraw Fee Warning */}
-              {BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
+              {!balanceLoading && BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
               )}
               {(() => {

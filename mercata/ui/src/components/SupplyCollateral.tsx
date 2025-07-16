@@ -187,8 +187,20 @@ const SupplyCollateralModal = ({
 
           <div className="space-y-3">
             <label className="text-sm font-medium">Supply Amount ({asset?._name})</label>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Max: {formatUnits(asset?.userBalance || 0,18)}</span>
+            <div className="flex justify-between items-center text-xs text-gray-500">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupplyAmount(formatUnits(asset?.userBalance || 0,18));
+                    setDisplayAmount(addCommasToInput(formatUnits(asset?.userBalance || 0,18)));
+                  }}
+                  className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                >
+                  Max :
+                </button>
+                <span>${formatUnits(asset?.userBalance || 0,18)}</span>
+              </div>
             </div>
             <div className="relative">
               <Input

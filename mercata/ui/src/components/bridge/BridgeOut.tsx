@@ -16,6 +16,7 @@ import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { roundToDecimals } from "@/utils/numberUtils";
+import BridgeWalletStatus from "./BridgeWalletStatus";
 
 interface Token {
   name: string;
@@ -83,7 +84,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
           setTokenBalance("0");
         }
 
-        if (selectedToken?.tokenAddress && address) {
+        if (selectedToken?.tokenAddress ) {
           const balanceData = await getBalance(selectedToken.tokenAddress);
 
           if (mounted && balanceData?.balance) {
@@ -117,7 +118,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     return () => {
       mounted = false;
     };
-  }, [isConnected, address, selectedToken, getBalance, formatBalance]);
+  }, [ selectedToken, getBalance, formatBalance]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -228,6 +229,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
 
   return (
     <div className="space-y-6">
+      <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="from">From Network</Label>
@@ -359,6 +361,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
           {isLoading ? "Processing..." : "Bridge Assets"}
         </Button>
       </div>
+      {!isConnected && (
+        <div className="text-center">
+          <p className="text-sm text-red-500">
+            Connect your wallet to bridge assets. Use the wallet where you'd like to receive funds.
+          </p>
+        </div>
+      )}
 
       <Modal
         title="Confirm Bridge Transaction"
