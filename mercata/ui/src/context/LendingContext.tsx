@@ -119,29 +119,19 @@ export const LendingProvider = ({
     }
   };
 
-  const setInterestRate = async (payload: { asset: string; rate: number }): Promise<void> => {
-    try {
-      await api.post("/lend/setInterestRate", payload);
-    } catch (err: any) {
-      console.error("Failed to set interest rate:", err);
-      throw err;
-    }
-  };
 
-  const setCollateralRatio = async (payload: { asset: string; ratio: number }): Promise<void> => {
+  const configureAsset = async (payload: { 
+    asset: string; 
+    ltv: number; 
+    liquidationThreshold: number; 
+    liquidationBonus: number; 
+    interestRate: number; 
+    reserveFactor: number; 
+  }): Promise<void> => {
     try {
-      await api.post("/lend/setCollateralRatio", payload);
+      await api.post("/lend/admin/configure-asset", payload);
     } catch (err: any) {
-      console.error("Failed to set collateral ratio:", err);
-      throw err;
-    }
-  };
-
-  const setLiquidationBonus = async (payload: { asset: string; bonus: number }): Promise<void> => {
-    try {
-      await api.post("/lend/setLiquidationBonus", payload);
-    } catch (err: any) {
-      console.error("Failed to set liquidation bonus:", err);
+      console.error("Failed to configure asset:", err);
       throw err;
     }
   };
@@ -265,9 +255,7 @@ export const LendingProvider = ({
       loadingLiquidity,
       refreshLiquidity : fetchLiquidityInfo,
       setPrice,
-      setInterestRate,
-      setCollateralRatio,
-      setLiquidationBonus,
+      configureAsset,
       refreshLendingData,
       borrowAsset,
       repayLoan,

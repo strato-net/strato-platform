@@ -69,38 +69,19 @@ export function validateWithdrawCollateralArgs(args: any) {
   }
 }
 
-export function validateSetInterestRateArgs(args: any) {
-  const schema = Joi.object({
-    asset: Joi.string().required(),
-    rate: Joi.number().min(0).max(100).required(),
-  });
-  
-  const { error } = schema.validate(args);
-  if (error) {
-    throw new Error("Set Interest Rate Argument Validation Error: " + error.message);
-  }
-}
 
-export function validateSetCollateralRatioArgs(args: any) {
+export function validateConfigureAssetArgs(args: any) {
   const schema = Joi.object({
     asset: Joi.string().required(),
-    ratio: Joi.number().min(100).max(1000).required(),
+    ltv: Joi.number().min(100).max(9500).required(),
+    liquidationThreshold: Joi.number().min(100).max(9500).required(),
+    liquidationBonus: Joi.number().min(10000).max(12500).required(),
+    interestRate: Joi.number().min(0).max(10000).required(),
+    reserveFactor: Joi.number().min(0).max(5000).required(),
   });
   
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Set Collateral Ratio Argument Validation Error: " + error.message);
-  }
-}
-
-export function validateSetLiquidationBonusArgs(args: any) {
-  const schema = Joi.object({
-    asset: Joi.string().required(),
-    bonus: Joi.number().min(100).max(200).required(),
-  });
-  
-  const { error } = schema.validate(args);
-  if (error) {
-    throw new Error("Set Liquidation Bonus Argument Validation Error: " + error.message);
+    throw new Error("Configure Asset Argument Validation Error: " + error.message);
   }
 }
