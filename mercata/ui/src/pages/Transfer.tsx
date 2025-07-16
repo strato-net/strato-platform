@@ -20,7 +20,7 @@ import { ChevronDown } from "lucide-react";
 
 const Transfer = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -247,14 +247,14 @@ const Transfer = () => {
                 const inputAmountWei = fromAmount ? parseUnits(fromAmount, 18) : 0n;
 
                 // Check if transferring USDST and leaving enough for fee
-                const isUsdstMaxIssue = fromAsset?.address === usdstAddress &&
+                const isUsdstMaxIssue = !loadingUsdstBalance && fromAsset?.address === usdstAddress &&
                   inputAmountWei > usdstBalanceBigInt - feeAmount &&
                   inputAmountWei <= usdstBalanceBigInt;
 
                 // Check if insufficient USDST for fee
-                const isInsufficientUsdstForFee = fromAsset?.address !== usdstAddress &&
+                const isInsufficientUsdstForFee = !loadingUsdstBalance && fromAsset?.address !== usdstAddress &&
                   usdstBalanceBigInt < feeAmount;
-
+                
                 // Check if input amount is within 0.10 of USDST balance (low balance warning)
                 const lowBalanceThreshold = parseUnits("0.10", 18);
                 const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
