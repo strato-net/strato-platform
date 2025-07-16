@@ -3,6 +3,7 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
 import {api} from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
@@ -10,6 +11,8 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/contants";
+import TransferConfirmationModal from "../components/TransferConfirmationModal";
+import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput } from "@/utils/numberUtils";
 
 import {
   Popover,
@@ -17,14 +20,6 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 const Transfer = () => {
   const { userAddress } = useUser();
@@ -73,7 +68,7 @@ const Transfer = () => {
     const isValidAmount = fromAmount && 
                          fromAmount !== "." && 
                          /^\d*\.?\d+$/.test(fromAmount) && 
-                         parseFloat(fromAmount) > 0;
+                         safeParseFloat(fromAmount) > 0;
     
     if (!isValidAmount) return;
     
@@ -88,7 +83,7 @@ const Transfer = () => {
       await api.post("/tokens/transfer", {
         address: fromAsset.address,
         to: recipient,
-        value: parseUnits(fromAmount, 18).toString(),
+        value: safeParseUnits(fromAmount, 18).toString(),
       });
       toast({
         title: "Success",
@@ -118,16 +113,6 @@ const Transfer = () => {
     }
   };
 
-  const addCommasToInput = (value: string) => {
-    if (!value) return '';
-    const parts = value.split('.');
-    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-    if (parts.length === 2) {
-      return integerPart + '.' + parts[1];
-    }
-    return integerPart;
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -194,7 +179,7 @@ const Transfer = () => {
             {/* Recipient Address */}
             <div className="space-y-2">
               <label className="text-sm text-gray-600">Recipient Address</label>
-              <input
+              <Input
                 type="text"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
@@ -222,10 +207,9 @@ const Transfer = () => {
                           }
 
                           let raw = formatUnits(max, 18);
-                          // clamp to 18 decimals
-                          const [w, f = ""] = raw.split(".");
-                          if (f.length > 18) raw = `${w}.${f.slice(0, 18)}`;
-                          setFromAmount(raw);
+                          // clamp to 18 decimals using utility function
+                          const clampedAmount = roundToDecimals(raw, 18);
+                          setFromAmount(clampedAmount);
                         } catch (error) {
                           console.error("Error setting max amount:", error);
                         }
@@ -240,30 +224,38 @@ const Transfer = () => {
                     {")"}</>
                 )}
               </label>
-              <input
+              <Input
                 type="text"
                 inputMode="decimal"
-                pattern="^\\d*(\\.\\d*)?$"
                 value={addCommasToInput(fromAmount)}
                 onChange={(e) => {
-                  try {
-                    // 1. Strip commas
-                    let v = e.target.value.replace(/,/g, "");
-                    if (!/^\d*\.?\d*$/.test(v)) return;
-                    // 2. Clamp to 18 decimals
-                    const [whole, frac = ""] = v.split(".");
-                    if (frac.length > 18) v = `${whole}.${frac.slice(0, 18)}`;
-                    setFromAmount(v);
-                    // Only parse if we have a valid number (not just "." or empty)
-                    if (v && v !== "." && /^\d*\.?\d+$/.test(v)) {
-                      const inputWei = parseUnits(v, 18);
-                      setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
-                    } else {
+                  const value = e.target.value;
+                  // Strip commas for validation
+                  const v = value.replace(/,/g, "");
+                  
+                  // Only allow valid decimal input
+                  if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                    // Handle the case where user types just "."
+                    if (v === '.') {
+                      setFromAmount('0.');
                       setWrongAmount(false);
+                    } else {
+                      // Preserve trailing decimal point if user just typed it
+                      let processedValue = v;
+                      if (!v.endsWith('.')) {
+                        // Only use roundToDecimals if there's no trailing decimal
+                        processedValue = roundToDecimals(v, 18);
+                      }
+                      setFromAmount(processedValue);
+                      
+                      // Only parse if we have a valid number (not just "." or empty)
+                      if (processedValue && processedValue !== "." && /^\d*\.?\d+$/.test(processedValue)) {
+                        const inputWei = safeParseUnits(processedValue, 18);
+                        setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
+                      } else {
+                        setWrongAmount(false);
+                      }
                     }
-                  } catch (error) {
-                    console.error("Error parsing amount:", error);
-                    setWrongAmount(true);
                   }
                 }}
                 placeholder="0.00"
@@ -280,7 +272,7 @@ const Transfer = () => {
               {(() => {
                 const feeAmount = parseUnits(TRANSFER_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                const inputAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? parseUnits(fromAmount, 18) : 0n;
+                const inputAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? safeParseUnits(fromAmount, 18) : 0n;
 
                 // Check if transferring USDST and leaving enough for fee
                 const isUsdstMaxIssue = !loadingUsdstBalance && fromAsset?.address === usdstAddress &&
@@ -339,7 +331,7 @@ const Transfer = () => {
                 wrongAmount ||
                 swapLoading ||
                 // Check if amount is invalid (just ".", or not a valid number, or 0)
-                (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || parseFloat(fromAmount) === 0) ||
+                (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0) ||
                 (() => {
                   const feeAmount = parseUnits(TRANSFER_FEE, 18);
                   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
@@ -351,7 +343,7 @@ const Transfer = () => {
 
                   // Check if transferring USDST and leaving enough for fee
                   if (fromAsset?.address === usdstAddress) {
-                    const fromAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? parseUnits(fromAmount, 18) : 0n;
+                    const fromAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? safeParseUnits(fromAmount, 18) : 0n;
                     const balance = BigInt(fromAsset.balance || "0");
 
                     if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
@@ -367,60 +359,15 @@ const Transfer = () => {
             </Button>
           </div>
 
-          {/* Confirmation Modal */}
-          <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Confirm Transfer</DialogTitle>
-                <DialogDescription>
-                  Please review your transfer details before confirming.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Token</p>
-                  <p className="font-medium">
-                    {fromAsset?.token?._symbol || fromAsset?.token?._name}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Amount</p>
-                  <p className="font-medium">{fromAmount}</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Recipient</p>
-                  <p className="font-medium text-xs break-all">{recipient}</p>
-                </div>
-                <div className="border-t pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Transaction Fee</span>
-                    <span className="font-medium">{TRANSFER_FEE} USDST</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-medium border-t pt-2">
-                    <span>Total</span>
-                    <span>
-                      {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST fee
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowConfirmModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={handleConfirmTransfer}
-                  disabled={swapLoading}
-                >
-                  {swapLoading ? "Processing..." : "Confirm Transfer"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <TransferConfirmationModal
+            open={showConfirmModal}
+            onOpenChange={setShowConfirmModal}
+            fromAsset={fromAsset}
+            fromAmount={fromAmount}
+            recipient={recipient}
+            swapLoading={swapLoading}
+            onConfirm={handleConfirmTransfer}
+          />
         </main>
       </div>
     </div>
