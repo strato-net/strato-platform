@@ -58,6 +58,7 @@ export const createContract = function(payload) {
 }
 
 export const createContractSuccess = function(response, contractAddress) {
+  const hasAddress = Boolean(contractAddress);
   return {
     type: CREATE_CONTRACT_SUCCESS,
     response: response,
@@ -65,7 +66,9 @@ export const createContractSuccess = function(response, contractAddress) {
     spinning: false,
     isOpen: true,
     toasts: true,
-    toastsMessage: response && response.status ? 'Contract Created' : response
+    toastsMessage: hasAddress
+      ? `Contract Deployed: ${contractAddress}`
+      : (response && response.status ? 'Contract Created' : response)
   }
 }
 
