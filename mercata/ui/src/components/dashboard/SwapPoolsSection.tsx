@@ -271,7 +271,7 @@ const SwapPoolsSection = () => {
       setWithdrawLoading(true);
       
       const value = BigInt(selectedPool.lpToken.balances?.[0]?.balance || "0");
-      const percent = parseFloat(withdrawPercent || "0");
+      const percent = withdrawPercent ? parseFloat(withdrawPercent) : 0;
       const percentScaled = BigInt(Math.round(percent * 100));
       const calculatedAmount = (value * percentScaled) / BigInt(10000);
 
@@ -764,8 +764,31 @@ const SwapPoolsSection = () => {
                     value={withdrawPercent}
                     onChange={(e) => {
                       const value = e.target.value;
-                      const percentRegex = /^(100|[0-9]{1,2})(\.[0-9]{0,2})?$/;
-                      if (value === '' || percentRegex.test(value)) {
+                      // Handle the case where user types just "."
+                      if (value === '.') {
+                        setWithdrawPercent('0.');
+                        return;
+                      }
+                      
+                      // Allow empty input
+                      if (value === '') {
+                        setWithdrawPercent('');
+                        return;
+                      }
+                      
+                      // Check if it's a valid number format first
+                      if (!/^\d*\.?\d*$/.test(value)) {
+                        return;
+                      }
+                      
+                      // Parse the number and validate range
+                      const numValue = parseFloat(value);
+                      if (isNaN(numValue)) {
+                        return;
+                      }
+                      
+                      // Allow only 0-100 range
+                      if (numValue >= 0 && numValue <= 100) {
                         setWithdrawPercent(value);
                       }
                     }}
@@ -784,6 +807,9 @@ const SwapPoolsSection = () => {
                     )}
                   </div>
                 </div>
+                {withdrawPercent && parseFloat(withdrawPercent) > 100 && (
+                  <p className="text-red-600 text-sm mt-1">Percentage cannot exceed 100%</p>
+                )}
               </div>
             </div>
 
@@ -848,7 +874,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
+              <Button disabled={withdrawLoading || !withdrawPercent || parseFloat(withdrawPercent) > 100 || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
