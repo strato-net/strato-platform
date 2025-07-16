@@ -1,4 +1,4 @@
-import { takeLatest, put, call } from 'redux-saga/effects';
+import { takeLatest, put, call, delay } from 'redux-saga/effects';
 import {
   CREATE_CONTRACT_REQUEST,
   createContractSuccess,
@@ -126,6 +126,47 @@ export function compileContractApiCall(contractName, source, solidvm) {
     });
 }
 
+// Helper function to poll for transaction result
+function* pollTransactionResult(txHash, maxAttempts = 30) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = yield call(transactionResultRequest, txHash);
+      console.log(`[TRACE] Transaction result attempt ${attempt + 1}:`, response);
+      
+      if (response && response[0] && response[0].status === 'Success') {
+        return response[0];
+      } else if (response && response[0] && response[0].status === 'Failure') {
+        throw new Error(`Transaction failed: ${response[0].txResult?.message || 'Unknown error'}`);
+      }
+      
+      // Wait 2 seconds before next attempt
+      yield delay(2000);
+    } catch (error) {
+      console.log(`[TRACE] Transaction result attempt ${attempt + 1} failed:`, error);
+      if (attempt === maxAttempts - 1) {
+        throw error;
+      }
+      yield delay(2000);
+    }
+  }
+  throw new Error('Transaction polling timeout');
+}
+
+// Helper function to get transaction result
+function transactionResultRequest(txHash) {
+  const url = env.STRATO_URL + `/transactionResult/${txHash}`;
+  return fetch(url, {
+    method: 'GET',
+    credentials: "include",
+    headers: {
+      'Accept': 'application/json'
+    }
+  })
+  .then(handleErrors)
+  .then(res => res.json())
+  .catch(error => { throw error; });
+}
+
 export function* createContract(action) {
   try {
     let response = yield call( createContractApiCall
@@ -142,11 +183,32 @@ export function* createContract(action) {
       yield put(createContractFailure(response));
     } else {
       const resp = response[0] || response;
-      // TRACE: Log the full response and extracted contract address
-      const contractAddress = resp && resp.data && resp.data.contents && resp.data.contents.address;
-      // eslint-disable-next-line no-console
-      console.log('[TRACE] createContractSuccess: response =', resp, 'contractAddress =', contractAddress);
-      yield put(createContractSuccess(resp, contractAddress));
+      console.log('[TRACE] Initial contract creation response:', resp);
+      
+      // If transaction is pending, poll for the result
+      if (resp.status === 'Pending' && resp.hash) {
+        console.log('[TRACE] Transaction pending, polling for result...');
+        try {
+          const finalResult = yield call(pollTransactionResult, resp.hash);
+          console.log('[TRACE] Final transaction result:', finalResult);
+          
+          // Extract contract address from the final result
+          const contractAddress = finalResult.data && finalResult.data.contents && finalResult.data.contents.address;
+          console.log('[TRACE] Extracted contract address:', contractAddress);
+          
+          yield put(createContractSuccess(finalResult, contractAddress));
+        } catch (pollError) {
+          console.error('[TRACE] Transaction polling failed:', pollError);
+          yield put(createContractFailure(`Transaction failed or timed out: ${pollError.message}`));
+          return;
+        }
+      } else {
+        // For immediate success or other cases
+        const contractAddress = resp && resp.data && resp.data.contents && resp.data.contents.address;
+        console.log('[TRACE] Immediate success, contract address:', contractAddress);
+        yield put(createContractSuccess(resp, contractAddress));
+      }
+      
       yield put(updateToast());
       yield put(fetchContracts(action.payload.chainId, 10, 0));
       yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));

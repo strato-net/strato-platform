@@ -499,6 +499,22 @@ class CreateContract extends Component {
                   </pre>
                 </div>
               </div>}
+              {this.props.contractAddress && <div className="row">
+                <div className="col-sm-12">
+                  <hr />
+                  <h5>Contract Deployed Successfully!</h5>
+                  <div className="row">
+                    <div className="col-sm-3 text-right">
+                      <label className="pt-label smd-pad-4">
+                        Contract Address:
+                      </label>
+                    </div>
+                    <div className="col-sm-9 smd-pad-4">
+                      <HexText value={this.props.contractAddress} classes="small" />
+                    </div>
+                  </div>
+                </div>
+              </div>}
             </div>
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
@@ -562,6 +578,7 @@ export function mapStateToProps(state) {
     toastsError: state.createContract.error,
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
+    contractAddress: state.createContract.contractAddress,
     initialValues: {
       address: state.user.oauthUser ? state.user.oauthUser.address : state.user.address || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
