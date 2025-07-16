@@ -311,7 +311,7 @@ pipeline {
                     """
                   }
                   sh "sudo ./strato --pull"
-                  // sh "./strato --wipe" // TODO: wipe when needed? May be try the wipe if the node is not starting properly without it?..
+                  sh ".sudo /strato --wipe"
                   sh "sudo ./strato-run.sh"
                 }
               }
