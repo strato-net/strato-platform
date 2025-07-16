@@ -9,4 +9,5 @@ secrets.json
 
 # logs
 /deploy/deployment-logs
+/scripts/token-transfer/transfer-logs
 r.log
