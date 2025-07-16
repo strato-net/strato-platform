@@ -20,11 +20,16 @@ import ContractSource from './ContractSource';
 class ContractCard extends Component {
   constructor(props) {
     super(props);
-    this.state = { isOpen: false };
+    // If search term exists and matches an instance, start open
+    const hasSearchMatch = this.props.contract.searchTerm && 
+      this.props.contract.contract && this.props.contract.contract.instances &&
+      this.props.contract.contract.instances.some(instance => 
+        instance.address.toLowerCase() === this.props.contract.searchTerm.toLowerCase()
+      );
+    this.state = { isOpen: hasSearchMatch };
   }
 
   componentWillMount(){
-    console.log("Called when ?", searchTerm, this.props.contract)
     const name = this.props.contract.name;
     const searchTerm = this.props.contract.searchTerm;
     if(searchTerm){
@@ -40,14 +45,22 @@ class ContractCard extends Component {
     const name = this.props.contract.name;
     const contract = this.props.contract.contract;
     const instances = contract && contract.instances ? contract.instances : [];
+    const searchTerm = this.props.contract.searchTerm;
     const self = this;
     const re = /[0-9a-fA-F]{40}$/;
     const showQueryBuilder = instances.reduce((acc, instance) => {
       return acc || instance.fromCirrus;
     }, false);
 
-    instances
-      .filter((instance) => { return re.test(instance.address) })
+    // Filter instances based on search term if present
+    const filteredInstances = searchTerm ? 
+      instances.filter(instance => 
+        re.test(instance.address) && 
+        instance.address.toLowerCase() === searchTerm.toLowerCase()
+      ) :
+      instances.filter(instance => re.test(instance.address));
+
+    filteredInstances
       .forEach(function (instance, index) {
         cardData.push(
           <tr

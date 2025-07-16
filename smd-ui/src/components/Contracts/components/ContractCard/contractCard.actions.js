@@ -13,9 +13,6 @@ export const FETCH_CONTRACT_INFO_SUCCESS = 'FETCH_CONTRACT_INFO_SUCCESS';
 export const FETCH_CONTRACT_INFO_FAILURE = 'FETCH_CONTRACT_INFO_FAILURE';
 
 export const fetchState = function (name, address, chainId) {
-  console.log(name, 'isdata coming');
-  console.log(address, 'isdata coming');
-  console.log(chainId, 'isdata coming');
   return {
     type: FETCH_STATE_REQUEST,
     name: name,
@@ -73,8 +70,6 @@ export const fetchCirrusInstancesFailure = function (contractName, error) {
 };
 
 export const fetchAccount = function (contractName, contractAddress) {
-  console.log(contractName, 'isdata coming');
-  console.log(contractAddress, 'isdata coming');
   return {
     type: FETCH_ACCOUNT_REQUEST,
     name: contractName,
@@ -101,10 +96,6 @@ export const fetchAccountFailure = function (contractName, contractAddress, erro
 }
 
 export const fetchContractInfoRequest = function(key, contractName, contractAddress, chainId) {
-  console.log(key, 'isdata coming');
-  console.log(contractName, 'isdata coming');
-  console.log(contractAddress, 'isdata coming');
-  console.log(chainId, 'isdata coming');
   return {
     type: FETCH_CONTRACT_INFO_REQUEST,
     key,
