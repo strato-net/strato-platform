@@ -14,18 +14,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, MoreVertical } from 'lucide-react';
-import SetCollateralRatioModal from './SetCollateralRatioModal';
-import SetInterestRateModal from './SetInterestRateModal';
-import SetLiquidationBonusModal from './SetLiquidationBonusModal';
+import ConfigureAssetModal from './ConfigureAssetModal';
 
 const TokenConfigTable = () => {
   const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
   const { getLend } = useLendingContext();
   const [lendData, setLendData] = useState<any>(null);
   const [lendLoading, setLendLoading] = useState(false);
-  const [collateralRatioModalOpen, setCollateralRatioModalOpen] = useState(false);
-  const [interestRateModalOpen, setInterestRateModalOpen] = useState(false);
-  const [liquidationBonusModalOpen, setLiquidationBonusModalOpen] = useState(false);
+  const [configureAssetModalOpen, setConfigureAssetModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
 
   const fetchActiveTokens = useCallback(async () => {
@@ -88,19 +84,25 @@ const TokenConfigTable = () => {
     return bonusData ? `${bonusData.bonus}%` : '-';
   };
 
-  const handleSetCollateralRatio = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setCollateralRatioModalOpen(true);
+  const getLiquidationThreshold = (address: string) => {
+    if (!lendData?.lendingPool?.liquidationThreshold) return '-';
+    const thresholdData = lendData.lendingPool.liquidationThreshold.find(
+      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+    );
+    return thresholdData ? `${thresholdData.threshold}%` : '-';
   };
 
-  const handleSetInterestRate = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setInterestRateModalOpen(true);
+  const getReserveFactor = (address: string) => {
+    if (!lendData?.lendingPool?.reserveFactor) return '-';
+    const reserveData = lendData.lendingPool.reserveFactor.find(
+      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
+    );
+    return reserveData ? `${reserveData.factor}%` : '-';
   };
 
-  const handleSetLiquidationBonus = (token: {address: string; symbol: string; name: string}) => {
+  const handleConfigureAsset = (token: {address: string; symbol: string; name: string}) => {
     setSelectedToken(token);
-    setLiquidationBonusModalOpen(true);
+    setConfigureAssetModalOpen(true);
   };
 
   if (loading || lendLoading) {
@@ -145,7 +147,7 @@ const TokenConfigTable = () => {
       <CardHeader>
         <CardTitle>Token Configs</CardTitle>
         <CardDescription>
-          Configure active tokens with collateral ratios, interest rates, and liquidation bonuses
+          Configure active tokens with comprehensive lending parameters including LTV, liquidation thresholds, bonuses, interest rates, and reserve factors
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -164,13 +166,15 @@ const TokenConfigTable = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Symbol</TableHead>
-                  <TableHead className="w-[200px]">Name</TableHead>
-                  <TableHead className="w-[140px]">Address</TableHead>
-                  <TableHead className="w-[80px]">Status</TableHead>
-                  <TableHead className="w-[120px]">Collateral Ratio</TableHead>
-                  <TableHead className="w-[100px]">Interest</TableHead>
-                  <TableHead className="w-[120px]">Liquidation Bonus</TableHead>
+                  <TableHead className="w-[80px]">Symbol</TableHead>
+                  <TableHead className="w-[150px]">Name</TableHead>
+                  <TableHead className="w-[120px]">Address</TableHead>
+                  <TableHead className="w-[70px]">Status</TableHead>
+                  <TableHead className="w-[90px]">LTV</TableHead>
+                  <TableHead className="w-[110px]">Liq. Threshold</TableHead>
+                  <TableHead className="w-[100px]">Liq. Bonus</TableHead>
+                  <TableHead className="w-[80px]">Interest</TableHead>
+                  <TableHead className="w-[90px]">Reserve</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -183,27 +187,33 @@ const TokenConfigTable = () => {
 
                   return (
                     <TableRow key={`${address}-${index}`}>
-                      <TableCell className="font-medium text-sm max-w-[100px] truncate">{symbol}</TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate" title={name}>{name}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[140px]">
+                      <TableCell className="font-medium text-sm max-w-[80px] truncate">{symbol}</TableCell>
+                      <TableCell className="text-sm max-w-[150px] truncate" title={name}>{name}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px]">
                         {address && address !== 'Unknown' 
                           ? `${address.slice(0, 6)}...${address.slice(-4)}`
                           : address
                         }
                       </TableCell>
-                      <TableCell className="max-w-[80px]">
+                      <TableCell className="max-w-[70px]">
                         <Badge variant="default" className="text-xs">
                           ACTIVE
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm max-w-[120px]">
+                      <TableCell className="text-sm max-w-[90px]">
                         {getCollateralRatio(address)}
                       </TableCell>
+                      <TableCell className="text-sm max-w-[110px]">
+                        {getLiquidationThreshold(address)}
+                      </TableCell>
                       <TableCell className="text-sm max-w-[100px]">
+                        {getLiquidationBonus(address)}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[80px]">
                         {getInterestRate(address)}
                       </TableCell>
-                      <TableCell className="text-sm max-w-[120px]">
-                        {getLiquidationBonus(address)}
+                      <TableCell className="text-sm max-w-[90px]">
+                        {getReserveFactor(address)}
                       </TableCell>
                       <TableCell className="max-w-[60px]">
                         <DropdownMenu>
@@ -213,14 +223,8 @@ const TokenConfigTable = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleSetInterestRate({address, symbol, name})}>
-                              Set Interest Rate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetCollateralRatio({address, symbol, name})}>
-                              Set Collateral Ratio
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetLiquidationBonus({address, symbol, name})}>
-                              Set Liquidation Bonus
+                            <DropdownMenuItem onClick={() => handleConfigureAsset({address, symbol, name})}>
+                              Configure Asset
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -234,27 +238,17 @@ const TokenConfigTable = () => {
         )}
       </CardContent>
       
-      <SetCollateralRatioModal
-        open={collateralRatioModalOpen}
-        onOpenChange={setCollateralRatioModalOpen}
+      <ConfigureAssetModal
+        open={configureAssetModalOpen}
+        onOpenChange={setConfigureAssetModalOpen}
         token={selectedToken}
-        currentRatio={selectedToken ? getCollateralRatio(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
-      />
-      
-      <SetInterestRateModal
-        open={interestRateModalOpen}
-        onOpenChange={setInterestRateModalOpen}
-        token={selectedToken}
-        currentRate={selectedToken ? getInterestRate(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
-      />
-      
-      <SetLiquidationBonusModal
-        open={liquidationBonusModalOpen}
-        onOpenChange={setLiquidationBonusModalOpen}
-        token={selectedToken}
-        currentBonus={selectedToken ? getLiquidationBonus(selectedToken.address) : undefined}
+        currentConfig={selectedToken ? {
+          ltv: getCollateralRatio(selectedToken.address),
+          liquidationThreshold: getLiquidationThreshold(selectedToken.address),
+          liquidationBonus: getLiquidationBonus(selectedToken.address),
+          interestRate: getInterestRate(selectedToken.address),
+          reserveFactor: getReserveFactor(selectedToken.address),
+        } : undefined}
         onSuccess={refreshAllData}
       />
     </Card>
