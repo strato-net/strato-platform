@@ -20,7 +20,7 @@ import ContractSource from './ContractSource';
 class ContractCard extends Component {
   constructor(props) {
     super(props);
-    this.state = { isOpen: false };
+    this.state = { isOpen: true };
   }
 
   render() {
