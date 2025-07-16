@@ -51,7 +51,7 @@ data AggregateAction = AggregateAction
     actionMappings :: [Text],
     actionArrays :: [Text],
     actionType :: Action.CallType,
-    actionMetadata :: Map Text Text
+    actionSrc :: Maybe Text
   }
   deriving (Show, Generic, NFData)
 
@@ -101,7 +101,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionMappings = _actionDataMappings,
             actionArrays = _actionDataArrays,
             actionType = t,
-            actionMetadata = fromMaybe M.empty _metadata
+            actionSrc = _src
           }
 
 formatAction :: AggregateAction -> Text

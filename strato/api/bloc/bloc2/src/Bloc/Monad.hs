@@ -30,7 +30,6 @@ where
 import Bloc.API.Transaction
 import BlockApps.Logging
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
@@ -54,10 +53,9 @@ type HasBlocEnv m = Accessible BlocEnv m
 data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
-    accountNonceLimit :: Integer,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Address Nonce,
-    txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
+    txTBQueue :: TBQueue (Maybe Text, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
     useWalletsByDefault :: Bool

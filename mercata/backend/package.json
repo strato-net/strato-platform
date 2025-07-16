@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.1",
+    "@types/hapi__joi": "^17.1.15",
+    "@types/node": "^22.14.1",
+    "@types/winston": "^2.4.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "@hapi/joi": "^17.1.1",
+    "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "http-status-codes": "^2.3.0",
+    "jwt-decode": "^4.0.0",
+    "winston": "^3.11.0"
+  }
+}

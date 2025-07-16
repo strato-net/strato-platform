@@ -49,12 +49,12 @@ import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
 import Data.Swagger hiding (Http, delete)
+import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Block
-import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Metadata as Metadata
 import Handlers.Options
@@ -107,7 +107,7 @@ instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceM
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  lookup _ k = fmap (fmap Text.encodeUtf8) $ Account.getCodeFromPostgres' k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
@@ -150,7 +150,6 @@ type CoreAPI =
            :<|> BatchTransactionResult.API
            :<|> BlkLast.API
            :<|> Block.API
-           :<|> Faucet.API
            :<|> Identity.API
            :<|> Metadata.API
            :<|> Peers.API
@@ -179,7 +178,6 @@ coreServer =
     :<|> BatchTransactionResult.server
     :<|> BlkLast.server
     :<|> Block.server
-    :<|> Faucet.server
     :<|> Identity.server
     :<|> Metadata.server
     :<|> Peers.server
@@ -285,7 +283,6 @@ main = do
   let env =
         BlocEnv
           { txSizeLimit = flags_txSizeLimit,
-            accountNonceLimit = flags_accountNonceLimit,
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,

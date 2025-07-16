@@ -100,7 +100,6 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
@@ -405,12 +404,13 @@ startingAction maybeCode env' =
       _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _metadata =
+      _src =
         case maybeCode of
           Just (Code theCode) ->
-            Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
-          Just (PtrToCode _) -> Env.metadata env'
-          Nothing -> Env.metadata env',
+            Just theCode
+          Just (PtrToCode _) -> Env.src env'
+          Nothing -> Env.src env',
+      _name = Env.name env',
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
@@ -452,6 +452,7 @@ getVariableOfName name = do
                           CC._usings = M.empty,
                           CC._contractType = currentContract x ^. CC.contractType,
                           CC._importedFrom = Nothing,
+                          CC._isContractRecord = currentContract x ^. CC.isContractRecord,
                           CC._contractContext = currentContract x ^. CC.contractContext
                         }
                   }
@@ -814,8 +815,13 @@ hintFromType = \case
         let upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString, BasicType)
             upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
         TStruct s <$> mapM upgrade fs
-  SVMType.Array {} -> return TComplex
-  SVMType.Mapping {} -> return TComplex
+  SVMType.Array t ml -> do
+    t' <- hintFromType t
+    pure $ TArray t' ml
+  SVMType.Mapping _ k v -> do
+    k' <- hintFromType k
+    v' <- hintFromType v
+    pure $ TMapping k' v'
   tt'' -> todo "hintFromType" tt''
 
 getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type
@@ -833,11 +839,11 @@ getXabiType acct field = do
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
-  let field = MS.getField path
-  mType <- getXabiType loc field
-  case mType of
-    Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
+  case MS.getField path of
+    Left e -> typeError "getXabiValueType/invalid storage path" e
+    Right field -> getXabiType loc field >>= \case
+      Nothing -> todo "getXabiValueType/unknown storage reference" field
+      Just v -> return $!! loop ccs' (tail $ MS.toList path) v
   where
     loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
     loop _ [] = id
@@ -897,7 +903,7 @@ initializeAction :: MonadSM m
                  -> [T.Text]
                  -> m ()
 initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -955,8 +961,8 @@ getCodeAndCollection address' = do
           Just (SolidVMCode cn ch') -> do
             cc' <- codeCollectionFromHash True ch'
             return (stringToLabel cn, ch', cc')
-          Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
-          Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
+          Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+          Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
@@ -988,7 +994,10 @@ getArrayNamesFromContract c =
    in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
-  MonadSM m =>
+  ( MonadLogger m
+  , A.Selectable Address AddressState m
+  , HasSolidStorageDB m
+  ) =>
   Address ->
   T.Text ->
   T.Text ->

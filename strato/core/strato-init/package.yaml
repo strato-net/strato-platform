@@ -41,6 +41,7 @@ library:
   - http-client
   - http-types
   - kafka-monad
+  - lens
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
@@ -49,6 +50,7 @@ library:
   - redis-monad
   - resourcet
   - servant-client
+  - solid-vm
   - solid-vm-compiler
   - solid-vm-model
   - sql-monad

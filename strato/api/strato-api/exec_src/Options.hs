@@ -30,5 +30,6 @@ getIdentityServerUrl = if null flags_identityServerUrl
     then case computeNetworkID of 
         7596898649924658542 -> "https://identity.mercata-testnet2.blockapps.net"
         6909499098523985262 -> "https://identity.blockapps.net"
+        114784819836269 -> "https://identity.mercata-testnet.blockapps.net"
         _ -> "http://172.17.0.1:8013" --maybe it's on your localhost?
     else flags_identityServerUrl

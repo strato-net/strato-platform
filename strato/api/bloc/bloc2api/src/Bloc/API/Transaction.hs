@@ -14,24 +14,19 @@
 module Bloc.API.Transaction where
 
 import Bloc.API.SwaggerSchema
-import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Gas
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
-import Control.Applicative ((<|>))
 import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing
-import qualified Data.ByteString as B
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -40,7 +35,6 @@ import Data.Text (Text)
 import Data.Word
 import GHC.Generics
 import qualified Generic.Random as GR
-import Numeric.Natural
 import Servant.API as S
 import Servant.Docs
 import Test.QuickCheck hiding (Success)
@@ -69,12 +63,11 @@ type PostBlocTransactionParallelCommon tokenHeaderName =
   "transaction"
     :> "parallel"
     :> S.Header tokenHeaderName Text
-    :> QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> QueryFlag "queue"
     :> ReqBody '[JSON] PostBlocTransactionRequest
-    :> Post '[JSON] [BlocChainOrTransactionResult]
+    :> Post '[JSON] [BlocTransactionResult]
 
 type PostBlocTransactionParallel = PostBlocTransactionParallelCommon "X-USER-ACCESS-TOKEN"
 type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Authorization"
@@ -82,11 +75,10 @@ type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Au
 type PostBlocTransaction =
   "transaction"
     :> S.Header "X-USER-ACCESS-TOKEN" Text
-    :> QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
-    :> Post '[JSON] [BlocChainOrTransactionResult]
+    :> Post '[JSON] [BlocTransactionResult]
 
 
 -- | PostBlocTransactionBody should return a list of signed transaction hashes,
@@ -99,7 +91,6 @@ type PostBlocTransactionBody =
   "transaction"
     :> "body" -- /transaction/body
     :> S.Header "X-USER-ACCESS-TOKEN" Text -- jwt
-    :> QueryParam "chainid" ChainId -- shard ID (optional)
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionBodyResult]
 
@@ -113,7 +104,6 @@ type PostBlocTransactionUnsigned =
   "transaction"
     :> "unsigned" -- /transaction/unsigned
     :> S.Header "X-USER-ACCESS-TOKEN" Text -- jwt
-    :> QueryParam "chainid" ChainId -- shard ID (optional)
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionUnsignedResult]
 
@@ -125,7 +115,6 @@ data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
     postbloctransactionrawrequestTo :: Maybe Address,
     postbloctransactionrawrequestValue :: Wei,
     postbloctransactionrawrequestInitOrData :: Code,
-    postbloctransactionrawrequestChainId :: Maybe ChainId,
     postbloctransactionrawrequestR :: Word256,
     postbloctransactionrawrequestS :: Word256,
     postbloctransactionrawrequestV :: Maybe Word8, -- we can infer from Address if necessary
@@ -152,8 +141,7 @@ instance ToSample PostBlocTransactionRawRequest where
         (Gas 2190000)
         Nothing
         (Wei 4)
-        (Code (B.singleton 7))
-        Nothing
+        (Code "contract test{}")
         (21 :: Word256)
         (42 :: Word256)
         Nothing
@@ -175,8 +163,7 @@ instance ToSchema PostBlocTransactionRawRequest where
           (Gas 2190000)
           Nothing
           (Wei 4)
-          (Code (B.singleton 7))
-          Nothing
+          (Code "contract test{}")
           (21 :: Word256)
           (42 :: Word256)
           Nothing
@@ -207,8 +194,6 @@ instance ToSample PostBlocTransactionRequest where
         [ BlocTransfer $
             TransferPayload
               (Address 0x12345678)
-              (Strung 600)
-              Nothing
               Nothing
               (Just $ Map.fromList [("purpose", "groceries")])
         ]
@@ -229,8 +214,6 @@ instance ToSchema PostBlocTransactionRequest where
           [ BlocTransfer $
               TransferPayload
                 (Address 0x12345678)
-                (Strung 600)
-                Nothing
                 Nothing
                 (Just $ Map.fromList [("purpose", "groceries")])
           ]
@@ -264,9 +247,7 @@ data ContractPayload = ContractPayload
   { contractpayloadSrc :: SourceMap,
     contractpayloadContract :: Maybe Text,
     contractpayloadArgs :: Maybe (Map Text ArgValue),
-    contractpayloadValue :: Maybe (Strung Natural),
     contractpayloadTxParams :: Maybe TxParams,
-    contractpayloadChainid :: Maybe ChainId,
     contractpayloadCodePtr :: Maybe Address,
     contractpayloadMetadata :: Maybe (Map Text Text)
   }
@@ -274,9 +255,7 @@ data ContractPayload = ContractPayload
 
 data TransferPayload = TransferPayload
   { transferpayloadToAddress :: Address,
-    transferpayloadValue :: Strung Natural,
     transferpayloadTxParams :: Maybe TxParams,
-    transferpayloadChainid :: Maybe ChainId,
     transferpayloadMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
@@ -285,9 +264,7 @@ data FunctionPayload = FunctionPayload
   { functionpayloadContractAddress :: Address,
     functionpayloadMethod :: Text,
     functionpayloadArgs :: Map Text ArgValue,
-    functionpayloadValue :: Maybe (Strung Natural),
     functionpayloadTxParams :: Maybe TxParams,
-    functionpayloadChainid :: Maybe ChainId,
     functionpayloadMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
@@ -307,9 +284,7 @@ instance ToJSON ContractPayload where
       [ "contract" .= contractpayloadContract,
         "src" .= contractpayloadSrc,
         "args" .= contractpayloadArgs,
-        "value" .= contractpayloadValue,
         "txParams" .= contractpayloadTxParams,
-        "chainid" .= contractpayloadChainid,
         "codePtr" .= contractpayloadCodePtr,
         "metadata" .= contractpayloadMetadata
       ]
@@ -326,9 +301,7 @@ instance FromJSON ContractPayload where
       <$> (fromMaybe mempty <$> o .:? "src")
       <*> (o .:? "contract")
       <*> (o .:? "args")
-      <*> (o .:? "value")
       <*> (o .:? "txParams")
-      <*> (o .:? "chainid")
       <*> (o .:? "codePtr")
       <*> (o .:? "metadata")
   parseJSON o = fail $ "parseJSON ContractPayload: Expected Object, got " ++ show o
@@ -353,9 +326,7 @@ instance ToSchema BlocTransactionPayload where
             { contractpayloadSrc = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }",
               contractpayloadContract = Nothing,
               contractpayloadArgs = Just $ Map.fromList [("_x", ArgInt 1)],
-              contractpayloadValue = Nothing,
               contractpayloadTxParams = Nothing,
-              contractpayloadChainid = Nothing,
               contractpayloadCodePtr = Nothing,
               contractpayloadMetadata = Nothing
             }
@@ -373,9 +344,7 @@ instance ToSchema ContractPayload where
           { contractpayloadSrc = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }",
             contractpayloadContract = Nothing,
             contractpayloadArgs = Just $ Map.fromList [("_x", ArgInt 1)],
-            contractpayloadValue = Nothing,
             contractpayloadTxParams = Nothing,
-            contractpayloadChainid = Nothing,
             contractpayloadCodePtr = Nothing,
             contractpayloadMetadata = Nothing
           }
@@ -391,9 +360,7 @@ instance ToSchema TransferPayload where
       ex =
         TransferPayload
           { transferpayloadToAddress = Address (0xdeadbeef),
-            transferpayloadValue = Strung 1000000,
             transferpayloadTxParams = Nothing,
-            transferpayloadChainid = Nothing,
             transferpayloadMetadata = Nothing
           }
 
@@ -410,54 +377,9 @@ instance ToSchema FunctionPayload where
           { functionpayloadContractAddress = Address (0xdeadbeef),
             functionpayloadMethod = "set",
             functionpayloadArgs = Map.fromList [("_x", ArgInt 5)],
-            functionpayloadValue = Nothing,
             functionpayloadTxParams = Nothing,
-            functionpayloadChainid = Nothing,
             functionpayloadMetadata = Nothing
           }
-
-data BlocChainOrTransactionResult
-  = BlocChainResult ChainId
-  | BlocTxResult BlocTransactionResult
-  deriving (Eq, Show, Generic)
-
-instance ToJSON BlocChainOrTransactionResult where
-  toJSON (BlocChainResult cid) = toJSON cid
-  toJSON (BlocTxResult btr) = toJSON btr
-
-instance FromJSON BlocChainOrTransactionResult where
-  parseJSON o =
-    (BlocTxResult <$> parseJSON o)
-      <|> (BlocChainResult <$> parseJSON o)
-
-instance Arbitrary BlocChainOrTransactionResult where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToSample BlocChainOrTransactionResult where
-  toSamples _ =
-    singleSample . BlocTxResult $
-      BlocTransactionResult
-        { blocTransactionStatus = Success,
-          blocTransactionHash = hash "foo",
-          blocTransactionTxResult = Nothing,
-          blocTransactionData = Nothing
-        }
-
-instance ToSchema BlocChainOrTransactionResult where
-  declareNamedSchema proxy =
-    genericDeclareNamedSchema blocSchemaOptions proxy
-      & mapped . schema . description ?~ "Bloc Chain or Transaction Result"
-      & mapped . schema . example ?~ toJSON ex
-    where
-      ex :: BlocChainOrTransactionResult
-      ex =
-        BlocTxResult $
-          BlocTransactionResult
-            { blocTransactionStatus = Success,
-              blocTransactionHash = hash "foo",
-              blocTransactionTxResult = Nothing,
-              blocTransactionData = Nothing
-            }
 
 instance ToParam (QueryFlag "hash") where
   toParam _ =

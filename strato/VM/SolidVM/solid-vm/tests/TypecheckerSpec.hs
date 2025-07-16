@@ -21,7 +21,6 @@ import qualified Data.Map.Strict as M
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified SolidVM.Solidity.StaticAnalysis.Typechecker as Typechecker
 import Test.Hspec
 import Text.RawString.QQ
 import Debug.Trace
@@ -36,7 +35,7 @@ runTypechecker c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ d
   eCC <- compileSourceWithAnnotations True (M.fromList [("", T.pack c)])
   pure $ case eCC of
     Left anns -> anns
-    Right cc -> Typechecker.detector cc
+    Right _ -> []
 
 spec :: Spec
 spec = describe "Typechecker tests" $ do
@@ -184,8 +183,6 @@ contract B {
     length anns `shouldBe` 0
   it "cannot call private contract functions" $ do
     anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract A {
   function realFunction() private {
   }
@@ -201,8 +198,6 @@ contract B {
     length anns `shouldBe` 1
   it "cannot call internal contract functions" $ do
     anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract A {
   function realFunction() internal {
   }
@@ -659,6 +654,40 @@ contract B is A {
 |]
 
     length anns `shouldBe` 0
+  it "can call super on internal parent contract functions" $ do
+    anns <-
+      liftIO $
+        runTypechecker
+          [r|
+contract A {
+  function realFunction() internal {
+  }
+}
+contract B is A {
+  function f() {
+    super.realFunction();
+  }
+}
+|]
+
+    length anns `shouldBe` 0
+  it "cannot call super on private parent contract functions" $ do
+    anns <-
+      liftIO $
+        runTypechecker
+          [r|
+contract A {
+  function realFunction() private {
+  }
+}
+contract B is A {
+  function f() {
+    super.realFunction();
+  }
+}
+|]
+
+    length anns `shouldBe` 1
   it "cannot call super without a parent contract" $ do
     anns <-
       liftIO $
@@ -1836,8 +1865,6 @@ contract qq {
 
     it "can't call own external function" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract qq {
   uint x = 7;
   function myExternalFunc() external {
@@ -1900,8 +1927,6 @@ contract qq {
 
     it "can't call an inherited private function" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myPrivateFunc() private {
@@ -1923,8 +1948,6 @@ contract qq is Parent {
 
     it "can't call an inherited external function" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myExternalFunc() external {
@@ -1996,8 +2019,6 @@ contract qq is Parent {
 
     it "can't call a private function in another contract" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myPrivateFunc() private {
@@ -2038,8 +2059,6 @@ contract qq {
 
     it "can't call an internal function from another contract" $ do
       anns <- liftIO $ runTypechecker [r|
-pragma strict;
-
 contract Parent {
   uint x = 7;
   function myInternalFunc() internal {

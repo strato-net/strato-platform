@@ -136,11 +136,9 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
 
       userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
       getNameAndUnit ss = \case
-        NamedXabi name (xabi, parents') -> do
-          ctrct <-
-            first SVMEx $
-              xabiToContract (textToLabel name) (map textToLabel parents') (userDefinedFromFile ss) xabi
-          pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUContract ctrct
+        FLContract c -> do
+          let ctrct = c & userDefined .~ userDefinedFromFile ss
+          pure . Just $ def & ufuUnits . at (_contractName c) ?~ FUContract ctrct
         FLFunc name fdec ->
           pure . Just $ def & ufuUnits . at name ?~ FUFunction fdec
         FLConstant name cnst ->
@@ -235,7 +233,7 @@ codeCollectionFromSource typeCheck initCode = do
       return (hsh, cc)
     (_, Nothing) -> do
       recordCacheEvent StorageWrite
-      hsh' <- addCode SolidVM canonicalInitCode
+      hsh' <- addCode canonicalInitCode
       ecc <- compileSource typeCheck initMap
       let cc = case ecc of
             Right a -> a
@@ -279,7 +277,7 @@ codeCollectionFromHashNoCache ::
 codeCollectionFromHashNoCache mergeFuncs typeCheck hsh =
   getCode hsh >>= \case
     Nothing -> internalError "unknown code hash" hsh
-    Just (_, initCode) -> do
+    Just initCode -> do
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just l -> M.fromList l
             Nothing -> M.singleton T.empty (decodeUtf8 initCode)

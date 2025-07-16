@@ -15,6 +15,7 @@
 
 module Blockchain.Strato.Discovery.ContextLite
   ( ContextLite (..),
+    UDPPacket (..),
     initContextLite,
     addPeer,
     DiscoveryRunner,
@@ -74,6 +75,8 @@ data ContextLite = ContextLite
     myUdpPort    :: UDPPort,
     myTcpPort    :: TCPPort
   }
+
+newtype UDPPacket = UDPPacket { getUDPPacket :: (B.ByteString, SockAddr) }
 
 instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
   access _ = asks liteSQLDB
@@ -175,10 +178,11 @@ instance MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT Conte
 instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
 
-instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextLite m) where
-  select _ _ = do
+instance MonadIO m => Mod.Awaitable UDPPacket (ReaderT ContextLite m) where
+  await = do
     sock' <- asks sock
-    liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
+    mPacket <- liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
+    pure $ UDPPacket <$> mPacket
 
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do
@@ -204,12 +208,12 @@ type MonadDiscovery m =
     MonadLogger m,
     MonadUnliftIO m,
     A.Selectable IP PPeer m,
-    A.Selectable () (B.ByteString, SockAddr) m,
     A.Replaceable Host PPeer m,
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
     Mod.Accessible [Validator] m,
+    Mod.Awaitable UDPPacket m,
     A.Selectable (Maybe Host, UDPPort) SockAddr m
   )
 

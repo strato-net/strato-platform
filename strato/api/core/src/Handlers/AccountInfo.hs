@@ -26,13 +26,12 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString as B
 import Data.List
 import Data.Maybe
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
+import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
 -- import qualified LabeledError
@@ -69,6 +68,7 @@ type API =
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
     :> QueryParam "ignoreChain" Bool
+    :> QueryParam "search" Text
     :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
@@ -89,7 +89,8 @@ data AccountsFilterParams = AccountsFilterParams
     _qaExternal :: Maybe Bool,
     _qaLimit :: Maybe Natural,
     _qaOffset :: Maybe Natural,
-    _qaIgnoreChain :: Maybe Bool
+    _qaIgnoreChain :: Maybe Bool,
+    _qaSearch :: Maybe Text
   }
   deriving (Eq, Ord, Show)
 
@@ -111,6 +112,7 @@ accountsFilterParams =
     Nothing
     Nothing
     []
+    Nothing
     Nothing
     Nothing
     Nothing
@@ -138,6 +140,7 @@ uncurryAccountsFilterParams ::
     Maybe Natural ->
     Maybe Natural ->
     Maybe Bool ->
+    Maybe Text ->
     r
   ) ->
   AccountsFilterParams ->
@@ -161,6 +164,7 @@ uncurryAccountsFilterParams f AccountsFilterParams {..} =
     _qaLimit
     _qaOffset
     _qaIgnoreChain
+    _qaSearch
 
 server :: HasSQL m => ServerT API m
 server = getAccount
@@ -201,7 +205,14 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
                       -- fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) _qaCode,
                       fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just v)) _qaCodeHash,
                       fmap (\v -> accStateRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) _qaContractName,
-                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress
+                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress,
+                      fmap (\search ->
+                          let isWhiteSpace c = c `elem` [' ', '\n', '\t']
+                              searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
+                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (accStateRef E.^. AddressStateRefAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (accStateRef E.^. AddressStateRefContractName `E.like` E.val (Just . T.unpack $ "%" <> v <> "%"))) <$> searches
+                           in foldr (E.||.) (E.val False) queries
+                        ) _qaSearch
                     ]
 
             E.where_ (foldl1 (E.&&.) criteria)
@@ -231,9 +242,10 @@ getAccount ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Bool ->
+  Maybe Text ->
   m [AddressStateRef']
-getAccount a b c d e f g h i j k l m n o p q =
-  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q)
+getAccount a b c d e f g h i j k l m n o p q r =
+  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q r)
 
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -260,7 +272,8 @@ accountQueryParams =
     "external",
     "limit",
     "offset",
-    "ignoreChain"
+    "ignoreChain",
+    "search"
   ]
 
 -- toCode :: Text -> BC.ByteString
@@ -278,11 +291,11 @@ codeServer cHash =
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . decodeUtf8
-   in fmap getSourceMap <$> getCodeByteStringFromPostgres cHash
+  let getSourceMap = deserializeSourceMap
+   in fmap getSourceMap <$> getCodeFromPostgres' cHash
 
-getCodeByteStringFromPostgres :: HasSQL m => Keccak256 -> m (Maybe B.ByteString)
-getCodeByteStringFromPostgres cHash =
+getCodeFromPostgres' :: HasSQL m => Keccak256 -> m (Maybe Text)
+getCodeFromPostgres' cHash =
   let getBS = codeRefCode . E.entityVal
    in fmap (listToMaybe . map getBS) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do

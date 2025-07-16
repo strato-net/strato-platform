@@ -17,7 +17,7 @@ where
 
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
-import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.Account (unspecifiedChain)
 import Control.DeepSeq
 import Control.Monad.Extra
 import Data.Bifunctor
@@ -36,9 +36,9 @@ import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 import Text.Printf
 
-decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]
+decodeSolidVMValues :: [(T.Text, T.Text)] -> [(T.Text, SolidityValue)]
 decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
-  pathValues <- mapM (bimapM hexStorageToPath hexStorageToBasic) hxs
+  pathValues <- mapM (bimapM storageKeyToPath (Right . textToBasicValue)) hxs
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 
@@ -48,29 +48,22 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
-decodeCacheValues hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
-  let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
-      isBasic (StoragePath ([Field _])) = True
-      isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
-      isBasic _ = False
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesWith f hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
+  let parseM = bimapM parsePath storageValueByteStringToBasic
   pathValues <- mapM parseM $ M.toList hxs
-  let pathValues' = filter (isBasic . fst) pathValues
+  let pathValues' = filter (uncurry f) pathValues
   finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
+decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValues = decodeCacheValuesWith (const . isBasic)
+  where isBasic (StoragePath ([Field _])) = True
+        isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
+        isBasic _ = False
+
 decodeCacheValuesForCollections :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
-decodeCacheValuesForCollections hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForCollections: %s" . show) id $ do
-  let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
-      isBasic (StoragePath [Field _, MapIndex _]) = True
-      isBasic (StoragePath [Field _, ArrayIndex _]) = True
-      isBasic (StoragePath [Field _, MapIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
-      isBasic (StoragePath [Field _, ArrayIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
-      isBasic _ = False
-  pathValues <- mapM parseM $ M.toList hxs
-  let pathValues' = filter (isBasic . fst) pathValues
-  finalState <- bimap show HM.toList $ synthesize pathValues'
-  mapM (bimapM bsToText return) finalState
+decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'
@@ -180,6 +173,8 @@ constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
 constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
+  BAccount a | a == unspecifiedChain 0x0 -> ValueArraySentinel 0
+  BDefault -> ValueArraySentinel 0
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
 constructFromNothing' (MapIndex n : sp) =

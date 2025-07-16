@@ -219,9 +219,8 @@ eventType x f =
 
 filterFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> [Visibility] -> Type'
 filterFuncs cc x name f visibilities = case f ^. funcVisibility of
-  Just v
-    | usesStrictModifiers cc && v `elem` visibilities ->
-      bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
+  Just v | v `elem` visibilities ->
+    bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
   _ -> functionType cc x name $ ("" <$) <$> f
 
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
@@ -840,13 +839,13 @@ typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
         Bottom _ -> do
           f <- typecheckMember (Static (SVMType.Contract c) x) n
           case f of
-            Bottom _ ->
+            Bottom (f' NE.:| _) ->
               pure . bottom $
                 ( T.concat
-                    [ "Missing label: ",
+                    [ "Missing label ",
                       labelToText c,
-                      (T.pack (show f)),
-                      " is not a known enum, struct, or contract."
+                      " ",
+                      showTextAnnotation f'
                     ]
                 )
                   <$ x
@@ -918,24 +917,14 @@ contractHelper ::
   Annotated ContractF ->
   Type'
 contractHelper cc c =
-  if isSVMVersion "11.4" cc
-    then
-      let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-          funcsAndConstr = constr <> _functions c 
-          varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
-          constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-          constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
-          funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-          modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
-      in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
-    else 
-      let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-          funcsAndConstr = constr <> _functions c 
-          varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
-          constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-          constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
-          funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-      in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
+  let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
+      funcsAndConstr = constr <> _functions c 
+      varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
+      constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
+      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
+  in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
 varDeclHelper ::
   Annotated CodeCollectionF ->
@@ -1082,10 +1071,7 @@ functionHelper ::
   Annotated FuncF ->
   Type'
 functionHelper cc c funcName f@Func {..} =
-  let check =
-        if usesStrictModifiers cc
-          then checkOverrides cc c funcName f
-          else functionType cc (f ^. funcContext) funcName f
+  let check = checkOverrides cc c funcName f
    in unlessBottom check $ \t' -> case f ^. funcContents of
         Nothing -> t'
         Just stmts ->
@@ -1202,12 +1188,9 @@ functionHelper cc c funcName f@Func {..} =
                     ret <- statementsHelper argVals stmts
                     pure $ reduceType' _funcContext [ret, mods]
                   where checkModifier modName modArgs = do
-                          if isSVMVersion "11.4" cc
-                            then do
-                              e <- getModifierByNameRecursively funcName modName _funcContext
-                              a <- productType' _funcContext <$> traverse tcExpr modArgs
-                              apply e a Nothing
-                            else pure $ topType' _funcContext
+                          e <- getModifierByNameRecursively funcName modName _funcContext
+                          a <- productType' _funcContext <$> traverse tcExpr modArgs
+                          apply e a Nothing
 
 statementsHelperM ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
@@ -1577,11 +1560,11 @@ getVarTypeByName' name ctx = do
               :| [ Function fArgs (Static s ctx') ctx' [] [] False
                  ]
         Just (e@(SVMType.Error _ err), ctx') -> do
-          args <- fmap snd <$> lookupError err
-          let eArgs = flip Product ctx $ flip Static ctx <$> args
+          args <- lookupError err
+          let eArgs = flip Product ctx $ flip Static ctx . snd <$> args
           pure . Sum $
             (Static e ctx')
-              :| [ Function eArgs (Static e ctx') ctx' [] [] False
+              :| [ Function eArgs (Static e ctx') ctx' [] (Just . fst <$> args) False
                  ]
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing ->
@@ -1641,9 +1624,6 @@ pushLocalVariable v@VarDefEntry {..} = modify $ \case
 
 pushLocalVariables :: [Annotated VarDefEntryF] -> SSS ()
 pushLocalVariables = traverse_ pushLocalVariable
-
-isSVMVersion :: String -> CodeCollectionF a -> Bool
-isSVMVersion ver cc = resolvePragmaFeature' (_pragmas cc) "solidvm" ver
 
 statementHelper :: Annotated StatementF -> SSS Type'
 statementHelper (IfStatement cond thens mElse x) = do
@@ -1710,66 +1690,41 @@ statementHelper (DoWhileStatement body cond x) = do
 statementHelper (Continue x) = pure $ topType' x
 statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
-  cc <- asks codeCollection
   mf <- asks function
-  if isSVMVersion "11.4" cc
-    then do 
-      fm <- asks modifier
-      case (fm,mf) of
-        (Nothing,Nothing) -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
-        (Nothing,Just f) -> do
-          let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
-          t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
-          modify $ \((ret, locals) :| rest) -> case ret of
-            Nothing -> (Just t', locals) :| rest
-            Just (Sum _) -> (Just t', locals) :| rest
-            _ -> (ret, locals) :| rest
-          pure t'
-        (Just _,Nothing) ->
-          pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x       
-        (Just _,Just _)  -> 
-          pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
-    else
-      case mf of 
-        Nothing -> pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
-        Just f -> do
-          let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
-          t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
-          modify $ \((ret, locals) :| rest) -> case ret of
-            Nothing -> (Just t', locals) :| rest
-            Just (Sum _) -> (Just t', locals) :| rest
-            _ -> (ret, locals) :| rest
-          pure t'
+  fm <- asks modifier
+  case (fm,mf) of
+    (Nothing,Nothing) -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+    (Nothing,Just f) -> do
+      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
+      t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+      modify $ \((ret, locals) :| rest) -> case ret of
+        Nothing -> (Just t', locals) :| rest
+        Just (Sum _) -> (Just t', locals) :| rest
+        _ -> (ret, locals) :| rest
+      pure t'
+    (Just _,Nothing) ->
+      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x       
+    (Just _,Just _)  -> 
+      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
 
 statementHelper (Throw e x) = do
   et <- tcExpr e
   pure $ reduceType' x [et]
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement eventName vals x) = do
-  cc <- asks codeCollection
-  if isSVMVersion "11.4" cc
-    then do
-      e <- tcExpr $ Variable x eventName
-      a <- productType' x <$> traverse (tcExpr . snd) vals
-      apply e a $ traverse fst vals
-    else
-      reduceType' x <$> traverse (tcExpr . snd) vals
+  e <- tcExpr $ Variable x eventName
+  a <- productType' x <$> traverse (tcExpr . snd) vals
+  apply e a $ traverse fst vals
 statementHelper (RevertStatement mErrorName args x) = do
-  cc <- asks codeCollection
-  if isSVMVersion "11.4" cc
-    then do
-      e <- case mErrorName of
-             Nothing -> pure $ sumType' (Function (Product [] x) (Product [] x) x [] [Nothing] False) (Function (Product [stringType' x] x) (Product [] x) x [] [Nothing] False)
-             Just errorName -> tcExpr $ Variable x errorName
-      a <- case args of
-        OrderedArgs es -> productType' x <$> traverse tcExpr es
-        NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      case args of
-        NamedArgs es -> apply e a $ Just (fst <$> es)
-        _ -> apply e a Nothing
-    else case args of
-           NamedArgs vals -> reduceType' x <$> traverse (tcExpr . snd) vals
-           OrderedArgs vals -> reduceType' x <$> traverse tcExpr vals
+  e <- case mErrorName of
+         Nothing -> pure $ sumType' (Function (Product [] x) (Product [] x) x [] [Nothing] False) (Function (Product [stringType' x] x) (Product [] x) x [] [Nothing] False)
+         Just errorName -> tcExpr $ Variable x errorName
+  a <- case args of
+    OrderedArgs es -> productType' x <$> traverse tcExpr es
+    NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+  case args of
+    NamedArgs es -> apply e a $ Just (fst <$> es)
+    _ -> apply e a Nothing
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x

@@ -29,6 +29,7 @@ import Control.Monad.Trans.Except
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
+import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
 import HFlags
@@ -84,11 +85,11 @@ main = do
       t =
         createContractCreationTX
           0 --nonce
-          1 --gas price
           1000000000000000000 --gas limit
-          1 --value
-          (Code pushLarges)
-          Nothing
+          ""
+          []
+          (Code $ Text.decodeUtf8 pushLarges)
+          ""
           secretKey
 
   signedTransaction' <- liftIO t
@@ -131,7 +132,7 @@ main = do
             addressStateChainId = Nothing
           }
 
-      runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction (Address 0)
+      runExceptT $ addTransaction blockData 10000000000000000000000000000 signedTransaction (Address 0)
 
   case result of
     Left e -> putStrLn $ show e

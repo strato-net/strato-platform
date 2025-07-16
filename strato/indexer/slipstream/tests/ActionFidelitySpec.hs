@@ -24,13 +24,13 @@ convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: Action.ActionData
-emptyEVMData = Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" Nothing "Clozure1" "Clozure1 address" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+emptyEVMData = Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" Nothing "Clozure1" "Clozure1 address" (Action.EVMDiff M.empty) M.empty [] [] []
 
 emptySolidVMData :: Action.ActionData
-emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" Nothing "Clozure2" "Clozure2 address" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
+emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" Nothing "Clozure2" "Clozure2 address" (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
-emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) 0x0 OMap.empty Nothing S.empty S.empty
+emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) 0x0 OMap.empty Nothing Nothing S.empty S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -156,13 +156,13 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCCCreator = Just "BlockApps0",
                       Action._actionDataRoot = "ClothingUTXO",
                       Action._actionDataApplication = "LogisticsEngine1",
-                      Action._actionDataCodeKind = EVM,
                       Action._actionDataAbstracts = M.empty,
                       Action._actionDataMappings = [],
                       Action._actionDataArrays = [],
                       Action._actionDataCallTypes = [Action.Create]
                     }),
-              Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")],
+              Action._src = Just "contract Vehicle {}",
+              Action._name = Just "Vehicle",
               Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" 0x2e385b6a3aea46d4172df98617b5385c13b7100d "Vehicle Event" [("field", "value", "String"), ("anotherField", "anotherValue", "String")],
               Action._delegatecalls = S.empty
             }

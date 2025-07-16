@@ -35,7 +35,6 @@ data TransactionFailureType
   | ExecutionFailure String
   | MissingCode
   | InvalidPragmaType
-  | NonceLimitError
   | TXSizeLimitError
   | GasLimitError
   | KnownFailedTXError

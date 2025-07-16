@@ -9,7 +9,6 @@
 module SolidVM.Model.Storable where
 
 import Blockchain.Data.RLP
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
@@ -20,6 +19,7 @@ import qualified Data.Aeson as JSON
 import Data.Attoparsec.ByteString as Atto
 import Data.Attoparsec.ByteString.Char8 (scientific)
 import Data.Binary
+import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Internal as BI
@@ -30,6 +30,9 @@ import Data.Hashable
 import Data.Maybe
 import Data.Scientific (isInteger, toBoundedInteger)
 import Data.String
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Generics
@@ -86,9 +89,21 @@ basicParse input =
         ("false", \[] -> Just $ BBool False),
         ("true", \[] -> Just $ BBool True),
         ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAccount $ read accountString),
+        ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
+        ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
-        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ C8.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
+        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
       ]
+
+textToBasicValue :: Text -> BasicValue
+textToBasicValue v =
+  let v' = fromMaybe (BString $ encodeUtf8 v)
+           $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
+         <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
+         <|> (BInteger <$> readMaybe (T.unpack v))
+         <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
+         <|> (case T.split (=='.') v of [a,b,c] -> BEnumVal (textToLabel a) (textToLabel b) <$> readMaybe (T.unpack c); _ -> Nothing)
+   in if isDefault v' then BDefault else v'
 
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i) = i == 0
@@ -108,10 +123,23 @@ instance Format BasicValue where
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
-  format (BEnumVal n1 n2 _) = labelToString n1 ++ "." ++ labelToString n2
-  format (BContract n a) = labelToString n ++ "(" ++ format a ++ ")"
+  format (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
+  format (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
+
+formatBasicValueForSQL :: BasicValue -> Text
+formatBasicValueForSQL (BInteger i) = T.pack $ show i
+formatBasicValueForSQL (BString s) = either (const . T.pack $ C8.unpack s) id $ decodeUtf8' s
+formatBasicValueForSQL (BDecimal v) = T.pack $ show v
+formatBasicValueForSQL (BBool True) = "true"
+formatBasicValueForSQL (BBool False) = "false"
+formatBasicValueForSQL (BAccount a) = T.pack $ show a
+formatBasicValueForSQL (BEnumVal n1 n2 w) = labelToText n1 <> "." <> labelToText n2 <> "." <> T.pack (show w)
+formatBasicValueForSQL (BContract _ a) = T.pack $ show a
+formatBasicValueForSQL BMappingSentinel = "<MappingSentinel>"
+formatBasicValueForSQL BDefault = ""
+
 --function that gives index type, wrap in map index 
 data IndexType
   = INum Integer
@@ -148,9 +176,9 @@ empty = StoragePath []
 singleton :: B.ByteString -> StoragePath
 singleton bs = StoragePath [Field bs]
 
-getField :: StoragePath -> B.ByteString
-getField (StoragePath (Field f : _)) = f
-getField path = error "StoragePath must begin with field" path
+getField :: StoragePath -> Either String B.ByteString
+getField (StoragePath (Field f : _)) = Right f
+getField path = Left $ "StoragePath must begin with field: " ++ show path
 
 snoc :: StoragePath -> StoragePathPiece -> StoragePath
 snoc (StoragePath p) piece = StoragePath $ p ++ [piece]
@@ -339,24 +367,27 @@ instance RLPSerializable BasicValue where
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
 
-pathToHexStorage :: StoragePath -> HexStorage
-pathToHexStorage = HexStorage . unparsePath
+pathToStorageKey :: StoragePath -> Text
+pathToStorageKey = decodeUtf8 . unparsePath
 
-basicToHexStorage :: BasicValue -> HexStorage
-basicToHexStorage = HexStorage . rlpSerialize . rlpEncode
+basicToStorageValue :: BasicValue -> Text
+basicToStorageValue = T.pack . format
 
-hexStorageToPath :: HexStorage -> Either String StoragePath
-hexStorageToPath (HexStorage hs) = parsePath hs
+storageKeyToPath :: Text -> Either String StoragePath
+storageKeyToPath = parsePath . encodeUtf8
 
-hexStorageToBasic :: HexStorage -> Either String BasicValue
-hexStorageToBasic (HexStorage hs) =
+storageValueByteStringToBasic :: B.ByteString -> Either String BasicValue
+storageValueByteStringToBasic bs =
   unsafeDupablePerformIO . handle handler
     . evaluate
     . force
     . Right
     . rlpDecode
     . rlpDeserialize
-    $ hs
+    $ bs
   where
     handler :: SomeException -> IO (Either String BasicValue)
     handler = return . Left . show
+
+storageValueByteStringToText :: B.ByteString -> Text
+storageValueByteStringToText = either T.pack formatBasicValueForSQL . storageValueByteStringToBasic

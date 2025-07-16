@@ -290,16 +290,15 @@ instance TransactionLike OutputTx where
   txChainHash = txChainHash . otBaseTx
   txSigner = Just . otSigner
   txNonce = txNonce . otBaseTx
+  txNetwork = txNetwork . otBaseTx
   txType = txType . otBaseTx
   txSignature = txSignature . otBaseTx
-  txValue = txValue . otBaseTx
+  txFuncName = txFuncName . otBaseTx
+  txContractName = txContractName . otBaseTx
+  txArgs = txArgs . otBaseTx
   txDestination = txDestination . otBaseTx
-  txGasPrice = txGasPrice . otBaseTx
   txGasLimit = txGasLimit . otBaseTx
   txCode = txCode . otBaseTx
-  txData = txData . otBaseTx
-  txChainId = txChainId . otBaseTx
-  txMetadata = txMetadata . otBaseTx
 
   morphTx t =
     OutputTx

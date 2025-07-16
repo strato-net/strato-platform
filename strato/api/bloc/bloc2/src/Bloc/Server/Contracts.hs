@@ -24,17 +24,14 @@ import BlockApps.Solidity.Xabi hiding (Func, Public, External)
 import BlockApps.Solidity.Xabi.Type (indexedTypeType)
 import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
-import BlockApps.Storage as S
 import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
@@ -50,14 +47,10 @@ import qualified Data.Text as Text
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Handlers.AccountInfo
 import Handlers.Storage
-import qualified MaybeNamed
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
 import UnliftIO
-
-hexStorageToWord256 :: HexStorage -> Word256
-hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
 
 getContracts ::
   ( MonadLogger m,
@@ -84,7 +77,7 @@ getContracts mName mOffset mLimit chainId = do
       accountsFilterParams
         { _qaChainId = maybeToList chainId,
           _qaExternal = Just False,
-          _qaContractName = mName,
+          _qaSearch = mName,
           _qaOffset = fromIntegral <$> mOffset,
           _qaLimit = fromIntegral <$> mLimit
         }
@@ -145,14 +138,6 @@ getContractsContract name addr chainId = do
           Left e -> throwIO $ UserError e
           Right contract -> pure $ snd contract
 
--- Only for EVM, unimplemented for SolidVM
-translateStorageMap :: [StorageAddress] -> S.Storage
-translateStorageMap storage' =
-  let storageMap = Map.fromList $ map (\StorageAddress {..} -> (hexStorageToWord256 key, hexStorageToWord256 value)) storage'
-
-      storage k = fromMaybe 0 $ Map.lookup k storageMap
-   in storage
-
 getContractsState ::
   ( MonadLogger m,
     A.Selectable Address AddressState m,
@@ -176,12 +161,10 @@ getContractsState _ address chainId mName mCount mOffset _ = do
       getStorage'
         storageFilterParams
           { qsAddress = Just address,
-            qsChainId = MaybeNamed.Unnamed <$> chainId,
             qsOffset = fromInteger <$> mOffset,
             qsLimit = fromInteger <$> mCount
           }
     Just _ -> pure []
-  -- let storage = translateStorageMap storage'
 
   let contractFuncs Contract {..} = catMaybes . map (traverse getFunction) $ Map.toList _functions
       convertType = (either (const Nothing) Just . xabiTypeToType . indexedTypeType) <=< indexedTypeToEvmIndexedType
@@ -194,17 +177,17 @@ getContractsState _ address chainId mName mCount mOffset _ = do
           else Nothing
 
   ret <- case (storage', mName) of
-    (StorageAddress {kind = SolidVM} : _, Nothing) -> do
+    (StorageAddress {} : _, Nothing) -> do
       $logInfoS "getContractsState/SolidVM" $
         Text.unlines
           [ "Storage:",
-            Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (kind s, key s, value s)) $ storage',
+            Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (key s, value s)) $ storage',
             "End of storage"
           ]
       return $
         (first Text.pack <$> contractFuncs contract')
           ++ (decodeSolidVMValues $ map (key &&& value) storage')
-    (StorageAddress {kind = SolidVM} : _, Just name) ->
+    (StorageAddress {} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
     ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
     _ ->
@@ -212,20 +195,10 @@ getContractsState _ address chainId mName mCount mOffset _ = do
   $logDebugS "getContractsState/storage" $
     Text.unlines
       [ "Storage:",
-        Text.pack $ unlines $ map (\s -> ("  " ++) $ show (kind s, key s, value s)) $ storage',
+        Text.pack $ unlines $ map (\s -> ("  " ++) $ show (key s, value s)) $ storage',
         "End of storage"
       ]
   return $ Map.fromList ret
-
--- where
---   getStorageRange :: (MonadIO m, MonadLogger m) =>
---                      Address -> (Word256, Word256) -> m [StorageAddress]
---   getStorageRange a (o,c) = getStorage'
---       storageFilterParams{ qsAddress = Just a
---                          , qsMinKey = Just . word256ToHexStorage . fromInteger $ toInteger o
---                          , qsMaxKey = Just . word256ToHexStorage . fromInteger $ toInteger (o + c - 1)
---                          , qsChainId = MaybeNamed.Unnamed <$> chainId
---                          }
 
 postContractsBatchStates ::
   ( MonadLogger m,
@@ -361,9 +334,7 @@ getContractsStateMapping _ _ _ _ _ =
 
   -- fetchLimit <- fromInteger <$> fmap stateFetchLimit getBlocEnv
 
-  -- let storageMap = Map.fromList $ map (\s -> case kind s of
-  --       EVM -> (hexStorageToWord256 $ key s, hexStorageToWord256 $ value s)
-  --       SolidVM -> error "unimplemented: getContractsStateMapping for SolidVM") storage'
+  -- let storageMap = Map.fromList $ map (\_ -> error "unimplemented: getContractsStateMapping for SolidVM") storage'
   --     storage k = fromMaybe 0 $ Map.lookup k storageMap
   --     ret = valueToSolidityValue <$> decodeMapValue fetchLimit (typeDefs contract') (mainStruct contract') storage mappingName keyName
 

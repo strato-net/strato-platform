@@ -46,7 +46,6 @@ describe('App: index', () => {
     const state = { 
       user: {
         oauthUser: undefined, 
-        userCertificate: undefined
       },
       appMetadata: {
         error: undefined,

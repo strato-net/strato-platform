@@ -13,6 +13,7 @@ module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
     getVar,
+    forceLoadVar,
     getInt,
     getRealNum,
     getBool,
@@ -28,6 +29,7 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
 import Blockchain.Strato.Model.Account
+import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -59,6 +61,20 @@ fromBasic = \case
   MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
 
+basicTypeToType :: BasicType -> SVMType.Type
+basicTypeToType = \case
+  TInteger -> SVMType.Int Nothing Nothing
+  TString -> SVMType.String Nothing
+  TDecimal -> SVMType.Decimal
+  TBool -> SVMType.Bool
+  TAccount -> SVMType.Address False
+  TContract n -> SVMType.Contract n
+  TEnumVal n -> SVMType.Enum Nothing n Nothing
+  TStruct n _ -> SVMType.Struct Nothing n
+  TArray t ml -> SVMType.Array (basicTypeToType t) ml
+  TMapping k v -> SVMType.Mapping Nothing (basicTypeToType k) (basicTypeToType v)
+  Todo msg -> todo "basicTypeToType/todo" msg
+
 findDefault :: BasicType -> Value
 findDefault = \case
   TInteger -> SInteger 0
@@ -67,9 +83,10 @@ findDefault = \case
   TBool -> SBool False
   TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
-  TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
-  TStruct n fs -> todo "findDefault/struct" (n, fs)
-  TComplex -> todo "finddefault/complex" TComplex
+  TEnumVal n -> SEnumVal n "" 0x0
+  TStruct n fs -> SStruct n . M.fromList $ (BC.unpack *** Constant . findDefault) <$> fs
+  a@(TArray t ml) -> SArray (basicTypeToType a) $ maybe V.empty (\l -> V.fromList $ Constant (findDefault t) <$ [0..l-1]) ml
+  m@TMapping{} -> SMap (basicTypeToType m) M.empty
   Todo msg -> todo "findDefault/todo" msg
 
 toBasic :: Value -> Maybe MS.BasicValue
@@ -159,8 +176,9 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
     MS.BDefault -> do
       typeHint <- getValueType addressedPath
       case typeHint of
-        TStruct _ _ -> return $ SReference addressedPath
-        TComplex -> return $ SReference addressedPath
+        TStruct{} -> return $ SReference addressedPath
+        TArray{} -> return $ SReference addressedPath
+        TMapping{} -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint
     MS.BString bs -> do
       t <- getXabiValueType addressedPath
@@ -210,6 +228,23 @@ getVar (Constant (SPush v (Just var))) = do
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
+forceLoadVar :: MonadSM m => Value -> m Value
+forceLoadVar (SReference a) = do
+  typeHint <- getValueType a
+  case typeHint of
+    TStruct n ts -> do
+      vs <- traverse (\(t,_) -> (BC.unpack t,) . Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.Field t))) ts
+      return . SStruct n $ M.fromList vs
+    t@(TArray _ ml) -> do
+      arrLen <- case ml of
+        Just l -> pure $ fromIntegral l
+        Nothing -> fmap fromIntegral . getInt . Constant . SReference . apSnoc a $ MS.Field "length"
+      vs <- traverse (\i -> Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.ArrayIndex i))) [0..arrLen-1]
+      pure . SArray (basicTypeToType t) $ V.fromList vs
+    TMapping{} -> typeError "forceLoadVar/mapping" (SReference a)
+    _ -> pure $ findDefault typeHint
+forceLoadVar v = pure v
+
 getInt :: MonadSM m => Variable -> m Integer
 getInt p = do
   v <- getVar p
@@ -234,7 +269,12 @@ getBool p = do
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference a@(AccountPath addr path))) = do
-  xType <- getXabiValueType a
+  xType <- getXabiValueType a >>= \case
+    SVMType.UnknownLabel s _ -> getTypeOfName s >>= \case
+      StructTypo {} -> pure $ SVMType.Struct Nothing s
+      ContractTypo {} -> pure $ SVMType.Contract s
+      EnumTypo ns -> pure $ SVMType.Enum Nothing s $ Just ns
+    t'' -> pure t''
   case xType of
     SVMType.Array {} -> do
       let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
@@ -243,6 +283,13 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       unless (len <= 0) . for_ [0 .. (len - 1)] $ \i -> do
         let elemPath = a `apSnoc` MS.ArrayIndex i
         deleteVar . Constant $ SReference elemPath
+    SVMType.Struct _ structName -> do
+      (ctract, _, cc) <- getCodeAndCollection addr
+      case M.lookup structName $ CC._structs ctract of
+        Just fields -> for_ fields $ \(fieldName, _, _) -> deleteVar (Constant . SReference $ a `apSnoc` MS.Field (UTF8.fromString fieldName))
+        Nothing -> case M.lookup structName $ CC._flStructs cc of
+          Just fields -> for_ fields $ \(fieldName, _, _) -> deleteVar (Constant . SReference $ a `apSnoc` MS.Field (UTF8.fromString fieldName))
+          Nothing -> pure ()
     _ -> do
       -- TODO: handle other types
       ro <- readOnly <$> getCurrentCallInfo

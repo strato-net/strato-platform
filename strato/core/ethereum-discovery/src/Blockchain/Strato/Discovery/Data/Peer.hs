@@ -4,7 +4,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
-
 module Blockchain.Strato.Discovery.Data.Peer
   (
     PPeer(..),
@@ -23,6 +22,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     BondedPeersForUDP(..),
     ClosestPeers(..),
     UnbondedPeersForUDP(..),
+    PeerLastBestBlockHash(..),
     ValidatorAddresses(..),
     createPeer,
     pointToNodeID,
@@ -90,6 +90,7 @@ import           Network.Socket
 import           Network.URI                                     (URI (..),
                                                                   URIAuth (..))
 import qualified Network.URI                                     as URI
+import           Numeric.Natural
 import           Prometheus
 import           Text.Format
 import           UnliftIO
@@ -118,6 +119,8 @@ newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
 
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
+newtype PeerLastBestBlockHash = PeerLastBestBlockHash { unPeerLastBestBlockHash :: Keccak256 }
+
 newtype ValidatorAddresses = ValidatorAddresses {unValidatorAddresses :: [Address]}
 
 type HasPeerDB m = (
@@ -129,11 +132,12 @@ type HasPeerDB m = (
   Mod.Accessible BondedPeers m,
   Mod.Accessible BondedPeersForUDP m,
   Mod.Accessible UnbondedPeersForUDP m,
-  A.Selectable Point ClosestPeers m,
+  A.Selectable (Point, Natural) ClosestPeers m,
   A.Replaceable PPeer UdpEnableTime m,
   A.Replaceable PPeer IP m,
   A.Replaceable PPeer TcpEnableTime m,
   A.Replaceable PPeer PeerDisable m,
+  A.Replaceable PPeer PeerLastBestBlockHash m,
   A.Replaceable PPeer PeerUdpDisable m,
   A.Replaceable PPeer Point m,
   A.Replaceable PPeer T.Text m,
@@ -357,14 +361,15 @@ pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256To
 
 getPeersClosestTo ::
   ( MonadLogger m
-  , A.Selectable Point ClosestPeers m
+  , A.Selectable (Point, Natural) ClosestPeers m
   , Mod.Accessible [Validator] m
   ) =>
+  Natural ->
   NodeID ->
   Point ->
   m [PPeer]
-getPeersClosestTo targetNID requesterPubkey = do
-    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) requesterPubkey
+getPeersClosestTo limit targetNID requesterPubkey = do
+    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) (requesterPubkey, limit)
     $logInfoS "getPeersClosestTo" $ T.pack $ "peer list: " ++ show peers
     validators <- Mod.access (Mod.Proxy @[Validator])
     $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show validators
@@ -373,7 +378,7 @@ getPeersClosestTo targetNID requesterPubkey = do
         (vals, nonvals) = Set.partition (\p -> hostToValidator (pPeerHost p) `elem` validators) peers
     return $
       Set.toList vals ++
-      (take 20 .
+      (take (fromIntegral limit) .
       sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) (dist targetPt (pPeerPubkey peerB))) $
       Set.toList nonvals)
 

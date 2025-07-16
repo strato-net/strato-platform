@@ -12,6 +12,7 @@ module OutputDataSpec where
 import Conduit
 import Control.Monad
 import qualified Data.ByteString as B
+import Data.Default (def)
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -28,7 +29,6 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import qualified Slipstream.Events as SE
 import Slipstream.OutputData
-import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
@@ -61,7 +61,7 @@ createInsertsCollection :: OutputM m
 createInsertsCollection collections = do
   unless (null collections) $ do
     let collection = head collections
-    _ <- createMappingTable  (creator collection, application collection, contractname collection) (collectionname collection)
+    _ <- createCollectionTable  (creator collection, application collection, contractname collection) def def (collectionname collection, [SVMType.String Nothing], SVMType.String Nothing)
     insertCollectionTable collections
 
 createInsertsAbstract :: OutputM m
@@ -102,6 +102,7 @@ createDummyContract v =
       _usings=undefined,
       _contractType=undefined,
       _importedFrom=undefined,
+      _isContractRecord=undefined,
       _contractContext=undefined
     }
 
@@ -122,10 +123,6 @@ createDummyCodeCollection contract = CodeCollection
 
 spec :: Spec
 spec = do
-  it "should be able to process array sentinels" $ do
-    valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
-      `shouldBe` SolidityArray [SolidityNum 0, SolidityNum 0]
-
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
@@ -744,7 +741,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           blockNumber = 123,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          collectionDataKey = V.SimpleValue $ V.ValueString "hi-key",
+          collectionDataKeys = [V.SimpleValue $ V.ValueString "hi-key"],
           collectionDataValue = V.SimpleValue $ V.ValueString "hi-value"
           }     ]
 

@@ -22,13 +22,10 @@ module SolidVM.Model.CodeCollection (
   flErrors,
   pragmas,  
   imports,
-  usesStrictModifiers,
   getContractsBySolidString,
   Pragma,
   supportedPragmaMap,
   supportedPragmas,
-  resolvePragmaFeature,
-  resolvePragmaFeature',
   resolveSolidVMVersion,
   resolveAllPragmas,
   isValidPragma,
@@ -160,8 +157,8 @@ getTopLevelAbstractsForContract cc = go
   where
     go c =
       let m = doParents c
-       in if _contractType c == AbstractType && M.null m
-            then M.singleton (_contractName c) c
+       in if _contractType c == AbstractType && _isContractRecord c
+            then M.insert (_contractName c) c m
             else m
     doParents = M.unions . map (maybe M.empty go . flip M.lookup (_contracts cc)) . _parents
 
@@ -182,9 +179,6 @@ instance Arbitrary CodeCollection where
             }
       ]
 
-usesStrictModifiers :: CodeCollectionF a -> Bool
-usesStrictModifiers = flip resolvePragmaFeature "strict" . _pragmas
-
 -- Function to get all ContractF values matching a SolidString
 getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
 getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)
@@ -192,30 +186,26 @@ getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contract
 type Pragma = (String, String)
 
 supportedPragmaMap :: Map Pragma (S.Set Pragma)
-supportedPragmaMap = M.fromList
-  [ (("solidvm", "11.4"), S.fromList [
-      ("es6", ""),
-      ("strict", ""),
-      ("builtinCreates", ""),
-      ("safeExternalCalls", ""),
-      ("strictDecimals", "")
-     ])
-  , (("solidvm", "11.5"), S.fromList [
-      ("solidvm", "11.4")
-    ])
-  , (("solidvm", "12.0"), S.fromList [
-      ("solidvm", "11.5")
-    ])
-  ]
+supportedPragmaMap = M.empty
+  -- NB: Leaving in old map here, commented out, to show how pragma dependencies 
+  -- M.fromList
+  -- [ (("solidvm", "11.4"), S.fromList [
+  --     ("es6", ""),
+  --     ("strict", ""),
+  --     ("builtinCreates", ""),
+  --     ("safeExternalCalls", ""),
+  --     ("strictDecimals", "")
+  --    ])
+  -- , (("solidvm", "11.5"), S.fromList [
+  --     ("solidvm", "11.4")
+  --   ])
+  -- , (("solidvm", "12.0"), S.fromList [
+  --     ("solidvm", "11.5")
+  --   ])
+  -- ]
 
 supportedPragmas :: [Pragma]
 supportedPragmas = S.toList . resolveAllPragmas $ M.keys supportedPragmaMap
-
-resolvePragmaFeature :: [Pragma] -> String -> Bool
-resolvePragmaFeature pragmaList feature = resolvePragmaFeature' pragmaList feature ""
-
-resolvePragmaFeature' :: [Pragma] -> String -> String -> Bool
-resolvePragmaFeature' pragmaList feature version = (feature, version) `S.member` resolveAllPragmas pragmaList
 
 resolveSolidVMVersion :: String -> [Pragma]
 resolveSolidVMVersion version = S.toList $ resolveAllPragmas [("solidvm", version)]

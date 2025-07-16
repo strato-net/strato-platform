@@ -204,8 +204,8 @@ class CreateContract extends Component {
         onChange={this.handleUsernameChange}
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.commonName : null}>
-          {isModeOauth && this.props.initialValues.commonName}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
         </option>
         {
           users.map((user, i) => {
@@ -231,8 +231,8 @@ class CreateContract extends Component {
         required
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.address : null}>
-          {isModeOauth && this.props.initialValues.address}
+        <option value={this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -301,18 +301,6 @@ class CreateContract extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-
         <AnchorButton onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal();
@@ -322,9 +310,8 @@ class CreateContract extends Component {
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
           text={"Create Contract"}
-          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract)}
         />
-        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -522,7 +509,7 @@ class CreateContract extends Component {
                 <Button
                   type="submit"
                   onClick={handleSubmit(this.submit)}
-                  disabled={pristine || submitting || !valid}
+                  disabled={submitting || !valid}
                   text="Create Contract"
                 />
 
@@ -576,15 +563,14 @@ export function mapStateToProps(state) {
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      commonName: state.user.userCertificate ? state.user.userCertificate.commonName : 'Verification Pending',
-      address: state.user.userCertificate ? state.user.userCertificate.userAddress : 'Verification Pending',
+      address: state.user.oauthUser ? state.user.oauthUser.address : state.user.address || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
+    oAuthUser: state.user.oauthUser,
     selectedChain: state.chains.selectedChain,
-    userCertificate: state.user.userCertificate,
   };
 }
 

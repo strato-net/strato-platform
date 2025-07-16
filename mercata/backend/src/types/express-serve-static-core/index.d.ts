@@ -1,0 +1,9 @@
+import "express-serve-static-core";
+
+declare module "express-serve-static-core" {
+  interface Request {
+    address: string;
+    accessToken: string;
+    userName?: string;
+  }
+}

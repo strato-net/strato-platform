@@ -218,8 +218,21 @@ valEquals ct lhs rhs = case (lhs, rhs) of
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
 
+createVar' :: MonadIO m => Value -> m Variable
+createVar' val = liftIO $ Variable <$> newIORef val
+
+toVar :: MonadIO m => Variable -> m Variable
+toVar (Constant val) = createVar val
+toVar var            = pure var
+
 createVar :: MonadIO m => Value -> m Variable
-createVar val = liftIO $ fmap Variable $ newIORef val
+createVar val = createVar' =<< case val of
+  SStruct n m -> SStruct n <$> traverse toVar m
+  STuple vs -> STuple <$> traverse toVar vs
+  SArray t vs -> SArray t <$> traverse toVar vs
+  SMap t m -> SMap t <$> traverse toVar m
+  SPush v mv -> SPush v <$> traverse toVar mv
+  _ -> pure val
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
 defaultValue :: CC.Contract -> SVMType.Type -> Value
@@ -316,7 +329,8 @@ data BasicType
   | TEnumVal SolidString
   | TContract SolidString
   | TStruct SolidString [(B.ByteString, BasicType)]
-  | TComplex
+  | TArray BasicType (Maybe Word)
+  | TMapping BasicType BasicType
   | Todo String
   deriving (Show, Eq)
 

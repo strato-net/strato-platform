@@ -2,8 +2,6 @@
 #strato-getting-started-min-version:4.4.0
 version: "3"
 volumes:
-  marketplacedata:
-   driver: local
   pgdata:
     driver: local
   prometheusdata:
@@ -17,6 +15,41 @@ volumes:
   zookeeperdata:
     driver: local
 services:
+  mercata-backend:
+    depends_on:
+      - nginx
+    build: ./mercata/backend
+    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - NODE_URL=http://nginx  # no TLS required within the docker network
+      - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
+      - POOL_FACTORY=${POOL_FACTORY}
+      - LENDING_REGISTRY=${LENDING_REGISTRY}
+      - TOKEN_FACTORY=${TOKEN_FACTORY}
+      - ONRAMP=${ONRAMP}
+      - ADMIN_REGISTRY=${ADMIN_REGISTRY}
+      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  mercata-ui:
+    depends_on:
+      - nginx
+      - mercata-backend
+    build: ./mercata/ui
+    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
   smd:
     depends_on:
     - apex
@@ -60,56 +93,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  marketplace-backend:
-    depends_on:
-    - nginx
-    environment:
-    - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
-    - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
-    - MP_API_DEBUG=${MP_API_DEBUG:-false}
-    - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
-    - MP_SERVER_HOST=${NODE_HOST}
-    - MP_SERVER_SSL=${ssl}
-    - STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL}
-    - STRATO_NODE_HOST=${STRATO_NODE_HOST}
-    - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used from config.yaml)
-    - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
-    - OAUTH_SERVICE_OAUTH_FLOW=client-credential
-    - OAUTH_TOKEN_FIELD=access_token
-    - OAUTH_TOKEN_USERNAME_PROPERTY=${OAUTH_TOKEN_USERNAME_PROPERTY:-email}
-    - OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW=${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW:-sub}
-    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-    - STRATO_PORT_API=${STRATO_PORT_API}
-    - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
-    - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
-    build: .
-    image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
-    volumes:
-       - marketplacedata:/config:rw
-  marketplace-ui:
-    depends_on:
-      - marketplace-backend
-    environment:
-      - SITE_ID=${SITE_ID:-038fe3fa}
-      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-      - STRATO_PORT_API=${STRATO_PORT_API}
-    build: .
-    image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
@@ -127,7 +110,6 @@ services:
     - postgres
     - redis
     environment:
-    - accountNonceLimit=${accountNonceLimit}
     - addBootnodes=${addBootnodes}
     - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}
@@ -138,7 +120,6 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - connectionTimeout=${connectionTimeout}
-    - creatorForkBlockNumber=${creatorForkBlockNumber}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
     - debugWSHost=${debugWSHost}
@@ -149,7 +130,7 @@ services:
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - generateKey=${generateKey:-true}
-    - idServerUrl=${idServerUrl}
+    # - idServerUrl=${idServerUrl}
     - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
@@ -178,7 +159,6 @@ services:
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
-    - requireCerts=${requireCerts:-true}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
@@ -190,10 +170,10 @@ services:
     - strictBlockstanbul=${strictBlockstanbul}
     - strictGas=${strictGas}
     - strictGasLimit=${strictGasLimit}
-    - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
+    - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
     - txSizeLimit=${txSizeLimit}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
@@ -271,8 +251,6 @@ services:
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
-    - MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST}
-    - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_SCOPE=${OAUTH_SCOPE}

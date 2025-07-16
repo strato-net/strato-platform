@@ -3,6 +3,7 @@
 exports[`ContractMethodCall: index mapStateToProps with default values 1`] = `
 Object {
   "accounts": undefined,
+  "address": "",
   "chainLabel": Object {
     "airline cartel 1": Object {
       "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
@@ -90,15 +91,12 @@ Object {
   "modalUsername": undefined,
   "oAuthUser": undefined,
   "selectedChain": undefined,
-  "userCertificate": undefined,
 }
 `;
 
 exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
 "<div>
-  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-    <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} disabled={true} text=\\"setX\\" />
-  </Blueprint.Popover>
+  <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} text=\\"setX\\" />
   <form>
     <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'setX\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
@@ -112,16 +110,6 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
         </div>
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Shard
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            Main Chain
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label label-margin\\">
               Name
             </label>
@@ -129,8 +117,8 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"\\">
               <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" disabled={true} required={true}>
-                <option value=\\"Verification Pending\\">
-                  Verification Pending
+                <option value=\\"Supplier1\\">
+                  Supplier1
                 </option>
               </Field>
             </div>
@@ -145,8 +133,8 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
               <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={true} required={true}>
-                <option value=\\"Verification Pending\\">
-                  Verification Pending
+                <option value={[undefined]}>
+                  370adf114257cb0e0025eedf0a96261b51af23e3
                 </option>
               </Field>
             </div>

@@ -55,6 +55,37 @@ getParams "mercata-hydrogen" =
             identity = blockAppsIdentity
           }
       ]
+getParams "helium" =
+  return $
+    Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10
+      [ NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "44.198.225.165",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "34.197.19.103",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "44.206.83.54",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "34.194.64.79",
+            identity = blockAppsIdentity
+          }
+      ]
+
+
+
+
+
+
+
 getParams "mercata" =
   return $
     Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10

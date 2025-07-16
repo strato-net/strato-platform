@@ -16,56 +16,52 @@ module Handlers.Storage
     getStorageClient,
     server,
     StorageAddress (..),
-    HexStorage (..),
-    CodeKind (..),
     getStorage',
   )
 where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Control.Arrow ((***))
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Data.Aeson
+import Data.Foldable (for_)
 import Data.Maybe
 import Data.Swagger hiding (name)
-import qualified Database.Esqueleto.Legacy as E
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Database.Esqueleto.Internal.Internal as E
 import Database.Persist.Postgresql
 import GHC.Generics
-import MaybeNamed
 import Numeric.Natural
 import Servant
 import Servant.Client
 import Settings
 
 type API =
-  "storage" :> QueryParam "key" HexStorage
-    :> QueryParam "minkey" HexStorage
-    :> QueryParam "maxkey" HexStorage
-    :> QueryParam "value" HexStorage
-    :> QueryParam "minvalue" HexStorage
-    :> QueryParam "maxvalue" HexStorage
+  "storage" :> QueryParam "key" Text
+    :> QueryParam "minkey" Text
+    :> QueryParam "maxkey" Text
+    :> QueryParam "value" Text
+    :> QueryParam "minvalue" Text
+    :> QueryParam "maxvalue" Text
+    :> QueryParam "search" Text
     :> QueryParam "address" Address
-    :> QueryParam "chainid" (MaybeNamed ChainId)
-    :> QueryParams "chainids" ChainId
     :> QueryParam "offset" Natural
     :> QueryParam "limit" Natural
     :> Get '[JSON] [StorageAddress]
 
 data StorageFilterParams = StorageFilterParams
-  { qsKey :: Maybe HexStorage,
-    qsMinKey :: Maybe HexStorage,
-    qsMaxKey :: Maybe HexStorage,
-    qsValue :: Maybe HexStorage,
-    qsMinValue :: Maybe HexStorage,
-    qsMaxValue :: Maybe HexStorage,
+  { qsKey :: Maybe Text,
+    qsMinKey :: Maybe Text,
+    qsMaxKey :: Maybe Text,
+    qsValue :: Maybe Text,
+    qsMinValue :: Maybe Text,
+    qsMaxValue :: Maybe Text,
+    qsSearch :: Maybe Text,
     qsAddress :: Maybe Address,
-    qsChainId :: Maybe (MaybeNamed ChainId),
-    qsChainIds :: [ChainId],
     qsOffset :: Maybe Natural,
     qsLimit :: Maybe Natural
   }
@@ -82,7 +78,6 @@ storageFilterParams =
     Nothing
     Nothing
     Nothing
-    []
     Nothing
     Nothing
 
@@ -98,9 +93,8 @@ getStorageClient = uncurryStorageFilterParams getStorageClient'
         qsValue
         qsMinValue
         qsMaxValue
+        qsSearch
         qsAddress
-        qsChainId
-        qsChainIds
         qsOffset
         qsLimit
 
@@ -110,9 +104,8 @@ server = getStorage
 -----------------------
 
 data StorageAddress = StorageAddress
-  { key :: HexStorage,
-    value :: HexStorage,
-    kind :: CodeKind,
+  { key :: Text,
+    value :: Text,
     address :: Address
   }
   deriving (Show, Read, Eq, Generic)
@@ -124,7 +117,7 @@ instance FromJSON StorageAddress
 instance ToSchema StorageAddress
 
 storage2StorageAddress :: Storage -> Address -> StorageAddress
-storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
+storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) addr)
 
 instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
   select _ StorageFilterParams {..} = do
@@ -143,6 +136,15 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
                     fmap (\v -> storage E.^. StorageValue E.==. E.val v) qsValue,
                     fmap (\v -> storage E.^. StorageValue E.>=. E.val v) qsMinValue,
                     fmap (\v -> storage E.^. StorageValue E.<=. E.val v) qsMaxValue,
+                    fmap (\search ->
+                        let isWhiteSpace c = c `elem` [' ', '\n', '\t']
+                            searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
+                            queries = (\v -> (E.unsafeSqlCastAs "TEXT" (addrStRef E.^. AddressStateRefAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                       E.||. (addrStRef E.^. AddressStateRefContractName `E.like` E.val (Just . T.unpack $ "%" <> v <> "%"))
+                                       E.||. (storage E.^. StorageKey `E.like` E.val ("%" <> v <> "%"))
+                                       E.||. (storage E.^. StorageValue `E.like` E.val ("%" <> v <> "%"))) <$> searches
+                         in foldr (E.||.) (E.val False) queries
+                      ) qsSearch,
                     -- Note: a join is done in StorageInfo
                     fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) qsAddress
                   ]
@@ -150,7 +152,9 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
           E.where_ (foldl1 (E.&&.) criteria2)
 
           E.offset . fromIntegral $ fromMaybe 0 qsOffset
-          E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qsLimit
+          case qsAddress of
+            Nothing -> E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qsLimit
+            Just _ -> for_ qsLimit $ E.limit . fromIntegral
 
           E.orderBy [E.asc (storage E.^. StorageKey)]
 
@@ -160,20 +164,19 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
 
 getStorage ::
   Selectable StorageFilterParams [StorageAddress] m =>
-  Maybe HexStorage ->
-  Maybe HexStorage ->
-  Maybe HexStorage ->
-  Maybe HexStorage ->
-  Maybe HexStorage ->
-  Maybe HexStorage ->
+  Maybe Text ->
+  Maybe Text ->
+  Maybe Text ->
+  Maybe Text ->
+  Maybe Text ->
+  Maybe Text ->
+  Maybe Text ->
   Maybe Address ->
-  Maybe (MaybeNamed ChainId) ->
-  [ChainId] ->
   Maybe Natural ->
   Maybe Natural ->
   m [StorageAddress]
-getStorage a b c d e f g h i j k =
-  getStorage' (StorageFilterParams a b c d e f g h i j k)
+getStorage a b c d e f g h i j =
+  getStorage' (StorageFilterParams a b c d e f g h i j)
 
 getStorage' ::
   Selectable StorageFilterParams [StorageAddress] m =>

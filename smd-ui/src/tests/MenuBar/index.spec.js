@@ -86,32 +86,6 @@ describe('MenuBar: index', () => {
           searchQuery: undefined,
         },
         user: {
-          userCertificate: {
-            address: "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
-            block_hash: "dcvn97pwo8yoh1ep9iwdo6hdulk9uxtz1dehps53emm6tpznqz7eba3p5p7pqoqc",
-            block_number: 107,
-            block_timestamp: "2022-11-09 23:13:38 UTC",
-            certificateString: "-----BEGIN CERTIFICATE-----\
-            ZFu7U9gH/tPDNlYKwV0JofxMwMgUuvsgHdGeSJju4d300QNAOFgUV10WeUQBgK486lwUcvk6o8nAhJWYDFGbfnWcA8midQ6iicps/m7/T7fTu7V4M0vpldEWqfxekFuG/0AUyujhoqfwSfLJPmo0iQEP8LT3ilASHwzMjOetzeujV9tOemSm/3tKZcWkmqNx8ayKhb4mDdcclQ8zOAhNIkGBVd1fybuqqJHXLQC4yzbLHkWZ/OZTN2VhthECeF5ryiUUGZdOYxN2EFYnGPIIoqlpYsl4ab0gZvXK6bBw0vR/JvtpQPhuyw25VUIpa3UVAYRcdjABrAKjRovYdpEb8T002C4BnMCQMbWs8za6mhaG15zGQw5bRngQvbzjypVP7rlgyNJaaaPW0/EISVuSb1oycITPsxSneoUAHty1NfFaqRlFiH8hWAKVQ5nCiCAbjHDK03QjAmRecA82nn0DKZXqlf67LsKZN4KNbtKVEHCsTdivymmx3AokxtbMx2Ca3EIPc3h2Eykby3f7nR857UskcmL600HYs4tPIlF=\
-              -----END CERTIFICATE-----\
-              ",
-            chainId: "",
-            commonName: "clinicaladmin",
-            country: "USA",
-            isValid: true,
-            organization: "BlockApps",
-            organizationalUnit: "Engineering",
-            owner: "6h2vbp7a08nevelwsyz6cnpuqr77diwi3wck720q",
-            parent: "0000000000000000000000000000000000000000",
-            publicKey: "-----BEGIN PUBLIC KEY-----\
-              VRBEESfuZn6/YKyN8YQfL6uwbLFUPZFWTwZZswyXv6KRDbpXwBcQuoNuB5AIiQ9saR4yxBJRhaHLSQEZ/JzJBABTSxEWEtibIneBx0h8eAjVA3Zrpio9RMq/==\
-              -----END PUBLIC KEY-----\
-              ",
-            record_id: "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
-            transaction_hash: "9hj1qyqu52wqn45kgk5c6doy3go7qfm3beuze4dw4rfdps8ffgperqxb08qv4y72",
-            transaction_sender: "a1n72r68azg8xgx5bnr6myz0npqs9setrw2tijoc",
-            userAddress: "bzvlsnw1xpmipq866nuxkyjxb2crh0jcw1t8olbj",
-          },
           oauthUser: undefined,
         }
       }

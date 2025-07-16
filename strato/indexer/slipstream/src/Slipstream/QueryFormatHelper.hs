@@ -141,6 +141,14 @@ tableNameToText (AbstractTableName c a n) =
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
 
+tableShortName :: TableName -> T.Text
+tableShortName (IndexTableName _ _ n) = n
+tableShortName (CollectionTableName _ _ n m) = n <> "-" <> m
+tableShortName (HistoryTableName _ _ n) = "history@" <> n
+tableShortName (EventTableName _ _ n e) = n <> "-" <> e
+tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
+tableShortName (AbstractTableName _ _ n) = n
+
 -- TODO: delete once marketplace uses new separator format everywhere
 oldTableNameToText :: TableName -> T.Text
 oldTableNameToText (EventTableName c a n e) =

@@ -152,37 +152,25 @@ rowToCollections row = do
         _ -> [] 
   return $ (Map.fromList $ newState)
 
-processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Maybe Text ->m [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state mapAndArrayNames row abiid cregator = do
-  let valueCollectionsMap = Map.filter (\value -> case value of 
-                                                      ValueMapping _ -> True 
-                                                      ValueArrayFixed _ _ -> True 
-                                                      ValueArrayDynamic _ -> True 
-                                                      _ -> False) state
-      onlyRecord = Map.toList (Map.restrictKeys valueCollectionsMap (S.fromList mapAndArrayNames))
-      recordVMs = fmap (\(a, value) -> case value of 
-                                    ValueMapping b -> (a, Left b) 
-                                    ValueArrayFixed _ b -> (a, Right (Left b)) 
-                                    ValueArrayDynamic b -> (a, Right (Right b)) 
-                                    _ -> undefined) onlyRecord
-  if null valueCollectionsMap  
-    then return $ []
-    else do
-      let result = concatMap processRecord recordVMs
-          processRecord :: (Text, Either (Map.Map SimpleValue Value) (Either [Value] (I.IntMap Value))) -> [ProcessedCollectionRow]
-          processRecord (mName, value) = 
-            case value of
-              Left theMap -> 
-                map (\(k, v) -> processedCollectionRow mName (T.pack "Mapping") row abiid cregator (SimpleValue k) v) (Map.toList theMap)
-              Right (Left arrayValues) -> 
-                map (processArrayFixed mName row abiid cregator) (zip [0..] arrayValues)
-              Right (Right intMapValues) -> 
-                map (processArrayDynamic mName row abiid cregator) (I.toList intMapValues)
-      return result
+processedContractToProcessedCollectionRows :: Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state mapAndArrayNames row abiid cregator =
+  let onlyRecord = Map.toList (Map.restrictKeys state (S.fromList mapAndArrayNames))
+      extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
+      extractValues (ValueArrayDynamic b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue . ValueInt False Nothing $ fromIntegral i):ks, v)) <$> extractValues v') $ I.toList b
+      extractValues (ValueMapping b)      = concatMap (\(k, v') -> (\(_, ks, v) -> ("Mapping", (SimpleValue k):ks, v)) <$> extractValues v') $ Map.toList b
+      extractValues v                     = [("it don't matter", [], v)]
+      recordVMs = concatMap
+        (\(a, value) -> mapMaybe
+          (\(t, ks, v) -> case ks of
+            [] -> Nothing
+            _  -> Just (a, t, ks, v)
+          ) $ extractValues value
+        ) onlyRecord
+      processRecord (n, t, ks, v) = processedCollectionRow n t row abiid cregator ks v
+   in processRecord <$> recordVMs  
 
-
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value ->  ProcessedCollectionRow
-processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> [Value] -> Value ->  ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator ks v =
   ProcessedCollectionRow
     { address = actionAddress,
       -- codehash = actionCodeHash,
@@ -199,22 +187,14 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       blockNumber = actionBlockNumber,
       transactionHash = actionTxHash,
       transactionSender = actionTxSender,
-      collectionDataKey = k,
+      collectionDataKeys = ks,
       collectionDataValue = v 
     }
-
-processArrayFixed :: Text -> AggregateAction -> ABIID -> Maybe Text -> (Int, Value) -> ProcessedCollectionRow
-processArrayFixed mName row abiid cregator (index, value) =
-  processedCollectionRow mName (T.pack "Array") row abiid cregator (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
-
-processArrayDynamic :: Text -> AggregateAction -> ABIID -> Maybe Text -> (Int, Value) -> ProcessedCollectionRow
-processArrayDynamic mName row abiid cregator (index, value) =
-  processedCollectionRow mName (T.pack "Array") row abiid cregator (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
-withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
+withSourceFirst = Down . any (isJust . actionSrc) . snd
 
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
 parseActions events' =
@@ -241,23 +221,14 @@ parseEvents = concatMap parseEvent
           eventIndex = idx
         }
 
-getMappingNamesFromContract :: ContractF () -> [Text]
-getMappingNamesFromContract c =
-  let storageDefs' = c ^. storageDefs
-      storageDefsList = Map.toList storageDefs'
-      listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _-> True; _ -> False) storageDefsList
-      listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
-      listOfCollections = listOfMappingsWithRecords
-   in T.pack . fst <$> listOfCollections
-
-getArrayNamesFromContract :: ContractF () -> Map.Map T.Text SVMType.Type
-getArrayNamesFromContract c =
-  let storageDefs' = c ^. storageDefs
-      storageDefsList = Map.toList storageDefs'
-      listOfArraysWithTypename = map (\(name, vd) -> case (_varType vd) of
-                                                       SVMType.Array entry _ -> Just (T.pack name, entry)
-                                                       _ -> Nothing) storageDefsList
-   in Map.fromList $ catMaybes listOfArraysWithTypename
+getCollectionsFromContract :: ContractF () -> [(T.Text, [SVMType.Type], SVMType.Type)] -- (collection name, key type(s), value type)
+getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . _storageDefs
+  where filterAndExtract name vd = if not (_isRecord vd) then Nothing else case extractKeys (_varType vd) of
+          ([], _) -> Nothing
+          (ks, v) -> Just (T.pack name, ks, v)
+        extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
+        extractKeys (SVMType.Mapping _ k entry) = let (ks, v) = extractKeys entry in (k:ks, v)
+        extractKeys v                           = ([], v)
 
 getContractsFromPC :: E.ProcessedContract -> [Text]
 getContractsFromPC pc = Map.keys $ Map.filter isValueContract (E.contractData pc)
@@ -290,38 +261,28 @@ processTheMessages env conn messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cr, ap, hl, abs', rm) | VME.CodeCollectionAdded cc cp cr ap hl abs' rm <- messages]
+      creates = [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
+  fkeys' <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
-          forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
+          forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these collections and add a foreign key to the main table
 
-            let mappingNames = getMappingNamesFromContract c  
-                arrayNamesAndTypes = Map.toList $ getArrayNamesFromContract c
-            let historyTableNames = map (historyTableName cr ap) hl
-            $logInfoS "processTheMessages/arrayNamesAndTypes" $ T.pack $ show arrayNamesAndTypes
-            $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
+            let collectionNamesAndTypes = getCollectionsFromContract c
+            $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
 
             let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
             $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
-            --Create mapping tables
-            deferredForeignKeysForMappings <- fmap concat $
-              forM mappingNames $ \m -> do
-                createMappingTable  nameParts m
-
-            --Create array tables
-            deferredForeignKeysForArrays <- fmap concat $
-              forM arrayNamesAndTypes $ \anat -> do
-                createArrayTable nameParts anat c cc
+            -- Create collection tables
+            deferredForeignKeysForCollections <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
@@ -336,15 +297,14 @@ processTheMessages env conn messages = do
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
-            $logInfoS "processTheMessages/deferredForeignKeysForMappings" $ T.pack $ show deferredForeignKeysForMappings
-            $logInfoS "processTheMessages/deferredForeignKeysForArrays" $ T.pack $ show deferredForeignKeysForArrays
+            $logInfoS "processTheMessages/deferredForeignKeysForCollections" $ T.pack $ show deferredForeignKeysForCollections
 
 
             -- outputData conn $ createExpandEventTables g c cc nameParts
             deferredForeignKeysForEvents <- createExpandEventTables c cc nameParts
 
 
-            return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays ++ deferredForeignKeysForEvents
+            return $ deferredForeignKeys ++ deferredForeignKeysForCollections ++ deferredForeignKeysForEvents
 
         -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
         --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
@@ -423,7 +383,7 @@ processTheMessages env conn messages = do
             stateDiff <- rowToCollections row
             parents' <- pure $ map (\(_,_,_,p ,_)-> p) abstractColumns'
             abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
-            pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
+            let pCollections = processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
             pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
             recordAction row
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts

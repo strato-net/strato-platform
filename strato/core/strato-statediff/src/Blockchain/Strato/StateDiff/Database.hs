@@ -15,13 +15,10 @@ module Blockchain.Strato.StateDiff.Database
 where
 
 import BlockApps.Logging
-import Blockchain.DB.CodeDB
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
 import Blockchain.Data.Transaction
@@ -32,8 +29,10 @@ import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
 import Data.Maybe
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
 import Database.Persist hiding (Update, get)
 import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
+import SolidVM.Model.Storable (storageValueByteStringToText)
 import UnliftIO
 
 type SqlDbM m = SQL.SqlPersistT m
@@ -62,14 +61,10 @@ createAccount blockNumber accountDiffs =
         forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
           let (_, diff) = accountDiff
           case storage diff of
-            EVMDiff m ->
-              return
-                [ Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
-                  | (k, Value v) <- Map.toList m
-                ]
+            EVMDiff _ -> return []
             SolidVMDiff m ->
               return
-                [ Storage addrID SolidVM (HexStorage k) (HexStorage v)
+                [ Storage addrID (decodeUtf8 k) (storageValueByteStringToText v)
                   | (k, Value v) <- Map.toList m
                 ]
 
@@ -83,7 +78,7 @@ createAccount blockNumber accountDiffs =
     codeRef account diff =
       CodeRef
         { codeRefCodeHash = hash $ code' account diff,
-          codeRefCode = code' account diff
+          codeRefCode = decodeUtf8 $ code' account diff
         }
     addrRef account diff =
       AddressStateRef
@@ -146,34 +141,13 @@ updateAccount blockNumber account diff = do
           setField balance AddressStateRefBalance $
             [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
       case storage diff of
-        EVMDiff m -> sequence_ $ Map.mapWithKey (commitStorage addrID) m
+        EVMDiff _ -> pure ()
         SolidVMDiff m2 -> sequence_ $ Map.mapWithKey (commitSolidStorage addrID) m2
   where
     setField field sqlField = maybe id (\v -> ((sqlField =. takeIncremental v) :)) $ field diff
     takeIncremental Create {newValue} = newValue
     takeIncremental Delete {} = 0
     takeIncremental Update {newValue} = newValue
-
-commitStorage ::
-  MonadIO m =>
-  SQL.Key AddressStateRef ->
-  Word256 ->
-  Diff Word256 'Incremental ->
-  SqlDbM m ()
-commitStorage addrID key v =
-  let key' = word256ToHexStorage key
-   in case v of
-        Create {newValue} ->
-          SQL.insert_ $ Storage addrID EVM key' (word256ToHexStorage newValue)
-        Delete {} -> do
-          mStorageID <- getStorageKeySQL addrID key'
-          for_ mStorageID SQL.delete
-        Update {newValue} -> do
-          let newValue' = word256ToHexStorage newValue
-          mStorageID <- getStorageKeySQL addrID key'
-          case mStorageID of
-            Nothing -> SQL.insert_ $ Storage addrID EVM key' newValue'
-            Just storageID -> SQL.update storageID [StorageValue =. newValue']
 
 commitSolidStorage ::
   MonadIO m =>
@@ -182,18 +156,17 @@ commitSolidStorage ::
   Diff BS.ByteString 'Incremental ->
   SqlDbM m ()
 commitSolidStorage addrID key v =
-  let key' = HexStorage key
+  let key' = decodeUtf8 key
    in case v of
-        Create {newValue} ->
-          SQL.insert_ $ Storage addrID SolidVM key' (HexStorage newValue)
+        Create {newValue} -> SQL.insert_ $ Storage addrID key' (storageValueByteStringToText newValue)
         Delete {} -> do
           mStorageID <- getStorageKeySQL addrID key'
           for_ mStorageID SQL.delete
         Update {newValue} -> do
-          let newValue' = HexStorage newValue
+          let newValue' = storageValueByteStringToText newValue
           mStorageID <- getStorageKeySQL addrID key'
           case mStorageID of
-            Nothing -> SQL.insert_ $ Storage addrID SolidVM key' newValue'
+            Nothing -> SQL.insert_ $ Storage addrID key' newValue'
             Just storageID -> SQL.update storageID [StorageValue =. newValue']
 
 getAddressStateSQL ::
@@ -210,7 +183,7 @@ getAddressStateSQL addr' = do
 getStorageKeySQL ::
   MonadIO m =>
   SQL.Key AddressStateRef ->
-  HexStorage ->
+  T.Text ->
   SqlDbM m (Maybe (SQL.Key Storage))
 getStorageKeySQL addrID storageKey' = do
   storageIDs <-

@@ -134,11 +134,11 @@ modifyATL f address atl = case M.lookup address atl of
 purgeFromATL :: Address -> Integer -> ATL -> ATL
 purgeFromATL address nonce' atl = case M.lookup address atl of
   Nothing -> atl
-  Just tl -> let newTL = M.delete nonce' tl in M.insert address newTL atl
+  Just tl -> let newTL = M.filterWithKey (const . (< nonce')) tl in M.insert address newTL atl
 
 calculateIntrinsicTxFee :: BaggerState -> (OutputTx -> Integer)
-calculateIntrinsicTxFee bs t@OutputTx {otBaseTx = bt} =
-  TD.transactionGasPrice bt * calculateIntrinsicGasAtNextBlock bs t
+calculateIntrinsicTxFee bs t@OutputTx {} =
+  calculateIntrinsicGasAtNextBlock bs t
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState {miningCache = MiningCache {bestBlockHeader = bh}, calculateIntrinsicGas = cig} =
@@ -186,11 +186,6 @@ popAllPending :: BaggerState -> ([OutputTx], BaggerState)
 popAllPending s@BaggerState {pending = p} = (popped, s {pending = M.empty})
   where
     popped = concatMap toList $ M.elems p
-
-purgeFromQueued :: OutputTx -> BaggerState -> BaggerState
-purgeFromQueued OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {queued = q} = s {queued = newATL}
-  where
-    newATL = purgeFromATL sender (TD.transactionNonce tx) q
 
 purgeFromPending :: OutputTx -> BaggerState -> BaggerState
 purgeFromPending OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {pending = p} = s {pending = newATL}

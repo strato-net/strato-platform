@@ -27,6 +27,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, maybeToList)
 import Data.Source
 import qualified Data.Text as T
+import Data.Text.Encoding as T
 import Data.Traversable (for)
 import Debugger
 import SolidVM.Model.CodeCollection
@@ -155,7 +156,7 @@ runFuzzerOnce ctx = do
       svmErr (Right e) = InternalError "SolidVM for non-solidvm code" (show e)
       txArgs =
         def & createNewAddress .~ contractAddress
-          & createCode .~ (Code . BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
+          & createCode .~ (Code $ T.decodeUtf8 $ BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
           & createArgs . argsMetadata ?~ M.empty
           & createArgs . argsMetadata . _Just . at "name" ?~ labelToText _fuzzerArgsContractName
           & createArgs . argsMetadata . _Just . at "args" ?~ _fuzzerArgsCreateArgs

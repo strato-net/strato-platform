@@ -79,7 +79,7 @@ AddressStateRef
 
 CodeRef
     codeHash Keccak256
-    code BS.ByteString
+    code Text
     UniqueCodeHash codeHash
     deriving Eq Read Show
 
@@ -87,29 +87,26 @@ RawTransaction
     timestamp UTCTime
     fromAddress Address
     nonce Integer sqltype=numeric(1000,0)
-    gasPrice Integer sqltype=numeric(1000,0)
     gasLimit Integer sqltype=numeric(1000,0)
     toAddress Address Maybe
-    value Integer sqltype=numeric(1000,0)
-    codeOrData BS.ByteString Maybe
-    contractName String Maybe
-    codePtrAddress Address Maybe
-    chainId Word256
+    funcName Text Maybe
+    contractName Text Maybe
+    args [Text]
+    network Text
+    code Code Maybe
     r Integer
     s Integer
     v Word8
-    metadata [TextPair] Maybe
     blockNumber Int
     txHash Keccak256
     origin TXOrigin
-    UniqueTXHash txHash chainId
+    UniqueTXHash txHash
     deriving Eq Generic Read Show
 
 Storage json
     addressStateRefId AddressStateRefId
-    kind CodeKind default='EVM'
-    key HexStorage
-    value HexStorage
+    key Text
+    value Text
     deriving Eq Read Show
 
 TransactionResult json
@@ -127,7 +124,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    kind CodeKind Maybe
     creator String
     appName String
     deriving Eq Read Show Generic

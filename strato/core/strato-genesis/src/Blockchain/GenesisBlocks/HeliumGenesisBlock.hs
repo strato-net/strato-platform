@@ -1,24 +1,157 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 
 module Blockchain.GenesisBlocks.HeliumGenesisBlock (
   genesisBlock
   ) where
 
-import BlockApps.X509
-import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlocks.Contracts.CertRegistry
-import Blockchain.GenesisBlocks.Contracts.GovernanceV2
-import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Validator
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import Data.Text (Text)
-import Text.RawString.QQ
+import           BlockApps.X509
+import           Blockchain.Data.GenesisInfo
+import           Blockchain.GenesisBlocks.Contracts.Decide
+import           Blockchain.GenesisBlocks.Contracts.CertRegistry
+import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
+import           Blockchain.GenesisBlocks.Contracts.Mercata
+import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
+import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
+import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.CodePtr
+import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
+import           Blockchain.Strato.Model.Validator
+import qualified Data.Aeson                                      as JSON
+import qualified Data.ByteString                                 as B
+import qualified Data.ByteString.Char8                           as BC
+import qualified Data.ByteString.Lazy                            as BL
+import           Data.List                                       (find)
+import qualified Data.Map.Strict                                 as M
+import           Data.Maybe                                      (mapMaybe)
+import           Data.Text                                       (Text)
+import qualified Data.Text                                       as T
+import           Data.Text.Encoding
+import           SolidVM.Model.Storable
+import           Text.RawString.QQ
+
+gramsToOz :: Integer -> Integer
+gramsToOz n = (10000 * n) `div` 283495
+
+assetMap :: M.Map Address GA.Asset
+assetMap = foldr (\k -> M.insert (GA.root k) k) M.empty GA.assets
+
+usdstAsset :: GA.Asset
+usdstAsset = head $ filter ((== "USDST") . GA.name) GA.assets
+
+usdstAddress :: Address
+usdstAddress = GA.root usdstAsset
+
+cataAsset :: GA.Asset
+cataAsset = maybe (error "Could not find cataAsset") id $ find ((== "CATA") . GA.name) GA.assets
+
+cataAddress :: Address
+cataAddress = GA.root cataAsset
+
+addrBS :: Address -> B.ByteString
+addrBS = BC.pack . formatAddressWithoutColor
+
+blockappsAddress :: Address
+blockappsAddress = 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce --0x0dbb9131d99c8317aa69a70909e124f2e02446e8
+
+goldstRoot :: Address
+goldstRoot = 0xcdc93d30182125e05eec985b631c7c61b3f63ff0
+
+goldOunceRoot :: Address
+goldOunceRoot = 0xb00e37ca092cb3c2a62d4110154a5e172279e770
+
+goldGramRoot :: Address
+goldGramRoot = 0xbc94173470e33deef702c6f45c6bf701d682f58c
+
+silvstRoot :: Address
+silvstRoot = 0x2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94
+
+altSilvstRoot :: Address
+altSilvstRoot = 0x7b5f6d756c4e02104d5039205442cf7aa913a8a6
+
+mercataAddress :: Address
+mercataAddress = 0x1000
+
+rateStrategyAddress :: Address
+rateStrategyAddress = 0x1001
+
+priceOracleAddress :: Address
+priceOracleAddress = 0x1002
+
+collateralVaultAddress :: Address
+collateralVaultAddress = 0x1003
+
+liquidityPoolAddress :: Address
+liquidityPoolAddress = 0x1004
+
+lendingPoolAddress :: Address
+lendingPoolAddress = 0x1005
+
+poolConfiguratorAddress :: Address
+poolConfiguratorAddress = 0x1006
+
+lendingRegistryAddress :: Address
+lendingRegistryAddress = 0x1007
+
+mercataEthBridgeAddress :: Address
+mercataEthBridgeAddress = 0x1008
+
+onRampAddress :: Address
+onRampAddress = 0x1009
+
+poolFactoryAddress :: Address
+poolFactoryAddress = 0x100a
+
+tokenFactoryAddress :: Address
+tokenFactoryAddress = 0x100b
+
+adminRegistryAddress :: Address
+adminRegistryAddress = 0x100c
+
+feeCollectorAddress :: Address
+feeCollectorAddress = 0x100d
+
+voucherAddress :: Address
+voucherAddress = 0x100e
+
+mTokenAddress :: Address
+mTokenAddress = 0x100f
+
+rewardsManagerAddress :: Address
+rewardsManagerAddress = 0x1010
+
+combinedEscrows :: [GE.Escrow]
+combinedEscrows = M.elems
+                . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
+                . map alloy
+                . map correctQ
+                $ filter GE.isActive GE.escrows
+  where go e1 e2 = e2
+          { GE.borrowedAmount = GE.borrowedAmount e1 + GE.borrowedAmount e2
+          , GE.collateralQuantity = GE.collateralQuantity e1 + GE.collateralQuantity e2
+          }
+        alloy e = case GE.assetRootAddress e of
+          a | a == goldOunceRoot -> e{ GE.assetRootAddress = goldstRoot }
+            | a == goldGramRoot -> e{ GE.assetRootAddress = goldstRoot
+                                    , GE.collateralQuantity = gramsToOz $ GE.collateralQuantity e
+                                    }
+            | a == altSilvstRoot -> e{ GE.assetRootAddress = silvstRoot }
+            | otherwise -> e
+        correctQ e = case M.lookup (GE.assetRootAddress e) assetMap of
+          Nothing -> e
+          Just GA.Asset{..} -> e{ GE.collateralQuantity = correctQuantity decimals name (GE.collateralQuantity e) }
 
 genesisBlock :: GenesisInfo
 genesisBlock  =
   insertMercataGovernanceContract validators admins
+  . insertDecideContract
   . insertCertRegistryContract extraCerts
   $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
@@ -26,107 +159,421 @@ genesisBlock  =
         genesisInfoGasLimit=22517998136852480000000000000000,
         genesisInfoCoinbase=Org "00000000000000000000" True,
         genesisInfoAccountInfo=[
-            NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624
-            ]
+            NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624,
+            SolidVMContractWithStorage
+              mercataAddress
+              720
+              (SolidVMCode "Mercata" (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts))
+              [ (".:creator", BString $ encodeUtf8 "BlockApps")
+              , (".:creatorAddress", BAccount $ unspecifiedChain blockappsAddress)
+              , (".:originAddress", BAccount $ unspecifiedChain mercataAddress)
+              , (".rateStrategy", BContract "RateStrategy" $ unspecifiedChain rateStrategyAddress)
+              , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
+              , (".collateralVault", BContract "CollateralVault" $ unspecifiedChain collateralVaultAddress)
+              , (".liquidityPool", BContract "LiquidityPool" $ unspecifiedChain liquidityPoolAddress)
+              , (".lendingPool", BContract "LendingPool" $ unspecifiedChain lendingPoolAddress)
+              , (".poolConfigurator", BContract "PoolConfigurator" $ unspecifiedChain poolConfiguratorAddress)
+              , (".lendingRegistry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+              , (".mercataEthBridge", BContract "MercataEthBridge" $ unspecifiedChain mercataEthBridgeAddress)
+              , (".onRamp", BContract "OnRamp" $ unspecifiedChain onRampAddress)
+              , (".poolFactory", BContract "PoolFactory" $ unspecifiedChain poolFactoryAddress)
+              , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+              , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
+              , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
+              , (".rewardsManager", BContract "RewardsManager" $ unspecifiedChain rewardsManagerAddress)
+              ]
+            ] ++ mapMaybe assetToAccountInfos GA.assets ++
+            [ rateStrategy
+            , priceOracle
+            , collateralVault
+            , liquidityPool
+            , lendingPool
+            , poolConfigurator
+            , lendingRegistry
+            , mercataEthBridge
+            , onRamp
+            , poolFactory
+            , tokenFactory
+            , adminRegistry
+            , feeCollector
+            , voucher
+            , mToken
+            , rewardsManager
+            ],
+        genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
         }
+
+createdByBlockApps :: Address -> [(B.ByteString, BasicValue)]
+createdByBlockApps originAddress =
+  [ (".:creator", BString $ encodeUtf8 "BlockApps")
+  , (".:creatorAddress", BAccount $ unspecifiedChain blockappsAddress)
+  , (".:originAddress", BAccount $ unspecifiedChain originAddress)
+  ]
+
+ownedByBlockApps :: Address -> [(B.ByteString, BasicValue)]
+ownedByBlockApps originAddress = ("._owner", BAccount $ unspecifiedChain blockappsAddress) : createdByBlockApps originAddress
+
+getDecimals :: Integer -> Text -> Integer
+getDecimals d n =
+  if d < 0 || d >= 18 || n `elem` ["CATA", "ETHST", "USDTEMP", "BETHTEMP"]
+    then 18
+    else if n == "STRAT"
+           then 4
+           else d
+
+correctQuantity :: Integer -> Text -> Integer -> Integer
+correctQuantity d n q =
+  let times10ToThe a b = foldr (*) a $ replicate b 10
+      decs = getDecimals d n
+   in q `times10ToThe` (fromIntegral $ 18 - decs)
+
+sigma :: Integer
+sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
+
+oneE18 :: Integer
+oneE18 = 1_000_000_000_000_000_000
+
+omega :: Integer
+omega = 2_000_000 * oneE18
+
+assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
+assetToAccountInfos GA.Asset{..} =
+  let accountBalances' = M.toList . foldr (uncurry $ M.insertWith (+)) M.empty
+        . concatMap (\(o, q) ->
+            let mEscrowBalance = correctQuantity decimals name . GE.collateralQuantity
+                             <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
+             in case mEscrowBalance of
+                  Nothing -> [(o, q)]
+                  Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (collateralVaultAddress, escrowBalance)])
+        . concatMap (\case
+          (GA.Balance _ o c q)
+            | root == usdstAddress &&  c == "mercata_usdst" ->
+                [(blockappsAddress, correctQuantity decimals name q)]
+            | root == goldstRoot ->
+                let goldstBalance = correctQuantity decimals name q
+                    goldOzBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldOunceRoot assetMap
+                    goldGmBalance = maybe 0 (\a -> maybe 0 (\b -> gramsToOz $ correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldGramRoot assetMap
+                 in [(o, goldstBalance + goldOzBalance + goldGmBalance)]
+            | root == goldOunceRoot -> []
+            | root == goldGramRoot -> []
+            | root == silvstRoot ->
+                let silvstBalance = correctQuantity decimals name q
+                    altSilvstBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup altSilvstRoot assetMap
+                 in [(o, silvstBalance + altSilvstBalance)]
+            | root == altSilvstRoot -> []
+            | otherwise ->
+                [(o, correctQuantity decimals name q)]
+        ) . filter ((>0) . GA.quantity) $ M.elems balances
+      allBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
+      takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
+   in case allBalances of
+        [] -> Nothing
+        _ -> Just . SolidVMContractWithStorage root 0 (CodeAtAccount mercataAddress "Token") $
+          ownedByBlockApps root ++
+          [ ("._name", if root == silvstRoot then BString "SILVST" else BString $ encodeUtf8 name)
+          , ("._symbol", if root == silvstRoot then BString "SILVST" else BString $ encodeUtf8 $ takeCaps name)
+          , (".description", BString $ encodeUtf8 description)
+          , (".customDecimals", BInteger 18)
+          , ("._totalSupply", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
+          , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
+          , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
+          , (".admin", BAccount $ unspecifiedChain blockappsAddress)
+          , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+          , (".images.length", BInteger . fromIntegral $ length images)
+          , (".files.length", BInteger . fromIntegral $ length files)
+          , (".fileNames.length", BInteger . fromIntegral $ length fileNames)
+          ] ++ map (\(k,v) -> (".images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
+            ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
+            ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
+            ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
+            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
+            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
+            ++ allBalances
+            ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)] else []
+            ++ (if root == usdstAddress
+                  then [ ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
+                       , ("._balances<a:c7f483b3ddb99d510570a8b7760aebda941c766d>", BInteger $ 1000 * oneE18) -- bob
+                       , ("._balances<a:a0ad0dc4c754d507ca7964246fa9590d6a3df8d4>", BInteger $ 100_000 * oneE18) -- jaime and victor
+                       ]
+                  else [])
+
+rateStrategy :: AccountInfo
+rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount mercataAddress "RateStrategy") $ createdByBlockApps mercataAddress
+
+priceOracle :: AccountInfo
+priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mercataAddress "PriceOracle") $
+  (".prices<a:" <> addrBS usdstAddress <> ">", BInteger oneE18)
+  : (".authorizedOracles<a:" <> addrBS usdstAddress <> ">", BBool True)
+  : ownedByBlockApps mercataAddress
+  ++ mapMaybe (\GR.Reserve{..} -> flip fmap (M.lookup assetRootAddress assetMap) $ \a ->
+    (".prices<a:" <> addrBS assetRootAddress <> ">", BInteger . round $ lastUpdatedOraclePrice * (10.0 ** (fromInteger $ 18 + getDecimals (GA.decimals a) (GA.name a))))
+  ) GR.reserves
+
+collateralVault :: AccountInfo
+collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAccount mercataAddress "CollateralVault") $ ownedByBlockApps mercataAddress ++
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+  ] ++ concatMap (\GE.Escrow{..} ->
+      [ (".userCollaterals<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">", BInteger collateralQuantity)
+      ]
+  ) combinedEscrows
+
+liquidityPool :: AccountInfo
+liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount mercataAddress "LiquidityPool") $ ownedByBlockApps mercataAddress ++
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+  , (".mToken", BContract "Token" $ unspecifiedChain mTokenAddress)
+  ]
+
+lendingPool :: AccountInfo
+lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+  , (".poolConfigurator", BAccount $ unspecifiedChain poolConfiguratorAddress)
+  , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+  , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
+  , (".borrowableAsset", BAccount $ unspecifiedChain usdstAddress)
+  , (".mToken", BAccount $ unspecifiedChain mTokenAddress)
+  , (".totalBorrowPrincipal", BInteger sigma)
+  ] ++
+  [ (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
+  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.interestRate", BInteger 500)
+  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.reserveFactor", BInteger 1000)
+  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationBonus", BInteger 10500)
+  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationThreshold", BInteger 8000)
+  , (".configuredAssets[0]", BAccount $ unspecifiedChain usdstAddress)
+  , (".configuredAssets.length", BInteger . fromIntegral $ 1 + length GR.reserves)
+  ] ++ concatMap (\(i, GR.Reserve{..}) ->
+  [ (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.ltv", BInteger 7500)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.interestRate", BInteger 500)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.reserveFactor", BInteger 1000)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationBonus", BInteger 10500)
+  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationThreshold", BInteger 8000)
+  , (".configuredAssets[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain assetRootAddress)
+  ]
+  ) (zip [1 :: Integer ..] GR.reserves)
+    ++ concatMap (\(bwr, amt) -> (if amt > 0 then
+  [ (".userLoan<a:" <> addrBS bwr <> ">.principalBalance", BInteger amt)
+  , (".userLoan<a:" <> addrBS bwr <> ">.interestOwed", BInteger 0)
+  , (".userLoan<a:" <> addrBS bwr <> ">.lastIntCalculated", BInteger 1752552000) -- July 15th, 2025, 12:00:00 AM
+  , (".userLoan<a:" <> addrBS bwr <> ">.lastUpdated", BInteger 1752552000) -- July 15th, 2025, 12:00:00 AM
+  ] else [])
+  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+
+poolConfigurator :: AccountInfo
+poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 (CodeAtAccount mercataAddress "PoolConfigurator") $ ownedByBlockApps mercataAddress ++
+  [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
+  ]
+
+lendingRegistry :: AccountInfo
+lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAccount mercataAddress "LendingRegistry") $ ownedByBlockApps mercataAddress ++
+  [ (".lendingPool", BContract "LendingPool" $ unspecifiedChain lendingPoolAddress)
+  , (".liquidityPool", BContract "LiquidityPool" $ unspecifiedChain liquidityPoolAddress)
+  , (".collateralVault", BContract "CollateralVault" $ unspecifiedChain collateralVaultAddress)
+  , (".rateStrategy", BContract "RateStrategy" $ unspecifiedChain rateStrategyAddress)
+  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
+  ]
+
+mercataEthBridge :: AccountInfo
+mercataEthBridge = SolidVMContractWithStorage mercataEthBridgeAddress 0 (CodeAtAccount mercataAddress "MercataEthBridge") $ createdByBlockApps mercataAddress ++
+  [ (".owner", BAccount $ unspecifiedChain blockappsAddress)
+  , (".relayer", BAccount $ unspecifiedChain blockappsAddress)
+  , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+  ]
+
+onRamp :: AccountInfo
+onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddress "OnRamp") $ createdByBlockApps mercataAddress ++
+  [ (".listingIdCounter", BInteger 0)
+  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
+  , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+  , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
+  , (".voucher", BContract "Voucher" $ unspecifiedChain voucherAddress)
+  ]
+
+poolFactory :: AccountInfo
+poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mercataAddress "PoolFactory") $ ownedByBlockApps mercataAddress ++
+  [ (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
+  , (".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)
+  , (".feeCollector", BAccount $ unspecifiedChain feeCollectorAddress)
+  , (".swapFeeRate", BInteger 30)
+  , (".lpSharePercent", BInteger 7000)
+  ]
+
+tokenFactory :: AccountInfo
+tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount mercataAddress "TokenFactory") $ ownedByBlockApps mercataAddress
+  ++ [ (".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)
+     , (".isFactoryToken<a:" <> addrBS mTokenAddress <> ">", BBool True)
+     , (".allTokens[0]", BAccount $ unspecifiedChain mTokenAddress)
+     , (".allTokens.length", BInteger . fromIntegral $ 1 + length GA.assets)
+     ]
+  ++ ((\GA.Asset{..} -> (".isFactoryToken<a:" <> addrBS root <> ">", BBool True)) <$> GA.assets)
+  ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(1 :: Integer)..] GA.assets)
+
+adminRegistry :: AccountInfo
+adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount mercataAddress "AdminRegistry") $ ownedByBlockApps mercataAddress
+  ++ [(".isAdmin<a:" <> addrBS blockappsAddress <> ">", BBool True)]
+  ++ [(".isAdmin<a:" <> addrBS poolFactoryAddress <> ">", BBool True)]
+
+feeCollector :: AccountInfo
+feeCollector = SolidVMContractWithStorage feeCollectorAddress 0 (CodeAtAccount mercataAddress "FeeCollector") $ ownedByBlockApps mercataAddress
+
+voucher :: AccountInfo
+voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddress "Voucher") $ ownedByBlockApps mercataAddress
+  ++ [ ("._name", BString "Voucher")
+     , ("._symbol", BString "VOUCHER")
+     , ("._totalSupply", BInteger $ 1_000_000 * oneE18)
+     , (".admin", BAccount $ unspecifiedChain blockappsAddress)
+     , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
+     , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 1_000_000 * oneE18)
+     ]
+
+mToken :: AccountInfo
+mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddress "Token") $ ownedByBlockApps mercataAddress
+  ++ [ ("._name", BString "MUSDST")
+     , ("._symbol", BString "MUSDST")
+     , (".description", BString "MUSDST")
+     , (".customDecimals", BInteger 18)
+     , ("._totalSupply", BInteger omega)
+     , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".minters<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , (".burners<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger omega)
+     , (".admin", BAccount $ unspecifiedChain blockappsAddress)
+     , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+     , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
+     ]
+
+rewardsManager :: AccountInfo
+rewardsManager = SolidVMContractWithStorage rewardsManagerAddress 0 (CodeAtAccount mercataAddress "RewardsManager") $ ownedByBlockApps mercataAddress
+  ++ [ (".rewardTokens[0]", BContract "Token" $ unspecifiedChain cataAddress)
+     , (".rewardTokens.length", BInteger 1)
+     , (".rewardTokenMap<a:" <> addrBS cataAddress <> ">", BInteger 1)
+     , (".rewardDelegate", BAccount $ unspecifiedChain 0x0)
+     , (".eligibleTokens.length", BInteger . fromIntegral $ length GR.reserves)
+     ]
+  ++ concatMap (\(i, GR.Reserve{..}) ->
+    [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain assetRootAddress)
+    , (".eligibleTokenMap<a:" <> addrBS assetRootAddress <> ">", BInteger $ i + 1)
+    ]
+  ) (zip [0..] GR.reserves)
 
 certStrings :: [String]
 certStrings =
   [
--- CN = NodeOne, O = BlockApps, OU = Mercata, C = USA
+-- CN = Admin, O = BlockApps, OU = '', C = US
     [r|-----BEGIN CERTIFICATE-----
-MIIBjDCCATCgAwIBAgIRAI52ezCbmgohZ+tZH9+y4iIwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIzMDIxMDIxMjQzOVoXDTI0MDIx
-MDIxMjQzOVowRjEQMA4GA1UEAwwHTm9kZU9uZTESMBAGA1UECgwJQmxvY2tBcHBz
-MRAwDgYDVQQLDAdNZXJjYXRhMQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUr
-gQQACgNCAASxFFREq3J1hCDp3sncIbWqsLhO1fcJZ3uem/5He43/zY6aiDOHafbR
-qVjDBjYgWT1QT2tODFb3Kmypj6586S63MAwGCCqGSM49BAMCBQADSAAwRQIhAP1w
-MFMuQmizH7ijmZZ2CNtGUbJwY4SLEJ9cf7hXsru9AiAjw5MfA+ctFRRV0wBdqtOr
-/QnFi7IXykn9Ie+//h59Zg==
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
--- CN = NodeTwo, O = BlockApps, OU = Mercata, C = USA
+-- CN = NodeOne, O = BlockApps, OU = '', C = USA
     [r|-----BEGIN CERTIFICATE-----
-MIIBijCCAS+gAwIBAgIQaHFD5KfvdVe135kgfzmevjAMBggqhkjOPQQDAgUAMEgx
-DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
-Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjMwMjEwMjEyNDM5WhcNMjQwMjEw
-MjEyNDM5WjBGMRAwDgYDVQQDDAdOb2RlVHdvMRIwEAYDVQQKDAlCbG9ja0FwcHMx
-EDAOBgNVBAsMB01lcmNhdGExDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB
-BAAKA0IABMdIOBZnx7tlOygp92l8yFKO1ZutgE4ewVOmPrK/tg0o09Qb4eb96mpQ
-WVld6E7/jAruGV+1VOe6A7yiM8LQR5YwDAYIKoZIzj0EAwIFAANHADBEAiAiKQFe
-bluDLPC3piHrJhayXkpUzGu4QOQCc1NvcXRS7QIgaMfzceY/fq0eeelO2kohndi3
-cScH5vDuTM1KTKJNdj8=
+MIIBYjCCAQegAwIBAgIRAMXR0KcRXjeBHoaxxoLgGJYwDAYIKoZIzj0EAwIFADAx
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMQswCQYDVQQGDAJV
+UzAeFw0yNTA1MTUxNDI3MTRaFw0yNjA1MTUxNDI3MTRaMDQxEDAOBgNVBAMMB05v
+ZGVPbmUxEjAQBgNVBAoMCUJsb2NrQXBwczEMMAoGA1UEBgwDVVNBMFYwEAYHKoZI
+zj0CAQYFK4EEAAoDQgAEPfHnJy73CK8RFh1AUM7d6sflX3Qth+AqYY2MLXFNl/oi
+LOyF1KoZLoO9Xd24oXN3ixj7U0BvqFjpVB7FNW7JqjAMBggqhkjOPQQDAgUAA0cA
+MEQCIBrthbt2+spomR2ksFyqdHB35Sz9Ya9ExuCWsKiY5g1BAiAwPf5d42eYl6vC
+tKj+TnAgQ+h5coRX9SSbO0FBx7QF4w==
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
--- CN = NodeThree, O = BlockApps, OU = Mercata, C = USA
+-- CN = NodeTwo, O = BlockApps, OU = '', C = USA
     [r|-----BEGIN CERTIFICATE-----
-MIIBjDCCATGgAwIBAgIQH3mR/RXtVAXFLEyzBqZuKDAMBggqhkjOPQQDAgUAMEgx
-DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
-Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjMwMjEwMjEyNDQwWhcNMjQwMjEw
-MjEyNDQwWjBIMRIwEAYDVQQDDAlOb2RlVGhyZWUxEjAQBgNVBAoMCUJsb2NrQXBw
-czEQMA4GA1UECwwHTWVyY2F0YTEMMAoGA1UEBgwDVVNBMFYwEAYHKoZIzj0CAQYF
-K4EEAAoDQgAEiC5GkH7LUQ1t3SyGltRoVsftcxKS/swq/vfmSp6prNCJdh2z3xVK
-Iww+RyuO0vuDwX9aVaaj/SWCCE2zAah3DzAMBggqhkjOPQQDAgUAA0cAMEQCIB0/
-p0+6sPvf6JRJmA/0OBADPp/oEPZClDJDC3YlefS4AiAXsdZZy1tZay013UEIeS77
-gexIR+gxweapdrHjU6X1sw==
+MIIBYjCCAQagAwIBAgIQQWK9sY3jZKZRssceCy6BezAMBggqhkjOPQQDAgUAMDEx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxCzAJBgNVBAYMAlVT
+MB4XDTI1MDUxNTE0Mjk1MloXDTI2MDUxNTE0Mjk1MlowNDEQMA4GA1UEAwwHTm9k
+ZVR3bzESMBAGA1UECgwJQmxvY2tBcHBzMQwwCgYDVQQGDANVU0EwVjAQBgcqhkjO
+PQIBBgUrgQQACgNCAASobiZDnC7/IdKUhfQD4K1jVDoupIect8ef7YZfouO+M983
+SlkBocgAeyeJK/Vy3sIfHTLQJ/VGf7iRO7IQMNmtMAwGCCqGSM49BAMCBQADSAAw
+RQIhAPB8MojJY+jog/NR4WW9v1N84+U9RJNGchT7k5hYwHPTAiBPlBPRzIk6bgJC
+oQgzpu+NG15D2ufaK7FT2d1W+GxHAA==
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
--- CN = NodeFour, O = BlockApps, OU = Mercata, C = USA
+-- CN = NodeThree, O = BlockApps, OU = '', C = USA
     [r|-----BEGIN CERTIFICATE-----
-MIIBjTCCATGgAwIBAgIRANY68yBodj4lMstRjyTB+OgwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIzMDIxMDIxMjQ0MFoXDTI0MDIx
-MDIxMjQ0MFowRzERMA8GA1UEAwwITm9kZUZvdXIxEjAQBgNVBAoMCUJsb2NrQXBw
-czEQMA4GA1UECwwHTWVyY2F0YTEMMAoGA1UEBgwDVVNBMFYwEAYHKoZIzj0CAQYF
-K4EEAAoDQgAES1+vpxI4NN1pCV9PeT3RndqqlvH0LH4BqceVN+4lbxe0PvmJM5Dx
-ahQzaMYQMHckpWd4SOgsJZ3UqW4cUyamDTAMBggqhkjOPQQDAgUAA0gAMEUCIQDl
-rzr+5SGj+BCBldJPAscnp7w8TA1LExoHfAf6Zlxc2QIgA3Il5RXTLuRDFh/IsPYs
-5FNHog9sg9Ae2b0vG0FgISc=
+MIIBYzCCAQigAwIBAgIQNRQNWAuhdo3fZjocjU1kEDAMBggqhkjOPQQDAgUAMDEx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxCzAJBgNVBAYMAlVT
+MB4XDTI1MDUxNTE0MzAwMVoXDTI2MDUxNTE0MzAwMVowNjESMBAGA1UEAwwJTm9k
+ZVRocmVlMRIwEAYDVQQKDAlCbG9ja0FwcHMxDDAKBgNVBAYMA1VTQTBWMBAGByqG
+SM49AgEGBSuBBAAKA0IABAiiPSINWtkR88fE12J9Uio2PGtMpgOOBHb9OemmWiM4
+M6Q6uJGdCUJzYd4s73aKTpTrDDfmyTka8ena3pql1fwwDAYIKoZIzj0EAwIFAANH
+ADBEAiB7EDnkDt43t4ooXX3eDR8VpeROvK23K5wpRyvu5a3wswIgByWDLnse+vjR
+LDOfa6IqkNqXlsKPf48L7EeV2flRVzs=
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
-MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
-bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
-MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
-MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
-BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
-9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
-R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
-N8txKc8G9R27ZYAUuz15zF0=
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
+-----END CERTIFICATE-----|],
+
+-- CN = NodeFour, O = BlockApps, OU = '', C = USA
+    [r|
+-----BEGIN CERTIFICATE-----
+MIIBYzCCAQigAwIBAgIRALSRHPs/LhpdHY59Zgtp7W8wDAYIKoZIzj0EAwIFADAx
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMQswCQYDVQQGDAJV
+UzAeFw0yNTA1MTUxNDMwMDdaFw0yNjA1MTUxNDMwMDdaMDUxETAPBgNVBAMMCE5v
+ZGVGb3VyMRIwEAYDVQQKDAlCbG9ja0FwcHMxDDAKBgNVBAYMA1VTQTBWMBAGByqG
+SM49AgEGBSuBBAAKA0IABLwIcqxa1nB+W3gJ+Y7ajiK8tXFSp+frERHxIXbEWF5g
+qu01rIsy3eBwpyBkoLO/uNgYeJSOALc3G2XyNWT97PEwDAYIKoZIzj0EAwIFAANH
+ADBEAiBx7+CeXKcdDpVuyR3HrNxkUhMg1qlRQrUcdR/JrzaasgIgTTYspF2KrcFe
+/xizVFvu46tyqPqKC3LreOAKlm7XbDY=
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIB7DCCAZICFEMvKtLHnafAC+NtPyE602XbANjXMAoGCCqGSM49BAMCMHoxCzAJ
+BgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwIQnJvb2tseW4x
+EjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4xITAfBgkqhkiG9w0B
+CQEWEmluZm9AYmxvY2thcHBzLm5ldDAeFw0yNTA1MTUxNDEyNDFaFw0yNTA2MTQx
+NDEyNDFaMHoxCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UE
+BwwIQnJvb2tseW4xEjAQBgNVBAoMCUJsb2NrQXBwczEOMAwGA1UEAwwFQWRtaW4x
+ITAfBgkqhkiG9w0BCQEWEmluZm9AYmxvY2thcHBzLm5ldDBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABDzHJIjkUFUq2gjFGtYGxphacY5KkS2CIJdYMDz8Q17nTmxaeKhN
+WzZSXO1OJ9pGV+XmogflsPbcUhM1nxbf/HAwCgYIKoZIzj0EAwIDSAAwRQIgC36s
+XYTtgQ7oC680AwflmbaqdBXES0NF9R+bWZksaSgCIQDKVknO52m6244djL3EvZ1d
+6usbU2KkC+E57SI0rU13rQ==
 -----END CERTIFICATE-----|],
 
 -- CN = BlockApps Support, O = BlockApps, OU = Mercata, C = USA
@@ -247,9 +694,78 @@ BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
 9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
 R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
 N8txKc8G9R27ZYAUuz15zF0=
------END CERTIFICATE-----|]
+-----END CERTIFICATE-----|],
 
-  
+-- CN = BlockApps, O = BlockApps, OU = '', C = ''
+    [r|-----BEGIN CERTIFICATE-----
+MIIBgjCCASegAwIBAgIQP3LNH8vr+118O6J/CIP78jAMBggqhkjOPQQDAgUAMEgx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
+Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjQwNDIzMTcwNzI0WhcNMjUwNDIz
+MTcwNzI0WjA+MRIwEAYDVQQDDAlCbG9ja0FwcHMxEjAQBgNVBAoMCUJsb2NrQXBw
+czEJMAcGA1UECwwAMQkwBwYDVQQGDAAwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATf
+31hXrACSTv/8cNMI0tWeA0GOtrh2rSg7ssDhbduFZvoMIDD50CDKMdknVcWDbMN6
+rrmTpNpDx+lwiQA3fNsTMAwGCCqGSM49BAMCBQADRwAwRAIgZ6z4c630p5S4ubC3
+FnsaXJsWsGrXKNZbaZMeUfRBYugCIGAFGgSqW1PSoLvwXeK1ih9BBjyKFpW+PlE/
+jtQJMv3t
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
+MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
+MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
+9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
+R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
+N8txKc8G9R27ZYAUuz15zF0=
+-----END CERTIFICATE-----|],
+
+-- CN = dnorwood-personal, O = Mercata Account d1ce262af, OU = '', C = ''
+    [r|-----BEGIN CERTIFICATE-----
+MIIBhTCCASmgAwIBAgIQJAvYwPpzGED65EyJ5Cg42jAMBggqhkjOPQQDAgUAMEgx
+DjAMBgNVBAMMBUFkbWluMRIwEAYDVQQKDAlCbG9ja0FwcHMxFDASBgNVBAsMC0Vu
+Z2luZWVyaW5nMQwwCgYDVQQGDANVU0EwHhcNMjQwMzI2MTk0MTMzWhcNMjUwMzI2
+MTk0MTMzWjBAMRowGAYDVQQDDBFkbm9yd29vZC1wZXJzb25hbDEiMCAGA1UECgwZ
+TWVyY2F0YSBBY2NvdW50IGQxY2UyNjJhZjBWMBAGByqGSM49AgEGBSuBBAAKA0IA
+BKVNGLs80o4HLkJawrDC/Bf10mtxGoPT04BPTVCOQZapfLvuDSPTZpPGr7yFgzuF
+mMYI3mqvkhhwQJL9DxKBrtcwDAYIKoZIzj0EAwIFAANIADBFAiEAwZg2LRxnvXT0
+i8vNXdiMuAG+y8U9itaUXRM1iUG2olYCIHt+KODJIBTRy2e0LsIIPJI8dX3p8gVs
+99HonTEOziXy
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
+MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
+MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
+9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
+R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
+N8txKc8G9R27ZYAUuz15zF0=
+-----END CERTIFICATE-----|],
+
+-- CN = gotan, O = BlockApps, OU = '', C = ''
+    [r|-----BEGIN CERTIFICATE-----
+MIIBajCCAQ6gAwIBAgIRAOxcR4q96wNTjpqVNYSI8rIwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTI0MDgxNTE5NTE0NFoXDTI1MDgx
+NTE5NTE0NFowJDEOMAwGA1UEAwwFZ290YW4xEjAQBgNVBAoMCUJsb2NrQXBwczBW
+MBAGByqGSM49AgEGBSuBBAAKA0IABDQUTuESFIQQEPZa38l/ShY1MO+eaFK7sXv/
+phDUCMQWK2XTl7p8qBtQZO7gtEBmxNXG3KIWg6s4CYt7s3FOxVwwDAYIKoZIzj0E
+AwIFAANIADBFAiEAxrawRiWvN+F6cSNc4TG26O9CHVUIbyC/k3WcDxaK7t4CIGi2
+S/u4WZO1JqHQdIysBA2MlBUZbssxWKcjBqKqBTLJ
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI
+MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF
+bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy
+MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU
+MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG
+BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs
+9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8
+R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n
+N8txKc8G9R27ZYAUuz15zF0=
+-----END CERTIFICATE-----|]
   ]
 
 extraCerts :: [X509Certificate]
@@ -257,8 +773,12 @@ extraCerts = map (\s -> either (error $ "can't parse cert: " ++ show s) id $ byt
 
 validators :: [Validator]
 validators = [
-  "bluecabinet"
---  "marketplace.mercata-beta.blockapps.net",
+    "NodeOne",
+    "NodeTwo",
+    "NodeThree",
+    "NodeFour"
+--  "bluecabinet"
+--  "marketplace.mercata-beta.blockapps.net"
 --  "blockchainhaberdasher.com"
   ]
 

@@ -17,5 +17,5 @@ predicate _ = False
 
 main :: IO ()
 main = do
-  void $ $initHFlagsDependentDefaults "debugger spec" (const $ const $ const $ [("requireCerts", "False"), ("minLogLevel", "LevelDebug"), ("accountNonceLimit", "10")])
+  void $ $initHFlagsDependentDefaults "debugger spec" (const $ const $ const $ [("minLogLevel", "LevelDebug")])
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec

@@ -1,0 +1,22 @@
+contract record PowerDealEvent {
+    enum PowerDealEvent {
+        NULL,
+        TRADER_PRICE,
+        COUNTER_PARTY_PRICE,
+        PRICE_MATCH,
+        PRICE_MISMATCH,
+        TRANSMISSION_MATCH,
+        TRANSMISSION_MISMATCH,
+        TRADER_CUTS_APPROVAL,
+        COUNTER_CUTS_APPROVAL,
+        EXCEPTION_CUTS_RESUPPLY,
+        RESUPPLY_COMPLETED,
+        EXCEPTION_CUTS_BOOKOUT,
+        BOOKOUT_COMPLETED,
+        EXCEPTION_CUTS_ADJUSTMENT,
+        ADJUSTMENT_COMPLETED,
+        SETTLEMENT,
+        PAID_OUT,
+        MAX
+    }
+}
