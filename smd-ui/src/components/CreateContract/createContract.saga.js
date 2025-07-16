@@ -1,4 +1,4 @@
-import { takeLatest, put, call, delay } from 'redux-saga/effects';
+import { takeLatest, put, call } from 'redux-saga/effects';
 import {
   CREATE_CONTRACT_REQUEST,
   createContractSuccess,
@@ -140,13 +140,13 @@ function* pollTransactionResult(txHash, maxAttempts = 30) {
       }
       
       // Wait 2 seconds before next attempt
-      yield delay(2000);
+      yield call(sleep, 2000);
     } catch (error) {
       console.log(`[TRACE] Transaction result attempt ${attempt + 1} failed:`, error);
       if (attempt === maxAttempts - 1) {
         throw error;
       }
-      yield delay(2000);
+      yield call(sleep, 2000);
     }
   }
   throw new Error('Transaction polling timeout');
@@ -245,3 +245,6 @@ export function* watchCompileContract() {
 export default function* watchCreateContract() {
   yield takeLatest(CREATE_CONTRACT_REQUEST, createContract);
 }
+
+// Simple sleep helper for polling without needing redux-saga's delay (not available in v0.15)
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
