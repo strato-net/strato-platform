@@ -22,3 +22,4 @@ export const nodeUrl = process.env.NODE_URL;
 export const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 export const stripeWebhookKey = process.env.STRIPE_WEBHOOK_SECRET || "";
 export const onRamp = process.env.ONRAMP;
+export const voucher = process.env.VOUCHER;

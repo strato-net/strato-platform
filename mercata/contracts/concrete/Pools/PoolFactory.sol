@@ -23,6 +23,9 @@ import "../Tokens/Token.sol";
 interface ITokenAccess {
     function addMinter(address accountAddress) external;
     function removeMinter(address accountAddress) external;
+    function addBurner(address accountAddress) external;
+    function removeBurner(address accountAddress) external;
+    function transferAdmin(address accountAddress) external;
 }
 
 /// @notice Pool factory contract

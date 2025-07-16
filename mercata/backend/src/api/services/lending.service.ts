@@ -9,10 +9,8 @@ import {
   simulateLoan, 
   CollateralInfo, 
   AssetConfig, 
-  calculateCollateralMetrics, 
-  calculateAccruedInterest,
+  calculateCollateralMetrics,
   calculateExchangeRate,
-  calculateTotalUSDSTSupplied,
   calculateTotalBorrowed,
   calculateUtilizationRate,
   calculateTotalCollateralValue,
@@ -316,7 +314,7 @@ export const liquidityAndBalance = async (
   // Fetch pool data with optimized query
   const registry = await getPool(accessToken, undefined);
   
-  const { borrowableAsset, mToken, assetConfigs, userLoan } = registry.lendingPool || {};
+  const { borrowableAsset, mToken, assetConfigs, userLoan, totalBorrowPrincipal } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
 
   if (!borrowableAsset || !mToken) {
@@ -340,7 +338,7 @@ export const liquidityAndBalance = async (
 
   // Extract total supply values with fallbacks
   const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
-  const actualUnderlying = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0";
+  const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0";
   // Get borrowable asset config
   const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
 
@@ -362,13 +360,15 @@ export const liquidityAndBalance = async (
 
   // Calculate all pool metrics in parallel
   const currentTime = Math.floor(Date.now() / 1000);
+  const totalUSDSTSupplied = (toBig(availableLiquidity) + toBig(totalBorrowPrincipal)).toString();
+  
   const [
     exchangeRate,
     totalBorrowed,
     totalCollateralValue,
     apyData
   ] = await Promise.all([
-    Promise.resolve(calculateExchangeRate(totalMTokenSupply, actualUnderlying)),
+    Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied)),
     Promise.resolve(calculateTotalBorrowed(
       userLoan || [], 
       borrowableAssetConfig?.interestRate || 0, 
@@ -387,9 +387,7 @@ export const liquidityAndBalance = async (
   ]);
 
   // Calculate derived metrics
-  const totalUSDSTSupplied = calculateTotalUSDSTSupplied(totalMTokenSupply, exchangeRate);
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
-  const availableLiquidity = BigInt(totalUSDSTSupplied) - BigInt(totalBorrowed);
 
   // Calculate max withdrawable amount using exchange rate directly
   const userMTokenBalance = BigInt(mTokenBalance);
@@ -415,7 +413,7 @@ export const liquidityAndBalance = async (
     totalUSDSTSupplied,
     totalBorrowed,
     utilizationRate,
-    availableLiquidity: availableLiquidity.toString(),
+    availableLiquidity,
     totalCollateralValue,
     supplyAPY: apyData.supplyAPY,
     borrowAPY: apyData.borrowAPY,

@@ -66,6 +66,12 @@ contract record LendingPool is Ownable {
     address public borrowableAsset; // The one asset that can be borrowed
     address public mToken; // mToken for the borrowable asset
 
+    // ───────────────────────────────────────────────────────────────────────────
+    // NEW: Aggregate principal tracking so exchange rate reflects outstanding
+    // debt.  Increases on borrow, decreases on principal repayment / liquidation.
+    // ───────────────────────────────────────────────────────────────────────────
+    uint256 public totalBorrowPrincipal;
+    
     // External Contracts
     LendingRegistry public registry;
     TokenFactory public tokenFactory;
@@ -232,6 +238,8 @@ contract record LendingPool is Ownable {
 
         // Update state after borrow
         loan.principalBalance += amount;
+        // Track aggregate outstanding principal for accurate exchange-rate math
+        totalBorrowPrincipal += amount;
         loan.interestOwed += accruedInterest;  // Add any accrued interest to interestOwed
         loan.lastIntCalculated = block.timestamp;
         loan.lastUpdated = block.timestamp;
@@ -300,6 +308,12 @@ contract record LendingPool is Ownable {
             loan.interestOwed -= interestPortion;
             loan.lastIntCalculated = block.timestamp;
             loan.lastUpdated = block.timestamp;
+        }
+
+        // Adjust aggregate principal tracker
+        if (principalPortion > 0) {
+            require(totalBorrowPrincipal >= principalPortion, "Principal tracker underflow");
+            totalBorrowPrincipal -= principalPortion;
         }
 
         emit Repaid(msg.sender, borrowableAsset, repayAmount);
@@ -383,6 +397,12 @@ contract record LendingPool is Ownable {
         } else {
             loan.lastIntCalculated = block.timestamp;
             loan.lastUpdated = block.timestamp;
+        }
+
+        // Adjust aggregate principal tracker for the portion of principal actually repaid
+        if (repaidPrincipal > 0) {
+            require(totalBorrowPrincipal >= repaidPrincipal, "Principal tracker underflow");
+            totalBorrowPrincipal -= repaidPrincipal;
         }
 
         // Calculate collateral to seize
@@ -511,16 +531,17 @@ contract record LendingPool is Ownable {
             return 1e18; // Initial 1:1 ratio
         }
         
-        // Get actual underlying balance in the LiquidityPool
-        uint256 actualUnderlying = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
-        
-        if (actualUnderlying == 0) {
-            return 1e18; // Fallback to 1:1 if no underlying
+        uint256 cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
+
+        // Include outstanding principal so the rate never dips below 1 when cash is lent out
+        uint256 underlying = cash + totalBorrowPrincipal;
+
+        if (underlying == 0) {
+            return 1e18; // Fallback to 1:1 if no underlying/cash
         }
-        
-        // Exchange rate = actualUnderlying / totalSupply
-        // This shows how much underlying each mToken can be redeemed for
-        return (actualUnderlying * 1e18) / totalSupply_;
+
+        // Exchange rate = (cash + outstanding principal) / total mToken supply
+        return (underlying * 1e18) / totalSupply_;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -701,6 +722,4 @@ contract record LendingPool is Ownable {
         
         return (totalCollateralValue * 1e18) / borrowableAssetPrice;
     }
-
-
 } 

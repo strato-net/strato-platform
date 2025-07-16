@@ -143,11 +143,24 @@ const SwapPoolsSection = () => {
     }
   };
 
-  const handleOpenWithdrawModal = (pool: LiquidityPool) => {
+  const handleOpenWithdrawModal = async (pool: LiquidityPool): Promise<void> => {
     if (operationInProgressRef.current) return;
-    
+
     setSelectedPool(pool);
     setIsWithdrawModalOpen(true);
+
+    try {
+      const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
+      setTokenABalance(balances.tokenABalance);
+      setTokenBBalance(balances.tokenBBalance);
+      setUsdstBalance(balances.usdstBalance);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch token balances",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCloseWithdrawModal = () => {
