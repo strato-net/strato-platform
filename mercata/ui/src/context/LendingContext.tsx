@@ -8,15 +8,15 @@ import React, {
 } from "react";
 import { parseUnits } from "ethers";
 import { api } from "@/lib/axios";
-import { Loan, WithdrawableToken } from "@/interface";
+import { CollateralData, LendData, LiquidityData, NewLoanData } from "@/interface";
 import { useUser } from "@/context/UserContext";
 
 
 type LendingContextType = {
-  loans: Loan[];
+  loans: NewLoanData;
   loadingLoans: boolean;
-  refreshLoans: (signal?: AbortSignal) => Promise<Loan[] | undefined>;
-  liquidityInfo: any;
+  refreshLoans: (signal?: AbortSignal) => Promise<NewLoanData[] | undefined>;
+  liquidityInfo: LiquidityData;
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
@@ -26,19 +26,19 @@ type LendingContextType = {
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     amount: string;
-  }) => Promise<any>;
+  }) => Promise<void>;
   repayLoan: (args: {
     amount: string;
-  }) => Promise<any>;
-  getLend: () => Promise<any>;
-  depositLiquidity: (args: { amount: string }) => Promise<any>;
-  withdrawLiquidity: (args: { amount: string }) => Promise<any>;
+  }) => Promise<void>;
+  getLend: () => Promise<LendData>;
+  depositLiquidity: (args: { amount: string }) => Promise<void>;
+  withdrawLiquidity: (args: { amount: string }) => Promise<void>;
 
-  collateralInfo: any;
+  collateralInfo: CollateralData[];
   refreshCollateral: (signal?: AbortSignal) => void;
   loadingCollateral: boolean;
-  supplyCollateral: (args: { asset: string; amount: string }) => Promise<any>;
-  withdrawCollateral: (args: { asset: string; amount: string }) => Promise<any>;
+  supplyCollateral: (args: { asset: string; amount: string }) => Promise<void>;
+  withdrawCollateral: (args: { asset: string; amount: string }) => Promise<void>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -48,12 +48,12 @@ export const LendingProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loans, setLoans] = useState<NewLoanData>();
   const [loadingLoans, setLoadingLoans] = useState(true);
 
-  const [liquidityInfo, setLiquidityInfo] = useState<any>()
+  const [liquidityInfo, setLiquidityInfo] = useState<LiquidityData>()
   const [loadingLiquidity, setLoadingLiquidity] = useState(true);
-  const [collateralInfo, setCollateralInfo] = useState<any>()
+  const [collateralInfo, setCollateralInfo] = useState<CollateralData[]>()
   const [loadingCollateral, setLoadingCollateral] = useState(true)
 
   // Access authentication status
@@ -62,13 +62,13 @@ export const LendingProvider = ({
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
     setLoadingLiquidity(true);
     try {
-      const res = await api.get<WithdrawableToken[]>("/lending/liquidity", {
+      const res = await api.get<LiquidityData>("/lending/liquidity", {
         signal,
       });
       if (res.data) {
           setLiquidityInfo(res.data);
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
@@ -79,13 +79,13 @@ export const LendingProvider = ({
   const fetchCollateralInfo = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoadingCollateral(true);
-      const res = await api.get<WithdrawableToken[]>("/lending/collateral", {
+      const res = await api.get<CollateralData[]>("/lending/collateral", {
         signal,
       });
       if (res.data) {
           setCollateralInfo(res.data);
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
@@ -99,10 +99,9 @@ export const LendingProvider = ({
       const res = await api.get("/lending/loans", { signal });
       setLoans(res.data);
       return res.data;
-    } catch (err: any) {
+    } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to fetch loans:", err);
-      setLoans([]);
       return [];
     } finally {
       setLoadingLoans(false);
@@ -113,12 +112,11 @@ export const LendingProvider = ({
     const weiPrice = parseUnits(payload.price, 18).toString();
     try {
       await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to set price:", err);
       throw err;
     }
   };
-
 
   const configureAsset = async (payload: { 
     asset: string; 
@@ -142,11 +140,10 @@ export const LendingProvider = ({
     amount: string;
   }) => {
     try {
-      const res = await api.post("/lending/loans", {
-        amount,
+      await api.post("/lending/loans", {
+        amount
       });
-      return res;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Borrow failed:", err);
       throw err;
     }
@@ -160,11 +157,10 @@ export const LendingProvider = ({
     asset: string;
   }) => {
     try {
-      const res = await api.patch("/lending/loans", {
-        amount,
+      await api.patch("/lending/loans", {
+        amount
       });
-      return res;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Repay failed:", err);
       throw err;
     }
@@ -174,7 +170,7 @@ export const LendingProvider = ({
     try {
       const res = await api.get("/lend/");
       return res.data;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Get lend failed:", err);
       throw err;
     }
@@ -182,9 +178,8 @@ export const LendingProvider = ({
 
   const depositLiquidity = async (args: { amount: string }) => {
     try {
-      const res = await api.post("/lending/pools/liquidity", args);
-      return res;
-    } catch (err: any) {
+      await api.post("/lending/pools/liquidity", args);
+    } catch (err) {
       console.error("Deposit liquidity failed:", err);
       throw err;
     }
@@ -192,9 +187,8 @@ export const LendingProvider = ({
 
   const withdrawLiquidity = async (args: { amount: string }) => {
     try {
-      const res = await api.delete("/lending/pools/liquidity", {data: args});
-      return res;
-    } catch (err: any) {
+      await api.delete("/lending/pools/liquidity", {data: args});
+    } catch (err) {
       console.error("Withdraw liquidity failed:", err);
       throw err;
     }
@@ -202,9 +196,8 @@ export const LendingProvider = ({
 
   const supplyCollateral = async (args: { asset: string, amount: string }) => {
     try {
-      const res = await api.post("/lending/collateral", args);
-      return res;
-    } catch (err: any) {
+       await api.post("/lending/collateral", args);
+    } catch (err) {
       console.error("Withdraw liquidity failed:", err);
       throw err;
     }
@@ -212,9 +205,8 @@ export const LendingProvider = ({
 
   const withdrawCollateral = async (args: { asset: string, amount: string }) => {
     try {
-      const res = await api.delete("/lending/collateral", {data: args});
-      return res;
-    } catch (err: any) {
+      await api.delete("/lending/collateral", {data: args});
+    } catch (err) {
       console.error("Withdraw liquidity failed:", err);
       throw err;
     }
@@ -226,7 +218,7 @@ export const LendingProvider = ({
       await fetchLoans();
       await fetchLiquidityInfo()
       await fetchCollateralInfo()
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to refresh lending data:", err);
       throw err;
     }

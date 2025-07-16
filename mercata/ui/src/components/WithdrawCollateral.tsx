@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
-  asset: any;
-  loanData: any;
+  asset: CollateralData;
+  loanData: NewLoanData;
   isOpen: boolean;
   onClose: () => void;
   onWithdraw: (amount: string) => void;
@@ -44,8 +45,8 @@ const getHealthFactorColor = (healthFactor: number) => {
 // Calculate health impact of withdrawal
 const calculateHealthImpact = (
   withdrawAmount: number,
-  asset: any,
-  loanData: any
+  asset: CollateralData,
+  loanData: NewLoanData
 ) => {
   if (!asset || !loanData) {
     return {
@@ -186,8 +187,20 @@ const WithdrawCollateralModal = ({
 
           <div className="space-y-3">
             <label className="text-sm font-medium">Withdraw Amount</label>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Max: {formatUnits(asset?.collateralizedAmount || 0,18)}</span>
+            <div className="flex justify-between items-center text-xs text-gray-500">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWithdrawAmount(formatUnits(asset?.collateralizedAmount || 0, 18));
+                    setDisplayAmount(addCommasToInput(formatUnits(asset?.collateralizedAmount || 0, 18)));
+                  }}
+                  className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                >
+                  Max :
+                </button>
+                <span>${formatUnits(asset?.collateralizedAmount || 0, 18)}</span>
+              </div>
             </div>
             <div className="relative">
               <Input

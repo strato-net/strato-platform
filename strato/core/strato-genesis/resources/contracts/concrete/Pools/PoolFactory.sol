@@ -23,6 +23,9 @@ import "../Tokens/Token.sol";
 interface ITokenAccess {
     function addMinter(address accountAddress) external;
     function removeMinter(address accountAddress) external;
+    function addBurner(address accountAddress) external;
+    function removeBurner(address accountAddress) external;
+    function transferAdmin(address accountAddress) external;
 }
 
 /// @notice Pool factory contract
@@ -210,10 +213,13 @@ contract record PoolFactory is Ownable {
 
         // deploy new pool first
         pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
-        
+
         // NEW: allow the pool to mint its own LP tokens
         ITokenAccess(lpTokenAddress).addMinter(pool);
         ITokenAccess(lpTokenAddress).removeMinter(address(this));
+        ITokenAccess(lpTokenAddress).addBurner(pool);
+        ITokenAccess(lpTokenAddress).removeBurner(address(this));
+        ITokenAccess(lpTokenAddress).transferAdmin(pool);
         Ownable(lpTokenAddress).transferOwnership(pool);
 
         // update pool registry

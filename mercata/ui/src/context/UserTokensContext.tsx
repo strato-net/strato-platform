@@ -52,7 +52,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       if (signal?.aborted) return;
       
       setUsdstBalance(res?.data?.[0]?.balance || "0");
-    } catch (err: any) {
+    } catch (err) {
       if (
         axios.isCancel?.(err) ||
         err?.name === "CanceledError" ||
@@ -87,7 +87,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setActiveTokens(prev => (isEqual(prev, active) ? prev : active));
       setInactiveTokens(prev => (isEqual(prev, inactive) ? prev : inactive));
-    } catch (err: any) {
+    } catch (err) {
       if (
         axios.isCancel?.(err) ||
         err?.name === "CanceledError" ||
@@ -117,7 +117,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       if (signal?.aborted) return;
       const tokens = response.data || [];
       setAllActiveTokens(tokens);
-    } catch (err: any) {
+    } catch (err) {
       if (
         axios.isCancel?.(err) ||
         err?.name === "CanceledError" ||

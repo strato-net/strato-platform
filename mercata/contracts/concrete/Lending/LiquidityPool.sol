@@ -45,23 +45,24 @@ contract record LiquidityPool is Ownable  {
     }
 
     /**
-     * @notice Deposit underlying asset into the pool
-     * @param amount Amount of underlying asset to deposit
-     * @param user Recipient of the minted mTokens
+     * @notice Deposit underlying asset and mint interest-bearing mTokens based on current exchange rate
+     * @param amount       Amount of underlying asset the user is supplying
+     * @param mintAmount   Number of mTokens that should be minted for the user (calculated in LendingPool)
+     * @param user         Recipient of the minted mTokens
      */
-    function deposit(uint256 amount, address user) external onlyLendingPool {
-        require(amount > 0 && user != address(0), "Invalid deposit");
+    function deposit(uint256 amount, uint256 mintAmount, address user) external onlyLendingPool {
+        require(amount > 0 && mintAmount > 0 && user != address(0), "Invalid deposit");
         require(address(mToken) != address(0), "mToken not set");
 
         address asset = _getAsset();
 
-        // Pull funds from user
+        // Pull funds from the user into the pool
         require(IERC20(asset).transferFrom(user, address(this), amount), "Transfer failed");
 
-        // Mint mTokens 1:1 with deposits 
-        mToken.mint(user, amount);
+        // Mint calculated amount of mTokens to the user
+        mToken.mint(user, mintAmount);
 
-        emit Deposited(user, amount, amount);
+        emit Deposited(user, amount, mintAmount);
     }
 
     /**

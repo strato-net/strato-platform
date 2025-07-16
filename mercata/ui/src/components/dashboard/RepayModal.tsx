@@ -6,13 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
+import { NewLoanData } from "@/interface";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RepayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  loan: any | null;
+  loan: NewLoanData | null;
   onRepaySuccess: () => void;
   usdstBalance?: string;
 }
@@ -152,7 +153,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
 
         <div className="space-y-3">
           <label className="text-sm font-medium">Repay Amount (USDST)</label>
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between items-center text-xs text-gray-500">
             <span>Min: $0.01</span>
             <span>Max: ${(() => {
               const totalOwed = BigInt(loan?.totalAmountOwed || 0);

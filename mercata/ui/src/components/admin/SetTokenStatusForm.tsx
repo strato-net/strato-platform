@@ -8,6 +8,7 @@ import { Loader2, Info, Settings } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTokenContext } from '@/context/TokenContext';
+import { ApiErrorResponse } from '@/interface';
 
 interface SetTokenStatusFormValues {
   status: number;
@@ -62,7 +63,7 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
       form.reset();
       onOpenChange(false);
     } catch (error: unknown) {
-      const axiosError = error as AxiosError<any>;
+      const axiosError = error as AxiosError<ApiErrorResponse>;
       console.error('Token status error:', axiosError);
       
       toast({

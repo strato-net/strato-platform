@@ -258,21 +258,21 @@ export const calculateCollateralMetrics = (
 /**
  * Calculate exchange rate between mToken and underlying asset
  * @param totalMTokenSupply Total mToken supply
- * @param actualUnderlying Total underlying asset in pool
+ * @param totalUSDSTSupplied Total underlying asset in pool
  * @returns Exchange rate scaled by 1e18
  */
 export const calculateExchangeRate = (
   totalMTokenSupply: string,
-  actualUnderlying: string
+  totalUSDSTSupplied: string
 ): string => {
   const mTokenSupply = toBig(totalMTokenSupply);
-  const underlying = toBig(actualUnderlying);
+  const underlying = toBig(totalUSDSTSupplied);
   
   if (mTokenSupply === 0n || underlying === 0n) {
     return DECIMALS.toString(); // Default 1:1 ratio
   }
   
-  // Exchange rate = actualUnderlying / totalSupply (scaled by 1e18)
+  // Exchange rate = totalUSDSTSupplied / totalMTokenSupply (scaled by 1e18)
   return ((underlying * DECIMALS) / mTokenSupply).toString();
 };
 

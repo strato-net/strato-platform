@@ -13,7 +13,7 @@
         uint256 durationSeconds = block.timestamp - lastUpdated;
         uint256 hoursElapsed = durationSeconds / 3600; // whole hours only; <1h accrues 0 interest
         if (hoursElapsed == 0) return 0;
-        // 8760 hours in a year; divide by 100 to convert rate percentage
-        return (principal * rate * hoursElapsed) / (8760 * 100);
+        // 8760 hours in a year; divide by 10_000 to convert rate from basis points (bps) to a percentage
+        return (principal * rate * hoursElapsed) / (8760 * 10000);
     }
 }
