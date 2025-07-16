@@ -64,15 +64,12 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
       const amountWei = parseUnits(withdrawAmount, 18);
-      const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
-      const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000"); // Default 1:1 if not available
+      const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
       const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
       const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
       
-      // Calculate how many mUSDST would be burned for this withdrawal
-      const mTokensToBurn = (amountWei * (10n ** 18n)) / exchangeRateWei;
       if (amountWei <= 0n) return false;
-      if (mTokensToBurn > userMTokenBalanceWei) return false; // Check if user has enough mUSDST
+      if (amountWei > maxWithdrawableWei) return false; // Check against max withdrawable (considers both user balance and pool liquidity)
       if (usdstBalanceWei < feeWei) return false;
       return true;
     } catch {
