@@ -389,11 +389,19 @@ export const liquidityAndBalance = async (
   // Calculate derived metrics
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
 
-  // Calculate max withdrawable amount using exchange rate directly
+  // Calculate max withdrawable amount considering both user's mUSDST balance and pool's available liquidity
   const userMTokenBalance = BigInt(mTokenBalance);
-  const maxWithdrawableUSDST = userMTokenBalance > 0n 
-    ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n)).toString()
-    : "0";
+  const userUSDSTValue = userMTokenBalance > 0n 
+    ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
+    : 0n;
+  
+  // Pool's available liquidity (cash in the pool)
+  const poolAvailableLiquidity = BigInt(availableLiquidity);
+  
+  // Max withdrawable is the minimum of user's USDST value and pool's available liquidity
+  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
+    ? userUSDSTValue.toString()
+    : poolAvailableLiquidity.toString();
 
   // Destructure token data to exclude balances array
   const { balances: _, ...borrowableTokenClean } = borrowableToken || {};
