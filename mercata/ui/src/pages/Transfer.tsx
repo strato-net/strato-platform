@@ -17,6 +17,14 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Transfer = () => {
   const { userAddress } = useUser();
@@ -35,6 +43,7 @@ const Transfer = () => {
   const [swapLoading, setSwapLoading] = useState<boolean>(false);
   const [wrongAmount, setWrongAmount] = useState(false);
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
 
@@ -57,10 +66,16 @@ const Transfer = () => {
     }
   }, [userAddress, fetchUserTokens, fetchUsdstBalance]);
 
-  const handleTransfer = async () => {
+  const handleTransferClick = () => {
+    if (!fromAsset || !recipient || !fromAmount || wrongAmount) return;
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;
     try {
       setSwapLoading(true);
+      setShowConfirmModal(false);
       await api.post("/tokens/transfer", {
         address: fromAsset.address,
         to: recipient,
@@ -76,7 +91,7 @@ const Transfer = () => {
       setFromAmount("");
       setRecipient("");
       const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find(t => t.address === fromAsset?.address);      
+      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);      
       if (updatedToken) {
         setFromAsset(updatedToken); // triggers re-render with updated balance
       } else {
@@ -297,7 +312,7 @@ const Transfer = () => {
 
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700"
-              onClick={handleTransfer}
+              onClick={handleTransferClick}
               disabled={
                 !fromAsset ||
                 !recipient ||
@@ -330,6 +345,61 @@ const Transfer = () => {
               {swapLoading ? <span>Processing…</span> : "Transfer"}
             </Button>
           </div>
+
+          {/* Confirmation Modal */}
+          <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Confirm Transfer</DialogTitle>
+                <DialogDescription>
+                  Please review your transfer details before confirming.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Token</p>
+                  <p className="font-medium">
+                    {fromAsset?.token?._symbol || fromAsset?.token?._name}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Amount</p>
+                  <p className="font-medium">{fromAmount}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Recipient</p>
+                  <p className="font-medium text-xs break-all">{recipient}</p>
+                </div>
+                <div className="border-t pt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Transaction Fee</span>
+                    <span className="font-medium">{TRANSFER_FEE} USDST</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium border-t pt-2">
+                    <span>Total</span>
+                    <span>
+                      {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST fee
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={handleConfirmTransfer}
+                  disabled={swapLoading}
+                >
+                  {swapLoading ? "Processing..." : "Confirm Transfer"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>
