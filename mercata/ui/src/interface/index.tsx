@@ -300,11 +300,17 @@ export interface LiquidationBonusItem {
   bonus: string;
 }
 
+export interface AssetConfig {
+  interestRate: string;
+  liquidationBonus: string;
+  liquidationThreshold: string;
+  ltv: string;
+  reserveFactor: string;
+}
+
 export interface LendData {
   lendingPool: {
-    collateralRatio: CollateralRatioItem[];
-    interestRate: InterestRateItem[];
-    liquidationBonus: LiquidationBonusItem[];
+    assetConfigs: Record<string, AssetConfig>;
   }
 }
 

@@ -15,11 +15,12 @@ import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, MoreVertical } from 'lucide-react';
 import ConfigureAssetModal from './ConfigureAssetModal';
+import { Token } from '@/interface';
 
 const TokenConfigTable = () => {
   const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
   const { getLend } = useLendingContext();
-  const [lendData, setLendData] = useState<LendData>(null);
+  const [lendData, setLendData] = useState<any>(null); // TODO: Update type when backend response is confirmed
   const [lendLoading, setLendLoading] = useState(false);
   const [configureAssetModalOpen, setConfigureAssetModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
@@ -36,6 +37,12 @@ const TokenConfigTable = () => {
     try {
       setLendLoading(true);
       const data = await getLend();
+      if (data?.registry) {
+        console.log('Registry data present:', data.registry);
+      }
+      if (data?.pool) {
+        console.log('Pool data present:', data.pool);
+      }
       setLendData(data);
     } catch (error) {
       console.error('Error fetching lend data:', error);
@@ -60,44 +67,117 @@ const TokenConfigTable = () => {
     fetchLendData();
   }, [fetchActiveTokens, fetchLendData]);
 
+  const getAssetConfig = (address: string) => {
+    if (!lendData) {
+      console.log('getAssetConfig: No lendData available');
+      return null;
+    }
+    
+    console.log(`Getting asset config for ${address}`);
+    
+    // Check if data is under 'pool' key (backend might return this)
+    const poolData = lendData.pool || lendData.lendingPool;
+    
+    if (poolData?.assetConfigs) {
+      // Handle array structure
+      if (Array.isArray(poolData.assetConfigs)) {
+        const config = poolData.assetConfigs.find(
+          (item: any) => item.asset?.toLowerCase() === address.toLowerCase()
+        );
+        if (config) {
+          console.log(`Found config for ${address}:`, config.AssetConfig);
+          return config.AssetConfig;
+        }
+      }
+      // Handle object/record structure
+      else if (typeof poolData.assetConfigs === 'object') {
+        const config = poolData.assetConfigs[address.toLowerCase()] || 
+                      poolData.assetConfigs[address];
+        if (config) {
+          console.log(`Found config for ${address}:`, config);
+          return config;
+        }
+      }
+    }
+    
+    console.log(`No config found for ${address}`);
+    return null;
+  };
+
   const getCollateralRatio = (address: string) => {
-    if (!lendData?.lendingPool?.collateralRatio) return '-';
-    const collateralData = lendData.lendingPool.collateralRatio.find(
-      (item: CollateralRatioItem) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return collateralData ? `${collateralData.ratio}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.ltv) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.ltv) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getInterestRate = (address: string) => {
-    if (!lendData?.lendingPool?.interestRate) return '-';
-    const interestData = lendData.lendingPool.interestRate.find(
-      (item: InterestRateItem) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return interestData ? `${interestData.rate}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.interestRate) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.interestRate) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getLiquidationBonus = (address: string) => {
-    if (!lendData?.lendingPool?.liquidationBonus) return '-';
-    const bonusData = lendData.lendingPool.liquidationBonus.find(
-      (item: LiquidationBonusItem) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return bonusData ? `${bonusData.bonus}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationBonus) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.liquidationBonus) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getLiquidationThreshold = (address: string) => {
-    if (!lendData?.lendingPool?.liquidationThreshold) return '-';
-    const thresholdData = lendData.lendingPool.liquidationThreshold.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return thresholdData ? `${thresholdData.threshold}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationThreshold) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.liquidationThreshold) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getReserveFactor = (address: string) => {
-    if (!lendData?.lendingPool?.reserveFactor) return '-';
-    const reserveData = lendData.lendingPool.reserveFactor.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return reserveData ? `${reserveData.factor}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.reserveFactor) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.reserveFactor) / 100).toFixed(1);
+    return `${percentage}%`;
+  };
+
+  // Helper functions to get raw values for the modal (not formatted strings)
+  const getRawCollateralRatio = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.ltv) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.ltv) / 100).toFixed(1);
+  };
+
+  const getRawInterestRate = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.interestRate) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.interestRate) / 100).toFixed(1);
+  };
+
+  const getRawLiquidationBonus = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationBonus) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.liquidationBonus) / 100).toFixed(1);
+  };
+
+  const getRawLiquidationThreshold = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationThreshold) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.liquidationThreshold) / 100).toFixed(1);
+  };
+
+  const getRawReserveFactor = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.reserveFactor) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.reserveFactor) / 100).toFixed(1);
   };
 
   const handleConfigureAsset = (token: {address: string; symbol: string; name: string}) => {
@@ -243,11 +323,11 @@ const TokenConfigTable = () => {
         onOpenChange={setConfigureAssetModalOpen}
         token={selectedToken}
         currentConfig={selectedToken ? {
-          ltv: getCollateralRatio(selectedToken.address),
-          liquidationThreshold: getLiquidationThreshold(selectedToken.address),
-          liquidationBonus: getLiquidationBonus(selectedToken.address),
-          interestRate: getInterestRate(selectedToken.address),
-          reserveFactor: getReserveFactor(selectedToken.address),
+          ltv: getRawCollateralRatio(selectedToken.address),
+          liquidationThreshold: getRawLiquidationThreshold(selectedToken.address),
+          liquidationBonus: getRawLiquidationBonus(selectedToken.address),
+          interestRate: getRawInterestRate(selectedToken.address),
+          reserveFactor: getRawReserveFactor(selectedToken.address),
         } : undefined}
         onSuccess={refreshAllData}
       />

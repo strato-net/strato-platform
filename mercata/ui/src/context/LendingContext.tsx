@@ -168,7 +168,7 @@ export const LendingProvider = ({
 
   const getLend = async () => {
     try {
-      const res = await api.get("/lend/");
+      const res = await api.get("/lend/pools");
       return res.data;
     } catch (err) {
       console.error("Get lend failed:", err);
