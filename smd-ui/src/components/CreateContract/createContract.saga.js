@@ -188,6 +188,10 @@ export function* createContract(action) {
       // If transaction is pending, poll for the result
       if (resp.status === 'Pending' && resp.hash) {
         console.log('[TRACE] Transaction pending, polling for result...');
+
+        // Dispatch a loading toast so user sees immediate feedback
+        yield put(createContractSuccess(resp, 'LOADING...'));
+
         try {
           const finalResult = yield call(pollTransactionResult, resp.hash);
           console.log('[TRACE] Final transaction result:', finalResult);
@@ -209,7 +213,7 @@ export function* createContract(action) {
         yield put(createContractSuccess(resp, contractAddress));
       }
       
-      yield put(updateToast());
+      // Hide toast after display duration automatically handled in UI; do not reset here.
       yield put(fetchContracts(action.payload.chainId, 10, 0));
       yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));
     }
