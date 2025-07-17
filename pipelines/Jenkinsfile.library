@@ -1476,7 +1476,7 @@ def replaceServerPortsDocker() {
 def waitLocalNodeIsSynced() {
   echo "Waiting for local node to be in-sync and healthy..."
   for (int i = 0; i < 1800; i++) {
-    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 bash -c 'curl strato:3000/eth/v1.2/metadata | grep \"isSynced\":true'")   != 0) {
+    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 bash -c \"curl strato:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true\"") != 0) {
       sleep 2
     } else {
       return true
