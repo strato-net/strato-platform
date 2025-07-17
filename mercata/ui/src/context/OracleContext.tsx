@@ -33,33 +33,34 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     
-    try {
-      console.log(`Fetching oracle price for asset: ${assetAddress}`);
-      const response = await api.get(`/oracle/price?asset=${assetAddress}`);
-      const oraclePrice = response.data;
-      console.log(`Oracle price response for ${assetAddress}:`, oraclePrice);
-      console.log(`Raw price value: ${oraclePrice.price}, type: ${typeof oraclePrice.price}`);
-      
-      if (oraclePrice && oraclePrice.price) {
-        setPrices(prev => ({
-          ...prev,
-          [assetAddress.toLowerCase()]: oraclePrice.price
-        }));
-        return oraclePrice.price;
-      }
-      
-      return null;
-    } catch (error) {
-      // Handle 500 errors which likely mean the asset price is not found
-      const axiosError = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
-      if (axiosError.response?.status === 500 && axiosError.response?.data?.message?.includes('Price not found')) {
-        console.warn(`Oracle price not found for asset ${assetAddress}`);
+          try {
+        // Fetch oracle prices directly using the lending/pools endpoint which has access to detailed oracle data
+        const response = await api.get(`/lending/pools`, {
+          params: {
+            select: `priceOracle:priceOracle_fkey(address,prices:BlockApps-Mercata-PriceOracle-prices(asset:key,price:value::text))`
+          }
+        });
+        
+        const registry = response.data;
+        const prices = registry?.priceOracle?.prices || [];
+        
+        const priceEntry = prices.find((p: { asset?: string; price?: string }) => 
+          p.asset && p.asset.toLowerCase() === assetAddress.toLowerCase()
+        );
+        
+        if (priceEntry && priceEntry.price) {
+          setPrices(prev => ({
+            ...prev,
+            [assetAddress.toLowerCase()]: priceEntry.price
+          }));
+          return priceEntry.price;
+        }
+        
         return null;
-      }
-      
-      console.error(`Error fetching oracle price for ${assetAddress}:`, error);
-      setError(axiosError.response?.data?.message || axiosError.message || 'Failed to fetch oracle price');
-      return null;
+          } catch (error) {
+        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+        setError(axiosError.response?.data?.message || axiosError.message || 'Failed to fetch oracle price');
+        return null;
     } finally {
       setLoading(false);
     }
@@ -69,11 +70,9 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     
-    try {
-      console.log('Fetching all oracle prices...');
-      const response = await api.get('/oracle/price');
-      const allPrices = response.data;
-      console.log('All oracle prices response:', allPrices);
+          try {
+        const response = await api.get('/oracle/price');
+        const allPrices = response.data;
       
       if (Array.isArray(allPrices)) {
         const priceMap = allPrices.reduce((acc: Record<string, string>, item: OraclePrice) => {
@@ -84,12 +83,10 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
         }, {});
         
         setPrices(priceMap);
-        console.log('Processed price map:', priceMap);
       }
-    } catch (error) {
-      console.error('Error fetching all oracle prices:', error);
-      const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
-      setError(axiosError.response?.data?.message || axiosError.message || 'Failed to fetch oracle prices');
+          } catch (error) {
+        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+        setError(axiosError.response?.data?.message || axiosError.message || 'Failed to fetch oracle prices');
     } finally {
       setLoading(false);
     }

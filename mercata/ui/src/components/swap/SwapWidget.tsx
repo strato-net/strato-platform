@@ -497,8 +497,6 @@ const SwapWidget = () => {
           fetchPrice(toAsset.address)
         ]);
 
-        console.log(`Oracle prices - ${fromAsset._symbol}: ${fromPrice}, ${toAsset._symbol}: ${toPrice}`);
-
         if (fromPrice && toPrice) {
           // Oracle prices are actually stored in 18-decimal format (1e18 = $1.00), not 8-decimal
           // Parse as 18-decimal values
