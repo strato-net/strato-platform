@@ -78,7 +78,7 @@ const Assets = () => {
           <div className="mb-8">
             <AssetSummary 
               title="Total Assets" 
-              value={formatBalance(totalBalance)}
+              value={`$${formatBalance(totalBalance)}`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />

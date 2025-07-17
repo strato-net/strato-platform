@@ -109,11 +109,11 @@ const AssetDetail = () => {
     );
   }
 
-  const handleConnectWallet = () => { };
+  // const handleConnectWallet = () => { };
 
-  const handleBuyNow = () => { };
+  // const handleBuyNow = () => { };
 
-  const handleBridge = () => { };
+  // const handleBridge = () => { };
 
 
   return (
@@ -178,7 +178,7 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Asset Deposits:</span>
+                      <span className="text-gray-500">User Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
@@ -214,7 +214,7 @@ const AssetDetail = () => {
                       </span>
                     </div>
                   </div>
-                  {!isWalletConnected ? (
+                  {/* {!isWalletConnected ? (
                     <Button
                       onClick={handleConnectWallet}
                       className="w-full flex items-center justify-center gap-2 mb-4"
@@ -247,7 +247,7 @@ const AssetDetail = () => {
                     >
                       Bridge
                     </Button>
-                  </div>
+                  </div> */}
                 </CardContent>
               </Card>
             </div>
