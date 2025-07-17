@@ -7,9 +7,7 @@ import {
   borrow,
   repay,
   executeLiquidation as executeLiquidationService,
-  setInterestRate as setInterestRateService,
-  setCollateralRatio as setCollateralRatioService,
-  setLiquidationBonus as setLiquidationBonusService,
+  configureAsset as configureAssetService,
   supplyCollateral,
   withdrawCollateral,
   collateralAndBalance,
@@ -25,9 +23,7 @@ import {
   validateRepayArgs,
   validateSupplyCollateralArgs,
   validateWithdrawCollateralArgs,
-  validateSetInterestRateArgs,
-  validateSetCollateralRatioArgs,
-  validateSetLiquidationBonusArgs,
+  validateConfigureAssetArgs,
 } from "../validators/lending.validator";
 
 class LendingController {
@@ -221,50 +217,17 @@ class LendingController {
 
   // ---------------- Admin Configuration Methods ----------------
 
-  static async setInterestRate(
+
+  static async configureAsset(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      validateSetInterestRateArgs(body);
+      validateConfigureAssetArgs(body);
 
-      const result = await setInterestRateService(accessToken, body);
-      res.status(RestStatus.OK).json(result);
-      return next();
-    } catch (error) {
-      return next(error);
-    }
-  }
-
-  static async setCollateralRatio(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body } = req;
-      validateSetCollateralRatioArgs(body);
-
-      const result = await setCollateralRatioService(accessToken, body);
-      res.status(RestStatus.OK).json(result);
-      return next();
-    } catch (error) {
-      return next(error);
-    }
-  }
-
-  static async setLiquidationBonus(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body } = req;
-      validateSetLiquidationBonusArgs(body);
-
-      const result = await setLiquidationBonusService(accessToken, body);
+      const result = await configureAssetService(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

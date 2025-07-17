@@ -3,9 +3,10 @@ import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
+import { NewLoanData } from "@/interface";
 
 interface BorrowingSectionProps {
-  loanData?: any;
+  loanData?: NewLoanData;
 }
 
 const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
@@ -135,15 +136,15 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-gray-600 text-sm sm:text-base">Health Factor</span>
-                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor(parseFloat(loanData?.healthFactor || 0)) }}>
+                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     if (currentBorrowed === 0) {
                       return "No Loan";
                     }
                     // Check if health factor is valid
-                    if (loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor))) {
-                      return parseFloat(loanData.healthFactor).toFixed(2);
+                    if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {
+                      return (loanData.healthFactor).toFixed(2);
                     }
                     return "N/A";
                   })()}

@@ -92,7 +92,7 @@ contract record Mercata {
 
         // Create Services
         mercataEthBridge = new MercataEthBridge(msg.sender, address(tokenFactory));
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry));
+        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
 
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
     }

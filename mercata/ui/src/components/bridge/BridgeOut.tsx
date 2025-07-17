@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/select";
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
+import PercentageButtons from "@/components/ui/PercentageButtons";
 import { roundToDecimals } from "@/utils/numberUtils";
+import BridgeWalletStatus from "./BridgeWalletStatus";
 
 interface Token {
   name: string;
@@ -82,7 +84,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
           setTokenBalance("0");
         }
 
-        if (selectedToken?.tokenAddress && address) {
+        if (selectedToken?.tokenAddress ) {
           const balanceData = await getBalance(selectedToken.tokenAddress);
 
           if (mounted && balanceData?.balance) {
@@ -116,7 +118,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     return () => {
       mounted = false;
     };
-  }, [isConnected, address, selectedToken, getBalance, formatBalance]);
+  }, [ selectedToken, getBalance, formatBalance]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -156,6 +158,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
     }
   };
 
+  const handlePercentageClick = (percentageAmount: string) => {
+    setAmount(percentageAmount);
+    validateAmount(percentageAmount);
+  };
+
   const showConfirmModal = () => {
     if (!selectedToken?.tokenAddress || !address) {
       toast({
@@ -193,7 +200,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       if (response?.success) {
         toast({
           title: "Transaction Proposed Successfully",
-          description: "Your transaction has been proposed and is waiting for approval",
+           description: `Your tokens have been burned and ${amount} ${selectedToken?.symbol} will be transferred to ${address}. Withdrawal is pending approval. Please wait for some time.`,
         });
 
         // Refresh balance after successful transaction
@@ -208,7 +215,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       } else {
         throw new Error("Failed to initiate transfer");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Bridge transaction failed:", error);
       toast({
         title: "Failed to initiate transfer",
@@ -222,6 +229,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
 
   return (
     <div className="space-y-6">
+      <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="from">From Network</Label>
@@ -289,6 +297,12 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         {amountError && (
           <p className="text-sm text-red-500">{amountError}</p>
         )}
+        <PercentageButtons
+          value={amount}
+          maxValue={tokenBalance}
+          onChange={handlePercentageClick}
+          className="mt-2"
+        />
         {amount && selectedToken && (
           <p className="text-sm text-gray-500">
             Amount will be rounded down to {selectedToken.decimals} decimal places
@@ -347,6 +361,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
           {isLoading ? "Processing..." : "Bridge Assets"}
         </Button>
       </div>
+      {!isConnected && (
+        <div className="text-center">
+          <p className="text-sm text-red-500">
+            Connect your wallet to bridge assets. Use the wallet where you'd like to receive funds.
+          </p>
+        </div>
+      )}
 
       <Modal
         title="Confirm Bridge Transaction"

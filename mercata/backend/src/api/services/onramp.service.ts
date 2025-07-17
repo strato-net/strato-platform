@@ -191,13 +191,6 @@ export async function buy(
         throw new Error("Invalid provider session response");
       }
 
-      try {
-        const mintUrl = paymentProvider.endpoint.replace("/checkout", "/mint-vouchers");
-        axios.post(mintUrl, { sessionId: data.sessionId }).catch(() => {});
-      } catch (e) {
-        console.warn("Unable to trigger voucher minting: ", e);
-      }
-
       return {
         sessionId: data.sessionId,
         url: data.url,

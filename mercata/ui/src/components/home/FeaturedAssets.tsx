@@ -122,7 +122,7 @@ const FeaturedAssets = () => {
                 <Link to="/dashboard" className="bg-white text-strato-blue px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
                   Launch STRATO
                 </Link>
-                <Link to="/dashboard" className="border border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors">
+                <Link to="https://www.stratomercata.com/" className="border border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors">
                   Learn More
                 </Link>
               </div>

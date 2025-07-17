@@ -14,24 +14,22 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, MoreVertical } from 'lucide-react';
-import SetCollateralRatioModal from './SetCollateralRatioModal';
-import SetInterestRateModal from './SetInterestRateModal';
-import SetLiquidationBonusModal from './SetLiquidationBonusModal';
+import ConfigureAssetModal from './ConfigureAssetModal';
+import { Token, LendingPoolResponse } from '@/interface';
+
 
 const TokenConfigTable = () => {
   const { activeTokens, loading, error, getActiveTokens } = useTokenContext();
   const { getLend } = useLendingContext();
-  const [lendData, setLendData] = useState<any>(null);
+  const [lendData, setLendData] = useState<LendingPoolResponse | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
-  const [collateralRatioModalOpen, setCollateralRatioModalOpen] = useState(false);
-  const [interestRateModalOpen, setInterestRateModalOpen] = useState(false);
-  const [liquidationBonusModalOpen, setLiquidationBonusModalOpen] = useState(false);
+  const [configureAssetModalOpen, setConfigureAssetModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
 
   const fetchActiveTokens = useCallback(async () => {
     try {
       await getActiveTokens();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching active tokens:', error);
     }
   }, [getActiveTokens]);
@@ -40,7 +38,14 @@ const TokenConfigTable = () => {
     try {
       setLendLoading(true);
       const data = await getLend();
-      setLendData(data);
+      const responseData = data as unknown as LendingPoolResponse;
+      if (responseData?.registry) {
+        console.log('Registry data present:', responseData.registry);
+      }
+      if (responseData?.pool) {
+        console.log('Pool data present:', responseData.pool);
+      }
+      setLendData(responseData);
     } catch (error) {
       console.error('Error fetching lend data:', error);
     } finally {
@@ -64,43 +69,122 @@ const TokenConfigTable = () => {
     fetchLendData();
   }, [fetchActiveTokens, fetchLendData]);
 
+  const getAssetConfig = (address: string) => {
+    if (!lendData) {
+      console.log('getAssetConfig: No lendData available');
+      return null;
+    }
+    
+    console.log(`Getting asset config for ${address}`);
+    
+    // Check if data is under 'pool' key (backend might return this)
+    const poolData = lendData.pool || lendData.lendingPool;
+    
+    if (poolData?.assetConfigs) {
+      // Handle array structure
+      if (Array.isArray(poolData.assetConfigs)) {
+        const config = poolData.assetConfigs.find(
+          (item) => item.asset?.toLowerCase() === address.toLowerCase()
+        );
+        if (config) {
+          console.log(`Found config for ${address}:`, config.AssetConfig);
+          return config.AssetConfig;
+        }
+      }
+      // Handle object/record structure
+      else if (typeof poolData.assetConfigs === 'object') {
+        const config = poolData.assetConfigs[address.toLowerCase()] || 
+                      poolData.assetConfigs[address];
+        if (config) {
+          console.log(`Found config for ${address}:`, config);
+          return config;
+        }
+      }
+    }
+    
+    console.log(`No config found for ${address}`);
+    return null;
+  };
+
   const getCollateralRatio = (address: string) => {
-    if (!lendData?.lendingPool?.collateralRatio) return '-';
-    const collateralData = lendData.lendingPool.collateralRatio.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return collateralData ? `${collateralData.ratio}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.ltv) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.ltv) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getInterestRate = (address: string) => {
-    if (!lendData?.lendingPool?.interestRate) return '-';
-    const interestData = lendData.lendingPool.interestRate.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return interestData ? `${interestData.rate}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.interestRate) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.interestRate) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getLiquidationBonus = (address: string) => {
-    if (!lendData?.lendingPool?.liquidationBonus) return '-';
-    const bonusData = lendData.lendingPool.liquidationBonus.find(
-      (item: any) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return bonusData ? `${bonusData.bonus}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationBonus) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.liquidationBonus) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
-  const handleSetCollateralRatio = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setCollateralRatioModalOpen(true);
+  const getLiquidationThreshold = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationThreshold) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.liquidationThreshold) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
-  const handleSetInterestRate = (token: {address: string; symbol: string; name: string}) => {
-    setSelectedToken(token);
-    setInterestRateModalOpen(true);
+  const getReserveFactor = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.reserveFactor) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.reserveFactor) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
-  const handleSetLiquidationBonus = (token: {address: string; symbol: string; name: string}) => {
+  // Helper functions to get raw values for the modal (not formatted strings)
+  const getRawCollateralRatio = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.ltv) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.ltv) / 100).toFixed(1);
+  };
+
+  const getRawInterestRate = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.interestRate) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.interestRate) / 100).toFixed(1);
+  };
+
+  const getRawLiquidationBonus = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationBonus) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.liquidationBonus) / 100).toFixed(1);
+  };
+
+  const getRawLiquidationThreshold = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.liquidationThreshold) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.liquidationThreshold) / 100).toFixed(1);
+  };
+
+  const getRawReserveFactor = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.reserveFactor) return '';
+    // Convert from basis points to percentage
+    return (parseInt(assetConfig.reserveFactor) / 100).toFixed(1);
+  };
+
+  const handleConfigureAsset = (token: {address: string; symbol: string; name: string}) => {
     setSelectedToken(token);
-    setLiquidationBonusModalOpen(true);
+    setConfigureAssetModalOpen(true);
   };
 
   if (loading || lendLoading) {
@@ -145,7 +229,7 @@ const TokenConfigTable = () => {
       <CardHeader>
         <CardTitle>Token Configs</CardTitle>
         <CardDescription>
-          Configure active tokens with collateral ratios, interest rates, and liquidation bonuses
+          Configure active tokens with comprehensive lending parameters including LTV, liquidation thresholds, bonuses, interest rates, and reserve factors
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -164,46 +248,54 @@ const TokenConfigTable = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Symbol</TableHead>
-                  <TableHead className="w-[200px]">Name</TableHead>
-                  <TableHead className="w-[140px]">Address</TableHead>
-                  <TableHead className="w-[80px]">Status</TableHead>
-                  <TableHead className="w-[120px]">Collateral Ratio</TableHead>
-                  <TableHead className="w-[100px]">Interest</TableHead>
-                  <TableHead className="w-[120px]">Liquidation Bonus</TableHead>
+                  <TableHead className="w-[80px]">Symbol</TableHead>
+                  <TableHead className="w-[150px]">Name</TableHead>
+                  <TableHead className="w-[120px]">Address</TableHead>
+                  <TableHead className="w-[70px]">Status</TableHead>
+                  <TableHead className="w-[90px]">LTV</TableHead>
+                  <TableHead className="w-[110px]">Liq. Threshold</TableHead>
+                  <TableHead className="w-[100px]">Liq. Bonus</TableHead>
+                  <TableHead className="w-[80px]">Interest</TableHead>
+                  <TableHead className="w-[90px]">Reserve</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(activeTokens || []).map((token, index) => {
-                  const tokenData = token as any;
+                  const tokenData = token as Token;
                   const name = tokenData.name || token._name || token.token?._name || token["BlockApps-Mercata-ERC20"]?._name || 'Unknown';
                   const symbol = tokenData.symbol || token._symbol || token.token?._symbol || token["BlockApps-Mercata-ERC20"]?._symbol || 'Unknown';
                   const address = tokenData.address || token.address || token.token?.address || token["BlockApps-Mercata-ERC20"]?.address || 'Unknown';
 
                   return (
                     <TableRow key={`${address}-${index}`}>
-                      <TableCell className="font-medium text-sm max-w-[100px] truncate">{symbol}</TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate" title={name}>{name}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[140px]">
+                      <TableCell className="font-medium text-sm max-w-[80px] truncate">{symbol}</TableCell>
+                      <TableCell className="text-sm max-w-[150px] truncate" title={name}>{name}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px]">
                         {address && address !== 'Unknown' 
                           ? `${address.slice(0, 6)}...${address.slice(-4)}`
                           : address
                         }
                       </TableCell>
-                      <TableCell className="max-w-[80px]">
+                      <TableCell className="max-w-[70px]">
                         <Badge variant="default" className="text-xs">
                           ACTIVE
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm max-w-[120px]">
+                      <TableCell className="text-sm max-w-[90px]">
                         {getCollateralRatio(address)}
                       </TableCell>
+                      <TableCell className="text-sm max-w-[110px]">
+                        {getLiquidationThreshold(address)}
+                      </TableCell>
                       <TableCell className="text-sm max-w-[100px]">
+                        {getLiquidationBonus(address)}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[80px]">
                         {getInterestRate(address)}
                       </TableCell>
-                      <TableCell className="text-sm max-w-[120px]">
-                        {getLiquidationBonus(address)}
+                      <TableCell className="text-sm max-w-[90px]">
+                        {getReserveFactor(address)}
                       </TableCell>
                       <TableCell className="max-w-[60px]">
                         <DropdownMenu>
@@ -213,14 +305,8 @@ const TokenConfigTable = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleSetInterestRate({address, symbol, name})}>
-                              Set Interest Rate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetCollateralRatio({address, symbol, name})}>
-                              Set Collateral Ratio
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSetLiquidationBonus({address, symbol, name})}>
-                              Set Liquidation Bonus
+                            <DropdownMenuItem onClick={() => handleConfigureAsset({address, symbol, name})}>
+                              Configure Asset
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -234,27 +320,17 @@ const TokenConfigTable = () => {
         )}
       </CardContent>
       
-      <SetCollateralRatioModal
-        open={collateralRatioModalOpen}
-        onOpenChange={setCollateralRatioModalOpen}
+      <ConfigureAssetModal
+        open={configureAssetModalOpen}
+        onOpenChange={setConfigureAssetModalOpen}
         token={selectedToken}
-        currentRatio={selectedToken ? getCollateralRatio(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
-      />
-      
-      <SetInterestRateModal
-        open={interestRateModalOpen}
-        onOpenChange={setInterestRateModalOpen}
-        token={selectedToken}
-        currentRate={selectedToken ? getInterestRate(selectedToken.address) : undefined}
-        onSuccess={refreshAllData}
-      />
-      
-      <SetLiquidationBonusModal
-        open={liquidationBonusModalOpen}
-        onOpenChange={setLiquidationBonusModalOpen}
-        token={selectedToken}
-        currentBonus={selectedToken ? getLiquidationBonus(selectedToken.address) : undefined}
+        currentConfig={selectedToken ? {
+          ltv: getRawCollateralRatio(selectedToken.address),
+          liquidationThreshold: getRawLiquidationThreshold(selectedToken.address),
+          liquidationBonus: getRawLiquidationBonus(selectedToken.address),
+          interestRate: getRawInterestRate(selectedToken.address),
+          reserveFactor: getRawReserveFactor(selectedToken.address),
+        } : undefined}
         onSuccess={refreshAllData}
       />
     </Card>

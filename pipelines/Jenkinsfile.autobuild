@@ -247,7 +247,7 @@ pipeline {
                   sh './run-vault.sh'
                   // run again but connecting to helium (testnet) this time
                   sh 'sed -i "s|useCustomGenesis=true|useCustomGenesis=false|" run.sh'
-                  sh "sed -i 's|./strato --single|network=helium BOOT_NODE_IP='\\\''[\\\"44.198.225.165\\\",\\\"34.197.19.103\\\",\\\"34.194.64.79\\\",\\\"44.206.83.54\\\"]'\\\'' ./strato|' run.sh"
+                  sh "sed -i 's|./strato --single|network=helium ./strato|' run.sh"
                   sh './run.sh'
                   sh './check_availability.sh'
                   script{
@@ -309,14 +309,31 @@ pipeline {
                           BRIDGE_API_BASE_URL=https://bridge.mercata-testnet.blockapps.net \\
                           ./strato
                     """
+                    sh "sudo ./strato --pull"
+                    sh "sudo ./strato --wipe"
+                    sh "sudo ./strato-run.sh"
+                    /* TODO: make sure the node syncs successfully
+                    script {
+                      def b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('$BUILDTEST_CLIENT_ID}:$BUILDTEST_CLIENT_SECRET'))\"").trim()
+                      def tokenEndpoint = sh(returnStdout: true, script: "curl -s  https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration | jq .token_endpoint | tr -d '\"'").trim()
+                      def serviceToken = sh(
+                          returnStdout: true,
+                          script: "curl -s -X POST '${tokenEndpoint}' " +
+                              "-H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic ${b64string}' " +
+                              "--data-urlencode 'grant_type=client_credentials' | jq -r .access_token"
+                      ).trim()
+                      if ("${serviceToken}" == null ) {
+                        echo "Unable to obtain service token"
+                        currentBuild.result = 'FAILURE'
+                        sh "exit 1"
+                      }
+                      // TODO: poll for isSynced: true at https://localhost/strato-api/eth/v1.2/metadata
+                    }*/
                   }
-                  sh "sudo ./strato --pull"
-                  // sh "./strato --wipe" // TODO: wipe when needed? May be try the wipe if the node is not starting properly without it?..
-                  sh "sudo ./strato-run.sh"
                 }
               }
               post {
-                always {
+                success {
                   script {
                     def VERSION = sh(
                         returnStdout: true,

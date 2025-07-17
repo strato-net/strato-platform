@@ -16,6 +16,8 @@ import { useUser } from '@/context/UserContext';
 import { formatUnits, parseUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, WITHDRAW_FEE } from "@/lib/contants";
+import { LiquidityPool } from '@/interface';
+import { safeParseUnits } from '@/utils/numberUtils';
 
 // Helper function to safely format numbers
 const formatNumber = (value: string | number): string => {
@@ -30,33 +32,6 @@ const formatNumber = (value: string | number): string => {
   }
 };
 
-interface Pool {
-  address: string;
-  aToBRatio: string;
-  bToARatio: string;
-  tokenABalance: string;
-  tokenBBalance: string;
-  lpToken: {
-    _name: string;
-    _symbol: string;
-    address: string;
-    _totalSupply: string;
-    balances?: Array<{ balance: string }>;
-  };
-  tokenA: {
-    _name: string;
-    _symbol: string;
-    address: string;
-  };
-  tokenB: {
-    _name: string;
-    _symbol: string;
-    address: string;
-  };
-  _name?: string;
-  _symbol?: string;
-}
-
 interface DepositFormValues {
   amount: string;
   token: string;
@@ -64,19 +39,20 @@ interface DepositFormValues {
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const [selectedPool, setSelectedPool] = useState<LiquidityPool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [token1Amount, setToken1Amount] = useState('');
   const [token2Amount, setToken2Amount] = useState('');
   const [withdrawPercent, setWithdrawPercent] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [pools, setPools] = useState<Pool[]>([]);
+  const [pools, setPools] = useState<LiquidityPool[]>([]);
   const [loading, setLoading] = useState(false);
   const [depositLoading, setDepositLoading] = useState(false);
   const [tokenABalance, setTokenABalance] = useState('');
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [usdstBalance, setUsdstBalance] = useState('');
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const operationInProgressRef = useRef(false);
 
@@ -144,32 +120,51 @@ const SwapPoolsSection = () => {
     }
   };
 
-  const handleOpenDepositModal = async (pool: Pool) => {
+  const handleOpenDepositModal = async (pool: LiquidityPool) => {
     if (operationInProgressRef.current) return;
     
+    setToken1Amount('');
+    setToken2Amount('');
     setSelectedPool(pool);
     setIsDepositModalOpen(true);
     try {
+      setBalanceLoading(true)
       const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
       setTokenABalance(balances.tokenABalance);
       setTokenBBalance(balances.tokenBBalance);
       setUsdstBalance(balances.usdstBalance);
+      setBalanceLoading(false)
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to fetch token balances",
         variant: "destructive",
       });
+      setBalanceLoading(false)
     }
-    setToken1Amount('');
-    setToken2Amount('');
   };
 
-  const handleOpenWithdrawModal = (pool: Pool) => {
+  const handleOpenWithdrawModal = async (pool: LiquidityPool): Promise<void> => {
     if (operationInProgressRef.current) return;
-    
+
     setSelectedPool(pool);
     setIsWithdrawModalOpen(true);
+
+    try {
+      setBalanceLoading(true)
+      const balances = await fetchTokenBalances(pool, userAddress, usdstAddress);
+      setTokenABalance(balances.tokenABalance);
+      setTokenBBalance(balances.tokenBBalance);
+      setUsdstBalance(balances.usdstBalance);
+      setBalanceLoading(false)
+    } catch (error) {
+      setBalanceLoading(false)
+      toast({
+        title: "Error",
+        description: "Failed to fetch token balances",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCloseWithdrawModal = () => {
@@ -189,8 +184,8 @@ const SwapPoolsSection = () => {
     if (!selectedPool || operationInProgressRef.current) return;
 
     const decimals = 18;
-    const token1AmountWei = parseUnits(token1Amount || "0", decimals);
-    const token2AmountWei = parseUnits(token2Amount || "0", decimals);
+    const token1AmountWei = safeParseUnits(token1Amount, decimals);
+    const token2AmountWei = safeParseUnits(token2Amount, decimals);
     const token1Balance = BigInt(tokenABalance || "0");
     const token2Balance = BigInt(tokenBBalance || "0");
 
@@ -209,9 +204,9 @@ const SwapPoolsSection = () => {
       
       const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
       const tokenAAmount = isInitialLiquidity 
-        ? parseUnits(token1Amount, 18)
-        : parseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
-      const tokenBAmount = parseUnits(token2Amount, 18);
+        ? safeParseUnits(token1Amount, 18)
+        : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
+      const tokenBAmount = safeParseUnits(token2Amount, 18);
 
       await addLiquidity({
         poolAddress: selectedPool.address,
@@ -242,6 +237,7 @@ const SwapPoolsSection = () => {
         setPools(enrichedPools);
 
         // Refresh balances
+        setBalanceLoading(true)
         const balances = await fetchTokenBalances(updatedPool, userAddress, usdstAddress);
         setTokenABalance(balances.tokenABalance);
         setTokenBBalance(balances.tokenBBalance);
@@ -261,6 +257,7 @@ const SwapPoolsSection = () => {
         variant: "destructive",
       });
     } finally {
+      setBalanceLoading(false)
       setDepositLoading(false);
       operationInProgressRef.current = false;
     }
@@ -274,7 +271,7 @@ const SwapPoolsSection = () => {
       setWithdrawLoading(true);
       
       const value = BigInt(selectedPool.lpToken.balances?.[0]?.balance || "0");
-      const percent = parseFloat(withdrawPercent || "0");
+      const percent = withdrawPercent ? parseFloat(withdrawPercent) : 0;
       const percentScaled = BigInt(Math.round(percent * 100));
       const calculatedAmount = (value * percentScaled) / BigInt(10000);
 
@@ -306,6 +303,7 @@ const SwapPoolsSection = () => {
         setPools(enrichedPools);
 
         // Refresh balances
+        setBalanceLoading(true)
         const balances = await fetchTokenBalances(updatedPool, userAddress, usdstAddress);
         setTokenABalance(balances.tokenABalance);
         setTokenBBalance(balances.tokenBBalance);
@@ -325,14 +323,30 @@ const SwapPoolsSection = () => {
         variant: "destructive",
       });
     } finally {
+      setBalanceLoading(false)
       setWithdrawLoading(false);
       operationInProgressRef.current = false;
     }
   };
 
   const handleMaxClick = (isFirstToken: boolean) => {
-    const maxVal = formatUnits(isFirstToken ? tokenABalance : tokenBBalance || "0", 18);
-    
+    const balance = isFirstToken ? tokenABalance : tokenBBalance;
+    const token = isFirstToken ? selectedPool.tokenA : selectedPool.tokenB;
+    const isUSDST = token.address.toLowerCase() === usdstAddress.toLowerCase();
+
+    let maxBigInt = BigInt(balance || "0");
+
+    if (isUSDST) {
+      const fee = parseUnits(DEPOSIT_FEE, 18);
+      if (maxBigInt > fee) {
+        maxBigInt = maxBigInt - fee;
+      } else {
+        maxBigInt = BigInt(0);
+      }
+    }
+
+    const maxVal = formatUnits(maxBigInt, 18);
+
     if (isFirstToken) {
       setToken1Amount(maxVal);
       handleInputChange(maxVal, 'token1');
@@ -349,11 +363,11 @@ const SwapPoolsSection = () => {
         if (
           value &&
           selectedPool?.aToBRatio &&
-          BigInt(parseUnits(selectedPool.aToBRatio, 18).toString()) > BigInt(0)
+          BigInt(safeParseUnits(selectedPool.aToBRatio, 18)) > BigInt(0)
         ) {
-          const token1Wei = parseUnits(value || "0", 18);
-          const ratioWei = parseUnits(selectedPool.aToBRatio, 18);
-          const token2Wei = (BigInt(token1Wei.toString()) * BigInt(ratioWei.toString())) / BigInt(10 ** 18);
+          const token1Wei = safeParseUnits(value, 18);
+          const ratioWei = safeParseUnits(selectedPool.aToBRatio, 18);
+          const token2Wei = (token1Wei * ratioWei) / BigInt(10 ** 18);
           setToken2Amount(formatUnits(token2Wei.toString(), 18));
         }
       } else {
@@ -361,20 +375,23 @@ const SwapPoolsSection = () => {
         if (
           value &&
           selectedPool?.bToARatio &&
-          BigInt(parseUnits(selectedPool.bToARatio, 18).toString()) > BigInt(0)
+          BigInt(safeParseUnits(selectedPool.bToARatio, 18)) > BigInt(0)
         ) {
-          const token2Wei = parseUnits(value || "0", 18);
-          const ratioWei = parseUnits(selectedPool.bToARatio, 18);
-          const token1Wei = (BigInt(token2Wei.toString()) * BigInt(ratioWei.toString())) / BigInt(10 ** 18);
+          const token2Wei = safeParseUnits(value, 18);
+          const ratioWei = safeParseUnits(selectedPool.bToARatio, 18);
+          const token1Wei = (token2Wei * ratioWei) / BigInt(10 ** 18);
           setToken1Amount(formatUnits(token1Wei.toString(), 18));
         }
       }
     } catch (error) {
       console.error('Error handling input change:', error);
-      if (token === 'token1') {
-        setToken1Amount(value);
-      } else {
-        setToken2Amount(value);
+      // Only set the value if it's a valid number or empty
+      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+        if (token === 'token1') {
+          setToken1Amount(value);
+        } else {
+          setToken2Amount(value);
+        }
       }
     }
   };
@@ -493,15 +510,22 @@ const SwapPoolsSection = () => {
                 <span className="text-sm text-gray-500">Amount</span>
                 <div className="flex items-center gap-2">
                   <Input
+                    disabled={balanceLoading}
                     placeholder="0.0"
                     className={`border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                      parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
+                      safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
                     }`}
                     value={token1Amount}
                     onChange={(e) => {
                       const value = e.target.value;
-                      if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
-                        handleInputChange(value, 'token1');
+                      // Only allow valid decimal input
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        // Handle the case where user types just "."
+                        if (value === '.') {
+                          handleInputChange('0.', 'token1');
+                        } else {
+                          handleInputChange(value, 'token1');
+                        }
                       }
                     }}
                   />
@@ -519,26 +543,29 @@ const SwapPoolsSection = () => {
                     )}
                   </div>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500">
-                    Balance: {formatUnits(tokenABalance || "0", 18)}
+                <div className='flex items-center'>
+                  <span className="text-sm text-gray-500 flex gap-1">
+                    Balance: {balanceLoading ?
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      : formatUnits(tokenABalance || "0", 18)}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-gray-500 mt-1"
+                    className="text-xs text-blue-500"
                     onClick={() => handleMaxClick(true)}
+                    disabled={balanceLoading}
                   >
                     Max
                   </Button>
                 </div>
-                {parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") && (
+                {safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") && (
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
-                {selectedPool?.tokenA.address === usdstAddress && 
-                 parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
-                 parseUnits(token1Amount || "0", 18) <= BigInt(tokenABalance || "0") && (
+                {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
+                 safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
+                 safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
                 {selectedPool?.tokenA.address !== usdstAddress && 
@@ -546,6 +573,27 @@ const SwapPoolsSection = () => {
                  BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
+                {(() => {
+                  // Low balance warning for token A when it's USDST
+                  if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
+                    const inputAmountWei = safeParseUnits(token1Amount, 18);
+                    const balanceWei = BigInt(tokenABalance || "0");
+                    const feeWei = parseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n && 
+                                             remainingBalance >= 0n && 
+                                             remainingBalance <= lowBalanceThreshold &&
+                                             inputAmountWei <= balanceWei - feeWei;
+                    
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Second Token */}
@@ -555,15 +603,22 @@ const SwapPoolsSection = () => {
                 </div>
                 <div className="flex items-center">
                   <Input
+                    disabled={balanceLoading}
                     placeholder="0.0"
                     className={`border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                      parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
+                      safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
                     }`}
                     value={token2Amount}
                     onChange={(e) => {
                       const value = e.target.value;
-                      if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
-                        handleInputChange(value, 'token2');
+                      // Only allow valid decimal input
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        // Handle the case where user types just "."
+                        if (value === '.') {
+                          handleInputChange('0.', 'token2');
+                        } else {
+                          handleInputChange(value, 'token2');
+                        }
                       }
                     }}
                   />
@@ -581,26 +636,29 @@ const SwapPoolsSection = () => {
                     )}
                   </div>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500">
-                    Balance: {formatUnits(tokenBBalance || "0", 18)}
+                <div className='flex items-center'>
+                  <span className="text-sm text-gray-500 flex gap-1">
+                    Balance: {balanceLoading ?
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      : formatUnits(tokenBBalance || "0", 18)}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-gray-500 mt-1"
+                    className="text-xs text-blue-500"
                     onClick={() => handleMaxClick(false)}
+                    disabled={balanceLoading}
                   >
                     Max
                   </Button>
                 </div>
-                {parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") && (
+                {safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") && (
                   <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
                 )}
-                {selectedPool?.tokenB.address === usdstAddress && 
-                 parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
-                 parseUnits(token2Amount || "0", 18) <= BigInt(tokenBBalance || "0") && (
+                {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
+                 safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
+                 safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
                 {selectedPool?.tokenA.address !== usdstAddress && 
@@ -608,6 +666,27 @@ const SwapPoolsSection = () => {
                  BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
                   <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
                 )}
+                {(() => {
+                  // Low balance warning for token B when it's USDST
+                  if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
+                    const inputAmountWei = safeParseUnits(token2Amount, 18);
+                    const balanceWei = BigInt(tokenBBalance || "0");
+                    const feeWei = parseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n && 
+                                             remainingBalance >= 0n && 
+                                             remainingBalance <= lowBalanceThreshold &&
+                                             inputAmountWei <= balanceWei - feeWei;
+                    
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 
@@ -646,8 +725,8 @@ const SwapPoolsSection = () => {
                   depositLoading || 
                   !token1Amount || 
                   !token2Amount || 
-                  parseUnits(token1Amount || "0", 18) > BigInt(tokenABalance || "0") ||
-                  parseUnits(token2Amount || "0", 18) > BigInt(tokenBBalance || "0") ||
+                  safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ||
+                  safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ||
                   BigInt(usdstBalance || "0") < parseUnits("0.3", 18)
                 } 
                 type="submit" 
@@ -685,8 +764,31 @@ const SwapPoolsSection = () => {
                     value={withdrawPercent}
                     onChange={(e) => {
                       const value = e.target.value;
-                      const percentRegex = /^(100|[0-9]{1,2})(\.[0-9]{0,2})?$/;
-                      if (value === '' || percentRegex.test(value)) {
+                      // Handle the case where user types just "."
+                      if (value === '.') {
+                        setWithdrawPercent('0.');
+                        return;
+                      }
+                      
+                      // Allow empty input
+                      if (value === '') {
+                        setWithdrawPercent('');
+                        return;
+                      }
+                      
+                      // Check if it's a valid number format first
+                      if (!/^\d*\.?\d*$/.test(value)) {
+                        return;
+                      }
+                      
+                      // Parse the number and validate range
+                      const numValue = parseFloat(value);
+                      if (isNaN(numValue)) {
+                        return;
+                      }
+                      
+                      // Allow only 0-100 range
+                      if (numValue >= 0 && numValue <= 100) {
                         setWithdrawPercent(value);
                       }
                     }}
@@ -705,6 +807,9 @@ const SwapPoolsSection = () => {
                     )}
                   </div>
                 </div>
+                {withdrawPercent && parseFloat(withdrawPercent) > 100 && (
+                  <p className="text-red-600 text-sm mt-1">Percentage cannot exceed 100%</p>
+                )}
               </div>
             </div>
 
@@ -729,9 +834,23 @@ const SwapPoolsSection = () => {
                 <span>{WITHDRAW_FEE} USDST</span>
               </div>
               {/* Withdraw Fee Warning */}
-              {BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
+              {!balanceLoading && BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
               )}
+              {(() => {
+                // Low balance warning for withdraw
+                const usdstBalanceWei = BigInt(usdstBalance || "0");
+                const feeWei = parseUnits(WITHDRAW_FEE, 18);
+                const lowBalanceThreshold = parseUnits("0.10", 18);
+                const remainingBalance = usdstBalanceWei - feeWei;
+                const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+                
+                return isLowBalanceWarning && usdstBalanceWei >= feeWei ? (
+                  <p className="text-yellow-600 text-sm mt-1">
+                    Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                  </p>
+                ) : null;
+              })()}
               {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                 <>
                   <div className="w-full flex justify-between">
@@ -755,7 +874,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
+              <Button disabled={withdrawLoading || !withdrawPercent || parseFloat(withdrawPercent) > 100 || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>

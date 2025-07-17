@@ -251,11 +251,10 @@ export const setTokenStatus = async (
 ) => {
   try {
     const tx = buildFunctionTx({
-      contractName: extractContractName(TokenFactory),
-      contractAddress: tokenFactory,
-      method: "setTokenStatus",
+      contractName: extractContractName(Token),
+      contractAddress: body.address as string,
+      method: "setStatus",
       args: {
-        token: body.address,
         newStatus: body.status,
       },
     });

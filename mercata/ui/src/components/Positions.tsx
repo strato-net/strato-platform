@@ -2,11 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
+import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 
 interface BorrowingSectionProps {
-  userCollaterals: any[];
-  loanData: any;
+  userCollaterals: CollateralData[];
+  loanData: NewLoanData;
   handleBorrow: () => void;
   handleRepay: () => void;
 }
@@ -93,7 +94,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                 <InfoTooltip content="Measures your position's safety. Higher is better. Below 1.0 means risk of liquidation. No loan means you have no outstanding debt.">
                   <span className="text-gray-600">Health Factor</span>
                 </InfoTooltip>
-                <span className="font-semibold text-green-500" style={{ color: getTextColor(parseFloat(loanData?.healthFactor)) }}>
+                <span className="font-semibold text-green-500" style={{ color: getTextColor((loanData?.healthFactor)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
@@ -101,8 +102,8 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                       return "No Loan";
                     }
                     // Check if health factor is valid
-                    if (loanData?.healthFactor && !isNaN(parseFloat(loanData.healthFactor))) {
-                      return parseFloat(loanData.healthFactor).toFixed(2);
+                    if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {
+                      return (loanData.healthFactor).toFixed(2);
                     }
                     return "N/A";
                   })()}

@@ -62,6 +62,7 @@ export const constants = (() => {
       "address," +
       "borrowableAsset," +
       "mToken," +
+      "totalBorrowPrincipal::text," +
       `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value),` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`,
     "oracle:priceOracle_fkey(" +
