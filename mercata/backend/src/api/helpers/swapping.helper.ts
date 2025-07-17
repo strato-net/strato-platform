@@ -36,3 +36,25 @@ export const getRequiredInput = (
   // Add 1 to round up (to ensure user provides enough input)
   return String(numerator / denominator + BigInt(1));
 };
+
+export const calculateImpliedPrice = (
+  amountIn: string,
+  amountOut: string,
+  isAToB: boolean
+): string => {
+  try {
+    const inBig = BigInt(amountIn);
+    const outBig = BigInt(amountOut);
+    
+    if (!inBig || !outBig) return '0.00';
+    
+    // Always calculate as TokenB/TokenA
+    const price = isAToB 
+      ? (outBig * 10n**18n) / inBig  // A→B: out/in
+      : (inBig * 10n**18n) / outBig; // B→A: in/out
+    
+    return (Number(price) / 1e18).toFixed(6);
+  } catch {
+    return '0.00';
+  }
+};
