@@ -1,7 +1,13 @@
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import CopyButton from '../ui/copy';
-import { Menu } from 'lucide-react';
+import { LogOutIcon, Menu } from 'lucide-react';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 interface DashboardHeaderProps {
   title: string;
@@ -9,11 +15,12 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
-  const { userAddress, userName } = useUser()
-   
-  const truncateAddress = (address: string | null | undefined) => {
+  const { userAddress, userName, logout } = useUser()
+
+  const truncateAddress = (address: string | null | undefined, front: number = 6, back: number = 4) => {
     if (!address) return "N/A";
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    if (address.length <= front + back) return address;
+    return `${address.substring(0, front)}...${address.substring(address.length - back)}`;
   };
 
   const getAvatarFallback = () => {
@@ -42,11 +49,32 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
               <CopyButton address={userAddress}/>
             </div>
           </div>
-          <Avatar className="w-8 h-8 bg-strato-blue">
-            <AvatarFallback className="text-white text-xs bg-strato-blue">
-              {getAvatarFallback()}
-            </AvatarFallback>
-          </Avatar>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Avatar className="w-8 h-8 bg-strato-blue cursor-pointer">
+                <AvatarFallback className="text-white text-xs bg-strato-blue">
+                  {getAvatarFallback()}
+                </AvatarFallback>
+              </Avatar>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-3 shadow-md mt-2" align="end" side="bottom">
+              <div className="flex flex-col space-y-0.5">
+                <div className="text-sm font-medium">{userName || "N/A"}</div>
+                <div className="text-xs text-gray-600 break-all !mb-1">
+                  {truncateAddress(userAddress, 16, 8)}
+                </div>
+
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={logout}
+                >
+                  <LogOutIcon />
+                  Logout
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </header>

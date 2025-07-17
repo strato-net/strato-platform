@@ -95,18 +95,6 @@ const DashboardSidebar = () => {
             ))}
           </ul>
         </nav>
-
-        <div className="mt-auto">
-          <button
-            onClick={logout}
-            className={`flex items-center text-red-400 hover:bg-red-500/10 w-full rounded-md px-4 py-2.5 ${
-              collapsed ? 'justify-center mx-auto' : ''
-            }`}
-          >
-            <LogOut size={20} />
-            {!collapsed && <span className="ml-3">Log Out</span>}
-          </button>
-        </div>
       </div>
     </div>
   );
