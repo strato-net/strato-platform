@@ -195,11 +195,6 @@ const AssetDetail = () => {
                     )}
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Provider:</span>
-                      <span className="font-medium">{asset?.provider || 'N/A'}</span>
-                    </div>
-
-                    <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Owner:</span>
                       <span className="font-medium">
                         {asset?.token?._owner
@@ -217,11 +212,6 @@ const AssetDetail = () => {
                           : 'N/A'}
                         <CopyButton address={asset?.address} />
                       </span>
-                    </div>
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Vault Service:</span>
-                      <span className="font-medium">{asset?.vaulter || 'N/A'}</span>
                     </div>
                   </div>
                   {!isWalletConnected ? (
@@ -354,16 +344,6 @@ const AssetDetail = () => {
                       className="prose max-w-none text-sm"
                       dangerouslySetInnerHTML={{ __html: asset?.token?.description }}
                     />
-                  </div>
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="font-semibold mb-2">Key Features</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-gray-700">
-                      <li>100% backed by real assets</li>
-                      <li>Regular independent audits</li>
-                      <li>Secure cold storage</li>
-                      <li>Instant liquidity</li>
-                      <li>Low transaction fees</li>
-                    </ul>
                   </div>
                 </CardContent>
               </Card>
