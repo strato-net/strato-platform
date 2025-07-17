@@ -312,7 +312,9 @@ pipeline {
                     sh "sudo ./strato --pull"
                     sh "sudo ./strato --wipe"
                     sh "sudo ./strato-run.sh"
-                    lib.waitLocalNodeIsSynced()
+                    script {
+                      lib.waitLocalNodeIsSynced()
+                    }
                   }
                 }
               }
