@@ -106,3 +106,14 @@ export function validateQueryParams(query: any) {
     throw new Error("Query Parameter Validation Error: " + error.message);
   }
 }
+
+export function validateSwapHistoryArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: Joi.string().required(),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Swap History Argument Validation Error: " + error.message);
+  }
+}
