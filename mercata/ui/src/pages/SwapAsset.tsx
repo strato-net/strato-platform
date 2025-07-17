@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import SwapWidget from "@/components/swap/SwapWidget";
+import SwapHistory from "@/components/swap/SwapHistory";
 
 const SwapAsset = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -17,9 +18,19 @@ const SwapAsset = () => {
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
         <DashboardHeader title="Swap Assets" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="p-6">
-          <div className="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
-            <SwapWidget />
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Main Swap Widget */}
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
+              <SwapWidget />
+            </div>
+          </div>
+          
+          {/* Separate Swap History Section - Full Width */}
+          <div className="mt-8 max-w-6xl mx-auto">
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <SwapHistory />
+            </div>
           </div>
         </main>
       </div>

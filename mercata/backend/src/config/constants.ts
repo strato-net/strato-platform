@@ -18,6 +18,7 @@ export const constants = (() => {
   const PriceOracle = `${CONTRACT_PREFIX}PriceOracle`;
   const PoolFactory = `${CONTRACT_PREFIX}PoolFactory`;
   const Pool = `${CONTRACT_PREFIX}Pool`;
+  const PoolSwap = `${CONTRACT_PREFIX}Pool-Swap`;
   const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
@@ -80,6 +81,17 @@ export const constants = (() => {
     `listings:${OnRamp}-listings(key,value)`,
     `paymentProviders:${OnRamp}-paymentProviders(key,value)`,
   ];
+
+  const swapHistorySelectFields = [
+    "id",
+    "block_timestamp",
+    "sender",
+    "tokenIn",
+    "tokenOut", 
+    "amountIn::text",
+    "amountOut::text",
+    "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))",
+  ];
   return {
     poolFactory,
     lendingRegistry,
@@ -94,6 +106,7 @@ export const constants = (() => {
     PriceOracle,
     PoolFactory,
     Pool,
+    PoolSwap,
     OnRamp,
     LendingRegistry,
     PoolConfigurator,
@@ -103,6 +116,7 @@ export const constants = (() => {
     poolSelectFields,
     registrySelectFields,
     onRampSelectFields,
+    swapHistorySelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();

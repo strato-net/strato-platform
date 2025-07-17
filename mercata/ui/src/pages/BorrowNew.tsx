@@ -19,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
@@ -36,6 +38,21 @@ const formatTokenAmount = (value: string) =>
     minimumFractionDigits: 1,
     maximumFractionDigits: 2,
   });
+
+// Reusable InfoTooltip component
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div className="inline-flex items-center gap-1 cursor-help">
+        {children}
+        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </div>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-xs">
+      <p>{content}</p>
+    </TooltipContent>
+  </Tooltip>
+);
 
 
 const BorrowNew = () => {
@@ -248,7 +265,11 @@ const BorrowNew = () => {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Eligible Collateral</CardTitle>
+              <CardTitle>
+                <InfoTooltip content="Tokens in your wallet that you can supply as collateral. Supply these tokens to enable borrowing USDST.">
+                  Eligible Collateral
+                </InfoTooltip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -257,8 +278,16 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Wallet Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>LTV</TableHead>
-                    <TableHead>Liquidation Threshold</TableHead>
+                    <TableHead>
+                      <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
+                        LTV
+                      </InfoTooltip>
+                    </TableHead>
+                    <TableHead>
+                      <InfoTooltip content="If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
+                        Liquidation Threshold
+                      </InfoTooltip>
+                    </TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -295,13 +324,20 @@ const BorrowNew = () => {
                         </TableCell>
                         <TableCell>{asset?.liquidationThreshold ? asset?.liquidationThreshold/100 : 0}%</TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSupply(asset)}
-                            className="flex items-center gap-1"
-                          >
-                            Supply
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSupply(asset)}
+                                className="flex items-center gap-1"
+                              >
+                                Supply
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later.</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
@@ -321,17 +357,33 @@ const BorrowNew = () => {
 
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Supplied Collateral</CardTitle>
+              <CardTitle>
+                <InfoTooltip content="Tokens you've supplied as collateral for your loans. These determine your borrowing power and can be withdrawn when you no longer need them.">
+                  Supplied Collateral
+                </InfoTooltip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Asset</TableHead>
-                    <TableHead>Supplied Balance</TableHead>
+                    <TableHead>
+                      <InfoTooltip content="Amount of tokens currently used as collateral for your loans. This determines your borrowing power.">
+                        Supplied Balance
+                      </InfoTooltip>
+                    </TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>LTV</TableHead>
-                    <TableHead>Liquidation Threshold</TableHead>
+                    <TableHead>
+                      <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
+                        LTV
+                      </InfoTooltip>
+                    </TableHead>
+                    <TableHead>
+                      <InfoTooltip content="If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
+                        Liquidation Threshold
+                      </InfoTooltip>
+                    </TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -370,11 +422,18 @@ const BorrowNew = () => {
                           {loan?.liquidationThreshold ? loan?.liquidationThreshold/100 : 0}%
                         </TableCell>
                         <TableCell>
-                          <Button
-                            onClick={() => {handleWithdraw(loan)}}
-                          >
-                            Withdraw
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={() => {handleWithdraw(loan)}}
+                              >
+                                Withdraw
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Remove collateral from your position. This reduces your borrowing power and may affect your loan if you have outstanding debt.</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
