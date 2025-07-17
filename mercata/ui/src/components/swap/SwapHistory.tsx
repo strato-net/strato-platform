@@ -86,7 +86,7 @@ const SwapHistory: React.FC = () => {
                 <TableHead className="w-[100px]">Token Out</TableHead>
                 <TableHead className="w-[120px]">Amount Out</TableHead>
                 <TableHead className="w-[120px]">Price {pool?.tokenB?._symbol}/{pool?.tokenA?._symbol}</TableHead>
-                <TableHead className="w-[100px]">Transaction</TableHead>
+                <TableHead className="w-[100px]">Sender</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -129,18 +129,18 @@ const SwapHistory: React.FC = () => {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              onClick={() => copyToClipboard(swap.txHash)}
+                              onClick={() => copyToClipboard(swap.sender)}
                               className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
                             >
                               <span>
-                                {copiedHash === swap.txHash ? 'Copied!' : formatHash(swap.txHash)}
+                                {copiedHash === swap.sender ? 'Copied!' : formatHash(swap.sender)}
                               </span>
                               <Copy className="h-3 w-3" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Click to copy full hash</p>
-                            <p className="font-mono text-xs break-all">{swap.txHash}</p>
+                            <p>Click to copy full address</p>
+                            <p className="font-mono text-xs break-all">{swap.sender}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>

@@ -450,5 +450,5 @@ export interface SwapHistoryEntry {
   amountIn: string;
   amountOut: string;
   impliedPrice: string;
-  txHash: string;
+  sender: string;
 }

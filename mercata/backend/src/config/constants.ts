@@ -85,13 +85,12 @@ export const constants = (() => {
   const swapHistorySelectFields = [
     "id",
     "block_timestamp",
-    "transaction_hash",
+    "sender",
     "tokenIn",
     "tokenOut", 
     "amountIn::text",
     "amountOut::text",
     "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))",
-    "id.count()",
   ];
   return {
     poolFactory,

@@ -351,7 +351,7 @@ export const getSwapHistory = async (
         amountIn: event.amountIn,
         amountOut: event.amountOut,
         impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
-        txHash: event.transaction_hash
+        sender: event.sender
       };
     });
 
