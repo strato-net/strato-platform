@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
 import { CollateralData, NewLoanData } from "@/interface";
-import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
+import { safeParseUnits, safeParseFloat, getHealthFactorColor, addCommasToInput } from "@/utils/numberUtils";
 
 interface SupplyModalProps {
   supplyLoading: boolean;
@@ -22,25 +22,6 @@ interface SupplyModalProps {
   onSupply: (amount: string) => void;
   usdstBalance?: string;
 }
-
-const addCommasToInput = (value: string) => {
-  if (!value) return '';
-  const parts = value.split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
-  if (parts.length === 2) {
-    return integerPart + '.' + parts[1];
-  }
-  return integerPart;
-};
-
-// Calculate health factor color based on value
-const getHealthFactorColor = (healthFactor: number) => {
-  if (healthFactor >= 1.5) return "text-green-600";
-  if (healthFactor >= 1.2) return "text-yellow-600";
-  if (healthFactor >= 1.0) return "text-orange-600";
-  return "text-red-600";
-};
 
 // Calculate health impact of supply
 const calculateHealthImpact = (

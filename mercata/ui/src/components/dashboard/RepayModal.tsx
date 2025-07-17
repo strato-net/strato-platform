@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
-import { safeParseUnits } from "@/utils/numberUtils";
+import { addCommasToInput, safeParseUnits } from "@/utils/numberUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RepayModalProps {
@@ -25,19 +25,6 @@ const formatCurrency = (value: string | number) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
   });
-};
-
-const addCommasToInput = (value: string) => {
-  if (!value) return '';
-  
-  const parts = value.split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
-  if (parts.length === 2) {
-    return integerPart + '.' + parts[1];
-  }
-  
-  return integerPart;
 };
 
 const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" }: RepayModalProps) => {

@@ -14,6 +14,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { CollateralData } from "@/interface";
 import { LiquidationEntry } from "@/context/LiquidationContext";
+import { addCommasToInput, ethToWei, weiToEth } from "@/utils/numberUtils";
 
 interface LiquidateModalProps {
   open: boolean;
@@ -22,32 +23,6 @@ interface LiquidateModalProps {
   collateral: CollateralData; // collateral entry object with maxRepay & expectedProfit
   onSuccess: () => void;
 }
-
-// ---------- helpers ----------
-const weiToEth = (v?: string | number | bigint | null): number => {
-  if (v === undefined || v === null) return 0;
-  try {
-    return Number(BigInt(v)) / 1e18;
-  } catch {
-    return 0;
-  }
-};
-
-const ethToWei = (eth: number): string => {
-  if (!isFinite(eth) || eth <= 0) return "0";
-  // Use floor to convert without rounding up (no safety buffer)
-  return BigInt(Math.floor(eth * 1e18)).toString();
-};
-
-const addCommasToInput = (value: string) => {
-  if (!value) return '';
-  const parts = value.split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  if (parts.length === 2) {
-    return integerPart + '.' + parts[1];
-  }
-  return integerPart;
-};
 
 const LiquidateModal: React.FC<LiquidateModalProps> = ({
   open,

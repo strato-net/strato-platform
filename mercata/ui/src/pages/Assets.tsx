@@ -16,6 +16,7 @@ import { useUserTokens } from '@/context/UserTokensContext';
 import { formatUnits } from 'ethers';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
+import { formatBalance } from '@/utils/numberUtils';
 
 const Assets = () => {
   const { userAddress } = useUser();
@@ -47,14 +48,6 @@ const Assets = () => {
     }
     setTotalBalance(total);
   }, [tokens]);
-
-  function formatBalance(value: number): string {
-    if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
-    return value.toLocaleString("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 2,
-    });
-  }
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">

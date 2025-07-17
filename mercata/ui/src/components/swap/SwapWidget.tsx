@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatBalanceWithSymbol } from "@/utils/numberUtils";
 
 // Constants
 const DEFAULT_SLIPPAGE = 4; // 4%
@@ -39,14 +40,6 @@ const formatAmount = (amount: string): string => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   });
-};
-
-const formatBalance = (balance: string | number | bigint, symbol: string): string => {
-  let formatted = formatUnits(BigInt(balance.toString()), DECIMALS);
-  if (formatted.includes('.')) {
-    formatted = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
-  }
-  return `${formatted} ${symbol}`;
 };
 
 // Components
@@ -205,7 +198,7 @@ const TokenInput = ({
           User Balance: 
           {isLoading 
             ? <LoadingSpinner /> 
-            : formatBalance(balance, asset?._symbol || "")
+            : formatBalanceWithSymbol(balance, asset?._symbol || "", DECIMALS)
           }
           {showMaxButton && (
             <button
@@ -276,7 +269,7 @@ const TokenInput = ({
       {pool && asset && (
         <div className="mt-2 flex justify-end">
           <span className="text-sm text-gray-500">
-            Pool Balance: {formatBalance(poolBalance, asset._symbol || "")}
+            Pool Balance: {formatBalanceWithSymbol(poolBalance, asset._symbol || "", DECIMALS)}
           </span>
         </div>
       )}

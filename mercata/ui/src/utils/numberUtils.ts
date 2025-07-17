@@ -1,4 +1,4 @@
-import { parseUnits } from "ethers";
+import { formatUnits, parseUnits } from "ethers";
 
 /**
  * Safely parses a string to BigInt using parseUnits, handling edge cases
@@ -89,3 +89,66 @@ export const addCommasToInput = (value: string): string => {
   
   return integerPart;
 }; 
+
+export const generatePriceData = (basePrice: number, days: number = 30) => {
+  const data = [];
+  let currentPrice = basePrice;
+
+  for (let i = 0; i < days; i++) {
+    // Random price fluctuation between -2% and +2%
+    const change = currentPrice * (Math.random() * 0.04 - 0.02);
+    currentPrice += change;
+
+    data.push({
+      date: new Date(Date.now() - (days - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      price: formatUnits(currentPrice?.toLocaleString("fullwide", { useGrouping: false }), 18),
+    });
+  }
+
+  return data;
+};
+
+// Calculate health factor color based on value
+export const getHealthFactorColor = (healthFactor: number) => {
+  if (healthFactor >= 1.5) return "text-green-600";
+  if (healthFactor >= 1.2) return "text-yellow-600";
+  if (healthFactor >= 1.0) return "text-orange-600";
+  return "text-red-600";
+};
+
+export const truncateAddress = (address: string | null | undefined) => {
+  if (!address) return "N/A";
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+};
+
+
+export const weiToEth = (v?: string | number | bigint | null): number => {
+  if (v === undefined || v === null) return 0;
+  try {
+    return Number(BigInt(v)) / 1e18;
+  } catch {
+    return 0;
+  }
+};
+
+export const ethToWei = (eth: number): string => {
+  if (!isFinite(eth) || eth <= 0) return "0";
+  return BigInt(Math.floor(eth * 1e18)).toString();
+};
+
+export const formatBalance = (value: number): string => {
+  if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
+
+  return value.toLocaleString("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  });
+}
+
+export const formatBalanceWithSymbol = (balance: string | number | bigint, symbol: string, decimal: number = 18): string => {
+  let formatted = formatUnits(BigInt(balance.toString()), decimal);
+  if (formatted.includes('.')) {
+    formatted = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
+  }
+  return `${formatted} ${symbol}`;
+};

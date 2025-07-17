@@ -102,15 +102,6 @@ const BorrowAssetModal = ({
     }
   }, [isOpen]);
 
-  const handlePercentageClick = (percent?: number) => {
-    const total = availableToBorrowFormatted;
-    const amount = percent
-      ? (parseFloat(total) * percent).toString()
-      : total;
-    setBorrowAmount(amount);
-    setDisplayAmount(addCommasToInput(amount));
-  };
-
   const handlePercentageButtonClick = (percentageAmount: string) => {
     setBorrowAmount(percentageAmount);
     setDisplayAmount(addCommasToInput(percentageAmount));

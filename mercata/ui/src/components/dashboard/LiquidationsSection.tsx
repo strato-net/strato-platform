@@ -15,16 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight } from "lucide-react";
-
-const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
-const weiToEther = (v?: string) => {
-  if (!v) return 0;
-  try {
-    return Number(BigInt(v)) / 1e18;
-  } catch {
-    return 0;
-  }
-};
+import { truncateAddress, weiToEth } from "@/utils/numberUtils";
 
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
@@ -74,7 +65,7 @@ const LiquidationsSection: React.FC = () => {
                         <div className="text-gray-500">
                           {expanded[ln.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </div>
-                        <span className="font-medium text-sm">{shorten(ln.user)}</span>
+                        <span className="font-medium text-sm">{truncateAddress(ln.user)}</span>
                         <CopyButton address={ln.user} />
                       </div>
                       <div className={`text-sm font-medium ${ln.healthFactor < 1 ? 'text-red-600' : 'text-yellow-600'}`}>
@@ -82,7 +73,7 @@ const LiquidationsSection: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-sm text-gray-600">
-                      Borrowed: <span className="font-medium">{weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}</span>
+                      Borrowed: <span className="font-medium">{weiToEth(ln.amount).toFixed(2)} {ln.assetSymbol}</span>
                     </div>
                   </div>
                   
@@ -98,7 +89,7 @@ const LiquidationsSection: React.FC = () => {
                       <div>
                         <div className="text-sm text-gray-500">Borrower</div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{shorten(ln.user)}</span>
+                          <span className="font-medium">{truncateAddress(ln.user)}</span>
                           <CopyButton address={ln.user} />
                         </div>
                       </div>
@@ -108,7 +99,7 @@ const LiquidationsSection: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-500">Borrowed</div>
                       <div className="font-medium">
-                        {weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}
+                        {weiToEth(ln.amount).toFixed(2)} {ln.assetSymbol}
                       </div>
                     </div>
                     
@@ -128,7 +119,7 @@ const LiquidationsSection: React.FC = () => {
                     {/* Mobile layout */}
                     <div className="block md:hidden space-y-3">
                       {ln.collaterals.map((c: CollateralData, idx: number) => {
-                        const usdVal = weiToEther(c.usdValue).toFixed(2);
+                        const usdVal = weiToEth(c.usdValue).toFixed(2);
                         const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                         const positive = profitNum > 0;
                         const profit = profitNum.toFixed(2);
@@ -157,7 +148,7 @@ const LiquidationsSection: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <div>
                                 <span className="text-gray-500">Amount: </span>
-                                <span className="font-medium">{weiToEther(c.amount).toFixed(2)}</span>
+                                <span className="font-medium">{weiToEth(c.amount).toFixed(2)}</span>
                               </div>
                               <div>
                                 <span className="text-gray-500">Value: </span>
@@ -189,7 +180,7 @@ const LiquidationsSection: React.FC = () => {
                         </TableHeader>
                         <TableBody>
                           {ln.collaterals.map((c: CollateralData, idx: number) => {
-                            const usdVal = weiToEther(c.usdValue).toFixed(2);
+                            const usdVal = weiToEth(c.usdValue).toFixed(2);
                             const profitNum = Number(BigInt(c.expectedProfit)) / 1e18;
                             const positive = profitNum > 0;
                             const profit = profitNum.toFixed(2);
@@ -203,7 +194,7 @@ const LiquidationsSection: React.FC = () => {
                                   />
                                 </TableCell>
                                 <TableCell className="font-medium">
-                                  {weiToEther(c.amount).toFixed(2)}
+                                  {weiToEth(c.amount).toFixed(2)}
                                 </TableCell>
                                 <TableCell className="font-medium">
                                   ${usdVal}

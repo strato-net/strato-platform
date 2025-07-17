@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import CopyButton from '../ui/copy';
 import { Menu } from 'lucide-react';
+import { truncateAddress } from "@/utils/numberUtils";
 
 interface DashboardHeaderProps {
   title: string;
@@ -11,11 +12,6 @@ interface DashboardHeaderProps {
 const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
   const { userAddress, userName } = useUser()
    
-  const truncateAddress = (address: string | null | undefined) => {
-    if (!address) return "N/A";
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
-
   const getAvatarFallback = () => {
     if (!userName) return "NA";
     return userName.substring(0, 2).toUpperCase();
