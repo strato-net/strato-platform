@@ -777,7 +777,7 @@ const SwapPoolsSection = () => {
                       }
                       
                       // Check if it's a valid number format first
-                      if (!/^\d*\.?\d*$/.test(value)) {
+                      if (!/^\d*\.?\d{0,2}$/.test(value)) {
                         return;
                       }
                       
@@ -874,7 +874,7 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="pt-2">
-              <Button disabled={withdrawLoading || !withdrawPercent || parseFloat(withdrawPercent) > 100 || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
+              <Button disabled={withdrawLoading || !withdrawPercent || parseFloat(withdrawPercent) <= 0 || parseFloat(withdrawPercent) > 100 || BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)} type="submit" className="w-full bg-strato-blue hover:bg-strato-blue/90">
                 {withdrawLoading ? (
                   <div className="flex justify-center items-center h-12">
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
