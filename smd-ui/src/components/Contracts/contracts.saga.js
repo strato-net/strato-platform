@@ -36,15 +36,15 @@ export async function getContracts(chainid, limit, offset, searchTerm) {
 
   if (chainid) params.set("chainid", chainid);
 
-  if (searchTerm && isValidContractAddress(searchTerm)) {
-    const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
-    const { _contractName } = await fetchJson(detailUrl);
+  // if (searchTerm && isValidContractAddress(searchTerm)) {
+  //   const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
+  //   const { _contractName } = await fetchJson(detailUrl);
     
-    if (_contractName) params.set("name", _contractName);
+  //   if (_contractName) params.set("name", searchTerm);
 
-    const listUrl = `${contractsUrl}?${params}`;
-    return fetchJson(listUrl);
-  }
+  //   const listUrl = `${contractsUrl}?${params}`;
+  //   return fetchJson(listUrl);
+  // }
 
   if (searchTerm) params.set("name", searchTerm);
 
