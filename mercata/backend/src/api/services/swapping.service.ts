@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice, getRequiredInput } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput, calculateImpliedPrice } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { SwapHistoryEntry } from "../../types";
 
@@ -341,15 +341,16 @@ export const getSwapHistory = async (
 
     const swapHistory = swapEvents.map((event: any) => {
       const { tokenA, tokenB } = event.pool;
-      const isTokenAInput = event.tokenInAddress === tokenA.address;
+      const isAToB = event.tokenIn === tokenA.address;
       
       return {
         id: event.id.toString(),
         timestamp: new Date(event.block_timestamp),
-        tokenIn: isTokenAInput ? tokenA.symbol : tokenB.symbol,
-        tokenOut: isTokenAInput ? tokenB.symbol : tokenA.symbol,
+        tokenIn: isAToB ? tokenA.symbol : tokenB.symbol,
+        tokenOut: isAToB ? tokenB.symbol : tokenA.symbol,
         amountIn: event.amountIn,
         amountOut: event.amountOut,
+        impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
         txHash: event.transaction_hash
       };
     });
