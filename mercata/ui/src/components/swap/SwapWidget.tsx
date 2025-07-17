@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
 import { usdstAddress, SWAP_FEE } from "@/lib/contants";
+import { safeParseUnits, formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
 import {
   Dialog,
   DialogContent,
@@ -43,11 +44,7 @@ const formatAmount = (amount: string): string => {
 };
 
 const formatBalance = (balance: string | number | bigint, symbol: string): string => {
-  let formatted = formatUnits(BigInt(balance.toString()), DECIMALS);
-  if (formatted.includes('.')) {
-    formatted = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
-  }
-  return `${formatted} ${symbol}`;
+  return formatBalanceUtil(balance, symbol, DECIMALS);
 };
 
 // Components
@@ -110,7 +107,6 @@ interface TokenInputProps {
   onOpenChange: (open: boolean) => void;
   label: string;
   onFocus: () => void;
-  usdstBalance: string;
   isFromInput: boolean;
   showMaxButton: boolean;
   onMaxClick: () => void;
@@ -132,59 +128,12 @@ const TokenInput = ({
   onOpenChange,
   label,
   onFocus,
-  usdstBalance,
   isFromInput,
   pool,
   fromAsset,
   showMaxButton,
   onMaxClick
 }: TokenInputProps) => {
-  const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
-  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-  
-  // Safely parse input amount to prevent errors with invalid inputs like "."
-  const inputAmountWei = (() => {
-    try {
-      if (!amount || amount === "." || amount === "0." || isNaN(Number(amount))) {
-        return 0n;
-      }
-      return parseUnits(amount, DECIMALS);
-    } catch {
-      return 0n;
-    }
-  })();
-
-  // Validation checks
-  const isUsdstMaxIssue = isFromInput &&
-    asset?.address === usdstAddress &&
-    inputAmountWei > usdstBalanceBigInt - feeAmount &&
-    inputAmountWei <= usdstBalanceBigInt;
-    
-  const isInsufficientUsdstForFee = useMemo(() => {
-    if (
-      !isFromInput ||
-      !asset ||
-      !usdstBalanceBigInt ||
-      !feeAmount
-    ) return false;
-
-    return (
-      asset?.address !== usdstAddress &&
-      usdstBalanceBigInt < feeAmount
-    );
-  }, [isFromInput, asset, usdstBalanceBigInt, feeAmount]);
-
-  // Check if input amount is within 0.10 of USDST balance (low balance warning)
-  const isLowBalanceWarning = useMemo(() => {
-    if (!isFromInput || !asset || asset?.address !== usdstAddress || !inputAmountWei) return false;
-    
-    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
-    const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
-    
-    return inputAmountWei > 0n && 
-           remainingBalance >= 0n && 
-           remainingBalance <= lowBalanceThreshold;
-  }, [isFromInput, asset, inputAmountWei, usdstBalanceBigInt, feeAmount]);
 
   // Get pool balance
   const getPoolBalance = () => {
@@ -247,21 +196,6 @@ const TokenInput = ({
           )}
           {insufficientPoolBalance && (
             <p className="text-orange-600 text-sm mt-1">Amount exceeds pool balance</p>
-          )}
-          {isUsdstMaxIssue && (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient balance for transaction fee ({SWAP_FEE} USDST)
-            </p>
-          )}
-          {isInsufficientUsdstForFee && (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
-            </p>
-          )}
-          {isLowBalanceWarning && (
-            <p className="text-yellow-600 text-sm mt-1">
-              Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-            </p>
           )}
         </div>
         <div className="flex-shrink-0">
@@ -443,6 +377,22 @@ const SwapWidget = () => {
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
+
+  // Fee warning logic
+  const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+  
+  // Safely parse input amounts
+  const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
+
+  // Fee warning checks
+  const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+
+  const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n && (() => {
+    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
+    const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
+    return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+  })();
   const lastCalculatedFromRef = useRef<string>("");
 
   // Fetch USDST balance when user changes
@@ -568,7 +518,7 @@ const SwapWidget = () => {
 
           // Recalculate if not actively editing and we have a preserved amount
           if (fromAmount && fromAmount === lastCalculatedFromRef.current && editingField === null) {
-            const parsedValue = parseUnits(fromAmount, DECIMALS);
+            const parsedValue = safeParseUnits(fromAmount, DECIMALS);
             const isAToB = poolData.tokenA?.address === fromAsset.address ? true : false;
 
             const swapAmount = await calculateSwap({
@@ -707,7 +657,7 @@ const SwapWidget = () => {
         return;
       }
       
-      const parsedValue = parseUnits(inputAmount, DECIMALS);
+      const parsedValue = safeParseUnits(inputAmount, DECIMALS);
 
       if (isFromInput) {
         // Forward calculation: input -> output
@@ -835,7 +785,7 @@ const SwapWidget = () => {
         return;
       }
 
-      const parsed = parseUnits(preservedAmount, DECIMALS);
+      const parsed = safeParseUnits(preservedAmount, DECIMALS);
       const isAToB = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? true : false;
 
       try {
@@ -876,14 +826,14 @@ const SwapWidget = () => {
         throw new Error("Invalid amount values");
       }
 
-      const toAmountInWei = parseUnits(toAmount, DECIMALS);
+      const toAmountInWei = safeParseUnits(toAmount, DECIMALS);
       const slippageBps = Math.round(slippage * 100);
       const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
         poolAddress: pool.address,
         isAToB,
-        amountIn: parseUnits(fromAmount, DECIMALS).toString(),
+        amountIn: safeParseUnits(fromAmount, DECIMALS).toString(),
         minAmountOut: minTokens.toString(),
       });
 
@@ -942,7 +892,7 @@ const SwapWidget = () => {
         return true;
       }
       
-      const fromAmountWei = parseUnits(fromAmount, DECIMALS);
+      const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
       const balance = BigInt(fromAsset.balance || "0");
 
       if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
@@ -997,7 +947,6 @@ const handleMaxClick = (isFrom: boolean) => {
         onOpenChange={setFromPopoverOpen}
         label="From"
         onFocus={() => setEditingField('from')}
-        usdstBalance={usdstBalance}
         isFromInput={true}
         pool={pool}
         fromAsset={fromAsset}
@@ -1030,7 +979,6 @@ const handleMaxClick = (isFrom: boolean) => {
         onOpenChange={setToPopoverOpen}
         label="To"
         onFocus={() => setEditingField('to')}
-        usdstBalance={usdstBalance}
         isFromInput={false}
         pool={pool}
         fromAsset={fromAsset}
@@ -1062,6 +1010,19 @@ const handleMaxClick = (isFrom: boolean) => {
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST</span>
         </div>
+        
+        {/* Fee Warnings */}
+        {hasInsufficientUsdstForFee && (
+          <p className="text-yellow-600 text-sm mt-1">
+            Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+          </p>
+        )}
+        {isLowBalanceWarning && (
+          <p className="text-yellow-600 text-sm mt-1">
+            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+          </p>
+        )}
+        
         <SlippageControl
           slippage={slippage}
           autoSlippage={autoSlippage}
