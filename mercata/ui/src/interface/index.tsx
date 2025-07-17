@@ -441,3 +441,13 @@ export interface Pool {
   _name?: string;
   _symbol?: string;
 }
+
+export interface SwapHistoryEntry {
+  id: string;
+  timestamp: Date;
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  amountOut: string;
+  txHash: string;
+}
