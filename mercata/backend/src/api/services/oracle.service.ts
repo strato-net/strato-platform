@@ -13,7 +13,9 @@ export const getPrice = async (
   accessToken: string,
   asset?: string
 ) => {
-  const registry = await getPool(accessToken, undefined, { select: "priceOracle" });
+  const registry = await getPool(accessToken, undefined, { 
+    select: `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`
+  });
 
   const prices: { asset: string; price: string }[] = registry.priceOracle
     ? registry.priceOracle.prices || []
