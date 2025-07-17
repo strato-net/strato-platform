@@ -25,7 +25,7 @@ const AssetsList = ({
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
-  const [showAllEarningAssets, setShowAllEarningAssets] = useState(false);
+  const [showAllEarningAssets, setShowAllEarningAssets] = useState(true);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
@@ -58,7 +58,7 @@ const AssetsList = ({
       <div>
         <div className="p-4 text-right border-t border-gray-100 flex justify-between">
           <span className="font-bold">Earning Assets</span>
-          <Button
+          {tokens.length > 10 && <Button
             size="sm"
             className="hidden sm:flex items-center gap-1"
             onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
@@ -71,7 +71,7 @@ const AssetsList = ({
                 <ArrowDown size={20} />
               )}
             </div>
-          </Button>
+          </Button>}
         </div>
         <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table style={{ minWidth: '700px', width: '100%' }}>
@@ -110,7 +110,7 @@ const AssetsList = ({
                   </td>
                 </tr>
               ) : tokens.length > 0 ? (
-                (showAllEarningAssets ? tokens : tokens.slice(0, 4)).map(
+                (showAllEarningAssets ? tokens : tokens.slice(0, 10)).map(
                   (asset, index) => (
                     <tr
                       key={index}
