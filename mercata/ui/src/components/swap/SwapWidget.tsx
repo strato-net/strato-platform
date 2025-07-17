@@ -413,7 +413,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 const SwapWidget = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool } = useSwapContext();
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -421,15 +421,12 @@ const SwapWidget = () => {
 
   // State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [fromAsset, setFromAsset] = useState<SwappableToken | undefined>();
-  const [toAsset, setToAsset] = useState<SwappableToken | undefined>();
   const [fromAmount, setFromAmount] = useState("");
   const [toAmount, setToAmount] = useState("");
   const [wrongAmount, setWrongAmount] = useState(false);
   const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
-  const [pool, setPool] = useState<LiquidityPool>(null);
   const [exchangeRate, setExchangeRate] = useState("0");
   const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
   const [toBalanceLoading, setToBalanceLoading] = useState(false);

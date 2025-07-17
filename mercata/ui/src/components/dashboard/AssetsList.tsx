@@ -25,7 +25,6 @@ const AssetsList = ({
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
-  const [showAllEarningAssets, setShowAllEarningAssets] = useState(false);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
@@ -58,20 +57,6 @@ const AssetsList = ({
       <div>
         <div className="p-4 text-right border-t border-gray-100 flex justify-between">
           <span className="font-bold">Earning Assets</span>
-          <Button
-            size="sm"
-            className="hidden sm:flex items-center gap-1"
-            onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
-          >
-            <div className="flex gap-1 justify-center items-center">
-              <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
-              {showAllEarningAssets ? (
-                <ArrowUp size={20} />
-              ) : (
-                <ArrowDown size={20} />
-              )}
-            </div>
-          </Button>
         </div>
         <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table style={{ minWidth: '700px', width: '100%' }}>
@@ -110,7 +95,7 @@ const AssetsList = ({
                   </td>
                 </tr>
               ) : tokens.length > 0 ? (
-                (showAllEarningAssets ? tokens : tokens.slice(0, 4)).map(
+                tokens.map(
                   (asset, index) => (
                     <tr
                       key={index}
@@ -154,25 +139,25 @@ const AssetsList = ({
                           {!asset?.["price"]
                             ? "-"
                             : `$${parseFloat(
-                                formatUnits(BigInt(asset.price), 18)
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`}
+                              formatUnits(BigInt(asset.price), 18)
+                            ).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <div
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             asset?.["change"] >= 0
-                              ? "bg-green-50 text-green-600"
-                              : "bg-red-50 text-red-600"
-                          }`}
+                            ? "bg-green-50 text-green-600"
+                            : "bg-red-50 text-red-600"
+                            }`}
                         >
                           {asset?.["change"] !== undefined
                             ? `${asset?.["change"] >= 0 ? "+" : ""}${
-                                asset?.["change"]
-                              }%`
+                              asset?.["change"]
+                            }%`
                             : "-"}
                         </div>
                       </td>
@@ -181,11 +166,11 @@ const AssetsList = ({
                           {!asset?.balance
                             ? "-"
                             : parseFloat(
-                                formatUnits(BigInt(asset.balance), 18)
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 4,
-                              })}
+                              formatUnits(BigInt(asset.balance), 18)
+                            ).toLocaleString(undefined, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 4,
+                            })}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
@@ -193,16 +178,16 @@ const AssetsList = ({
                           {!asset?.["price"] || !asset?.balance
                             ? "-"
                             : `$${(
-                                parseFloat(
-                                  formatUnits(BigInt(asset.price), 18)
-                                ) *
-                                parseFloat(
-                                  formatUnits(BigInt(asset.balance), 18)
-                                )
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`}
+                              parseFloat(
+                                formatUnits(BigInt(asset.price), 18)
+                              ) *
+                              parseFloat(
+                                formatUnits(BigInt(asset.balance), 18)
+                              )
+                            ).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
@@ -210,11 +195,11 @@ const AssetsList = ({
                           {!asset?.collateralBalance
                             ? "-"
                             : parseFloat(
-                                formatUnits(BigInt(asset.collateralBalance), 18)
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 4,
-                              })}
+                              formatUnits(BigInt(asset.collateralBalance), 18)
+                            ).toLocaleString(undefined, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 4,
+                            })}
                         </p>
                       </td>
                     </tr>
@@ -234,24 +219,6 @@ const AssetsList = ({
               )}
             </tbody>
           </table>
-        </div>
-        
-        {/* Mobile View All button - shown at bottom */}
-        <div className="sm:hidden p-4 border-t border-gray-100">
-          <Button
-            size="sm"
-            className="w-full flex items-center justify-center gap-1"
-            onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
-          >
-            <div className="flex gap-1 justify-center items-center">
-              <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
-              {showAllEarningAssets ? (
-                <ArrowUp size={20} />
-              ) : (
-                <ArrowDown size={20} />
-              )}
-            </div>
-          </Button>
         </div>
       </div>
 
