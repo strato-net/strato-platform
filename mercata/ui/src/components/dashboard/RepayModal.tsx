@@ -153,7 +153,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
 
         <div className="space-y-3">
           <label className="text-sm font-medium">Repay Amount (USDST)</label>
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between items-center text-xs text-gray-500">
             <span>Min: $0.01</span>
             <span>Max: ${(() => {
               const totalOwed = BigInt(loan?.totalAmountOwed || 0);

@@ -33,8 +33,9 @@ const BorrowAssetModal = ({
   loan,
   usdstBalance = "0"
 }: BorrowAssetModalProps) => {
+  const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0, 18)
+  const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0, 18))
   const isMobile = useIsMobile();
-  const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0,18)
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [displayAmount, setDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
@@ -165,9 +166,21 @@ const BorrowAssetModal = ({
 
           <div className="space-y-3">
             <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex justify-between items-center text-xs text-gray-500">
               <span>Min: $0.01</span>
-              <span>Max: ${availableToBorrowFormatted}</span>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBorrowAmount(availableToBorrowFormatted);
+                    setDisplayAmount(addCommasToInput(availableToBorrowFormatted));
+                  }}
+                  className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                >
+                  Max :
+                </button>
+                <span>${availableToBorrowFormatted}</span>
+              </div>
             </div>
             <div className="relative">
               <Input
@@ -190,8 +203,7 @@ const BorrowAssetModal = ({
               <span>Risk Level:</span>
               <div className="flex items-center gap-2">
                 <span
-                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                    riskLevel < 30
+                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${riskLevel < 30
                       ? "bg-green-50 text-green-700"
                       : riskLevel < 70
                         ? "bg-yellow-50 text-yellow-700"
