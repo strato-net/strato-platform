@@ -198,8 +198,9 @@ export const LendingProvider = ({
     try {
        await api.post("/lending/collateral", args);
     } catch (err) {
-      console.error("Withdraw liquidity failed:", err);
-      throw err;
+      console.error("Supply collateral failed:", err);
+      console.log(err.response.data.error.message);
+      throw err.response.data.error.message;
     }
   };
 
@@ -247,6 +248,9 @@ export const LendingProvider = ({
       loadingLiquidity,
       refreshLiquidity : fetchLiquidityInfo,
       setPrice,
+      setInterestRate: () => Promise.resolve(), // Placeholder implementation
+      setCollateralRatio: () => Promise.resolve(), // Placeholder implementation
+      setLiquidationBonus: () => Promise.resolve(), // Placeholder implementation
       configureAsset,
       refreshLendingData,
       borrowAsset,

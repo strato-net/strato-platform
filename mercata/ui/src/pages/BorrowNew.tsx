@@ -133,7 +133,7 @@ const BorrowNew = () => {
       setIsBorrowModalOpen(false);
       toast({
         title: "Borrow Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
+        description: `Something went wrong - ${error?.response?.data?.error?.message || error?.message || "Please try again later."}`,
         variant: "destructive",
       });
     }
@@ -184,7 +184,7 @@ const BorrowNew = () => {
       setIsSupplyModalOpen(false);
       toast({
         title: "Supply Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
+        description: error,
         variant: "destructive",
       });
     }
@@ -226,7 +226,7 @@ const BorrowNew = () => {
       setIsWithdrawModalOpen(false);
       toast({
         title: "Withdraw Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
+        description: `Something went wrong - ${error?.response?.data?.error?.message || error?.message || "Please try again later."}`,
         variant: "destructive",
       });
     }
