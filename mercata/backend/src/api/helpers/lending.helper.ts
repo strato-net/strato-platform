@@ -403,7 +403,7 @@ export const calculateActualSupplyAPR = (
   if (!interest || !supply) return 0;
 
   // APR = (interest / supply) * 100 (annualized)
-  return (interest / supply) * 100;
+  return (interest / supply) * 10000;
 };
 
 /**
@@ -416,9 +416,10 @@ export const calculateAPYs = (
   interestRate: number,
   reserveFactor: number = 1000
 ): { supplyAPY: number; borrowAPR: number } => {
-  const borrowAPR = interestRate / 10000;
+  // interestRate is in bps, so /100 gives percent
+  const borrowAPR = interestRate / 100;
+  // reserveFactor is in bps, so /10000 is fraction
   const supplyAPY = borrowAPR * (1 - reserveFactor / 10000);
-  
   return { supplyAPY, borrowAPR };
 };
 

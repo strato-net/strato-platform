@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { SwapHistoryEntry } from "../../types";
 
@@ -60,11 +60,18 @@ export const getPools = async (
   return poolData.map((pool: any) => {
     const tokenAPrice = priceMap.get(pool.tokenA?.address) || "0";
     const tokenBPrice = priceMap.get(pool.tokenB?.address) || "0";
-    const lpTokenPrice = priceMap.get(pool.lpToken?.address) || "0";
     
     const tokenAValue = (BigInt(pool.tokenABalance || "0") * BigInt(tokenAPrice)) / BigInt(10 ** 18);
     const tokenBValue = (BigInt(pool.tokenBBalance || "0") * BigInt(tokenBPrice)) / BigInt(10 ** 18);
     const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
+    
+    const lpTokenPrice = calculateLPTokenPrice(
+      pool.tokenABalance || "0",
+      pool.tokenBBalance || "0",
+      tokenAPrice,
+      tokenBPrice,
+      pool.lpToken?._totalSupply || "0"
+    );
     
     const tradingVolume24h = volumeMap.get(pool.address) || "0";
     const swapFeeRate = pool.swapFeeRate || 30;

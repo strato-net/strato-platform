@@ -16,7 +16,8 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
     if (!rawBalance || !price) return "0.00";
 
     const balance = parseFloat(formatUnits(rawBalance, 18));
-    const value = balance * parseFloat(price);
+    const priceValue = parseFloat(formatUnits(price, 18));
+    const value = balance * priceValue;
 
     return value.toFixed(2);
   };
@@ -33,7 +34,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
         {/* Header Row */}
         <div className="grid grid-cols-4 px-4 text-sm text-gray-500 font-medium">
           <div>Token</div>
-          <div className="text-center">Value</div>
+          <div className="text-center">Withdraw Value</div>
           <div className="text-center">Balance</div>
           <div className="text-right">APY</div>
         </div>
@@ -50,12 +51,11 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
               <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
                 <div className="font-semibold text-gray-700">{liquidityInfo.withdrawable._name}</div>
                 <div className="text-center font-medium text-gray-900">
-                  {liquidityInfo?.withdrawable?._totalSupply
-                      ? formatValue(liquidityInfo?.withdrawable?.userBalance,liquidityInfo?.withdrawable?.price)
+                  {liquidityInfo?.withdrawable?.withdrawValue
+                      ? Number(formatUnits(liquidityInfo?.withdrawable?.withdrawValue, 18)).toFixed(2)
                       : "0.00"}
                 </div>
                 <div className="text-center font-semibold text-gray-900">
-                  {/* {formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)} */}
                   {liquidityInfo?.withdrawable?.userBalance
                       ? formatBalance(liquidityInfo?.withdrawable?.userBalance)
                       : "0.00"}
@@ -76,7 +76,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                   <div className="font-semibold text-gray-700">{lpToken.lpToken._name}</div>
                   <div className="text-center font-medium text-gray-900">
                     {lpToken?.lpToken?._totalSupply
-                      ? formatValue(lpToken?.lpToken?.balances[0].balance,lpToken?.lpTokenPrice)
+                      ? formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)
                       : "0.00"}
                   </div>
                   <div className="text-center font-semibold text-gray-900">

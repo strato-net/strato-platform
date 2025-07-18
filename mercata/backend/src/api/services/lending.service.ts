@@ -368,7 +368,6 @@ export const liquidityAndBalance = async (
     exchangeRate,
     totalBorrowed,
     totalCollateralValue,
-    totalAccruedInterest,
     apyData
   ] = await Promise.all([
     Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied)),
@@ -383,30 +382,16 @@ export const liquidityAndBalance = async (
       priceMap, 
       borrowableAsset
     )),
-    Promise.resolve(calculateTotalAccruedInterest(
-      userLoan || [], 
-      borrowableAssetConfig?.interestRate || 0, 
-      currentTime
-    )),
     Promise.resolve(calculateAPYs(
       borrowableAssetConfig?.interestRate || 0,
       borrowableAssetConfig?.reserveFactor || 1000
     ))
   ]);
 
-  // Calculate actual supply APR based on current accrued interest
-  // Apply reserve factor to get supplier's share
-  const reserveFactor = borrowableAssetConfig?.reserveFactor || 1000;
-  const supplierInterest = (BigInt(totalAccruedInterest) * BigInt(10000 - reserveFactor)) / 10000n;
-  
-  const supplyAPR = calculateActualSupplyAPR(
-    supplierInterest.toString(),
-    totalUSDSTSupplied
-  );
-
-  // Calculate derived metrics
+  // Calculate utilization rate
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
-
+  // Supply APY = theoretical max APY × utilization rate
+  const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
   // Calculate max withdrawable amount considering both user's mUSDST balance and pool's available liquidity
   const userMTokenBalance = BigInt(mTokenBalance);
   const userUSDSTValue = userMTokenBalance > 0n 
@@ -434,6 +419,7 @@ export const liquidityAndBalance = async (
       ...mTokenInfoClean,
       userBalance: mTokenBalance,
       maxWithdrawableUSDST,
+      withdrawValue: userUSDSTValue.toString(),
     },
     // Pool metrics
     totalUSDSTSupplied,
@@ -441,8 +427,8 @@ export const liquidityAndBalance = async (
     utilizationRate,
     availableLiquidity,
     totalCollateralValue,
-    supplyAPY: Number(supplyAPR.toFixed(2)),
-    borrowAPR: Number((apyData.borrowAPR * 100).toFixed(2)),
+    supplyAPY: Math.floor(supplyAPY * 100) / 100,
+    borrowAPR: Math.floor(apyData.borrowAPR * 100) / 100,
     exchangeRate,
   };
 };
