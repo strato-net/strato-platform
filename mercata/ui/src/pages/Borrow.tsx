@@ -301,12 +301,20 @@ const Borrow = () => {
                       <TableRow key={asset?.address}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
-                              style={{ backgroundColor: "red" }}
-                            >
-                              {asset?._symbol.slice(0, 2)}
-                            </div>
+                            {asset?.images?.[0] ? (
+                              <img
+                                src={asset.images[0].value}
+                                alt={asset._name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {asset?._symbol.slice(0, 2)}
+                              </div>
+                            )}
                             <div>
                               <div className="font-medium">{asset?._name}</div>
                               <div className="text-xs text-gray-500">{asset?._symbol}</div>
@@ -397,12 +405,20 @@ const Borrow = () => {
                       <TableRow key={loanIndex}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
-                              style={{ backgroundColor: "red" }}
-                            >
-                              {loan?._symbol?.slice(0, 2)}
-                            </div>
+                            {loan?.images?.[0] ? (
+                              <img
+                                src={loan.images[0].value}
+                                alt={loan._name || loan._symbol}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {loan?._symbol?.slice(0, 2)}
+                              </div>
+                            )}
                             <div>
                               <div className="font-medium">{loan?._name || loan?._symbol}</div>
                               <div className="text-xs text-gray-500">{loan?._symbol}</div>

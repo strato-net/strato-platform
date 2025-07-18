@@ -248,6 +248,7 @@ export interface CollateralData {
   _owner: string;
   _symbol: string;
   _totalSupply: string;
+  images?: Array<{ value: string }>;
   asset?: string;
   maxRepay?: string;
   symbol?: string;
