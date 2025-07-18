@@ -16,6 +16,8 @@ import {
   calculateTotalCollateralValue,
   calculateTotalCollateralValueForHealth,
   calculateHealthFactor,
+  calculateActualSupplyAPR,
+  calculateTotalAccruedInterest,
   calculateAPYs,
   toBig,
 } from "../helpers/lending.helper";
@@ -366,6 +368,7 @@ export const liquidityAndBalance = async (
     exchangeRate,
     totalBorrowed,
     totalCollateralValue,
+    totalAccruedInterest,
     apyData
   ] = await Promise.all([
     Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied)),
@@ -380,11 +383,26 @@ export const liquidityAndBalance = async (
       priceMap, 
       borrowableAsset
     )),
+    Promise.resolve(calculateTotalAccruedInterest(
+      userLoan || [], 
+      borrowableAssetConfig?.interestRate || 0, 
+      currentTime
+    )),
     Promise.resolve(calculateAPYs(
       borrowableAssetConfig?.interestRate || 0,
       borrowableAssetConfig?.reserveFactor || 1000
     ))
   ]);
+
+  // Calculate actual supply APR based on current accrued interest
+  // Apply reserve factor to get supplier's share
+  const reserveFactor = borrowableAssetConfig?.reserveFactor || 1000;
+  const supplierInterest = (BigInt(totalAccruedInterest) * BigInt(10000 - reserveFactor)) / 10000n;
+  
+  const supplyAPR = calculateActualSupplyAPR(
+    supplierInterest.toString(),
+    totalUSDSTSupplied
+  );
 
   // Calculate derived metrics
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
@@ -423,8 +441,8 @@ export const liquidityAndBalance = async (
     utilizationRate,
     availableLiquidity,
     totalCollateralValue,
-    supplyAPY: apyData.supplyAPY,
-    borrowAPY: apyData.borrowAPY,
+    supplyAPR: Number(supplyAPR.toFixed(2)),
+    borrowAPY: Number((apyData.borrowAPY * 100).toFixed(2)),
     exchangeRate,
   };
 };

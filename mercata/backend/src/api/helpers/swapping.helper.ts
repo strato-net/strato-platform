@@ -58,3 +58,42 @@ export const calculateImpliedPrice = (
     return '0.00';
   }
 };
+
+/**
+ * Calculate pool APR based on actual fees earned over 24h
+ * @param fees24h 24-hour fees earned by LPs in USD
+ * @param totalLiquidity Total value locked in the pool in USD
+ * @returns APR as a percentage
+ */
+export const calculatePoolAPR = (
+  fees24h: string,
+  totalLiquidity: string
+): number => {
+  const fees = parseFloat(fees24h);
+  const liquidity = parseFloat(totalLiquidity);
+
+  if (!fees || !liquidity) return 0;
+
+  return Math.max(0, (fees / liquidity) * 365 * 100);
+};
+
+/**
+ * Calculate fees earned by LPs from trading volume
+ * @param tradingVolume24h 24-hour trading volume in USD
+ * @param swapFeeRate Swap fee rate in basis points (e.g., 30 = 0.3%)
+ * @param lpSharePercent LP share percentage in basis points (e.g., 7000 = 70%)
+ * @returns Fees earned by LPs in USD
+ */
+export const calculateLPFees24h = (
+  tradingVolume24h: string,
+  swapFeeRate: number,
+  lpSharePercent: number
+): string => {
+  const volume = parseFloat(tradingVolume24h);
+  if (!volume) return "0";
+
+  const totalFees = volume * (swapFeeRate / 10000);
+  const lpFees = totalFees * (lpSharePercent / 10000);
+
+  return lpFees.toString();
+};

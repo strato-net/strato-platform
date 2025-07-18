@@ -207,8 +207,8 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Supply APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
+                  <span className="text-gray-500 text-sm sm:text-base">Supply APR</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPR ? `${liquidityInfo.supplyAPR}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Borrow APY</span>
