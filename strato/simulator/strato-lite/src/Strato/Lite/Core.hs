@@ -107,6 +107,7 @@ import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM2
 import Executable.StratoP2P
+import GHC.Conc (ThreadId, myThreadId)
 import SolidVM.Model.Storable hiding (toList)
 import Strato.Lite.Base
 import Text.Format
@@ -713,23 +714,32 @@ runMonad :: (m ~> BaseM) -> CorePeer -> CoreT m a -> BaseM a
 runMonad hoist p = hoist . flip runReaderT p
 
 runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> BaseM [Async ()]
-runNodeWithoutP2P hoist p = traverse (uncurry asyncOn) . zip [0..] $ nonP2pThreads hoist p
+runNodeWithoutP2P hoist p = do
+  tid <- liftIO myThreadId
+  traverse (uncurry asyncOn) . zip [0..] $ nonP2pThreads hoist p tid
 
-nonP2pThreads :: MonadBase m => (m ~> BaseM) -> CorePeer -> [BaseM ()]
-nonP2pThreads hoist p =
-  [ runMonad hoist p corePeerSequencer `catch` (\(e :: SomeException) -> $logErrorS "Sequencer ERROR" . T.pack $ show e)
-  , runMonad hoist p corePeerSeqTimerSource `catch` (\(e :: SomeException) -> $logErrorS "Seq Timer ERROR" . T.pack $ show e)
-  , runMonad hoist p corePeerVm `catch` (\(e :: SomeException) -> $logErrorS "VM ERROR" . T.pack $ show e)
-  , runMonad hoist p corePeerApiIndexer `catch` (\(e :: SomeException) -> $logErrorS "API Indexer ERROR" . T.pack $ show e)
-  , runMonad hoist p corePeerP2pIndexer `catch` (\(e :: SomeException) -> $logErrorS "P2P Indexer ERROR" . T.pack $ show e)
-  , runMonad hoist p corePeerSlipstream `catch` (\(e :: SomeException) -> $logErrorS "Slipstream ERROR" . T.pack $ show e)
+runBackgroundThread :: (MonadUnliftIO m, MonadLogger m) => Text -> ThreadId -> m () -> m ()
+runBackgroundThread name tid f = catch f $ \(e :: SomeException) -> do
+  $logErrorS (name <> " ERROR") . T.pack $ show e
+  throwTo tid e
+
+nonP2pThreads :: MonadBase m => (m ~> BaseM) -> CorePeer -> ThreadId -> [BaseM ()]
+nonP2pThreads hoist p tid =
+  [ runBackgroundThread "Sequencer"   tid $ runMonad hoist p corePeerSequencer
+  , runBackgroundThread "Seq Timer"   tid $ runMonad hoist p corePeerSeqTimerSource
+  , runBackgroundThread "VM"          tid $ runMonad hoist p corePeerVm
+  , runBackgroundThread "API Indexer" tid $ runMonad hoist p corePeerApiIndexer
+  , runBackgroundThread "P2P Indexer" tid $ runMonad hoist p corePeerP2pIndexer
+  , runBackgroundThread "Slipstream"  tid $ runMonad hoist p corePeerSlipstream
   ]
 
 runNode :: MonadBase m => (m ~> BaseM) -> (m ~> m) -> CorePeer -> BaseM [Async ()]
 runNode hoist initDiscovery p = do
   runMonad hoist p corePeerSetup
-  traverse (uncurry asyncOn) . zip [0..] $ runP2P : runEthDisc : nonP2pThreads hoist p
-  where runP2P = liftIO . loggingFunc $ stratoP2P (\f -> do
+  tid <- liftIO myThreadId
+  traverse (uncurry asyncOn) . zip [0..] $ runP2P tid : runEthDisc tid : nonP2pThreads hoist p tid
+  where runP2P tid = liftIO . loggingFunc . runBackgroundThread "STRATO P2P" tid $
+          stratoP2P (\f -> do
             ctx <- newIORef (def :: P2PContext)
             runResourceT . hoist . flip runReaderT p $ do
               let s = do
@@ -737,11 +747,15 @@ runNode hoist initDiscovery p = do
                     chan <- atomically $ dupTMChan seqP2pSource
                     sourceTMChan chan
               runReaderT (f s) ctx
-          ) `catch` (\(e :: SomeException) -> $logErrorS "STRATO P2P ERROR" . T.pack $ show e)
-        runEthDisc  = liftIO . loggingFunc . runResourceT $ ethereumDiscovery (\f -> do
+          )
+        runEthDisc tid = liftIO . loggingFunc . runResourceT . runBackgroundThread "Ethereum Discovery" tid $
+          ethereumDiscovery (\f -> do
             ctx <- newIORef (def :: P2PContext)
             hoist . initDiscovery . flip runReaderT p $ runReaderT (f 100) ctx
-          ) `catch` (\(e :: SomeException) -> $logErrorS "Ethereum Discovery ERROR" . T.pack $ show e)
+          ) `catch` (\(e :: SomeException) -> do
+                      $logErrorS "Ethereum Discovery ERROR" . T.pack $ show e
+                      throwTo tid e
+                    )
 
 postEvent :: SeqLoopEvent -> CorePeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_corePeerUnseqSource p) e
