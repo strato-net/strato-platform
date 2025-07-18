@@ -75,10 +75,10 @@ const AssetsList = ({
                   Balance
                 </th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
-                  Value
+                  Collateral Balance
                 </th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
-                  Collateral
+                  Value
                 </th>
               </tr>
             </thead>
@@ -175,23 +175,6 @@ const AssetsList = ({
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
-                          {!asset?.["price"] || !asset?.balance
-                            ? "-"
-                            : `$${(
-                              parseFloat(
-                                formatUnits(BigInt(asset.price), 18)
-                              ) *
-                              parseFloat(
-                                formatUnits(BigInt(asset.balance), 18)
-                              )
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}`}
-                        </p>
-                      </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-gray-900">
                           {!asset?.collateralBalance
                             ? "-"
                             : parseFloat(
@@ -200,6 +183,26 @@ const AssetsList = ({
                               minimumFractionDigits: 1,
                               maximumFractionDigits: 4,
                             })}
+                        </p>
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-gray-900">
+                          {!asset?.["price"] || (!asset?.balance && !asset?.collateralBalance)
+                            ? "-"
+                            : `$${(
+                              parseFloat(
+                                formatUnits(BigInt(asset.price), 18)
+                              ) *
+                              (parseFloat(
+                                formatUnits(BigInt(asset.balance || 0), 18)
+                              ) +
+                              parseFloat(
+                                formatUnits(BigInt(asset.collateralBalance || 0), 18)
+                              ))
+                            ).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`}
                         </p>
                       </td>
                     </tr>
@@ -225,7 +228,7 @@ const AssetsList = ({
       {isDashboard && (
         <div>
           <div className="p-4 text-right border-t border-gray-100 flex justify-between">
-            <span className="font-bold">Non earning Assets</span>
+            <span className="font-bold">Non-earning Assets</span>
             <div className="flex gap-4">
               <Button
                 size="sm"
