@@ -388,25 +388,6 @@ export const calculateTotalCollateralValue = (
 };
 
 /**
- * Calculate actual supply APR based on current pool's accrued interest
- * @param totalAccruedInterest Total accrued interest across all loans (in USD)
- * @param totalSupply Total supply (principal + liquidity pool balance) in USD
- * @returns Supply APR as percentage
- */
-export const calculateActualSupplyAPR = (
-  totalAccruedInterest: string,
-  totalSupply: string
-): number => {
-  const interest = parseFloat(totalAccruedInterest);
-  const supply = parseFloat(totalSupply);
-
-  if (!interest || !supply) return 0;
-
-  // APR = (interest / supply) * 100 (annualized)
-  return (interest / supply) * 10000;
-};
-
-/**
  * Calculate theoretical APY for supply and APR for borrow
  * @param interestRate Interest rate in basis points
  * @param reserveFactor Reserve factor in basis points
@@ -422,40 +403,3 @@ export const calculateAPYs = (
   const supplyAPY = borrowAPR * (1 - reserveFactor / 10000);
   return { supplyAPY, borrowAPR };
 };
-
-/**
- * Calculate total accrued interest across all loans
- * @param loans Array of loan entries
- * @param interestRate Interest rate in basis points
- * @param currentTime Current timestamp
- * @returns Total accrued interest across all loans
- */
-export const calculateTotalAccruedInterest = (
-  loans: any[],
-  interestRate: number,
-  currentTime: number
-): string => {
-  let totalAccruedInterest = 0n;
-  
-  for (const loanEntry of loans) {
-    const loan = loanEntry.LoanInfo;
-    if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {
-      // Calculate total accrued interest since last calculation
-      const timeElapsed = Math.max(0, currentTime - Number(loan.lastIntCalculated));
-      const hoursElapsed = BigInt(Math.floor(timeElapsed / 3600)); // Convert to hours
-      
-      // Calculate interest: (principal * rate * hours) / (8760 * 10000)
-      const accruedInterest = (
-        (toBig(loan.principalBalance) * BigInt(interestRate) * hoursElapsed) /
-        BigInt(8760 * 10000)
-      );
-      
-      // Add existing interest owed
-      const existingInterest = toBig(loan.interestOwed || "0");
-      
-      totalAccruedInterest += accruedInterest + existingInterest;
-    }
-  }
-  
-  return totalAccruedInterest.toString();
-}; 

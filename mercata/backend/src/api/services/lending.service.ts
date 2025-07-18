@@ -16,8 +16,6 @@ import {
   calculateTotalCollateralValue,
   calculateTotalCollateralValueForHealth,
   calculateHealthFactor,
-  calculateActualSupplyAPR,
-  calculateTotalAccruedInterest,
   calculateAPYs,
   toBig,
 } from "../helpers/lending.helper";
