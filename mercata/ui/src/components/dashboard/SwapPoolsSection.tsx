@@ -438,18 +438,34 @@ const SwapPoolsSection = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center">
                     <div className="flex items-center -space-x-2 mr-3">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
-                        style={{ backgroundColor: "red" }}
-                      >
-                        {pool._name?.slice(0, 2)}
-                      </div>
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                        style={{ backgroundColor: "red" }}
-                      >
-                        {pool._name?.split('/')[1].slice(0, 2)}
-                      </div>
+                      {pool.tokenA?.images?.[0] ? (
+                        <img
+                          src={pool.tokenA.images[0].value}
+                          alt={pool._name?.split('/')[1]}
+                          className="w-8 h-8 rounded-full object-cover z-10 border-2 border-white"
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
+                          style={{ backgroundColor: "red" }}
+                        >
+                          {pool._name?.split('/')[1].slice(0, 2)}
+                        </div>
+                      )}
+                      {pool.tokenB?.images?.[0] ? (
+                        <img
+                          src={pool.tokenB.images[0].value}
+                          alt={pool._name?.split('/')[0]}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                          style={{ backgroundColor: "red" }}
+                        >
+                          {pool._name?.slice(0, 2)}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <h3 className="font-medium">{pool._name}</h3>
