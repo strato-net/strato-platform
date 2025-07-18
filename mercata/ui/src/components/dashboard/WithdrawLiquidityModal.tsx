@@ -108,10 +108,10 @@ const WithdrawLiquidityModal = ({
                   {selectedPool && (
                     <>
                       <div className="flex items-center -space-x-2">
-                        {selectedPool?.tokenB?.images?.[0] ? (
+                        {selectedPool?.tokenA?.images?.[0] ? (
                           <img
-                            src={selectedPool.tokenB.images[0].value}
-                            alt={selectedPool._name?.split('/')[0]}
+                            src={selectedPool.tokenA.images[0].value}
+                            alt={selectedPool._name?.split('/')[1]}
                             className="w-6 h-6 rounded-full object-cover z-10 border-2 border-white"
                           />
                         ) : (
@@ -119,13 +119,13 @@ const WithdrawLiquidityModal = ({
                             className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
                             style={{ backgroundColor: "red" }}
                           >
-                            {selectedPool._name?.split('/')[0]?.slice(0, 2)}
+                            {selectedPool._name?.split('/')[1]?.slice(0, 2)}
                           </div>
                         )}
-                        {selectedPool?.tokenA?.images?.[0] ? (
+                        {selectedPool?.tokenB?.images?.[0] ? (
                           <img
-                            src={selectedPool.tokenA.images[0].value}
-                            alt={selectedPool._name?.split('/')[1]}
+                            src={selectedPool.tokenB.images[0].value}
+                            alt={selectedPool._name?.split('/')[0]}
                             className="w-6 h-6 rounded-full object-cover"
                           />
                         ) : (
@@ -133,7 +133,7 @@ const WithdrawLiquidityModal = ({
                             className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                             style={{ backgroundColor: "red" }}
                           >
-                            {selectedPool._name?.split('/')[1]?.slice(0, 2)}
+                            {selectedPool._name?.split('/')[0]?.slice(0, 2)}
                           </div>
                         )}
                       </div>
