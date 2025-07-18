@@ -1473,4 +1473,16 @@ def replaceServerPortsDocker() {
   sh './replace_server_ports_docker.sh docker-compose.highway.yml'
 }
 
+def waitLocalNodeIsSynced() {
+  echo "Waiting for local node to be in-sync and healthy..."
+  for (int i = 0; i < 1800; i++) {
+    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl strato:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") != 0) {
+      sleep 2
+    } else {
+      return true
+    }
+  }
+  error ("STRATO node failed to sync after more than an hour. Check the strato logs in artifacts for more details.")
+}
+
 return this

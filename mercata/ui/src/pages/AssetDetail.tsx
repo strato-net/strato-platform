@@ -92,11 +92,11 @@ const AssetDetail = () => {
     );
   }
 
-  const handleConnectWallet = () => { };
+  // const handleConnectWallet = () => { };
 
-  const handleBuyNow = () => { };
+  // const handleBuyNow = () => { };
 
-  const handleBridge = () => { };
+  // const handleBridge = () => { };
 
 
   return (
@@ -161,7 +161,7 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Asset Deposits:</span>
+                      <span className="text-gray-500">User Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
@@ -176,11 +176,6 @@ const AssetDetail = () => {
                         <span className="font-medium text-red-500">Sold Out</span>
                       </div>
                     )}
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Provider:</span>
-                      <span className="font-medium">{asset?.provider || 'N/A'}</span>
-                    </div>
 
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Owner:</span>
@@ -201,13 +196,8 @@ const AssetDetail = () => {
                         <CopyButton address={asset?.address} />
                       </span>
                     </div>
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Vault Service:</span>
-                      <span className="font-medium">{asset?.vaulter || 'N/A'}</span>
-                    </div>
                   </div>
-                  {!isWalletConnected ? (
+                  {/* {!isWalletConnected ? (
                     <Button
                       onClick={handleConnectWallet}
                       className="w-full flex items-center justify-center gap-2 mb-4"
@@ -240,7 +230,7 @@ const AssetDetail = () => {
                     >
                       Bridge
                     </Button>
-                  </div>
+                  </div> */}
                 </CardContent>
               </Card>
             </div>
@@ -337,16 +327,6 @@ const AssetDetail = () => {
                       className="prose max-w-none text-sm"
                       dangerouslySetInnerHTML={{ __html: asset?.token?.description }}
                     />
-                  </div>
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="font-semibold mb-2">Key Features</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-gray-700">
-                      <li>100% backed by real assets</li>
-                      <li>Regular independent audits</li>
-                      <li>Secure cold storage</li>
-                      <li>Instant liquidity</li>
-                      <li>Low transaction fees</li>
-                    </ul>
                   </div>
                 </CardContent>
               </Card>

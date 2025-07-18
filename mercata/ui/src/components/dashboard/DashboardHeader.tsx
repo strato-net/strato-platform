@@ -1,8 +1,14 @@
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import CopyButton from '../ui/copy';
-import { Menu } from 'lucide-react';
 import { truncateAddress } from "@/utils/numberUtils";
+import { LogOutIcon, Menu } from 'lucide-react';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 interface DashboardHeaderProps {
   title: string;
@@ -10,8 +16,8 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
-  const { userAddress, userName } = useUser()
-   
+  const { userAddress, userName, logout } = useUser()
+
   const getAvatarFallback = () => {
     if (!userName) return "NA";
     return userName.substring(0, 2).toUpperCase();
@@ -38,11 +44,32 @@ const DashboardHeader = ({ title, onMenuClick }: DashboardHeaderProps) => {
               <CopyButton address={userAddress}/>
             </div>
           </div>
-          <Avatar className="w-8 h-8 bg-strato-blue">
-            <AvatarFallback className="text-white text-xs bg-strato-blue">
-              {getAvatarFallback()}
-            </AvatarFallback>
-          </Avatar>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Avatar className="w-8 h-8 bg-strato-blue cursor-pointer">
+                <AvatarFallback className="text-white text-xs bg-strato-blue">
+                  {getAvatarFallback()}
+                </AvatarFallback>
+              </Avatar>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-3 shadow-md mt-2" align="end" side="bottom">
+              <div className="flex flex-col space-y-0.5">
+                <div className="text-sm font-medium">{userName || "N/A"}</div>
+                <div className="text-xs text-gray-600 break-all !mb-1">
+                  {truncateAddress(userAddress, 16, 8)}
+                </div>
+
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={logout}
+                >
+                  <LogOutIcon />
+                  Logout
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </header>

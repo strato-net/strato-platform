@@ -3,10 +3,11 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice, getRequiredInput } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput, calculateImpliedPrice } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
+import { SwapHistoryEntry } from "../../types";
 
-const { poolSelectFields, Pool, PoolFactory, Token, PriceOracle } = constants;
+const { poolSelectFields, Pool, PoolFactory, Token, PriceOracle, PoolSwap, swapHistorySelectFields } = constants;
 
 export const getPools = async (
   accessToken: string,
@@ -304,4 +305,59 @@ export const calculateSwapReverse = async (
     : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
 
   return getRequiredInput(BigInt(amountIn), inputReserve, outputReserve);
+};
+
+export const getSwapHistory = async (
+  accessToken: string,
+  poolAddress: string,
+  rawParams: Record<string, string | undefined> = {}
+): Promise<{ data: SwapHistoryEntry[], totalCount: number }> => {
+  try {
+    const params = {
+      address: `eq.${poolAddress}`,
+      select: rawParams.select || swapHistorySelectFields.join(','),
+      order: rawParams.order || 'block_timestamp.desc',
+      ...Object.fromEntries(
+        Object.entries(rawParams).filter(([key, value]) => 
+          value !== undefined && 
+          !['select', 'order'].includes(key)
+        )
+      )
+    };
+
+    const [swapEventsResponse, countResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${PoolSwap}`, { params }),
+      cirrus.get(accessToken, `/${PoolSwap}`, { 
+        params: { address: `eq.${poolAddress}`, select: 'id.count()' }
+      })
+    ]);
+
+    const swapEvents = swapEventsResponse.data;
+    const totalCount = countResponse.data?.[0]?.count || 0;
+
+    if (!Array.isArray(swapEvents)) {
+      return { data: [], totalCount: 0 };
+    }
+
+    const swapHistory = swapEvents.map((event: any) => {
+      const { tokenA, tokenB } = event.pool;
+      const isAToB = event.tokenIn === tokenA.address;
+      
+      return {
+        id: event.id.toString(),
+        timestamp: new Date(event.block_timestamp),
+        tokenIn: isAToB ? tokenA.symbol : tokenB.symbol,
+        tokenOut: isAToB ? tokenB.symbol : tokenA.symbol,
+        amountIn: event.amountIn,
+        amountOut: event.amountOut,
+        impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
+        sender: event.sender
+      };
+    });
+
+    return { data: swapHistory, totalCount };
+  } catch (error) {
+    console.error('Error fetching swap history:', error);
+    throw new Error('Failed to fetch swap history');
+  }
 };
