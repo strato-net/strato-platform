@@ -225,7 +225,7 @@ const AssetsList = ({
       {isDashboard && (
         <div>
           <div className="p-4 text-right border-t border-gray-100 flex justify-between">
-            <span className="font-bold">Non earning Assets</span>
+            <span className="font-bold">Non-earning Assets</span>
             <div className="flex gap-4">
               <Button
                 size="sm"
