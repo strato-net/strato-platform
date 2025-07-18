@@ -386,9 +386,10 @@ export const liquidityAndBalance = async (
     ))
   ]);
 
-  // Calculate derived metrics
+  // Calculate utilization rate
   const utilizationRate = calculateUtilizationRate(totalBorrowed, totalUSDSTSupplied);
-
+  // Supply APY = theoretical max APY × utilization rate
+  const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
   // Calculate max withdrawable amount considering both user's mUSDST balance and pool's available liquidity
   const userMTokenBalance = BigInt(mTokenBalance);
   const userUSDSTValue = userMTokenBalance > 0n 
@@ -416,6 +417,7 @@ export const liquidityAndBalance = async (
       ...mTokenInfoClean,
       userBalance: mTokenBalance,
       maxWithdrawableUSDST,
+      withdrawValue: userUSDSTValue.toString(),
     },
     // Pool metrics
     totalUSDSTSupplied,
@@ -423,8 +425,9 @@ export const liquidityAndBalance = async (
     utilizationRate,
     availableLiquidity,
     totalCollateralValue,
-    supplyAPY: apyData.supplyAPY,
-    borrowAPY: apyData.borrowAPY,
+    supplyAPY: Math.floor(supplyAPY * 100) / 100,
+    maxSupplyAPY: Math.floor(apyData.supplyAPY * 100) / 100,
+    borrowAPR: Math.floor(apyData.borrowAPR * 100) / 100,
     exchangeRate,
   };
 };
