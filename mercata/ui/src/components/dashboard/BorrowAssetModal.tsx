@@ -261,7 +261,7 @@ const BorrowAssetModal = ({
             <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
               <p className="text-gray-600">
                 Borrowing against your assets allows you to access liquidity
-                without selling your holdings. Be mindful of the risk level, as
+                without selling your balances. Be mindful of the risk level, as
                 high borrowing increases liquidation risk during market
                 volatility.
               </p>

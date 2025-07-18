@@ -11,6 +11,7 @@ import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
+import { useOracleContext } from "@/context/OracleContext";
 import { formatUnits, parseUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
@@ -351,6 +352,7 @@ const SwapWidget = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
+  const { getPrice, fetchPrice } = useOracleContext();
   const { toast } = useToast();
 
   // State
@@ -368,6 +370,10 @@ const SwapWidget = () => {
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
+  const [oracleExchangeRate, setOracleExchangeRate] = useState("0");
+  const [oracleLoading, setOracleLoading] = useState(false);
+  const [oracleDisplayFromSymbol, setOracleDisplayFromSymbol] = useState("");
+  const [oracleDisplayToSymbol, setOracleDisplayToSymbol] = useState("");
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
@@ -424,6 +430,58 @@ const SwapWidget = () => {
       fetchPairableTokens(fromAsset.address);
     }
   }, [fromAsset?.address, fetchPairableTokens]);
+
+  // Fetch oracle exchange rate when assets change
+  useEffect(() => {
+    const fetchOracleExchangeRate = async () => {
+      if (!fromAsset?.address || !toAsset?.address) {
+        setOracleExchangeRate("0");
+        setOracleLoading(false);
+        return;
+      }
+
+      setOracleLoading(true);
+      try {
+        const [fromPrice, toPrice] = await Promise.all([
+          fetchPrice(fromAsset.address),
+          fetchPrice(toAsset.address)
+        ]);
+
+        if (fromPrice && toPrice) {
+          // Oracle prices are actually stored in 18-decimal format (1e18 = $1.00), not 8-decimal
+          // Parse as 18-decimal values
+          const fromPriceBig = parseUnits(fromPrice, 18);
+          const toPriceBig = parseUnits(toPrice, 18);
+          
+          if (fromPriceBig > 0n && toPriceBig > 0n) {
+            // Calculate exchange rate: how much toAsset you get for 1 fromAsset
+            // Rate = fromPrice / toPrice (since higher priced asset should give less units)
+            const rate = (fromPriceBig * parseUnits("1", 18)) / toPriceBig;
+            setOracleExchangeRate(formatUnits(rate, 18));
+            
+            // Always use the same symbol order as the swap direction
+            setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+            setOracleDisplayToSymbol(toAsset?._symbol || "");
+          } else {
+            setOracleExchangeRate("0");
+            setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+            setOracleDisplayToSymbol(toAsset?._symbol || "");
+          }
+        } else {
+          setOracleExchangeRate("0");
+          setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+          setOracleDisplayToSymbol(toAsset?._symbol || "");
+        }
+      } catch (error) {
+        console.error("Failed to fetch oracle prices:", error);
+        setOracleExchangeRate("0");
+      } finally {
+        setOracleLoading(false);
+      }
+    };
+
+    fetchOracleExchangeRate();
+  }, [fromAsset?.address, toAsset?.address, fetchPrice]);
 
   // Combined effect: fetch pool, update rate, and poll for updates
   useEffect(() => {
@@ -930,11 +988,24 @@ const handleMaxClick = (isFrom: boolean) => {
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Exchange Rate</span>
+          <span className="text-gray-600 decoration-2">Exchange Rate</span>
           <span className="font-medium">
             1 {fromAsset?._symbol || ""} ≈ {formatAmount(exchangeRate)} {toAsset?._symbol || ""}
           </span>
         </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Exchange Rate (Spot)</span>
+          <span className="font-medium text-gray-400">
+            {oracleLoading ? (
+              <LoadingSpinner />
+            ) : oracleExchangeRate === "0" ? (
+              "Price data unavailable"
+            ) : (
+              <>1 {oracleDisplayFromSymbol} ≈ {formatAmount(oracleExchangeRate)} {oracleDisplayToSymbol}</>
+            )}
+          </span>
+        </div>
+        <div className="my-3"></div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST</span>
