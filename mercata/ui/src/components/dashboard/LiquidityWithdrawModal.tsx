@@ -36,12 +36,10 @@ const LiquidityWithdrawModal = ({
 }: LiquidityWithdrawModalProps) => {
   const [withdrawPercent, setWithdrawPercent] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [tokenABalance, setTokenABalance] = useState('');
-  const [tokenBBalance, setTokenBBalance] = useState('');
   const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
 
-  const { removeLiquidity, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
+  const { removeLiquidity, fetchTokenBalances } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -57,8 +55,6 @@ const LiquidityWithdrawModal = ({
         try {
           setBalanceLoading(true);
           const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
-          setTokenABalance(balances.tokenABalance);
-          setTokenBBalance(balances.tokenBBalance);
           setUsdstBalance(balances.usdstBalance);
           setBalanceLoading(false);
         } catch (error) {
@@ -164,16 +160,52 @@ const LiquidityWithdrawModal = ({
                 <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1">
                   {selectedPool && (
                     <>
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                        style={{ backgroundColor: "red" }}
-                      >
-                        {selectedPool._symbol?.slice(0, 2)}
+                      <div className="flex items-center -space-x-1">
+                        {selectedPool.tokenA?.images?.[0]?.value ? (
+                          <img
+                            src={selectedPool.tokenA.images[0].value}
+                            alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
+                            className="w-5 h-5 rounded-full z-10 border border-white object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border border-white"
+                            style={{ backgroundColor: "red" }}
+                          >
+                            {selectedPool._name?.split('/')[0]?.slice(0, 1)}
+                          </div>
+                        )}
+                        {selectedPool.tokenB?.images?.[0]?.value ? (
+                          <img
+                            src={selectedPool.tokenB.images[0].value}
+                            alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
+                            className="w-5 h-5 rounded-full border border-white object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white"
+                            style={{ backgroundColor: "red" }}
+                          >
+                            {selectedPool._name?.split('/')[1]?.slice(0, 1)}
+                          </div>
+                        )}
                       </div>
-                      <span className="font-medium">{selectedPool._symbol}</span>
+                      <span className="font-medium text-sm">{selectedPool._symbol}</span>
                     </>
                   )}
                 </div>
+              </div>
+              <div className='flex items-center justify-between'>
+                <span></span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-blue-500"
+                  onClick={() => setWithdrawPercent('100')}
+                >
+                  Max
+                </Button>
               </div>
               {withdrawPercent && parseFloat(withdrawPercent) > 100 && (
                 <p className="text-red-600 text-sm mt-1">Percentage cannot exceed 100%</p>

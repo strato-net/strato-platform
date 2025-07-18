@@ -235,7 +235,7 @@ const LiquidityDepositModal = ({
                 <Input
                   disabled={balanceLoading}
                   placeholder="0.0"
-                  className={`border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
+                  className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                     safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
                   }`}
                   value={token1Amount}
@@ -250,16 +250,24 @@ const LiquidityDepositModal = ({
                     }
                   }}
                 />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1">
+                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
                   {selectedPool && (
                     <>
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                        style={{ backgroundColor: "red" }}
-                      >
-                        {selectedPool._name?.split('/')[0]?.slice(0, 2)}
-                      </div>
-                      <span className="font-medium">{selectedPool._name?.split('/')[0]}</span>
+                      {selectedPool.tokenA?.images?.[0]?.value ? (
+                        <img
+                          src={selectedPool.tokenA.images[0].value}
+                          alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                          style={{ backgroundColor: "red" }}
+                        >
+                          {selectedPool._name?.split('/')[0]?.slice(0, 2)}
+                        </div>
+                      )}
+                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[0]}</span>
                     </>
                   )}
                 </div>
@@ -321,11 +329,11 @@ const LiquidityDepositModal = ({
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-gray-500">Amount</span>
               </div>
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <Input
                   disabled={balanceLoading}
                   placeholder="0.0"
-                  className={`border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
+                  className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                     safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
                   }`}
                   value={token2Amount}
@@ -340,16 +348,24 @@ const LiquidityDepositModal = ({
                     }
                   }}
                 />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1">
+                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
                   {selectedPool && (
                     <>
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                        style={{ backgroundColor: "red" }}
-                      >
-                        {selectedPool._name?.split('/')[1]?.slice(0, 2)}
-                      </div>
-                      <span className="font-medium">{selectedPool._name?.split('/')[1]}</span>
+                      {selectedPool.tokenB?.images?.[0]?.value ? (
+                        <img
+                          src={selectedPool.tokenB.images[0].value}
+                          alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                          style={{ backgroundColor: "red" }}
+                        >
+                          {selectedPool._name?.split('/')[1]?.slice(0, 2)}
+                        </div>
+                      )}
+                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[1]}</span>
                     </>
                   )}
                 </div>
