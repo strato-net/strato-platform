@@ -72,7 +72,7 @@ const AssetsList = ({
                   Change
                 </th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
-                  Holdings
+                  Balance
                 </th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Value
@@ -256,7 +256,7 @@ const AssetsList = ({
                       Asset
                     </th>
                     <th className="w-[50%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Holdings
+                      Balance
                     </th>
                   </tr>
                 </thead>
