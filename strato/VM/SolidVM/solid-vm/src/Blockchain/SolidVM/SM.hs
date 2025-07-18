@@ -51,6 +51,7 @@ module Blockchain.SolidVM.SM
     getBSum,
     addEvent,
     addDelegatecall,
+    getContractNameAndHash,
     getCodeAndCollection,
     getContractsForParents,
     getAbstractParentsFromContract,
@@ -951,7 +952,7 @@ getContractNameAndHash address' = do
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-  let maybeCI = find (\ci -> currentAddress ci == address')
+  let maybeCI = find (\ci -> currentAddress ci == address') callStack'
 
   -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
   -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
