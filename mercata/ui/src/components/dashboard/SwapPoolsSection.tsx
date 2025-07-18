@@ -461,7 +461,7 @@ const SwapPoolsSection = () => {
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
                       <div className="text-sm text-gray-500">APY</div>
-                      <div className="font-medium">-</div>
+                      <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
                     <div className="flex space-x-2">
                       <Button
@@ -691,10 +691,10 @@ const SwapPoolsSection = () => {
             </div>
 
             <div className="rounded-lg bg-gray-50 p-3">
-              <div className="flex justify-between items-center text-sm text-gray-500">
-                <span>APY</span>
-                <span className="font-medium">-</span>
-              </div>
+                              <div className="flex justify-between items-center text-sm text-gray-500">
+                  <span>APY</span>
+                  <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
+                </div>
               <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
                 <span>Current pool ratio</span>
                 <span className="font-medium">

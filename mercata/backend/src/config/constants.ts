@@ -83,6 +83,7 @@ export const constants = (() => {
   ];
 
   const swapHistorySelectFields = [
+    "address",
     "id",
     "block_timestamp",
     "sender",

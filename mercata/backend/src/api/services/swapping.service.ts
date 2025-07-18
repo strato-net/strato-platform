@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice, getRequiredInput, calculateImpliedPrice } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { SwapHistoryEntry } from "../../types";
 
@@ -43,7 +43,7 @@ export const getPools = async (
 
   // Fetch oracle prices
   const { oracle: { prices } } = await getLendingRegistry(accessToken, undefined, {
-    select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+    select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
   });
   
   const priceMap = new Map<string, string>(
@@ -54,12 +54,42 @@ export const getPools = async (
       : []
   );
 
-  return poolData.map((pool: any) => ({
-    ...pool,
-    ...(pool.tokenA?.address && { tokenAPrice: priceMap.get(pool.tokenA.address) || "0" }),
-    ...(pool.tokenB?.address && { tokenBPrice: priceMap.get(pool.tokenB.address) || "0" }),
-    ...(pool.lpToken?.address && { lpTokenPrice: priceMap.get(pool.lpToken.address) || "0" })
-  }));
+  const poolAddresses = poolData.map((pool: any) => pool.address);
+  const volumeMap = await getTradingVolume24hForPools(accessToken, poolAddresses, priceMap);
+  
+  return poolData.map((pool: any) => {
+    const tokenAPrice = priceMap.get(pool.tokenA?.address) || "0";
+    const tokenBPrice = priceMap.get(pool.tokenB?.address) || "0";
+    
+    const tokenAValue = (BigInt(pool.tokenABalance || "0") * BigInt(tokenAPrice)) / BigInt(10 ** 18);
+    const tokenBValue = (BigInt(pool.tokenBBalance || "0") * BigInt(tokenBPrice)) / BigInt(10 ** 18);
+    const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
+    
+    const lpTokenPrice = calculateLPTokenPrice(
+      pool.tokenABalance || "0",
+      pool.tokenBBalance || "0",
+      tokenAPrice,
+      tokenBPrice,
+      pool.lpToken?._totalSupply || "0"
+    );
+    
+    const tradingVolume24h = volumeMap.get(pool.address) || "0";
+    const swapFeeRate = pool.swapFeeRate || 30;
+    const lpSharePercent = pool.lpSharePercent || 7000;
+    
+    const fees24h = calculateLPFees24h(tradingVolume24h, swapFeeRate, lpSharePercent);
+    const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
+    
+    return {
+      ...pool,
+      tokenAPrice,
+      tokenBPrice,
+      lpTokenPrice,
+      totalLiquidityUSD,
+      tradingVolume24h,
+      apy: apy.toFixed(2)
+    };
+  });
 };
 
 export const createPool = async (
@@ -305,6 +335,51 @@ export const calculateSwapReverse = async (
     : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
 
   return getRequiredInput(BigInt(amountIn), inputReserve, outputReserve);
+};
+
+export const getTradingVolume24hForPools = async (
+  accessToken: string,
+  poolAddresses: string[],
+  priceMap: Map<string, string>
+): Promise<Map<string, string>> => {
+  if (poolAddresses.length === 0) {
+    return new Map();
+  }
+
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  const timestamp24hAgo = oneDayAgo.toISOString();
+  
+  const params = {
+    select: swapHistorySelectFields.join(","),
+    address: `in.(${poolAddresses.join(',')})`,
+    block_timestamp: `gte.${timestamp24hAgo}`,
+  };
+
+  const { data: swapHistory } = await cirrus.get(accessToken, `/${PoolSwap}`, {
+    params,
+  });
+
+  const volumeMap = new Map<string, number>();
+  poolAddresses.forEach(address => volumeMap.set(address, 0));
+
+  swapHistory.forEach(({ address: poolAddress, tokenIn, amountIn }: any) => {
+    const priceStr = priceMap.get(tokenIn);
+    const amount = parseFloat(amountIn || "0");
+    const price = parseFloat(priceStr || "0");
+
+    if (!volumeMap.has(poolAddress) || price === 0 || amount === 0) return;
+
+    const volumeUSD = (amount * price) / 1e18;
+    volumeMap.set(poolAddress, (volumeMap.get(poolAddress) || 0) + volumeUSD);
+  });
+
+  const result = new Map<string, string>();
+  volumeMap.forEach((volume, address) => {
+    result.set(address, volume.toString());
+  });
+
+  return result;
 };
 
 export const getSwapHistory = async (
