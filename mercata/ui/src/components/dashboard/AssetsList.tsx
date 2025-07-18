@@ -103,6 +103,20 @@ const AssetsList = ({
                     >
                       <td className="py-4 px-4">
                         <div className="flex items-center">
+                          {asset?.token?.images?.[0] ? (
+                            <img
+                              src={asset.token.images[0].value}
+                              alt={asset.token._name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                              style={{ backgroundColor: "red" }}
+                            >
+                              {asset?.token?._symbol?.slice(0, 2) || "??"}
+                            </div>
+                          )}
                           <div className="ml-3 min-w-0 flex-1">
                             <TooltipProvider>
                               <Tooltip>
@@ -283,6 +297,20 @@ const AssetsList = ({
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center">
+                            {asset?.token?.images?.[0] ? (
+                              <img
+                                src={asset.token.images[0].value}
+                                alt={asset.token._name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {asset?.token?._symbol?.slice(0, 2) || "??"}
+                              </div>
+                            )}
                             <div className="ml-3 min-w-0 flex-1">
                               <TooltipProvider>
                                 <Tooltip>
