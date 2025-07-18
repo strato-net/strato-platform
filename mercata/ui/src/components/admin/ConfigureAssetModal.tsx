@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
 
 interface ConfigureAssetFormValues {
   ltv: string;
@@ -45,7 +46,8 @@ const ConfigureAssetModal = ({
   onSuccess 
 }: ConfigureAssetModalProps) => {
   const { toast } = useToast();
-  const { configureAsset, loading } = useLendingContext();
+  const { configureAsset } = useLendingContext();
+  const [loading, setLoading] = useState(false);
   
   const form = useForm<ConfigureAssetFormValues>({
     defaultValues: {
@@ -90,6 +92,7 @@ const ConfigureAssetModal = ({
       return;
     }
     
+    setLoading(true);
     try {
       const payload = {
         asset: token.address,
@@ -115,15 +118,8 @@ const ConfigureAssetModal = ({
 
       form.reset();
       onOpenChange(false);
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError<any>;
-      console.error('Asset configuration error:', axiosError);
-      
-      toast({
-        title: 'Error Configuring Asset',
-        description: axiosError.response?.data?.message || (error as Error)?.message || 'Failed to configure asset. Please try again.',
-        variant: 'destructive',
-      });
+    } finally {
+      setLoading(false);
     }
   };
 

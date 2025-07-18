@@ -1,19 +1,13 @@
-import React, { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import PercentageButtons from "@/components/ui/PercentageButtons";
-import TokenIcon from "@/components/ui/TokenIcon";
-import { api } from "@/lib/axios";
-import { useToast } from "@/hooks/use-toast";
-import { CollateralData } from "@/interface";
-import { LiquidationEntry } from "@/context/LiquidationContext";
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { CollateralData } from '@/interface';
+import { LiquidationEntry } from '@/context/LiquidationContext';
+import TokenIcon from '@/components/ui/TokenIcon';
+import PercentageButtons from '@/components/ui/PercentageButtons';
+import { useLiquidationContext } from '@/context/LiquidationContext';
 
 interface LiquidateModalProps {
   open: boolean;
@@ -71,6 +65,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   }, [maxRepayEth]);
 
   const { toast } = useToast();
+  const { executeLiquidation } = useLiquidationContext();
 
   // Guard – nothing to render if data missing
   if (!loan || !collateral) return null;
@@ -131,18 +126,11 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
-    try {
-      await api.post(`/lend/liquidate/${loan.id}`, {
-        collateralAsset: collateral.asset,
-        repayAmount: repayWei,
-      });
-      toast({ title: "Liquidation submitted", variant: "success" });
-      onSuccess();
-      onOpenChange(false);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err.message || "Liquidation failed";
-      toast({ title: "Liquidation failed", description: msg, variant: "destructive" });
-    }
+    
+    await executeLiquidation(loan.id, collateral.asset, repayWei);
+    toast({ title: "Liquidation submitted", variant: "success" });
+    onSuccess();
+    onOpenChange(false);
   };
 
   return (

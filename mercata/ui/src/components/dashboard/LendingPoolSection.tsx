@@ -101,11 +101,7 @@ const LendingPoolSection = () => {
 
       refreshLendingData();
     } catch (error) {
-      toast({
-        title: type === "deposit" ? "Deposit Error" : "Withdrawal Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setIsProcessing(false);
     }

@@ -75,11 +75,7 @@ export const DepositForm = () => {
         }
       } catch (error) {
         console.error("Error while getting listings:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch available listings. Please try again.",
-          variant: "destructive",
-        });
+        // Error toast is now handled globally by axios interceptor
       }
     };
     fetchData();
@@ -117,11 +113,7 @@ export const DepositForm = () => {
       }
     } catch (error) {
       console.error("Failed to lock on-ramp amount:", error);
-      toast({
-        title: "Error",
-        description: "Failed to process deposit. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setLoading(false);
     }

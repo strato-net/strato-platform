@@ -40,6 +40,7 @@ type SwapContextType = {
     tokenBBalance: string;
     usdstBalance: string;
   }>;
+  getTokenBalance: (tokenAddress: string) => Promise<string>;
   enrichPools: (pools: LiquidityPool[]) => LiquidityPool[];
   lpTokens: LiquidityPool[]
   fetchLpTokensPositions: () => Promise<void>;
@@ -228,6 +229,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getTokenBalance = useCallback(async (tokenAddress: string) => {
+    try {
+      const res = await api.get(`/tokens/balance?address=eq.${tokenAddress}`);
+      return res.data[0]?.balance || "0";
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to get token balance');
+      throw err;
+    }
+  }, []);
+
   const fetchLpTokensPositions = useCallback(async () => {
     try {
       setLoading(true)
@@ -272,6 +283,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         addLiquidity,
         removeLiquidity,
         fetchTokenBalances,
+        getTokenBalance,
         enrichPools,
         lpTokens,
         fetchLpTokensPositions,

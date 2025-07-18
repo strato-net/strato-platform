@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { fetchJson } from '@/lib/fetch';
 
 interface Token {
   name: string;
@@ -88,18 +89,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/config`);
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to fetch bridge config');
-      }
+      const responseData = await fetchJson<any>(`/api/bridge/config`);
       
       const bridgeConfig = responseData.data.data;
       setConfig(bridgeConfig);
       return bridgeConfig;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge config';
+      const errorMessage = err.message || 'Failed to fetch bridge config';
       setError(errorMessage);
       console.error('Error fetching bridge config:', err);
       throw err;
@@ -113,18 +109,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeInTokens`);
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to fetch bridge in tokens');
-      }
+      const responseData = await fetchJson<any>(`/api/bridge/bridgeInTokens`);
       
       const tokens = responseData.data.data.bridgeInTokens;
       setBridgeInTokens(tokens);
       return tokens;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge in tokens';
+      const errorMessage = err.message || 'Failed to fetch bridge in tokens';
       setError(errorMessage);
       console.error('Error fetching bridge in tokens:', err);
       return [];
@@ -138,26 +129,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeIn`, {
+      const responseData = await fetchJson<any>(`/api/bridge/bridgeIn`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(params),
       });
-
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || "Bridge transaction failed");
-      }
 
       return {
         success: true,
         data: responseData.data
       };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Bridge transaction failed";
+      const errorMessage = err.message || "Bridge transaction failed";
       setError(errorMessage);
       console.error("Bridge API error:", err);
       throw err;
@@ -171,18 +153,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeOutTokens`);
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to fetch bridge out tokens');
-      }
+      const responseData = await fetchJson<any>(`/api/bridge/bridgeOutTokens`);
       
       const tokens = responseData.data.data.bridgeOutTokens;
       setBridgeOutTokens(tokens);
       return tokens;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge out tokens';
+      const errorMessage = err.message || 'Failed to fetch bridge out tokens';
       setError(errorMessage);
       console.error('Error fetching bridge out tokens:', err);
       return [];
@@ -196,26 +173,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeOut`, {
+      const responseData = await fetchJson<any>(`/api/bridge/bridgeOut`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(params),
       });
-
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || "Bridge transaction failed");
-      }
 
       return {
         success: true,
         data: responseData.data
       };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Bridge transaction failed";
+      const errorMessage = err.message || "Bridge transaction failed";
       setError(errorMessage);
       console.error("Bridge API error:", err);
       throw err;
@@ -232,22 +200,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const formattedTokenAddress = tokenAddress.startsWith("0x")
         ? tokenAddress
         : `0x${tokenAddress}`;
-      const response = await fetch(`/api/bridge/balance/${formattedTokenAddress}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || "Failed to fetch balance");
-      }
+      const responseData = await fetchJson<any>(`/api/bridge/balance/${formattedTokenAddress}`);
       
       return responseData.data;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Failed to fetch balance";
+      const errorMessage = err.message || "Failed to fetch balance";
       setError(errorMessage);
       console.error("Balance API error:", err);
       throw err;

@@ -131,11 +131,7 @@ const BorrowNew = () => {
       console.log(error, "error");
       setBorrowLoading(false);
       setIsBorrowModalOpen(false);
-      toast({
-        title: "Borrow Error",
-        description: `Something went wrong - ${error?.response?.data?.error?.message || error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     }
   };
   
@@ -179,14 +175,8 @@ const BorrowNew = () => {
         fetchUsdstBalance(userAddress || ""),
       ]);
     } catch (error) {
-      console.log(error, "error");
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
-      toast({
-        title: "Supply Error",
-        description: error,
-        variant: "destructive",
-      });
     }
   };
 
@@ -224,11 +214,7 @@ const BorrowNew = () => {
       console.log(error, "error");
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
-      toast({
-        title: "Withdraw Error",
-        description: `Something went wrong - ${error?.response?.data?.error?.message || error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     }
   };
 

@@ -33,7 +33,7 @@ type LiquidationContextType = {
   error: string | null;
   fetchLiquidatable: (signal?: AbortSignal) => Promise<void>;
   fetchWatchlist: (signal?: AbortSignal) => Promise<void>;
-  executeLiquidation: (id: string) => Promise<void>;
+  executeLiquidation: (id: string, collateralAsset?: string, repayAmount?: string) => Promise<void>;
   refreshData: () => Promise<void>;
 };
 
@@ -76,23 +76,6 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const executeLiquidation = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await api.post(`/lend/liquidate/${id}`);
-      // Refresh data after successful liquidation
-      await refreshData();
-    } catch (err) {
-      console.error('Liquidation failed:', err);
-      const backendMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message;
-      // rethrow a clean Error so the UI layer can surface it
-      throw new Error(backendMsg);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const refreshData = useCallback(async () => {
     try {
       await Promise.all([
@@ -103,6 +86,32 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error refreshing liquidation data:', err);
     }
   }, [fetchLiquidatable, fetchWatchlist]);
+
+  const executeLiquidation = useCallback(async (id: string, collateralAsset?: string, repayAmount?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (collateralAsset && repayAmount) {
+        // Extended liquidation with specific collateral and amount
+        await api.post(`/lend/liquidate/${id}`, {
+          collateralAsset,
+          repayAmount,
+        });
+      } else {
+        // Simple liquidation (existing behavior)
+        await api.post(`/lend/liquidate/${id}`);
+      }
+      // Refresh data after successful liquidation
+      await refreshData();
+    } catch (err) {
+      console.error('Liquidation failed:', err);
+      const backendMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message;
+      // rethrow a clean Error so the UI layer can surface it
+      throw new Error(backendMsg);
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshData]);
 
   useEffect(() => {
     if (isLoggedIn) {

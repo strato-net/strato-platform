@@ -17,6 +17,7 @@ type TokenContextType = {
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
   getActiveTokens: () => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
+  getUserTokensWithBalance: () => Promise<Token[]>;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
@@ -67,6 +68,20 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch token');
       return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getUserTokensWithBalance = useCallback(async (): Promise<Token[]> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get<Token[]>(`/tokens/balance?value=gt.0`);
+      return res.data || [];
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch user tokens with balance');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -163,6 +178,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getAllTokens,
         getActiveTokens,
         getToken,
+        getUserTokensWithBalance,
         createToken,
         transferToken,
         approveToken,

@@ -257,33 +257,45 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     try {
       let hash: `0x${string}` | undefined;
 
-      if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
-        const txHash = await sendTransactionAsync({
-          to: safeAddress as `0x${string}`,
-          value: parseEther(amount),
+      // MetaMask transaction - handle wallet errors with toasts
+      try {
+        if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
+          const txHash = await sendTransactionAsync({
+            to: safeAddress as `0x${string}`,
+            value: parseEther(amount),
+          });
+          hash = txHash as `0x${string}`;
+        } else {
+          const txHash = await writeContractAsync({
+            address: tokenAddress as `0x${string}`,
+            abi: [
+              {
+                name: "transfer",
+                type: "function",
+                stateMutability: "nonpayable",
+                inputs: [
+                  { name: "recipient", type: "address" },
+                  { name: "amount", type: "uint256" },
+                ],
+                outputs: [{ name: "", type: "bool" }],
+              },
+            ],
+            functionName: "transfer",
+            args: [safeAddress as `0x${string}`, parseUnits(amount, 6)],
+            chain: showTestnet ? sepolia : mainnet,
+            account: address as `0x${string}`,
+          });
+          hash = txHash as `0x${string}`;
+        }
+      } catch (walletError: any) {
+        console.error("MetaMask wallet error:", walletError);
+        
+        toast({
+          title: "Wallet Error",
+          description: walletError?.message || "Transaction failed",
+          variant: "destructive",
         });
-        hash = txHash as `0x${string}`;
-      } else {
-        const txHash = await writeContractAsync({
-          address: tokenAddress as `0x${string}`,
-          abi: [
-            {
-              name: "transfer",
-              type: "function",
-              stateMutability: "nonpayable",
-              inputs: [
-                { name: "recipient", type: "address" },
-                { name: "amount", type: "uint256" },
-              ],
-              outputs: [{ name: "", type: "bool" }],
-            },
-          ],
-          functionName: "transfer",
-          args: [safeAddress as `0x${string}`, parseUnits(amount, 6)],
-          chain: showTestnet ? sepolia : mainnet,
-          account: address as `0x${string}`,
-        });
-        hash = txHash as `0x${string}`;
+        return;
       }
 
       const client = createPublicClient({
@@ -336,11 +348,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       }
     } catch (error) {
       console.error("Bridge transaction failed:", error);
-      toast({
-        title: "Failed to initiate transfer",
-        description: error.message || "Please try again later",
-        variant: "destructive",
-      });
+      // API errors are handled globally by fetch wrapper
     } finally {
       setIsLoading(false);
     }

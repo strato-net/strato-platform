@@ -96,11 +96,6 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
       onRepaySuccess();
     } catch (error) {
       console.error("Error repaying loan:", error);
-      toast({
-        title: "Error",
-        description: `Repay Error - ${error}`,
-        variant: "destructive",
-      });
       setRepayLoading(false);
     }
   };

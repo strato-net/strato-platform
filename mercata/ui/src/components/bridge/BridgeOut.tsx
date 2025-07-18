@@ -217,11 +217,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       }
     } catch (error) {
       console.error("Bridge transaction failed:", error);
-      toast({
-        title: "Failed to initiate transfer",
-        description: error.message || "Please try again later",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by fetch wrapper
     } finally {
       setIsLoading(false);
     }

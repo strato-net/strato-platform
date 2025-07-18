@@ -20,6 +20,14 @@ type LendingContextType = {
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  configureAsset: (payload: { 
+    asset: string; 
+    ltv: number; 
+    liquidationThreshold: number; 
+    liquidationBonus: number; 
+    interestRate: number; 
+    reserveFactor: number; 
+  }) => Promise<void>;
   setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
   setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
   setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
@@ -198,8 +206,6 @@ export const LendingProvider = ({
     try {
        await api.post("/lending/collateral", args);
     } catch (err) {
-      console.error("Supply collateral failed:", err);
-      console.log(err.response.data.error.message);
       throw err.response.data.error.message;
     }
   };

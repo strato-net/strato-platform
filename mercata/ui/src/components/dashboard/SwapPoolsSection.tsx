@@ -110,11 +110,7 @@ const SwapPoolsSection = () => {
       const enrichedPools = enrichPools(tempPools);
       setPools(enrichedPools);
     } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch pools",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch pools:", err);
     } finally {
       setLoading(false);
     }
@@ -135,11 +131,7 @@ const SwapPoolsSection = () => {
       setUsdstBalance(balances.usdstBalance);
       setBalanceLoading(false)
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch token balances",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch token balances:", error);
       setBalanceLoading(false)
     }
   };
@@ -159,11 +151,7 @@ const SwapPoolsSection = () => {
       setBalanceLoading(false)
     } catch (error) {
       setBalanceLoading(false)
-      toast({
-        title: "Error",
-        description: "Failed to fetch token balances",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch token balances:", error);
     }
   };
 
@@ -251,11 +239,7 @@ const SwapPoolsSection = () => {
         variant: "success",
       });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Something went wrong - ${error}`,
-        variant: "destructive",
-      });
+      console.error("Deposit failed:", error);
     } finally {
       setBalanceLoading(false)
       setDepositLoading(false);
@@ -317,11 +301,7 @@ const SwapPoolsSection = () => {
         variant: "success",
       });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Something went wrong - ${error}`,
-        variant: "destructive",
-      });
+      console.error("Withdraw failed:", error);
     } finally {
       setBalanceLoading(false)
       setWithdrawLoading(false);
