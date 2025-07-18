@@ -1329,7 +1329,9 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) address eventName evArgs
+          addr <- getCurrentAddress
+          contractName' <- fst <$> getContractNameAndHash addr
+          addEvent $ Event bHash ctrName parentName (labelToString contractName') address eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
