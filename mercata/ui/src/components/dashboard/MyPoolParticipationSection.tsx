@@ -35,7 +35,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
           <div>Token</div>
           <div className="text-center">Value</div>
           <div className="text-center">Balance</div>
-          <div className="text-right">APR</div>
+          <div className="text-right">APY</div>
         </div>
 
         {loadingLiquidity || loadingLpTokens ? (
@@ -61,7 +61,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                       : "0.00"}
                 </div>
                 <div className="text-right font-semibold text-gray-900">
-                  {liquidityInfo?.supplyAPR ? `${liquidityInfo.supplyAPR}%` : "N/A"}
+                  {liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
                 </div>
               </div>
             ) : null}
@@ -85,7 +85,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                       : "0.00"}
                   </div>
                   <div className="text-right font-semibold text-gray-900">
-                    {lpToken?.apr ? `${lpToken.apr}%` : "N/A"}
+                    {lpToken?.apy ? `${lpToken.apy}%` : "N/A"}
                   </div>
                 </div>
               ))

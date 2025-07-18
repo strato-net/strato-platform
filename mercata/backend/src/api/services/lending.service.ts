@@ -441,8 +441,8 @@ export const liquidityAndBalance = async (
     utilizationRate,
     availableLiquidity,
     totalCollateralValue,
-    supplyAPR: Number(supplyAPR.toFixed(2)),
-    borrowAPY: Number((apyData.borrowAPY * 100).toFixed(2)),
+    supplyAPY: Number(supplyAPR.toFixed(2)),
+    borrowAPR: Number((apyData.borrowAPR * 100).toFixed(2)),
     exchangeRate,
   };
 };

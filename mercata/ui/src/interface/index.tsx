@@ -273,9 +273,9 @@ export interface TokenInfo {
 
 export interface LiquidityData {
   availableLiquidity: string;
-  borrowAPY: number;
+  borrowAPR: number;
   exchangeRate: string;
-  supplyAPR: number;
+  supplyAPY: number;
   supplyable: TokenInfo;
   withdrawable: TokenInfo;
   totalBorrowed: string;
@@ -348,7 +348,7 @@ export interface LiquidityPool {
   lpTokenPrice: string;
   totalLiquidityUSD?: string;
   tradingVolume24h?: string;
-  apr?: string;
+  apy?: string;
   _name?: string;
   _symbol?: string;
 }

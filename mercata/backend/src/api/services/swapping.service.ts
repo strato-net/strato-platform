@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPR } from "../helpers/swapping.helper";
+import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { SwapHistoryEntry } from "../../types";
 
@@ -71,7 +71,7 @@ export const getPools = async (
     const lpSharePercent = pool.lpSharePercent || 7000;
     
     const fees24h = calculateLPFees24h(tradingVolume24h, swapFeeRate, lpSharePercent);
-    const apr = calculatePoolAPR(fees24h, totalLiquidityUSD);
+    const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
     
     return {
       ...pool,
@@ -80,7 +80,7 @@ export const getPools = async (
       lpTokenPrice,
       totalLiquidityUSD,
       tradingVolume24h,
-      apr: apr.toFixed(2)
+      apy: apy.toFixed(2)
     };
   });
 };

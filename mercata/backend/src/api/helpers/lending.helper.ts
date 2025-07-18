@@ -407,19 +407,19 @@ export const calculateActualSupplyAPR = (
 };
 
 /**
- * Calculate theoretical APY values for supply and borrow (for comparison)
+ * Calculate theoretical APY for supply and APR for borrow
  * @param interestRate Interest rate in basis points
  * @param reserveFactor Reserve factor in basis points
- * @returns Object with supplyAPY and borrowAPY
+ * @returns Object with supplyAPY and borrowAPR
  */
 export const calculateAPYs = (
   interestRate: number,
   reserveFactor: number = 1000
-): { supplyAPY: number; borrowAPY: number } => {
-  const borrowAPY = interestRate / 10000;
-  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000);
+): { supplyAPY: number; borrowAPR: number } => {
+  const borrowAPR = interestRate / 10000;
+  const supplyAPY = borrowAPR * (1 - reserveFactor / 10000);
   
-  return { supplyAPY, borrowAPY };
+  return { supplyAPY, borrowAPR };
 };
 
 /**

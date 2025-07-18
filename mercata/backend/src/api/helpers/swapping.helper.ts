@@ -60,12 +60,12 @@ export const calculateImpliedPrice = (
 };
 
 /**
- * Calculate pool APR based on actual fees earned over 24h
+ * Calculate pool APY based on actual fees earned over 24h
  * @param fees24h 24-hour fees earned by LPs in USD
  * @param totalLiquidity Total value locked in the pool in USD
- * @returns APR as a percentage
+ * @returns APY as a percentage
  */
-export const calculatePoolAPR = (
+export const calculatePoolAPY = (
   fees24h: string,
   totalLiquidity: string
 ): number => {
