@@ -54,15 +54,13 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
   </Tooltip>
 );
 
-
-const BorrowNew = () => {
+const Borrow = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [showRepayModal, setShowRepayModal] = useState(false)
-  const [wrongAmount, setWrongAmount] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState([])
   const [suppliedCollateral, setSuppliedCollateral] = useState([])
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
@@ -505,4 +503,4 @@ const BorrowNew = () => {
   );
 };
 
-export default BorrowNew;
+export default Borrow;
