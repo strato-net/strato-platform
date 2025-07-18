@@ -12,7 +12,7 @@ import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/contants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
-import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput } from "@/utils/numberUtils";
+import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput } from "@/utils";
 
 import {
   Popover,

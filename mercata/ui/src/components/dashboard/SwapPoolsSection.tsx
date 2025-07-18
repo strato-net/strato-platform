@@ -17,7 +17,7 @@ import { formatUnits, parseUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, WITHDRAW_FEE } from "@/lib/contants";
 import { LiquidityPool } from '@/interface';
-import { safeParseUnits } from '@/utils/numberUtils';
+import { safeParseUnits } from "@/utils"
 
 // Helper function to safely format numbers
 const formatNumber = (value: string | number): string => {

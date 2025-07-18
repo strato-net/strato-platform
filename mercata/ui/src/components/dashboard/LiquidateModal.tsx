@@ -14,7 +14,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { CollateralData } from "@/interface";
 import { LiquidationEntry } from "@/context/LiquidationContext";
-import { addCommasToInput, ethToWei, weiToEth } from "@/utils/numberUtils";
+import { addCommasToInput, ethToWei, weiToEth } from "@/utils";
 
 interface LiquidateModalProps {
   open: boolean;

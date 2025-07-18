@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Copy } from 'lucide-react';
 import { useSwapContext } from '@/context/SwapContext';
-import { formatWeiAmount, formatHash } from '@/utils/numberUtils';
+import { formatWeiAmount, formatHash } from '@/utils';
 import { SwapHistoryEntry } from '@/interface';
 
 const SwapHistory: React.FC = () => {

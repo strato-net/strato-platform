@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { formatUnits, parseUnits } from "ethers";
 import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
 import { CollateralData, NewLoanData } from "@/interface";
-import { safeParseUnits, safeParseFloat, getHealthFactorColor, addCommasToInput } from "@/utils/numberUtils";
+import { safeParseUnits, safeParseFloat, getHealthFactorColor, addCommasToInput } from "@/utils";
 
 interface SupplyModalProps {
   supplyLoading: boolean;

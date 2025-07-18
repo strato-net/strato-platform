@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
-import { addCommasToInput, safeParseUnits } from "@/utils/numberUtils";
+import { addCommasToInput, safeParseUnits } from "@/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RepayModalProps {

@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useUser } from '@/context/UserContext';
 import CopyButton from '../ui/copy';
-import { truncateAddress } from "@/utils/numberUtils";
+import { truncateAddress } from "@/utils";
 import { LogOutIcon, Menu } from 'lucide-react';
 import {
   Popover,

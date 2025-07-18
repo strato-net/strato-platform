@@ -13,7 +13,7 @@ import { formatUnits, parseUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput } from "@/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BorrowAssetModalProps {

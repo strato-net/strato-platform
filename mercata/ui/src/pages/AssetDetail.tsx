@@ -19,7 +19,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import CopyButton from '@/components/ui/copy';
-import { generatePriceData } from '@/utils/numberUtils';
+import { generatePriceData } from '@/utils';
 
 type PricePoint = {
   date: string;

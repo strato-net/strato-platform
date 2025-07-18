@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { truncateAddress, weiToEth } from "@/utils/numberUtils";
+import { truncateAddress, weiToEth } from "@/utils";
 
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();

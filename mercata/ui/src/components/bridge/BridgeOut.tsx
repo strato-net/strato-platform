@@ -15,7 +15,7 @@ import {
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { roundToDecimals } from "@/utils/numberUtils";
+import { roundToDecimals } from "@/utils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 
 interface Token {

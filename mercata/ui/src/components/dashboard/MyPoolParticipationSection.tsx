@@ -5,11 +5,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatUnits } from "ethers";
+import { formatBalanceForDashboard } from "@/utils"
 
 export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }) {
-
-  const formatBalance = (balance: string) =>
-    balance ? Number(formatUnits(balance, 18)).toFixed(2) : "0.00";
 
   
   const formatValue = (rawBalance: string, price: string): string => {
@@ -49,9 +47,8 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
               <div className="grid grid-cols-3 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
                 <div className="font-semibold text-gray-700">{liquidityInfo.withdrawable._name}</div>
                 <div className="text-center font-medium text-gray-900">
-                  {/* {formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)} */}
                   {liquidityInfo?.withdrawable?.userBalance
-                      ? formatBalance(liquidityInfo?.withdrawable?.userBalance)
+                      ? formatBalanceForDashboard(liquidityInfo?.withdrawable?.userBalance)
                       : "0.00"}
                 </div>
                 <div className="text-right font-semibold text-gray-900">
@@ -72,7 +69,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                   <div className="font-semibold text-gray-700">{lpToken.lpToken._name}</div>
                   <div className="text-center font-medium text-gray-900">
                     {lpToken?.lpToken?.balances[0]?.balance
-                      ? formatBalance(lpToken?.lpToken?.balances[0]?.balance)
+                      ? formatBalanceForDashboard(lpToken?.lpToken?.balances[0]?.balance)
                       : "0.00"}
                   </div>
                   <div className="text-right font-semibold text-gray-900">

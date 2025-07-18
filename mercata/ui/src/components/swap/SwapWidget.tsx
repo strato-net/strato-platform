@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
 import { usdstAddress, SWAP_FEE } from "@/lib/contants";
-import { safeParseUnits, formatBalanceWithSymbol } from "@/utils/numberUtils";
+import { safeParseUnits, formatBalanceWithSymbol, formatAmount } from "@/utils";
 import {
   Dialog,
   DialogContent,
@@ -30,17 +30,6 @@ import {
 const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
 const DECIMALS = 18;
-
-// Utility functions
-const formatAmount = (amount: string): string => {
-  if (!amount) return "";
-  const value = Number(amount);
-  const roundedDown = Math.floor(value * 1000000) / 1000000;
-  return roundedDown.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
-  });
-};
 
 // Components
 const LoadingSpinner = () => (
