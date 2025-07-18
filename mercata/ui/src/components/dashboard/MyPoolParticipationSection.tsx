@@ -34,7 +34,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
         {/* Header Row */}
         <div className="grid grid-cols-4 px-4 text-sm text-gray-500 font-medium">
           <div>Token</div>
-          <div className="text-center">Withdraw Value</div>
+          <div className="text-center">Value</div>
           <div className="text-center">Balance</div>
           <div className="text-right">APY</div>
         </div>
@@ -52,8 +52,8 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                 <div className="font-semibold text-gray-700">{liquidityInfo.withdrawable._name}</div>
                 <div className="text-center font-medium text-gray-900">
                   {liquidityInfo?.withdrawable?.withdrawValue
-                      ? Number(formatUnits(liquidityInfo?.withdrawable?.withdrawValue, 18)).toFixed(2)
-                      : "0.00"}
+                      ? `$${Number(formatUnits(liquidityInfo?.withdrawable?.withdrawValue, 18)).toFixed(2)}`
+                      : "$0.00"}
                 </div>
                 <div className="text-center font-semibold text-gray-900">
                   {liquidityInfo?.withdrawable?.userBalance
@@ -76,8 +76,8 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                   <div className="font-semibold text-gray-700">{lpToken.lpToken._name}</div>
                   <div className="text-center font-medium text-gray-900">
                     {lpToken?.lpToken?._totalSupply
-                      ? formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)
-                      : "0.00"}
+                      ? `$${formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)}`
+                      : "$0.00"}
                   </div>
                   <div className="text-center font-semibold text-gray-900">
                     {lpToken?.lpToken?.balances[0]?.balance
