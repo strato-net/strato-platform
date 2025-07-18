@@ -426,6 +426,7 @@ export const liquidityAndBalance = async (
     availableLiquidity,
     totalCollateralValue,
     supplyAPY: Math.floor(supplyAPY * 100) / 100,
+    maxSupplyAPY: Math.floor(apyData.supplyAPY * 100) / 100,
     borrowAPR: Math.floor(apyData.borrowAPR * 100) / 100,
     exchangeRate,
   };

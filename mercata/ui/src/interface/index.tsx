@@ -276,6 +276,7 @@ export interface LiquidityData {
   borrowAPR: number;
   exchangeRate: string;
   supplyAPY: number;
+  maxSupplyAPY: number;
   supplyable: TokenInfo;
   withdrawable: TokenInfo;
   totalBorrowed: string;
