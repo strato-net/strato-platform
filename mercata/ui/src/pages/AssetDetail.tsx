@@ -49,7 +49,7 @@ const AssetDetail = () => {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
   const { userAddress } = useUser()
-  const { activeTokens: assets, inactiveTokens, loading, fetchTokens } = useUserTokens()
+  const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
   
   useEffect(() => {
@@ -60,6 +60,7 @@ const AssetDetail = () => {
     // Find the asset with the matching id
     const foundAsset = assets.find(a => a?.address === id);
     const foundInActiveAsset = inactiveTokens.find(a => a?.address === id)
+    const foundInAllActiveTokens = allActiveTokens.find(a => a?.address === id)
     if (foundAsset) {
       setAsset(foundAsset);
       document.title = `${foundAsset?.token?._name} | Asset Details`;
@@ -76,6 +77,16 @@ const AssetDetail = () => {
 
       if (foundInActiveAsset?.price) {
         const basePrice = parseFloat(foundInActiveAsset.price.toString());
+        if (!isNaN(basePrice)) {
+          setPriceData(generatePriceData(basePrice));
+        }
+      }
+    } else if (foundInAllActiveTokens){
+      setAsset(foundInAllActiveTokens);
+      document.title = `${foundInAllActiveTokens?.token?._name} | Asset Details`;
+
+      if (foundInAllActiveTokens?.price) {
+        const basePrice = parseFloat(foundInAllActiveTokens.price.toString());
         if (!isNaN(basePrice)) {
           setPriceData(generatePriceData(basePrice));
         }
@@ -109,19 +120,19 @@ const AssetDetail = () => {
     );
   }
 
-  const handleConnectWallet = () => { };
+  // const handleConnectWallet = () => { };
 
-  const handleBuyNow = () => { };
+  // const handleBuyNow = () => { };
 
-  const handleBridge = () => { };
+  // const handleBridge = () => { };
 
-
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
-        <DashboardHeader title={`${asset?.token?._symbol} Details`} />
+        <DashboardHeader title={`${asset?.token?._symbol || asset?._symbol} Details`} />
 
         <main className="p-6">
           <div className="mb-6">
@@ -137,14 +148,14 @@ const AssetDetail = () => {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-blue-600">{asset?.token?._symbol}</p>
-                      <CardTitle className="text-xl">{asset?.token?._name}</CardTitle>
+                      <p className="text-sm font-semibold text-blue-600">{asset?.token?._symbol || asset?._symbol}</p>
+                      <CardTitle className="text-xl">{asset?.token?._name || asset?._name}</CardTitle>
                     </div>
                     <div
                       className="w-16 h-16 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden"
                       style={{ backgroundColor: asset?.color || "#EF4444" }} // fallback to red if no color
                     >
-                      {asset?.token?._symbol?.toUpperCase() || "N/A"}
+                      {asset?.token?._symbol?.toUpperCase() || asset?._symbol?.toUpperCase() || "N/A"}
                     </div>
                   </div>
                 </CardHeader>
@@ -154,16 +165,16 @@ const AssetDetail = () => {
                     <div
                       className="w-32 h-32 rounded-full bg-white border-4 flex items-center justify-center overflow-hidden relative"
                     >
-                      {asset?.token?.images?.length > 0 ? (
+                      {asset?.token?.images?.length > 0 || asset?.images?.length > 0 ? (
                         <img
-                          src={asset.token.images[0].value}
-                          alt={asset.token?._name}
+                          src={asset?.token?.images[0]?.value || asset?.images[0]?.value}
+                          alt={asset?.token?._name || asset?._name}
                           className="w-full h-full object-contain"
                           onError={(e) => (e.currentTarget.style.display = "none")}
                         />
                       ) : (
                         <span className="absolute inset-0 flex items-center justify-center text-center text-sm font-semibold text-gray-500 p-2">
-                          {asset?.token?._name}
+                          {asset?.token?._name || asset?._name}
                         </span>
                       )}
                     </div>
@@ -178,11 +189,11 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Asset Deposits:</span>
+                      <span className="text-gray-500">User Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
-                    {asset?.available ? (
+                    {asset?.status == "2" ? (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Status:</span>
                         <span className="font-medium text-green-500">Available</span>
@@ -195,17 +206,12 @@ const AssetDetail = () => {
                     )}
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Provider:</span>
-                      <span className="font-medium">{asset?.provider || 'N/A'}</span>
-                    </div>
-
-                    <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Owner:</span>
                       <span className="font-medium">
                         {asset?.token?._owner
                           ? `${asset.token._owner.slice(0, 6)}...${asset.token._owner.slice(-4)}`
-                          : 'N/A'}
-                      <CopyButton address={asset?.token?._owner} />
+                          : asset?._owner ? `${asset?._owner?.slice(0, 6)}...${asset?._owner?.slice(-4)}` : 'N/A'}
+                      <CopyButton address={asset?.token?._owner || asset?._owner} />
                       </span>
                     </div>
 
@@ -218,13 +224,8 @@ const AssetDetail = () => {
                         <CopyButton address={asset?.address} />
                       </span>
                     </div>
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Vault Service:</span>
-                      <span className="font-medium">{asset?.vaulter || 'N/A'}</span>
-                    </div>
                   </div>
-                  {!isWalletConnected ? (
+                  {/* {!isWalletConnected ? (
                     <Button
                       onClick={handleConnectWallet}
                       className="w-full flex items-center justify-center gap-2 mb-4"
@@ -257,7 +258,7 @@ const AssetDetail = () => {
                     >
                       Bridge
                     </Button>
-                  </div>
+                  </div> */}
                 </CardContent>
               </Card>
             </div>
@@ -345,25 +346,15 @@ const AssetDetail = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>About {asset?.token?._name}</CardTitle>
+                  <CardTitle>About {asset?.token?._name || asset?._name}</CardTitle>
                 </CardHeader>
 
                 <CardContent>
                   <div className="space-y-4">
                     <div
                       className="prose max-w-none text-sm"
-                      dangerouslySetInnerHTML={{ __html: asset?.token?.description }}
+                      dangerouslySetInnerHTML={{ __html: asset?.token?.description || asset?.description }}
                     />
-                  </div>
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="font-semibold mb-2">Key Features</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-gray-700">
-                      <li>100% backed by real assets</li>
-                      <li>Regular independent audits</li>
-                      <li>Secure cold storage</li>
-                      <li>Instant liquidity</li>
-                      <li>Low transaction fees</li>
-                    </ul>
                   </div>
                 </CardContent>
               </Card>

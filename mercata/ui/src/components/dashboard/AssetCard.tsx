@@ -68,7 +68,7 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
   // Asset details rows
   const assetDetails = [
     { label: "Price", value: formattedPrice },
-    { label: "Asset Deposits", value: formattedDeposit },
+    { label: "User Balance", value: formattedDeposit },
     { label: "Collateral", value: formattedCollateral }
   ];
 

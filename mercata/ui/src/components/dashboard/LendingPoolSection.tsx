@@ -326,14 +326,9 @@ const LendingPoolSection = () => {
                     
                     return (
                       <>
-                        {isInsufficientUsdstForFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
-                          </p>
-                        )}
                         {isInsufficientBalanceForDepositAndFee && (
                           <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
+                            Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
                           </p>
                         )}
                         {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForDepositAndFee && (

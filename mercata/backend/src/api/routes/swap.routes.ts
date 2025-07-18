@@ -40,4 +40,9 @@ router.get("/swap/quote", authHandler.authorizeRequest(true), SwappingController
 // Execute swap transaction
 router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
 
+// ----- Swap History -----
+// Get swap history for a specific pool (with optional query parameters)
+// Query params: select, order, offset, limit, block_timestamp, transaction_hash, etc.
+router.get("/swap-history/:poolAddress", authHandler.authorizeRequest(true), SwappingController.getSwapHistory);
+
 export default router;
