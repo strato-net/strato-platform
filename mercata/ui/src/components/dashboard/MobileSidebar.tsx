@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Database, LogOut, Book, ArrowRightLeft, Send, Shield, X } from 'lucide-react';
+import { LayoutDashboard, Wallet, Database, Book, ArrowRightLeft, Send, Shield, X } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
 
@@ -9,7 +9,7 @@ interface MobileSidebarProps {
 }
 
 const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
-  const { logout, isAdmin } = useUser();
+  const { isAdmin } = useUser();
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
@@ -71,18 +71,6 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
             </ul>
           </nav>
 
-          <div className="mt-auto">
-            <button
-              onClick={() => {
-                logout();
-                onClose();
-              }}
-              className="flex items-center text-red-600 hover:bg-red-50 w-full rounded-md px-4 py-2.5"
-            >
-              <LogOut size={20} />
-              <span className="ml-3">Log Out</span>
-            </button>
-          </div>
         </div>
       </div>
     </>
