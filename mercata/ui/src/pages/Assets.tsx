@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import AssetSummary from '@/components/dashboard/AssetSummary';
 import AssetsGrid from '@/components/dashboard/AssetsGrid';
-import { Coins } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
@@ -78,8 +78,8 @@ const Assets = () => {
                 <AssetSummary 
                   title="Net Balance" 
                   value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
-                  icon={<Coins className="text-white" size={18} />}
-                  color="bg-purple-500"
+                  icon={<Wallet className="text-white" size={18} />}
+                  color="bg-blue-500"
                 />
               </div>
               <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />

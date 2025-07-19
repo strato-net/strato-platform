@@ -245,7 +245,7 @@ export const collateralAndBalance = async (
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
   const userCollaterals = registry.collateralVault.userCollaterals || [];
   const userTokens = await getBalance(accessToken, userAddress, {
-    address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals)`
+    address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value))`
   });
 
   const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
