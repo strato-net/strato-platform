@@ -29,7 +29,12 @@ const UsdstBalanceBox: React.FC = () => {
   useEffect(() => {
     const fetchUsdstToken = async () => {
       try {
-        const token = await getToken(USDST_ADDRESS);
+        const tokenResponse = await getToken(USDST_ADDRESS);
+        console.log('USDST Token fetched:', tokenResponse);
+        // Handle if the response is an array
+        const token = Array.isArray(tokenResponse) ? tokenResponse[0] : tokenResponse;
+        console.log('USDST Token (processed):', token);
+        console.log('USDST Token images:', token?.images);
         setUsdstToken(token);
       } catch (error) {
         console.error('Error fetching USDST token:', error);
@@ -67,11 +72,12 @@ const UsdstBalanceBox: React.FC = () => {
       md: 'h-4 w-4', 
       lg: 'h-5 w-5'
     };
-
-    console.log('huh', usdstToken?.images)
-
+    
+    console.log('renderIcon called with:', { size, usdstToken, hasImage: usdstToken?.images?.[0]?.value });
+    
     // If we have a token with image, use it
-    if (usdstToken?.images?.[0]) {
+    if (usdstToken?.images?.[0]?.value) {
+      console.log('Using token image:', usdstToken.images[0].value);
       return (
         <img
           src={usdstToken.images[0].value}
@@ -80,6 +86,8 @@ const UsdstBalanceBox: React.FC = () => {
         />
       );
     }
+
+    console.log('Using fallback icon - isLowBalance:', isLowBalance, 'isCriticalBalance:', isCriticalBalance);
 
     // Fallback to warning/normal icons
     if (isLowBalance || isCriticalBalance) {
@@ -115,11 +123,7 @@ const UsdstBalanceBox: React.FC = () => {
       <CardContent className="p-3">
         <div className="flex items-center space-x-2">
           <div className={`p-1.5 rounded-full ${isCriticalBalance ? 'bg-red-100' : isLowBalance ? 'bg-orange-100' : 'bg-blue-100'}`}>
-            {(isLowBalance || isCriticalBalance) ? (
-              <AlertTriangle className={`h-4 w-4 ${isCriticalBalance ? 'text-red-600' : 'text-orange-600'}`} />
-            ) : (
-              <Coins className="h-4 w-4 text-blue-600" />
-            )}
+            {renderIcon('lg')}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
