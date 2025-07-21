@@ -7,6 +7,14 @@ export const TRANSACTION_QUERY_TYPES = {
     key: 'blocknumber',
     displayName : 'Block Number'
   },
+  minblocknumber : {
+    key: 'minblocknumber',
+    displayName : 'Min Block Number'
+  },
+  maxblocknumber : {
+    key: 'maxblocknumber',
+    displayName : 'Max Block Number'
+  },
   hash : {
     key : 'hash',
     displayName : 'Hash'
@@ -46,6 +54,10 @@ export const TRANSACTION_QUERY_TYPES = {
   last : {
     key: 'last',
     displayName : 'Last'
+  },
+  search : {
+    key: 'search',
+    displayName : 'Search'
   },
   chainid: {
     key: 'chainid',
