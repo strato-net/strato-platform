@@ -167,7 +167,7 @@ const BorrowAssetModal = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Borrow Amount (USDST)</label>
             <div className="flex justify-between items-center text-xs text-gray-500">
-              <span>Min: $0.01</span>
+              <span>Min: 0.01 USDST</span>
               <div>
                 <button
                   type="button"
@@ -179,7 +179,7 @@ const BorrowAssetModal = ({
                 >
                   Max :
                 </button>
-                <span>${availableToBorrowFormatted}</span>
+                <span>{availableToBorrowFormatted} USDST</span>
               </div>
             </div>
             <div className="relative">
@@ -189,7 +189,7 @@ const BorrowAssetModal = ({
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
             </div>
             <PercentageButtons
               value={borrowAmount}

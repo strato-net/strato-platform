@@ -231,9 +231,9 @@ const LendingPoolSection = () => {
                         placeholder="0.00"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
-                        className={`pl-8 ${!isDepositAmountValid() ? 'text-red-600' : ''}`}
+                        className={`pl-16 ${!isDepositAmountValid() ? 'text-red-600' : ''}`}
                       />
-                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
@@ -340,9 +340,9 @@ const LendingPoolSection = () => {
                         placeholder="0.00"
                         value={withdrawAmount}
                         onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className={`pl-8 ${!isWithdrawAmountValid() ? 'text-red-600' : ''}`}
+                        className={`pl-16 ${!isWithdrawAmountValid() ? 'text-red-600' : ''}`}
                       />
-                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("withdraw")}
