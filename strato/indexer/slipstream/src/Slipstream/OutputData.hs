@@ -1645,7 +1645,10 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
 
 ------------------
 
---This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
+-- This is a temporary function that converts solidity types to a sample
+-- value...  I am just using this now to convert table creation from the old way
+-- (value based when values come through) to the new way (direct from the types
+-- when a CC is registered)
 solidityTypeToSQLType :: Bool -> Maybe (ContractF ()) -> CodeCollectionF () -> SVMType.Type -> Maybe Text
 solidityTypeToSQLType _ _ _ SVMType.Bool = Just "bool"
 solidityTypeToSQLType _ _ _ (SVMType.Int _ _) = Just "decimal"

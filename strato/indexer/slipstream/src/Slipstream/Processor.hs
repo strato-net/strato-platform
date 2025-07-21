@@ -260,8 +260,11 @@ processTheMessages env conn messages = do
 
         deferredForeignKeys <- fmap concat $
           forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
-            -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
-            -- We will then create a table for each of these collections and add a foreign key to the main table
+            -- Here we will get the storageDefs attribute of the contract (c)
+            -- and iterate through the Map of (Text, VariableDecl) and look for
+            -- VariableDecls that have the last attribute (isRecord) true and
+            -- thetype are mappings We will then create a table for each of
+            -- these collections and add a foreign key to the main table
 
             let collectionNamesAndTypes = getCollectionsFromContract c
             $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
