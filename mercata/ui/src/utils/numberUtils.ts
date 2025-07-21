@@ -11,9 +11,19 @@ import { parseUnits, formatUnits } from "ethers";
 export const safeParseUnits = (value: string, decimals: number): bigint => {
   try {
     // Handle edge cases that parseUnits can't handle
-    if (!value || value === '.' || value === '0.' || value.endsWith('.')) {
+    if (!value || value === '.') {
       return 0n;
     }
+    
+    // Handle incomplete decimal inputs (e.g., "35.") by treating as "35"
+    if (value.endsWith('.')) {
+      const numericValue = value.slice(0, -1);
+      if (!numericValue) {
+        return 0n;
+      }
+      return parseUnits(numericValue, decimals);
+    }
+    
     return parseUnits(value, decimals);
   } catch {
     return 0n;
