@@ -49,10 +49,20 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
   }, [isOpen]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const cursorPosition = input.selectionStart;
     const value = e.target.value.replace(/,/g, '');
+    
     if (/^\d*\.?\d*$/.test(value)) {
       setRepayAmount(value);
       setDisplayAmount(addCommasToInput(value));
+      
+      // Restore cursor position after state update
+      setTimeout(() => {
+        const newDisplayValue = addCommasToInput(value);
+        const newCursorPosition = Math.min(cursorPosition, newDisplayValue.length);
+        input.setSelectionRange(newCursorPosition, newCursorPosition);
+      }, 0);
     }
   };
 
@@ -182,6 +192,20 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             return repayAmount && totalNeeded > balance ? (
               <p className="text-red-600 text-sm mt-1">
                 Insufficient USDST balance. You need ${formatCurrency(formatUnits(totalNeeded, 18))} USDST (${formatCurrency(formatUnits(repayAmountWei, 18))} + ${REPAY_FEE} fee) but have ${formatCurrency(formatUnits(balance, 18))} USDST.
+              </p>
+            ) : null;
+          })()}
+          
+          {/* Max amount validation warnings */}
+          {(() => {
+            const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+            const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+            const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+            const maxAmount = available < totalOwed ? available : totalOwed;
+            
+            return repayAmount && repayAmountWei > maxAmount ? (
+              <p className="text-red-600 text-sm mt-1">
+                Amount cannot exceed ${formatCurrency(formatUnits(maxAmount, 18))} USDST.
               </p>
             ) : null;
           })()}
