@@ -55,6 +55,14 @@ export const TRANSACTION_QUERY_TYPES = {
     key: 'last',
     displayName : 'Last'
   },
+  limit : {
+    key: 'limit',
+    displayName : 'Limit'
+  },
+  offset : {
+    key: 'offset',
+    displayName : 'Offset'
+  },
   search : {
     key: 'search',
     displayName : 'Search'
