@@ -140,13 +140,13 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} />
-          </div>
-
-          <div className="mb-8">
             <BorrowingSection 
               loanData={loans}
             />
+          </div>
+
+          <div className="mb-8">
+            <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} />
           </div>
 
           <div className="mb-8">

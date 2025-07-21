@@ -123,104 +123,6 @@ const LendingPoolSection = () => {
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg p-4 border">
-              <div className="flex justify-between mb-4">
-                <h3 className="font-medium">Pool Stats</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Supplied</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                    {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
-                      </span>
-                    ) : liquidityInfo ? (
-                      formatBalance(liquidityInfo.totalUSDSTSupplied || 0n, undefined, 18, 2, 2, true)
-                    ) : (
-                      "$0.00"
-                    )}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Borrowed</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                    {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
-                      </span>
-                    ) : liquidityInfo?.totalBorrowed ? (
-                      formatBalance(liquidityInfo.totalBorrowed || 0n, undefined, 18, 2, 2, true)
-                    ) : (
-                      "$0.00"
-                    )}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Utilization Rate</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Available Liquidity</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                     {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
-                      </span>
-                    ) : liquidityInfo?.availableLiquidity ? (
-                      formatBalance(liquidityInfo.availableLiquidity || 0n, undefined, 18, 2, 2, true)
-                    ) : (
-                      "$0.00"
-                    )}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Total Collateral Value</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                    {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
-                      </span>
-                    ) : liquidityInfo?.totalCollateralValue ? (
-                        formatBalance(liquidityInfo.totalCollateralValue || 0n, undefined, 18, 2, 2, true)
-                    ) : (
-                      "$0.00"
-                    )}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Supply APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Max Supply APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Borrow APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Your mUSDST</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
-                    {loadingLiquidity ? (
-                      <span className="text-gray-400 animate-pulse">
-                        Loading...
-                      </span>
-                    ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
-                    ) : (
-                      "0.00"
-                    )}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Conversion Rate</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
-                </div>
-              </div>
-            </div>
-
             <div>
               <div className="flex flex-col space-y-4">
                 <div className="bg-white rounded-lg p-4 border">
@@ -238,7 +140,7 @@ const LendingPoolSection = () => {
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
-                      className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-auto hidden sm:flex sm:items-center sm:justify-center"
+                      className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
                       disabled={loading || isProcessing || !isDepositAmountValid()}
                     >
                       {isProcessing ? (
@@ -348,7 +250,7 @@ const LendingPoolSection = () => {
                     <Button
                       onClick={() => handleLiquidityAction("withdraw")}
                       variant="outline"
-                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full sm:w-auto hidden sm:flex sm:items-center sm:justify-center"
+                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
                       disabled={
                         loadingLiquidity ||
                         isProcessing ||
@@ -456,6 +358,104 @@ const LendingPoolSection = () => {
                       </>
                     )}
                   </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 border">
+              <div className="flex justify-between mb-4">
+                <h3 className="font-medium">Pool Stats</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Supplied</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo ? (
+                      formatBalance(liquidityInfo.totalUSDSTSupplied || 0n, undefined, 18, 2, 2, true)
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Total USDST Borrowed</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.totalBorrowed ? (
+                      formatBalance(liquidityInfo.totalBorrowed || 0n, undefined, 18, 2, 2, true)
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Utilization Rate</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Available Liquidity</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                     {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.availableLiquidity ? (
+                      formatBalance(liquidityInfo.availableLiquidity || 0n, undefined, 18, 2, 2, true)
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Total Collateral Value</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.totalCollateralValue ? (
+                        formatBalance(liquidityInfo.totalCollateralValue || 0n, undefined, 18, 2, 2, true)
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Supply APY</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Max Supply APY</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Borrow APY</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Your mUSDST</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.withdrawable?.userBalance ? (
+                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
+                    ) : (
+                      "0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Conversion Rate</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 mUSDST = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>
