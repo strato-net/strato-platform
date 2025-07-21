@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Wallet } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { Token } from '@/interface';
+import { Token, PriceHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
+import { api } from '@/lib/axios';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import {
   Area,
@@ -22,25 +23,40 @@ import CopyButton from '@/components/ui/copy';
 
 type PricePoint = {
   date: string;
-  price: string; // since you're using `formatUnits`, it's a string
+  price: string;
+  timestamp?: number;
 };
 
-const generatePriceData = (basePrice: number, days: number = 30) => {
-  const data = [];
-  let currentPrice = basePrice;
+interface PriceHistoryApiEntry {
+  id: string;
+  timestamp: string;
+  asset: string;
+  price: string;
+  blockTimestamp: string;
+}
 
-  for (let i = 0; i < days; i++) {
-    // Random price fluctuation between -2% and +2%
-    const change = currentPrice * (Math.random() * 0.04 - 0.02);
-    currentPrice += change;
-
-    data.push({
-      date: new Date(Date.now() - (days - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      price: formatUnits(currentPrice?.toLocaleString("fullwide", { useGrouping: false }), 18),
-    });
+const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
+  try {
+    const response = await api.get<{ data: PriceHistoryApiEntry[] }>(`/oracle/price-history/${assetAddress}`);
+    
+    const processedData = response.data.data
+      .filter((entry: PriceHistoryApiEntry) => entry.price && entry.price !== "0") // Filter out zero prices
+      .map((entry: PriceHistoryApiEntry) => {
+        const date = new Date(entry.blockTimestamp);
+        const price = formatUnits(entry.price, 18);
+        return {
+          date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
+          price: price,
+          timestamp: date.getTime()
+        };
+      });
+    
+    
+    return processedData;
+  } catch (error) {
+    console.error('Failed to fetch price history:', error);
+    return [];
   }
-
-  return data;
 };
 
 const AssetDetail = () => {
@@ -48,6 +64,7 @@ const AssetDetail = () => {
   const [asset, setAsset] = useState<Token | null>(null);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
+  const [priceDataLoading, setPriceDataLoading] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
@@ -65,31 +82,34 @@ const AssetDetail = () => {
       setAsset(foundAsset);
       document.title = `${foundAsset?.token?._name} | Asset Details`;
 
-      if (foundAsset?.price) {
-        const basePrice = parseFloat(foundAsset.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
+      // Fetch real price history
+      if (foundAsset?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundAsset.address)
+          .then(setPriceData)
+          .finally(() => setPriceDataLoading(false));
       }
     } else if (foundInActiveAsset){
       setAsset(foundInActiveAsset);
       document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
 
-      if (foundInActiveAsset?.price) {
-        const basePrice = parseFloat(foundInActiveAsset.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
+      // Fetch real price history
+      if (foundInActiveAsset?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundInActiveAsset.address)
+          .then(setPriceData)
+          .finally(() => setPriceDataLoading(false));
       }
     } else if (foundInAllActiveTokens){
       setAsset(foundInAllActiveTokens);
       document.title = `${foundInAllActiveTokens?.token?._name} | Asset Details`;
 
-      if (foundInAllActiveTokens?.price) {
-        const basePrice = parseFloat(foundInAllActiveTokens.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
+      // Fetch real price history
+      if (foundInAllActiveTokens?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundInAllActiveTokens.address)
+          .then(setPriceData)
+          .finally(() => setPriceDataLoading(false));
       }
     }
   }, [id, assets]);  
@@ -268,12 +288,22 @@ const AssetDetail = () => {
 
               <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle>Price History</CardTitle>
+                  <CardTitle>Price History (Hourly Oracle Data)</CardTitle>
+                  {priceData.length > 0 && (
+                    <p className="text-sm text-gray-600">
+                      Hourly price data from first available oracle price to present
+                    </p>
+                  )}
                 </CardHeader>
 
                 <CardContent className="overflow-hidden">
-                  {priceData.length > 0 ? (
-                    <div className="h-80 w-full">
+                  {priceDataLoading ? (
+                    <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                      <p className="text-gray-500 ml-3">Loading price history...</p>
+                    </div>
+                  ) : priceData.length > 0 ? (
+                    <div className="w-full aspect-[21/9]">
                       <ChartContainer
                         config={{
                           price: {
@@ -294,7 +324,7 @@ const AssetDetail = () => {
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={priceData}
-                            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                            margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
                           >
                             <defs>
                               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -306,10 +336,11 @@ const AssetDetail = () => {
                               dataKey="date"
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => {
-                                const date = new Date(value);
-                                return `${date.getMonth() + 1}/${date.getDate()}`;
+                              tick={{ fontSize: 10 }}
+                              tickCount={8}
+                              tickFormatter={(value, index) => {
+                                const parts = value.split(' ');
+                                return parts[0];
                               }}
                             />
                             <YAxis
@@ -317,11 +348,15 @@ const AssetDetail = () => {
                               tickLine={false}
                               tick={{ fontSize: 12 }}
                               domain={['auto', 'auto']}
-                              tickFormatter={(value) => `$${parseFloat(value).toFixed(2)}`}
+                              width={50}
+                              tickFormatter={(value) => `$${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             />
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <ChartTooltip
-                              content={<ChartTooltipContent />}
+                              content={<ChartTooltipContent 
+                                labelFormatter={(value) => `Time: ${value}`}
+                                formatter={(value: string | number) => [`$${parseFloat(value.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]}
+                              />}
                             />
                             <Area
                               type="monotone"
@@ -338,7 +373,7 @@ const AssetDetail = () => {
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
-                      <p className="text-gray-500">Price data not available</p>
+                      <p className="text-gray-500">No price history available for this asset</p>
                     </div>
                   )}
                 </CardContent>
