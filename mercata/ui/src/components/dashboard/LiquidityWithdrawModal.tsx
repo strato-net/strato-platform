@@ -10,10 +10,10 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
-import { parseUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, WITHDRAW_FEE } from "@/lib/contants";
 import { LiquidityPool } from '@/interface';
+import { safeParseUnits } from '@/utils/numberUtils';
 
 interface WithdrawFormValues {
   percent: string;
@@ -232,13 +232,13 @@ const LiquidityWithdrawModal = ({
               <span>Transaction fee</span>
               <span>{WITHDRAW_FEE} USDST</span>
             </div>
-            {!balanceLoading && BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18) && (
+            {!balanceLoading && BigInt(usdstBalance || "0") < safeParseUnits(WITHDRAW_FEE, 18) && (
               <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
             )}
             {(() => {
               const usdstBalanceWei = BigInt(usdstBalance || "0");
-              const feeWei = parseUnits(WITHDRAW_FEE, 18);
-              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const feeWei = safeParseUnits(WITHDRAW_FEE, 18);
+              const lowBalanceThreshold = safeParseUnits("0.10", 18);
               const remainingBalance = usdstBalanceWei - feeWei;
               const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
               
@@ -277,7 +277,7 @@ const LiquidityWithdrawModal = ({
                 !withdrawPercent || 
                 parseFloat(withdrawPercent) <= 0 || 
                 parseFloat(withdrawPercent) > 100 || 
-                BigInt(usdstBalance || "0") < parseUnits(WITHDRAW_FEE, 18)
+                BigInt(usdstBalance || "0") < safeParseUnits(WITHDRAW_FEE, 18)
               } 
               type="submit" 
               className="w-full bg-strato-blue hover:bg-strato-blue/90"

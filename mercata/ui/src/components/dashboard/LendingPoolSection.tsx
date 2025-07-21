@@ -1,4 +1,4 @@
-import { formatUnits, parseUnits } from "ethers";
+import { formatUnits } from "ethers";
 import { DollarSign, ArrowDown, ArrowUp } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/contants";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
@@ -47,9 +48,9 @@ const LendingPoolSection = () => {
     if (!depositAmount) return false;
     if (!/^\d+(\.\d{1,18})?$/.test(depositAmount)) return false;
     try {
-      const amountWei = parseUnits(depositAmount, 18);
+      const amountWei = safeParseUnits(depositAmount, 18);
       const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-      const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
+      const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
       
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
@@ -64,9 +65,9 @@ const LendingPoolSection = () => {
     if (!withdrawAmount) return false;
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
-      const amountWei = parseUnits(withdrawAmount, 18);
+      const amountWei = safeParseUnits(withdrawAmount, 18);
       const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
-      const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
+      const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
       const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
       
       if (amountWei <= 0n) return false;
@@ -82,7 +83,7 @@ const LendingPoolSection = () => {
     try {
       setIsProcessing(true);
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
-      const amountWei = parseUnits(amount, 18).toString();
+      const amountWei = safeParseUnits(amount, 18).toString();
       await (type === "deposit" ? depositLiquidity : withdrawLiquidity)({
         amount: amountWei,
       });
@@ -135,12 +136,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo ? (
-                      `$${Number(
-                        formatUnits(liquidityInfo.totalUSDSTSupplied || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
+                      formatBalance(liquidityInfo.totalUSDSTSupplied || 0n, undefined, 18, 2, 2, true)
                     ) : (
                       "$0.00"
                     )}
@@ -154,12 +150,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo?.totalBorrowed ? (
-                      `$${Number(
-                        formatUnits(liquidityInfo.totalBorrowed || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
+                      formatBalance(liquidityInfo.totalBorrowed || 0n, undefined, 18, 2, 2, true)
                     ) : (
                       "$0.00"
                     )}
@@ -177,12 +168,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo?.availableLiquidity ? (
-                      `$${Number(
-                        formatUnits(liquidityInfo?.availableLiquidity || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
+                      formatBalance(liquidityInfo.availableLiquidity || 0n, undefined, 18, 2, 2, true)
                     ) : (
                       "$0.00"
                     )}
@@ -196,12 +182,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo?.totalCollateralValue ? (
-                      `$${Number(
-                        formatUnits(liquidityInfo?.totalCollateralValue || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
+                        formatBalance(liquidityInfo.totalCollateralValue || 0n, undefined, 18, 2, 2, true)
                     ) : (
                       "$0.00"
                     )}
@@ -216,8 +197,8 @@ const LendingPoolSection = () => {
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Borrow APR</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPR ? `${liquidityInfo.borrowAPR}%` : "N/A"}</span>
+                  <span className="text-gray-500 text-sm sm:text-base">Borrow APY</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Your mUSDST</span>
@@ -227,12 +208,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      `${Number(
-                        formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
+                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
                     ) : (
                       "0.00"
                     )}
@@ -280,7 +256,7 @@ const LendingPoolSection = () => {
                       type="button"
                       onClick={() => {
                         const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                        const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
+                        const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
                         const maxDepositableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
                         const formatted = formatUnits(maxDepositableWei, 18);
 
@@ -299,12 +275,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                       : liquidityInfo?.supplyable?.userBalance
-                        ? Number(
-                          formatUnits(liquidityInfo?.supplyable?.userBalance || 0, 18)
-                        ).toLocaleString(undefined, {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 4,
-                        })
+                        ? formatBalance(liquidityInfo.supplyable.userBalance || 0n, undefined, 18, 2)
                         : "0.00"}{" "}
                     USDST
                   </div>
@@ -315,8 +286,8 @@ const LendingPoolSection = () => {
                   {/* Fee Warning */}
                   {(() => {
                     const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                    const feeWei = parseUnits(LENDING_DEPOSIT_FEE, 18);
-                    const depositAmountWei = depositAmount ? parseUnits(depositAmount, 18) : 0n;
+                    const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
+                    const depositAmountWei = depositAmount ? safeParseUnits(depositAmount, 18) : 0n;
                     
                     // Check if user has enough USDST for fee
                     const isInsufficientUsdstForFee = !loadingLiquidity && availableWei < feeWei;
@@ -325,7 +296,7 @@ const LendingPoolSection = () => {
                     const isInsufficientBalanceForDepositAndFee = !loadingLiquidity && depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
                     
                     // Check if remaining balance after deposit and fee is low
-                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
                     const remainingBalance = availableWei - depositAmountWei - feeWei;
                     const isLowBalanceWarning = depositAmountWei > 0n && remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
                     
@@ -402,7 +373,7 @@ const LendingPoolSection = () => {
                         const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000");
                         const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
                         const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                        const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
+                        const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
 
                         if (!rawMax || usdstBalanceWei < feeWei) return;
 
@@ -429,9 +400,9 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                       : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
-                        ? formatUnits(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || 0, 18)
+                        ? formatBalance(0 || 0n, "USDST", 18, 2, 2)
                         : "0.00"}{" "}
-                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatUnits(liquidityInfo?.withdrawable?.userBalance || 0, 18) : "0.00"} mUSDST)
+                    ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
@@ -440,13 +411,13 @@ const LendingPoolSection = () => {
                   {/* Fee Warning */}
                   {(() => {
                     const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                    const feeWei = parseUnits(LENDING_WITHDRAW_FEE, 18);
+                    const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
                     
                     // Check if user has enough USDST for fee
                     const isInsufficientUsdstForFee = !loadingLiquidity && usdstBalanceWei < feeWei;
                     
                     // Check if remaining balance after fee is low
-                    const lowBalanceThreshold = parseUnits("0.10", 18);
+                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
                     const remainingBalance = usdstBalanceWei - feeWei;
                     const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
                     

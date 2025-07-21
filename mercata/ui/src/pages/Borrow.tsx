@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatUnits, parseUnits } from "ethers";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
@@ -32,12 +32,6 @@ const LoadingSpinner = () => (
     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
   </div>
 );
-
-const formatTokenAmount = (value: string) =>
-  parseFloat(formatUnits(value || 0, 18)).toLocaleString("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
 
 // Reusable InfoTooltip component
 const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
@@ -128,7 +122,7 @@ const Borrow = () => {
   const executeBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
-      await borrowAssetFn({ amount: parseUnits(amount, 18).toString() });
+      await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
       toast({
         title: "Borrow Initiated",
         description: `You borrowed ${amount} USDST`,
@@ -178,7 +172,7 @@ const Borrow = () => {
       setSupplyLoading(true);
       await supplyCollateral({
         asset: asset.address,
-        amount: parseUnits(amount, 18).toString(),
+        amount: safeParseUnits(amount, 18).toString(),
       });
       toast({
         title: "Supply Initiated",
@@ -220,7 +214,7 @@ const Borrow = () => {
       setWithdrawLoading(true);
       await withdrawCollateral({
         asset: asset.address,
-        amount: parseUnits(amount, 18).toString(),
+        amount: safeParseUnits(amount, 18).toString(),
       });
       toast({
         title: "Withdraw Initiated",
@@ -321,9 +315,9 @@ const Borrow = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatUnits(asset?.userBalance,18)}</TableCell>
+                        <TableCell>{formatBalance(asset?.userBalance || 0n, undefined, 18, 2)}</TableCell>
                         <TableCell>
-                          ${formatTokenAmount(asset?.userBalanceValue)}
+                          ${formatBalance(asset?.userBalanceValue, undefined, 18, 1, 2)}
                         </TableCell>
                         <TableCell>
                           {asset?.ltv ? asset?.ltv/100 : 0}%
@@ -425,9 +419,9 @@ const Borrow = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatUnits(loan?.collateralizedAmount, 18)}</TableCell>
+                        <TableCell>{formatBalance(loan?.collateralizedAmount || 0n, undefined, 18, 2)}</TableCell>
                         <TableCell>
-                          ${formatTokenAmount(loan?.collateralizedAmountValue || 0)}
+                          {formatBalance(loan?.collateralizedAmountValue, undefined, 18, 1, 2,true)}
                         </TableCell>
                         <TableCell>
                           {loan?.ltv ? loan?.ltv/100 : 0}%
