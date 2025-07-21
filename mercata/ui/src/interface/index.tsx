@@ -248,6 +248,7 @@ export interface CollateralData {
   _owner: string;
   _symbol: string;
   _totalSupply: string;
+  images?: Array<{ value: string }>;
   asset?: string;
   maxRepay?: string;
   symbol?: string;
@@ -273,9 +274,10 @@ export interface TokenInfo {
 
 export interface LiquidityData {
   availableLiquidity: string;
-  borrowAPY: number;
+  borrowAPR: number;
   exchangeRate: string;
   supplyAPY: number;
+  maxSupplyAPY: number;
   supplyable: TokenInfo;
   withdrawable: TokenInfo;
   totalBorrowed: string;
@@ -346,6 +348,9 @@ export interface LiquidityPool {
   tokenAPrice: string;
   tokenBPrice: string;
   lpTokenPrice: string;
+  totalLiquidityUSD?: string;
+  tradingVolume24h?: string;
+  apy?: string;
   _name?: string;
   _symbol?: string;
 }

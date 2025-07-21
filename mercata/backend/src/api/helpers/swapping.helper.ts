@@ -58,3 +58,77 @@ export const calculateImpliedPrice = (
     return '0.00';
   }
 };
+
+/**
+ * Calculate pool APY based on actual fees earned over 24h
+ * @param fees24h 24-hour fees earned by LPs in USD
+ * @param totalLiquidity Total value locked in the pool in USD
+ * @returns APY as a percentage
+ */
+export const calculatePoolAPY = (
+  fees24h: string,
+  totalLiquidity: string
+): number => {
+  const fees = parseFloat(fees24h);
+  const liquidity = parseFloat(totalLiquidity);
+
+  if (!fees || !liquidity) return 0;
+
+  return Math.max(0, (fees / liquidity) * 365 * 100);
+};
+
+/**
+ * Calculate fees earned by LPs from trading volume
+ * @param tradingVolume24h 24-hour trading volume in USD
+ * @param swapFeeRate Swap fee rate in basis points (e.g., 30 = 0.3%)
+ * @param lpSharePercent LP share percentage in basis points (e.g., 7000 = 70%)
+ * @returns Fees earned by LPs in USD
+ */
+export const calculateLPFees24h = (
+  tradingVolume24h: string,
+  swapFeeRate: number,
+  lpSharePercent: number
+): string => {
+  const volume = parseFloat(tradingVolume24h);
+  if (!volume) return "0";
+
+  const totalFees = volume * (swapFeeRate / 10000);
+  const lpFees = totalFees * (lpSharePercent / 10000);
+
+  return lpFees.toString();
+};
+
+/**
+ * Calculate LP token price based on underlying token values
+ * @param tokenABalance Balance of token A in the pool
+ * @param tokenBBalance Balance of token B in the pool
+ * @param tokenAPrice Price of token A in USD
+ * @param tokenBPrice Price of token B in USD
+ * @param lpTokenTotalSupply Total supply of LP tokens
+ * @returns LP token price in USD
+ */
+export const calculateLPTokenPrice = (
+  tokenABalance: string,
+  tokenBBalance: string,
+  tokenAPrice: string,
+  tokenBPrice: string,
+  lpTokenTotalSupply: string
+): string => {
+  const tokenABalanceBig = BigInt(tokenABalance || "0");
+  const tokenBBalanceBig = BigInt(tokenBBalance || "0");
+  const tokenAPriceBig = BigInt(tokenAPrice || "0");
+  const tokenBPriceBig = BigInt(tokenBPrice || "0");
+  const lpTokenSupplyBig = BigInt(lpTokenTotalSupply || "0");
+
+  if (lpTokenSupplyBig === 0n) return "0";
+
+  // Calculate total value of underlying tokens in USD
+  const tokenAValue = (tokenABalanceBig * tokenAPriceBig) / BigInt(10 ** 18);
+  const tokenBValue = (tokenBBalanceBig * tokenBPriceBig) / BigInt(10 ** 18);
+  const totalValue = tokenAValue + tokenBValue;
+
+  // LP token price = total value / total supply
+  const lpTokenPrice = (totalValue * BigInt(10 ** 18)) / lpTokenSupplyBig;
+
+  return lpTokenPrice.toString();
+};

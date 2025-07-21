@@ -157,7 +157,7 @@ class SwappingController {
     try {
       const { accessToken, address } = req;
 
-      const userTokens = await getBalance(accessToken, address);
+      const userTokens = await getBalance(accessToken, address, {select: "address", value: "gt.0"});
       const userTokensAddresses = userTokens.map((token: any) => token.address);
       const pools = await getPools(accessToken, address, {
         lpToken: "in.(" + userTokensAddresses.join(",") + ")",
