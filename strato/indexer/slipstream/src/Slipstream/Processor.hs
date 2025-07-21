@@ -249,9 +249,10 @@ processTheMessages env conn messages = do
 
   let changes = parseActions messages
       events' = parseEvents messages
-      -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
-      -- delegates = [d | DelegatecallMade d <- messages]
+      -- TODO (Dan) : would be nice if we didn't just rip events out at the top
+      -- level like this
+      creates =
+        [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
   fkeys' <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
@@ -362,13 +363,15 @@ processTheMessages env conn messages = do
     forM_ insertsByCodeHash $ \ins -> do
       insertIndexTable $ indexInsert ins
       insertAbstractTable (abstractInserts ins)-- not historic
-      unless ((length (collectionInserts ins) < 1)) $ insertCollectionTable $ collectionInserts ins
+      unless ((length (collectionInserts ins) < 1)) $
+        insertCollectionTable $ collectionInserts ins
 
       --updating the foreign keys from null
     forM_ insertsByCodeHash $ \ins -> do
       updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
       updateForeignKeysFromNULLIndex (indexInsert ins)
-      unless ((length (collectionInserts ins) < 1)) $ updateForeignKeysFromNULLArray (collectionInserts ins)
+      unless ((length (collectionInserts ins) < 1)) $
+        updateForeignKeysFromNULLArray (collectionInserts ins)
 
     forM_ concatFkeys $ \deferredForeignKey -> do
       createForeignIndexesForJoins deferredForeignKey
@@ -378,11 +381,13 @@ processTheMessages env conn messages = do
     notifyPostgREST conn
 
   when (not (null events')) $ do
-    --Getting event entries that go into the parent abstract tables and event array inserts
+    -- Getting event entries that go into the parent abstract tables and event
+    -- array inserts
     let processedEvents = concatMap getAllEvents events'
         processedEventArrays = concatMap aggEventToCollectionRows processedEvents
-         -- TODO: Remove arrays once marketplace switches over to using event array tables
-        processedEventsWithoutArrays = processedEvents -- map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+         -- TODO: Remove arrays once marketplace switches over to using event
+         -- array tables
+        processedEventsWithoutArrays = processedEvents
         
     -- Insert the events into the event tables
     outputData conn $ insertEventTables processedEventArrays processedEventsWithoutArrays
@@ -391,7 +396,8 @@ processTheMessages env conn messages = do
     unless (null processedEventArrays) $
       outputData conn $ updateForeignKeysFromNULLArray processedEventArrays
 
-  $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
+  $logInfoS "processTheMessages" . T.pack $
+    "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
   forM_ transactionResults $ putTransactionResult
 

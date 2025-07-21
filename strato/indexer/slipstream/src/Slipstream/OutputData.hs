@@ -239,7 +239,8 @@ outputDataDedup ::
   PGConnection ->
   ConduitM () Text m a ->
   m a
-outputDataDedup conn c = runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
+outputDataDedup conn c =
+  runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
 
 baseColumns :: TableColumns
 baseColumns =
