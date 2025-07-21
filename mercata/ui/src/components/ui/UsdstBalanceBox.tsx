@@ -1,20 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useUser } from '@/context/UserContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { Card, CardContent } from './card';
 import { Coins, AlertTriangle, HelpCircle, Minus, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatWeiAmount, formatCurrency } from '@/utils/numberUtils';
-import { formatUnits } from 'viem';
+import { formatWeiAmount, formatCurrency, safeParseFloat } from '@/utils/numberUtils';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { Button } from './button';
+import { Token } from '@/interface';
+
+const USDST_ADDRESS = '937efa7e3a77e20bbdbd7c0d32b6514f368c1010';
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress } = useUser();
   const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance } = useUserTokens();
+  const { getToken } = useTokenContext();
   const [isMinimized, setIsMinimized] = useState(false);
-
-  console.log('USDST Balance:', usdstBalance, 'Loading:', loadingUsdstBalance);
+  const [usdstToken, setUsdstToken] = useState<Token | null>(null);
 
   useEffect(() => {
     if (userAddress) {
@@ -22,34 +25,24 @@ const UsdstBalanceBox: React.FC = () => {
     }
   }, [userAddress, fetchUsdstBalance]);
 
-  // Refresh balance periodically and when window gains focus
+  // Fetch USDST token info for image
   useEffect(() => {
-    if (!userAddress) return;
-
-    // Refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchUsdstBalance(userAddress);
-    }, 30000);
-
-    // Refresh when window gains focus (often after transactions)
-    const handleFocus = () => {
-      fetchUsdstBalance(userAddress);
+    const fetchUsdstToken = async () => {
+      try {
+        const token = await getToken(USDST_ADDRESS);
+        setUsdstToken(token);
+      } catch (error) {
+        console.error('Error fetching USDST token:', error);
+      }
     };
+    
+    fetchUsdstToken();
+  }, [getToken]);
 
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [userAddress, fetchUsdstBalance]);
 
   const getBalanceValue = (balance: string): number => {
-    try {
-      return parseFloat(formatUnits(BigInt(balance), 18));
-    } catch {
-      return 0;
-    }
+    const formattedBalance = formatWeiAmount(balance);
+    return safeParseFloat(formattedBalance);
   };
 
   const balanceValue = getBalanceValue(usdstBalance);
@@ -67,6 +60,39 @@ const UsdstBalanceBox: React.FC = () => {
     return 'border-blue-200 bg-white/95';
   };
 
+  // Render the appropriate icon based on state and token image availability
+  const renderIcon = (size: 'sm' | 'md' | 'lg' = 'md') => {
+    const sizeClasses = {
+      sm: 'h-4 w-4',
+      md: 'h-4 w-4', 
+      lg: 'h-5 w-5'
+    };
+
+    console.log('huh', usdstToken?.images)
+
+    // If we have a token with image, use it
+    if (usdstToken?.images?.[0]) {
+      return (
+        <img
+          src={usdstToken.images[0].value}
+          alt="USDST"
+          className={`${sizeClasses[size]} rounded-full object-cover`}
+        />
+      );
+    }
+
+    // Fallback to warning/normal icons
+    if (isLowBalance || isCriticalBalance) {
+      return (
+        <AlertTriangle 
+          className={`${sizeClasses[size]} ${isCriticalBalance ? 'text-red-600' : 'text-orange-600'}`} 
+        />
+      );
+    }
+
+    return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
+  };
+
   if (isMinimized) {
     return (
       <Card className={`fixed bottom-4 right-4 z-50 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}>
@@ -77,11 +103,7 @@ const UsdstBalanceBox: React.FC = () => {
             className="h-full w-full p-0"
             onClick={() => setIsMinimized(false)}
           >
-            {(isLowBalance || isCriticalBalance) ? (
-              <AlertTriangle className={`h-5 w-5 ${isCriticalBalance ? 'text-red-600' : 'text-orange-600'}`} />
-            ) : (
-              <Coins className="h-5 w-5 text-blue-600" />
-            )}
+            {renderIcon('lg')}
           </Button>
         </CardContent>
       </Card>
