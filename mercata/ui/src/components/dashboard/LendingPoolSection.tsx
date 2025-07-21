@@ -12,7 +12,7 @@ import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/contants";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
+  const { activeTokens: tokens, loading, fetchTokens, fetchUsdstBalance } = useUserTokens();
   const {
     liquidityInfo,
     loadingLiquidity,
@@ -29,6 +29,7 @@ const LendingPoolSection = () => {
     if (!userAddress) return;
     fetchTokens(signal);
     refreshLiquidity(signal);
+    fetchUsdstBalance(userAddress);
   };
 
   // 1. Fetch on userAddress change only, with abort controller

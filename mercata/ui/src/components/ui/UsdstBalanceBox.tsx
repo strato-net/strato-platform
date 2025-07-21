@@ -1,16 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useUser } from '@/context/UserContext';
 import { Card, CardContent } from './card';
-import { Coins, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Coins, AlertTriangle, HelpCircle, Minus, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatWeiAmount, formatCurrency } from '@/utils/numberUtils';
 import { formatUnits } from 'viem';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
+import { Button } from './button';
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress } = useUser();
   const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance } = useUserTokens();
+  const [isMinimized, setIsMinimized] = useState(false);
 
   console.log('USDST Balance:', usdstBalance, 'Loading:', loadingUsdstBalance);
 
@@ -18,6 +20,28 @@ const UsdstBalanceBox: React.FC = () => {
     if (userAddress) {
       fetchUsdstBalance(userAddress);
     }
+  }, [userAddress, fetchUsdstBalance]);
+
+  // Refresh balance periodically and when window gains focus
+  useEffect(() => {
+    if (!userAddress) return;
+
+    // Refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchUsdstBalance(userAddress);
+    }, 30000);
+
+    // Refresh when window gains focus (often after transactions)
+    const handleFocus = () => {
+      fetchUsdstBalance(userAddress);
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [userAddress, fetchUsdstBalance]);
 
   const getBalanceValue = (balance: string): number => {
@@ -32,11 +56,37 @@ const UsdstBalanceBox: React.FC = () => {
   const isLowBalance = balanceValue <= 0.2 && balanceValue > 0.03;
   const isCriticalBalance = balanceValue <= 0.03;
 
+  // Don't render if user is not logged in
+  if (!userAddress) {
+    return null;
+  }
+
   const getCardClasses = () => {
     if (isCriticalBalance) return 'border-red-300 bg-red-200/95';
     if (isLowBalance) return 'border-orange-300 bg-orange-200/95';
     return 'border-blue-200 bg-white/95';
   };
+
+  if (isMinimized) {
+    return (
+      <Card className={`fixed bottom-4 right-4 z-50 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}>
+        <CardContent className="p-0 h-full flex items-center justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-full w-full p-0"
+            onClick={() => setIsMinimized(false)}
+          >
+            {(isLowBalance || isCriticalBalance) ? (
+              <AlertTriangle className={`h-5 w-5 ${isCriticalBalance ? 'text-red-600' : 'text-orange-600'}`} />
+            ) : (
+              <Coins className="h-5 w-5 text-blue-600" />
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className={`fixed bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}>
@@ -69,6 +119,14 @@ const UsdstBalanceBox: React.FC = () => {
               )}
             </p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 hover:bg-gray-100"
+            onClick={() => setIsMinimized(true)}
+          >
+            <Minus className="h-3 w-3 text-gray-500" />
+          </Button>
         </div>
         
         {(isLowBalance || isCriticalBalance) && !loadingUsdstBalance && (

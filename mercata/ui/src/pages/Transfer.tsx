@@ -101,6 +101,10 @@ const Transfer = () => {
       } else {
         setFromAsset(null)
       }
+      // Refresh USDST balance since gas fees were paid
+      if (userAddress) {
+        await fetchUsdstBalance(userAddress);
+      }
     } catch (error) {
       const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
       toast({
@@ -206,7 +210,7 @@ const Transfer = () => {
                             max = max > feeAmount ? max - feeAmount : 0n;
                           }
 
-                          let raw = formatUnits(max, 18);
+                          const raw = formatUnits(max, 18);
                           // clamp to 18 decimals using utility function
                           const clampedAmount = roundToDecimals(raw, 18);
                           setFromAmount(clampedAmount);

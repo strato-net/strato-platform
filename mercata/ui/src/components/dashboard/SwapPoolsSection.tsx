@@ -5,6 +5,7 @@ import { BanknoteIcon, CircleArrowDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { useUserTokens } from '@/context/UserTokensContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { LiquidityPool } from '@/interface';
@@ -23,6 +24,8 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress, enrichPools } = useSwapContext();
+  const { fetchUsdstBalance } = useUserTokens();
+  const { userAddress } = useUser();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -105,11 +108,17 @@ const SwapPoolsSection = () => {
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
     await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
   };
 
 
