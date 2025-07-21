@@ -255,11 +255,11 @@ processTheMessages env conn messages = do
         [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
+  fkeys <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
-        deferredForeignKeys <- fmap concat $
+        fmap concat $
           forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
             -- Here we will get the storageDefs attribute of the contract (c)
             -- and iterate through the Map of (Text, VariableDecl) and look for
@@ -298,10 +298,7 @@ processTheMessages env conn messages = do
 
             return $ deferredForeignKeys ++ deferredForeignKeysForCollections ++ deferredForeignKeysForEvents
 
-        pure $ Right deferredForeignKeys
-
-  let fkeys = rights $ fkeys' -- ++ dfkeys'
-      concatFkeys = concat fkeys
+  let concatFkeys = concat fkeys
 
   inserts <- fmap concat $ enterBloc2 env $ do
     forM changes $ \(_, actions) -> do
@@ -402,3 +399,4 @@ processTheMessages env conn messages = do
   forM_ transactionResults $ putTransactionResult
 
   return events'
+
