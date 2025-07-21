@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatUnits } from "ethers";
-import { BORROW_FEE } from "@/lib/contants";
+import { BORROW_FEE } from "@/lib/constants";
 import { NewLoanData } from "@/interface";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";

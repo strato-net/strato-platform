@@ -5,7 +5,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { REPAY_FEE } from "@/lib/contants";
+import { REPAY_FEE } from "@/lib/constants";
 import { NewLoanData } from "@/interface";
 import { formatCurrency, safeParseUnits } from "@/utils/numberUtils";
 import { useIsMobile } from "@/hooks/use-mobile";

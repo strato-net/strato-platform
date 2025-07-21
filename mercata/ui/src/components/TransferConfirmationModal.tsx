@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import { TRANSFER_FEE } from "@/lib/contants";
+import { TRANSFER_FEE } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
