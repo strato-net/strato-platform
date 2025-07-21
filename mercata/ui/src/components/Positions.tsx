@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { HelpCircle } from "lucide-react";
 import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
+import { formatBalance } from "@/utils/numberUtils";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -38,11 +39,6 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
 
   return `rgb(${red}, ${green}, 0)`;
 }
-
-  // Use the available borrowing power from loanData (which is calculated correctly in backend)
-  const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
-    ? parseFloat(formatUnits(loanData.maxAvailableToBorrowUSD, 18))
-    : 0;
   
   return (
     <Card className="border border-gray-100 shadow-sm">
@@ -82,12 +78,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
               <div className="flex flex-col">
                 <span className="text-gray-600">Total Borrowed</span>
                 <span className="font-semibold">
-                  {loanData?.totalAmountOwed != null
-                    ? `${parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })} USDST`
-                    : "0 USDST"}
+                  {formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
               <div className="flex flex-col">
@@ -114,10 +105,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                   <span className="text-gray-600">Available Borrowing Power</span>
                 </InfoTooltip>
                 <span className="font-semibold">
-                  {availableBorrowingPower.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
+                  {formatBalance(loanData?.maxAvailableToBorrowUSD || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
               <div className="flex flex-col">
@@ -125,10 +113,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                   <span className="text-gray-600">Interest Owed</span>
                 </InfoTooltip>
                 <span className="font-semibold">
-                  {parseFloat(formatUnits(loanData?.accruedInterest || 0, 18)).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
+                  {formatBalance(loanData?.accruedInterest || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
               <div className="flex flex-col">

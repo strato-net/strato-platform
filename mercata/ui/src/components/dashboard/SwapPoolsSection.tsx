@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { BanknoteIcon, CircleArrowDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
-import { formatUnits } from 'ethers';
+import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { LiquidityPool } from '@/interface';
 import LiquidityDepositModal from './LiquidityDepositModal';
@@ -187,7 +186,7 @@ const SwapPoolsSection = () => {
                     <div>
                       <h3 className="font-medium">{pool._name}</h3>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Liquidity: {Number(formatUnits(pool.lpToken._totalSupply, 18)).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 6 })}</span>
+                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)}</span>
                       </div>
                     </div>
                   </div>
