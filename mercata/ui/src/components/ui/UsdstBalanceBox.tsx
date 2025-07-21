@@ -30,11 +30,7 @@ const UsdstBalanceBox: React.FC = () => {
     const fetchUsdstToken = async () => {
       try {
         const tokenResponse = await getToken(USDST_ADDRESS);
-        console.log('USDST Token fetched:', tokenResponse);
-        // Handle if the response is an array
         const token = Array.isArray(tokenResponse) ? tokenResponse[0] : tokenResponse;
-        console.log('USDST Token (processed):', token);
-        console.log('USDST Token images:', token?.images);
         setUsdstToken(token);
       } catch (error) {
         console.error('Error fetching USDST token:', error);
@@ -73,11 +69,9 @@ const UsdstBalanceBox: React.FC = () => {
       lg: 'h-5 w-5'
     };
     
-    console.log('renderIcon called with:', { size, usdstToken, hasImage: usdstToken?.images?.[0]?.value });
     
     // If we have a token with image, use it
     if (usdstToken?.images?.[0]?.value) {
-      console.log('Using token image:', usdstToken.images[0].value);
       return (
         <img
           src={usdstToken.images[0].value}
@@ -86,8 +80,6 @@ const UsdstBalanceBox: React.FC = () => {
         />
       );
     }
-
-    console.log('Using fallback icon - isLowBalance:', isLowBalance, 'isCriticalBalance:', isCriticalBalance);
 
     // Fallback to warning/normal icons
     if (isLowBalance || isCriticalBalance) {
