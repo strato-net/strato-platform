@@ -1,15 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useUserTokens } from '@/context/UserTokensContext';
+import { useUser } from '@/context/UserContext';
 import { Card, CardContent } from './card';
-import { Coins, AlertTriangle } from 'lucide-react';
+import { Coins, AlertTriangle, HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatWeiAmount, formatCurrency } from '@/utils/numberUtils';
 import { formatUnits } from 'viem';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 
 const UsdstBalanceBox: React.FC = () => {
-  const { usdstBalance, loadingUsdstBalance } = useUserTokens();
+  const { userAddress } = useUser();
+  const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance } = useUserTokens();
 
   console.log('USDST Balance:', usdstBalance, 'Loading:', loadingUsdstBalance);
+
+  useEffect(() => {
+    if (userAddress) {
+      fetchUsdstBalance(userAddress);
+    }
+  }, [userAddress, fetchUsdstBalance]);
 
   const getBalanceValue = (balance: string): number => {
     try {
@@ -23,14 +32,14 @@ const UsdstBalanceBox: React.FC = () => {
   const isLowBalance = balanceValue <= 0.2 && balanceValue > 0.03;
   const isCriticalBalance = balanceValue <= 0.03;
 
-  const getCardBorderClass = () => {
-    if (isCriticalBalance) return 'border-red-300';
-    if (isLowBalance) return 'border-orange-300';
-    return 'border-blue-200';
+  const getCardClasses = () => {
+    if (isCriticalBalance) return 'border-red-300 bg-red-200/95';
+    if (isLowBalance) return 'border-orange-300 bg-orange-200/95';
+    return 'border-blue-200 bg-white/95';
   };
 
   return (
-    <Card className={`fixed bottom-4 right-4 z-50 w-60 shadow-lg ${getCardBorderClass()} bg-white/95 backdrop-blur-sm`}>
+    <Card className={`fixed bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}>
       <CardContent className="p-3">
         <div className="flex items-center space-x-2">
           <div className={`p-1.5 rounded-full ${isCriticalBalance ? 'bg-red-100' : isLowBalance ? 'bg-orange-100' : 'bg-blue-100'}`}>
@@ -41,7 +50,17 @@ const UsdstBalanceBox: React.FC = () => {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-600">USDST Balance</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs font-medium text-gray-600">USDST Balance</p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>USDST is used to pay for gas fees on the STRATO Mercata network</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <p className="text-sm font-semibold text-gray-900 truncate">
               {loadingUsdstBalance ? (
                 <span className="animate-pulse">Loading...</span>
