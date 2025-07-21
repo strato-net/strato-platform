@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formatUnits, parseUnits } from "ethers";
+import { formatUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
 import PercentageButtons from "@/components/ui/PercentageButtons";
@@ -239,7 +239,7 @@ const BorrowAssetModal = ({
             </div>
             {/* Fee validation warnings */}
             {(() => {
-              const feeAmount = parseUnits(BORROW_FEE, 18);
+              const feeAmount = safeParseUnits(BORROW_FEE, 18);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
               // Check if insufficient USDST for fee
@@ -283,7 +283,7 @@ const BorrowAssetModal = ({
               borrowLoading ||
               safeParseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ||
               (() => {
-                const feeAmount = parseUnits(BORROW_FEE, 18);
+                const feeAmount = safeParseUnits(BORROW_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
                 return usdstBalanceBigInt < feeAmount;
               })()
