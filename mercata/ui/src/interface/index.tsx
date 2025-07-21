@@ -274,7 +274,7 @@ export interface TokenInfo {
 
 export interface LiquidityData {
   availableLiquidity: string;
-  borrowAPR: number;
+  borrowAPY: number;
   exchangeRate: string;
   supplyAPY: number;
   maxSupplyAPY: number;

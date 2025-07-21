@@ -6,8 +6,13 @@ import {
 } from "@/components/ui/card";
 import { formatBalance } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import LPTokenDropdown from "./LPTokenDropdown";
 
 export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }) {
+  
+  const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
   
   const formatValue = (rawBalance: string, price: string): string => {
     if (!rawBalance || !price) return "0.00";
@@ -17,6 +22,16 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
     const value = balance * priceValue;
 
     return value.toFixed(2);
+  };
+
+  const toggleTokenExpansion = (tokenAddress: string) => {
+    const newExpanded = new Set(expandedTokens);
+    if (newExpanded.has(tokenAddress)) {
+      newExpanded.delete(tokenAddress);
+    } else {
+      newExpanded.add(tokenAddress);
+    }
+    setExpandedTokens(newExpanded);
   };
 
   return (
@@ -57,37 +72,61 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
                 </div>
                 <div className="text-right font-medium text-gray-900">
                   {liquidityInfo?.withdrawable?.withdrawValue
-                      ? `$${Number(formatUnits(liquidityInfo?.withdrawable?.withdrawValue, 18)).toFixed(2)}`
-                      : "$0.00"}
+                    ? `$${Number(formatUnits(liquidityInfo?.withdrawable?.withdrawValue, 18)).toFixed(2)}`
+                    : "$0.00"}
                 </div>
               </div>
             ) : null}
 
             {/* LP Token Rows */}
             {lpTokens.length > 0 ? (
-              lpTokens.map((lpToken, idx) => (
-                <div
-                  key={lpToken?.lpToken?.address || idx}
-                  className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2"
-                >
-                  <div className="font-semibold text-gray-700">{lpToken.lpToken._name}</div>
-                  <div className="text-center font-semibold text-gray-900">
-                    {lpToken?.lpToken?.balances[0]?.balance
-                      ? formatBalance(lpToken?.lpToken?.balances[0]?.balance,undefined,18,2,2)
-                      : "0.00"}
-                  </div>
-                  <div className="text-center font-semibold text-gray-900">
-                    {lpToken?.apy ? `${lpToken.apy}%` : "N/A"}
-                  </div>
-                  <div className="text-right font-medium text-gray-900">
-                    {lpToken?.lpToken?._totalSupply
-                      ? `$${formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)}`
-                      : "$0.00"}
-                  </div>
-                </div>
-              ))
-            ) : !liquidityInfo?.withdrawable && Array.isArray(lpTokens) && lpTokens.length > 0 ? (
-              <div className="p-2 flex justify-center">No data to show</div>
+              <div className="space-y-2">
+                {lpTokens.map((lpToken, idx) => {
+                  const tokenAddress = lpToken?.lpToken?.address || `token-${idx}`;
+                  const isExpanded = expandedTokens.has(tokenAddress);
+                  
+                  return (
+                    <div key={tokenAddress}>
+                      {/* Clickable LP Token Row */}
+                      <div 
+                        className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => toggleTokenExpansion(tokenAddress)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-700">{lpToken.lpToken._name}</span>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
+                          )}
+                        </div>
+                        <div className="text-center font-semibold text-gray-900">
+                          {lpToken?.lpToken?.balances[0]?.balance
+                            ? formatBalance(lpToken?.lpToken?.balances[0]?.balance,undefined,18,2,2)
+                            : "0.00"}
+                        </div>
+                        <div className="text-center font-semibold text-gray-900">
+                          {lpToken?.apy ? `${lpToken.apy}%` : "N/A"}
+                        </div>
+                        <div className="text-right font-medium text-gray-900">
+                          {lpToken?.lpToken?._totalSupply
+                            ? `$${formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)}`
+                            : "$0.00"}
+                        </div>
+                      </div>
+                      
+                      {/* Dropdown with detailed breakdown */}
+                      <LPTokenDropdown
+                        lpToken={lpToken}
+                        className="mb-2"
+                        isExpanded={isExpanded}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : !liquidityInfo?.withdrawable && Array.isArray(lpTokens) && lpTokens.length === 0 ? (
+              <div className="p-2 flex justify-center text-gray-500">No LP tokens found</div>
             ) : null}
           </>
         )}
