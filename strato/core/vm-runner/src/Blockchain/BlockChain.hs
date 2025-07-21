@@ -424,7 +424,12 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
 
   feeResult' <- payFees b availableGas tAddr t proposer
   let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
-      attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
+      attachFeeResult er = er
+        { erAction = (maybe id (\era -> actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era)) $ erAction feeResult) <$> erAction er
+        , erTrace = erTrace feeResult ++ erTrace er
+        , erLogs = erLogs feeResult ++ erLogs er
+        , erEvents = erEvents feeResult ++ erEvents er
+        }
 
   if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
     then do
