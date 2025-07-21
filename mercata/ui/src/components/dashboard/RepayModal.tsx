@@ -105,7 +105,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
   const handlePercentageClick = (percent?: bigint) => {
     const totalOwed = BigInt(loan?.totalAmountOwed || 0);
     const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
-    const maxAmount = available < totalOwed ? available : totalOwed;
+    const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
     const amount = formatUnits((maxAmount * percent) / 100n, 18);
     setRepayAmount(amount);
     setDisplayAmount(addCommasToInput(amount));
@@ -170,7 +170,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           
           {/* USDST Balance Display */}
           <div className="text-xs text-gray-500">
-            Your USDST Balance: ${formatCurrency(formatUnits(usdstBalance || "0", 18))} (${formatCurrency(formatUnits(BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18), 18))} available for repayment)
+            Your USDST Balance: ${formatCurrency(formatUnits(usdstBalance || "0", 18))} (${formatCurrency(formatUnits(BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) > 0n ? BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) : 0n, 18))} available for repayment)
           </div>
           
           {/* Balance validation warnings */}
