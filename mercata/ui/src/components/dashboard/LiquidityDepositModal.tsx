@@ -11,7 +11,7 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
-import { formatUnits, parseUnits } from 'ethers';
+import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE } from "@/lib/contants";
 import { LiquidityPool } from '@/interface';
@@ -19,7 +19,7 @@ import { safeParseUnits } from '@/utils/numberUtils';
 
 const formatNumber = (value: string | number): string => {
   try {
-    const weiValue = parseUnits(value.toString(), 18);
+    const weiValue = safeParseUnits(value.toString(), 18);
     return formatUnits(weiValue, 18);
   } catch (error) {
     console.error('Error formatting number:', error);
@@ -159,7 +159,7 @@ const LiquidityDepositModal = ({
     let maxBigInt = BigInt(balance || "0");
 
     if (isUSDST) {
-      const fee = parseUnits(DEPOSIT_FEE, 18);
+      const fee = safeParseUnits(DEPOSIT_FEE, 18);
       if (maxBigInt > fee) {
         maxBigInt = maxBigInt - fee;
       } else {
@@ -293,27 +293,27 @@ const LiquidityDepositModal = ({
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
               {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
-               safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
+               safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
                safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {selectedPool?.tokenA.address !== usdstAddress && 
                selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
+               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {(() => {
                 if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
                   const inputAmountWei = safeParseUnits(token1Amount, 18);
                   const balanceWei = BigInt(tokenABalance || "0");
-                  const feeWei = parseUnits(DEPOSIT_FEE, 18);
-                  const lowBalanceThreshold = parseUnits("0.10", 18);
+                  const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
+                  const lowBalanceThreshold = safeParseUnits("0.10", 18);
                   const remainingBalance = balanceWei - inputAmountWei - feeWei;
-                  const isLowBalanceWarning = inputAmountWei > 0n && 
-                                           remainingBalance >= 0n && 
-                                           remainingBalance <= lowBalanceThreshold &&
-                                           inputAmountWei <= balanceWei - feeWei;
-                  
+                  const isLowBalanceWarning = inputAmountWei > 0n &&
+                    remainingBalance >= 0n &&
+                    remainingBalance <= lowBalanceThreshold &&
+                    inputAmountWei <= balanceWei - feeWei;
+
                   return isLowBalanceWarning ? (
                     <p className="text-yellow-600 text-sm mt-1">
                       Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
@@ -391,27 +391,27 @@ const LiquidityDepositModal = ({
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
               {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
-               safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - parseUnits(DEPOSIT_FEE, 18) && 
+               safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
                safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {selectedPool?.tokenA.address !== usdstAddress && 
                selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < parseUnits(DEPOSIT_FEE, 18) && (
+               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {(() => {
                 if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
                   const inputAmountWei = safeParseUnits(token2Amount, 18);
                   const balanceWei = BigInt(tokenBBalance || "0");
-                  const feeWei = parseUnits(DEPOSIT_FEE, 18);
-                  const lowBalanceThreshold = parseUnits("0.10", 18);
+                  const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
+                  const lowBalanceThreshold = safeParseUnits("0.10", 18);
                   const remainingBalance = balanceWei - inputAmountWei - feeWei;
-                  const isLowBalanceWarning = inputAmountWei > 0n && 
-                                           remainingBalance >= 0n && 
-                                           remainingBalance <= lowBalanceThreshold &&
-                                           inputAmountWei <= balanceWei - feeWei;
-                  
+                  const isLowBalanceWarning = inputAmountWei > 0n &&
+                    remainingBalance >= 0n &&
+                    remainingBalance <= lowBalanceThreshold &&
+                    inputAmountWei <= balanceWei - feeWei;
+
                   return isLowBalanceWarning ? (
                     <p className="text-yellow-600 text-sm mt-1">
                       Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
@@ -460,7 +460,7 @@ const LiquidityDepositModal = ({
                 !token2Amount || 
                 safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ||
                 safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ||
-                BigInt(usdstBalance || "0") < parseUnits("0.3", 18)
+                BigInt(usdstBalance || "0") < safeParseUnits("0.3", 18)
               } 
               type="submit" 
               className="w-full bg-strato-blue hover:bg-strato-blue/90"
