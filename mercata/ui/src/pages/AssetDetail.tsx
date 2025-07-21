@@ -308,7 +308,7 @@ const AssetDetail = () => {
                       <p className="text-gray-500 ml-3">Loading price history...</p>
                     </div>
                   ) : priceData.length > 0 ? (
-                    <div className="h-80 w-full">
+                    <div className="w-full aspect-[21/9]">
                       <ChartContainer
                         config={{
                           price: {
