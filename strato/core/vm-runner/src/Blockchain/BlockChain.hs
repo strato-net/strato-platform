@@ -100,6 +100,7 @@ import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
 import Data.Maybe
 import Data.Proxy
+import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
@@ -425,7 +426,10 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   feeResult' <- payFees b availableGas tAddr t proposer
   let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
       attachFeeResult er = er
-        { erAction = (maybe id (\era -> actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era)) $ erAction feeResult) <$> erAction er
+        { erAction = (maybe id (\era ->
+              (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
+            . (events %~ (_events era Seq.><))
+          ) $ erAction feeResult) <$> erAction er
         , erTrace = erTrace feeResult ++ erTrace er
         , erLogs = erLogs feeResult ++ erLogs er
         , erEvents = erEvents feeResult ++ erEvents er
