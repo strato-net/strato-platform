@@ -23,8 +23,8 @@ import CopyButton from '@/components/ui/copy';
 
 type PricePoint = {
   date: string;
-  price: string; // formatted price string
-  timestamp?: number; // raw timestamp for chart handling
+  price: string;
+  timestamp?: number;
 };
 
 interface PriceHistoryApiEntry {
@@ -45,17 +45,12 @@ const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> =>
         const date = new Date(entry.blockTimestamp);
         const price = formatUnits(entry.price, 18);
         return {
-          // Format as MM/DD HH:mm for better hourly resolution display
           date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
           price: price,
-          timestamp: date.getTime() // Add raw timestamp for better chart handling
+          timestamp: date.getTime()
         };
       });
     
-    console.log(`[fetchPriceHistory] Received ${response.data.data.length} entries, filtered to ${processedData.length} valid entries`);
-    if (processedData.length > 0) {
-      console.log(`[fetchPriceHistory] Price range: ${processedData[0].price} to ${processedData[processedData.length - 1].price}`);
-    }
     
     return processedData;
   } catch (error) {
@@ -344,9 +339,8 @@ const AssetDetail = () => {
                               tick={{ fontSize: 10 }}
                               tickCount={8}
                               tickFormatter={(value, index) => {
-                                // Show date ticks distributed across the chart width
                                 const parts = value.split(' ');
-                                return parts[0]; // Just show MM/DD
+                                return parts[0];
                               }}
                             />
                             <YAxis

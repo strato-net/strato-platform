@@ -89,7 +89,7 @@ export const getPriceHistory = async (
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     const oneMonthAgoISO = oneMonthAgo.toISOString();
 
-    console.log(`[getPriceHistory] Querying events for oracle ${oracleAddress}, asset ${assetAddress}, from ${oneMonthAgoISO}`);
+    // console.log(`[getPriceHistory] Querying events for oracle ${oracleAddress}, asset ${assetAddress}, from ${oneMonthAgoISO}`);
 
     const params = {
       address: `eq.${oracleAddress}`,
@@ -128,8 +128,8 @@ export const getPriceHistory = async (
     const priceEvents = priceEventsResponse.data;
     const totalCount = countResponse.data?.[0]?.count || 0;
 
-    console.log(`[getPriceHistory] Found ${priceEvents?.length || 0} price events for asset ${assetAddress} from ${oneMonthAgoISO}`);
-    console.log(`[getPriceHistory] First few events:`, priceEvents?.slice(0, 3));
+    // console.log(`[getPriceHistory] Found ${priceEvents?.length || 0} price events for asset ${assetAddress} from ${oneMonthAgoISO}`);
+    // console.log(`[getPriceHistory] First few events:`, priceEvents?.slice(0, 3));
 
     if (!Array.isArray(priceEvents)) {
       return { data: [], totalCount: 0 };
@@ -159,7 +159,7 @@ export const getPriceHistory = async (
       }
     });
 
-    console.log(`[getPriceHistory] Created ${hourlyPrices.size} unique hourly price points`);
+    // console.log(`[getPriceHistory] Created ${hourlyPrices.size} unique hourly price points`);
 
     // If no historical data, return empty
     if (hourlyPrices.size === 0) {
