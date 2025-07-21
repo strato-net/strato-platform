@@ -329,7 +329,7 @@ const AssetDetail = () => {
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={priceData}
-                            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                            margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
                           >
                             <defs>
                               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -354,13 +354,14 @@ const AssetDetail = () => {
                               tickLine={false}
                               tick={{ fontSize: 12 }}
                               domain={['auto', 'auto']}
-                              tickFormatter={(value) => `$${parseFloat(value).toFixed(2)}`}
+                              width={50}
+                              tickFormatter={(value) => `$${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             />
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <ChartTooltip
                               content={<ChartTooltipContent 
                                 labelFormatter={(value) => `Time: ${value}`}
-                                formatter={(value: string | number) => [`$${parseFloat(value.toString()).toFixed(6)}`, 'Price']}
+                                formatter={(value: string | number) => [`$${parseFloat(value.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]}
                               />}
                             />
                             <Area
