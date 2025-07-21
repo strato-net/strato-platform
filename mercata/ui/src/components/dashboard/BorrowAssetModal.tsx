@@ -35,6 +35,14 @@ const BorrowAssetModal = ({
   usdstBalance = "0",
   eligibleCollateralTokens = []
 }: BorrowAssetModalProps) => {
+  const borrowInfoMessage = (
+    <p className="text-gray-600 mt-2">
+      Borrowing against your assets allows you to access liquidity
+      without selling your holdings. Be mindful of the risk level, as
+      high borrowing increases liquidation risk during market
+      volatility.
+    </p>
+  );
   const availableToBorrowFormatted = formatUnits(loan?.maxAvailableToBorrowUSD || 0, 18)
   const collateralValueFormatted = parseFloat(formatUnits(loan?.totalCollateralValueUSD || 0, 18))
   const isMobile = useIsMobile();
@@ -266,12 +274,7 @@ const BorrowAssetModal = ({
 
               {!isMobile && (
                 <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
-                  <p className="text-gray-600">
-                    Borrowing against your assets allows you to access liquidity
-                    without selling your balances. Be mindful of the risk level, as
-                    high borrowing increases liquidation risk during market
-                    volatility.
-                  </p>
+                  {borrowInfoMessage}
                 </div>
               )}
             </div>
@@ -311,20 +314,15 @@ const BorrowAssetModal = ({
               {Array.isArray(eligibleCollateralTokens) && eligibleCollateralTokens.length === 0 ? (
                 <p className="font-bold">
                   ⚠️ You cannot currently borrow any USDST because you do not have any eligible collateral to borrow against.
-                  You will need to buy or swap other assets for ETHST, WBTCST, GOLDST, SILVST or BCSPXST which you can borrow against. ⚠️
+                  You will need to buy or swap other assets for ETH, BTC, GOLDST or SILVST which you can borrow against. ⚠️
                 </p>
               ) : (
                 <p className="font-bold">
                   ⚠️ You cannot currently borrow any USDST because you have not made any of your collateral available to borrow against.
-                  Return to the main Borrow page and click on Supply for some of your eligible collateral ⚠️
+                  Return to the main Borrow page and click on Supply for some of your collateral ⚠️
                 </p>
               )}
-              <p className="text-gray-600 mt-2">
-                Borrowing against your assets allows you to access liquidity
-                without selling your holdings. Be mindful of the risk level, as
-                high borrowing increases liquidation risk during market
-                volatility.
-              </p>
+              {borrowInfoMessage}
             </div>
             <DialogFooter className={isMobile ? 'flex-col space-y-2 pt-4' : ''}>
               <Button 
