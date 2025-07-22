@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
-import { usdstAddress, DEPOSIT_FEE } from "@/lib/contants";
+import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
 import { LiquidityPool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 
