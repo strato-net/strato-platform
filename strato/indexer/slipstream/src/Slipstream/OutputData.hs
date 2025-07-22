@@ -1570,9 +1570,9 @@ insertGlobalEventTable agEv = do
 -- created dynamically per contract/event type, this global table has a fixed
 -- schema and stores all events in a normalized format.
 --
--- TODO (pawel) This function does not include the 'attributes' column yet,
--- which will contain the event arguments in JSON format. That will be added in
--- a future iteration.
+-- Event arguments are converted to a JSON object and stored in the 'attributes'
+-- column, where each argument name becomes a key and its value becomes the
+-- corresponding JSON value.
 insertGlobalEventTableQuery :: AggregateEvent -> Text
 insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let creator = T.pack $ Action.evContractCreator ev
@@ -1586,6 +1586,18 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       transactionSender = tshow . eventTxSender $ agEv
       eventIdx = tshow . eventIndex $ agEv
 
+      attributesMap =
+        Map.fromList [(T.pack name, T.pack value) | (name, value, _) <- Action.evArgs ev]
+
+      -- Please note that all types are being treated here as strings. This is
+      -- due to how `evArgs` is represented in the `Event` (tuple of strings).
+      --
+      -- TODO (pawel): A good follow-up to this work would be a refactoring of
+      -- `evArgs` in `Event`. By getting rid of this tech debt, we would also
+      -- significantly improve the quality of the `attributes` column in the
+      -- `events` table, making them type-aware.
+      attributesJson = decodeUtf8 . BL.toStrict $ Aeson.encode attributesMap
+
       columns = wrapAndEscapeDouble . map escapeQuotes $
         [ "creator"
         , "application"
@@ -1597,6 +1609,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , "transaction_hash"
         , "transaction_sender"
         , "event_index"
+        , "attributes"
         ]
 
       values = csv $ map (wrapSingleQuotes . escapeQuotes)
@@ -1610,7 +1623,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , transactionHash
         , transactionSender
         , eventIdx
-        ]
+        ] ++ [wrapSingleQuotes attributesJson <> "::jsonb"]
 
   in T.concat
        [ "INSERT INTO events "
