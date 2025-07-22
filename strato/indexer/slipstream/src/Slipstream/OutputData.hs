@@ -19,6 +19,8 @@ module Slipstream.OutputData (
   outputDataDedup,
   OutputM,
   ProcessedCollectionRow(..),
+  insertGlobalEventTable,
+  pipeInsertGlobalEventTable,
   insertEventTables,
   insertIndexTable,
   insertForeignKeys,
@@ -1550,6 +1552,16 @@ getArraysFromEvents evArgs = do
          let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
                             (map (SimpleValue . ValueString . T.pack) elements))
+
+pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () Text m ()
+pipeInsertGlobalEventTable aggregatedEvents =
+  yieldMany =<< lift (mapM insertGlobalEventTable aggregatedEvents)
+
+insertGlobalEventTable :: OutputM m => AggregateEvent -> m Text
+insertGlobalEventTable agEv = do
+  let query = insertGlobalEventTableQuery agEv
+  $logInfoS "insertGlobalEventTable/query" query
+  return query
 
 -- | Generates an INSERT SQL statement for the global 'events' table.
 --
