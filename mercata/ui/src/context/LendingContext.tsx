@@ -6,7 +6,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { parseUnits } from "ethers";
+import { safeParseUnits } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 import { CollateralData, LendData, LiquidityData, NewLoanData } from "@/interface";
 import { useUser } from "@/context/UserContext";
@@ -20,17 +20,6 @@ type LendingContextType = {
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
-  configureAsset: (payload: { 
-    asset: string; 
-    ltv: number; 
-    liquidationThreshold: number; 
-    liquidationBonus: number; 
-    interestRate: number; 
-    reserveFactor: number; 
-  }) => Promise<void>;
-  setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
-  setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
-  setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     amount: string;
@@ -117,7 +106,7 @@ export const LendingProvider = ({
   }, []);
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
-    const weiPrice = parseUnits(payload.price, 18).toString();
+    const weiPrice = safeParseUnits(payload.price, 18).toString();
     try {
       await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
     } catch (err) {
@@ -254,9 +243,6 @@ export const LendingProvider = ({
       loadingLiquidity,
       refreshLiquidity : fetchLiquidityInfo,
       setPrice,
-      setInterestRate: () => Promise.resolve(), // Placeholder implementation
-      setCollateralRatio: () => Promise.resolve(), // Placeholder implementation
-      setLiquidationBonus: () => Promise.resolve(), // Placeholder implementation
       configureAsset,
       refreshLendingData,
       borrowAsset,

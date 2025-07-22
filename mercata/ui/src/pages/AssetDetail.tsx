@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Wallet } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { Token } from '@/interface';
+import { Token, PriceHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
+import { api } from '@/lib/axios';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import {
   Area,
@@ -22,25 +23,40 @@ import CopyButton from '@/components/ui/copy';
 
 type PricePoint = {
   date: string;
-  price: string; // since you're using `formatUnits`, it's a string
+  price: string;
+  timestamp?: number;
 };
 
-const generatePriceData = (basePrice: number, days: number = 30) => {
-  const data = [];
-  let currentPrice = basePrice;
+interface PriceHistoryApiEntry {
+  id: string;
+  timestamp: string;
+  asset: string;
+  price: string;
+  blockTimestamp: string;
+}
 
-  for (let i = 0; i < days; i++) {
-    // Random price fluctuation between -2% and +2%
-    const change = currentPrice * (Math.random() * 0.04 - 0.02);
-    currentPrice += change;
-
-    data.push({
-      date: new Date(Date.now() - (days - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      price: formatUnits(currentPrice?.toLocaleString("fullwide", { useGrouping: false }), 18),
-    });
+const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
+  try {
+    const response = await api.get<{ data: PriceHistoryApiEntry[] }>(`/oracle/price-history/${assetAddress}`);
+    
+    const processedData = response.data.data
+      .filter((entry: PriceHistoryApiEntry) => entry.price && entry.price !== "0") // Filter out zero prices
+      .map((entry: PriceHistoryApiEntry) => {
+        const date = new Date(entry.blockTimestamp);
+        const price = formatUnits(entry.price, 18);
+        return {
+          date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
+          price: price,
+          timestamp: date.getTime()
+        };
+      });
+    
+    
+    return processedData;
+  } catch (error) {
+    console.error('Failed to fetch price history:', error);
+    return [];
   }
-
-  return data;
 };
 
 const AssetDetail = () => {
@@ -48,8 +64,9 @@ const AssetDetail = () => {
   const [asset, setAsset] = useState<Token | null>(null);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
+  const [priceDataLoading, setPriceDataLoading] = useState(false);
   const { userAddress } = useUser()
-  const { activeTokens: assets, inactiveTokens, loading, fetchTokens } = useUserTokens()
+  const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
   
   useEffect(() => {
@@ -60,25 +77,39 @@ const AssetDetail = () => {
     // Find the asset with the matching id
     const foundAsset = assets.find(a => a?.address === id);
     const foundInActiveAsset = inactiveTokens.find(a => a?.address === id)
+    const foundInAllActiveTokens = allActiveTokens.find(a => a?.address === id)
     if (foundAsset) {
       setAsset(foundAsset);
       document.title = `${foundAsset?.token?._name} | Asset Details`;
 
-      if (foundAsset?.price) {
-        const basePrice = parseFloat(foundAsset.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
+      // Fetch real price history
+      if (foundAsset?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundAsset.address)
+          .then(setPriceData)
+          .finally(() => setPriceDataLoading(false));
       }
     } else if (foundInActiveAsset){
       setAsset(foundInActiveAsset);
       document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
 
-      if (foundInActiveAsset?.price) {
-        const basePrice = parseFloat(foundInActiveAsset.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
+      // Fetch real price history
+      if (foundInActiveAsset?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundInActiveAsset.address)
+          .then(setPriceData)
+          .finally(() => setPriceDataLoading(false));
+      }
+    } else if (foundInAllActiveTokens){
+      setAsset(foundInAllActiveTokens);
+      document.title = `${foundInAllActiveTokens?.token?._name} | Asset Details`;
+
+      // Fetch real price history
+      if (foundInAllActiveTokens?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundInAllActiveTokens.address)
+          .then(setPriceData)
+          .finally(() => setPriceDataLoading(false));
       }
     }
   }, [id, assets]);  
@@ -109,19 +140,19 @@ const AssetDetail = () => {
     );
   }
 
-  const handleConnectWallet = () => { };
+  // const handleConnectWallet = () => { };
 
-  const handleBuyNow = () => { };
+  // const handleBuyNow = () => { };
 
-  const handleBridge = () => { };
+  // const handleBridge = () => { };
 
-
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
-        <DashboardHeader title={`${asset?.token?._symbol} Details`} />
+        <DashboardHeader title={`${asset?.token?._symbol || asset?._symbol} Details`} />
 
         <main className="p-6">
           <div className="mb-6">
@@ -137,14 +168,14 @@ const AssetDetail = () => {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-blue-600">{asset?.token?._symbol}</p>
-                      <CardTitle className="text-xl">{asset?.token?._name}</CardTitle>
+                      <p className="text-sm font-semibold text-blue-600">{asset?.token?._symbol || asset?._symbol}</p>
+                      <CardTitle className="text-xl">{asset?.token?._name || asset?._name}</CardTitle>
                     </div>
                     <div
                       className="w-16 h-16 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden"
                       style={{ backgroundColor: asset?.color || "#EF4444" }} // fallback to red if no color
                     >
-                      {asset?.token?._symbol?.toUpperCase() || "N/A"}
+                      {asset?.token?._symbol?.toUpperCase() || asset?._symbol?.toUpperCase() || "N/A"}
                     </div>
                   </div>
                 </CardHeader>
@@ -154,16 +185,16 @@ const AssetDetail = () => {
                     <div
                       className="w-32 h-32 rounded-full bg-white border-4 flex items-center justify-center overflow-hidden relative"
                     >
-                      {asset?.token?.images?.length > 0 ? (
+                      {asset?.token?.images?.length > 0 || asset?.images?.length > 0 ? (
                         <img
-                          src={asset.token.images[0].value}
-                          alt={asset.token?._name}
+                          src={asset?.token?.images[0]?.value || asset?.images[0]?.value}
+                          alt={asset?.token?._name || asset?._name}
                           className="w-full h-full object-contain"
                           onError={(e) => (e.currentTarget.style.display = "none")}
                         />
                       ) : (
                         <span className="absolute inset-0 flex items-center justify-center text-center text-sm font-semibold text-gray-500 p-2">
-                          {asset?.token?._name}
+                          {asset?.token?._name || asset?._name}
                         </span>
                       )}
                     </div>
@@ -178,11 +209,11 @@ const AssetDetail = () => {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Asset Deposits:</span>
+                      <span className="text-gray-500">User Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0"), 18)}</span>
                     </div>
 
-                    {asset?.available ? (
+                    {asset?.status == "2" ? (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Status:</span>
                         <span className="font-medium text-green-500">Available</span>
@@ -195,17 +226,12 @@ const AssetDetail = () => {
                     )}
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Provider:</span>
-                      <span className="font-medium">{asset?.provider || 'N/A'}</span>
-                    </div>
-
-                    <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Owner:</span>
                       <span className="font-medium">
                         {asset?.token?._owner
                           ? `${asset.token._owner.slice(0, 6)}...${asset.token._owner.slice(-4)}`
-                          : 'N/A'}
-                      <CopyButton address={asset?.token?._owner} />
+                          : asset?._owner ? `${asset?._owner?.slice(0, 6)}...${asset?._owner?.slice(-4)}` : 'N/A'}
+                      <CopyButton address={asset?.token?._owner || asset?._owner} />
                       </span>
                     </div>
 
@@ -218,13 +244,8 @@ const AssetDetail = () => {
                         <CopyButton address={asset?.address} />
                       </span>
                     </div>
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Vault Service:</span>
-                      <span className="font-medium">{asset?.vaulter || 'N/A'}</span>
-                    </div>
                   </div>
-                  {!isWalletConnected ? (
+                  {/* {!isWalletConnected ? (
                     <Button
                       onClick={handleConnectWallet}
                       className="w-full flex items-center justify-center gap-2 mb-4"
@@ -257,7 +278,7 @@ const AssetDetail = () => {
                     >
                       Bridge
                     </Button>
-                  </div>
+                  </div> */}
                 </CardContent>
               </Card>
             </div>
@@ -267,12 +288,22 @@ const AssetDetail = () => {
 
               <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle>Price History</CardTitle>
+                  <CardTitle>Price History (Hourly Oracle Data)</CardTitle>
+                  {priceData.length > 0 && (
+                    <p className="text-sm text-gray-600">
+                      Hourly price data from first available oracle price to present
+                    </p>
+                  )}
                 </CardHeader>
 
                 <CardContent className="overflow-hidden">
-                  {priceData.length > 0 ? (
-                    <div className="h-80 w-full">
+                  {priceDataLoading ? (
+                    <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                      <p className="text-gray-500 ml-3">Loading price history...</p>
+                    </div>
+                  ) : priceData.length > 0 ? (
+                    <div className="w-full aspect-[21/9]">
                       <ChartContainer
                         config={{
                           price: {
@@ -293,7 +324,7 @@ const AssetDetail = () => {
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={priceData}
-                            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                            margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
                           >
                             <defs>
                               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -305,10 +336,11 @@ const AssetDetail = () => {
                               dataKey="date"
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => {
-                                const date = new Date(value);
-                                return `${date.getMonth() + 1}/${date.getDate()}`;
+                              tick={{ fontSize: 10 }}
+                              tickCount={8}
+                              tickFormatter={(value, index) => {
+                                const parts = value.split(' ');
+                                return parts[0];
                               }}
                             />
                             <YAxis
@@ -316,11 +348,15 @@ const AssetDetail = () => {
                               tickLine={false}
                               tick={{ fontSize: 12 }}
                               domain={['auto', 'auto']}
-                              tickFormatter={(value) => `$${parseFloat(value).toFixed(2)}`}
+                              width={50}
+                              tickFormatter={(value) => `$${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             />
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <ChartTooltip
-                              content={<ChartTooltipContent />}
+                              content={<ChartTooltipContent 
+                                labelFormatter={(value) => `Time: ${value}`}
+                                formatter={(value: string | number) => [`$${parseFloat(value.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]}
+                              />}
                             />
                             <Area
                               type="monotone"
@@ -337,7 +373,7 @@ const AssetDetail = () => {
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
-                      <p className="text-gray-500">Price data not available</p>
+                      <p className="text-gray-500">No price history available for this asset</p>
                     </div>
                   )}
                 </CardContent>
@@ -345,25 +381,15 @@ const AssetDetail = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>About {asset?.token?._name}</CardTitle>
+                  <CardTitle>About {asset?.token?._name || asset?._name}</CardTitle>
                 </CardHeader>
 
                 <CardContent>
                   <div className="space-y-4">
                     <div
                       className="prose max-w-none text-sm"
-                      dangerouslySetInnerHTML={{ __html: asset?.token?.description }}
+                      dangerouslySetInnerHTML={{ __html: asset?.token?.description || asset?.description }}
                     />
-                  </div>
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="font-semibold mb-2">Key Features</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-gray-700">
-                      <li>100% backed by real assets</li>
-                      <li>Regular independent audits</li>
-                      <li>Secure cold storage</li>
-                      <li>Instant liquidity</li>
-                      <li>Low transaction fees</li>
-                    </ul>
                   </div>
                 </CardContent>
               </Card>

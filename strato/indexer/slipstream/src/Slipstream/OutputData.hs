@@ -74,11 +74,8 @@ import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
--- import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
--- import           Data.Bifunctor                  (first)
--- import           Data.Function                   (on)
 import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -109,7 +106,6 @@ instance Functor (First b) where
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    -- codehash :: Maybe CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
@@ -243,7 +239,8 @@ outputDataDedup ::
   PGConnection ->
   ConduitM () Text m a ->
   m a
-outputDataDedup conn c = runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
+outputDataDedup conn c =
+  runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
 
 baseColumns :: TableColumns
 baseColumns =
@@ -306,8 +303,6 @@ baseAbstractColumns =
     "data"
   ]
 
--- baseTableColumns :: TableColumns
--- baseTableColumns = baseColumns
 
 baseTableColumnsForEvent :: TableColumns
 baseTableColumnsForEvent = baseEventColumns
@@ -1289,8 +1284,6 @@ insertAbstractTableQuery cs =
                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
                       dataVals = [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper (Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns )) <> "::jsonb"]
-                      -- jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
-                      -- jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
                       regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
                       fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
                       valsForSQL = baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
@@ -1458,14 +1451,6 @@ createEventTable (creator, a, n) evName ev cc = do
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
       eventFkeys = getDeferredForeignKeysForEvent eventTable crtr app
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
-  -- eventAlreadyCreated <- isTableCreated eventTable
-  -- unless eventAlreadyCreated $ do
-  --   setTableCreated globalsIORef eventTable $ colsCombined
-  --   yield $ createEventTableQuery eventTable colsCombined
-  -- if eventAlreadyCreated
-  --   then return []
-  --   else do
-    -- setTableCreated eventTable $ colsCombined
   yieldMany $ createEventTableQuery eventTable colsCombined uniqueConstraint
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
     createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
@@ -1601,16 +1586,6 @@ processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
           }
       }
 
--- insertEventTable ::
---   OutputM m =>
---   AggregateEvent ->
---   m (Text)
--- insertEventTable agEv = do
---   let q = insertEventTableQuery agEv
---   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
---   return q
-
-
 insertEventTable ::
   OutputM m =>
   AggregateEvent ->
@@ -1671,7 +1646,10 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
 
 ------------------
 
---This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
+-- This is a temporary function that converts solidity types to a sample
+-- value...  I am just using this now to convert table creation from the old way
+-- (value based when values come through) to the new way (direct from the types
+-- when a CC is registered)
 solidityTypeToSQLType :: Bool -> Maybe (ContractF ()) -> CodeCollectionF () -> SVMType.Type -> Maybe Text
 solidityTypeToSQLType _ _ _ SVMType.Bool = Just "bool"
 solidityTypeToSQLType _ _ _ (SVMType.Int _ _) = Just "decimal"
@@ -1684,14 +1662,12 @@ solidityTypeToSQLType _ _ _ (SVMType.Account _) = Just "text"
 solidityTypeToSQLType isEvent _ _ (SVMType.Array _ _) = if isEvent then Just "jsonb" else Nothing
 solidityTypeToSQLType _ _ _ (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
 solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe "text" (const "jsonb") $ (\c -> structDef c cc l) =<< mc
---solidityTypeToSQLType _ (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType _ _ _ (SVMType.Struct _ _) = Just "jsonb"
 solidityTypeToSQLType _ _ _ (SVMType.Enum _ _ _) = Just "text"
 solidityTypeToSQLType _ _ _ (SVMType.Contract _) = Just "text"
 solidityTypeToSQLType _ _ _ (SVMType.Error _ _) = Just "text"
 solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
 
---solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 ------------------
 

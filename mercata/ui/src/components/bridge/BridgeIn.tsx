@@ -18,12 +18,14 @@ import {
   useSendTransaction,
   useWriteContract,
 } from "wagmi";
-import { parseEther, createPublicClient, http, parseUnits } from "viem";
+import { parseEther, createPublicClient, http } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
 import { useBridgeContext } from "@/context/BridgeContext";
 import BridgeWalletStatus from './BridgeWalletStatus';
 import PercentageButtons from "@/components/ui/PercentageButtons";
+import { safeParseUnits } from "@/utils/numberUtils";
+import { parseUnits } from "ethers";
 
 interface Token {
   name: string;

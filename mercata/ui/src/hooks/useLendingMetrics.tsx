@@ -207,7 +207,7 @@ export const useLendingMetrics = () => {
           
           // Method 4: Last resort - reasonable default for DeFi lending
           if (interestRate === 0) {
-            interestRate = 8.0; // 8% APR as a reasonable default
+            interestRate = 8.0; // 8% APY as a reasonable default
           }
           
           // Weight the rate by loan principal amount

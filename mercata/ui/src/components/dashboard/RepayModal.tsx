@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { formatUnits, parseUnits } from "ethers";
+import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { REPAY_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
-import { safeParseUnits } from "@/utils/numberUtils";
+import { formatCurrency, safeParseUnits } from "@/utils/numberUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RepayModalProps {
@@ -17,15 +17,6 @@ interface RepayModalProps {
   onRepaySuccess: () => void;
   usdstBalance?: string;
 }
-
-const formatCurrency = (value: string | number) => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return "0.00";
-  return num.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  });
-};
 
 const addCommasToInput = (value: string) => {
   if (!value) return '';
@@ -58,10 +49,20 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
   }, [isOpen]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const cursorPosition = input.selectionStart;
     const value = e.target.value.replace(/,/g, '');
+    
     if (/^\d*\.?\d*$/.test(value)) {
       setRepayAmount(value);
       setDisplayAmount(addCommasToInput(value));
+      
+      // Restore cursor position after state update
+      setTimeout(() => {
+        const newDisplayValue = addCommasToInput(value);
+        const newCursorPosition = Math.min(cursorPosition, newDisplayValue.length);
+        input.setSelectionRange(newCursorPosition, newCursorPosition);
+      }, 0);
     }
   };
 
@@ -69,7 +70,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
     try {
       setRepayLoading(true);
       const totalOwedWei = BigInt(loan?.totalAmountOwed || 0);
-      let amountInWei = parseUnits(repayAmount || "0", 18);
+      let amountInWei = safeParseUnits(repayAmount || "0", 18);
       
       // Cap at total owed amount
       if (amountInWei > totalOwedWei) {
@@ -108,8 +109,8 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
 
   const handlePercentageClick = (percent?: bigint) => {
     const totalOwed = BigInt(loan?.totalAmountOwed || 0);
-    const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
-    const maxAmount = available < totalOwed ? available : totalOwed;
+    const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+    const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
     const amount = formatUnits((maxAmount * percent) / 100n, 18);
     setRepayAmount(amount);
     setDisplayAmount(addCommasToInput(amount));
@@ -149,12 +150,12 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
         <div className="space-y-3">
           <label className="text-sm font-medium">Repay Amount (USDST)</label>
           <div className="flex justify-between items-center text-xs text-gray-500">
-            <span>Min: $0.01</span>
-            <span>Max: ${(() => {
+            <span>Min: 0.01 USDST</span>
+            <span>Max: {(() => {
               const totalOwed = BigInt(loan?.totalAmountOwed || 0);
-              const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
+              const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
               const max = available < totalOwed ? available : totalOwed;
-              return formatCurrency(formatUnits(max > 0n ? max : 0n, 18));
+              return formatCurrency(formatUnits(max > 0n ? max : 0n, 18)) + " USDST";
             })()}</span>
           </div>
           <div className="relative">
@@ -163,29 +164,43 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
               className={`pr-8 ${(() => { 
                 const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
                 const totalOwed = BigInt(loan?.totalAmountOwed || 0);
-                const available = BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18);
+                const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
                 return repayAmountWei > totalOwed || repayAmountWei > available ? 'text-red-600' : ''; 
               })()}`}
               value={displayAmount}
               onChange={handleAmountChange}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
           </div>
           
           {/* USDST Balance Display */}
           <div className="text-xs text-gray-500">
-            Your USDST Balance: ${formatCurrency(formatUnits(usdstBalance || "0", 18))} (${formatCurrency(formatUnits(BigInt(usdstBalance || "0") - parseUnits(REPAY_FEE, 18), 18))} available for repayment)
+            Your USDST Balance: {formatCurrency(formatUnits(usdstBalance || "0", 18))} USDST ({formatCurrency(formatUnits(BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) > 0n ? BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) : 0n, 18))} USDST available for repayment)
           </div>
           
           {/* Balance validation warnings */}
           {(() => {
             const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-            const totalNeeded = repayAmountWei + parseUnits(REPAY_FEE, 18);
+            const totalNeeded = repayAmountWei + safeParseUnits(REPAY_FEE, 18);
             const balance = BigInt(usdstBalance || "0");
             
             return repayAmount && totalNeeded > balance ? (
               <p className="text-red-600 text-sm mt-1">
-                Insufficient USDST balance. You need ${formatCurrency(formatUnits(totalNeeded, 18))} USDST (${formatCurrency(formatUnits(repayAmountWei, 18))} + ${REPAY_FEE} fee) but have ${formatCurrency(formatUnits(balance, 18))} USDST.
+                Insufficient USDST balance. You need {formatCurrency(formatUnits(totalNeeded, 18))} USDST ({formatCurrency(formatUnits(repayAmountWei, 18))} + {REPAY_FEE} fee) but have {formatCurrency(formatUnits(balance, 18))} USDST.
+              </p>
+            ) : null;
+          })()}
+          
+          {/* Max amount validation warnings */}
+          {(() => {
+            const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+            const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+            const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+            const maxAmount = available < totalOwed ? available : totalOwed;
+            
+            return repayAmount && repayAmountWei > maxAmount ? (
+              <p className="text-red-600 text-sm mt-1">
+                Amount cannot exceed {formatCurrency(formatUnits(maxAmount, 18))} USDST.
               </p>
             ) : null;
           })()}
@@ -230,7 +245,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Payment Amount</span>
             <span className="font-medium">
-              {repayAmount ? `$${formatCurrency(repayAmount)}` : "$0.00"}
+              {repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}
             </span>
           </div>
           
@@ -242,9 +257,9 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
                   const totalOwed = BigInt(loan?.totalAmountOwed || 0);
                   const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
                   const remaining = totalOwed - repayAmountWei;
-                  return `$${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))}`;
+                  return `${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))} USDST`;
                 } catch {
-                  return `$${formatCurrency(formatUnits(loan?.totalAmountOwed || 0, 18))}`;
+                  return `${formatCurrency(formatUnits(loan?.totalAmountOwed || 0, 18))} USDST`;
                 }
               })()}
             </span>
@@ -259,7 +274,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
           </div>
           {/* Fee validation warnings */}
           {(() => {
-            const feeAmount = parseUnits(REPAY_FEE, 18);
+            const feeAmount = safeParseUnits(REPAY_FEE, 18);
             const usdstBalanceBigInt = BigInt(usdstBalance || "0");
             
             // Check if insufficient USDST for fee
@@ -298,11 +313,11 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             disabled={
               repayLoading ||
               !repayAmount ||
-              (() => { try { return parseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
-              (() => { try { return parseUnits(repayAmount || "0", 18) > BigInt(loan?.totalAmountOwed || 0); } catch { return true; } })() ||
+              (() => { try { return safeParseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
+              (() => { try { return safeParseUnits(repayAmount || "0", 18) > BigInt(loan?.totalAmountOwed || 0); } catch { return true; } })() ||
               (() => {
-                const repayAmountWei = parseUnits(repayAmount || "0", 18);
-                const totalNeeded = repayAmountWei + parseUnits(REPAY_FEE, 18);
+                const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                const totalNeeded = repayAmountWei + safeParseUnits(REPAY_FEE, 18);
                 return BigInt(usdstBalance || "0") < totalNeeded;
               })()
             }
@@ -311,7 +326,7 @@ const RepayModal = ({ isOpen, onClose, loan, onRepaySuccess, usdstBalance = "0" 
             {repayLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
             ) : (
-              `Repay ${repayAmount ? `$${formatCurrency(repayAmount)}` : "$0.00"}`
+              `Repay ${repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}`
             )}
           </Button>
         </div>

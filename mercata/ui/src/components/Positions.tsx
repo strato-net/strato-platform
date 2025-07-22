@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
+import { formatBalance } from "@/utils/numberUtils";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -9,6 +12,21 @@ interface BorrowingSectionProps {
   handleBorrow: () => void;
   handleRepay: () => void;
 }
+
+// Reusable InfoTooltip component
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div className="inline-flex items-center gap-1 cursor-help">
+        {children}
+        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </div>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-xs">
+      <p>{content}</p>
+    </TooltipContent>
+  </Tooltip>
+);
 
 const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay }: BorrowingSectionProps) => {
 
@@ -21,11 +39,6 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
 
   return `rgb(${red}, ${green}, 0)`;
 }
-
-  // Use the available borrowing power from loanData (which is calculated correctly in backend)
-  const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
-    ? parseFloat(formatUnits(loanData.maxAvailableToBorrowUSD, 18))
-    : 0;
   
   return (
     <Card className="border border-gray-100 shadow-sm">
@@ -34,12 +47,26 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
           <CardTitle className="text-2xl font-bold">Your Position</CardTitle>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleBorrow} className="flex items-center gap-2">
-            Borrow
-          </Button>
-          <Button onClick={handleRepay} className="flex items-center gap-2">
-            Repay
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={handleBorrow} className="flex items-center gap-2">
+                Borrow
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Borrow USDST against your supplied collateral. You'll need to supply tokens first to enable borrowing.</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={handleRepay} className="flex items-center gap-2">
+                Repay
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Repay your borrowed USDST to reduce debt and improve your position's health factor.</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </CardHeader>
       <CardContent>
@@ -51,16 +78,13 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
               <div className="flex flex-col">
                 <span className="text-gray-600">Total Borrowed</span>
                 <span className="font-semibold">
-                  {loanData?.totalAmountOwed != null
-                    ? `${parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })} USDST`
-                    : "0 USDST"}
+                  {formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Health Factor</span>
+                <InfoTooltip content="Measures your position's safety. Higher is better. Below 1.0 means risk of liquidation. No loan means you have no outstanding debt.">
+                  <span className="text-gray-600">Health Factor</span>
+                </InfoTooltip>
                 <span className="font-semibold text-green-500" style={{ color: getTextColor((loanData?.healthFactor)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
@@ -77,25 +101,25 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Available Borrowing Power</span>
+                <InfoTooltip content="You need to supply tokens as collateral before you can borrow. Click 'Supply' in the Eligible Collateral table below to get started.">
+                  <span className="text-gray-600">Available Borrowing Power</span>
+                </InfoTooltip>
                 <span className="font-semibold">
-                  {availableBorrowingPower.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
+                  {formatBalance(loanData?.maxAvailableToBorrowUSD || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Interest Owed</span>
+                <InfoTooltip content="Accumulated interest on your borrowed amount. This increases over time and should be repaid along with your principal.">
+                  <span className="text-gray-600">Interest Owed</span>
+                </InfoTooltip>
                 <span className="font-semibold">
-                  {parseFloat(formatUnits(loanData?.accruedInterest || 0, 18)).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
+                  {formatBalance(loanData?.accruedInterest || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Interest Rate</span>
+                <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
+                  <span className="text-gray-600">Interest Rate</span>
+                </InfoTooltip>
                 <span className="font-semibold">{loanData?.interestRate || 0}%</span>
               </div>
             </div>

@@ -7,6 +7,7 @@ import DepositModal from "./DepositModal";
 import DepositOptionsModal from "./DepositOptionsModal";
 import { Token } from "../../interface";
 import { formatUnits } from "ethers";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 
 interface AssetsProps {
   loading: boolean;
@@ -25,7 +26,6 @@ const AssetsList = ({
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
-  const [showAllEarningAssets, setShowAllEarningAssets] = useState(false);
 
   const handleOptionSelect = (option: "credit-card" | "bridge") => {
     setIsOptionsModalOpen(false);
@@ -58,20 +58,6 @@ const AssetsList = ({
       <div>
         <div className="p-4 text-right border-t border-gray-100 flex justify-between">
           <span className="font-bold">Earning Assets</span>
-          <Button
-            size="sm"
-            className="hidden sm:flex items-center gap-1"
-            onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
-          >
-            <div className="flex gap-1 justify-center items-center">
-              <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
-              {showAllEarningAssets ? (
-                <ArrowUp size={20} />
-              ) : (
-                <ArrowDown size={20} />
-              )}
-            </div>
-          </Button>
         </div>
         <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table style={{ minWidth: '700px', width: '100%' }}>
@@ -87,13 +73,13 @@ const AssetsList = ({
                   Change
                 </th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
-                  Holdings
+                  Balance
+                </th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
+                  Collateral Balance
                 </th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
                   Value
-                </th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4 min-w-[100px]">
-                  Collateral
                 </th>
               </tr>
             </thead>
@@ -110,7 +96,7 @@ const AssetsList = ({
                   </td>
                 </tr>
               ) : tokens.length > 0 ? (
-                (showAllEarningAssets ? tokens : tokens.slice(0, 4)).map(
+                tokens.map(
                   (asset, index) => (
                     <tr
                       key={index}
@@ -118,6 +104,20 @@ const AssetsList = ({
                     >
                       <td className="py-4 px-4">
                         <div className="flex items-center">
+                          {asset?.token?.images?.[0] ? (
+                            <img
+                              src={asset.token.images[0].value}
+                              alt={asset.token._name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                              style={{ backgroundColor: "red" }}
+                            >
+                              {asset?.token?._symbol?.slice(0, 2) || "??"}
+                            </div>
+                          )}
                           <div className="ml-3 min-w-0 flex-1">
                             <TooltipProvider>
                               <Tooltip>
@@ -153,26 +153,21 @@ const AssetsList = ({
                         <p className="font-medium text-gray-900">
                           {!asset?.["price"]
                             ? "-"
-                            : `$${parseFloat(
-                                formatUnits(BigInt(asset.price), 18)
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`}
+                            : formatBalance(asset.price, undefined, 18, 2,2, true)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <div
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             asset?.["change"] >= 0
-                              ? "bg-green-50 text-green-600"
-                              : "bg-red-50 text-red-600"
-                          }`}
+                            ? "bg-green-50 text-green-600"
+                            : "bg-red-50 text-red-600"
+                            }`}
                         >
                           {asset?.["change"] !== undefined
                             ? `${asset?.["change"] >= 0 ? "+" : ""}${
-                                asset?.["change"]
-                              }%`
+                              asset?.["change"]
+                            }%`
                             : "-"}
                         </div>
                       </td>
@@ -180,41 +175,21 @@ const AssetsList = ({
                         <p className="font-medium text-gray-900">
                           {!asset?.balance
                             ? "-"
-                            : parseFloat(
-                                formatUnits(BigInt(asset.balance), 18)
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 4,
-                              })}
-                        </p>
-                      </td>
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-gray-900">
-                          {!asset?.["price"] || !asset?.balance
-                            ? "-"
-                            : `$${(
-                                parseFloat(
-                                  formatUnits(BigInt(asset.price), 18)
-                                ) *
-                                parseFloat(
-                                  formatUnits(BigInt(asset.balance), 18)
-                                )
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`}
+                            : formatBalance(asset.balance, undefined, 18,1, 4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
                           {!asset?.collateralBalance
                             ? "-"
-                            : parseFloat(
-                                formatUnits(BigInt(asset.collateralBalance), 18)
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 4,
-                              })}
+                            : formatBalance(asset.collateralBalance, undefined, 18,1,4)}
+                        </p>
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-gray-900">
+                          {!asset?.["price"] || (!asset?.balance && !asset?.collateralBalance)
+                            ? "-"
+                            : formatBalance(safeParseUnits((parseFloat(formatUnits(BigInt(asset.price), 18)) * (parseFloat(formatUnits(BigInt(asset.balance || 0), 18)) + parseFloat(formatUnits(BigInt(asset.collateralBalance || 0), 18)))).toString(), 18), undefined, 18, 2, 2, true)}
                         </p>
                       </td>
                     </tr>
@@ -235,30 +210,12 @@ const AssetsList = ({
             </tbody>
           </table>
         </div>
-        
-        {/* Mobile View All button - shown at bottom */}
-        <div className="sm:hidden p-4 border-t border-gray-100">
-          <Button
-            size="sm"
-            className="w-full flex items-center justify-center gap-1"
-            onClick={() => setShowAllEarningAssets(!showAllEarningAssets)}
-          >
-            <div className="flex gap-1 justify-center items-center">
-              <span>{showAllEarningAssets ? "Show Less" : "View All"}</span>
-              {showAllEarningAssets ? (
-                <ArrowUp size={20} />
-              ) : (
-                <ArrowDown size={20} />
-              )}
-            </div>
-          </Button>
-        </div>
       </div>
 
       {isDashboard && (
         <div>
           <div className="p-4 text-right border-t border-gray-100 flex justify-between">
-            <span className="font-bold">Non earning Assets</span>
+            <span className="font-bold">Non-earning Assets</span>
             <div className="flex gap-4">
               <Button
                 size="sm"
@@ -289,7 +246,7 @@ const AssetsList = ({
                       Asset
                     </th>
                     <th className="w-[50%] text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Holdings
+                      Balance
                     </th>
                   </tr>
                 </thead>
@@ -313,6 +270,20 @@ const AssetsList = ({
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center">
+                            {asset?.token?.images?.[0] ? (
+                              <img
+                                src={asset.token.images[0].value}
+                                alt={asset.token._name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {asset?.token?._symbol?.slice(0, 2) || "??"}
+                              </div>
+                            )}
                             <div className="ml-3 min-w-0 flex-1">
                               <TooltipProvider>
                                 <Tooltip>
@@ -348,12 +319,7 @@ const AssetsList = ({
                           <p className="font-medium text-gray-900">
                             {!asset?.balance
                               ? "-"
-                              : parseFloat(
-                                  formatUnits(BigInt(asset.balance), 18)
-                                ).toLocaleString(undefined, {
-                                  minimumFractionDigits: 1,
-                                  maximumFractionDigits: 4,
-                                })}
+                              : formatBalance(asset.balance, undefined, 18,1,4)}
                           </p>
                         </td>
                       </tr>

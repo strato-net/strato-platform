@@ -1,45 +1,68 @@
-import {
-  takeEvery,
-  put,
-  call
-} from 'redux-saga/effects';
+import { takeEvery, put, call } from "redux-saga/effects";
 import {
   FETCH_CONTRACTS,
   fetchContractsSuccess,
-  fetchContractsFailure
-} from './contracts.actions';
-import { env } from '../../env';
-import { handleErrors } from '../../lib/handleErrors';
+  fetchContractsFailure,
+} from "./contracts.actions";
+import { env } from "../../env";
+import { handleErrors } from "../../lib/handleErrors";
+
+import { 
+  selectContractInstance,
+  fetchState,
+  fetchAccount,
+  fetchContractInfoRequest
+} from './components/ContractCard/contractCard.actions';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-export function getContracts(chainid, limit, offset, name) {
-  const url = `${contractsUrl}?limit=${limit}&offset=${offset}${chainid ? `&chainid=${chainid}` : ''}${name ? `&name=${name}` : ''}`
+function isValidContractAddress(address) {
+  const regex = /\b[a-fA-F0-9]{40}\b/;
+  return regex.test(address);
+}
 
-  return fetch(
-    url,
-    {
-      method: 'GET',
-      credentials: "include",
-      headers: {
-        'Accept': 'application/json'
-      },
-    })
-    .then(handleErrors)
-    .then(function (response) {
-      return response.json()
-    })
-    .catch(function (error) {
-      throw error;
-    });
+async function fetchJson(url) {
+  const res = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function getContracts(chainid, limit, offset, searchTerm) {
+  const params = new URLSearchParams({ limit, offset });
+
+  if (chainid) params.set("chainid", chainid);
+
+  // if (searchTerm && isValidContractAddress(searchTerm)) {
+  //   const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
+  //   const { _contractName } = await fetchJson(detailUrl);
+    
+  //   if (_contractName) params.set("name", searchTerm);
+
+  //   const listUrl = `${contractsUrl}?${params}`;
+  //   return fetchJson(listUrl);
+  // }
+
+  if (searchTerm) params.set("name", searchTerm);
+
+  const listUrl = `${contractsUrl}?${params}`;
+  return fetchJson(listUrl);
 }
 
 export function* fetchContracts(action) {
   try {
-    let response = yield call(getContracts, action.chainId, action.limit, action.offset, action.name);
+    let response = yield call(
+      getContracts,
+      action.chainId,
+      action.limit,
+      action.offset,
+      action.name
+    );
     yield put(fetchContractsSuccess(response));
-  }
-  catch (err) {
+  } catch (err) {
     yield put(fetchContractsFailure(err));
   }
 }

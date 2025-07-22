@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formatUnits, parseUnits } from "ethers";
+import { formatUnits } from "ethers";
 import { BORROW_FEE } from "@/lib/contants";
 import { NewLoanData } from "@/interface";
 import PercentageButtons from "@/components/ui/PercentageButtons";
@@ -167,7 +167,7 @@ const BorrowAssetModal = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Borrow Amount (USDST)</label>
             <div className="flex justify-between items-center text-xs text-gray-500">
-              <span>Min: $0.01</span>
+              <span>Min: 0.01 USDST</span>
               <div>
                 <button
                   type="button"
@@ -179,7 +179,7 @@ const BorrowAssetModal = ({
                 >
                   Max :
                 </button>
-                <span>${availableToBorrowFormatted}</span>
+                <span>{availableToBorrowFormatted} USDST</span>
               </div>
             </div>
             <div className="relative">
@@ -189,7 +189,7 @@ const BorrowAssetModal = ({
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
             </div>
             <PercentageButtons
               value={borrowAmount}
@@ -239,7 +239,7 @@ const BorrowAssetModal = ({
             </div>
             {/* Fee validation warnings */}
             {(() => {
-              const feeAmount = parseUnits(BORROW_FEE, 18);
+              const feeAmount = safeParseUnits(BORROW_FEE, 18);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
               // Check if insufficient USDST for fee
@@ -261,7 +261,7 @@ const BorrowAssetModal = ({
             <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
               <p className="text-gray-600">
                 Borrowing against your assets allows you to access liquidity
-                without selling your holdings. Be mindful of the risk level, as
+                without selling your balances. Be mindful of the risk level, as
                 high borrowing increases liquidation risk during market
                 volatility.
               </p>
@@ -283,7 +283,7 @@ const BorrowAssetModal = ({
               borrowLoading ||
               safeParseUnits(borrowAmount || "0", 18) > BigInt(loan?.maxAvailableToBorrowUSD || 0) ||
               (() => {
-                const feeAmount = parseUnits(BORROW_FEE, 18);
+                const feeAmount = safeParseUnits(BORROW_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
                 return usdstBalanceBigInt < feeAmount;
               })()

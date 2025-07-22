@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatUnits, parseUnits } from "ethers";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
@@ -19,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
@@ -31,21 +33,28 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const formatTokenAmount = (value: string) =>
-  parseFloat(formatUnits(value || 0, 18)).toLocaleString("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  });
+// Reusable InfoTooltip component
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div className="inline-flex items-center gap-1 cursor-help">
+        {children}
+        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </div>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-xs">
+      <p>{content}</p>
+    </TooltipContent>
+  </Tooltip>
+);
 
-
-const BorrowNew = () => {
+const Borrow = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [showRepayModal, setShowRepayModal] = useState(false)
-  const [wrongAmount, setWrongAmount] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState([])
   const [suppliedCollateral, setSuppliedCollateral] = useState([])
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
@@ -113,7 +122,7 @@ const BorrowNew = () => {
   const executeBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
-      await borrowAssetFn({ amount: parseUnits(amount, 18).toString() });
+      await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
       toast({
         title: "Borrow Initiated",
         description: `You borrowed ${amount} USDST`,
@@ -159,7 +168,7 @@ const BorrowNew = () => {
       setSupplyLoading(true);
       await supplyCollateral({
         asset: asset.address,
-        amount: parseUnits(amount, 18).toString(),
+        amount: safeParseUnits(amount, 18).toString(),
       });
       toast({
         title: "Supply Initiated",
@@ -195,7 +204,7 @@ const BorrowNew = () => {
       setWithdrawLoading(true);
       await withdrawCollateral({
         asset: asset.address,
-        amount: parseUnits(amount, 18).toString(),
+        amount: safeParseUnits(amount, 18).toString(),
       });
       toast({
         title: "Withdraw Initiated",
@@ -234,7 +243,11 @@ const BorrowNew = () => {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Eligible Collateral</CardTitle>
+              <CardTitle>
+                <InfoTooltip content="Tokens in your wallet that you can supply as collateral. Supply these tokens to enable borrowing USDST.">
+                  Eligible Collateral
+                </InfoTooltip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -243,8 +256,16 @@ const BorrowNew = () => {
                     <TableHead>Asset</TableHead>
                     <TableHead>Wallet Balance</TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>LTV</TableHead>
-                    <TableHead>Liquidation Threshold</TableHead>
+                    <TableHead>
+                      <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
+                        LTV
+                      </InfoTooltip>
+                    </TableHead>
+                    <TableHead>
+                      <InfoTooltip content="If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
+                        Liquidation Threshold
+                      </InfoTooltip>
+                    </TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -260,34 +281,49 @@ const BorrowNew = () => {
                       <TableRow key={asset?.address}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
-                              style={{ backgroundColor: "red" }}
-                            >
-                              {asset?._symbol.slice(0, 2)}
-                            </div>
+                            {asset?.images?.[0] ? (
+                              <img
+                                src={asset.images[0].value}
+                                alt={asset._name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {asset?._symbol.slice(0, 2)}
+                              </div>
+                            )}
                             <div>
                               <div className="font-medium">{asset?._name}</div>
                               <div className="text-xs text-gray-500">{asset?._symbol}</div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatUnits(asset?.userBalance,18)}</TableCell>
+                        <TableCell>{formatBalance(asset?.userBalance || 0n, undefined, 18, 2)}</TableCell>
                         <TableCell>
-                          ${formatTokenAmount(asset?.userBalanceValue)}
+                          ${formatBalance(asset?.userBalanceValue, undefined, 18, 1, 2)}
                         </TableCell>
                         <TableCell>
                           {asset?.ltv ? asset?.ltv/100 : 0}%
                         </TableCell>
                         <TableCell>{asset?.liquidationThreshold ? asset?.liquidationThreshold/100 : 0}%</TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSupply(asset)}
-                            className="flex items-center gap-1"
-                          >
-                            Supply
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSupply(asset)}
+                                className="flex items-center gap-1"
+                              >
+                                Supply
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later.</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
@@ -307,17 +343,33 @@ const BorrowNew = () => {
 
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Supplied Collateral</CardTitle>
+              <CardTitle>
+                <InfoTooltip content="Tokens you've supplied as collateral for your loans. These determine your borrowing power and can be withdrawn when you no longer need them.">
+                  Supplied Collateral
+                </InfoTooltip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Asset</TableHead>
-                    <TableHead>Supplied Balance</TableHead>
+                    <TableHead>
+                      <InfoTooltip content="Amount of tokens currently used as collateral for your loans. This determines your borrowing power.">
+                        Supplied Balance
+                      </InfoTooltip>
+                    </TableHead>
                     <TableHead>USD Value</TableHead>
-                    <TableHead>LTV</TableHead>
-                    <TableHead>Liquidation Threshold</TableHead>
+                    <TableHead>
+                      <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
+                        LTV
+                      </InfoTooltip>
+                    </TableHead>
+                    <TableHead>
+                      <InfoTooltip content="If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
+                        Liquidation Threshold
+                      </InfoTooltip>
+                    </TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -333,21 +385,29 @@ const BorrowNew = () => {
                       <TableRow key={loanIndex}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
-                              style={{ backgroundColor: "red" }}
-                            >
-                              {loan?._symbol?.slice(0, 2)}
-                            </div>
+                            {loan?.images?.[0] ? (
+                              <img
+                                src={loan.images[0].value}
+                                alt={loan._name || loan._symbol}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {loan?._symbol?.slice(0, 2)}
+                              </div>
+                            )}
                             <div>
                               <div className="font-medium">{loan?._name || loan?._symbol}</div>
                               <div className="text-xs text-gray-500">{loan?._symbol}</div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatUnits(loan?.collateralizedAmount, 18)}</TableCell>
+                        <TableCell>{formatBalance(loan?.collateralizedAmount || 0n, undefined, 18, 2)}</TableCell>
                         <TableCell>
-                          ${formatTokenAmount(loan?.collateralizedAmountValue || 0)}
+                          {formatBalance(loan?.collateralizedAmountValue, undefined, 18, 1, 2,true)}
                         </TableCell>
                         <TableCell>
                           {loan?.ltv ? loan?.ltv/100 : 0}%
@@ -356,11 +416,18 @@ const BorrowNew = () => {
                           {loan?.liquidationThreshold ? loan?.liquidationThreshold/100 : 0}%
                         </TableCell>
                         <TableCell>
-                          <Button
-                            onClick={() => {handleWithdraw(loan)}}
-                          >
-                            Withdraw
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={() => {handleWithdraw(loan)}}
+                              >
+                                Withdraw
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Remove collateral from your position. This reduces your borrowing power and may affect your loan if you have outstanding debt.</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
@@ -432,4 +499,4 @@ const BorrowNew = () => {
   );
 };
 
-export default BorrowNew;
+export default Borrow;

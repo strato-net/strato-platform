@@ -33,7 +33,13 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
     : 0;
 
   // Calculate LTV ratio for risk assessment
-  const ltvRatio = availableBorrowingPower > 0 ? currentBorrowed / availableBorrowingPower : 0;
+  let ltvRatio = availableBorrowingPower > 0 ? currentBorrowed / availableBorrowingPower : 0;
+  if(availableBorrowingPower === 0 && currentBorrowed > 0){
+    ltvRatio = 1;
+  }else if(availableBorrowingPower === 0 && currentBorrowed === 0){
+    ltvRatio = 0;
+  }
+
   const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%
 
   // Risk level mapping
@@ -73,7 +79,7 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
             {/* Bar graph now appears first */}
             <div className="mb-2">
               {/* Dynamic risk bar */}
-              <div className="w-full bg-gray-200 rounded-full h-2 relative mb-3">
+              <div className="w-[97%] bg-gray-200 rounded-full h-2 relative mb-3">
                 <div className="h-2 rounded-full" style={{ width: `${riskPercentage}%`, backgroundColor: riskColor,}}></div>
 
                 {/* Collateral Value Marker */}
