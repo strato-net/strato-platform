@@ -4,7 +4,7 @@ import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Wallet } from 'lucide-react';
+import { ChevronLeft, Wallet, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { Token, PriceHistoryEntry } from '@/interface';
@@ -61,6 +61,7 @@ const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> =>
 };
 
 const AssetDetail = () => {
+
   const { id } = useParams<{ id: string }>();
   const [asset, setAsset] = useState<Token | null>(null);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
@@ -70,51 +71,44 @@ const AssetDetail = () => {
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
+  const PRICE_WINDOW = 30; // Number of days to show in the price chart
+  const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
+    if (!currentPrice || priceData.length === 0) return "#ef4444"; // default red
+    
+    const current = parseFloat(formatUnits(currentPrice.toString(), 18));
+    const first = parseFloat(priceData[0].price);
+    return current > first ? "#2563eb" : "#ef4444"; // BlockApps blue if up, red if down
+  };
   
   useEffect(() => {
     fetchTokens()
   }, [userAddress])
 
   useEffect(() => {
-    // Find the asset with the matching id
-    const foundAsset = assets.find(a => a?.address === id);
-    const foundInActiveAsset = inactiveTokens.find(a => a?.address === id)
-    const foundInAllActiveTokens = allActiveTokens.find(a => a?.address === id)
-    if (foundAsset) {
+    // Helper function to handle asset setup and price fetching
+    const setupAsset = (foundAsset: Token) => {
       setAsset(foundAsset);
-      document.title = `${foundAsset?.token?._name} | Asset Details`;
+      document.title = `${foundAsset?.token?._name || foundAsset?._name} | Asset Details`;
 
-      // Fetch real price history
+      // Fetch price history if address exists
       if (foundAsset?.address) {
         setPriceDataLoading(true);
         fetchPriceHistory(foundAsset.address)
-          .then(setPriceData)
+          .then(data => setPriceData(data.slice(-(PRICE_WINDOW * 24)))) // Show last N days (24 hours each)
           .finally(() => setPriceDataLoading(false));
       }
-    } else if (foundInActiveAsset){
-      setAsset(foundInActiveAsset);
-      document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
+    };
 
-      // Fetch real price history
-      if (foundInActiveAsset?.address) {
-        setPriceDataLoading(true);
-        fetchPriceHistory(foundInActiveAsset.address)
-          .then(setPriceData)
-          .finally(() => setPriceDataLoading(false));
-      }
-    } else if (foundInAllActiveTokens){
-      setAsset(foundInAllActiveTokens);
-      document.title = `${foundInAllActiveTokens?.token?._name} | Asset Details`;
+    // Find asset across all token sources
+    const foundAsset = 
+      assets.find(a => a?.address === id) ||
+      inactiveTokens.find(a => a?.address === id) ||
+      allActiveTokens.find(a => a?.address === id);
 
-      // Fetch real price history
-      if (foundInAllActiveTokens?.address) {
-        setPriceDataLoading(true);
-        fetchPriceHistory(foundInAllActiveTokens.address)
-          .then(setPriceData)
-          .finally(() => setPriceDataLoading(false));
-      }
+    if (foundAsset) {
+      setupAsset(foundAsset);
     }
-  }, [id, assets]);  
+  }, [id, assets, inactiveTokens, allActiveTokens]);  
 
   if (!asset) {
     return (
@@ -209,9 +203,27 @@ const AssetDetail = () => {
                       onMouseLeave={() => setShowPriceTooltip(false)}
                     >
                       <span className="text-gray-500">Current Price:</span>
-                      <span className="font-medium">
-                        ${roundToDecimals(addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)), 2)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                          ${roundToDecimals(addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)), 2)}
+                        </span>
+                        
+                        {/* Price trend indicator */}
+                        {priceData.length > 0 && asset?.price && (() => {
+                          const isUp = getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData) === "#2563eb";
+                          const firstPrice = parseFloat(priceData[0].price);
+                          
+                          return (
+                            <div title={isUp ? `Up from initial: $${firstPrice.toFixed(2)}` : `Down from initial: $${firstPrice.toFixed(2)}`}>
+                              {isUp ? (
+                                <ArrowUp size={14} className="text-blue-600" />
+                              ) : (
+                                <ArrowDown size={14} className="text-red-500" />
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                       
                       {/* Price timestamp tooltip */}
                       {showPriceTooltip && priceData.length > 0 && (
@@ -327,36 +339,40 @@ const AssetDetail = () => {
                       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
                       <p className="text-gray-500 ml-3">Loading price history...</p>
                     </div>
-                  ) : priceData.length > 0 ? (
-                    <div className="w-full aspect-[21/9]">
-                      <ChartContainer
-                        config={{
-                          price: {
-                            theme: {
-                              light: asset?.color || "#EF4444",
-                              dark: asset?.color || "#EF4466",
+                  ) : priceData.length > 0 ? (() => {
+                    // Determine chart color based on price trend
+                    const chartColor = getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData);
+                    
+                    return (
+                      <div className="w-full aspect-[21/9]">
+                        <ChartContainer
+                          config={{
+                            price: {
+                              theme: {
+                                light: chartColor,
+                                dark: chartColor,
+                              }
+                            },
+                            tooltip: {
+                              theme: {
+                                light: "gray",
+                                dark: "gray"
+                              }
                             }
-                          },
-                          tooltip: {
-                            theme: {
-                              light: "gray",
-                              dark: "gray"
-                            }
-                          }
-                        }}
-                        className="w-full h-full"
-                      >
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={priceData}
-                            margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
-                          >
-                            <defs>
-                              <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={asset.color} stopOpacity={0.8} />
-                                <stop offset="95%" stopColor={asset.color} stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
+                          }}
+                          className="w-full h-full"
+                        >
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                              data={priceData}
+                              margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.8} />
+                                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
                             <XAxis
                               dataKey="date"
                               axisLine={false}
@@ -387,7 +403,7 @@ const AssetDetail = () => {
                               type="monotone"
                               dataKey="price"
                               name="Price"
-                              stroke={asset?.color || "#EF4444"}
+                              stroke={chartColor}
                               fillOpacity={1}
                               fill="url(#colorPrice)"
                               activeDot={{ r: 8 }}
@@ -396,7 +412,8 @@ const AssetDetail = () => {
                         </ResponsiveContainer>
                       </ChartContainer>
                     </div>
-                  ) : (
+                    );
+                  })() : (
                     <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
                       <p className="text-gray-500">No price history available for this asset</p>
                     </div>
