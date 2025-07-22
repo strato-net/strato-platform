@@ -179,8 +179,8 @@ const UsdstBalanceBox: React.FC = () => {
               <div className="text-xs">
                 <p className="font-medium">
                   {isCriticalBalance
-                    ? "Critical: Purchase more USDST"
-                    : "Warning: Running low on USDST"}
+                    ? "Critical: Low gas funds - add USDST to continue transacting"
+                    : "Warning: Low gas funds - add USDST to continue transacting"}
                 </p>
                 <Link
                   to="/dashboard/deposits"
