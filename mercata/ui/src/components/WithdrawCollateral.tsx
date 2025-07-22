@@ -50,20 +50,20 @@ const getMaxSafeWithdrawAmount = (
   const assetPrice = BigInt(asset?.assetPrice || "0");
   const liquidationThreshold = BigInt(asset?.liquidationThreshold || "0");
   const userCollateralAmount = BigInt(asset?.collateralizedAmount || "0");
+  const healthFactor = loanData?.healthFactor
 
-  if (totalBorrow === 0n || assetPrice === 0n || liquidationThreshold === 0n) {
-    return userCollateralAmount;
+  if (healthFactor <= 1 || totalBorrow === 0n || liquidationThreshold === 0n || assetPrice === 0n) {
+    return 0n;
   }
+  const healthFactorMinus1 = safeParseUnits((healthFactor - 1).toString(), 18); // bigint
 
-  const maxAllowedValue = (totalBorrow * 10n ** 18n * 10000n) / liquidationThreshold;
-  // Max collateral that must remain to keep health factor >= 1
-  const minRequiredCollateral = maxAllowedValue / assetPrice;
+  const numerator = healthFactorMinus1 * totalBorrow; // Numerator: (HF - 1) * TotalBorrowed
 
-  // So max the user can safely withdraw is:
-  const safeWithdraw = userCollateralAmount > minRequiredCollateral
-    ? userCollateralAmount - minRequiredCollateral : 0n;
+  const denominator = liquidationThreshold * 10n ** 18n; // Denominator: liquidationThreshold (scaled by 1e4 * 1e18 = 1e22)
 
-  return safeWithdraw;
+  const withdrawable = numerator / denominator;
+  // Return the smaller of withdrawable and actual collateral
+  return withdrawable < userCollateralAmount ? withdrawable : userCollateralAmount;
 };
 
 // Calculate health impact of withdrawal
