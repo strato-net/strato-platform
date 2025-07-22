@@ -46,27 +46,37 @@ const getMaxSafeWithdrawAmount = (
   asset: CollateralData,
   loanData: NewLoanData
 ): bigint => {
-  const totalBorrow = BigInt(loanData?.totalAmountOwed || "0");
-  const assetPrice = BigInt(asset?.assetPrice || "0");
-  const liquidationThreshold = BigInt(asset?.liquidationThreshold || "0");
-  const userCollateralAmount = BigInt(asset?.collateralizedAmount || "0");
-  const healthFactor = loanData?.healthFactor
+  // --- pull raw numbers ------------------------------------------------------
+  const ltvBP           = BigInt(asset?.ltv ?? "0");                    // asset LTV (basis-points)
+  const priceAssetUSD   = BigInt(asset?.assetPrice ?? "0");             // 1e18-scaled USD
+  const userCollatAmt   = BigInt(asset?.collateralizedAmount ?? "0");   // asset units (18 dec)
+  // Calculate total collateral USD dynamically from asset amount and price
+  const totalCollatUSD = (userCollatAmt * priceAssetUSD) / (10n ** 18n);
+  const totalBorrowUSD  = BigInt(loanData?.totalAmountOwed ?? "0");         // 1e18-scaled USD
 
-  if (healthFactor <= 1 || totalBorrow === 0n || liquidationThreshold === 0n || assetPrice === 0n) {
-    return 0n;
-  }
-  const healthFactorMinus1 = safeParseUnits((healthFactor - 1).toString(), 18); // bigint
+  // --- guardrails ------------------------------------------------------------
+  if (
+    ltvBP === 0n || priceAssetUSD === 0n ||
+    totalCollatUSD === 0n || totalBorrowUSD === 0n
+  ) return 0n;
 
-  const numerator = healthFactorMinus1 * totalBorrow; // Numerator: (HF - 1) * TotalBorrowed
+  // Needed collateral (USD) to remain right at LTV:
+  //   neededCollatUSD = borrow / (ltv/10000)
+  const neededCollatUSD = (totalBorrowUSD * 10000n) / ltvBP;
 
-  const denominator = liquidationThreshold * 10n ** 18n; // Denominator: liquidationThreshold (scaled by 1e4 * 1e18 = 1e22)
+  // If we’re already at or below LTV, nothing withdrawable
+  if (totalCollatUSD <= neededCollatUSD) return 0n;
 
-  const withdrawable = numerator / denominator;
-  // Return the smaller of withdrawable and actual collateral
-  return withdrawable < userCollateralAmount ? withdrawable : userCollateralAmount;
+  const excessCollatUSD = totalCollatUSD - neededCollatUSD;
+
+  // Convert USD → asset units:  withdrawAmt = excess * 1e18 / price
+  const withdrawAmtAsset = (excessCollatUSD * 10n ** 18n) / priceAssetUSD;
+
+  // Never let user withdraw more than they actually have
+  return withdrawAmtAsset < userCollatAmt ? withdrawAmtAsset : userCollatAmt;
 };
 
-// Calculate health impact of withdrawal
+// Calculate health impact of withdrawal using BigInt and healthFactorRaw
 const calculateHealthImpact = (
   withdrawAmount: number,
   asset: CollateralData,
@@ -83,7 +93,7 @@ const calculateHealthImpact = (
 
   // Current values from backend
   const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
-  const currentHealthFactor = loanData?.healthFactor || 0;
+  const currentHealthFactorRaw = BigInt(loanData?.healthFactorRaw || 0n);
   const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
 
   // If there's no outstanding loan, withdrawal is always healthy
@@ -110,15 +120,19 @@ const calculateHealthImpact = (
   // Subtract from current collateral value
   const newCollateralValue = currentCollateralValue - withdrawnValueWithThreshold;
 
-  // Calculate new health factor
-  const newHealthFactor = Number(newCollateralValue) / Number(currentTotalBorrowValue);
+  // Calculate new health factor (raw, scaled to 1e18)
+  const newHealthFactorRaw =
+    currentTotalBorrowValue === 0n
+      ? 0n
+      : (newCollateralValue * 10n ** 18n) / currentTotalBorrowValue;
 
-  const healthImpact = newHealthFactor - currentHealthFactor;
-  const isHealthy = newHealthFactor >= 1.0;
+  // Calculate health impact and isHealthy using raw values
+  const healthImpact = Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
+  const isHealthy = newHealthFactorRaw >= 10n ** 18n;
 
   return {
-    currentHealthFactor,
-    newHealthFactor,
+    currentHealthFactor: Number(currentHealthFactorRaw) / 1e18,
+    newHealthFactor: Number(newHealthFactorRaw) / 1e18,
     healthImpact,
     isHealthy,
   };
@@ -203,9 +217,9 @@ const WithdrawCollateralModal = ({
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Available balance</span>
+              <span className="text-sm text-gray-500">Collateral Amount</span>
               <span className="font-medium">
-                {formatUnits(maxSafeWithdrawAmount || 0,18)}
+                {formatUnits(asset?.collateralizedAmount || 0, 18)}
               </span>
             </div>
           </div>
