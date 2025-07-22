@@ -302,7 +302,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                       : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
-                        ? formatBalance(0 || 0n, "USDST", 18, 2, 2)
+                        ? formatBalance(liquidityInfo.withdrawable.maxWithdrawableUSDST || 0n, "USDST", 18, 2, 2)
                         : "0.00"}{" "}
                     ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
                   </div>
