@@ -28,6 +28,7 @@ type LendingContextType = {
     interestRate: number; 
     reserveFactor: number; 
   }) => Promise<void>;
+  loading: boolean;
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     amount: string;
@@ -60,6 +61,7 @@ export const LendingProvider = ({
   const [loadingLiquidity, setLoadingLiquidity] = useState(true);
   const [collateralInfo, setCollateralInfo] = useState<CollateralData[]>()
   const [loadingCollateral, setLoadingCollateral] = useState(true)
+  const [loading, setLoading] = useState(false);
 
   // Access authentication status
   const { isLoggedIn } = useUser();
@@ -131,11 +133,14 @@ export const LendingProvider = ({
     interestRate: number; 
     reserveFactor: number; 
   }): Promise<void> => {
+    setLoading(true);
     try {
       await api.post("/lend/admin/configure-asset", payload);
     } catch (err: any) {
       console.error("Failed to configure asset:", err);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -252,6 +257,7 @@ export const LendingProvider = ({
       refreshLiquidity : fetchLiquidityInfo,
       setPrice,
       configureAsset,
+      loading,
       refreshLendingData,
       borrowAsset,
       repayLoan,
@@ -269,7 +275,8 @@ export const LendingProvider = ({
       loadingLoans,
       liquidityInfo,
       loadingLiquidity,
-      loadingCollateral
+      loadingCollateral,
+      loading
     ]
   );
 

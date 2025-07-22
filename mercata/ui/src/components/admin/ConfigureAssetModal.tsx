@@ -5,12 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Settings, TrendingUp, Percent, Shield, AlertTriangle } from 'lucide-react';
-import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useState } from 'react';
+
 
 interface ConfigureAssetFormValues {
   ltv: string;
@@ -46,8 +45,7 @@ const ConfigureAssetModal = ({
   onSuccess 
 }: ConfigureAssetModalProps) => {
   const { toast } = useToast();
-  const { configureAsset } = useLendingContext();
-  const [loading, setLoading] = useState(false);
+  const { configureAsset, loading } = useLendingContext();
   
   const form = useForm<ConfigureAssetFormValues>({
     defaultValues: {
@@ -92,35 +90,30 @@ const ConfigureAssetModal = ({
       return;
     }
     
-    setLoading(true);
-    try {
-      const payload = {
-        asset: token.address,
-        ltv: Math.round(parseFloat(data.ltv) * 100), // Convert to basis points
-        liquidationThreshold: Math.round(parseFloat(data.liquidationThreshold) * 100),
-        liquidationBonus: Math.round(parseFloat(data.liquidationBonus) * 100),
-        interestRate: Math.round(parseFloat(data.interestRate) * 100),
-        reserveFactor: Math.round(parseFloat(data.reserveFactor) * 100),
-      };
+    const payload = {
+      asset: token.address,
+      ltv: Math.round(parseFloat(data.ltv) * 100), // Convert to basis points
+      liquidationThreshold: Math.round(parseFloat(data.liquidationThreshold) * 100),
+      liquidationBonus: Math.round(parseFloat(data.liquidationBonus) * 100),
+      interestRate: Math.round(parseFloat(data.interestRate) * 100),
+      reserveFactor: Math.round(parseFloat(data.reserveFactor) * 100),
+    };
 
-      console.log('Configuring asset with payload:', payload);
+    console.log('Configuring asset with payload:', payload);
 
-      await configureAsset(payload);
+    await configureAsset(payload);
 
-      toast({
-        title: 'Asset Configuration Updated',
-        description: `${token.symbol} has been successfully configured with new parameters`,
-      });
+    toast({
+      title: 'Asset Configuration Updated',
+      description: `${token.symbol} has been successfully configured with new parameters`,
+    });
 
-      if (onSuccess) {
-        await onSuccess();
-      }
-
-      form.reset();
-      onOpenChange(false);
-    } finally {
-      setLoading(false);
+    if (onSuccess) {
+      await onSuccess();
     }
+
+    form.reset();
+    onOpenChange(false);
   };
 
   return (
