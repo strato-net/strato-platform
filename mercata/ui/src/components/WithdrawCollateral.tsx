@@ -42,6 +42,30 @@ const getHealthFactorColor = (healthFactor: number) => {
   return "text-red-600";
 };
 
+const getMaxSafeWithdrawAmount = (
+  asset: CollateralData,
+  loanData: NewLoanData
+): bigint => {
+  const totalBorrow = BigInt(loanData?.totalAmountOwed || "0");
+  const assetPrice = BigInt(asset?.assetPrice || "0");
+  const liquidationThreshold = BigInt(asset?.liquidationThreshold || "0");
+  const userCollateralAmount = BigInt(asset?.collateralizedAmount || "0");
+
+  if (totalBorrow === 0n || assetPrice === 0n || liquidationThreshold === 0n) {
+    return userCollateralAmount;
+  }
+
+  const maxAllowedValue = (totalBorrow * 10n ** 18n * 10000n) / liquidationThreshold;
+  // Max collateral that must remain to keep health factor >= 1
+  const minRequiredCollateral = maxAllowedValue / assetPrice;
+
+  // So max the user can safely withdraw is:
+  const safeWithdraw = userCollateralAmount > minRequiredCollateral
+    ? userCollateralAmount - minRequiredCollateral : 0n;
+
+  return safeWithdraw;
+};
+
 // Calculate health impact of withdrawal
 const calculateHealthImpact = (
   withdrawAmount: number,
@@ -117,6 +141,7 @@ const WithdrawCollateralModal = ({
     healthImpact: 0,
     isHealthy: true,
   });
+  const maxSafeWithdrawAmount = getMaxSafeWithdrawAmount(asset, loanData);
 
   // Calculate health impact when withdraw amount changes
   useEffect(() => {
@@ -149,7 +174,7 @@ const WithdrawCollateralModal = ({
   }, [isOpen]);
 
   const handlePercentageClick = (percent?: bigint) => {
-    const amount = formatUnits((BigInt(asset?.collateralizedAmount || 0) * percent) / 100n, 18);
+    const amount = formatUnits((maxSafeWithdrawAmount * percent) / 100n, 18);
     setWithdrawAmount(amount);
     setDisplayAmount(addCommasToInput(amount));
   };
@@ -180,7 +205,7 @@ const WithdrawCollateralModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Available balance</span>
               <span className="font-medium">
-                {formatUnits(asset?.collateralizedAmount || 0,18)}
+                {formatUnits(maxSafeWithdrawAmount || 0,18)}
               </span>
             </div>
           </div>
@@ -192,20 +217,21 @@ const WithdrawCollateralModal = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setWithdrawAmount(formatUnits(asset?.collateralizedAmount || 0, 18));
-                    setDisplayAmount(addCommasToInput(formatUnits(asset?.collateralizedAmount || 0, 18)));
+                    const max = formatUnits(maxSafeWithdrawAmount, 18);
+                    setWithdrawAmount(max);
+                    setDisplayAmount(addCommasToInput(max));
                   }}
                   className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
                 >
                   Max :
                 </button>
-                <span>${formatUnits(asset?.collateralizedAmount || 0, 18)}</span>
+                <span>${formatUnits(maxSafeWithdrawAmount || 0, 18)}</span>
               </div>
             </div>
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > BigInt(maxSafeWithdrawAmount || 0) ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -213,7 +239,7 @@ const WithdrawCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 10n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 10n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
@@ -221,7 +247,7 @@ const WithdrawCollateralModal = ({
                 10%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 25n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 25n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
@@ -229,7 +255,7 @@ const WithdrawCollateralModal = ({
                 25%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 50n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 50n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
@@ -237,7 +263,7 @@ const WithdrawCollateralModal = ({
                 50%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 100n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 100n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
@@ -324,7 +350,7 @@ const WithdrawCollateralModal = ({
             disabled={
               safeParseUnits(withdrawAmount || "0", 18) === 0n ||
               withdrawLoading ||
-              safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ||
+              safeParseUnits(withdrawAmount || "0", 18) > maxSafeWithdrawAmount ||
               !healthImpact.isHealthy ||
               (() => {
                 const feeAmount = safeParseUnits(WITHDRAW_COLLATERAL_FEE, 18);
