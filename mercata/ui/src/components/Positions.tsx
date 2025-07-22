@@ -82,7 +82,7 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
                 </span>
               </div>
               <div className="flex flex-col">
-                <InfoTooltip content="Measures your position's safety. Higher is better. Below 1.0 means risk of liquidation. No loan means you have no outstanding debt.">
+                <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
                   <span className="text-gray-600">Health Factor</span>
                 </InfoTooltip>
                 <span className="font-semibold text-green-500" style={{ color: getTextColor((loanData?.healthFactor)) }}>
