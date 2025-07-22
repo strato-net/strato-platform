@@ -5,6 +5,7 @@ import { HelpCircle } from "lucide-react";
 import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance } from "@/utils/numberUtils";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -13,20 +14,74 @@ interface BorrowingSectionProps {
   handleRepay: () => void;
 }
 
-// Reusable InfoTooltip component
-const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <div className="inline-flex items-center gap-1 cursor-help">
-        {children}
-        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+// Optimized InfoTooltip component using hook
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('positions-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative positions-tooltip-container">
+        <div 
+          className="inline-flex items-center gap-1 cursor-help"
+          onClick={handleToggle}
+        >
+          {children}
+          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </div>
+        {showTooltip && (
+          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
       </div>
-    </TooltipTrigger>
-    <TooltipContent className="max-w-xs">
-      <p>{content}</p>
-    </TooltipContent>
-  </Tooltip>
-);
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="inline-flex items-center gap-1 cursor-help">
+          {children}
+          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+// Optimized ButtonTooltip component using hook
+const ButtonTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('positions-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative positions-tooltip-container">
+        <div onClick={handleToggle}>
+          {children}
+        </div>
+        {showTooltip && (
+          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay }: BorrowingSectionProps) => {
 
@@ -47,26 +102,16 @@ const PositionSection = ({ userCollaterals, loanData, handleBorrow, handleRepay 
           <CardTitle className="text-2xl font-bold">Your Position</CardTitle>
         </div>
         <div className="flex gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button onClick={handleBorrow} className="flex items-center gap-2">
-                Borrow
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Borrow USDST against your supplied collateral. You'll need to supply tokens first to enable borrowing.</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button onClick={handleRepay} className="flex items-center gap-2">
-                Repay
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Repay your borrowed USDST to reduce debt and improve your position's health factor.</p>
-            </TooltipContent>
-          </Tooltip>
+          <ButtonTooltip content="Borrow USDST against your supplied collateral. You'll need to supply tokens first to enable borrowing.">
+            <Button onClick={handleBorrow} className="flex items-center gap-2">
+              Borrow
+            </Button>
+          </ButtonTooltip>
+          <ButtonTooltip content="Repay your borrowed USDST to reduce debt and improve your position's health factor.">
+            <Button onClick={handleRepay} className="flex items-center gap-2">
+              Repay
+            </Button>
+          </ButtonTooltip>
         </div>
       </CardHeader>
       <CardContent>
