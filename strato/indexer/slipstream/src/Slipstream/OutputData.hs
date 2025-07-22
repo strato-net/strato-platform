@@ -1551,6 +1551,63 @@ getArraysFromEvents evArgs = do
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
                             (map (SimpleValue . ValueString . T.pack) elements))
 
+-- | Generates an INSERT SQL statement for the global 'events' table.
+--
+-- This function creates a SQL INSERT statement that adds a single event record
+-- to the centralized 'events' table. Unlike event-specific tables that are
+-- created dynamically per contract/event type, this global table has a fixed
+-- schema and stores all events in a normalized format.
+--
+-- TODO (pawel) This function does not include the 'attributes' column yet,
+-- which will contain the event arguments in JSON format. That will be added in
+-- a future iteration.
+insertGlobalEventTableQuery :: AggregateEvent -> Text
+insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
+  let creator = T.pack $ Action.evContractCreator ev
+      application = T.pack $ Action.evContractApplication ev
+      contractName = T.pack $ Action.evContractName ev
+      address = tshow . Action.evContractAddress $ ev
+      blockHash = T.pack . keccak256ToHex . eventBlockHash $ agEv
+      blockTimestamp = tshow . eventBlockTimestamp $ agEv
+      blockNumber = tshow . eventBlockNumber $ agEv
+      transactionHash = T.pack . keccak256ToHex . eventTxHash $ agEv
+      transactionSender = tshow . eventTxSender $ agEv
+      eventIdx = tshow . eventIndex $ agEv
+
+      columns = wrapAndEscapeDouble . map escapeQuotes $
+        [ "creator"
+        , "application"
+        , "contract_name"
+        , "address"
+        , "block_hash"
+        , "block_timestamp"
+        , "block_number"
+        , "transaction_hash"
+        , "transaction_sender"
+        , "event_index"
+        ]
+
+      values = csv $ map (wrapSingleQuotes . escapeQuotes)
+        [ creator
+        , application
+        , contractName
+        , address
+        , blockHash
+        , blockTimestamp
+        , blockNumber
+        , transactionHash
+        , transactionSender
+        , eventIdx
+        ]
+
+  in T.concat
+       [ "INSERT INTO events "
+       , columns
+       , "VALUES ("
+       , values
+       , ")"
+       ]
+
 insertEventTables :: 
   OutputM m =>
   [ProcessedCollectionRow] ->
