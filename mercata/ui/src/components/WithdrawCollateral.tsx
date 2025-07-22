@@ -231,7 +231,7 @@ const WithdrawCollateralModal = ({
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > BigInt(maxSafeWithdrawAmount || 0) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > maxSafeWithdrawAmount ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -239,7 +239,7 @@ const WithdrawCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 10n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 10n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
@@ -247,7 +247,7 @@ const WithdrawCollateralModal = ({
                 10%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 25n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 25n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
@@ -255,7 +255,7 @@ const WithdrawCollateralModal = ({
                 25%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 50n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 50n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
@@ -263,7 +263,7 @@ const WithdrawCollateralModal = ({
                 50%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(maxSafeWithdrawAmount || 0) * 100n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 100n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
