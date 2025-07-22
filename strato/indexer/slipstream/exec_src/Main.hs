@@ -27,7 +27,6 @@ import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
--- import Slipstream.Processor
 
 import SelectAccessible ()
 import Slipstream.Globals

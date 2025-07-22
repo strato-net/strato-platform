@@ -1560,8 +1560,6 @@ insertEventTables processedEventArrays processedEventsWithoutArrays = do
   $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
   $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
   yieldMany . concat =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
-      
-  -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $
     yieldMany $ insertEventArrayTableQuery processedEventArrays
 
