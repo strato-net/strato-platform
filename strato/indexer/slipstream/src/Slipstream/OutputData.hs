@@ -1615,9 +1615,9 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   in T.concat
        [ "INSERT INTO events "
        , columns
-       , "VALUES ("
+       , " VALUES ("
        , values
-       , ")"
+       , ");"
        ]
 
 insertEventTables :: 
