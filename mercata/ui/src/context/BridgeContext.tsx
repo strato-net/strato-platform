@@ -149,16 +149,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const response = await api.get(`/bridge/bridgeOutTokens`);
-      
-      // Debug: Log the response structure
-      console.log('Bridge out tokens API response:', response.data);
-      console.log('Bridge out tokens path check:', {
-        'response.data.data.data.bridgeOutTokens': response.data?.data?.data?.bridgeOutTokens,
-        'response.data.data.bridgeOutTokens': response.data?.data?.bridgeOutTokens,
-        'response.data.bridgeOutTokens': response.data?.bridgeOutTokens,
-        'response.data': response.data
-      });
-      
       // Get tokens from the correct path
       let tokens = response.data.data.data.bridgeOutTokens;
       
@@ -205,7 +195,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         ? tokenAddress
         : `0x${tokenAddress}`;
       const response = await api.get(`/bridge/balance/${formattedTokenAddress}`);
-      console.log("response.data bridgeout balance", response.data.data.balance);
       return { balance: response.data.data.balance };
     } catch (err) {
       console.error("Balance API error:", err);

@@ -20,6 +20,14 @@ type LendingContextType = {
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  configureAsset: (payload: { 
+    asset: string; 
+    ltv: number; 
+    liquidationThreshold: number; 
+    liquidationBonus: number; 
+    interestRate: number; 
+    reserveFactor: number; 
+  }) => Promise<void>;
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     amount: string;
