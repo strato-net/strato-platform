@@ -5,6 +5,7 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
+import { createCompletePriceMap } from "../helpers/oracle.helper";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory } = constants;
 
@@ -28,7 +29,7 @@ export const getTokens = async (
     const [response, lendingResponse] = await Promise.all([
       cirrus.get(accessToken, "/" + Token, { params }),
       getLendingRegistry(accessToken, undefined, {
-        select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`
+        select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`
       })
     ]);
 
@@ -51,7 +52,7 @@ export const getTokens = async (
 
     // Process price data
     const rawPrices = lendingResponse.oracle?.prices || [];
-    const priceMap = new Map<string, number>(rawPrices.map((p: any) => [p.key, p.value]));
+    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
 
     return (response.data as any[]).map((token) => ({
       ...token,
@@ -119,13 +120,11 @@ export const getBalance = async (
     const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c.amount]));
 
     const lendingInfo = await getLendingRegistry(accessToken, undefined, {
-      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value))`,
+      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
     });
   
     const rawPrices = lendingInfo.oracle?.prices || [];
-    const priceMap = new Map<string, number>(
-      rawPrices.map((p: any) => [p.key, p.value])
-    );
+    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
 
     return response.data
       .map((token: any) => ({

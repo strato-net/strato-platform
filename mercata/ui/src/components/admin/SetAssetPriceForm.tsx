@@ -47,9 +47,6 @@ const SetAssetPriceForm = () => {
 
       await setPrice(payload);
 
-      console.log('Setting price with payload:', payload);
-      console.log('Selected token:', selectedToken);
-
       toast({
         title: 'Price Updated Successfully',
         description: `Price for ${selectedToken?._symbol} has been set to $${data.price}`,

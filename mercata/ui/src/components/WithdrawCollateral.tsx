@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatUnits, parseUnits } from "ethers";
-import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { formatUnits } from "ethers";
+import { WITHDRAW_COLLATERAL_FEE } from "@/lib/constants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
@@ -287,14 +287,14 @@ const WithdrawCollateralModal = ({
             </div>
             {/* Fee validation warnings */}
             {(() => {
-              const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+              const feeAmount = safeParseUnits(WITHDRAW_COLLATERAL_FEE, 18);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
               // Check if USDST balance is running low after fee
-              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const lowBalanceThreshold = safeParseUnits("0.10", 18);
               const remainingBalance = usdstBalanceBigInt - feeAmount;
               const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
 
@@ -327,7 +327,7 @@ const WithdrawCollateralModal = ({
               safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ||
               !healthImpact.isHealthy ||
               (() => {
-                const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+                const feeAmount = safeParseUnits(WITHDRAW_COLLATERAL_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
                 return usdstBalanceBigInt < feeAmount;
               })()

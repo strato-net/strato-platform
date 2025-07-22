@@ -11,12 +11,13 @@ import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
-import { formatUnits, parseUnits } from "ethers";
+import { useOracleContext } from "@/context/OracleContext";
+import { formatUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/contants";
-import { safeParseUnits, formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
+import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
 import {
   Dialog,
   DialogContent,
@@ -31,19 +32,8 @@ const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
 const DECIMALS = 18;
 
-// Utility functions
-const formatAmount = (amount: string): string => {
-  if (!amount) return "";
-  const value = Number(amount);
-  const roundedDown = Math.floor(value * 1000000) / 1000000;
-  return roundedDown.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
-  });
-};
-
 const formatBalance = (balance: string | number | bigint, symbol: string): string => {
-  return formatBalanceUtil(balance, symbol, DECIMALS);
+  return formatBalanceUtil(balance, symbol, DECIMALS,2,24);
 };
 
 // Components
@@ -351,6 +341,7 @@ const SwapWidget = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
+  const { getPrice, fetchPrice } = useOracleContext();
   const { toast } = useToast();
 
   // State
@@ -368,12 +359,16 @@ const SwapWidget = () => {
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
+  const [oracleExchangeRate, setOracleExchangeRate] = useState("0");
+  const [oracleLoading, setOracleLoading] = useState(false);
+  const [oracleDisplayFromSymbol, setOracleDisplayFromSymbol] = useState("");
+  const [oracleDisplayToSymbol, setOracleDisplayToSymbol] = useState("");
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
 
   // Fee warning logic
-  const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+  const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
   
   // Safely parse input amounts
@@ -383,7 +378,7 @@ const SwapWidget = () => {
   const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
   const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n && (() => {
-    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
+    const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
     const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
     return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
   })();
@@ -424,6 +419,58 @@ const SwapWidget = () => {
       fetchPairableTokens(fromAsset.address);
     }
   }, [fromAsset?.address, fetchPairableTokens]);
+
+  // Fetch oracle exchange rate when assets change
+  useEffect(() => {
+    const fetchOracleExchangeRate = async () => {
+      if (!fromAsset?.address || !toAsset?.address) {
+        setOracleExchangeRate("0");
+        setOracleLoading(false);
+        return;
+      }
+
+      setOracleLoading(true);
+      try {
+        const [fromPrice, toPrice] = await Promise.all([
+          fetchPrice(fromAsset.address),
+          fetchPrice(toAsset.address)
+        ]);
+
+        if (fromPrice && toPrice) {
+          // Oracle prices are actually stored in 18-decimal format (1e18 = $1.00), not 8-decimal
+          // Parse as 18-decimal values
+          const fromPriceBig = safeParseUnits(fromPrice, 18);
+          const toPriceBig = safeParseUnits(toPrice, 18);
+          
+          if (fromPriceBig > 0n && toPriceBig > 0n) {
+            // Calculate exchange rate: how much toAsset you get for 1 fromAsset
+            // Rate = fromPrice / toPrice (since higher priced asset should give less units)
+            const rate = (fromPriceBig * safeParseUnits("1", 18)) / toPriceBig;
+            setOracleExchangeRate(formatUnits(rate, 18));
+            
+            // Always use the same symbol order as the swap direction
+            setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+            setOracleDisplayToSymbol(toAsset?._symbol || "");
+          } else {
+            setOracleExchangeRate("0");
+            setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+            setOracleDisplayToSymbol(toAsset?._symbol || "");
+          }
+        } else {
+          setOracleExchangeRate("0");
+          setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+          setOracleDisplayToSymbol(toAsset?._symbol || "");
+        }
+      } catch (error) {
+        console.error("Failed to fetch oracle prices:", error);
+        setOracleExchangeRate("0");
+      } finally {
+        setOracleLoading(false);
+      }
+    };
+
+    fetchOracleExchangeRate();
+  }, [fromAsset?.address, toAsset?.address, fetchPrice]);
 
   // Combined effect: fetch pool, update rate, and poll for updates
   useEffect(() => {
@@ -814,7 +861,7 @@ const SwapWidget = () => {
 
   // Validation helpers
   const isSwapDisabled = () => {
-    const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+    const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
     // Basic validations
@@ -859,7 +906,7 @@ const handleMaxClick = (isFrom: boolean) => {
 
 
    if (asset?.address === usdstAddress) {
-    const fee = parseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
+    const fee = safeParseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
     if (balance > fee) {
       balance -= fee;
     } else {
@@ -930,11 +977,24 @@ const handleMaxClick = (isFrom: boolean) => {
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Exchange Rate</span>
+          <span className="text-gray-600 decoration-2">Exchange Rate</span>
           <span className="font-medium">
             1 {fromAsset?._symbol || ""} ≈ {formatAmount(exchangeRate)} {toAsset?._symbol || ""}
           </span>
         </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Exchange Rate (Spot)</span>
+          <span className="font-medium text-gray-400">
+            {oracleLoading ? (
+              <LoadingSpinner />
+            ) : oracleExchangeRate === "0" ? (
+              "Price data unavailable"
+            ) : (
+              <>1 {oracleDisplayFromSymbol} ≈ {formatAmount(oracleExchangeRate)} {oracleDisplayToSymbol}</>
+            )}
+          </span>
+        </div>
+        <div className="my-3"></div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST</span>

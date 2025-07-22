@@ -51,6 +51,7 @@ module Blockchain.SolidVM.SM
     getBSum,
     addEvent,
     addDelegatecall,
+    getContractNameAndHash,
     getCodeAndCollection,
     getContractsForParents,
     getAbstractParentsFromContract,
@@ -100,6 +101,7 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
@@ -937,32 +939,28 @@ getBSum bh =
   fromMaybe (error $ "missing value in block summary DB: " ++ format bh)
     <$> A.lookup (A.Proxy @BlockSummary) bh
 
+getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
+getContractNameAndHash address' = do
+  codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
+
+  resolvedCodeHash <- resolveCodePtr codeHash
+  case resolvedCodeHash of
+    Just (SolidVMCode cn ch') -> return (stringToLabel cn, ch')
+    Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+    Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
+
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-  let maybeAddress =
-        case callStack' of
-          (current' : _) -> Just $ currentAddress current'
-          _ -> Nothing
+  let maybeCI = find (\ci -> currentAddress ci == address') callStack'
 
   -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
   -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-  if Just address' == maybeAddress
-    then do
-      c' <- getCurrentContract
-      (hsh, cc') <- getCurrentCodeCollection
-      return (c', hsh, cc')
-    else do
-      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-
-      resolvedCodeHash <- resolveCodePtr codeHash
-      (contractName', ch, cc) <-
-        case resolvedCodeHash of
-          Just (SolidVMCode cn ch') -> do
-            cc' <- codeCollectionFromHash True ch'
-            return (stringToLabel cn, ch', cc')
-          Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
-          Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
+  case maybeCI of
+    Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
+    Nothing -> do
+      (contractName', ch) <- getContractNameAndHash address'
+      cc <- codeCollectionFromHash True ch
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 

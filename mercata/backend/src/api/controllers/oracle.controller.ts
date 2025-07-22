@@ -3,6 +3,7 @@ import RestStatus from "http-status-codes";
 import {
   setPrice,
   getPrice,
+  getPriceHistory,
 } from "../services/oracle.service";
 
 class OracleController {
@@ -30,6 +31,27 @@ class OracleController {
     try {
       const { accessToken, body } = req;
       const result = await setPrice(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPriceHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params, query } = req;
+      const { assetAddress } = params;
+      
+      if (!assetAddress) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Asset address is required" });
+        return;
+      }
+
+      const result = await getPriceHistory(accessToken, assetAddress, query as Record<string, string | undefined>);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

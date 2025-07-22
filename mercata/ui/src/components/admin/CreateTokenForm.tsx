@@ -143,17 +143,6 @@ const CreateTokenForm = () => {
         }
       }
 
-      console.log('Creating token with data:', {
-        name: data.name,
-        symbol: data.symbol,
-        initialSupply: data.initialSupply,
-        description: data.description,
-        images: imageBase64 ? [imageBase64] : [],
-        files: filesBase64,
-        fileNames: data.fileNames,
-        customDecimals: data.customDecimals,
-      });
-
       // Call the context method to create the token
       await createToken({
         name: data.name,

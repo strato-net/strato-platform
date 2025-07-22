@@ -38,7 +38,6 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
         return formatNumberForMobile(formatted);
       }
     } catch (error) {
-      console.log(`${symbol} formatting error:`, error);
       return isPrice ? "$0.00" : "0.00";
     }
   };

@@ -11,9 +11,19 @@ import { parseUnits, formatUnits } from "ethers";
 export const safeParseUnits = (value: string, decimals: number): bigint => {
   try {
     // Handle edge cases that parseUnits can't handle
-    if (!value || value === '.' || value === '0.' || value.endsWith('.')) {
+    if (!value || value === '.') {
       return 0n;
     }
+    
+    // Handle incomplete decimal inputs (e.g., "35.") by treating as "35"
+    if (value.endsWith('.')) {
+      const numericValue = value.slice(0, -1);
+      if (!numericValue) {
+        return 0n;
+      }
+      return parseUnits(numericValue, decimals);
+    }
+    
     return parseUnits(value, decimals);
   } catch {
     return 0n;
@@ -114,14 +124,42 @@ export const formatAmount = (amount: string): string => {
 };
 
 /**
- * Formats a balance with symbol, handling BigInt conversion and decimal cleanup
+  * Formats a balance with symbol, from wei/smallest unit into a human-readable string.
  */
-export const formatBalance = (balance: string | number | bigint, symbol: string, decimals: number = 18): string => {
-  let formatted = formatUnits(BigInt(balance.toString()), decimals);
-  if (formatted.includes('.')) {
-    formatted = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
+export const formatBalance = (
+  balance: string | number | bigint,
+  symbol?: string,
+  decimals: number = 18,
+  minPrecision?: number,
+  maxPrecision?: number,
+  isPrice?: boolean
+): string => {
+  const raw = BigInt(balance.toString());
+
+  if (raw === 0n) {
+    const zero = minPrecision !== undefined ? `0.${"0".repeat(minPrecision)}` : "0";
+    const withSymbol = symbol ? `${zero} ${symbol}` : zero;
+    return isPrice ? `$${withSymbol}` : withSymbol;
   }
-  return `${formatted} ${symbol}`;
+  
+  const formatted = formatUnits(raw, decimals); // e.g., "1234.56789"
+
+  let [int, dec = ""] = formatted.split(".");
+
+  if (maxPrecision !== undefined) {
+    const rounded = Number(formatted).toFixed(maxPrecision);
+    [int, dec = ""] = rounded.split(".");
+  }
+
+  if (minPrecision !== undefined && dec.length < minPrecision) {
+    dec = dec.padEnd(minPrecision, "0");
+  }
+
+  const localized = Number(int).toLocaleString();
+  const result = dec ? `${localized}.${dec}` : localized;
+
+  const withSymbol = symbol ? `${result} ${symbol}` : result;
+  return isPrice ? `$${withSymbol}` : withSymbol;
 };
 
 /**

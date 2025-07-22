@@ -388,7 +388,7 @@ export const calculateTotalCollateralValue = (
 };
 
 /**
- * Calculate APY values for supply and borrow
+ * Calculate theoretical APY for supply and APY for borrow
  * @param interestRate Interest rate in basis points
  * @param reserveFactor Reserve factor in basis points
  * @returns Object with supplyAPY and borrowAPY
@@ -397,8 +397,9 @@ export const calculateAPYs = (
   interestRate: number,
   reserveFactor: number = 1000
 ): { supplyAPY: number; borrowAPY: number } => {
-  const borrowAPY = interestRate / 100; // Convert from basis points
-  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000); // Subtract reserve factor
-  
+  // interestRate is in bps, so /100 gives percent
+  const borrowAPY = interestRate / 100;
+  // reserveFactor is in bps, so /10000 is fraction
+  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000);
   return { supplyAPY, borrowAPY };
-}; 
+};
