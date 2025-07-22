@@ -20,6 +20,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import CopyButton from '@/components/ui/copy';
+import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
 
 type PricePoint = {
   date: string;
@@ -65,6 +66,7 @@ const AssetDetail = () => {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
   const [priceDataLoading, setPriceDataLoading] = useState(false);
+  const [showPriceTooltip, setShowPriceTooltip] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
@@ -201,11 +203,34 @@ const AssetDetail = () => {
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
+                    <div 
+                      className="flex justify-between text-sm relative cursor-help"
+                      onMouseEnter={() => setShowPriceTooltip(true)}
+                      onMouseLeave={() => setShowPriceTooltip(false)}
+                    >
                       <span className="text-gray-500">Current Price:</span>
                       <span className="font-medium">
-                        {formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)}
+                        ${roundToDecimals(addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)), 2)}
                       </span>
+                      
+                      {/* Price timestamp tooltip */}
+                      {showPriceTooltip && priceData.length > 0 && (
+                        <div className="absolute right-0 top-full mt-1 z-10 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                          Last updated: {(() => {
+                            const latestEntry = priceData[priceData.length - 1];
+                            if (latestEntry?.timestamp) {
+                              return new Date(latestEntry.timestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              });
+                            }
+                            return 'Unknown';
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-between text-sm">
