@@ -26,6 +26,7 @@ import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
 import HexText from '../HexText';
 import { useEffect, useState } from 'react';
+import { changeContractFilter } from '../Contracts/contracts.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -38,7 +39,37 @@ class CreateContract extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.isToasts) {
+    if (nextProps.isToasts && nextProps.contractAddress) {
+      // Show custom toast with clickable contract address
+      const toastContent = (
+        <div>
+          <span>Contract Deployed: </span>
+          <a 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              // Navigate to contracts page and search for this address
+              this.props.history.push('/contracts');
+              // Set the filter to search for this contract address
+              this.props.changeContractFilter(nextProps.contractAddress);
+              // Dismiss the toast
+              toasts.dismiss();
+            }}
+            style={{ color: '#48aff0', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            {nextProps.contractAddress}
+          </a>
+        </div>
+      );
+      
+      toasts.show({ 
+        message: toastContent,
+        timeout: 8000, // Give users more time to click the link
+        intent: 'success'
+      });
+      this.props.resetError();
+    } else if (nextProps.isToasts && nextProps.toastsMessage) {
+      // Show regular toast for non-deployment messages
       toasts.show({ message: nextProps.toastsMessage });
       this.props.resetError();
     }
@@ -606,7 +637,8 @@ const connected = connect(mapStateToProps, {
   resetError,
   fetchChainIds,
   getLabelIds,
-  updateUsingSampleContract
+  updateUsingSampleContract,
+  changeContractFilter
 })(formed);
 
 export default withRouter(connected);
