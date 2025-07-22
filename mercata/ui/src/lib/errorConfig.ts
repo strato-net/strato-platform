@@ -39,7 +39,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/onramp/lock": "Lock Error",
   "/onramp/unlock": "Unlock Error",
   
-  // Bridge operations (using fetch, not axios)
+  // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",
   "/bridge/bridgeInTokens": "Bridge In Tokens Error",
   "/bridge/bridgeOutTokens": "Bridge Out Tokens Error",

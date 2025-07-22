@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { fetchJson } from '@/lib/fetch';
+import { api } from '@/lib/axios';
 
 interface Token {
   name: string;
@@ -86,17 +86,16 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBridgeConfig = useCallback(async (): Promise<BridgeConfig> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const responseData = await fetchJson<any>(`/api/bridge/config`);
-      
-      const bridgeConfig = responseData.data.data;
+      const response = await api.get(`/bridge/config`);
+      let bridgeConfig = response.data.data.data;
+      if (!bridgeConfig) {
+        bridgeConfig = response.data;
+      }
       setConfig(bridgeConfig);
       return bridgeConfig;
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch bridge config';
-      setError(errorMessage);
       console.error('Error fetching bridge config:', err);
       throw err;
     } finally {
@@ -106,18 +105,21 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBridgeInTokens = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const responseData = await fetchJson<any>(`/api/bridge/bridgeInTokens`);
+      const response = await api.get(`/bridge/bridgeInTokens`);
+      // Get tokens from the correct path
+      let tokens = response.data.data.data.bridgeInTokens;
+      // Ensure tokens is always an array
+      if (!Array.isArray(tokens)) {
+        console.warn('Bridge in tokens response is not an array:', tokens);
+        tokens = [];
+      }
       
-      const tokens = responseData.data.data.bridgeInTokens;
       setBridgeInTokens(tokens);
       return tokens;
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch bridge in tokens';
-      setError(errorMessage);
-      console.error('Error fetching bridge in tokens:', err);
+      setBridgeInTokens([]);
       return [];
     } finally {
       setLoading(false);
@@ -126,21 +128,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const bridgeIn = useCallback(async (params: BridgeInParams): Promise<BridgeResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const responseData = await fetchJson<any>(`/api/bridge/bridgeIn`, {
-        method: "POST",
-        body: JSON.stringify(params),
-      });
+      const response = await api.post(`/bridge/bridgeIn`, params);
 
       return {
         success: true,
-        data: responseData.data
+        data: response.data
       };
     } catch (err) {
-      const errorMessage = err.message || "Bridge transaction failed";
-      setError(errorMessage);
       console.error("Bridge API error:", err);
       throw err;
     } finally {
@@ -150,18 +146,33 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBridgeOutTokens = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const responseData = await fetchJson<any>(`/api/bridge/bridgeOutTokens`);
+      const response = await api.get(`/bridge/bridgeOutTokens`);
       
-      const tokens = responseData.data.data.bridgeOutTokens;
+      // Debug: Log the response structure
+      console.log('Bridge out tokens API response:', response.data);
+      console.log('Bridge out tokens path check:', {
+        'response.data.data.data.bridgeOutTokens': response.data?.data?.data?.bridgeOutTokens,
+        'response.data.data.bridgeOutTokens': response.data?.data?.bridgeOutTokens,
+        'response.data.bridgeOutTokens': response.data?.bridgeOutTokens,
+        'response.data': response.data
+      });
+      
+      // Get tokens from the correct path
+      let tokens = response.data.data.data.bridgeOutTokens;
+      
+      // Ensure tokens is always an array
+      if (!Array.isArray(tokens)) {
+        console.warn('Bridge out tokens response is not an array:', tokens);
+        tokens = [];
+      }
+      
       setBridgeOutTokens(tokens);
       return tokens;
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch bridge out tokens';
-      setError(errorMessage);
       console.error('Error fetching bridge out tokens:', err);
+      setBridgeOutTokens([]);
       return [];
     } finally {
       setLoading(false);
@@ -170,21 +181,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const bridgeOut = useCallback(async (params: BridgeOutParams): Promise<BridgeResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const responseData = await fetchJson<any>(`/api/bridge/bridgeOut`, {
-        method: "POST",
-        body: JSON.stringify(params),
-      });
+      const response = await api.post(`/bridge/bridgeOut`, params);
 
       return {
         success: true,
-        data: responseData.data
+        data: response.data
       };
     } catch (err) {
-      const errorMessage = err.message || "Bridge transaction failed";
-      setError(errorMessage);
       console.error("Bridge API error:", err);
       throw err;
     } finally {
@@ -194,18 +199,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const getBalance = useCallback(async (tokenAddress: string): Promise<BalanceResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
       const formattedTokenAddress = tokenAddress.startsWith("0x")
         ? tokenAddress
         : `0x${tokenAddress}`;
-      const responseData = await fetchJson<any>(`/api/bridge/balance/${formattedTokenAddress}`);
-      
-      return responseData.data;
+      const response = await api.get(`/bridge/balance/${formattedTokenAddress}`);
+      console.log("response.data bridgeout balance", response.data.data.balance);
+      return { balance: response.data.data.balance };
     } catch (err) {
-      const errorMessage = err.message || "Failed to fetch balance";
-      setError(errorMessage);
       console.error("Balance API error:", err);
       throw err;
     } finally {

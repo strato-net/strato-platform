@@ -278,7 +278,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in bridgeIn:", error?.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -314,8 +320,15 @@ class BridgeController {
         bridgeOutResponse,
       });
     } catch (error: any) {
-      logger.error("Error in bridgeOut:", error);
-      next(error);
+      // Extract just the error message for logging
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      console.error("Error in bridgeOut controller 2 :", errorMessage);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -343,7 +356,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in stratoToBalance:", error.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -361,7 +380,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching bridge in networks:", error?.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -378,7 +403,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching bridge out networks:", error?.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -411,7 +442,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching deposit status:", error?.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -436,7 +473,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching deposit status:", error?.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 
@@ -457,7 +500,13 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching bridge config:", error?.message);
-      next(error);
+      
+      // Return the error message in HTTP response instead of using next(error)
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      res.status(400).json({ 
+        success: false, 
+        message: errorMessage 
+      });
     }
   }
 }

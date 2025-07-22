@@ -1,8 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
 import { RawDepositData, RawWithdrawData } from '@/interface/index';
-import { fetchJson } from '@/lib/fetch';
+import { api } from '@/lib/axios';
 
 interface Transaction {
   transaction_hash: string;
@@ -65,7 +64,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     limit?: number;
   }): Promise<TransactionResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
       const params = new URLSearchParams({
@@ -75,7 +73,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         orderDirection: 'desc',
       });
 
-      const responseData = await fetchJson<any>(`/api/bridge/depositStatus/${status}?${params}`);
+      const response = await api.get(`/bridge/depositStatus/${status}?${params}`);
+      const responseData = response.data;
 
       const depositData = responseData?.data?.data.data || [];
       
@@ -113,9 +112,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         totalCount
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch deposit transactions';
-      setError(errorMessage);
-      console.error('Error fetching deposit transactions:', err);
+  
       return {
         data: [],
         totalCount: 0
@@ -135,7 +132,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     limit?: number;
   }): Promise<TransactionResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
       const params = new URLSearchParams({
@@ -145,7 +141,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         orderDirection: 'desc',
       });
 
-      const responseData = await fetchJson<any>(`/api/bridge/withdrawalStatus/${status}?${params}`);
+      const response = await api.get(`/bridge/withdrawalStatus/${status}?${params}`);
+      const responseData = response.data;
 
       const withdrawalData = responseData?.data?.data.data || [];
       
@@ -183,9 +180,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         totalCount
       };
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch withdraw transactions';
-      setError(errorMessage);
-      console.error('Error fetching withdraw transactions:', err);
       return {
         data: [],
         totalCount: 0
