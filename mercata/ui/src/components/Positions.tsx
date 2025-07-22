@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
@@ -55,9 +54,9 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
                   {formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2)}
                 </span>
               </div>
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
-                <InfoTooltip content="Measures your position's safety. Higher is better. Below 1.0 means risk of liquidation. No loan means you have no outstanding debt.">
-                  <span className="text-gray-600 text-sm font-medium">Health Factor</span>
+              <div className="flex flex-col">
+                <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
+                  <span className="text-gray-600">Health Factor</span>
                 </InfoTooltip>
                 <span className="font-semibold text-lg" style={{ color: getTextColor((loanData?.healthFactor)) }}>
                   {(() => {
