@@ -346,10 +346,6 @@ run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pAskForBlocks startBlock endBlock i)
---run Checkpoints {..} = case operation of
---  Get -> doCheckpointGet service
---  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
---  NullOperation -> doCheckpointUsage
 run Code {..} = Code.doit hash
 run DeleteDepBlock {..} = deleteDepBlock valK
 run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
