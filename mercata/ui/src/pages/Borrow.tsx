@@ -24,7 +24,6 @@ import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
-import PercentageButtons from "@/components/ui/PercentageButtons";
 import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
 
 import { CollateralData } from "@/interface";
@@ -809,10 +808,10 @@ const Borrow = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {asset?.ltv ? (asset.ltv / 100) : 0}%
+                            {asset?.ltv ? (Number(asset.ltv) / 100) : 0}%
                           </TableCell>
                           <TableCell>
-                            {asset?.liquidationThreshold ? (asset.liquidationThreshold / 100) : 0}%
+                            {asset?.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100) : 0}%
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-end gap-4">
