@@ -50,8 +50,12 @@ class CreateContract extends Component {
               e.preventDefault();
               // Navigate to contracts page and search for this address
               this.props.history.push('/contracts');
-              // Set the filter to search for this contract address
-              this.props.changeContractFilter(nextProps.contractAddress);
+              // Add a small delay to ensure the Contracts component is mounted before setting the filter
+              setTimeout(() => {
+                this.props.changeContractFilter(nextProps.contractAddress);
+                // Also trigger the search by fetching contracts with the filter
+                this.props.fetchContracts(this.props.selectedChain, 10, 0, nextProps.contractAddress);
+              }, 100);
               // Dismiss the toast
               toasts.dismiss();
             }}
