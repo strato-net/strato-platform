@@ -388,6 +388,9 @@ processTheMessages env conn messages = do
         
     -- Insert the events into the event tables
     outputData conn $ insertEventTables processedEventArrays processedEventsWithoutArrays
+
+    -- Insert the events into the global 'events' table
+    outputData conn $ pipeInsertGlobalEventTable processedEvents
     
     -- If there are processed event arrays, update the foreign keys
     unless (null processedEventArrays) $
