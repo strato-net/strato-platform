@@ -11,7 +11,7 @@ import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useSwapContext } from '@/context/SwapContext';
-import { usdstAddress, WITHDRAW_FEE } from "@/lib/contants";
+import { usdstAddress, WITHDRAW_FEE } from "@/lib/constants";
 import { LiquidityPool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 

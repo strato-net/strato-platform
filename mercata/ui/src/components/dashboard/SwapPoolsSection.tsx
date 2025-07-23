@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BanknoteIcon, CircleArrowDown, Search } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
+import { useUserTokens } from '@/context/UserTokensContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { LiquidityPool } from '@/interface';
@@ -22,6 +24,8 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress, enrichPools } = useSwapContext();
+  const { fetchUsdstBalance } = useUserTokens();
+  const { userAddress } = useUser();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -104,11 +108,17 @@ const SwapPoolsSection = () => {
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
     await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
   };
 
 
@@ -213,7 +223,7 @@ const SwapPoolsSection = () => {
                         disabled={!pool.lpToken.balances?.length}
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
                       >
-                        <BanknoteIcon className="mr-1 h-4 w-4" />
+                        <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>
                         <span className="sm:hidden">-</span>
                       </Button>

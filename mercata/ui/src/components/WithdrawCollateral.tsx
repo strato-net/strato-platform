@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits } from "ethers";
-import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { WITHDRAW_COLLATERAL_FEE } from "@/lib/constants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";

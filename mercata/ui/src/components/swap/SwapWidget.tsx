@@ -16,7 +16,7 @@ import { formatUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/contants";
+import { usdstAddress, SWAP_FEE } from "@/lib/constants";
 import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
 import {
   Dialog,
