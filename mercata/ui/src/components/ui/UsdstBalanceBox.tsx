@@ -14,6 +14,41 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 import { Button } from "./button";
 import { Token } from "@/interface";
 import { usdstAddress } from "@/lib/constants";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+
+// Optimized InfoTooltip component using hook
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('usdst-balance-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative usdst-balance-tooltip-container">
+        <div 
+          className="cursor-help"
+          onClick={handleToggle}
+        >
+          {children}
+        </div>
+        {showTooltip && (
+          <div className="absolute bottom-full left-0 mb-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress } = useUser();
@@ -138,17 +173,9 @@ const UsdstBalanceBox: React.FC = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
               <p className="text-xs font-medium text-gray-600">USDST Balance</p>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>
-                    USDST is used to pay for gas fees on the STRATO Mercata
-                    network
-                  </p>
-                </TooltipContent>
-              </Tooltip>
+              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network">
+                <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+              </InfoTooltip>
             </div>
             <p className="text-sm font-semibold text-gray-900 truncate">
               {loadingUsdstBalance ? (
