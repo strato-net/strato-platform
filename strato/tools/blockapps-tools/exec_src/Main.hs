@@ -44,7 +44,6 @@ data Options
   | DumpKafkaSequencerVM {startingBlock :: Int}
   | DumpKafkaSequencerP2P {startingBlock :: Int}
   | DumpKafkaUnSequencer {startingBlock :: Int}
---  | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
   | DumpKafkaStateDiff {startingBlock :: Int}
   | SyncStats {}
   | FRawMP {stateRoot :: String, filename :: String}
@@ -154,15 +153,7 @@ dumpKafkaVMEventsOptions =
     DumpKafkaVMEvents {startingBlock = undefined}
     [ startingBlock := 0 += typ "INT"
     ]
-{-
-dumpKafkaRawOptions :: Annotate Ann
-dumpKafkaRawOptions =
-  record
-    DumpKafkaRaw {startingBlock = undefined, streamName = undefined}
-    [ startingBlock := 0 += typ "INT" += argPos 1,
-      streamName := def += typ "DBSTRING" += argPos 0
-    ]
--}
+
 dumpKafkaStateDiffOptions :: Annotate Ann
 dumpKafkaStateDiffOptions =
   record
@@ -366,7 +357,6 @@ run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
 run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
---run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
 run SyncStats = syncStats
 run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
