@@ -7,18 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Wallet, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { Token, PriceHistoryEntry } from '@/interface';
+import { Token, PriceHistoryEntry, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import PriceChart from '@/components/charts/PriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
 
@@ -28,12 +20,28 @@ type PricePoint = {
   timestamp?: number;
 };
 
+type SwapPricePoint = {
+  date: string;
+  price: string;
+  timestamp: number;
+  poolAddress: string;
+  volume: string;
+};
+
 interface PriceHistoryApiEntry {
   id: string;
   timestamp: string;
   asset: string;
   price: string;
   blockTimestamp: string;
+}
+
+interface Pool {
+  address: string;
+  tokenA: { address: string; _symbol: string };
+  tokenB: { address: string; _symbol: string };
+  aToBRatio: string;
+  bToARatio: string;
 }
 
 const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
@@ -60,6 +68,84 @@ const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> =>
   }
 };
 
+const fetchPoolsForAsset = async (assetAddress: string): Promise<Pool[]> => {
+  try {
+    const response = await api.get('/swap-pools');
+    const pools = response.data || [];
+    
+    // Filter pools that contain this asset
+    return pools.filter((pool: Pool) => 
+      pool.tokenA?.address?.toLowerCase() === assetAddress.toLowerCase() ||
+      pool.tokenB?.address?.toLowerCase() === assetAddress.toLowerCase()
+    );
+  } catch (error) {
+    console.error('Failed to fetch pools for asset:', error);
+    return [];
+  }
+};
+
+const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint[]> => {
+  try {
+    // First, get all pools containing this asset
+    const pools = await fetchPoolsForAsset(assetAddress);
+    
+    if (pools.length === 0) {
+      return [];
+    }
+
+    // Fetch swap history for each pool and combine the data
+    const allSwapPrices: SwapPricePoint[] = [];
+    
+    for (const pool of pools) {
+      try {
+        const response = await api.get(`/swap-history/${pool.address}`, {
+          params: {
+            limit: '1000', // Get more history for better chart
+            order: 'block_timestamp.desc'
+          }
+        });
+        
+        const swapHistory: SwapHistoryEntry[] = response.data.data || [];
+        
+        // Convert swap history to price points
+        const poolPrices = swapHistory
+          .filter(swap => swap.impliedPrice && swap.impliedPrice !== "0")
+          .map(swap => {
+            const date = new Date(swap.timestamp);
+            return {
+              date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
+              price: swap.impliedPrice,
+              timestamp: date.getTime(),
+              poolAddress: pool.address,
+              volume: swap.amountIn
+            };
+          });
+        
+        allSwapPrices.push(...poolPrices);
+      } catch (poolError) {
+        console.error(`Failed to fetch swap history for pool ${pool.address}:`, poolError);
+      }
+    }
+    
+    // Sort by timestamp and return last 30 days worth of data
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    return allSwapPrices
+      .filter(point => point.timestamp >= thirtyDaysAgo)
+      .sort((a, b) => a.timestamp - b.timestamp);
+      
+  } catch (error) {
+    console.error('Failed to fetch swap pool prices:', error);
+    return [];
+  }
+};
+
+// Consistent color scheme for all charts
+const CHART_COLORS = {
+  GREEN: "#10b981", // Consistent green for upward trends
+  RED: "#ef4444",   // Consistent red for downward trends  
+  BLUE: "#2563eb"   // Default blue for neutral/no data
+};
+
 const AssetDetail = () => {
 
   const { id } = useParams<{ id: string }>();
@@ -67,17 +153,28 @@ const AssetDetail = () => {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
   const [priceDataLoading, setPriceDataLoading] = useState(false);
+  const [swapPriceData, setSwapPriceData] = useState<SwapPricePoint[]>([]);
+  const [swapPriceDataLoading, setSwapPriceDataLoading] = useState(false);
   const [showPriceTooltip, setShowPriceTooltip] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
+  
   const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
-    if (!currentPrice || priceData.length === 0) return "blue"; // default blue
+    if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
     
     const current = parseFloat(formatUnits(currentPrice.toString(), 18));
     const first = parseFloat(priceData[0].price);
-    return current > first ? "green" : "red"; // BlockApps blue if up, red if down
+    return current > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
+  };
+  
+  const getSwapChartColor = (swapPriceData: SwapPricePoint[]): string => {
+    if (swapPriceData.length === 0) return CHART_COLORS.BLUE;
+    
+    const first = parseFloat(swapPriceData[0].price);
+    const last = parseFloat(swapPriceData[swapPriceData.length - 1].price);
+    return last > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
   };
   
   useEffect(() => {
@@ -90,12 +187,18 @@ const AssetDetail = () => {
       setAsset(foundAsset);
       document.title = `${foundAsset?.token?._name || foundAsset?._name} | Asset Details`;
 
-      // Fetch price history if address exists
+      // Fetch oracle price history if address exists
       if (foundAsset?.address) {
         setPriceDataLoading(true);
         fetchPriceHistory(foundAsset.address)
           .then(data => setPriceData(data.slice(-(PRICE_WINDOW * 24)))) // Show last N days (24 hours each)
           .finally(() => setPriceDataLoading(false));
+
+        // Fetch swap pool price history
+        setSwapPriceDataLoading(true);
+        fetchSwapPoolPrices(foundAsset.address)
+          .then(data => setSwapPriceData(data))
+          .finally(() => setSwapPriceDataLoading(false));
       }
     };
 
@@ -205,24 +308,25 @@ const AssetDetail = () => {
                       <span className="text-gray-500">Current Price:</span>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">
-                          ${roundToDecimals(addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)), 2)}
+                          {addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18))} USDST
                         </span>
                         
                         {/* Price trend indicator */}
-                        {priceData.length > 0 && asset?.price && (() => {
-                          const isUp = getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData) === "#2563eb";
+                        {/* {priceData.length > 0 && asset?.price && (() => {
+                          const chartColor = getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData);
+                          const isUp = chartColor === CHART_COLORS.GREEN;
                           const firstPrice = parseFloat(priceData[0].price);
                           
                           return (
                             <div title={isUp ? `Up from initial: $${firstPrice.toFixed(2)}` : `Down from initial: $${firstPrice.toFixed(2)}`}>
                               {isUp ? (
-                                <ArrowUp size={14} className="text-blue-600" />
+                                <ArrowUp size={14} style={{ color: CHART_COLORS.GREEN }} />
                               ) : (
-                                <ArrowDown size={14} className="text-red-500" />
+                                <ArrowDown size={14} style={{ color: CHART_COLORS.RED }} />
                               )}
                             </div>
                           );
-                        })()}
+                        })()} */}
                       </div>
                       
                       {/* Price timestamp tooltip */}
@@ -323,103 +427,27 @@ const AssetDetail = () => {
             {/* Charts and Description */}
             <div className="lg:col-span-2">
 
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Price History (Hourly Oracle Data)</CardTitle>
-                  {priceData.length > 0 && (
-                    <p className="text-sm text-gray-600">
-                      Hourly price data from first available oracle price to present
-                    </p>
-                  )}
-                </CardHeader>
+              <PriceChart
+                data={priceData}
+                loading={priceDataLoading}
+                title="Spot Price History"
+                subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
+                loadingMessage="Loading price history..."
+                emptyMessage="No price history available for this asset"
+                chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
+                gradientId="colorPrice"
+              />
 
-                <CardContent className="overflow-hidden">
-                  {priceDataLoading ? (
-                    <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                      <p className="text-gray-500 ml-3">Loading price history...</p>
-                    </div>
-                  ) : priceData.length > 0 ? (() => {
-                    // Determine chart color based on price trend
-                    const chartColor = getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData);
-                    
-                    return (
-                      <div className="w-full aspect-[21/9]">
-                        <ChartContainer
-                          config={{
-                            price: {
-                              theme: {
-                                light: chartColor,
-                                dark: chartColor,
-                              }
-                            },
-                            tooltip: {
-                              theme: {
-                                light: "gray",
-                                dark: "gray"
-                              }
-                            }
-                          }}
-                          className="w-full h-full"
-                        >
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                              data={priceData}
-                              margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
-                            >
-                              <defs>
-                                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.8} />
-                                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                            <XAxis
-                              dataKey="date"
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 10 }}
-                              tickCount={8}
-                              tickFormatter={(value, index) => {
-                                const parts = value.split(' ');
-                                return parts[0];
-                              }}
-                            />
-                            <YAxis
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 12 }}
-                              domain={['auto', 'auto']}
-                              width={50}
-                              tickFormatter={(value) => `$${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                            />
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <ChartTooltip
-                              content={<ChartTooltipContent 
-                                labelFormatter={(value) => `Time: ${value}`}
-                                formatter={(value: string | number) => [`$${parseFloat(value.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]}
-                              />}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="price"
-                              name="Price"
-                              stroke={chartColor}
-                              fillOpacity={1}
-                              fill="url(#colorPrice)"
-                              activeDot={{ r: 8 }}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </ChartContainer>
-                    </div>
-                    );
-                  })() : (
-                    <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
-                      <p className="text-gray-500">No price history available for this asset</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <PriceChart
+                data={swapPriceData}
+                loading={swapPriceDataLoading}
+                title="Swap Pool Price History"
+                subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
+                loadingMessage="Loading swap pool prices..."
+                emptyMessage="No swap pool data available for this asset"
+                chartColor={getSwapChartColor(swapPriceData)}
+                gradientId="colorSwapPrice"
+              />
 
               <Card>
                 <CardHeader>
