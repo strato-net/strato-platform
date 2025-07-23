@@ -263,7 +263,8 @@ const AssetDetail = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Asset Summary Card */}
             <div className="lg:col-span-1">
-              <Card className="mb-6">
+              <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
+                <Card className="mb-6">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -422,6 +423,22 @@ const AssetDetail = () => {
                   </div> */}
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>About {asset?.token?._name || asset?._name}</CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="space-y-4">
+                    <div
+                      className="prose max-w-none text-sm"
+                      dangerouslySetInnerHTML={{ __html: asset?.token?.description || asset?.description }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              </div>
             </div>
 
             {/* Charts and Description */}
@@ -448,21 +465,6 @@ const AssetDetail = () => {
                 chartColor={getSwapChartColor(swapPriceData)}
                 gradientId="colorSwapPrice"
               />
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>About {asset?.token?._name || asset?._name}</CardTitle>
-                </CardHeader>
-
-                <CardContent>
-                  <div className="space-y-4">
-                    <div
-                      className="prose max-w-none text-sm"
-                      dangerouslySetInnerHTML={{ __html: asset?.token?.description || asset?.description }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </main>
