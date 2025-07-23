@@ -188,13 +188,14 @@ export const simulateLoan = (
     
     // Calculated values
     healthFactor: healthFactorToPercentage(healthFactor),
+    healthFactorRaw: healthFactor,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
     accruedInterest,
     interestRate: borrowableAssetConfig.interestRate / 100,
     totalAmountOwed: newTotalOwed,
     totalCollateralValueUSD: totalCollateralValue,
     maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
-    
+
     // Health status flags
     isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS),
   };

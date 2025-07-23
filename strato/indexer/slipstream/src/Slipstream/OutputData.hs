@@ -19,6 +19,8 @@ module Slipstream.OutputData (
   outputDataDedup,
   OutputM,
   ProcessedCollectionRow(..),
+  insertGlobalEventTable,
+  pipeInsertGlobalEventTable,
   insertEventTables,
   insertIndexTable,
   insertForeignKeys,
@@ -1551,6 +1553,83 @@ getArraysFromEvents evArgs = do
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
                             (map (SimpleValue . ValueString . T.pack) elements))
 
+pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () Text m ()
+pipeInsertGlobalEventTable aggregatedEvents =
+  yieldMany =<< lift (mapM insertGlobalEventTable aggregatedEvents)
+
+insertGlobalEventTable :: OutputM m => AggregateEvent -> m Text
+insertGlobalEventTable agEv = do
+  let query = insertGlobalEventTableQuery agEv
+  $logInfoS "insertGlobalEventTable/query" query
+  return query
+
+-- | Generates an INSERT SQL statement for the global 'events' table.
+--
+-- This function creates a SQL INSERT statement that adds a single event record
+-- to the centralized 'events' table. Unlike event-specific tables that are
+-- created dynamically per contract/event type, this global table has a fixed
+-- schema and stores all events in a normalized format.
+--
+-- Event arguments are converted to a JSON object and stored in the 'attributes'
+-- column, where each argument name becomes a key and its value becomes the
+-- corresponding JSON value.
+insertGlobalEventTableQuery :: AggregateEvent -> Text
+insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
+  let creator = T.pack $ Action.evContractCreator ev
+      application = T.pack $ Action.evContractApplication ev
+      contractName = T.pack $ Action.evContractName ev
+      eventName = T.pack $ Action.evName ev
+      address = tshow . Action.evContractAddress $ ev
+      blockHash = T.pack . keccak256ToHex . eventBlockHash $ agEv
+      blockTimestamp = tshow . eventBlockTimestamp $ agEv
+      blockNumber = tshow . eventBlockNumber $ agEv
+      transactionHash = T.pack . keccak256ToHex . eventTxHash $ agEv
+      transactionSender = tshow . eventTxSender $ agEv
+      eventIdx = tshow . eventIndex $ agEv
+
+      attributesMap =
+        Map.fromList [(T.pack name, T.pack value) | (name, value, _) <- Action.evArgs ev]
+
+      -- Please note that all types are being treated here as strings. This is
+      -- due to how `evArgs` is represented in the `Event` (tuple of strings).
+      --
+      -- TODO (pawel): A good follow-up to this work would be a refactoring of
+      -- `evArgs` in `Event`. By getting rid of this tech debt, we would also
+      -- significantly improve the quality of the `attributes` column in the
+      -- `events` table, making them type-aware.
+      attributesJson = decodeUtf8 . BL.toStrict $ Aeson.encode attributesMap
+
+      columns = wrapAndEscapeDouble . map escapeQuotes $
+        baseEventColumns ++
+        [ "creator"
+        , "application"
+        , "contract_name"
+        , "event_name"
+        , "attributes"
+        ]
+
+      values = csv $ map (wrapSingleQuotes . escapeQuotes)
+        [ address
+        , blockHash
+        , blockTimestamp
+        , blockNumber
+        , transactionHash
+        , transactionSender
+        , eventIdx
+        , creator
+        , application
+        , contractName
+        , eventName
+        ] ++ [wrapSingleQuotes attributesJson <> "::jsonb"]
+
+  in T.concat
+       [ "INSERT INTO event "
+       , columns
+       , " VALUES ("
+       , values
+       , ");"
+       ]
+
 insertEventTables :: 
   OutputM m =>
   [ProcessedCollectionRow] ->
@@ -1560,8 +1639,6 @@ insertEventTables processedEventArrays processedEventsWithoutArrays = do
   $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
   $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
   yieldMany . concat =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
-      
-  -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $
     yieldMany $ insertEventArrayTableQuery processedEventArrays
 

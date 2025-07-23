@@ -971,7 +971,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isFromInput={false}
         pool={pool}
         fromAsset={fromAsset}
-        showMaxButton={!!toAsset?.balance}
+        showMaxButton={false}
         onMaxClick={() => handleMaxClick(false)}
       />
 
