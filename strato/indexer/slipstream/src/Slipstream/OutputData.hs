@@ -1578,6 +1578,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let creator = T.pack $ Action.evContractCreator ev
       application = T.pack $ Action.evContractApplication ev
       contractName = T.pack $ Action.evContractName ev
+      eventName = T.pack $ Action.evName ev
       address = tshow . Action.evContractAddress $ ev
       blockHash = T.pack . keccak256ToHex . eventBlockHash $ agEv
       blockTimestamp = tshow . eventBlockTimestamp $ agEv
@@ -1599,34 +1600,31 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       attributesJson = decodeUtf8 . BL.toStrict $ Aeson.encode attributesMap
 
       columns = wrapAndEscapeDouble . map escapeQuotes $
+        baseEventColumns ++
         [ "creator"
         , "application"
         , "contract_name"
-        , "address"
-        , "block_hash"
-        , "block_timestamp"
-        , "block_number"
-        , "transaction_hash"
-        , "transaction_sender"
-        , "event_index"
+        , "event_name"
         , "attributes"
         ]
 
       values = csv $ map (wrapSingleQuotes . escapeQuotes)
-        [ creator
-        , application
-        , contractName
-        , address
+        [ address
         , blockHash
         , blockTimestamp
         , blockNumber
         , transactionHash
         , transactionSender
         , eventIdx
-        ] ++ [wrapSingleQuotes attributesJson <> "::jsonb"]
+        , creator
+        , application
+        , contractName
+        , eventName
+        , wrapSingleQuotes attributesJson <> "::jsonb"
+        ]
 
   in T.concat
-       [ "INSERT INTO events "
+       [ "INSERT INTO event "
        , columns
        , " VALUES ("
        , values
