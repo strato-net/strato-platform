@@ -861,7 +861,7 @@ const Borrow = () => {
                                     <span className="cursor-help">
                                       <Button
                                         onClick={() => handleWithdraw(asset)}
-                                        disabled={!canWithdraw}
+                                        disabled={!canWithdraw || !hasCollateral}
                                       >
                                         Withdraw
                                       </Button>
