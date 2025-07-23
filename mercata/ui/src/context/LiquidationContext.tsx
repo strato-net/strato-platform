@@ -54,7 +54,6 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       setLiquidatable(res.data || []);
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      console.error('Error fetching liquidatable loans:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch liquidatable loans');
     } finally {
       setLoading(false);
@@ -69,7 +68,6 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       setWatchlist(res.data || []);
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      console.error('Error fetching watchlist loans:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch watchlist loans');
     } finally {
       setLoading(false);
@@ -83,7 +81,6 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
         fetchWatchlist(),
       ]);
     } catch (err) {
-      console.error('Error refreshing liquidation data:', err);
     }
   }, [fetchLiquidatable, fetchWatchlist]);
 
@@ -104,10 +101,6 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       // Refresh data after successful liquidation
       await refreshData();
     } catch (err) {
-      console.error('Liquidation failed:', err);
-      const backendMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message;
-      // rethrow a clean Error so the UI layer can surface it
-      throw new Error(backendMsg);
     } finally {
       setLoading(false);
     }

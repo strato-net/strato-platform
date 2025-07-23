@@ -96,8 +96,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       setConfig(bridgeConfig);
       return bridgeConfig;
     } catch (err) {
-      console.error('Error fetching bridge config:', err);
-      throw err;
+      throw err ;
     } finally {
       setLoading(false);
     }
@@ -112,7 +111,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       let tokens = response.data.data.data.bridgeInTokens;
       // Ensure tokens is always an array
       if (!Array.isArray(tokens)) {
-        console.warn('Bridge in tokens response is not an array:', tokens);
         tokens = [];
       }
       
@@ -137,7 +135,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         data: response.data
       };
     } catch (err) {
-      console.error("Bridge API error:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -154,14 +151,12 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       
       // Ensure tokens is always an array
       if (!Array.isArray(tokens)) {
-        console.warn('Bridge out tokens response is not an array:', tokens);
         tokens = [];
       }
       
       setBridgeOutTokens(tokens);
       return tokens;
     } catch (err) {
-      console.error('Error fetching bridge out tokens:', err);
       setBridgeOutTokens([]);
       return [];
     } finally {
@@ -180,7 +175,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         data: response.data
       };
     } catch (err) {
-      console.error("Bridge API error:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -197,7 +191,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const response = await api.get(`/bridge/balance/${formattedTokenAddress}`);
       return { balance: response.data.data.balance };
     } catch (err) {
-      console.error("Balance API error:", err);
       throw err;
     } finally {
       setLoading(false);

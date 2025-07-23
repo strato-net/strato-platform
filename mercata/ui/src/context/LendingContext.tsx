@@ -77,7 +77,6 @@ export const LendingProvider = ({
       }
     } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
       setLoadingLiquidity(false);
     }
@@ -94,7 +93,6 @@ export const LendingProvider = ({
       }
     } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
       setLoadingCollateral(false);
     }
@@ -108,7 +106,6 @@ export const LendingProvider = ({
       return res.data;
     } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Failed to fetch loans:", err);
       return [];
     } finally {
       setLoadingLoans(false);
@@ -120,7 +117,6 @@ export const LendingProvider = ({
     try {
       await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
     } catch (err) {
-      console.error("Failed to set price:", err);
       throw err;
     }
   };
@@ -137,7 +133,6 @@ export const LendingProvider = ({
     try {
       await api.post("/lend/admin/configure-asset", payload);
     } catch (err: any) {
-      console.error("Failed to configure asset:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -154,7 +149,6 @@ export const LendingProvider = ({
         amount
       });
     } catch (err) {
-      console.error("Borrow failed:", err);
       throw err;
     }
   };
@@ -171,7 +165,6 @@ export const LendingProvider = ({
         amount
       });
     } catch (err) {
-      console.error("Repay failed:", err);
       throw err;
     }
   };
@@ -181,7 +174,6 @@ export const LendingProvider = ({
       const res = await api.get("/lend/pools");
       return res.data;
     } catch (err) {
-      console.error("Get lend failed:", err);
       throw err;
     }
   };
@@ -190,7 +182,6 @@ export const LendingProvider = ({
     try {
       await api.post("/lending/pools/liquidity", args);
     } catch (err) {
-      console.error("Deposit liquidity failed:", err);
       throw err;
     }
   };
@@ -199,7 +190,6 @@ export const LendingProvider = ({
     try {
       await api.delete("/lending/pools/liquidity", {data: args});
     } catch (err) {
-      console.error("Withdraw liquidity failed:", err);
       throw err;
     }
   };
@@ -216,7 +206,6 @@ export const LendingProvider = ({
     try {
       await api.delete("/lending/collateral", {data: args});
     } catch (err) {
-      console.error("Withdraw liquidity failed:", err);
       throw err;
     }
   };
@@ -228,7 +217,6 @@ export const LendingProvider = ({
       await fetchLiquidityInfo()
       await fetchCollateralInfo()
     } catch (err) {
-      console.error("Failed to refresh lending data:", err);
       throw err;
     }
   };

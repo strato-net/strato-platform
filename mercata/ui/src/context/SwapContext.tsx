@@ -259,10 +259,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       setLpTokens(res?.data || [])
       setLoading(false)
     } catch (err) {
-      setLoading(false)
-      setError(err.response?.data?.message || err.message || 'Failed to fetch Lp Token Positions');
-      console.log(error);
-      
     }
   },[]);
 
@@ -289,8 +285,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       
       return { data, totalCount: response.data.totalCount };
     } catch (err) {
-      console.error('Error fetching swap history:', err);
-      throw new Error(err.response?.data?.message || err.message || 'Failed to fetch swap history');
     }
   }, []);
 

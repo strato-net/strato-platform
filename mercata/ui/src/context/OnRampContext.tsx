@@ -20,7 +20,6 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await api.get("/onramp");
       return res.data;
     } catch (err) {
-      console.error("Get onramp data failed:", err);
       throw err;
     }
   };
@@ -41,7 +40,6 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await api.post("/onramp/buy", buyPayload, { headers });
       return res.data;
     } catch (err) {
-      console.error("OnRamp buy failed:", err);
       throw err;
     }
   };
@@ -52,7 +50,6 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
       return res.data;
     } catch (err) {
-      console.error("OnRamp sell failed:", err);
       throw err;
     }
   };
@@ -62,7 +59,6 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await api.post("/onramp/lock", body);
       return res.data;
     } catch (err) {
-      console.error("OnRamp lock failed:", err);
       throw err;
     }
   };
@@ -72,7 +68,6 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await api.post("/onramp/unlock", { listingId });
       return res.data;
     } catch (err) {
-      console.error("Unlock tokens failed:", err);
       throw err;
     }
   };
