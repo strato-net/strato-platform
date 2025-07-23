@@ -75,13 +75,10 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshData = useCallback(async () => {
-    try {
-      await Promise.all([
-        fetchLiquidatable(),
-        fetchWatchlist(),
-      ]);
-    } catch (err) {
-    }
+    await Promise.all([
+      fetchLiquidatable(),
+      fetchWatchlist(),
+    ]);
   }, [fetchLiquidatable, fetchWatchlist]);
 
   const executeLiquidation = useCallback(async (id: string, collateralAsset?: string, repayAmount?: string) => {

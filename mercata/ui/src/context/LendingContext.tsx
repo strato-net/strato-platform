@@ -114,11 +114,7 @@ export const LendingProvider = ({
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
     const weiPrice = safeParseUnits(payload.price, 18).toString();
-    try {
-      await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
-    } catch (err) {
-      throw err;
-    }
+    await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
   };
 
   const configureAsset = async (payload: { 
@@ -144,13 +140,9 @@ export const LendingProvider = ({
   }: {
     amount: string;
   }) => {
-    try {
-      await api.post("/lending/loans", {
-        amount
-      });
-    } catch (err) {
-      throw err;
-    }
+    await api.post("/lending/loans", {
+      amount
+    });
   };
 
   const repayLoan = async ({
@@ -160,65 +152,37 @@ export const LendingProvider = ({
     amount: string;
     asset: string;
   }) => {
-    try {
-      await api.patch("/lending/loans", {
-        amount
-      });
-    } catch (err) {
-      throw err;
-    }
+    await api.patch("/lending/loans", {
+      amount
+    });
   };
 
   const getLend = async () => {
-    try {
-      const res = await api.get("/lend/pools");
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
+    const res = await api.get("/lend/pools");
+    return res.data;
   };
 
   const depositLiquidity = async (args: { amount: string }) => {
-    try {
-      await api.post("/lending/pools/liquidity", args);
-    } catch (err) {
-      throw err;
-    }
+    await api.post("/lending/pools/liquidity", args);
   };
 
   const withdrawLiquidity = async (args: { amount: string }) => {
-    try {
-      await api.delete("/lending/pools/liquidity", {data: args});
-    } catch (err) {
-      throw err;
-    }
+    await api.delete("/lending/pools/liquidity", {data: args});
   };
 
   const supplyCollateral = async (args: { asset: string, amount: string }) => {
-    try {
-       await api.post("/lending/collateral", args);
-    } catch (err) {
-      throw err.response.data.error.message;
-    }
+    await api.post("/lending/collateral", args);
   };
 
   const withdrawCollateral = async (args: { asset: string, amount: string }) => {
-    try {
-      await api.delete("/lending/collateral", {data: args});
-    } catch (err) {
-      throw err;
-    }
+    await api.delete("/lending/collateral", {data: args});
   };
 
   const refreshLendingData = async (): Promise<void> => {
-    try {
-      // Refresh all lending-related data
-      await fetchLoans();
-      await fetchLiquidityInfo()
-      await fetchCollateralInfo()
-    } catch (err) {
-      throw err;
-    }
+    // Refresh all lending-related data
+    await fetchLoans();
+    await fetchLiquidityInfo()
+    await fetchCollateralInfo()
   };
 
 

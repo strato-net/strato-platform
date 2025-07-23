@@ -16,60 +16,40 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
 
 
   const get = async (): Promise<OnrampApiResponse> => {
-    try {
-      const res = await api.get("/onramp");
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
+    const res = await api.get("/onramp");
+    return res.data;
   };
 
   const buy = async (payload: BuyPayload, userAddress: string): Promise<{ url: string }> => {
-    try {
-      const weiAmount = safeParseUnits(payload.amount, 18).toString();
-      const buyPayload = {
-        token: payload.token,
-        amount: weiAmount,
-        paymentProviderAddress: payload.paymentProviderAddress,
-      };
+    const weiAmount = safeParseUnits(payload.amount, 18).toString();
+    const buyPayload = {
+      token: payload.token,
+      amount: weiAmount,
+      paymentProviderAddress: payload.paymentProviderAddress,
+    };
 
-      const headers = {
-        address: userAddress,
-      };
+    const headers = {
+      address: userAddress,
+    };
 
-      const res = await api.post("/onramp/buy", buyPayload, { headers });
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
+    const res = await api.post("/onramp/buy", buyPayload, { headers });
+    return res.data;
   };
 
   const sell = async (payload) => {
-    try {
     const weiAmount = safeParseUnits(payload.amount, 18).toString() ;
-      const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
+    const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
+    return res.data;
   };
 
   const lock = async (body): Promise<{ url: string }> => {
-    try {
-      const res = await api.post("/onramp/lock", body);
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
+    const res = await api.post("/onramp/lock", body);
+    return res.data;
   };
 
   const unlockTokens = async (listingId: string) => {
-    try {
-      const res = await api.post("/onramp/unlock", { listingId });
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
+    const res = await api.post("/onramp/unlock", { listingId });
+    return res.data;
   };
 
   return (

@@ -217,11 +217,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const copyToClipboard = useCallback(async (text: string): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (error) {
-      throw error;
-    }
+    await navigator.clipboard.writeText(text);
   }, []);
 
   const renderTruncatedAddress = useCallback((address: string): string => {
