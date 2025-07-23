@@ -14,10 +14,13 @@ export const getEvents = async (
       order: query.order || "block_timestamp.desc"
     };
 
-    // Get total count
+    // Get total count - include all filter parameters
     const countParams = {
-      application: params.application,
-      creator: params.creator
+      ...params,
+      // Remove pagination parameters from count query
+      limit: undefined,
+      offset: undefined,
+      order: undefined
     };
     
     const countResponse = await cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
