@@ -26,6 +26,7 @@ import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
+import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -430,18 +431,33 @@ const Borrow = () => {
                           {loan?.liquidationThreshold ? loan?.liquidationThreshold/100 : 0}%
                         </TableCell>
                         <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                onClick={() => {handleWithdraw(loan)}}
-                              >
-                                Withdraw
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Remove collateral from your position. This reduces your borrowing power and may affect your loan if you have outstanding debt.</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          {(() => {
+                            const maxWithdrawAmount = getMaxSafeWithdrawAmount(loan, loans);
+                            const canWithdraw = maxWithdrawAmount > 0n;
+                            
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="cursor-help">
+                                    <Button
+                                      onClick={() => {handleWithdraw(loan)}}
+                                      disabled={!canWithdraw}
+                                    >
+                                      Withdraw
+                                    </Button>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    {canWithdraw 
+                                      ? "Remove collateral from your position. This reduces your borrowing power and may affect your loan if you have outstanding debt."
+                                      : "Cannot withdraw collateral. Your position is at maximum borrowing capacity or you have no available borrowing power."
+                                    }
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })()}
                         </TableCell>
                       </TableRow>
                     ))

@@ -12,6 +12,7 @@ import { formatUnits } from "ethers";
 import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
+import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
@@ -42,39 +43,7 @@ const getHealthFactorColor = (healthFactor: number) => {
   return "text-red-600";
 };
 
-const getMaxSafeWithdrawAmount = (
-  asset: CollateralData,
-  loanData: NewLoanData
-): bigint => {
-  // --- pull raw numbers ------------------------------------------------------
-  const ltvBP           = BigInt(asset?.ltv ?? "0");                    // asset LTV (basis-points)
-  const priceAssetUSD   = BigInt(asset?.assetPrice ?? "0");             // 1e18-scaled USD
-  const userCollatAmt   = BigInt(asset?.collateralizedAmount ?? "0");   // asset units (18 dec)
-  // Calculate total collateral USD dynamically from asset amount and price
-  const totalCollatUSD = (userCollatAmt * priceAssetUSD) / (10n ** 18n);
-  const totalBorrowUSD  = BigInt(loanData?.totalAmountOwed ?? "0");         // 1e18-scaled USD
 
-  // --- guardrails ------------------------------------------------------------
-  if (
-    ltvBP === 0n || priceAssetUSD === 0n ||
-    totalCollatUSD === 0n || totalBorrowUSD === 0n
-  ) return 0n;
-
-  // Needed collateral (USD) to remain right at LTV:
-  //   neededCollatUSD = borrow / (ltv/10000)
-  const neededCollatUSD = (totalBorrowUSD * 10000n) / ltvBP;
-
-  // If we’re already at or below LTV, nothing withdrawable
-  if (totalCollatUSD <= neededCollatUSD) return 0n;
-
-  const excessCollatUSD = totalCollatUSD - neededCollatUSD;
-
-  // Convert USD → asset units:  withdrawAmt = excess * 1e18 / price
-  const withdrawAmtAsset = (excessCollatUSD * 10n ** 18n) / priceAssetUSD;
-
-  // Never let user withdraw more than they actually have
-  return withdrawAmtAsset < userCollatAmt ? withdrawAmtAsset : userCollatAmt;
-};
 
 // Calculate health impact of withdrawal using BigInt and healthFactorRaw
 const calculateHealthImpact = (
@@ -239,7 +208,7 @@ const WithdrawCollateralModal = ({
                 >
                   Max :
                 </button>
-                <span>${formatUnits(maxSafeWithdrawAmount || 0, 18)}</span>
+                <span>{formatUnits(maxSafeWithdrawAmount || 0, 18)} {asset?._symbol}</span>
               </div>
             </div>
             <div className="relative">
