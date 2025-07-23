@@ -30,6 +30,7 @@ import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
+import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -839,31 +840,41 @@ const Borrow = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-end gap-4">
-                              <div className="text-right">
-                                <div className="font-medium">{formatBalance(asset?.collateralizedAmount || 0n, undefined, 18, 2)}</div>
-                                <div className="text-xs text-gray-500">
-                                  {formatBalance(asset?.collateralizedAmountValue, undefined, 18, 1, 2, true)}
-                                </div>
-                              </div>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleWithdraw(asset)}
-                                    disabled={!hasSuppliedBalance}
-                                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
-                                  >
-                                    <ArrowUpCircle className="h-4 w-4 mr-1" />
-                                    Withdraw
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{hasSuppliedBalance ? "Remove collateral from your position. This reduces your borrowing power and may affect your loan if you have outstanding debt." : "No collateral to withdraw"}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
+                            {(() => {
+                              const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
+                              const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
+                              const canWithdraw = maxWithdrawAmount > 0n;
+                              
+                              // Determine specific reason why withdrawal is not possible
+                              let tooltipMessage = "";
+                              if (canWithdraw) {
+                                tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
+                              } else if (!hasCollateral) {
+                                tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
+                              } else {
+                                tooltipMessage = "Cannot withdraw.\nNo available borrowing power.";
+                              }
+
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help">
+                                      <Button
+                                        onClick={() => handleWithdraw(asset)}
+                                        disabled={!canWithdraw || !hasCollateral}
+                                      >
+                                        Withdraw
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <span>
+                                      {tooltipMessage}
+                                    </span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       );
