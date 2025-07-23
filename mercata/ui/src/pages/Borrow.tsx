@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
@@ -7,10 +8,9 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
-import BorrowAssetModal from "@/components/dashboard/BorrowAssetModal";
-import RepayModal from "@/components/dashboard/RepayModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -21,6 +21,11 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
+import PercentageButtons from "@/components/ui/PercentageButtons";
+import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
 
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
@@ -62,6 +67,14 @@ const Borrow = () => {
   const [supplyLoading, setSupplyLoading] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
+  // Embedded form states
+  const [borrowAmount, setBorrowAmount] = useState<string>("");
+  const [borrowDisplayAmount, setBorrowDisplayAmount] = useState("");
+  const [repayAmount, setRepayAmount] = useState<string>("");
+  const [repayDisplayAmount, setRepayDisplayAmount] = useState("");
+  const [riskLevel, setRiskLevel] = useState(0);
+  const [repayLoading, setRepayLoading] = useState(false);
 
 
   const { toast } = useToast();
@@ -73,8 +86,29 @@ const Borrow = () => {
     loadingCollateral,
     refreshCollateral,
     supplyCollateral,
-    withdrawCollateral
+    withdrawCollateral,
+    repayLoan: repayLoanFn
   } = useLendingContext();
+
+  // Calculate risk level for borrow form
+  useEffect(() => {
+    try {
+      const existingBorrowedBigInt = BigInt(loans?.totalAmountOwed || 0);
+      const newBorrowAmountBigInt = safeParseUnits(borrowAmount || "0", 18);
+      const totalBorrowedBigInt = existingBorrowedBigInt + newBorrowAmountBigInt;
+      const collateralValueBigInt = BigInt(loans?.totalCollateralValueUSD || 0);
+
+      if (collateralValueBigInt === 0n) {
+        setRiskLevel(0);
+        return;
+      }
+
+      const risk = Number((totalBorrowedBigInt * 10000n) / collateralValueBigInt) / 100;
+      setRiskLevel(Math.min(risk, 100));
+    } catch {
+      setRiskLevel(0);
+    }
+  }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
 
   useEffect(() => {
     document.title = "Borrow Assets | STRATO Mercata";
@@ -227,6 +261,116 @@ const Borrow = () => {
     }
   };
 
+  // Helper functions for embedded forms
+  const getRiskColor = () => {
+    if (riskLevel < 30) return "bg-green-500";
+    if (riskLevel < 70) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  const getRiskText = () => {
+    if (riskLevel < 30) return "Low";
+    if (riskLevel < 70) return "Moderate";
+    return "High";
+  };
+
+  const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/,/g, '');
+    if (/^\d*\.?\d*$/.test(value)) {
+      setBorrowDisplayAmount(addCommasToInput(value));
+      setBorrowAmount(value);
+    }
+  };
+
+  const handleRepayAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/,/g, '');
+    if (/^\d*\.?\d*$/.test(value)) {
+      setRepayDisplayAmount(addCommasToInput(value));
+      setRepayAmount(value);
+    }
+  };
+
+  const handleBorrowPercentage = (percentageAmount: string) => {
+    setBorrowAmount(percentageAmount);
+    setBorrowDisplayAmount(addCommasToInput(percentageAmount));
+  };
+
+  const handleRepayPercentage = (percent: bigint) => {
+    const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+    const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+    const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
+    const amount = formatUnits((maxAmount * percent) / 100n, 18);
+    setRepayAmount(amount);
+    setRepayDisplayAmount(addCommasToInput(amount));
+  };
+
+  const executeEmbeddedBorrow = async () => {
+    try {
+      setBorrowLoading(true);
+      await borrowAssetFn({ amount: safeParseUnits(borrowAmount, 18).toString() });
+      toast({
+        title: "Borrow Initiated",
+        description: `You borrowed ${borrowAmount} USDST`,
+        variant: "success",
+      });
+      setBorrowLoading(false);
+      setBorrowAmount("");
+      setBorrowDisplayAmount("");
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
+    } catch (error) {
+      setBorrowLoading(false);
+      toast({
+        title: "Borrow Error",
+        description: `Something went wrong - ${error?.message || "Please try again later."}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const executeEmbeddedRepay = async () => {
+    try {
+      setRepayLoading(true);
+      const totalOwedWei = BigInt(loans?.totalAmountOwed || 0);
+      let amountInWei = safeParseUnits(repayAmount || "0", 18);
+      
+      if (amountInWei > totalOwedWei) {
+        amountInWei = totalOwedWei;
+      }
+
+      await repayLoanFn({
+        amount: amountInWei.toString(),
+      });
+      
+      toast({
+        title: "Success",
+        description: `Successfully Repaid ${repayAmount} USDST`,
+        variant: "success",
+      });
+      
+      setRepayAmount("");
+      setRepayDisplayAmount("");
+      setRepayLoading(false);
+      
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress || ""),
+      ]);
+    } catch (error) {
+      console.error("Error repaying loan:", error);
+      toast({
+        title: "Error",
+        description: `Repay Error - ${error}`,
+        variant: "destructive",
+      });
+      setRepayLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
@@ -238,8 +382,354 @@ const Borrow = () => {
         <DashboardHeader title="Borrow" onMenuClick={() => setIsMobileSidebarOpen(true)} />
 
         <main className="p-6">
-          <div className="mb-8">
-            <PositionSection handleBorrow={handleBorrow} handleRepay={handleRepay} loanData={loans} userCollaterals={collateralInfo} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Left Column - Borrow/Repay Tabbed Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Borrow & Repay</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="borrow" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="borrow">Borrow</TabsTrigger>
+                    <TabsTrigger value="repay">Repay</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="borrow">
+                    <div className="space-y-4 pt-4">
+                      {/* Loan Details */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Available to borrow</span>
+                          <span className="font-medium">
+                            USDST {formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Currently borrowed</span>
+                          <span className="font-medium">
+                            USDST {loans?.totalAmountOwed ? formatUnits(loans.totalAmountOwed, 18) : "0.00"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Interest Rate</span>
+                          <span className="font-medium">
+                            {loans?.interestRate ? `${loans.interestRate.toFixed(2)}%` : "-"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Borrow Amount Input */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">Borrow Amount (USDST)</label>
+                        <div className="flex justify-between items-center text-xs text-gray-500">
+                          <span>Min: 0.01 USDST</span>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                                setBorrowAmount(availableToBorrowFormatted);
+                                setBorrowDisplayAmount(addCommasToInput(availableToBorrowFormatted));
+                              }}
+                              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                            >
+                              Max :
+                            </button>
+                            <span>{formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)} USDST</span>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <Input
+                            placeholder="0.00"
+                            className={`pr-16 ${safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''}`}
+                            value={borrowDisplayAmount}
+                            onChange={handleBorrowAmountChange}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
+                        </div>
+                        <PercentageButtons
+                          value={borrowAmount}
+                          maxValue={formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)}
+                          onChange={handleBorrowPercentage}
+                        />
+                      </div>
+
+                      {/* Risk Level */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span>Risk Level:</span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${riskLevel < 30
+                                  ? "bg-green-50 text-green-700"
+                                  : riskLevel < 70
+                                    ? "bg-yellow-50 text-yellow-700"
+                                    : "bg-red-50 text-red-700"
+                                }`}
+                            >
+                              {getRiskText()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <Progress value={riskLevel} className="h-2">
+                            <div
+                              className={`absolute inset-0 ${getRiskColor()} h-full rounded-full`}
+                              style={{ width: `${riskLevel}%` }}
+                            />
+                          </Progress>
+
+                          <div className="flex justify-between mt-1 text-xs text-gray-500">
+                            <span>Safe</span>
+                            <span>Risk Increases →</span>
+                            <span>Liquidation</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Transaction Fee */}
+                      <div className="px-4 py-3 bg-gray-50 rounded-md">
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600">Transaction Fee</span>
+                          <span className="font-medium">{BORROW_FEE} USDST</span>
+                        </div>
+                        {(() => {
+                          const feeAmount = safeParseUnits(BORROW_FEE, 18);
+                          const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                          const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+
+                          return isInsufficientUsdstForFee ? (
+                            <p className="text-yellow-600 text-sm mt-1">
+                              Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
+                            </p>
+                          ) : null;
+                        })()}
+                      </div>
+
+                      {/* Borrow Button */}
+                      <Button
+                        onClick={executeEmbeddedBorrow}
+                        disabled={
+                          !borrowAmount ||
+                          borrowLoading ||
+                          safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
+                          (() => {
+                            const feeAmount = safeParseUnits(BORROW_FEE, 18);
+                            const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                            return usdstBalanceBigInt < feeAmount;
+                          })()
+                        }
+                        className="w-full"
+                      >
+                        {borrowLoading ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                        ) : null}
+                        Borrow
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="repay">
+                    <div className="space-y-4 pt-4">
+                      {loans ? (
+                        <>
+                          {/* Loan Details */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-500">Principal Balance</span>
+                              <span className="font-medium">${formatUnits(loans?.principalBalance || 0, 18)}</span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-500">Accrued Interest</span>
+                              <span className="font-medium">${formatUnits(loans?.accruedInterest || 0, 18)}</span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center font-bold pt-2 border-t">
+                              <span>Total Amount Due</span>
+                              <span className="text-lg">${formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
+                            </div>
+                          </div>
+
+                          {/* Repay Amount Input */}
+                          <div className="space-y-3">
+                            <label className="text-sm font-medium">Repay Amount (USDST)</label>
+                            <div className="flex justify-between items-center text-xs text-gray-500">
+                              <span>Min: 0.01 USDST</span>
+                              <span>Max: {(() => {
+                                const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                                const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+                                const max = available < totalOwed ? available : totalOwed;
+                                return formatCurrency(formatUnits(max > 0n ? max : 0n, 18)) + " USDST";
+                              })()}</span>
+                            </div>
+                            <div className="relative">
+                              <Input
+                                placeholder="0.00"
+                                className={`pr-16 ${(() => { 
+                                  const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                                  const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                                  const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+                                  return repayAmountWei > totalOwed || repayAmountWei > available ? 'text-red-600' : ''; 
+                                })()}`}
+                                value={repayDisplayAmount}
+                                onChange={handleRepayAmountChange}
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
+                            </div>
+                            
+                            {/* USDST Balance Display */}
+                            <div className="text-xs text-gray-500">
+                              Your USDST Balance: {formatCurrency(formatUnits(usdstBalance || "0", 18))} USDST ({formatCurrency(formatUnits(BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) > 0n ? BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) : 0n, 18))} USDST available for repayment)
+                            </div>
+                            
+                            {/* Balance validation warnings */}
+                            {(() => {
+                              const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                              const totalNeeded = repayAmountWei + safeParseUnits(REPAY_FEE, 18);
+                              const balance = BigInt(usdstBalance || "0");
+                              
+                              return repayAmount && totalNeeded > balance ? (
+                                <p className="text-red-600 text-sm mt-1">
+                                  Insufficient USDST balance. You need {formatCurrency(formatUnits(totalNeeded, 18))} USDST ({formatCurrency(formatUnits(repayAmountWei, 18))} + {REPAY_FEE} fee) but have {formatCurrency(formatUnits(balance, 18))} USDST.
+                                </p>
+                              ) : null;
+                            })()}
+                            
+                            {/* Max amount validation warnings */}
+                            {(() => {
+                              const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                              const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                              const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+                              const maxAmount = available < totalOwed ? available : totalOwed;
+                              
+                              return repayAmount && repayAmountWei > maxAmount ? (
+                                <p className="text-red-600 text-sm mt-1">
+                                  Amount cannot exceed {formatCurrency(formatUnits(maxAmount, 18))} USDST.
+                                </p>
+                              ) : null;
+                            })()}
+                            
+                            {/* Percentage Buttons */}
+                            <div className="flex gap-1">
+                              <Button
+                                variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 10n) / 100n ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleRepayPercentage(10n)}
+                                className="flex-1 text-xs px-2"
+                              >
+                                10%
+                              </Button>
+                              <Button
+                                variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 25n) / 100n ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleRepayPercentage(25n)}
+                                className="flex-1 text-xs px-2"
+                              >
+                                25%
+                              </Button>
+                              <Button
+                                variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 50n) / 100n ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleRepayPercentage(50n)}              
+                                className="flex-1 text-xs px-2"
+                              >
+                                50%
+                              </Button>
+                              <Button
+                                variant={safeParseUnits(repayAmount || "0", 18) === BigInt(loans?.totalAmountOwed || 0) ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleRepayPercentage(100n)}
+                                className="flex-1 text-xs px-2"
+                              >
+                                100%
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Payment Summary */}
+                          <div className="space-y-2 pt-3 border-t">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-500">Payment Amount</span>
+                              <span className="font-medium">
+                                {repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-500">Remaining Balance</span>
+                              <span className="font-medium">
+                                {(() => {
+                                  try {
+                                    const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                                    const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                                    const remaining = totalOwed - repayAmountWei;
+                                    return `${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))} USDST`;
+                                  } catch {
+                                    return `${formatCurrency(formatUnits(loans?.totalAmountOwed || 0, 18))} USDST`;
+                                  }
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Transaction Fee */}
+                          <div className="px-4 py-3 bg-gray-50 rounded-md">
+                            <div className="flex justify-between text-sm mb-2">
+                              <span className="text-gray-600">Transaction Fee</span>
+                              <span className="font-medium">{REPAY_FEE} USDST</span>
+                            </div>
+                            {(() => {
+                              const feeAmount = safeParseUnits(REPAY_FEE, 18);
+                              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+                              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+                              
+                              return isInsufficientUsdstForFee ? (
+                                <p className="text-yellow-600 text-sm mt-1">
+                                  Insufficient USDST balance for transaction fee ({REPAY_FEE} USDST)
+                                </p>
+                              ) : null;
+                            })()}
+                          </div>
+
+                          {/* Repay Button */}
+                          <Button
+                            onClick={executeEmbeddedRepay}
+                            disabled={
+                              repayLoading ||
+                              !repayAmount ||
+                              (() => { try { return safeParseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
+                              (() => { try { return safeParseUnits(repayAmount || "0", 18) > BigInt(loans?.totalAmountOwed || 0); } catch { return true; } })() ||
+                              (() => {
+                                const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                                const totalNeeded = repayAmountWei + safeParseUnits(REPAY_FEE, 18);
+                                return BigInt(usdstBalance || "0") < totalNeeded;
+                              })()
+                            }
+                            className="w-full"
+                          >
+                            {repayLoading ? (
+                              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                            ) : (
+                              `Repay ${repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}`
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="text-center text-gray-500 py-8">
+                          No active loan to repay
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            {/* Right Column - Your Position */}
+            <div>
+              <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+            </div>
           </div>
           <Card>
             <CardHeader>
@@ -447,33 +937,6 @@ const Borrow = () => {
         </main>
       </div>
 
-      
-        <BorrowAssetModal
-          borrowLoading={borrowLoading}
-          isOpen={isBorrowModalOpen}
-          onClose={closeBorrowModal}
-          onBorrow={(amount) => executeBorrow(amount)}
-          loan={loans}
-          usdstBalance={usdstBalance}
-        />
-
-      <RepayModal
-        isOpen={showRepayModal}
-        onClose={closeRepayModal}
-        loan={loans}
-        onRepaySuccess={async () => {
-          try {
-            await Promise.all([
-              refreshLoans(),
-              refreshCollateral(),
-              fetchUsdstBalance(userAddress || ""),
-            ]);
-          } catch (error) {
-            console.error("Error refreshing data:", error);
-          }
-        }}
-        usdstBalance={usdstBalance}
-      />
 
       <SupplyCollateralModal 
           supplyLoading={supplyLoading}

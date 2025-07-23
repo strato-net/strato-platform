@@ -99,9 +99,7 @@ const ConfigureAssetModal = ({
       reserveFactor: Math.round(parseFloat(data.reserveFactor) * 100),
     };
 
-    console.log('Configuring asset with payload:', payload);
-
-    await configureAsset(payload);
+      await configureAsset(payload);
 
     toast({
       title: 'Asset Configuration Updated',
