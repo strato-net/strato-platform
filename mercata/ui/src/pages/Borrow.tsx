@@ -399,11 +399,70 @@ const Borrow = () => {
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
                         </div>
-                        <PercentageButtons
-                          value={borrowAmount}
-                          maxValue={formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)}
-                          onChange={handleBorrowPercentage}
-                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const tenPercent = (parseFloat(maxAvailable) * 0.1).toString();
+                              return borrowAmount === tenPercent ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const tenPercent = (parseFloat(maxAvailable) * 0.1).toString();
+                              handleBorrowPercentage(tenPercent);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            10%
+                          </Button>
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const twentyFivePercent = (parseFloat(maxAvailable) * 0.25).toString();
+                              return borrowAmount === twentyFivePercent ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const twentyFivePercent = (parseFloat(maxAvailable) * 0.25).toString();
+                              handleBorrowPercentage(twentyFivePercent);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            25%
+                          </Button>
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const fiftyPercent = (parseFloat(maxAvailable) * 0.5).toString();
+                              return borrowAmount === fiftyPercent ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const fiftyPercent = (parseFloat(maxAvailable) * 0.5).toString();
+                              handleBorrowPercentage(fiftyPercent);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            50%
+                          </Button>
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              return borrowAmount === maxAvailable ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              handleBorrowPercentage(maxAvailable);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            100%
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Risk Level */}
@@ -489,17 +548,17 @@ const Borrow = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-500">Principal Balance</span>
-                              <span className="font-medium">${formatUnits(loans?.principalBalance || 0, 18)}</span>
+                              <span className="font-medium">USDST {formatUnits(loans?.principalBalance || 0, 18)}</span>
                             </div>
                             
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-500">Accrued Interest</span>
-                              <span className="font-medium">${formatUnits(loans?.accruedInterest || 0, 18)}</span>
+                              <span className="font-medium">USDST {formatUnits(loans?.accruedInterest || 0, 18)}</span>
                             </div>
                             
                             <div className="flex justify-between items-center font-bold pt-2 border-t">
                               <span>Total Amount Due</span>
-                              <span className="text-lg">${formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
+                              <span className="text-lg">USDST {formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
                             </div>
                           </div>
 
@@ -563,12 +622,12 @@ const Borrow = () => {
                             })()}
                             
                             {/* Percentage Buttons */}
-                            <div className="flex gap-1">
+                            <div className="flex gap-2">
                               <Button
                                 variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 10n) / 100n ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(10n)}
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 10%
                               </Button>
@@ -576,7 +635,7 @@ const Borrow = () => {
                                 variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 25n) / 100n ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(25n)}
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 25%
                               </Button>
@@ -584,7 +643,7 @@ const Borrow = () => {
                                 variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 50n) / 100n ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(50n)}              
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 50%
                               </Button>
@@ -592,7 +651,7 @@ const Borrow = () => {
                                 variant={safeParseUnits(repayAmount || "0", 18) === BigInt(loans?.totalAmountOwed || 0) ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(100n)}
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 100%
                               </Button>
