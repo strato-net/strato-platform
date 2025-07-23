@@ -73,11 +73,11 @@ const AssetDetail = () => {
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
   const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
-    if (!currentPrice || priceData.length === 0) return "#ef4444"; // default red
+    if (!currentPrice || priceData.length === 0) return "blue"; // default blue
     
     const current = parseFloat(formatUnits(currentPrice.toString(), 18));
     const first = parseFloat(priceData[0].price);
-    return current > first ? "#2563eb" : "#ef4444"; // BlockApps blue if up, red if down
+    return current > first ? "green" : "red"; // BlockApps blue if up, red if down
   };
   
   useEffect(() => {
