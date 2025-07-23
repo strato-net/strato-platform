@@ -117,7 +117,6 @@ replayHistoricBlock realValidators seqNo blk = do
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
   let expectedValidatorList = S.map chainMemberParsedSetToValidator $ unChainMembers _validatorList
---  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $
     blockstanbulError $
