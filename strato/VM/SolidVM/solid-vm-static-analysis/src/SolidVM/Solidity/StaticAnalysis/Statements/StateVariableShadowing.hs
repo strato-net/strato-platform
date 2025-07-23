@@ -15,7 +15,6 @@ import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
 import SolidVM.Solidity.StaticAnalysis.Types
 
--- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
