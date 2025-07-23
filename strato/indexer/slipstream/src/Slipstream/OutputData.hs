@@ -1620,8 +1620,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , application
         , contractName
         , eventName
-        , wrapSingleQuotes attributesJson <> "::jsonb"
-        ]
+        ] ++ [wrapSingleQuotes attributesJson <> "::jsonb"]
 
   in T.concat
        [ "INSERT INTO event "
