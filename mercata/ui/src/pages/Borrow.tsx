@@ -792,8 +792,10 @@ const Borrow = () => {
                                 <TooltipTrigger asChild>
                                   <Button
                                     size="sm"
+                                    variant="outline"
                                     onClick={() => handleWithdraw(asset)}
                                     disabled={!hasSuppliedBalance}
+                                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                                   >
                                     <ArrowUpCircle className="h-4 w-4 mr-1" />
                                     Withdraw
