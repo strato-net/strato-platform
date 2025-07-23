@@ -41,7 +41,7 @@ const ActivityFeedList = () => {
   const [totalEvents, setTotalEvents] = useState(0);
   const [filters, setFilters] = useState<FilterOptions>({});
   const itemsPerPage = 10;
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, userAddress } = useUser();
 
   const [filterOptions, setFilterOptions] = useState<{ 
     contractNames: string[]; 
@@ -105,7 +105,8 @@ const ActivityFeedList = () => {
         const apiFilters = {
           ...filters,
           contract_name: filters.contract_name ? `eq.${filters.contract_name}` : undefined,
-          event_name: filters.event_name ? `eq.${filters.event_name}` : undefined
+          event_name: filters.event_name ? `eq.${filters.event_name}` : undefined,
+          transaction_sender: filters.transaction_sender ? `eq.${filters.transaction_sender}` : undefined
         };
         
         const response = await activityFeedApi.getEvents({
@@ -363,6 +364,7 @@ const ActivityFeedList = () => {
         onFiltersChange={handleFiltersChange}
         contractNames={filterOptions.contractNames}
         eventNames={filterOptions.eventNames}
+        userAddress={userAddress}
       />
       
       {error && (

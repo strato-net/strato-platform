@@ -1,12 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { X, Filter } from "lucide-react";
+import { X, Filter, User } from "lucide-react";
 import { memo } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface FilterOptions {
   contract_name?: string;
   event_name?: string;
+  transaction_sender?: string;
 }
 
 interface ActivityFeedFiltersProps {
@@ -14,13 +21,15 @@ interface ActivityFeedFiltersProps {
   onFiltersChange: (filters: FilterOptions) => void;
   contractNames: string[];
   eventNames: Array<{ name: string; contract: string }>;
+  userAddress?: string | null;
 }
 
 const ActivityFeedFilters = memo(({ 
   filters, 
   onFiltersChange, 
   contractNames, 
-  eventNames
+  eventNames,
+  userAddress
 }: ActivityFeedFiltersProps) => {
 
   const handleContractChange = (value: string) => {
@@ -40,11 +49,19 @@ const ActivityFeedFilters = memo(({
     onFiltersChange(newFilters);
   };
 
+  const handleMyTransactionsToggle = () => {
+    const newFilters = {
+      ...filters,
+      transaction_sender: filters.transaction_sender ? undefined : userAddress || undefined
+    };
+    onFiltersChange(newFilters);
+  };
+
   const clearFilters = () => {
     onFiltersChange({});
   };
 
-  const hasActiveFilters = filters.contract_name || filters.event_name;
+  const hasActiveFilters = filters.contract_name || filters.event_name || filters.transaction_sender;
 
   // Filter events based on selected contract
   const availableEvents = filters.contract_name 
@@ -109,6 +126,36 @@ const ActivityFeedFilters = memo(({
             </SelectContent>
           </Select>
         </div>
+
+        {userAddress && (
+          <div className="flex items-center gap-2 ml-2">
+            <div className="w-px h-6 bg-gray-300 mx-2"></div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={filters.transaction_sender ? "default" : "outline"}
+                    size="sm"
+                    onClick={handleMyTransactionsToggle}
+                    className={`h-9 transition-all duration-200 relative ${
+                      filters.transaction_sender 
+                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md scale-105" 
+                        : "hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 hover:scale-105"
+                    }`}
+                  >
+                    {filters.transaction_sender && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                    )}
+                    My Transactions
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Filter to show only transactions where you are the sender</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </div>
 
       {hasActiveFilters && (
@@ -121,6 +168,11 @@ const ActivityFeedFilters = memo(({
           {filters.event_name && (
             <Badge variant="secondary" className="text-xs">
               Event: {filters.event_name}
+            </Badge>
+          )}
+          {filters.transaction_sender && (
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+              My Transactions
             </Badge>
           )}
         </div>

@@ -32,6 +32,7 @@ export interface EventsFilters {
   offset?: number;
   contract_name?: string;
   event_name?: string;
+  transaction_sender?: string;
 }
 
 export const activityFeedApi = {
@@ -48,6 +49,7 @@ export const activityFeedApi = {
     // Add filter parameters
     if (filters.contract_name) params.append('contract_name', filters.contract_name);
     if (filters.event_name) params.append('event_name', filters.event_name);
+    if (filters.transaction_sender) params.append('transaction_sender', filters.transaction_sender);
 
     // Backend endpoint: /events (since baseURL is already /api)
     const response = await api.get(`/events?${params.toString()}`);
