@@ -7,6 +7,7 @@ import DepositModal from "./DepositModal";
 import DepositOptionsModal from "./DepositOptionsModal";
 import { Token } from "../../interface";
 import { formatUnits } from "ethers";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 
 interface AssetsProps {
   loading: boolean;
@@ -152,12 +153,7 @@ const AssetsList = ({
                         <p className="font-medium text-gray-900">
                           {!asset?.["price"]
                             ? "-"
-                            : `$${parseFloat(
-                              formatUnits(BigInt(asset.price), 18)
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}`}
+                            : formatBalance(asset.price, undefined, 18, 2,2, true)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
@@ -179,44 +175,21 @@ const AssetsList = ({
                         <p className="font-medium text-gray-900">
                           {!asset?.balance
                             ? "-"
-                            : parseFloat(
-                              formatUnits(BigInt(asset.balance), 18)
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 1,
-                              maximumFractionDigits: 4,
-                            })}
+                            : formatBalance(asset.balance, undefined, 18,1, 4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
                           {!asset?.collateralBalance
                             ? "-"
-                            : parseFloat(
-                              formatUnits(BigInt(asset.collateralBalance), 18)
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 1,
-                              maximumFractionDigits: 4,
-                            })}
+                            : formatBalance(asset.collateralBalance, undefined, 18,1,4)}
                         </p>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-gray-900">
                           {!asset?.["price"] || (!asset?.balance && !asset?.collateralBalance)
                             ? "-"
-                            : `$${(
-                              parseFloat(
-                                formatUnits(BigInt(asset.price), 18)
-                              ) *
-                              (parseFloat(
-                                formatUnits(BigInt(asset.balance || 0), 18)
-                              ) +
-                              parseFloat(
-                                formatUnits(BigInt(asset.collateralBalance || 0), 18)
-                              ))
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}`}
+                            : formatBalance(safeParseUnits((parseFloat(formatUnits(BigInt(asset.price), 18)) * (parseFloat(formatUnits(BigInt(asset.balance || 0), 18)) + parseFloat(formatUnits(BigInt(asset.collateralBalance || 0), 18)))).toString(), 18), undefined, 18, 2, 2, true)}
                         </p>
                       </td>
                     </tr>
@@ -346,12 +319,7 @@ const AssetsList = ({
                           <p className="font-medium text-gray-900">
                             {!asset?.balance
                               ? "-"
-                              : parseFloat(
-                                  formatUnits(BigInt(asset.balance), 18)
-                                ).toLocaleString(undefined, {
-                                  minimumFractionDigits: 1,
-                                  maximumFractionDigits: 4,
-                                })}
+                              : formatBalance(asset.balance, undefined, 18,1,4)}
                           </p>
                         </td>
                       </tr>

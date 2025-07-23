@@ -47,7 +47,6 @@ import Control.Monad (forM, forM_, unless, when)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
--- import Data.IORef
 import qualified Data.IntMap as I
 import qualified Data.Map.Ordered as OMap
 import Data.List (sortOn)
@@ -114,13 +113,6 @@ processedContract ABIID {..} state AggregateAction {..} =
       transactionSender = actionTxSender
     }
 
--- readPreviousSolidVMState ::
---   MonadIO m =>
---   IORef Globals ->
---   Account ->
---   m [(Text, Value)]
--- readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
-
 rowToInsert ::
   ABIID ->
   AggregateAction ->
@@ -130,7 +122,6 @@ rowToInsert abiid row cont =
   let newState = case actionStorage row of
         Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-  -- setContractState gref (actionAccount row) newState
    in processedContract abiid (Map.fromList $ newState) row
 
 
@@ -247,19 +238,23 @@ processTheMessages messages = do
 
   let changes = parseActions messages
       events' = parseEvents messages
-      -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
-      -- delegates = [d | DelegatecallMade d <- messages]
+      -- TODO (Dan) : would be nice if we didn't just rip events out at the top
+      -- level like this
+      creates =
+        [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
+  fkeys <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
-        deferredForeignKeys <- fmap concat $
+        fmap concat $
           forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
-            -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
-            -- We will then create a table for each of these collections and add a foreign key to the main table
+            -- Here we will get the storageDefs attribute of the contract (c)
+            -- and iterate through the Map of (Text, VariableDecl) and look for
+            -- VariableDecls that have the last attribute (isRecord) true and
+            -- thetype are mappings We will then create a table for each of
+            -- these collections and add a foreign key to the main table
 
             let collectionNamesAndTypes = getCollectionsFromContract c
             $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
@@ -287,46 +282,12 @@ processTheMessages messages = do
             $logInfoS "processTheMessages/deferredForeignKeysForCollections" $ T.pack $ show deferredForeignKeysForCollections
 
 
-            -- outputData conn $ createExpandEventTables g c cc nameParts
             deferredForeignKeysForEvents <- createExpandEventTables c cc nameParts
 
 
             return $ deferredForeignKeys ++ deferredForeignKeysForCollections ++ deferredForeignKeysForEvents
 
-        -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
-        --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
-        pure $ Right deferredForeignKeys
-  -- TODO: Add delegatecall indexing back in
-  -- dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
-  --   dels <- getDelegates  s
-  --   $logInfoS "processTheMessages" $ "Got delegates for " <> T.pack (format s) <> ": " <> T.pack (show dels)
-  --   if c' `elem` dels
-  --     then do
-  --       $logInfoS "processTheMessages" $ T.pack (format c') <> " was already seen as a delegate of " <> T.pack (format s)
-  --       pure $ Right []
-  --     else do
-  --       $logInfoS "processTheMessages" $ T.pack (format c') <> " was not a delegate of " <> T.pack (format s)
-  --       $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
-  --       mStorageContract <- select (Proxy @Contract) s
-  --       mCodeContract <- select (Proxy @Contract) c'
-  --       mCodeCollection <- select (Proxy @CodeCollection) c' 
-  --       deferredForeignKeys <- case (,,) <$> mStorageContract <*> mCodeContract <*> mCodeCollection of
-  --         Nothing -> pure []
-  --         Just (sc, cc, _') -> do
-  --           let c = cc {_contractName = _contractName sc}
-  --               mapNames = getMapNamesFromContract c
-  --           nameParts <- resolveNameParts o a c
-  --           forM_ mapNames $ outputData conn . createCollectionTable  nameParts
-  --           deferredForeignKeys <- outputData conn $ createExpandIndexTable c nameParts
-  --           outputData' conn $ createExpandHistoryTable c nameParts
-  --           outputData conn $ createExpandEventTables c nameParts
-  --           pure deferredForeignKeys
-        -- forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
-  --       addDelegate  s c'
-  --       pure $ Right deferredForeignKeys
-
-  let fkeys = rights $ fkeys' -- ++ dfkeys'
-      concatFkeys = concat fkeys
+  let concatFkeys = concat fkeys
 
   inserts <- fmap concat $ do
     forM changes $ \(_, actions) -> do
@@ -386,13 +347,15 @@ processTheMessages messages = do
     forM_ insertsByCodeHash $ \ins -> do
       insertIndexTable $ indexInsert ins
       insertAbstractTable (abstractInserts ins)-- not historic
-      unless ((length (collectionInserts ins) < 1)) $ insertCollectionTable $ collectionInserts ins
+      unless ((length (collectionInserts ins) < 1)) $
+        insertCollectionTable $ collectionInserts ins
 
       --updating the foreign keys from null
     forM_ insertsByCodeHash $ \ins -> do
       updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
       updateForeignKeysFromNULLIndex (indexInsert ins)
-      unless ((length (collectionInserts ins) < 1)) $ updateForeignKeysFromNULLArray (collectionInserts ins)
+      unless ((length (collectionInserts ins) < 1)) $
+        updateForeignKeysFromNULLArray (collectionInserts ins)
 
     forM_ concatFkeys $ \deferredForeignKey -> do
       createForeignIndexesForJoins deferredForeignKey
@@ -402,21 +365,28 @@ processTheMessages messages = do
     mapOutput Right notifyPostgREST
 
   when (not (null events')) $ do
-    --Getting event entries that go into the parent abstract tables and event array inserts
+    -- Getting event entries that go into the parent abstract tables and event
+    -- array inserts
     let processedEvents = concatMap getAllEvents events'
         processedEventArrays = concatMap aggEventToCollectionRows processedEvents
-         -- TODO: Remove arrays once marketplace switches over to using event array tables
-        processedEventsWithoutArrays = processedEvents -- map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+         -- TODO: Remove arrays once marketplace switches over to using event
+         -- array tables
+        processedEventsWithoutArrays = processedEvents
         
     -- Insert the events into the event tables
     mapOutput Right . outputData $ insertEventTables processedEventArrays processedEventsWithoutArrays
+
+    -- Insert the events into the global 'events' table
+    mapOutput Right . outputData $ pipeInsertGlobalEventTable processedEvents
     
     -- If there are processed event arrays, update the foreign keys
     unless (null processedEventArrays) $
       mapOutput Right . outputData $ updateForeignKeysFromNULLArray processedEventArrays
 
-  $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
+  $logInfoS "processTheMessages" . T.pack $
+    "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
   yieldMany $ Left <$> transactionResults
 
   return events'
+

@@ -188,13 +188,14 @@ export const simulateLoan = (
     
     // Calculated values
     healthFactor: healthFactorToPercentage(healthFactor),
+    healthFactorRaw: healthFactor,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
     accruedInterest,
     interestRate: borrowableAssetConfig.interestRate / 100,
     totalAmountOwed: newTotalOwed,
     totalCollateralValueUSD: totalCollateralValue,
     maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
-    
+
     // Health status flags
     isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS),
   };
@@ -388,18 +389,18 @@ export const calculateTotalCollateralValue = (
 };
 
 /**
- * Calculate theoretical APY for supply and APR for borrow
+ * Calculate theoretical APY for supply and APY for borrow
  * @param interestRate Interest rate in basis points
  * @param reserveFactor Reserve factor in basis points
- * @returns Object with supplyAPY and borrowAPR
+ * @returns Object with supplyAPY and borrowAPY
  */
 export const calculateAPYs = (
   interestRate: number,
   reserveFactor: number = 1000
-): { supplyAPY: number; borrowAPR: number } => {
+): { supplyAPY: number; borrowAPY: number } => {
   // interestRate is in bps, so /100 gives percent
-  const borrowAPR = interestRate / 100;
+  const borrowAPY = interestRate / 100;
   // reserveFactor is in bps, so /10000 is fraction
-  const supplyAPY = borrowAPR * (1 - reserveFactor / 10000);
-  return { supplyAPY, borrowAPR };
+  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000);
+  return { supplyAPY, borrowAPY };
 };

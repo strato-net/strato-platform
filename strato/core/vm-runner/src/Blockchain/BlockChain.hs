@@ -101,12 +101,13 @@ import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
 import Data.Maybe
 import Data.Proxy
+import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import Prometheus as P
-import SolidVM.Model.CodeCollection hiding (Event, Block)
+import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -426,7 +427,15 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
 
   feeResult' <- payFees b availableGas tAddr t proposer
   let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
-      attachFeeResult er = maybe er (\a -> er{erAction = (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData a)) <$> erAction er}) $ erAction feeResult
+      attachFeeResult er = er
+        { erAction = (maybe id (\era ->
+              (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
+            . (events %~ (_events era Seq.><))
+          ) $ erAction feeResult) <$> erAction er
+        , erTrace = erTrace feeResult ++ erTrace er
+        , erLogs = erLogs feeResult ++ erLogs er
+        , erEvents = erEvents feeResult ++ erEvents er
+        }
 
   if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
     then do

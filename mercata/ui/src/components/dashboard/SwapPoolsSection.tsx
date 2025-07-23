@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BanknoteIcon, CircleArrowDown, Search } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
-import { formatUnits } from 'ethers';
+import { useUserTokens } from '@/context/UserTokensContext';
+import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { LiquidityPool } from '@/interface';
 import LiquidityDepositModal from './LiquidityDepositModal';
@@ -23,6 +24,8 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress, enrichPools } = useSwapContext();
+  const { fetchUsdstBalance } = useUserTokens();
+  const { userAddress } = useUser();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -105,11 +108,17 @@ const SwapPoolsSection = () => {
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
     await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
   };
 
 
@@ -187,7 +196,7 @@ const SwapPoolsSection = () => {
                     <div>
                       <h3 className="font-medium">{pool._name}</h3>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Liquidity: {Number(formatUnits(pool.lpToken._totalSupply, 18)).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 6 })}</span>
+                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)}</span>
                       </div>
                     </div>
                   </div>
@@ -214,7 +223,7 @@ const SwapPoolsSection = () => {
                         disabled={!pool.lpToken.balances?.length}
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
                       >
-                        <BanknoteIcon className="mr-1 h-4 w-4" />
+                        <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>
                         <span className="sm:hidden">-</span>
                       </Button>

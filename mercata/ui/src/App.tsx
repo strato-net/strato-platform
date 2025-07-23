@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import UsdstBalanceBox from "@/components/ui/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
@@ -18,7 +19,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
-import Assets from "./pages/Assets";
+import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
 import NotFound from "./pages/NotFound";
@@ -85,6 +86,7 @@ const App = () => (
                               <Toaster />
                               {/* <Sonner /> */}
                               <BrowserRouter>
+                                <UsdstBalanceBox />
                                 <Routes>
                                   <Route path="/" element={<Index />} />
                                   <Route
@@ -107,7 +109,7 @@ const App = () => (
                                     path="/dashboard/deposits"
                                     element={
                                       <ProtectedRoute>
-                                        <Assets />
+                                        <DepositsPage />
                                       </ProtectedRoute>
                                     }
                                   />

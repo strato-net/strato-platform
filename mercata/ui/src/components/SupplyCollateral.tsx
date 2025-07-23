@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatUnits, parseUnits } from "ethers";
-import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
+import { formatUnits } from "ethers";
+import { SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
@@ -199,7 +199,7 @@ const SupplyCollateralModal = ({
                 >
                   Max :
                 </button>
-                <span>${formatUnits(asset?.userBalance || 0,18)}</span>
+                <span>{formatUnits(asset?.userBalance || 0,18)} {asset?._symbol}</span>
               </div>
             </div>
             <div className="relative">
@@ -286,14 +286,14 @@ const SupplyCollateralModal = ({
               <span className="font-medium">{SUPPLY_COLLATERAL_FEE} USDST</span>
             </div>
             {(() => {
-              const feeAmount = parseUnits(SUPPLY_COLLATERAL_FEE, 18);
+              const feeAmount = safeParseUnits(SUPPLY_COLLATERAL_FEE, 18);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
               // Check if USDST balance is running low after fee
-              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const lowBalanceThreshold = safeParseUnits("0.10", 18);
               const remainingBalance = usdstBalanceBigInt - feeAmount;
               const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
 
@@ -324,7 +324,7 @@ const SupplyCollateralModal = ({
               safeParseUnits(supplyAmount || "0", 18) === 0n ||
               supplyLoading ||
               safeParseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ||
-              BigInt(usdstBalance || 0) < parseUnits(SUPPLY_COLLATERAL_FEE, 18)
+              BigInt(usdstBalance || 0) < safeParseUnits(SUPPLY_COLLATERAL_FEE, 18)
             }
             onClick={handleSupply}
             className="px-6"

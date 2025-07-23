@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wallet, Database, Book, ArrowRightLeft, Send, Shield, X } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
@@ -10,6 +10,7 @@ interface MobileSidebarProps {
 
 const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
   const { isAdmin } = useUser();
+  const location = useLocation();
 
   const allNavItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Overview', path: '/dashboard' },
@@ -22,6 +23,11 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
   ];
 
   const navItems = allNavItems.filter(item => item.label !== 'Admin' || isAdmin);
+
+  const isActive = (itemPath: string) => {
+    if (itemPath === '/dashboard') return location.pathname === '/dashboard';
+    return location.pathname.startsWith(itemPath);
+  };
 
   return (
     <>
@@ -56,18 +62,23 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
         <div className="flex flex-col flex-1 overflow-y-auto py-4">
           <nav className="flex-1">
             <ul className="space-y-1">
-              {navItems.map((item, index) => (
-                <li key={index}>
-                  <Link
-                    to={item.path}
-                    onClick={onClose}
-                    className="flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md mx-2"
-                  >
-                    <span className="flex-shrink-0">{item.icon}</span>
-                    <span className="ml-3">{item.label}</span>
-                  </Link>
-                </li>
-              ))}
+              {navItems.map((item, index) => {
+                const active = isActive(item.path);
+                return (
+                  <li key={index}>
+                    <Link
+                      to={item.path}
+                      onClick={onClose}
+                      className={`flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200 ${active
+                          ? 'bg-muted text-black font-semibold border-l-4 border-primary'
+                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        }`}
+                    >
+                      <span className={`flex-shrink-0 ${active ? 'text-black' : ''}`}>{item.icon}</span>
+                      <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
+                    </Link>
+                  </li>
+              )})}
             </ul>
           </nav>
 

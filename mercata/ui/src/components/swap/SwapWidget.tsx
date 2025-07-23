@@ -12,12 +12,12 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { useOracleContext } from "@/context/OracleContext";
-import { formatUnits, parseUnits } from "ethers";
+import { formatUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/contants";
-import { safeParseUnits, formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
+import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
 import {
   Dialog,
   DialogContent,
@@ -32,19 +32,8 @@ const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
 const DECIMALS = 18;
 
-// Utility functions
-const formatAmount = (amount: string): string => {
-  if (!amount) return "";
-  const value = Number(amount);
-  const roundedDown = Math.floor(value * 1000000) / 1000000;
-  return roundedDown.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
-  });
-};
-
 const formatBalance = (balance: string | number | bigint, symbol: string): string => {
-  return formatBalanceUtil(balance, symbol, DECIMALS);
+  return formatBalanceUtil(balance, symbol, DECIMALS,2,24);
 };
 
 // Components
@@ -379,7 +368,7 @@ const SwapWidget = () => {
   const swapInputAbortRef = useRef<AbortController | null>(null);
 
   // Fee warning logic
-  const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+  const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
   
   // Safely parse input amounts
@@ -389,7 +378,7 @@ const SwapWidget = () => {
   const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
   const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n && (() => {
-    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
+    const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
     const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
     return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
   })();
@@ -450,13 +439,13 @@ const SwapWidget = () => {
         if (fromPrice && toPrice) {
           // Oracle prices are actually stored in 18-decimal format (1e18 = $1.00), not 8-decimal
           // Parse as 18-decimal values
-          const fromPriceBig = parseUnits(fromPrice, 18);
-          const toPriceBig = parseUnits(toPrice, 18);
+          const fromPriceBig = safeParseUnits(fromPrice, 18);
+          const toPriceBig = safeParseUnits(toPrice, 18);
           
           if (fromPriceBig > 0n && toPriceBig > 0n) {
             // Calculate exchange rate: how much toAsset you get for 1 fromAsset
             // Rate = fromPrice / toPrice (since higher priced asset should give less units)
-            const rate = (fromPriceBig * parseUnits("1", 18)) / toPriceBig;
+            const rate = (fromPriceBig * safeParseUnits("1", 18)) / toPriceBig;
             setOracleExchangeRate(formatUnits(rate, 18));
             
             // Always use the same symbol order as the swap direction
@@ -872,7 +861,7 @@ const SwapWidget = () => {
 
   // Validation helpers
   const isSwapDisabled = () => {
-    const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+    const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
     // Basic validations
@@ -917,7 +906,7 @@ const handleMaxClick = (isFrom: boolean) => {
 
 
    if (asset?.address === usdstAddress) {
-    const fee = parseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
+    const fee = safeParseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
     if (balance > fee) {
       balance -= fee;
     } else {
@@ -982,7 +971,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isFromInput={false}
         pool={pool}
         fromAsset={fromAsset}
-        showMaxButton={!!toAsset?.balance}
+        showMaxButton={false}
         onMaxClick={() => handleMaxClick(false)}
       />
 

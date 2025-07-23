@@ -118,6 +118,14 @@ Object {
     "displayName": "Last",
     "key": "last",
   },
+  "limit": Object {
+    "displayName": "Limit",
+    "key": "limit",
+  },
+  "maxblocknumber": Object {
+    "displayName": "Max Block Number",
+    "key": "maxblocknumber",
+  },
   "maxgasprice": Object {
     "displayName": "Max Gas Price",
     "key": "maxgasprice",
@@ -126,6 +134,10 @@ Object {
     "displayName": "Max Value",
     "key": "maxvalue",
   },
+  "minblocknumber": Object {
+    "displayName": "Min Block Number",
+    "key": "minblocknumber",
+  },
   "mingasprice": Object {
     "displayName": "Min Gas Price",
     "key": "mingasprice",
@@ -133,6 +145,14 @@ Object {
   "minvalue": Object {
     "displayName": "Min Value",
     "key": "minvalue",
+  },
+  "offset": Object {
+    "displayName": "Offset",
+    "key": "offset",
+  },
+  "search": Object {
+    "displayName": "Search",
+    "key": "search",
   },
   "to": Object {
     "displayName": "To",

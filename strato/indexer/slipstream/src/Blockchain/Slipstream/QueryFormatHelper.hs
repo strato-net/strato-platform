@@ -7,7 +7,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
 import qualified Data.Text as T
---import Slipstream.Data.Globals (TableName (..))
 
 -- TODO: Refactor this type before someone external sees it
 data TableName

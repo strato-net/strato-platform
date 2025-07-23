@@ -24,6 +24,8 @@ module Blockchain.Slipstream.OutputData (
   outputDataDedup,
   OutputM,
   ProcessedCollectionRow(..),
+  insertGlobalEventTable,
+  pipeInsertGlobalEventTable,
   insertEventTables,
   insertIndexTable,
   insertCollectionTable,
@@ -84,11 +86,8 @@ import           Blockchain.Slipstream.QueryFormatHelper
 import           Blockchain.Slipstream.SolidityValue
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
--- import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
--- import           Data.Bifunctor                  (first)
--- import           Data.Function                   (on)
 import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -137,9 +136,11 @@ sqlTypePostgres SqlDecimal = "decimal"
 sqlTypePostgres SqlText    = "text"
 sqlTypePostgres SqlJsonb   = "jsonb"
 
+data OnConflict = OnConflict [Text] [Text] (Maybe Text) deriving (Eq, Ord, Show)
+
 data SlipstreamQuery = CreateTable TableName [(Text, SqlType)] [Text] (Maybe (Text, Text))
                      | CreateIndex Text TableName [Text]
-                     | InsertTable TableName [Text] [[Maybe Value]] [Text] [Text] (Maybe Text)
+                     | InsertTable TableName [Text] [[Maybe Value]] (Maybe OnConflict)
                      | InsertTableWithUC TableName [Text] [[Maybe Value]] (Maybe (Text, [Text]))
                      | AlterTableAddColumns TableName [(Text, SqlType)]
                      | AlterTableAddForeignKey Text ForeignKeyInfo
@@ -216,20 +217,23 @@ slipstreamQueryText _ (CreateIndex indexName tableName cols) = T.concat
   , wrapAndEscapeDouble cols
   , ";"
   ]
-slipstreamQueryText _ (InsertTable tableName cols valss conflictCols conflictUpdateCols mExtraSQL) = T.concat
+slipstreamQueryText _ (InsertTable tableName cols valss mOnConflict) = T.concat $
   [ "INSERT INTO ",
     tableNameToDoubleQuoteText tableName,
     " ",
     wrapAndEscapeDouble cols,
     "\n  VALUES ",
-    csv $ wrapParens . csv . map (maybe "NULL" (wrapSingleQuotes . escapeSingleQuotes) . (valueToSQLText =<<)) <$> valss,
-    "\n ON CONFLICT ",
-    wrapAndEscapeDouble conflictCols,
-    " DO UPDATE SET ",
-    tableUpsert conflictUpdateCols,
-    maybe "" (", " <>) mExtraSQL,
-    ";"
-  ]
+    csv $ wrapParens . csv . map (maybe "NULL" (wrapSingleQuotes . escapeSingleQuotes) . (valueToSQLText =<<)) <$> valss
+  ] ++ (case mOnConflict of
+    Nothing -> []
+    Just (OnConflict conflictCols conflictUpdateCols mExtraSQL) ->
+      [ "\n ON CONFLICT ",
+        wrapAndEscapeDouble conflictCols,
+        " DO UPDATE SET ",
+        tableUpsert conflictUpdateCols,
+        maybe "" (", " <>) mExtraSQL,
+        ";"
+      ])
 slipstreamQueryText _ (InsertTableWithUC tableName cols valss mOnConflict) = T.concat
   [ "INSERT INTO ",
     tableNameToDoubleQuoteText tableName,
@@ -292,7 +296,6 @@ slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    -- codehash :: Maybe CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
@@ -476,8 +479,6 @@ baseAbstractColumns =
     "data"
   ]
 
--- baseTableColumns :: TableColumns
--- baseTableColumns = baseColumns
 
 baseTableColumnsForEvent :: TableColumns
 baseTableColumnsForEvent = baseEventColumns
@@ -1089,7 +1090,7 @@ insertIndexTableQuery cs =
                 valsForSQL = baseRowVals ++ regularVals ++ fkeyVals
                 conflictUpdateBaseCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
                 conflictUpdateCols = conflictUpdateBaseCols ++ keysForSQL
-            in InsertTable tableName keySt [valsForSQL] ["address"] conflictUpdateCols Nothing
+            in InsertTable tableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols Nothing
     in processContract cs'
 
 insertCollectionTableQuery :: [ProcessedCollectionRow] -> [SlipstreamQuery]
@@ -1179,7 +1180,7 @@ insertCollectionTableQuery rows =
                 "collectionname",
                 "collectiontype"
               ]
-       in [InsertTable tblName columns valueTuples onConflictCols updateSet (Just valueUpdateSQL)]
+       in [InsertTable tblName columns valueTuples . Just $ OnConflict onConflictCols updateSet (Just valueUpdateSQL)]
 
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 insertEventArrayTableQuery [] = []
@@ -1209,7 +1210,7 @@ insertEventArrayTableQuery ms =
                     ValueString . collectiontype
                   ]
                 vals = map (Just . SimpleValue . ($ x)) baseVals ++ [Just k, Just v, Nothing]
-             in [InsertTable tableName keySt [vals] [] [] Nothing]
+             in [InsertTable tableName keySt [vals] . Just $ OnConflict [] [] Nothing]
 
 insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], TableName, TableColumns)] -> [SlipstreamQuery]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
@@ -1267,7 +1268,7 @@ insertAbstractTableQuery cs =
                       then "excluded.data::jsonb"
                       else dataVals''
                   ]
-            in [InsertTable abTableName keySt vals ["address"] updateSet mExtraSQL]
+            in [InsertTable abTableName keySt vals . Just $ OnConflict ["address"] updateSet mExtraSQL]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
 updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], TableName, TableColumns)] -> [SlipstreamQuery]
@@ -1449,7 +1450,69 @@ getArraysFromEvents evArgs = do
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..])
                             (map (SimpleValue . ValueString . T.pack) elements))
 
-insertEventTables ::
+pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
+pipeInsertGlobalEventTable aggregatedEvents =
+  yieldMany =<< lift (mapM insertGlobalEventTable aggregatedEvents)
+
+insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
+insertGlobalEventTable agEv = do
+  let query = insertGlobalEventTableQuery agEv
+  $logInfoS "insertGlobalEventTable/query" . T.pack $ show query
+  return query
+
+-- | Generates an INSERT SQL statement for the global 'events' table.
+--
+-- This function creates a SQL INSERT statement that adds a single event record
+-- to the centralized 'events' table. Unlike event-specific tables that are
+-- created dynamically per contract/event type, this global table has a fixed
+-- schema and stores all events in a normalized format.
+--
+-- Event arguments are converted to a JSON object and stored in the 'attributes'
+-- column, where each argument name becomes a key and its value becomes the
+-- corresponding JSON value.
+insertGlobalEventTableQuery :: AggregateEvent -> SlipstreamQuery
+insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
+  let creator = T.pack $ Action.evContractCreator ev
+      application = T.pack $ Action.evContractApplication ev
+      contractName = T.pack $ Action.evContractName ev
+      eventName = T.pack $ Action.evName ev
+      address = Action.evContractAddress ev
+      blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
+      blockTimestamp = tshow $ eventBlockTimestamp agEv
+      blockNumber = eventBlockNumber agEv
+      transactionHash = T.pack . keccak256ToHex $ eventTxHash agEv
+      transactionSender = eventTxSender agEv
+      eventIdx = eventIndex agEv
+
+      attributesMap = ValueMapping $
+        Map.fromList [(ValueString $ T.pack name, SimpleValue . ValueString $ T.pack value) | (name, value, _) <- Action.evArgs ev]
+
+      columns =
+        baseEventColumns ++
+        [ "creator"
+        , "application"
+        , "contract_name"
+        , "event_name"
+        , "attributes"
+        ]
+
+      values = Just <$>
+        [ SimpleValue $ ValueAddress address
+        , SimpleValue $ ValueString blockHash
+        , SimpleValue $ ValueString blockTimestamp
+        , SimpleValue $ ValueInt False Nothing blockNumber
+        , SimpleValue $ ValueString transactionHash
+        , SimpleValue $ ValueAddress transactionSender
+        , SimpleValue . ValueInt False Nothing $ fromIntegral eventIdx
+        , SimpleValue $ ValueString creator
+        , SimpleValue $ ValueString application
+        , SimpleValue $ ValueString contractName
+        , SimpleValue $ ValueString eventName
+        , attributesMap
+        ]
+  in InsertTable (IndexTableName "" "" "event") columns [values] Nothing
+
+insertEventTables :: 
   OutputM m =>
   [ProcessedCollectionRow] ->
   [AggregateEvent] ->
@@ -1483,16 +1546,6 @@ processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
         Action.evContractName = T.unpack n'
           }
       }
-
--- insertEventTable ::
---   OutputM m =>
---   AggregateEvent ->
---   m (Text)
--- insertEventTable agEv = do
---   let q = insertEventTableQuery agEv
---   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
---   return q
-
 
 insertEventTable ::
   OutputM m =>
@@ -1535,7 +1588,10 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
 
 ------------------
 
---This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
+-- This is a temporary function that converts solidity types to a sample
+-- value...  I am just using this now to convert table creation from the old way
+-- (value based when values come through) to the new way (direct from the types
+-- when a CC is registered)
 solidityTypeToSQLType :: Bool -> Maybe (ContractF ()) -> CodeCollectionF () -> SVMType.Type -> Maybe SqlType
 solidityTypeToSQLType _ _ _ SVMType.Bool = Just SqlBool
 solidityTypeToSQLType _ _ _ SVMType.Int{} = Just SqlDecimal
@@ -1548,14 +1604,12 @@ solidityTypeToSQLType _ _ _ SVMType.Account{} = Just SqlText
 solidityTypeToSQLType isEvent _ _ SVMType.Array{} = if isEvent then Just SqlJsonb else Nothing
 solidityTypeToSQLType _ _ _ SVMType.Mapping{} = Nothing -- Just SqlJsonb
 solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe SqlText (const SqlJsonb) $ (\c -> structDef c cc l) =<< mc
---solidityTypeToSQLType _ (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType _ _ _ SVMType.Struct{} = Just SqlJsonb
 solidityTypeToSQLType _ _ _ SVMType.Enum{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Contract{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Error{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
 
---solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 ------------------
 

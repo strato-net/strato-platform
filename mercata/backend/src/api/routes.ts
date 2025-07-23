@@ -38,6 +38,7 @@ router.use("/lend", lendingRoutes);
 
 // ----- Oracle Routes -----
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
+router.get("/oracle/price-history/:assetAddress", authHandler.authorizeRequest(true), OracleController.getPriceHistory);
 router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);
 
 // ----- Onramp Routes -----

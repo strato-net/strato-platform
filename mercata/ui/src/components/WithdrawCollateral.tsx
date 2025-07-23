@@ -8,10 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatUnits, parseUnits } from "ethers";
-import { WITHDRAW_COLLATERAL_FEE } from "@/lib/contants";
+import { formatUnits } from "ethers";
+import { WITHDRAW_COLLATERAL_FEE } from "@/lib/constants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
+import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
@@ -42,7 +43,9 @@ const getHealthFactorColor = (healthFactor: number) => {
   return "text-red-600";
 };
 
-// Calculate health impact of withdrawal
+
+
+// Calculate health impact of withdrawal using BigInt and healthFactorRaw
 const calculateHealthImpact = (
   withdrawAmount: number,
   asset: CollateralData,
@@ -59,7 +62,7 @@ const calculateHealthImpact = (
 
   // Current values from backend
   const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
-  const currentHealthFactor = loanData?.healthFactor || 0;
+  const currentHealthFactorRaw = BigInt(loanData?.healthFactorRaw || 0n);
   const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
 
   // If there's no outstanding loan, withdrawal is always healthy
@@ -86,15 +89,19 @@ const calculateHealthImpact = (
   // Subtract from current collateral value
   const newCollateralValue = currentCollateralValue - withdrawnValueWithThreshold;
 
-  // Calculate new health factor
-  const newHealthFactor = Number(newCollateralValue) / Number(currentTotalBorrowValue);
+  // Calculate new health factor (raw, scaled to 1e18)
+  const newHealthFactorRaw =
+    currentTotalBorrowValue === 0n
+      ? 0n
+      : (newCollateralValue * 10n ** 18n) / currentTotalBorrowValue;
 
-  const healthImpact = newHealthFactor - currentHealthFactor;
-  const isHealthy = newHealthFactor >= 1.0;
+  // Calculate health impact and isHealthy using raw values
+  const healthImpact = Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
+  const isHealthy = newHealthFactorRaw >= 10n ** 18n;
 
   return {
-    currentHealthFactor,
-    newHealthFactor,
+    currentHealthFactor: Number(currentHealthFactorRaw) / 1e18,
+    newHealthFactor: Number(newHealthFactorRaw) / 1e18,
     healthImpact,
     isHealthy,
   };
@@ -117,6 +124,7 @@ const WithdrawCollateralModal = ({
     healthImpact: 0,
     isHealthy: true,
   });
+  const maxSafeWithdrawAmount = getMaxSafeWithdrawAmount(asset, loanData);
 
   // Calculate health impact when withdraw amount changes
   useEffect(() => {
@@ -149,7 +157,7 @@ const WithdrawCollateralModal = ({
   }, [isOpen]);
 
   const handlePercentageClick = (percent?: bigint) => {
-    const amount = formatUnits((BigInt(asset?.collateralizedAmount || 0) * percent) / 100n, 18);
+    const amount = formatUnits((maxSafeWithdrawAmount * percent) / 100n, 18);
     setWithdrawAmount(amount);
     setDisplayAmount(addCommasToInput(amount));
   };
@@ -178,9 +186,9 @@ const WithdrawCollateralModal = ({
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Available balance</span>
+              <span className="text-sm text-gray-500">Collateral Amount</span>
               <span className="font-medium">
-                {formatUnits(asset?.collateralizedAmount || 0,18)}
+                {formatUnits(asset?.collateralizedAmount || 0, 18)}
               </span>
             </div>
           </div>
@@ -192,20 +200,21 @@ const WithdrawCollateralModal = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setWithdrawAmount(formatUnits(asset?.collateralizedAmount || 0, 18));
-                    setDisplayAmount(addCommasToInput(formatUnits(asset?.collateralizedAmount || 0, 18)));
+                    const max = formatUnits(maxSafeWithdrawAmount, 18);
+                    setWithdrawAmount(max);
+                    setDisplayAmount(addCommasToInput(max));
                   }}
                   className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
                 >
                   Max :
                 </button>
-                <span>${formatUnits(asset?.collateralizedAmount || 0, 18)}</span>
+                <span>{formatUnits(maxSafeWithdrawAmount || 0, 18)} {asset?._symbol}</span>
               </div>
             </div>
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${safeParseUnits(withdrawAmount || "0", 18) > maxSafeWithdrawAmount ? 'text-red-600' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -213,7 +222,7 @@ const WithdrawCollateralModal = ({
             </div>
             <div className="flex gap-2">
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 10n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 10n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
@@ -221,7 +230,7 @@ const WithdrawCollateralModal = ({
                 10%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 25n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 25n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
@@ -229,7 +238,7 @@ const WithdrawCollateralModal = ({
                 25%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 50n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 50n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
@@ -237,7 +246,7 @@ const WithdrawCollateralModal = ({
                 50%
               </Button>
               <Button
-                variant={safeParseUnits(withdrawAmount || "0", 18) === (BigInt(asset?.collateralizedAmount || 0) * 100n) / 100n ? "default" : "outline"}
+                variant={safeParseUnits(withdrawAmount || "0", 18) === (maxSafeWithdrawAmount * 100n) / 100n ? "default" : "outline"}
                 size="sm"
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
@@ -287,14 +296,14 @@ const WithdrawCollateralModal = ({
             </div>
             {/* Fee validation warnings */}
             {(() => {
-              const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+              const feeAmount = safeParseUnits(WITHDRAW_COLLATERAL_FEE, 18);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
               // Check if insufficient USDST for fee
               const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
               // Check if USDST balance is running low after fee
-              const lowBalanceThreshold = parseUnits("0.10", 18);
+              const lowBalanceThreshold = safeParseUnits("0.10", 18);
               const remainingBalance = usdstBalanceBigInt - feeAmount;
               const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
 
@@ -324,10 +333,10 @@ const WithdrawCollateralModal = ({
             disabled={
               safeParseUnits(withdrawAmount || "0", 18) === 0n ||
               withdrawLoading ||
-              safeParseUnits(withdrawAmount || "0", 18) > BigInt(asset?.collateralizedAmount || 0) ||
+              safeParseUnits(withdrawAmount || "0", 18) > maxSafeWithdrawAmount ||
               !healthImpact.isHealthy ||
               (() => {
-                const feeAmount = parseUnits(WITHDRAW_COLLATERAL_FEE, 18);
+                const feeAmount = safeParseUnits(WITHDRAW_COLLATERAL_FEE, 18);
                 const usdstBalanceBigInt = BigInt(usdstBalance || "0");
                 return usdstBalanceBigInt < feeAmount;
               })()

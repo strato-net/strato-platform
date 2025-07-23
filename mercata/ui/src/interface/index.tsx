@@ -274,7 +274,7 @@ export interface TokenInfo {
 
 export interface LiquidityData {
   availableLiquidity: string;
-  borrowAPR: number;
+  borrowAPY: number;
   exchangeRate: string;
   supplyAPY: number;
   maxSupplyAPY: number;
@@ -361,6 +361,7 @@ export type NewLoanData = {
   lastIntCalculated: string;
   lastUpdated: string;
   healthFactor: number;
+  healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
   accruedInterest: string;
   interestRate: number;
@@ -456,4 +457,17 @@ export interface SwapHistoryEntry {
   amountOut: string;
   impliedPrice: string;
   sender: string;
+}
+
+export interface PriceHistoryEntry {
+  id: string;
+  timestamp: Date;
+  asset: string;
+  price: string;
+  blockTimestamp: Date;
+}
+
+export interface PriceHistoryResponse {
+  data: PriceHistoryEntry[];
+  totalCount: number;
 }

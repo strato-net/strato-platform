@@ -98,15 +98,6 @@ const Dashboard = () => {
     setCataBalance(cataTotal);
   }, [tokens, loans]);
 
-  function formatBalance(value: number): string {
-    if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
-
-    return value.toLocaleString("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 2,
-    });
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
