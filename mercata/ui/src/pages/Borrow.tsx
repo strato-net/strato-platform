@@ -840,41 +840,48 @@ const Borrow = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {(() => {
-                              const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
-                              const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
-                              const canWithdraw = maxWithdrawAmount > 0n;
-                              
-                              // Determine specific reason why withdrawal is not possible
-                              let tooltipMessage = "";
-                              if (canWithdraw) {
-                                tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
-                              } else if (!hasCollateral) {
-                                tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
-                              } else {
-                                tooltipMessage = "Cannot withdraw.\nNo available borrowing power.";
-                              }
+                            <div className="flex items-center justify-end gap-4">
+                              <div className="text-right">
+                                <div className="font-medium">
+                                  {formatBalance(asset?.collateralizedAmount || 0n, undefined, 18, 2)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatBalance(asset?.collateralizedAmountValue, undefined, 18, 1, 2, true)}
+                                </div>
+                              </div>
+                              {(() => {
+                                const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
+                                const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
+                                const canWithdraw = maxWithdrawAmount > 0n;
 
-                              return (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="cursor-help">
-                                      <Button
-                                        onClick={() => handleWithdraw(asset)}
-                                        disabled={!canWithdraw || !hasCollateral}
-                                      >
-                                        Withdraw
-                                      </Button>
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <span>
-                                      {tooltipMessage}
-                                    </span>
-                                  </TooltipContent>
-                                </Tooltip>
-                              );
-                            })()}
+                                let tooltipMessage = "";
+                                if (canWithdraw) {
+                                  tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
+                                } else if (!hasCollateral) {
+                                  tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
+                                } else {
+                                  tooltipMessage = "Cannot withdraw.\nNo available borrowing power.";
+                                }
+
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help">
+                                        <Button
+                                          onClick={() => handleWithdraw(asset)}
+                                          disabled={!canWithdraw || !hasCollateral}
+                                        >
+                                          Withdraw
+                                        </Button>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <span>{tooltipMessage}</span>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              })()}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

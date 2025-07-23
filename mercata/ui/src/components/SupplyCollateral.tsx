@@ -199,7 +199,7 @@ const SupplyCollateralModal = ({
                 >
                   Max :
                 </button>
-                <span>${formatUnits(asset?.userBalance || 0,18)}</span>
+                <span>{formatUnits(asset?.userBalance || 0,18)} {asset?._symbol}</span>
               </div>
             </div>
             <div className="relative">
