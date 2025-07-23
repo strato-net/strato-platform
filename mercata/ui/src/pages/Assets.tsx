@@ -72,7 +72,7 @@ const Assets = () => {
         <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-start">
-            <div className="flex-1 min-w-0 max-w-full">
+            <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
               {/* Asset Summary */}
               <div className="mb-6">
                 <AssetSummary 
@@ -82,10 +82,10 @@ const Assets = () => {
                   color="bg-blue-500"
                 />
               </div>
-              <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
-            </div>
-            <div className="w-full lg:w-[40%] lg:min-w-[400px] lg:max-w-[600px] lg:sticky lg:top-0">
               <ExchangeCart />
+            </div>
+            <div className="flex-1 min-w-0 max-w-full">
+              <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
             </div>
           </div>
           {/* Assets List */}

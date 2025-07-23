@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import UsdstBalanceBox from "@/components/ui/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
@@ -85,6 +86,7 @@ const App = () => (
                               <Toaster />
                               {/* <Sonner /> */}
                               <BrowserRouter>
+                                <UsdstBalanceBox />
                                 <Routes>
                                   <Route path="/" element={<Index />} />
                                   <Route

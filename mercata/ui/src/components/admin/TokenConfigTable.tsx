@@ -39,12 +39,6 @@ const TokenConfigTable = () => {
       setLendLoading(true);
       const data = await getLend();
       const responseData = data as unknown as LendingPoolResponse;
-      if (responseData?.registry) {
-        console.log('Registry data present:', responseData.registry);
-      }
-      if (responseData?.pool) {
-        console.log('Pool data present:', responseData.pool);
-      }
       setLendData(responseData);
     } catch (error) {
       console.error('Error fetching lend data:', error);
@@ -71,12 +65,9 @@ const TokenConfigTable = () => {
 
   const getAssetConfig = (address: string) => {
     if (!lendData) {
-      console.log('getAssetConfig: No lendData available');
       return null;
     }
-    
-    console.log(`Getting asset config for ${address}`);
-    
+        
     // Check if data is under 'pool' key (backend might return this)
     const poolData = lendData.pool || lendData.lendingPool;
     
@@ -87,7 +78,6 @@ const TokenConfigTable = () => {
           (item) => item.asset?.toLowerCase() === address.toLowerCase()
         );
         if (config) {
-          console.log(`Found config for ${address}:`, config.AssetConfig);
           return config.AssetConfig;
         }
       }
@@ -96,14 +86,11 @@ const TokenConfigTable = () => {
         const config = poolData.assetConfigs[address.toLowerCase()] || 
                       poolData.assetConfigs[address];
         if (config) {
-          console.log(`Found config for ${address}:`, config);
           return config;
         }
       }
     }
-    
-    console.log(`No config found for ${address}`);
-    return null;
+        return null;
   };
 
   const getCollateralRatio = (address: string) => {

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useMemo, useCallback } from
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
-import { usdstAddress } from "@/lib/contants";
+import { usdstAddress } from "@/lib/constants";
 
 type UserTokensContextType = {
   activeTokens: Token[];
