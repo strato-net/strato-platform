@@ -19,7 +19,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
-import Assets from "./pages/Assets";
+import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
 import NotFound from "./pages/NotFound";
@@ -109,7 +109,7 @@ const App = () => (
                                     path="/dashboard/deposits"
                                     element={
                                       <ProtectedRoute>
-                                        <Assets />
+                                        <DepositsPage />
                                       </ProtectedRoute>
                                     }
                                   />
