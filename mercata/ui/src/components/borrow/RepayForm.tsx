@@ -73,12 +73,40 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
         <label className="text-sm font-medium">Repay Amount (USDST)</label>
         <div className="flex justify-between items-center text-xs text-gray-500">
           <span>Min: 0.01 USDST</span>
-          <span>Max: {(() => {
-            const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-            const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
-            const max = available < totalOwed ? available : totalOwed;
-            return formatCurrency(formatUnits(max > 0n ? max : 0n, 18)) + " USDST";
-          })()}</span>
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+                const max = available > 0n && available < totalOwed ? available : totalOwed;
+                const maxFormatted = formatUnits(max > 0n ? max : 0n, 18);
+                setRepayAmount(maxFormatted);
+                setRepayDisplayAmount(addCommasToInput(maxFormatted));
+              }}
+              disabled={(() => {
+                const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+                const max = available > 0n && available < totalOwed ? available : totalOwed;
+                return max === 0n;
+              })()}
+              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+              title={(() => {
+                const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+                const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+                const max = available > 0n && available < totalOwed ? available : totalOwed;
+                return max === 0n ? "No amount available to repay" : "Set to maximum repayable amount";
+              })()}
+            >
+              Max :
+            </button>
+            <span>{(() => {
+              const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+              const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+              const max = available < totalOwed ? available : totalOwed;
+              return max === 0n ? '-' : formatCurrency(formatUnits(max, 18)) + " USDST";
+            })()}</span>
+          </div>
         </div>
         <div className="relative">
           <Input

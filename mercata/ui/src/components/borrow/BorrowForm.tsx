@@ -230,11 +230,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
         const isZeroAvailable = safeParseFloat(availableToBorrowFormatted) === 0;
         
-        // Check eligible collateral tokens (ETH, BTC, GOLDST, SILVST)
-        const eligibleCollateralSymbols = ['ETH', 'BTC', 'GOLDST', 'SILVST'];
-        const eligibleCollateralTokens = collateralInfo?.filter(asset => 
-          eligibleCollateralSymbols.includes(asset?._symbol || '') && BigInt(asset?.userBalance || 0) > 0n
-        ) || [];
+        // collateralInfo already contains only eligible collateral (balance > 0)
+        const eligibleCollateralTokens = collateralInfo || [];
 
         const borrowInfoMessage = (
           <p className="text-gray-600 mt-2">
