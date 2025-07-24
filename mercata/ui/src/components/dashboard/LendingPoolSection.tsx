@@ -1,5 +1,5 @@
 import { formatUnits } from "ethers";
-import { DollarSign, ArrowDown, ArrowUp } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -143,7 +143,7 @@ const LendingPoolSection = () => {
                         "Processing..."
                       ) : (
                         <>
-                          <ArrowDown className="mr-2 h-4 w-4" />
+                          <CircleArrowDown className="mr-2 h-4 w-4" />
                           Deposit
                         </>
                       )}
@@ -223,7 +223,7 @@ const LendingPoolSection = () => {
                       "Processing..."
                     ) : (
                       <>
-                        <ArrowDown className="mr-2 h-4 w-4" />
+                        <CircleArrowDown className="mr-2 h-4 w-4" />
                         Deposit
                       </>
                     )}
@@ -257,7 +257,7 @@ const LendingPoolSection = () => {
                         "Processing..."
                       ) : (
                         <>
-                          <ArrowUp className="mr-2 h-4 w-4" />
+                          <CircleArrowUp className="mr-2 h-4 w-4" />
                           Withdraw
                         </>
                       )}
@@ -349,7 +349,7 @@ const LendingPoolSection = () => {
                       "Processing..."
                     ) : (
                       <>
-                        <ArrowUp className="mr-2 h-4 w-4" />
+                        <CircleArrowUp className="mr-2 h-4 w-4" />
                         Withdraw
                       </>
                     )}

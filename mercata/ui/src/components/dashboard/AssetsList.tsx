@@ -14,6 +14,7 @@ interface AssetsProps {
   tokens: Token[];
   isDashboard?: boolean;
   inActiveTokens: Token[];
+  shouldPreventFlash?: boolean;
 }
 
 const AssetsList = ({
@@ -21,6 +22,7 @@ const AssetsList = ({
   tokens,
   inActiveTokens,
   isDashboard = true,
+  shouldPreventFlash = false,
 }: AssetsProps) => {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -33,6 +35,9 @@ const AssetsList = ({
       setIsDepositModalOpen(true);
     }
   };
+
+  // Don't show loading indicator immediately if shouldPreventFlash is true
+  const shouldShowLoading = loading && !shouldPreventFlash;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm w-full overflow-hidden">
@@ -84,7 +89,7 @@ const AssetsList = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading ? (
+              {shouldShowLoading ? (
                 <tr className="hover:bg-gray-50 transition-colors">
                   <td
                     colSpan={6}
@@ -251,7 +256,7 @@ const AssetsList = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {loading ? (
+                  {shouldShowLoading ? (
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td
                         colSpan={5}

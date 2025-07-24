@@ -89,8 +89,6 @@ export const getPriceHistory = async (
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     const oneMonthAgoISO = oneMonthAgo.toISOString();
 
-    // console.log(`[getPriceHistory] Querying events for oracle ${oracleAddress}, asset ${assetAddress}, from ${oneMonthAgoISO}`);
-
     const params = {
       address: `eq.${oracleAddress}`,
       asset: `eq.${assetAddress}`,
@@ -104,8 +102,6 @@ export const getPriceHistory = async (
         )
       )
     };
-
-    console.log(`[getPriceHistory] Query params:`, params);
 
     const [priceEventsResponse, countResponse] = await Promise.all([
       cirrus.get(accessToken, `/${PriceOracleEvents}`, { params }).catch(err => {
@@ -127,9 +123,6 @@ export const getPriceHistory = async (
 
     const priceEvents = priceEventsResponse.data;
     const totalCount = countResponse.data?.[0]?.count || 0;
-
-    // console.log(`[getPriceHistory] Found ${priceEvents?.length || 0} price events for asset ${assetAddress} from ${oneMonthAgoISO}`);
-    // console.log(`[getPriceHistory] First few events:`, priceEvents?.slice(0, 3));
 
     if (!Array.isArray(priceEvents)) {
       return { data: [], totalCount: 0 };
@@ -159,8 +152,6 @@ export const getPriceHistory = async (
       }
     });
 
-    // console.log(`[getPriceHistory] Created ${hourlyPrices.size} unique hourly price points`);
-
     // If no historical data, return empty
     if (hourlyPrices.size === 0) {
       console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
@@ -182,10 +173,7 @@ export const getPriceHistory = async (
     // End at current time (or latest data point if it's more recent)
     const now = new Date();
     const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
-    
-    console.log(`[getPriceHistory] Chart range: ${startTime.toISOString()} to ${endTime.toISOString()}`);
-    console.log(`[getPriceHistory] Earliest data: ${earliestDataPoint.price} at ${earliestDataPoint.blockTimestamp}`);
-    
+
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
     
@@ -212,7 +200,6 @@ export const getPriceHistory = async (
       hoursGenerated++;
     }
 
-    console.log(`[getPriceHistory] Generated ${hoursGenerated} hours from first data point, returning ${filledPriceHistory.length} data points`);
     
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {

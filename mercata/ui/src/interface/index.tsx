@@ -361,6 +361,7 @@ export type NewLoanData = {
   lastIntCalculated: string;
   lastUpdated: string;
   healthFactor: number;
+  healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
   accruedInterest: string;
   interestRate: number;

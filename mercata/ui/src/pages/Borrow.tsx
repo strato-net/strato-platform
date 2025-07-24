@@ -20,17 +20,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
-import PercentageButtons from "@/components/ui/PercentageButtons";
 import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
 
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
+import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -57,11 +57,7 @@ const Borrow = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
-  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [borrowLoading, setBorrowLoading] = useState(false);
-  const [showRepayModal, setShowRepayModal] = useState(false)
-  const [eligibleCollateral, setEligibleCollateral] = useState([])
-  const [suppliedCollateral, setSuppliedCollateral] = useState([])
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [supplyLoading, setSupplyLoading] = useState(false);
@@ -114,18 +110,6 @@ const Borrow = () => {
     document.title = "Borrow Assets | STRATO Mercata";
   }, []);
 
-  useEffect(() => {
-    if (collateralInfo && Array.isArray(collateralInfo)) {
-      const filtered = collateralInfo.filter((item) => parseFloat(item.collateralizedAmount) > 0);
-      setSuppliedCollateral(filtered);
-      
-      // Only show assets that have a balance > 0
-      const eligibleWithBalance = collateralInfo.filter((item) => 
-        BigInt(item.userBalance || 0) > 0n
-      );
-      setEligibleCollateral(eligibleWithBalance);
-    }
-  }, [collateralInfo])
 
   // Refresh data when page loads and when userAddress changes
   useEffect(() => {
@@ -144,48 +128,6 @@ const Borrow = () => {
       refreshData();
     }
   }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
-
-  const handleBorrow = () => {
-    setIsBorrowModalOpen(true);
-  };
-  
-  const closeBorrowModal = () => {
-    setIsBorrowModalOpen(false);
-  };
-
-  const executeBorrow = async (amount: string) => {
-    try {
-      setBorrowLoading(true);
-      await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
-      toast({
-        title: "Borrow Initiated",
-        description: `You borrowed ${amount} USDST`,
-        variant: "success",
-      });
-      setBorrowLoading(false);
-      setIsBorrowModalOpen(false);
-      // Refresh all data after successful borrow
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      console.log(error, "error");
-      setBorrowLoading(false);
-      setIsBorrowModalOpen(false);
-      // Error toast is now handled globally by axios interceptor
-    }
-  };
-  
-  const handleRepay = () => {
-    setShowRepayModal(true);
-  };
-
-  const closeRepayModal = () => {
-    setShowRepayModal(false)
-  }
-  
 
   const handleSupply = (asset) => {
     setSelectedAsset(asset)
@@ -447,11 +389,70 @@ const Borrow = () => {
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
                         </div>
-                        <PercentageButtons
-                          value={borrowAmount}
-                          maxValue={formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)}
-                          onChange={handleBorrowPercentage}
-                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const tenPercent = (parseFloat(maxAvailable) * 0.1).toString();
+                              return borrowAmount === tenPercent ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const tenPercent = (parseFloat(maxAvailable) * 0.1).toString();
+                              handleBorrowPercentage(tenPercent);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            10%
+                          </Button>
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const twentyFivePercent = (parseFloat(maxAvailable) * 0.25).toString();
+                              return borrowAmount === twentyFivePercent ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const twentyFivePercent = (parseFloat(maxAvailable) * 0.25).toString();
+                              handleBorrowPercentage(twentyFivePercent);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            25%
+                          </Button>
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const fiftyPercent = (parseFloat(maxAvailable) * 0.5).toString();
+                              return borrowAmount === fiftyPercent ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              const fiftyPercent = (parseFloat(maxAvailable) * 0.5).toString();
+                              handleBorrowPercentage(fiftyPercent);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            50%
+                          </Button>
+                          <Button
+                            variant={(() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              return borrowAmount === maxAvailable ? "default" : "outline";
+                            })()}
+                            size="sm"
+                            onClick={() => {
+                              const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+                              handleBorrowPercentage(maxAvailable);
+                            }}
+                            className="flex-1 transition-all duration-200 hover:scale-105"
+                          >
+                            100%
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Risk Level */}
@@ -537,17 +538,17 @@ const Borrow = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-500">Principal Balance</span>
-                              <span className="font-medium">${formatUnits(loans?.principalBalance || 0, 18)}</span>
+                              <span className="font-medium">USDST {formatUnits(loans?.principalBalance || 0, 18)}</span>
                             </div>
                             
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-500">Accrued Interest</span>
-                              <span className="font-medium">${formatUnits(loans?.accruedInterest || 0, 18)}</span>
+                              <span className="font-medium">USDST {formatUnits(loans?.accruedInterest || 0, 18)}</span>
                             </div>
                             
                             <div className="flex justify-between items-center font-bold pt-2 border-t">
                               <span>Total Amount Due</span>
-                              <span className="text-lg">${formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
+                              <span className="text-lg">USDST {formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
                             </div>
                           </div>
 
@@ -611,12 +612,12 @@ const Borrow = () => {
                             })()}
                             
                             {/* Percentage Buttons */}
-                            <div className="flex gap-1">
+                            <div className="flex gap-2">
                               <Button
                                 variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 10n) / 100n ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(10n)}
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 10%
                               </Button>
@@ -624,7 +625,7 @@ const Borrow = () => {
                                 variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 25n) / 100n ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(25n)}
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 25%
                               </Button>
@@ -632,7 +633,7 @@ const Borrow = () => {
                                 variant={safeParseUnits(repayAmount || "0", 18) === (BigInt(loans?.totalAmountOwed || 0) * 50n) / 100n ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(50n)}              
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 50%
                               </Button>
@@ -640,7 +641,7 @@ const Borrow = () => {
                                 variant={safeParseUnits(repayAmount || "0", 18) === BigInt(loans?.totalAmountOwed || 0) ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => handleRepayPercentage(100n)}
-                                className="flex-1 text-xs px-2"
+                                className="flex-1 transition-all duration-200 hover:scale-105"
                               >
                                 100%
                               </Button>
@@ -734,108 +735,8 @@ const Borrow = () => {
           <Card>
             <CardHeader>
               <CardTitle>
-                <InfoTooltip content="Tokens in your wallet that you can supply as collateral. Supply these tokens to enable borrowing USDST.">
-                  Eligible Collateral
-                </InfoTooltip>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Wallet Balance</TableHead>
-                    <TableHead>USD Value</TableHead>
-                    <TableHead>
-                      <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
-                        LTV
-                      </InfoTooltip>
-                    </TableHead>
-                    <TableHead>
-                      <InfoTooltip content="If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
-                        Liquidation Threshold
-                      </InfoTooltip>
-                    </TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingCollateral ? (
-                    <TableRow>
-                      <TableCell colSpan={7}>
-                        <LoadingSpinner />
-                      </TableCell>
-                    </TableRow>
-                  ) : eligibleCollateral.length > 0 ? (
-                    eligibleCollateral.map((asset) => (
-                      <TableRow key={asset?.address}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {asset?.images?.[0] ? (
-                              <img
-                                src={asset.images[0].value}
-                                alt={asset._name}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
-                                style={{ backgroundColor: "red" }}
-                              >
-                                {asset?._symbol.slice(0, 2)}
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-medium">{asset?._name}</div>
-                              <div className="text-xs text-gray-500">{asset?._symbol}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatBalance(asset?.userBalance || 0n, undefined, 18, 2)}</TableCell>
-                        <TableCell>
-                          ${formatBalance(asset?.userBalanceValue, undefined, 18, 1, 2)}
-                        </TableCell>
-                        <TableCell>
-                          {asset?.ltv ? asset?.ltv/100 : 0}%
-                        </TableCell>
-                        <TableCell>{asset?.liquidationThreshold ? asset?.liquidationThreshold/100 : 0}%</TableCell>
-                        <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                onClick={() => handleSupply(asset)}
-                                className="flex items-center gap-1"
-                              >
-                                Supply
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) :
-                    <TableRow>
-                      <TableCell colSpan={7}>
-                        <div className="w-full flex justify-center items-center mt-4">
-                          No data to show
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  }
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>
-                <InfoTooltip content="Tokens you've supplied as collateral for your loans. These determine your borrowing power and can be withdrawn when you no longer need them.">
-                  Supplied Collateral
+                <InfoTooltip content="Manage your collateral assets. Supply tokens from your wallet or withdraw supplied collateral.">
+                  Collateral Management
                 </InfoTooltip>
               </CardTitle>
             </CardHeader>
@@ -845,22 +746,17 @@ const Borrow = () => {
                   <TableRow>
                     <TableHead>Asset</TableHead>
                     <TableHead>
-                      <InfoTooltip content="Amount of tokens currently used as collateral for your loans. This determines your borrowing power.">
-                        Supplied Balance
-                      </InfoTooltip>
-                    </TableHead>
-                    <TableHead>USD Value</TableHead>
-                    <TableHead>
                       <InfoTooltip content="Loan-to-Value ratio: Maximum percentage of collateral value you can borrow against. Higher LTV means more borrowing power but higher risk.">
                         LTV
                       </InfoTooltip>
                     </TableHead>
                     <TableHead>
-                      <InfoTooltip content="If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
-                        Liquidation Threshold
+                      <InfoTooltip content="Liquidation Threshold: If your position value falls below this percentage, your collateral may be liquidated to repay your debt. Keep your position above this threshold.">
+                        LT
                       </InfoTooltip>
                     </TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Supply</TableHead>
+                    <TableHead className="text-right">Withdraw</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -870,66 +766,125 @@ const Borrow = () => {
                         <LoadingSpinner />
                       </TableCell>
                     </TableRow>
-                  ) : suppliedCollateral?.length > 0 ? (
-                    suppliedCollateral?.map((loan, loanIndex) => (
-                      <TableRow key={loanIndex}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {loan?.images?.[0] ? (
-                              <img
-                                src={loan.images[0].value}
-                                alt={loan._name || loan._symbol}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
-                                style={{ backgroundColor: "red" }}
-                              >
-                                {loan?._symbol?.slice(0, 2)}
+                  ) : collateralInfo && collateralInfo.length > 0 ? (
+                    collateralInfo.map((asset) => {
+                      const hasWalletBalance = BigInt(asset?.userBalance || 0) > 0n;
+                      const hasSuppliedBalance = parseFloat(asset?.collateralizedAmount || "0") > 0;
+                      
+                      // Only show assets that have either wallet balance or supplied balance
+                      if (!hasWalletBalance && !hasSuppliedBalance) return null;
+                      
+                      return (
+                        <TableRow key={asset?.address}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {asset?.images?.[0] ? (
+                                <img
+                                  src={asset.images[0].value}
+                                  alt={asset._name}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"
+                                  style={{ backgroundColor: "red" }}
+                                >
+                                  {asset?._symbol.slice(0, 2)}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium">{asset?._name}</div>
+                                <div className="text-xs text-gray-500">{asset?._symbol}</div>
                               </div>
-                            )}
-                            <div>
-                              <div className="font-medium">{loan?._name || loan?._symbol}</div>
-                              <div className="text-xs text-gray-500">{loan?._symbol}</div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatBalance(loan?.collateralizedAmount || 0n, undefined, 18, 2)}</TableCell>
-                        <TableCell>
-                          {formatBalance(loan?.collateralizedAmountValue, undefined, 18, 1, 2,true)}
-                        </TableCell>
-                        <TableCell>
-                          {loan?.ltv ? loan?.ltv/100 : 0}%
-                        </TableCell>
-                        <TableCell>
-                          {loan?.liquidationThreshold ? loan?.liquidationThreshold/100 : 0}%
-                        </TableCell>
-                        <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                onClick={() => {handleWithdraw(loan)}}
-                              >
-                                Withdraw
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Remove collateral from your position. This reduces your borrowing power and may affect your loan if you have outstanding debt.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) :
+                          </TableCell>
+                          <TableCell>
+                            {asset?.ltv ? (Number(asset.ltv) / 100) : 0}%
+                          </TableCell>
+                          <TableCell>
+                            {asset?.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100) : 0}%
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-4">
+                              <div className="text-right">
+                                <div className="font-medium">{formatBalance(asset?.userBalance || 0n, undefined, 18, 2)}</div>
+                                <div className="text-xs text-gray-500">
+                                  ${formatBalance(asset?.userBalanceValue, undefined, 18, 1, 2)}
+                                </div>
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSupply(asset)}
+                                    disabled={!hasWalletBalance}
+                                  >
+                                    <ArrowDownCircle className="h-4 w-4 mr-1" />
+                                    Supply
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{hasWalletBalance ? "Deposit tokens as collateral to enable borrowing. You can withdraw these tokens later." : "No tokens in wallet to supply"}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-4">
+                              <div className="text-right">
+                                <div className="font-medium">
+                                  {formatBalance(asset?.collateralizedAmount || 0n, undefined, 18, 2)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatBalance(asset?.collateralizedAmountValue, undefined, 18, 1, 2, true)}
+                                </div>
+                              </div>
+                              {(() => {
+                                const maxWithdrawAmount = getMaxSafeWithdrawAmount(asset, loans);
+                                const hasCollateral = BigInt(asset?.collateralizedAmount || 0) > 0n;
+                                const canWithdraw = maxWithdrawAmount > 0n;
+
+                                let tooltipMessage = "";
+                                if (canWithdraw) {
+                                  tooltipMessage = "Withdraw collateral.\nReduces borrowing power.";
+                                } else if (!hasCollateral) {
+                                  tooltipMessage = "Cannot withdraw.\nNo collateral supplied for this asset.";
+                                } else {
+                                  tooltipMessage = "Cannot withdraw.\nNo available borrowing power.";
+                                }
+
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help">
+                                        <Button
+                                          onClick={() => handleWithdraw(asset)}
+                                          disabled={!canWithdraw || !hasCollateral}
+                                        >
+                                          Withdraw
+                                        </Button>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <span>{tooltipMessage}</span>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              })()}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={5}>
                         <div className="w-full flex justify-center items-center mt-4">
-                          No data to show
+                          No collateral assets available
                         </div>
                       </TableCell>
                     </TableRow>
-                  }
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
