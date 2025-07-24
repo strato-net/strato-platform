@@ -160,35 +160,39 @@ const LiquidityWithdrawModal = ({
                 <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1">
                   {selectedPool && (
                     <>
-                      <div className="flex items-center -space-x-1">
-                        {selectedPool.tokenA?.images?.[0]?.value ? (
-                          <img
-                            src={selectedPool.tokenA.images[0].value}
-                            alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
-                            className="w-5 h-5 rounded-full z-10 border border-white object-cover"
-                          />
-                        ) : (
-                          <div
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border border-white"
-                            style={{ backgroundColor: "red" }}
-                          >
-                            {selectedPool._name?.split('/')[0]?.slice(0, 1)}
-                          </div>
-                        )}
-                        {selectedPool.tokenB?.images?.[0]?.value ? (
-                          <img
-                            src={selectedPool.tokenB.images[0].value}
-                            alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
-                            className="w-5 h-5 rounded-full border border-white object-cover"
-                          />
-                        ) : (
-                          <div
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white"
-                            style={{ backgroundColor: "red" }}
-                          >
-                            {selectedPool._name?.split('/')[1]?.slice(0, 1)}
-                          </div>
-                        )}
+                      <div className="flex items-center">
+                        <div className="relative w-5 h-5">
+                          {selectedPool.tokenA?.images?.[0]?.value ? (
+                            <img
+                              src={selectedPool.tokenA.images[0].value}
+                              alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
+                              className="w-5 h-5 rounded-full border border-white object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white"
+                              style={{ backgroundColor: "red" }}
+                            >
+                              {selectedPool._name?.split('/')[0]?.slice(0, 1)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="relative w-5 h-5 -ml-1">
+                          {selectedPool.tokenB?.images?.[0]?.value ? (
+                            <img
+                              src={selectedPool.tokenB.images[0].value}
+                              alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
+                              className="w-5 h-5 rounded-full border border-white object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white"
+                              style={{ backgroundColor: "red" }}
+                            >
+                              {selectedPool._name?.split('/')[1]?.slice(0, 1)}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <span className="font-medium text-sm">{selectedPool._symbol}</span>
                     </>
