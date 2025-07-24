@@ -104,8 +104,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
               const totalOwed = BigInt(loans?.totalAmountOwed || 0);
               const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
               const max = available < totalOwed ? available : totalOwed;
-              return max === 0n ? '-' : formatCurrency(formatUnits(max, 18)) + " USDST";
-            })()}</span>
+              return max <= 0n ? '-' : formatCurrency(formatUnits(max, 18));
+            })()} USDST</span>
           </div>
         </div>
         <div className="relative">
@@ -161,9 +161,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             const totalOwed = BigInt(loans?.totalAmountOwed || 0);
             const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
             const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
-            const percentageAmountBigInt = (maxAmount * BigInt(percentage)) / 100n;
-            const percentageAmount = formatUnits(percentageAmountBigInt, 18);
-            const isActive = parseFloat(repayAmount || "0").toFixed(6) === parseFloat(percentageAmount).toFixed(6);
+            const isDisabled = maxAmount <= 0n;
             
             return (
               <Button
@@ -171,7 +169,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
                 variant="outline"
                 size="sm"
                 onClick={() => handleRepayPercentage(BigInt(percentage))}
-                className="flex-1 transition-all duration-200 hover:scale-105"
+                disabled={isDisabled}
+                className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
+                title={isDisabled ? "No amount available to repay" : `Set to ${percentage}% of available amount`}
               >
                 {percentage}%
               </Button>
