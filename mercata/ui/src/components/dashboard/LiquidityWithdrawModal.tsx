@@ -161,7 +161,7 @@ const LiquidityWithdrawModal = ({
                   {selectedPool && (
                     <>
                       <div className="flex items-center">
-                        <div className="relative w-5 h-5">
+                        <div className="relative w-5 h-5 z-10">
                           {selectedPool.tokenA?.images?.[0]?.value ? (
                             <img
                               src={selectedPool.tokenA.images[0].value}
