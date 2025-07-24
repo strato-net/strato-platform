@@ -4,95 +4,214 @@ import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Wallet } from 'lucide-react';
+import { ChevronLeft, Wallet, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { Token } from '@/interface';
+import { Token, PriceHistoryEntry, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import { api } from '@/lib/axios';
+import PriceChart from '@/components/charts/PriceChart';
 import CopyButton from '@/components/ui/copy';
+import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
 
 type PricePoint = {
   date: string;
-  price: string; // since you're using `formatUnits`, it's a string
+  price: string;
+  timestamp?: number;
 };
 
-const generatePriceData = (basePrice: number, days: number = 30) => {
-  const data = [];
-  let currentPrice = basePrice;
+type SwapPricePoint = {
+  date: string;
+  price: string;
+  timestamp: number;
+  poolAddress: string;
+  volume: string;
+};
 
-  for (let i = 0; i < days; i++) {
-    // Random price fluctuation between -2% and +2%
-    const change = currentPrice * (Math.random() * 0.04 - 0.02);
-    currentPrice += change;
+interface PriceHistoryApiEntry {
+  id: string;
+  timestamp: string;
+  asset: string;
+  price: string;
+  blockTimestamp: string;
+}
 
-    data.push({
-      date: new Date(Date.now() - (days - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      price: formatUnits(currentPrice?.toLocaleString("fullwide", { useGrouping: false }), 18),
-    });
+interface Pool {
+  address: string;
+  tokenA: { address: string; _symbol: string };
+  tokenB: { address: string; _symbol: string };
+  aToBRatio: string;
+  bToARatio: string;
+}
+
+const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
+  try {
+    const response = await api.get<{ data: PriceHistoryApiEntry[] }>(`/oracle/price-history/${assetAddress}`);
+    
+    const processedData = response.data.data
+      .filter((entry: PriceHistoryApiEntry) => entry.price && entry.price !== "0") // Filter out zero prices
+      .map((entry: PriceHistoryApiEntry) => {
+        const date = new Date(entry.blockTimestamp);
+        const price = formatUnits(entry.price, 18);
+        return {
+          date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
+          price: price,
+          timestamp: date.getTime()
+        };
+      });
+    
+    
+    return processedData;
+  } catch (error) {
+    console.error('Failed to fetch price history:', error);
+    return [];
   }
+};
 
-  return data;
+const fetchPoolsForAsset = async (assetAddress: string): Promise<Pool[]> => {
+  try {
+    const response = await api.get('/swap-pools');
+    const pools = response.data || [];
+    
+    // Filter pools that contain this asset
+    return pools.filter((pool: Pool) => 
+      pool.tokenA?.address?.toLowerCase() === assetAddress.toLowerCase() ||
+      pool.tokenB?.address?.toLowerCase() === assetAddress.toLowerCase()
+    );
+  } catch (error) {
+    console.error('Failed to fetch pools for asset:', error);
+    return [];
+  }
+};
+
+const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint[]> => {
+  try {
+    // First, get all pools containing this asset
+    const pools = await fetchPoolsForAsset(assetAddress);
+    
+    if (pools.length === 0) {
+      return [];
+    }
+
+    // Fetch swap history for each pool and combine the data
+    const allSwapPrices: SwapPricePoint[] = [];
+    
+    for (const pool of pools) {
+      try {
+        const response = await api.get(`/swap-history/${pool.address}`, {
+          params: {
+            limit: '1000', // Get more history for better chart
+            order: 'block_timestamp.desc'
+          }
+        });
+        
+        const swapHistory: SwapHistoryEntry[] = response.data.data || [];
+        
+        // Convert swap history to price points
+        const poolPrices = swapHistory
+          .filter(swap => swap.impliedPrice && swap.impliedPrice !== "0")
+          .map(swap => {
+            const date = new Date(swap.timestamp);
+            return {
+              date: `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
+              price: swap.impliedPrice,
+              timestamp: date.getTime(),
+              poolAddress: pool.address,
+              volume: swap.amountIn
+            };
+          });
+        
+        allSwapPrices.push(...poolPrices);
+      } catch (poolError) {
+        console.error(`Failed to fetch swap history for pool ${pool.address}:`, poolError);
+      }
+    }
+    
+    // Sort by timestamp and return last 30 days worth of data
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    return allSwapPrices
+      .filter(point => point.timestamp >= thirtyDaysAgo)
+      .sort((a, b) => a.timestamp - b.timestamp);
+      
+  } catch (error) {
+    console.error('Failed to fetch swap pool prices:', error);
+    return [];
+  }
+};
+
+// Consistent color scheme for all charts
+const CHART_COLORS = {
+  GREEN: "#10b981", // Consistent green for upward trends
+  RED: "#ef4444",   // Consistent red for downward trends  
+  BLUE: "#2563eb"   // Default blue for neutral/no data
 };
 
 const AssetDetail = () => {
+
   const { id } = useParams<{ id: string }>();
   const [asset, setAsset] = useState<Token | null>(null);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
+  const [priceDataLoading, setPriceDataLoading] = useState(false);
+  const [swapPriceData, setSwapPriceData] = useState<SwapPricePoint[]>([]);
+  const [swapPriceDataLoading, setSwapPriceDataLoading] = useState(false);
+  const [showPriceTooltip, setShowPriceTooltip] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
+  const PRICE_WINDOW = 30; // Number of days to show in the price chart
+  
+  const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
+    if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
+    
+    const current = parseFloat(formatUnits(currentPrice.toString(), 18));
+    const first = parseFloat(priceData[0].price);
+    return current > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
+  };
+  
+  const getSwapChartColor = (swapPriceData: SwapPricePoint[]): string => {
+    if (swapPriceData.length === 0) return CHART_COLORS.BLUE;
+    
+    const first = parseFloat(swapPriceData[0].price);
+    const last = parseFloat(swapPriceData[swapPriceData.length - 1].price);
+    return last > first ? CHART_COLORS.GREEN : CHART_COLORS.RED;
+  };
   
   useEffect(() => {
     fetchTokens()
   }, [userAddress])
 
   useEffect(() => {
-    // Find the asset with the matching id
-    const foundAsset = assets.find(a => a?.address === id);
-    const foundInActiveAsset = inactiveTokens.find(a => a?.address === id)
-    const foundInAllActiveTokens = allActiveTokens.find(a => a?.address === id)
-    if (foundAsset) {
+    // Helper function to handle asset setup and price fetching
+    const setupAsset = (foundAsset: Token) => {
       setAsset(foundAsset);
-      document.title = `${foundAsset?.token?._name} | Asset Details`;
+      document.title = `${foundAsset?.token?._name || foundAsset?._name} | Asset Details`;
 
-      if (foundAsset?.price) {
-        const basePrice = parseFloat(foundAsset.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
-      }
-    } else if (foundInActiveAsset){
-      setAsset(foundInActiveAsset);
-      document.title = `${foundInActiveAsset?.token?._name} | Asset Details`;
+      // Fetch oracle price history if address exists
+      if (foundAsset?.address) {
+        setPriceDataLoading(true);
+        fetchPriceHistory(foundAsset.address)
+          .then(data => setPriceData(data.slice(-(PRICE_WINDOW * 24)))) // Show last N days (24 hours each)
+          .finally(() => setPriceDataLoading(false));
 
-      if (foundInActiveAsset?.price) {
-        const basePrice = parseFloat(foundInActiveAsset.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
+        // Fetch swap pool price history
+        setSwapPriceDataLoading(true);
+        fetchSwapPoolPrices(foundAsset.address)
+          .then(data => setSwapPriceData(data))
+          .finally(() => setSwapPriceDataLoading(false));
       }
-    } else if (foundInAllActiveTokens){
-      setAsset(foundInAllActiveTokens);
-      document.title = `${foundInAllActiveTokens?.token?._name} | Asset Details`;
+    };
 
-      if (foundInAllActiveTokens?.price) {
-        const basePrice = parseFloat(foundInAllActiveTokens.price.toString());
-        if (!isNaN(basePrice)) {
-          setPriceData(generatePriceData(basePrice));
-        }
-      }
+    // Find asset across all token sources
+    const foundAsset = 
+      assets.find(a => a?.address === id) ||
+      inactiveTokens.find(a => a?.address === id) ||
+      allActiveTokens.find(a => a?.address === id);
+
+    if (foundAsset) {
+      setupAsset(foundAsset);
     }
-  }, [id, assets]);  
+  }, [id, assets, inactiveTokens, allActiveTokens]);  
 
   if (!asset) {
     return (
@@ -144,7 +263,8 @@ const AssetDetail = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Asset Summary Card */}
             <div className="lg:col-span-1">
-              <Card className="mb-6">
+              <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
+                <Card className="mb-6">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -181,11 +301,53 @@ const AssetDetail = () => {
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
+                    <div 
+                      className="flex justify-between text-sm relative cursor-help"
+                      onMouseEnter={() => setShowPriceTooltip(true)}
+                      onMouseLeave={() => setShowPriceTooltip(false)}
+                    >
                       <span className="text-gray-500">Current Price:</span>
-                      <span className="font-medium">
-                        {formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                          {addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18))} USDST
+                        </span>
+                        
+                        {/* Price trend indicator */}
+                        {/* {priceData.length > 0 && asset?.price && (() => {
+                          const chartColor = getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData);
+                          const isUp = chartColor === CHART_COLORS.GREEN;
+                          const firstPrice = parseFloat(priceData[0].price);
+                          
+                          return (
+                            <div title={isUp ? `Up from initial: $${firstPrice.toFixed(2)}` : `Down from initial: $${firstPrice.toFixed(2)}`}>
+                              {isUp ? (
+                                <ArrowUp size={14} style={{ color: CHART_COLORS.GREEN }} />
+                              ) : (
+                                <ArrowDown size={14} style={{ color: CHART_COLORS.RED }} />
+                              )}
+                            </div>
+                          );
+                        })()} */}
+                      </div>
+                      
+                      {/* Price timestamp tooltip */}
+                      {showPriceTooltip && priceData.length > 0 && (
+                        <div className="absolute right-0 top-full mt-1 z-10 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                          Last updated: {(() => {
+                            const latestEntry = priceData[priceData.length - 1];
+                            if (latestEntry?.timestamp) {
+                              return new Date(latestEntry.timestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              });
+                            }
+                            return 'Unknown';
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-between text-sm">
@@ -261,88 +423,6 @@ const AssetDetail = () => {
                   </div> */}
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Charts and Description */}
-            <div className="lg:col-span-2">
-
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Price History</CardTitle>
-                </CardHeader>
-
-                <CardContent className="overflow-hidden">
-                  {priceData.length > 0 ? (
-                    <div className="h-80 w-full">
-                      <ChartContainer
-                        config={{
-                          price: {
-                            theme: {
-                              light: asset?.color || "#EF4444",
-                              dark: asset?.color || "#EF4466",
-                            }
-                          },
-                          tooltip: {
-                            theme: {
-                              light: "gray",
-                              dark: "gray"
-                            }
-                          }
-                        }}
-                        className="w-full h-full"
-                      >
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={priceData}
-                            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
-                          >
-                            <defs>
-                              <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={asset.color} stopOpacity={0.8} />
-                                <stop offset="95%" stopColor={asset.color} stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis
-                              dataKey="date"
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => {
-                                const date = new Date(value);
-                                return `${date.getMonth() + 1}/${date.getDate()}`;
-                              }}
-                            />
-                            <YAxis
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 12 }}
-                              domain={['auto', 'auto']}
-                              tickFormatter={(value) => `$${parseFloat(value).toFixed(2)}`}
-                            />
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <ChartTooltip
-                              content={<ChartTooltipContent />}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="price"
-                              name="Price"
-                              stroke={asset?.color || "#EF4444"}
-                              fillOpacity={1}
-                              fill="url(#colorPrice)"
-                              activeDot={{ r: 8 }}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </ChartContainer>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
-                      <p className="text-gray-500">Price data not available</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               <Card>
                 <CardHeader>
@@ -358,6 +438,33 @@ const AssetDetail = () => {
                   </div>
                 </CardContent>
               </Card>
+              </div>
+            </div>
+
+            {/* Charts and Description */}
+            <div className="lg:col-span-2">
+
+              <PriceChart
+                data={priceData}
+                loading={priceDataLoading}
+                title="Spot Price History"
+                subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
+                loadingMessage="Loading price history..."
+                emptyMessage="No price history available for this asset"
+                chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
+                gradientId="colorPrice"
+              />
+
+              <PriceChart
+                data={swapPriceData}
+                loading={swapPriceDataLoading}
+                title="Swap Pool Price History"
+                subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
+                loadingMessage="Loading swap pool prices..."
+                emptyMessage="No swap pool data available for this asset"
+                chartColor={getSwapChartColor(swapPriceData)}
+                gradientId="colorSwapPrice"
+              />
             </div>
           </div>
         </main>

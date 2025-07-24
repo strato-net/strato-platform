@@ -11,6 +11,7 @@ import OracleController from "./controllers/oracle.controller";
 import userRoutes from "./routes/user.routes";
 import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
+import eventsRoutes from "./routes/events.routes";
 
 const router = Router();
 const bridgeController = new BridgeController();
@@ -36,8 +37,12 @@ router.use("/lending", lendingRoutes);
 // UI compatibility alias
 router.use("/lend", lendingRoutes);
 
+// ----- Events Routes -----
+router.use("/events", eventsRoutes);
+
 // ----- Oracle Routes -----
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
+router.get("/oracle/price-history/:assetAddress", authHandler.authorizeRequest(true), OracleController.getPriceHistory);
 router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);
 
 // ----- Onramp Routes -----

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { formatUnits } from "ethers";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
-import { usdstAddress } from "@/lib/contants";
+import { usdstAddress } from "@/lib/constants";
 
 export const useLendingMetrics = () => {
   const [loanList, setLoanList] = useState([]);

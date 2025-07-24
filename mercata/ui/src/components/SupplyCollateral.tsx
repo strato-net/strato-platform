@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatUnits } from "ethers";
-import { SUPPLY_COLLATERAL_FEE } from "@/lib/contants";
+import { SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
@@ -24,12 +24,12 @@ interface SupplyModalProps {
 }
 
 const addCommasToInput = (value: string) => {
-  if (!value) return '';
-  const parts = value.split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
+  if (!value) return "";
+  const parts = value.split(".");
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
   if (parts.length === 2) {
-    return integerPart + '.' + parts[1];
+    return integerPart + "." + parts[1];
   }
   return integerPart;
 };
@@ -78,16 +78,19 @@ const calculateHealthImpact = (
 
   // Convert supply amount to wei and calculate USD value
   const supplyAmountWei = BigInt(Math.round(supplyAmount * Math.pow(10, 18)));
-  const suppliedValueUSD = (supplyAmountWei * assetPrice) / (10n ** 18n);
+  const suppliedValueUSD = (supplyAmountWei * assetPrice) / 10n ** 18n;
 
   // Apply liquidation threshold to get health factor value
-  const suppliedValueWithThreshold = (suppliedValueUSD * liquidationThreshold) / 10000n;
+  const suppliedValueWithThreshold =
+    (suppliedValueUSD * liquidationThreshold) / 10000n;
 
   // Add to current collateral value
-  const newCollateralValue = currentCollateralValue + suppliedValueWithThreshold;
+  const newCollateralValue =
+    currentCollateralValue + suppliedValueWithThreshold;
 
   // Calculate new health factor
-  const newHealthFactor = Number(newCollateralValue) / Number(currentTotalBorrowValue);
+  const newHealthFactor =
+    Number(newCollateralValue) / Number(currentTotalBorrowValue);
 
   const healthImpact = newHealthFactor - currentHealthFactor;
   const isHealthy = newHealthFactor >= 1.0;
@@ -132,7 +135,7 @@ const SupplyCollateralModal = ({
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, '');
+    const value = e.target.value.replace(/,/g, "");
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
       setSupplyAmount(value);
@@ -148,29 +151,39 @@ const SupplyCollateralModal = ({
   }, [isOpen]);
 
   const handlePercentageClick = (percent?: bigint) => {
-    const amount = formatUnits((BigInt(asset?.userBalance || 0) * percent) / 100n, 18);
+    const amount = formatUnits(
+      (BigInt(asset?.userBalance || 0) * percent) / 100n,
+      18
+    );
     setSupplyAmount(amount);
     setDisplayAmount(addCommasToInput(amount));
   };
 
   const handleClose = () => {
-    setDisplayAmount("")
-    setSupplyAmount("")
-    onClose()
-  }
-  
+    setDisplayAmount("");
+    setSupplyAmount("");
+    onClose();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
-              style={{ backgroundColor: "red" }}
-            >
-              {asset?._symbol?.slice(0, 2)}
-            </div>
+            {asset?.images?.[0] ? (
+              <img
+                src={asset.images[0].value}
+                alt={asset._name}
+                className="w-6 h-6 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
+                style={{ backgroundColor: "red" }}
+              >
+                {asset?._symbol?.slice(0, 2) || "??"}
+              </div>
+            )}
             {`Supply ${asset?._name} as Collateral`}
           </DialogTitle>
         </DialogHeader>
@@ -180,40 +193,58 @@ const SupplyCollateralModal = ({
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Available balance</span>
               <span className="font-medium">
-                {formatUnits(asset?.userBalance || 0,18)}
+                {formatUnits(asset?.userBalance || 0, 18)}
               </span>
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-medium">Supply Amount ({asset?._name})</label>
+            <label className="text-sm font-medium">
+              Supply Amount ({asset?._name})
+            </label>
             <div className="flex justify-between items-center text-xs text-gray-500">
               <div>
                 <button
                   type="button"
                   onClick={() => {
-                    setSupplyAmount(formatUnits(asset?.userBalance || 0,18));
-                    setDisplayAmount(addCommasToInput(formatUnits(asset?.userBalance || 0,18)));
+                    setSupplyAmount(formatUnits(asset?.userBalance || 0, 18));
+                    setDisplayAmount(
+                      addCommasToInput(formatUnits(asset?.userBalance || 0, 18))
+                    );
                   }}
                   className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
                 >
                   Max :
                 </button>
-                <span>${formatUnits(asset?.userBalance || 0,18)}</span>
+                <span>
+                  {formatUnits(asset?.userBalance || 0, 18)} {asset?._symbol}
+                </span>
               </div>
             </div>
             <div className="relative">
               <Input
                 placeholder="0.00"
-                className={`pr-8 ${safeParseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ? 'text-red-600' : ''}`}
+                className={`pr-8 ${
+                  safeParseUnits(supplyAmount || "0", 18) >
+                  BigInt(asset?.userBalance || 0)
+                    ? "text-red-600"
+                    : ""
+                }`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{asset?._symbol}</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                {asset?._symbol}
+              </span>
             </div>
             <div className="flex gap-2">
               <Button
-                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 10n) / 100n ? "default" : "outline"}
+                variant={
+                  safeParseUnits(supplyAmount || "0", 18) ===
+                  (BigInt(asset?.userBalance || 0) * 10n) / 100n
+                    ? "default"
+                    : "outline"
+                }
                 size="sm"
                 onClick={() => handlePercentageClick(10n)}
                 className="flex-1"
@@ -221,7 +252,12 @@ const SupplyCollateralModal = ({
                 10%
               </Button>
               <Button
-                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 25n) / 100n ? "default" : "outline"}
+                variant={
+                  safeParseUnits(supplyAmount || "0", 18) ===
+                  (BigInt(asset?.userBalance || 0) * 25n) / 100n
+                    ? "default"
+                    : "outline"
+                }
                 size="sm"
                 onClick={() => handlePercentageClick(25n)}
                 className="flex-1"
@@ -229,7 +265,12 @@ const SupplyCollateralModal = ({
                 25%
               </Button>
               <Button
-                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 50n) / 100n ? "default" : "outline"}
+                variant={
+                  safeParseUnits(supplyAmount || "0", 18) ===
+                  (BigInt(asset?.userBalance || 0) * 50n) / 100n
+                    ? "default"
+                    : "outline"
+                }
                 size="sm"
                 onClick={() => handlePercentageClick(50n)}
                 className="flex-1"
@@ -237,7 +278,12 @@ const SupplyCollateralModal = ({
                 50%
               </Button>
               <Button
-                variant={safeParseUnits(supplyAmount || "0", 18) === (BigInt(asset?.userBalance || 0) * 100n) / 100n ? "default" : "outline"}
+                variant={
+                  safeParseUnits(supplyAmount || "0", 18) ===
+                  (BigInt(asset?.userBalance || 0) * 100n) / 100n
+                    ? "default"
+                    : "outline"
+                }
                 size="sm"
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
@@ -250,29 +296,51 @@ const SupplyCollateralModal = ({
           {/* Health Impact Section */}
           {safeParseUnits(supplyAmount || "0", 18) !== 0n && (
             <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-700">Health Impact</h4>
+              <h4 className="text-sm font-medium text-gray-700">
+                Health Impact
+              </h4>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Current Health Factor:</span>
-                  <span className={`font-medium ${getHealthFactorColor(healthImpact.currentHealthFactor)}`}>
-                    {healthImpact.currentHealthFactor === Infinity ? "No Loan" : healthImpact.currentHealthFactor.toFixed(2)}
+                  <span
+                    className={`font-medium ${getHealthFactorColor(
+                      healthImpact.currentHealthFactor
+                    )}`}
+                  >
+                    {healthImpact.currentHealthFactor === Infinity
+                      ? "No Loan"
+                      : healthImpact.currentHealthFactor.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">New Health Factor:</span>
-                  <span className={`font-medium ${getHealthFactorColor(healthImpact.newHealthFactor)}`}>
-                    {healthImpact.newHealthFactor === Infinity ? "No Loan" : healthImpact.newHealthFactor.toFixed(2)}
+                  <span
+                    className={`font-medium ${getHealthFactorColor(
+                      healthImpact.newHealthFactor
+                    )}`}
+                  >
+                    {healthImpact.newHealthFactor === Infinity
+                      ? "No Loan"
+                      : healthImpact.newHealthFactor.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Change:</span>
-                  <span className={`font-medium ${healthImpact.healthImpact >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {healthImpact.healthImpact >= 0 ? '+' : ''}{healthImpact.healthImpact.toFixed(2)}
+                  <span
+                    className={`font-medium ${
+                      healthImpact.healthImpact >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {healthImpact.healthImpact >= 0 ? "+" : ""}
+                    {healthImpact.healthImpact.toFixed(2)}
                   </span>
                 </div>
                 {healthImpact.healthImpact > 0 && (
                   <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                    ✅ This supply will improve your position health and increase your borrowing power.
+                    ✅ This supply will improve your position health and
+                    increase your borrowing power.
                   </div>
                 )}
               </div>
@@ -295,18 +363,22 @@ const SupplyCollateralModal = ({
               // Check if USDST balance is running low after fee
               const lowBalanceThreshold = safeParseUnits("0.10", 18);
               const remainingBalance = usdstBalanceBigInt - feeAmount;
-              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+              const isLowBalanceWarning =
+                remainingBalance >= 0n &&
+                remainingBalance <= lowBalanceThreshold;
 
               return (
                 <>
                   {isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee ({SUPPLY_COLLATERAL_FEE} USDST)
+                      Insufficient USDST balance for transaction fee (
+                      {SUPPLY_COLLATERAL_FEE} USDST)
                     </p>
                   )}
                   {isLowBalanceWarning && !isInsufficientUsdstForFee && (
                     <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      Warning: Your USDST balance is running low. Add more funds
+                      now to avoid issues with future transactions.
                     </p>
                   )}
                 </>
@@ -323,15 +395,17 @@ const SupplyCollateralModal = ({
             disabled={
               safeParseUnits(supplyAmount || "0", 18) === 0n ||
               supplyLoading ||
-              safeParseUnits(supplyAmount || "0", 18) > BigInt(asset?.userBalance || 0) ||
-              BigInt(usdstBalance || 0) < safeParseUnits(SUPPLY_COLLATERAL_FEE, 18)
+              safeParseUnits(supplyAmount || "0", 18) >
+                BigInt(asset?.userBalance || 0) ||
+              BigInt(usdstBalance || 0) <
+                safeParseUnits(SUPPLY_COLLATERAL_FEE, 18)
             }
             onClick={handleSupply}
             className="px-6"
           >
             {supplyLoading && (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
-            )} {" "}
+            )}{" "}
             Supply
           </Button>
         </DialogFooter>

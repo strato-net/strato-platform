@@ -16,7 +16,7 @@ import { formatUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/contants";
+import { usdstAddress, SWAP_FEE } from "@/lib/constants";
 import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
 import {
   Dialog,
@@ -53,7 +53,25 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
       <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
-        <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        <div className="flex items-center gap-2">
+          {asset ? (
+            asset.images?.[0]?.value ? (
+              <img
+                src={asset.images[0].value}
+                alt={asset._name}
+                className="w-4 h-4 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                style={{ backgroundColor: "red" }}
+              >
+                {asset._symbol?.slice(0, 1)}
+              </div>
+            )
+          ) : null}
+          <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        </div>
         <ChevronDown className="h-4 w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
@@ -70,7 +88,23 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
                 onSelect(token);
               }}
             >
-              <span>{token._symbol}</span>
+              <div className="flex items-center gap-2">
+                {token.images?.[0]?.value ? (
+                  <img
+                    src={token.images[0].value}
+                    alt={token._name}
+                    className="w-4 h-4 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                    style={{ backgroundColor: "red" }}
+                  >
+                    {token._symbol?.slice(0, 1)}
+                  </div>
+                )}
+                <span>{token._symbol}</span>
+              </div>
               {token._symbol === asset?._symbol && <Check className="h-4 w-4 ml-auto" />}
             </Button>
           ))
@@ -971,7 +1005,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isFromInput={false}
         pool={pool}
         fromAsset={fromAsset}
-        showMaxButton={!!toAsset?.balance}
+        showMaxButton={false}
         onMaxClick={() => handleMaxClick(false)}
       />
 

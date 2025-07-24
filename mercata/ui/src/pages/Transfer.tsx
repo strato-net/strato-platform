@@ -10,7 +10,7 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
-import { usdstAddress, TRANSFER_FEE } from "@/lib/contants";
+import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
 import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput, formatBalance } from "@/utils/numberUtils";
 
@@ -100,6 +100,10 @@ const Transfer = () => {
         setFromAsset(updatedToken); // triggers re-render with updated balance
       } else {
         setFromAsset(null)
+      }
+      // Refresh USDST balance since gas fees were paid
+      if (userAddress) {
+        await fetchUsdstBalance(userAddress);
       }
     } catch (error) {
       const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
@@ -206,7 +210,7 @@ const Transfer = () => {
                             max = max > feeAmount ? max - feeAmount : 0n;
                           }
 
-                          let raw = formatUnits(max, 18);
+                          const raw = formatUnits(max, 18);
                           // clamp to 18 decimals using utility function
                           const clampedAmount = roundToDecimals(raw, 18);
                           setFromAmount(clampedAmount);
@@ -319,7 +323,7 @@ const Transfer = () => {
             </div>
 
             <Button
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full"
               onClick={handleTransferClick}
               disabled={
                 !fromAsset ||
