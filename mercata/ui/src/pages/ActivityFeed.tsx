@@ -26,13 +26,13 @@ const ActivityFeed = () => {
           onMenuClick={() => setIsMobileSidebarOpen(true)}
         />
 
-        <main className="p-6">
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <Activity className="h-6 w-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Blockchain Events</h1>
+        <main className="p-4 sm:p-6">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Blockchain Events</h1>
             </div>
-            <p className="text-gray-600">
+            <p className="text-sm sm:text-base text-gray-600">
               View all events emitted from smart contracts on the blockchain
             </p>
           </div>

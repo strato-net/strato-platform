@@ -146,13 +146,13 @@ const ActivityFeedList = () => {
   const getEventIcon = useCallback((eventName: string) => {
     switch (eventName.toLowerCase()) {
       case 'transfer':
-        return <ArrowUpRight className="h-4 w-4" />;
+        return <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" />;
       case 'mint':
-        return <ArrowDownLeft className="h-4 w-4" />;
+        return <ArrowDownLeft className="h-3 w-3 sm:h-4 sm:w-4" />;
       case 'burn':
-        return <Minus className="h-4 w-4" />;
+        return <Minus className="h-3 w-3 sm:h-4 sm:w-4" />;
       default:
-        return <Activity className="h-4 w-4" />;
+        return <Activity className="h-3 w-3 sm:h-4 sm:w-4" />;
     }
   }, []);
 
@@ -197,7 +197,8 @@ const ActivityFeedList = () => {
     if (totalPages <= 1) return [];
     
     const pages = [];
-    const maxVisiblePages = 7;
+    const isMobile = window.innerWidth < 640;
+    const maxVisiblePages = isMobile ? 3 : 7;
     const halfVisible = Math.floor(maxVisiblePages / 2);
     
     let startPage = Math.max(1, currentPage - halfVisible);
@@ -240,39 +241,39 @@ const ActivityFeedList = () => {
 
   // Memoized event card renderer to prevent unnecessary re-renders
   const renderEventCard = useCallback((event: BlockchainEvent) => (
-    <Card key={`${event.transaction_hash}-${event.event_index}`} className="mb-4 hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${getEventColor(event.event_name)}`}>
+    <Card key={`${event.transaction_hash}-${event.event_index}`} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
+      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2 rounded-full ${getEventColor(event.event_name)}`}>
               {getEventIcon(event.event_name)}
             </div>
             <div>
-              <CardTitle className="text-lg font-semibold">{event.event_name}</CardTitle>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Building2 className="h-4 w-4" />
+              <CardTitle className="text-base sm:text-lg font-semibold">{event.event_name}</CardTitle>
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
+                <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>{event.contract_name}</span>
                 <span>•</span>
                 <span>{event.application}</span>
               </div>
             </div>
           </div>
-          <div className="text-right">
-            <Badge variant="outline" className="text-xs">
+          <div className="flex items-center gap-2 sm:block sm:text-right">
+            <Badge variant="outline" className="text-xs inline-flex">
               Block #{event.block_number}
             </Badge>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 sm:mt-1">
               {formatTimestamp(event.block_timestamp)}
             </div>
           </div>
         </div>
       </CardHeader>
       
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <CardContent className="px-3 sm:px-6 pt-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Hash className="h-4 w-4 text-gray-500" />
+            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Hash className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
               <span className="font-medium">Transaction:</span>
               <TooltipProvider>
                 <Tooltip>
@@ -287,8 +288,8 @@ const ActivityFeedList = () => {
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-gray-500" />
+            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
               <span className="font-medium">Sender:</span>
               <TooltipProvider>
                 <Tooltip>
@@ -303,8 +304,8 @@ const ActivityFeedList = () => {
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <FileText className="h-4 w-4" />
+            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="font-medium">Contract:</span>
               <TooltipProvider>
                 <Tooltip>
@@ -322,10 +323,10 @@ const ActivityFeedList = () => {
           </div>
           
           <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-700">Event Attributes:</div>
+            <div className="text-xs sm:text-sm font-medium text-gray-700">Event Attributes:</div>
             <div className="space-y-1">
               {Object.entries(event.attributes).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-sm">
+                <div key={key} className="flex justify-between text-xs sm:text-sm">
                   <span className="text-gray-600 capitalize">{key}:</span>
                   <span className="font-mono text-xs">
                     {key.toLowerCase().includes('value') 
@@ -376,9 +377,9 @@ const ActivityFeedList = () => {
         </Card>
       )}
       
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="text-xs sm:text-sm text-gray-600">
             Showing {paginationInfo.startItem}-{paginationInfo.endItem} of {totalEvents} events
             {loading && (
               <span className="ml-2 inline-flex items-center gap-1 text-blue-600">
@@ -416,9 +417,9 @@ const ActivityFeedList = () => {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8 pb-20 sm:pb-0">
           <Pagination>
-            <PaginationContent>
+            <PaginationContent className="flex flex-wrap sm:flex-nowrap justify-center gap-0 sm:gap-1">
               <PaginationItem>
                 <PaginationPrevious 
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -429,7 +430,7 @@ const ActivityFeedList = () => {
               {paginationItems.map((item, index) => {
                 if (item.type === 'ellipsis') {
                   return (
-                    <PaginationItem key={`ellipsis-${index}`}>
+                    <PaginationItem key={`ellipsis-${index}`} className="hidden sm:flex">
                       <span className="px-3 py-2 text-sm text-gray-500">...</span>
                     </PaginationItem>
                   );
@@ -440,7 +441,7 @@ const ActivityFeedList = () => {
                     <PaginationLink
                       onClick={() => setCurrentPage(item.number)}
                       isActive={currentPage === item.number}
-                      className={`cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`cursor-pointer px-2 sm:px-3 ${loading ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       {item.number}
                     </PaginationLink>
