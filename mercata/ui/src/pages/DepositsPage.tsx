@@ -18,7 +18,7 @@ import { formatUnits } from 'viem';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
 
-const Assets = () => {
+const DepositsPage = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens } = useUserTokens();
   const { loans } = useLendingContext();
@@ -103,4 +103,4 @@ const Assets = () => {
   );
 };
 
-export default Assets;
+export default DepositsPage;

@@ -89,10 +89,7 @@ main = do
                       contract (id serial primary key, "codeHash" text, contract text, abi text)|]
       migrateCirrus [r|alter table contract add column if not exists "chainId" text|]
       migrateCirrus
-        [r|CREATE TABLE IF NOT EXISTS events (
-                creator text,
-                application text,
-                contract_name text,
+        [r|CREATE TABLE IF NOT EXISTS event (
                 address text,
                 block_hash text,
                 block_timestamp text,
@@ -100,6 +97,10 @@ main = do
                 transaction_hash text NOT NULL,
                 transaction_sender text,
                 event_index integer NOT NULL,
+                creator text,
+                application text,
+                contract_name text,
+                event_name text,
                 attributes jsonb,
                 PRIMARY KEY (transaction_hash, event_index)
             )|]
