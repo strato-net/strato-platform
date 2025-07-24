@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, safeParseFloat, formatWeiAmount } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData } from "@/interface";
 
 interface BorrowFormProps {
@@ -78,7 +78,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         <div className="flex justify-between">
           <span className="text-sm text-gray-500">Available to borrow</span>
           <span className="font-medium">
-            USDST {formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)}
+            USDST {safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')}
           </span>
         </div>
         <div className="flex justify-between">
@@ -108,11 +108,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
                 setBorrowAmount(availableToBorrowFormatted);
                 setBorrowDisplayAmount(addCommasToInput(availableToBorrowFormatted));
               }}
-              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+              disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
+              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+              title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to maximum available amount"}
             >
               Max :
             </button>
-            <span>{formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)} USDST</span>
+            <span>{safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')} USDST</span>
           </div>
         </div>
         <div className="relative">
@@ -129,9 +131,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
             const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
             const percentageAmount = percentage === 100 
               ? maxAvailable 
-              : (parseFloat(maxAvailable) * (percentage / 100)).toFixed(18);
-            const isActive = parseFloat(borrowAmount || "0").toFixed(6) === parseFloat(percentageAmount).toFixed(6);
-            const isDisabled = parseFloat(maxAvailable) === 0;
+              : (safeParseFloat(maxAvailable) * (percentage / 100)).toFixed(18);
+            const isDisabled = safeParseFloat(maxAvailable) === 0;
             
             return (
               <Button
@@ -227,7 +228,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
       {/* Conditional Warning Messages */}
       {(() => {
         const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
-        const isZeroAvailable = parseFloat(availableToBorrowFormatted) === 0;
+        const isZeroAvailable = safeParseFloat(availableToBorrowFormatted) === 0;
         
         // Check eligible collateral tokens (ETH, BTC, GOLDST, SILVST)
         const eligibleCollateralSymbols = ['ETH', 'BTC', 'GOLDST', 'SILVST'];
