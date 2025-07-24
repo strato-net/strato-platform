@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, MoreVertical } from 'lucide-react';
+import CopyButton from '../ui/copy';
 import ConfigureAssetModal from './ConfigureAssetModal';
 import { Token, LendingPoolResponse } from '@/interface';
 
@@ -174,6 +175,7 @@ const TokenConfigTable = () => {
     setConfigureAssetModalOpen(true);
   };
 
+
   if (loading || lendLoading) {
     return (
       <Card>
@@ -259,10 +261,17 @@ const TokenConfigTable = () => {
                       <TableCell className="font-medium text-sm max-w-[80px] truncate">{symbol}</TableCell>
                       <TableCell className="text-sm max-w-[150px] truncate" title={name}>{name}</TableCell>
                       <TableCell className="font-mono text-xs max-w-[120px]">
-                        {address && address !== 'Unknown' 
-                          ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                          : address
-                        }
+                        <div className="flex items-center space-x-2">
+                          <span>
+                            {address && address !== 'Unknown' 
+                              ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                              : address
+                            }
+                          </span>
+                          {address && address !== 'Unknown' && (
+                            <CopyButton address={address} />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-[70px]">
                         <Badge variant="default" className="text-xs">
