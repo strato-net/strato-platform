@@ -417,7 +417,7 @@ const ActivityFeedList = () => {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-6 sm:mt-8 pb-20 sm:pb-0">
+        <div className="mt-6 sm:mt-8 pb-12 sm:pb-0">
           <Pagination>
             <PaginationContent className="flex flex-wrap sm:flex-nowrap justify-center gap-0 sm:gap-1">
               <PaginationItem>
