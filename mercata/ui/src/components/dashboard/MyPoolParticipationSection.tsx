@@ -10,7 +10,21 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
-export default function MyPoolParticipationSection({ liquidityInfo, loadingLiquidity, lpTokens, loadingLpTokens }) {
+interface PoolParticipationProps {
+  liquidityInfo: any;
+  loadingLiquidity: any;
+  lpTokens: any;
+  loadingLpTokens: any;
+  shouldPreventFlash?: boolean;
+}
+
+export default function MyPoolParticipationSection({ 
+  liquidityInfo, 
+  loadingLiquidity, 
+  lpTokens, 
+  loadingLpTokens,
+  shouldPreventFlash = false
+}: PoolParticipationProps) {
   
   const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
   
@@ -34,6 +48,9 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
     setExpandedTokens(newExpanded);
   };
 
+  // Don't show loading indicator immediately if shouldPreventFlash is true
+  const shouldShowLoading = (loadingLiquidity || loadingLpTokens) && !shouldPreventFlash;
+
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
       <CardHeader>
@@ -51,7 +68,7 @@ export default function MyPoolParticipationSection({ liquidityInfo, loadingLiqui
           <div className="text-right">Value</div>
         </div>
 
-        {loadingLiquidity || loadingLpTokens ? (
+        {shouldShowLoading ? (
           <div className="flex items-center justify-center gap-2">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
             <span className="text-sm text-gray-600">Loading...</span>

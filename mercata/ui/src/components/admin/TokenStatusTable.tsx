@@ -16,6 +16,7 @@ import { useTokenContext } from '@/context/TokenContext';
 import { Loader2, Filter, Search, RefreshCw } from 'lucide-react';
 import SetTokenStatusModal from './SetTokenStatusForm';
 import { Token } from '@/interface';
+import CopyButton from '../ui/copy';
 
 const getStatusLabel = (status?: string | number) => {
   switch (String(status)) {
@@ -217,10 +218,17 @@ const TokenStatusTable = () => {
                       <TableCell className="font-medium text-sm max-w-[100px] truncate">{symbol}</TableCell>
                       <TableCell className="text-sm max-w-[200px] truncate" title={name}>{name}</TableCell>
                       <TableCell className="font-mono text-xs max-w-[140px]">
-                        {address && address !== 'Unknown' 
-                          ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                          : address
-                        }
+                        <div className="flex items-center space-x-2">
+                          <span>
+                            {address && address !== 'Unknown' 
+                              ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                              : address
+                            }
+                          </span>
+                          {address && address !== 'Unknown' && (
+                            <CopyButton address={address} />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-[80px]">
                         <Badge variant={status.variant} className="text-xs">
