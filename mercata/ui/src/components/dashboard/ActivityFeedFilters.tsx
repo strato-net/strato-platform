@@ -69,10 +69,10 @@ const ActivityFeedFilters = memo(({
     : eventNames;
 
   return (
-    <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-      <div className="flex items-center gap-2 mb-3">
-        <Filter className="h-4 w-4" />
-        <span className="font-medium">Filters</span>
+    <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-gray-50">
+      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+        <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
+        <span className="text-sm sm:text-base font-medium">Filters</span>
         {hasActiveFilters && (
           <Button
             variant="ghost"
@@ -86,14 +86,14 @@ const ActivityFeedFilters = memo(({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Contract:</label>
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
+          <label className="text-xs sm:text-sm font-medium text-gray-700 sm:min-w-fit">Contract:</label>
           <Select
             value={filters.contract_name || "all"}
             onValueChange={handleContractChange}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select contract" />
             </SelectTrigger>
             <SelectContent>
@@ -107,13 +107,13 @@ const ActivityFeedFilters = memo(({
           </Select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Event:</label>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
+          <label className="text-xs sm:text-sm font-medium text-gray-700 sm:min-w-fit">Event:</label>
           <Select
             value={filters.event_name || "all"}
             onValueChange={handleEventChange}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select event" />
             </SelectTrigger>
             <SelectContent>
@@ -128,8 +128,8 @@ const ActivityFeedFilters = memo(({
         </div>
 
         {userAddress && (
-          <div className="flex items-center gap-2 ml-2">
-            <div className="w-px h-6 bg-gray-300 mx-2"></div>
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-2">
+            <div className="hidden sm:block w-px h-6 bg-gray-300 mx-2"></div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -159,7 +159,7 @@ const ActivityFeedFilters = memo(({
       </div>
 
       {hasActiveFilters && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-2 sm:mt-3 flex flex-wrap gap-1 sm:gap-2">
           {filters.contract_name && (
             <Badge variant="secondary" className="text-xs">
               Contract: {filters.contract_name}

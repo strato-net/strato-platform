@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
-import { Card, CardContent } from "./card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Coins, AlertTriangle, HelpCircle, Minus } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -10,8 +10,8 @@ import {
   formatCurrency,
   safeParseFloat,
 } from "@/utils/numberUtils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
-import { Button } from "./button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
 import { usdstAddress } from "@/lib/constants";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
