@@ -25,6 +25,7 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import BridgeWalletStatus from './BridgeWalletStatus';
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
 import { parseUnits } from "ethers";
 
 interface Token {
@@ -67,10 +68,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [balanceError, setBalanceError] = useState<string>("");
+  const [networkError, setNetworkError] = useState<string>("");
   const [fromChain, setFromChain] = useState<string>(
     showTestnet ? "Sepolia" : "Ethereum"
   );
   const [toChain, setToChain] = useState<string>("STRATO");
+
+  // Expected network validation - use chainId from selected token
+  // This needs to be computed every time chainId or selectedToken changes
+  const isCorrectNetwork = isConnected && chainId && selectedToken?.chainId && chainId === selectedToken.chainId;
+  
 
   // Fetch network tokens
   useEffect(() => {
@@ -98,6 +105,27 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     setBalanceError("");
   }, [selectedToken, isConnected, address]);
 
+  // Network validation - following existing error handling pattern
+  useEffect(() => {
+    if (isConnected && chainId && selectedToken?.chainId) {
+      if (chainId !== selectedToken.chainId) {
+        setNetworkError(getNetworkErrorMessage({
+          networkName: selectedToken.name,
+          tokenSymbol: selectedToken.symbol,
+          direction: "in"
+        }));
+      } else {
+        setNetworkError("");
+      }
+    } else if (isConnected && !selectedToken) {
+      setNetworkError(getTokenSelectionErrorMessage("in"));
+    } else {
+      setNetworkError("");
+    }
+  }, [chainId, isConnected, selectedToken]);
+
+  // Force re-validation when chainId changes - additional safety check
+ 
   // Balance fetching hooks
   const { data: nativeBalance, refetch: refetchNativeBalance, isError: isNativeBalanceError, isLoading: isNativeBalanceLoading } = useBalance({
     address,
@@ -126,19 +154,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       refetchInterval: false,
     },
   });
-
-  // Network validation
-  useEffect(() => {
-    if (isConnected && chainId && selectedToken?.chainId) {
-      if (chainId !== selectedToken.chainId) {
-        toast({
-          title: "Wrong Network",
-          description: `Please switch to the correct network for ${selectedToken.name}`,
-          variant: "destructive",
-        });
-      }
-    }
-  }, [chainId, isConnected, selectedToken, toast]);
 
   // Balance update effect
   useEffect(() => {
@@ -333,6 +348,20 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const handleBridgeIn = async () => {
     const tokenAddress = selectedToken?.tokenAddress;
     const tokenChainId = selectedToken?.chainId;
+
+    // Network validation - following existing error handling pattern
+    if (!isCorrectNetwork) {
+      toast({
+        title: "Wrong Network",
+        description: getNetworkErrorMessage({
+          networkName: selectedToken?.name || "network",
+          tokenSymbol: selectedToken?.symbol || "tokens",
+          direction: "in"
+        }),
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (!tokenChainId) {
       toast({
@@ -591,16 +620,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       </div>
 
       <div className="flex justify-end gap-4">
-        <Button
-          onClick={handleBridgeIn}
-          disabled={Boolean(
-            isLoading || !amount || !selectedToken || !isConnected
-          )}
-          className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-        >
+                           <Button
+           onClick={handleBridgeIn}
+           disabled={Boolean(
+             isLoading || !amount || !selectedToken || !isConnected || !isCorrectNetwork
+           )}
+           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+         >
           {isLoading ? "Processing..." : "Bridge Assets"}
         </Button>
       </div>
+      {networkError && (
+        <p className="text-sm text-red-500">{networkError}</p>
+      )}
     </div>
   );
 };
