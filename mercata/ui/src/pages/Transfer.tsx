@@ -8,8 +8,8 @@ import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { formatUnits, isAddress } from "ethers";
 import { useTokenContext } from "@/context/TokenContext";
-import { parseUnits, formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
@@ -21,6 +21,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
+import { validateRecipientAddress } from "@/utils/misc";
 
 const Transfer = () => {
   const { userAddress } = useUser();
@@ -41,6 +42,7 @@ const Transfer = () => {
   const [wrongAmount, setWrongAmount] = useState(false);
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("")
 
   const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
 
@@ -115,6 +117,12 @@ const Transfer = () => {
     }
   };
 
+  const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.trim();
+    setRecipient(value);
+    setErrorMessage(validateRecipientAddress(value, userAddress));
+  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -184,10 +192,11 @@ const Transfer = () => {
               <Input
                 type="text"
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={handleRecipientAddress}
                 placeholder="..."
                 className="w-full p-2 border rounded"
               />
+              {errorMessage && <span className="text-red-600 text-sm">{errorMessage}</span>}
             </div>
 
             {/* Amount */}
@@ -329,6 +338,7 @@ const Transfer = () => {
                 !fromAmount ||
                 wrongAmount ||
                 swapLoading ||
+                !!errorMessage ||
                 // Check if amount is invalid (just ".", or not a valid number, or 0)
                 (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0) ||
                 (() => {
