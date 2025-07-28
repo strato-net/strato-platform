@@ -43,6 +43,8 @@ import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
+import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Indexer.IContext (API (..), IndexerException (..), P2P (..))
 import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
@@ -76,7 +78,6 @@ import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe) -- (catMaybes, fromMaybe)
 import qualified Data.NibbleString as N
 -- import Data.Ord (Down(..))
-import Data.Pool (withResource)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock (addUTCTime, getCurrentTime)
@@ -201,12 +202,53 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => (FilesystemT m) `Mod.Yields` Dat
 instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` StateDiff where
   output = commitSqlDiffs
 
-instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` SlipstreamCommands where
-  output (SlipstreamCommands cmds) = do
-    conn <- asks $ _sqlPool . _filesystemDBs
+instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` SlipstreamQuery where
+  output slipstreamQuery = do
+    let cmds = slipstreamQuerySQLite slipstreamQuery
+    pool <- asks $ _sqlPool . _filesystemDBs
     flip for_ ($logDebugS ("slipstream/cmds")) $ concatMap T.lines cmds
-    liftIO . withResource conn $ \c -> loggingFunc $ flip SQL.runSqlConn c . for_ cmds $ \cmd ->
+    liftIO . loggingFunc $ flip SQL.runSqlPool pool . for_ cmds $ \cmd ->
       (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) []) `catch` (\(e :: SomeException) -> $logErrorS "slipstream/error" . T.pack $ show e)
+
+sqlTypeSQLite :: SqlType -> T.Text
+sqlTypeSQLite SqlBool    = "bool"
+sqlTypeSQLite SqlDecimal = "decimal"
+sqlTypeSQLite SqlText    = "text"
+sqlTypeSQLite SqlJsonb   = "jsonb"
+
+slipstreamQuerySQLite :: SlipstreamQuery -> [T.Text]
+slipstreamQuerySQLite (CreateTable tableName cols pk mUc) = [T.concat
+  [ "CREATE TABLE IF NOT EXISTS ",
+    tableNameToDoubleQuoteText tableName,
+    " (",
+    csv $ (\(c,t) -> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeSQLite t) <$> cols,
+    case pk of
+      [] -> ""
+      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk,
+    case mUc of
+      Nothing -> ""
+      Just (n, uc) -> T.concat
+        [
+          ", CONSTRAINT ",
+          wrapDoubleQuotes $ escapeQuotes n,
+          " UNIQUE ",
+          uc
+        ],
+    ");"
+  ]]
+slipstreamQuerySQLite (AlterTableAddColumns tableName cols) = (\(c,t) -> T.concat
+  [ "ALTER TABLE ",
+    tableNameToDoubleQuoteText tableName,
+    " ADD COLUMN ",
+    wrapDoubleQuotes (escapeDoubleQuotes c),
+    " ",
+    sqlTypeSQLite t,
+    ";"
+  ]) <$> cols
+slipstreamQuerySQLite AlterTableAddForeignKey{} = []
+slipstreamQuerySQLite AlterTableAddPrimaryKey{} = []
+slipstreamQuerySQLite NotifyPostgREST = []
+slipstreamQuerySQLite sq = [slipstreamQueryText sqlTypeSQLite sq]
 
 lookupLDB :: (MonadIO m, Binary k, Binary v) => (r -> LDB.DB) -> k -> ReaderT r m (Maybe v)
 lookupLDB getDB k = do

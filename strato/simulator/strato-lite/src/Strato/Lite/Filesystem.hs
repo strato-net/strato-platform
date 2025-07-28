@@ -161,7 +161,7 @@ createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPo
       Left e -> error $ e ++ ": " ++ BC.unpack privBS
       Right p -> pure p
     -- either error id . bsToPriv <$> B.readFile privKeyFile
-  conn <- liftIO . loggingFunc $ Lite.createSqlitePool (T.pack dbPath) 20
+  conn <- liftIO . loggingFunc $ Lite.createSqlitePool (T.pack dbPath) 1
   liftIO . withResource conn $ \c -> loggingFunc $ do
     flip runReaderT c $ do
       Lite.runMigration DataDefs.migrateAuto

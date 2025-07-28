@@ -18,6 +18,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
+import Blockchain.Slipstream.OutputData
 import Blockchain.Strato.Discovery.ContextLite (MonadDiscovery)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
@@ -44,8 +45,6 @@ loggingFunc :: LoggingT m a -> m a
 loggingFunc = runLoggingT
 
 type BaseM = ResourceT (LoggingT IO)
-
-newtype SlipstreamCommands = SlipstreamCommands { getSlipstreamCommands :: [Text] }
 
 type MonadBase m = ( MonadFail m
                    , MonadMonitor m
@@ -86,7 +85,7 @@ type MonadBase m = ( MonadFail m
                    , A.Replaceable PPeer Text m
                    , m `Mod.Yields` DataDefs.TransactionResult
                    , m `Mod.Outputs` StateDiff
-                   , m `Mod.Outputs` SlipstreamCommands
+                   , m `Mod.Outputs` SlipstreamQuery
                    , (Keccak256 `A.Alters` API OutputTx) m
                    , (Keccak256 `A.Alters` API OutputBlock) m
                    , (Keccak256 `A.Alters` P2P OutputBlock) m

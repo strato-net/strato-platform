@@ -39,6 +39,7 @@ import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
+import Blockchain.Slipstream.OutputData
 import Blockchain.Strato.Discovery.ContextLite (UDPPacket(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
@@ -256,8 +257,8 @@ instance {-# OVERLAPPING #-} MonadIO m => (MonadSimulator m) `Mod.Yields` DataDe
 instance {-# OVERLAPPING #-} Monad m => (MonadSimulator m) `Mod.Outputs` StateDiff where
   output _ = pure () 
 
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (MonadSimulator m) `Mod.Outputs` SlipstreamCommands where
-  output (SlipstreamCommands cmds) = traverse_ ($logInfoS ("slipstream/cmds")) $ concatMap T.lines cmds
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (MonadSimulator m) `Mod.Outputs` SlipstreamQuery where
+  output = traverse_ ($logInfoS ("slipstream/cmds") . T.pack) . lines . show
 
 instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` API OutputTx) (MonadSimulator m) where
   lookup _ _ = pure Nothing
