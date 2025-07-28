@@ -27,7 +27,6 @@ import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
--- import Slipstream.Processor
 
 import SelectAccessible ()
 import Slipstream.Globals
@@ -89,6 +88,22 @@ main = do
         [r|create table if not exists
                       contract (id serial primary key, "codeHash" text, contract text, abi text)|]
       migrateCirrus [r|alter table contract add column if not exists "chainId" text|]
+      migrateCirrus
+        [r|CREATE TABLE IF NOT EXISTS event (
+                address text,
+                block_hash text,
+                block_timestamp text,
+                block_number text,
+                transaction_hash text NOT NULL,
+                transaction_sender text,
+                event_index integer NOT NULL,
+                creator text,
+                application text,
+                contract_name text,
+                event_name text,
+                attributes jsonb,
+                PRIMARY KEY (transaction_hash, event_index)
+            )|]
 
       -- There are three permanent connections/pools to postgres:
       -- 1. The `workerConn` is from persistent-postgresql for the storage worker in the background

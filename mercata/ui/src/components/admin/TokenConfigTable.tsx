@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, MoreVertical } from 'lucide-react';
+import CopyButton from '../ui/copy';
 import ConfigureAssetModal from './ConfigureAssetModal';
 import { Token, LendingPoolResponse } from '@/interface';
 
@@ -39,12 +40,6 @@ const TokenConfigTable = () => {
       setLendLoading(true);
       const data = await getLend();
       const responseData = data as unknown as LendingPoolResponse;
-      if (responseData?.registry) {
-        console.log('Registry data present:', responseData.registry);
-      }
-      if (responseData?.pool) {
-        console.log('Pool data present:', responseData.pool);
-      }
       setLendData(responseData);
     } catch (error) {
       console.error('Error fetching lend data:', error);
@@ -71,12 +66,9 @@ const TokenConfigTable = () => {
 
   const getAssetConfig = (address: string) => {
     if (!lendData) {
-      console.log('getAssetConfig: No lendData available');
       return null;
     }
-    
-    console.log(`Getting asset config for ${address}`);
-    
+        
     // Check if data is under 'pool' key (backend might return this)
     const poolData = lendData.pool || lendData.lendingPool;
     
@@ -87,7 +79,6 @@ const TokenConfigTable = () => {
           (item) => item.asset?.toLowerCase() === address.toLowerCase()
         );
         if (config) {
-          console.log(`Found config for ${address}:`, config.AssetConfig);
           return config.AssetConfig;
         }
       }
@@ -96,14 +87,11 @@ const TokenConfigTable = () => {
         const config = poolData.assetConfigs[address.toLowerCase()] || 
                       poolData.assetConfigs[address];
         if (config) {
-          console.log(`Found config for ${address}:`, config);
           return config;
         }
       }
     }
-    
-    console.log(`No config found for ${address}`);
-    return null;
+        return null;
   };
 
   const getCollateralRatio = (address: string) => {
@@ -186,6 +174,7 @@ const TokenConfigTable = () => {
     setSelectedToken(token);
     setConfigureAssetModalOpen(true);
   };
+
 
   if (loading || lendLoading) {
     return (
@@ -272,10 +261,17 @@ const TokenConfigTable = () => {
                       <TableCell className="font-medium text-sm max-w-[80px] truncate">{symbol}</TableCell>
                       <TableCell className="text-sm max-w-[150px] truncate" title={name}>{name}</TableCell>
                       <TableCell className="font-mono text-xs max-w-[120px]">
-                        {address && address !== 'Unknown' 
-                          ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                          : address
-                        }
+                        <div className="flex items-center space-x-2">
+                          <span>
+                            {address && address !== 'Unknown' 
+                              ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                              : address
+                            }
+                          </span>
+                          {address && address !== 'Unknown' && (
+                            <CopyButton address={address} />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-[70px]">
                         <Badge variant="default" className="text-xs">

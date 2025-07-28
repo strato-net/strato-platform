@@ -6,7 +6,7 @@ import {
   OnrampApiResponse,
   OnRampContextType 
 } from "@/interface";
-import { parseUnits } from "ethers";
+import { safeParseUnits } from "@/utils/numberUtils";
 
 const OnRampContext = createContext<OnRampContextType | undefined>(undefined);
 
@@ -27,7 +27,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
 
   const buy = async (payload: BuyPayload, userAddress: string): Promise<{ url: string }> => {
     try {
-      const weiAmount = parseUnits(payload.amount, 18).toString();
+      const weiAmount = safeParseUnits(payload.amount, 18).toString();
       const buyPayload = {
         token: payload.token,
         amount: weiAmount,
@@ -48,7 +48,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
 
   const sell = async (payload) => {
     try {
-    const weiAmount = parseUnits(payload.amount, 18).toString() ;
+    const weiAmount = safeParseUnits(payload.amount, 18).toString() ;
       const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
       return res.data;
     } catch (err) {

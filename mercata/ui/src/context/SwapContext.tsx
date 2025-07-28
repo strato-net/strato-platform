@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { LiquidityPool, SwappableToken } from '@/interface';
+import { LiquidityPool, SwappableToken, SwapHistoryEntry } from '@/interface';
 import {api} from '@/lib/axios';
 
 type SwapContextType = {
@@ -7,6 +7,14 @@ type SwapContextType = {
   pairableTokens: SwappableToken[];
   loading: boolean;
   error: string | null;
+  // Current swap state
+  fromAsset: SwappableToken | undefined;
+  toAsset: SwappableToken | undefined;
+  pool: LiquidityPool | null;
+  setFromAsset: (asset: SwappableToken | undefined) => void;
+  setToAsset: (asset: SwappableToken | undefined) => void;
+  setPool: (pool: LiquidityPool | null) => void;
+  // Functions
   refetchSwappableTokens: () => void;
   fetchPairableTokens: (tokenAddress: string) => void;
   createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
@@ -43,6 +51,7 @@ type SwapContextType = {
   enrichPools: (pools: LiquidityPool[]) => LiquidityPool[];
   lpTokens: LiquidityPool[]
   fetchLpTokensPositions: () => Promise<void>;
+  fetchSwapHistory: (poolAddress: string, params?: Record<string, string>) => Promise<{ data: SwapHistoryEntry[]; totalCount: number }>;
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -53,6 +62,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lpTokens, setLpTokens] = useState<LiquidityPool[]>([])
+  // Current swap state
+  const [fromAsset, setFromAsset] = useState<SwappableToken | undefined>();
+  const [toAsset, setToAsset] = useState<SwappableToken | undefined>();
+  const [pool, setPool] = useState<LiquidityPool | null>(null);
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -250,6 +263,26 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, []);
 
+  const fetchSwapHistory = useCallback(async (poolAddress: string, params?: Record<string, string>): Promise<{ data: SwapHistoryEntry[]; totalCount: number }> => {
+    if (!poolAddress) return { data: [], totalCount: 0 };
+    
+    try {
+      // Fetch swap history with total count from the updated backend service
+      const response = await api.get(`/swap-history/${poolAddress}`, { params });
+      
+      // Convert timestamp strings back to Date objects
+      const data = response.data.data.map((item: any) => ({
+        ...item,
+        timestamp: new Date(item.timestamp)
+      }));
+      
+      return { data, totalCount: response.data.totalCount };
+    } catch (err) {
+      console.error('Error fetching swap history:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to fetch swap history');
+    }
+  }, []);
+
   useEffect(() => {
     fetchSwappableTokens();
   }, [fetchSwappableTokens]);
@@ -261,6 +294,14 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         pairableTokens,
         loading,
         error,
+        // Current swap state
+        fromAsset,
+        toAsset,
+        pool,
+        setFromAsset,
+        setToAsset,
+        setPool,
+        // Functions
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,
         createPool,
@@ -275,6 +316,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         enrichPools,
         lpTokens,
         fetchLpTokensPositions,
+        fetchSwapHistory,
       }}
     >
       {children}

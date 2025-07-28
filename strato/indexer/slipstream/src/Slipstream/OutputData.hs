@@ -19,6 +19,8 @@ module Slipstream.OutputData (
   outputDataDedup,
   OutputM,
   ProcessedCollectionRow(..),
+  insertGlobalEventTable,
+  pipeInsertGlobalEventTable,
   insertEventTables,
   insertIndexTable,
   insertForeignKeys,
@@ -74,11 +76,8 @@ import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
--- import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
--- import           Data.Bifunctor                  (first)
--- import           Data.Function                   (on)
 import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -109,7 +108,6 @@ instance Functor (First b) where
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    -- codehash :: Maybe CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
@@ -243,7 +241,8 @@ outputDataDedup ::
   PGConnection ->
   ConduitM () Text m a ->
   m a
-outputDataDedup conn c = runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
+outputDataDedup conn c =
+  runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
 
 baseColumns :: TableColumns
 baseColumns =
@@ -306,8 +305,6 @@ baseAbstractColumns =
     "data"
   ]
 
--- baseTableColumns :: TableColumns
--- baseTableColumns = baseColumns
 
 baseTableColumnsForEvent :: TableColumns
 baseTableColumnsForEvent = baseEventColumns
@@ -1289,8 +1286,6 @@ insertAbstractTableQuery cs =
                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
                       dataVals = [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper (Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns )) <> "::jsonb"]
-                      -- jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
-                      -- jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
                       regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
                       fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
                       valsForSQL = baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
@@ -1458,14 +1453,6 @@ createEventTable (creator, a, n) evName ev cc = do
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
       eventFkeys = getDeferredForeignKeysForEvent eventTable crtr app
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
-  -- eventAlreadyCreated <- isTableCreated eventTable
-  -- unless eventAlreadyCreated $ do
-  --   setTableCreated globalsIORef eventTable $ colsCombined
-  --   yield $ createEventTableQuery eventTable colsCombined
-  -- if eventAlreadyCreated
-  --   then return []
-  --   else do
-    -- setTableCreated eventTable $ colsCombined
   yieldMany $ createEventTableQuery eventTable colsCombined uniqueConstraint
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
     createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
@@ -1566,6 +1553,83 @@ getArraysFromEvents evArgs = do
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
                             (map (SimpleValue . ValueString . T.pack) elements))
 
+pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () Text m ()
+pipeInsertGlobalEventTable aggregatedEvents =
+  yieldMany =<< lift (mapM insertGlobalEventTable aggregatedEvents)
+
+insertGlobalEventTable :: OutputM m => AggregateEvent -> m Text
+insertGlobalEventTable agEv = do
+  let query = insertGlobalEventTableQuery agEv
+  $logInfoS "insertGlobalEventTable/query" query
+  return query
+
+-- | Generates an INSERT SQL statement for the global 'events' table.
+--
+-- This function creates a SQL INSERT statement that adds a single event record
+-- to the centralized 'events' table. Unlike event-specific tables that are
+-- created dynamically per contract/event type, this global table has a fixed
+-- schema and stores all events in a normalized format.
+--
+-- Event arguments are converted to a JSON object and stored in the 'attributes'
+-- column, where each argument name becomes a key and its value becomes the
+-- corresponding JSON value.
+insertGlobalEventTableQuery :: AggregateEvent -> Text
+insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
+  let creator = T.pack $ Action.evContractCreator ev
+      application = T.pack $ Action.evContractApplication ev
+      contractName = T.pack $ Action.evContractName ev
+      eventName = T.pack $ Action.evName ev
+      address = tshow . Action.evContractAddress $ ev
+      blockHash = T.pack . keccak256ToHex . eventBlockHash $ agEv
+      blockTimestamp = tshow . eventBlockTimestamp $ agEv
+      blockNumber = tshow . eventBlockNumber $ agEv
+      transactionHash = T.pack . keccak256ToHex . eventTxHash $ agEv
+      transactionSender = tshow . eventTxSender $ agEv
+      eventIdx = tshow . eventIndex $ agEv
+
+      attributesMap =
+        Map.fromList [(T.pack name, T.pack value) | (name, value, _) <- Action.evArgs ev]
+
+      -- Please note that all types are being treated here as strings. This is
+      -- due to how `evArgs` is represented in the `Event` (tuple of strings).
+      --
+      -- TODO (pawel): A good follow-up to this work would be a refactoring of
+      -- `evArgs` in `Event`. By getting rid of this tech debt, we would also
+      -- significantly improve the quality of the `attributes` column in the
+      -- `events` table, making them type-aware.
+      attributesJson = decodeUtf8 . BL.toStrict $ Aeson.encode attributesMap
+
+      columns = wrapAndEscapeDouble . map escapeQuotes $
+        baseEventColumns ++
+        [ "creator"
+        , "application"
+        , "contract_name"
+        , "event_name"
+        , "attributes"
+        ]
+
+      values = csv $ map (wrapSingleQuotes . escapeQuotes)
+        [ address
+        , blockHash
+        , blockTimestamp
+        , blockNumber
+        , transactionHash
+        , transactionSender
+        , eventIdx
+        , creator
+        , application
+        , contractName
+        , eventName
+        ] ++ [wrapSingleQuotes attributesJson <> "::jsonb"]
+
+  in T.concat
+       [ "INSERT INTO event "
+       , columns
+       , " VALUES ("
+       , values
+       , ");"
+       ]
+
 insertEventTables :: 
   OutputM m =>
   [ProcessedCollectionRow] ->
@@ -1575,8 +1639,6 @@ insertEventTables processedEventArrays processedEventsWithoutArrays = do
   $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
   $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
   yieldMany . concat =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
-      
-  -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $
     yieldMany $ insertEventArrayTableQuery processedEventArrays
 
@@ -1600,16 +1662,6 @@ processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
         Action.evContractName = T.unpack n'
           }
       }
-
--- insertEventTable ::
---   OutputM m =>
---   AggregateEvent ->
---   m (Text)
--- insertEventTable agEv = do
---   let q = insertEventTableQuery agEv
---   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
---   return q
-
 
 insertEventTable ::
   OutputM m =>
@@ -1671,7 +1723,10 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
 
 ------------------
 
---This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
+-- This is a temporary function that converts solidity types to a sample
+-- value...  I am just using this now to convert table creation from the old way
+-- (value based when values come through) to the new way (direct from the types
+-- when a CC is registered)
 solidityTypeToSQLType :: Bool -> Maybe (ContractF ()) -> CodeCollectionF () -> SVMType.Type -> Maybe Text
 solidityTypeToSQLType _ _ _ SVMType.Bool = Just "bool"
 solidityTypeToSQLType _ _ _ (SVMType.Int _ _) = Just "decimal"
@@ -1684,14 +1739,12 @@ solidityTypeToSQLType _ _ _ (SVMType.Account _) = Just "text"
 solidityTypeToSQLType isEvent _ _ (SVMType.Array _ _) = if isEvent then Just "jsonb" else Nothing
 solidityTypeToSQLType _ _ _ (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
 solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe "text" (const "jsonb") $ (\c -> structDef c cc l) =<< mc
---solidityTypeToSQLType _ (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType _ _ _ (SVMType.Struct _ _) = Just "jsonb"
 solidityTypeToSQLType _ _ _ (SVMType.Enum _ _ _) = Just "text"
 solidityTypeToSQLType _ _ _ (SVMType.Contract _) = Just "text"
 solidityTypeToSQLType _ _ _ (SVMType.Error _ _) = Just "text"
 solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
 
---solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 ------------------
 

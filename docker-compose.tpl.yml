@@ -17,7 +17,8 @@ volumes:
 services:
   mercata-backend:
     depends_on:
-      - nginx
+      - strato
+      - postgrest
     build: ./mercata/backend
     image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
     environment:
@@ -40,7 +41,6 @@ services:
         max-file: "3"
   mercata-ui:
     depends_on:
-      - nginx
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
@@ -244,6 +244,8 @@ services:
     - prometheus
     - smd
     - strato
+    - mercata-backend
+    - mercata-ui
     environment:
     - APEX_HOST=${APEX_HOST}
     - blockstanbul=${blockstanbul}

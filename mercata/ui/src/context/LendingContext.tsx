@@ -6,7 +6,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { parseUnits } from "ethers";
+import { safeParseUnits } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 import { CollateralData, LendData, LiquidityData, NewLoanData } from "@/interface";
 import { useUser } from "@/context/UserContext";
@@ -20,9 +20,6 @@ type LendingContextType = {
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
-  setInterestRate: (payload: { asset: string; rate: number }) => Promise<void>;
-  setCollateralRatio: (payload: { asset: string; ratio: number }) => Promise<void>;
-  setLiquidationBonus: (payload: { asset: string; bonus: number }) => Promise<void>;
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     amount: string;
@@ -109,7 +106,7 @@ export const LendingProvider = ({
   }, []);
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
-    const weiPrice = parseUnits(payload.price, 18).toString();
+    const weiPrice = safeParseUnits(payload.price, 18).toString();
     try {
       await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
     } catch (err) {

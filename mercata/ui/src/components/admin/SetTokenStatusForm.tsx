@@ -50,9 +50,6 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
         address: token.address,
         status: data.status,
       };
-
-      console.log('Setting token status with payload:', payload);
-
       await setTokenStatus(payload);
 
       toast({
