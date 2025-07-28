@@ -20,6 +20,15 @@ type LendingContextType = {
   refreshLiquidity: (signal?: AbortSignal) => void;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
+  configureAsset: (payload: { 
+    asset: string; 
+    ltv: number; 
+    liquidationThreshold: number; 
+    liquidationBonus: number; 
+    interestRate: number; 
+    reserveFactor: number; 
+  }) => Promise<void>;
+  loading: boolean;
   refreshLendingData: () => Promise<void>;
   borrowAsset: (args: {
     amount: string;
@@ -52,6 +61,7 @@ export const LendingProvider = ({
   const [loadingLiquidity, setLoadingLiquidity] = useState(true);
   const [collateralInfo, setCollateralInfo] = useState<CollateralData[]>()
   const [loadingCollateral, setLoadingCollateral] = useState(true)
+  const [loading, setLoading] = useState(false);
 
   // Access authentication status
   const { isLoggedIn } = useUser();
@@ -67,7 +77,6 @@ export const LendingProvider = ({
       }
     } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
       setLoadingLiquidity(false);
     }
@@ -84,7 +93,6 @@ export const LendingProvider = ({
       }
     } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Failed to fetch withdrawable tokens:", err);
     } finally {
       setLoadingCollateral(false);
     }
@@ -98,7 +106,6 @@ export const LendingProvider = ({
       return res.data;
     } catch (err) {
       if (err.name === "CanceledError" || err.name === "AbortError") return;
-      console.error("Failed to fetch loans:", err);
       return [];
     } finally {
       setLoadingLoans(false);
@@ -107,12 +114,7 @@ export const LendingProvider = ({
 
   const setPrice = async (payload: { token: string; price: string }): Promise<void> => {
     const weiPrice = safeParseUnits(payload.price, 18).toString();
-    try {
-      await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
-    } catch (err) {
-      console.error("Failed to set price:", err);
-      throw err;
-    }
+    await api.post("/oracle/price", { ...payload, price: weiPrice.toString() });
   };
 
   const configureAsset = async (payload: { 
@@ -123,11 +125,13 @@ export const LendingProvider = ({
     interestRate: number; 
     reserveFactor: number; 
   }): Promise<void> => {
+    setLoading(true);
     try {
       await api.post("/lend/admin/configure-asset", payload);
     } catch (err: any) {
-      console.error("Failed to configure asset:", err);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -136,14 +140,9 @@ export const LendingProvider = ({
   }: {
     amount: string;
   }) => {
-    try {
-      await api.post("/lending/loans", {
-        amount
-      });
-    } catch (err) {
-      console.error("Borrow failed:", err);
-      throw err;
-    }
+    await api.post("/lending/loans", {
+      amount
+    });
   };
 
   const repayLoan = async ({
@@ -153,72 +152,37 @@ export const LendingProvider = ({
     amount: string;
     asset: string;
   }) => {
-    try {
-      await api.patch("/lending/loans", {
-        amount
-      });
-    } catch (err) {
-      console.error("Repay failed:", err);
-      throw err;
-    }
+    await api.patch("/lending/loans", {
+      amount
+    });
   };
 
   const getLend = async () => {
-    try {
-      const res = await api.get("/lend/pools");
-      return res.data;
-    } catch (err) {
-      console.error("Get lend failed:", err);
-      throw err;
-    }
+    const res = await api.get("/lend/pools");
+    return res.data;
   };
 
   const depositLiquidity = async (args: { amount: string }) => {
-    try {
-      await api.post("/lending/pools/liquidity", args);
-    } catch (err) {
-      console.error("Deposit liquidity failed:", err);
-      throw err;
-    }
+    await api.post("/lending/pools/liquidity", args);
   };
 
   const withdrawLiquidity = async (args: { amount: string }) => {
-    try {
-      await api.delete("/lending/pools/liquidity", {data: args});
-    } catch (err) {
-      console.error("Withdraw liquidity failed:", err);
-      throw err;
-    }
+    await api.delete("/lending/pools/liquidity", {data: args});
   };
 
   const supplyCollateral = async (args: { asset: string, amount: string }) => {
-    try {
-       await api.post("/lending/collateral", args);
-    } catch (err) {
-      console.error("Withdraw liquidity failed:", err);
-      throw err;
-    }
+    await api.post("/lending/collateral", args);
   };
 
   const withdrawCollateral = async (args: { asset: string, amount: string }) => {
-    try {
-      await api.delete("/lending/collateral", {data: args});
-    } catch (err) {
-      console.error("Withdraw liquidity failed:", err);
-      throw err;
-    }
+    await api.delete("/lending/collateral", {data: args});
   };
 
   const refreshLendingData = async (): Promise<void> => {
-    try {
-      // Refresh all lending-related data
-      await fetchLoans();
-      await fetchLiquidityInfo()
-      await fetchCollateralInfo()
-    } catch (err) {
-      console.error("Failed to refresh lending data:", err);
-      throw err;
-    }
+    // Refresh all lending-related data
+    await fetchLoans();
+    await fetchLiquidityInfo()
+    await fetchCollateralInfo()
   };
 
 
@@ -245,6 +209,7 @@ export const LendingProvider = ({
       refreshLiquidity : fetchLiquidityInfo,
       setPrice,
       configureAsset,
+      loading,
       refreshLendingData,
       borrowAsset,
       repayLoan,
@@ -262,7 +227,8 @@ export const LendingProvider = ({
       loadingLoans,
       liquidityInfo,
       loadingLiquidity,
-      loadingCollateral
+      loadingCollateral,
+      loading
     ]
   );
 

@@ -41,7 +41,14 @@ export class BridgeService {
         hash: response.data.hash,
       };
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
   
@@ -65,7 +72,16 @@ export class BridgeService {
 
       return response.data;
     } catch (error: any) {
-      throw error;
+  
+      
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
 
@@ -94,7 +110,14 @@ export class BridgeService {
         balance: balance.toString(),
       };
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
 
@@ -124,7 +147,14 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
 
@@ -154,7 +184,14 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
   
@@ -173,7 +210,14 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
 
@@ -191,7 +235,14 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
 
@@ -202,7 +253,14 @@ export class BridgeService {
       );
       return response.data;
     } catch (error: any) {
-      throw error;
+      // Extract error message from axios error response
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Unknown error occurred');
+      }
     }
   }
 
