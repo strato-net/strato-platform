@@ -72,6 +72,7 @@ packages:
 #- simulator/strato-lite
 
 - tools/blockapps-tools
+- tools/convoke
 - tools/debugger-tools
 - tools/process-monitor
 - tools/x509-tools
