@@ -252,19 +252,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           <div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Current Health Factor</span>
-              <span className={`font-medium 
-                              ${getHealthFactorColor(
-                healthImpact.currentHealthFactor
-              )}
-                              `}>{healthImpact?.currentHealthFactor?.toFixed(2)}</span>
+              <span className={`font-medium ${getHealthFactorColor(healthImpact.currentHealthFactor)}`}>
+                {healthImpact?.currentHealthFactor?.toFixed(2)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">New Health Factor</span>
-              <span className={`font-medium 
-                              ${getHealthFactorColor(
-                healthImpact.newHealthFactor
-              )}
-                              `}>{healthImpact?.newHealthFactor?.toFixed(2)}</span>
+              <span className={`font-medium ${getHealthFactorColor(healthImpact.newHealthFactor)}`}>
+                {healthImpact?.newHealthFactor?.toFixed(2)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Change:</span>
