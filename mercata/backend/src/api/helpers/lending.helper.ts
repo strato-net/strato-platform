@@ -188,13 +188,14 @@ export const simulateLoan = (
     
     // Calculated values
     healthFactor: healthFactorToPercentage(healthFactor),
+    healthFactorRaw: healthFactor,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
     accruedInterest,
     interestRate: borrowableAssetConfig.interestRate / 100,
     totalAmountOwed: newTotalOwed,
     totalCollateralValueUSD: totalCollateralValue,
     maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
-    
+
     // Health status flags
     isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS),
   };
@@ -258,21 +259,21 @@ export const calculateCollateralMetrics = (
 /**
  * Calculate exchange rate between mToken and underlying asset
  * @param totalMTokenSupply Total mToken supply
- * @param actualUnderlying Total underlying asset in pool
+ * @param totalUSDSTSupplied Total underlying asset in pool
  * @returns Exchange rate scaled by 1e18
  */
 export const calculateExchangeRate = (
   totalMTokenSupply: string,
-  actualUnderlying: string
+  totalUSDSTSupplied: string
 ): string => {
   const mTokenSupply = toBig(totalMTokenSupply);
-  const underlying = toBig(actualUnderlying);
+  const underlying = toBig(totalUSDSTSupplied);
   
   if (mTokenSupply === 0n || underlying === 0n) {
     return DECIMALS.toString(); // Default 1:1 ratio
   }
   
-  // Exchange rate = actualUnderlying / totalSupply (scaled by 1e18)
+  // Exchange rate = totalUSDSTSupplied / totalMTokenSupply (scaled by 1e18)
   return ((underlying * DECIMALS) / mTokenSupply).toString();
 };
 
@@ -388,7 +389,7 @@ export const calculateTotalCollateralValue = (
 };
 
 /**
- * Calculate APY values for supply and borrow
+ * Calculate theoretical APY for supply and APY for borrow
  * @param interestRate Interest rate in basis points
  * @param reserveFactor Reserve factor in basis points
  * @returns Object with supplyAPY and borrowAPY
@@ -397,8 +398,9 @@ export const calculateAPYs = (
   interestRate: number,
   reserveFactor: number = 1000
 ): { supplyAPY: number; borrowAPY: number } => {
-  const borrowAPY = interestRate / 100; // Convert from basis points
-  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000); // Subtract reserve factor
-  
+  // interestRate is in bps, so /100 gives percent
+  const borrowAPY = interestRate / 100;
+  // reserveFactor is in bps, so /10000 is fraction
+  const supplyAPY = borrowAPY * (1 - reserveFactor / 10000);
   return { supplyAPY, borrowAPY };
-}; 
+};

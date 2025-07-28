@@ -7,15 +7,16 @@ import {
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { LiquidityPool, SwappableToken, Token } from "@/interface";
-import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
-import { formatUnits, parseUnits } from "ethers";
+import { useOracleContext } from "@/context/OracleContext";
+import { formatUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/contants";
+import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
 import {
   Dialog,
   DialogContent,
@@ -30,23 +31,8 @@ const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
 const DECIMALS = 18;
 
-// Utility functions
-const formatAmount = (amount: string): string => {
-  if (!amount) return "";
-  const value = Number(amount);
-  const roundedDown = Math.floor(value * 1000000) / 1000000;
-  return roundedDown.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
-  });
-};
-
 const formatBalance = (balance: string | number | bigint, symbol: string): string => {
-  let formatted = formatUnits(BigInt(balance.toString()), DECIMALS);
-  if (formatted.includes('.')) {
-    formatted = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
-  }
-  return `${formatted} ${symbol}`;
+  return formatBalanceUtil(balance, symbol, DECIMALS,2,24);
 };
 
 // Components
@@ -66,7 +52,25 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
       <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
-        <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        <div className="flex items-center gap-2">
+          {asset ? (
+            asset.images?.[0]?.value ? (
+              <img
+                src={asset.images[0].value}
+                alt={asset._name}
+                className="w-4 h-4 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                style={{ backgroundColor: "red" }}
+              >
+                {asset._symbol?.slice(0, 1)}
+              </div>
+            )
+          ) : null}
+          <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        </div>
         <ChevronDown className="h-4 w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
@@ -83,7 +87,23 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
                 onSelect(token);
               }}
             >
-              <span>{token._symbol}</span>
+              <div className="flex items-center gap-2">
+                {token.images?.[0]?.value ? (
+                  <img
+                    src={token.images[0].value}
+                    alt={token._name}
+                    className="w-4 h-4 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                    style={{ backgroundColor: "red" }}
+                  >
+                    {token._symbol?.slice(0, 1)}
+                  </div>
+                )}
+                <span>{token._symbol}</span>
+              </div>
               {token._symbol === asset?._symbol && <Check className="h-4 w-4 ml-auto" />}
             </Button>
           ))
@@ -109,8 +129,9 @@ interface TokenInputProps {
   onOpenChange: (open: boolean) => void;
   label: string;
   onFocus: () => void;
-  usdstBalance: string;
   isFromInput: boolean;
+  showMaxButton: boolean;
+  onMaxClick: () => void;
   pool: LiquidityPool;
   fromAsset?: Token;
 }
@@ -129,57 +150,12 @@ const TokenInput = ({
   onOpenChange,
   label,
   onFocus,
-  usdstBalance,
   isFromInput,
   pool,
-  fromAsset
+  fromAsset,
+  showMaxButton,
+  onMaxClick
 }: TokenInputProps) => {
-  const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
-  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-  
-  // Safely parse input amount to prevent errors with invalid inputs like "."
-  const inputAmountWei = (() => {
-    try {
-      if (!amount || amount === "." || amount === "0." || isNaN(Number(amount))) {
-        return 0n;
-      }
-      return parseUnits(amount, DECIMALS);
-    } catch {
-      return 0n;
-    }
-  })();
-
-  // Validation checks
-  const isUsdstMaxIssue = isFromInput &&
-    asset?.address === usdstAddress &&
-    inputAmountWei > usdstBalanceBigInt - feeAmount &&
-    inputAmountWei <= usdstBalanceBigInt;
-    
-  const isInsufficientUsdstForFee = useMemo(() => {
-    if (
-      !isFromInput ||
-      !asset ||
-      !usdstBalanceBigInt ||
-      !feeAmount
-    ) return false;
-
-    return (
-      asset?.address !== usdstAddress &&
-      usdstBalanceBigInt < feeAmount
-    );
-  }, [isFromInput, asset, usdstBalanceBigInt, feeAmount]);
-
-  // Check if input amount is within 0.10 of USDST balance (low balance warning)
-  const isLowBalanceWarning = useMemo(() => {
-    if (!isFromInput || !asset || asset?.address !== usdstAddress || !inputAmountWei) return false;
-    
-    const lowBalanceThreshold = parseUnits("0.10", DECIMALS);
-    const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
-    
-    return inputAmountWei > 0n && 
-           remainingBalance >= 0n && 
-           remainingBalance <= lowBalanceThreshold;
-  }, [isFromInput, asset, inputAmountWei, usdstBalanceBigInt, feeAmount]);
 
   // Get pool balance
   const getPoolBalance = () => {
@@ -197,8 +173,22 @@ const TokenInput = ({
     <div className="bg-gray-50 p-4 rounded-lg">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-gray-600 font-semibold">{label}</label>
-        <span className="text-sm text-gray-600 mt-1 sm:mt-0">
-          User Balance: {isLoading ? <LoadingSpinner /> : formatBalance(balance, asset?._symbol || "")}
+        <span className="text-sm text-gray-600 mt-1 sm:mt-0 flex gap-1">
+          User Balance: 
+          {isLoading 
+            ? <LoadingSpinner /> 
+            : formatBalance(balance, asset?._symbol || "")
+          }
+          {showMaxButton && (
+            <button
+              type="button"
+              className="text-blue-600 text-xs ml-2 underline"
+              onClick={onMaxClick}
+              disabled={isLoading}
+            >
+              Max
+            </button>
+          )}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -228,21 +218,6 @@ const TokenInput = ({
           )}
           {insufficientPoolBalance && (
             <p className="text-orange-600 text-sm mt-1">Amount exceeds pool balance</p>
-          )}
-          {isUsdstMaxIssue && (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient balance for transaction fee ({SWAP_FEE} USDST)
-            </p>
-          )}
-          {isInsufficientUsdstForFee && (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
-            </p>
-          )}
-          {isLowBalanceWarning && (
-            <p className="text-yellow-600 text-sm mt-1">
-              Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-            </p>
           )}
         </div>
         <div className="flex-shrink-0">
@@ -395,23 +370,21 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 const SwapWidget = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance } = useSwapContext();
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
+  const { getPrice, fetchPrice } = useOracleContext();
   const { toast } = useToast();
 
   // State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [fromAsset, setFromAsset] = useState<SwappableToken | undefined>();
-  const [toAsset, setToAsset] = useState<SwappableToken | undefined>();
   const [fromAmount, setFromAmount] = useState("");
   const [toAmount, setToAmount] = useState("");
   const [wrongAmount, setWrongAmount] = useState(false);
   const [insufficientPoolBalance, setInsufficientPoolBalance] = useState(false);
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
-  const [pool, setPool] = useState<LiquidityPool>(null);
   const [exchangeRate, setExchangeRate] = useState("0");
   const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
   const [toBalanceLoading, setToBalanceLoading] = useState(false);
@@ -419,9 +392,29 @@ const SwapWidget = () => {
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
+  const [oracleExchangeRate, setOracleExchangeRate] = useState("0");
+  const [oracleLoading, setOracleLoading] = useState(false);
+  const [oracleDisplayFromSymbol, setOracleDisplayFromSymbol] = useState("");
+  const [oracleDisplayToSymbol, setOracleDisplayToSymbol] = useState("");
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
+
+  // Fee warning logic
+  const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
+  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+  
+  // Safely parse input amounts
+  const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
+
+  // Fee warning checks
+  const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+
+  const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n && (() => {
+    const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
+    const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
+    return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
+  })();
   const lastCalculatedFromRef = useRef<string>("");
 
   // Fetch USDST balance when user changes
@@ -438,13 +431,9 @@ const SwapWidget = () => {
   const initialTokenSetup = async () => {
     try {
       setFromBalanceLoading(true)
-      const res = await api.get(
-         `/tokens/balance?address=eq.${swappableTokens[0].address}`
-       );
- 
-       const balance = res?.data?.[0]?.balance || "0";
-       setFromAsset({...swappableTokens[0], balance})
-       setFromBalanceLoading(false)
+      const balance = await getTokenBalance(swappableTokens[0].address);
+      setFromAsset({...swappableTokens[0], balance})
+      setFromBalanceLoading(false)
     } catch (error) {
       setFromBalanceLoading(false)
       console.log(error);
@@ -459,6 +448,58 @@ const SwapWidget = () => {
       fetchPairableTokens(fromAsset.address);
     }
   }, [fromAsset?.address, fetchPairableTokens]);
+
+  // Fetch oracle exchange rate when assets change
+  useEffect(() => {
+    const fetchOracleExchangeRate = async () => {
+      if (!fromAsset?.address || !toAsset?.address) {
+        setOracleExchangeRate("0");
+        setOracleLoading(false);
+        return;
+      }
+
+      setOracleLoading(true);
+      try {
+        const [fromPrice, toPrice] = await Promise.all([
+          fetchPrice(fromAsset.address),
+          fetchPrice(toAsset.address)
+        ]);
+
+        if (fromPrice && toPrice) {
+          // Oracle prices are actually stored in 18-decimal format (1e18 = $1.00), not 8-decimal
+          // Parse as 18-decimal values
+          const fromPriceBig = safeParseUnits(fromPrice, 18);
+          const toPriceBig = safeParseUnits(toPrice, 18);
+          
+          if (fromPriceBig > 0n && toPriceBig > 0n) {
+            // Calculate exchange rate: how much toAsset you get for 1 fromAsset
+            // Rate = fromPrice / toPrice (since higher priced asset should give less units)
+            const rate = (fromPriceBig * safeParseUnits("1", 18)) / toPriceBig;
+            setOracleExchangeRate(formatUnits(rate, 18));
+            
+            // Always use the same symbol order as the swap direction
+            setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+            setOracleDisplayToSymbol(toAsset?._symbol || "");
+          } else {
+            setOracleExchangeRate("0");
+            setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+            setOracleDisplayToSymbol(toAsset?._symbol || "");
+          }
+        } else {
+          setOracleExchangeRate("0");
+          setOracleDisplayFromSymbol(fromAsset?._symbol || "");
+          setOracleDisplayToSymbol(toAsset?._symbol || "");
+        }
+      } catch (error) {
+        console.error("Failed to fetch oracle prices:", error);
+        setOracleExchangeRate("0");
+      } finally {
+        setOracleLoading(false);
+      }
+    };
+
+    fetchOracleExchangeRate();
+  }, [fromAsset?.address, toAsset?.address, fetchPrice]);
 
   // Combined effect: fetch pool, update rate, and poll for updates
   useEffect(() => {
@@ -495,7 +536,7 @@ const SwapWidget = () => {
 
           // Recalculate if not actively editing and we have a preserved amount
           if (fromAmount && fromAmount === lastCalculatedFromRef.current && editingField === null) {
-            const parsedValue = parseUnits(fromAmount, DECIMALS);
+            const parsedValue = safeParseUnits(fromAmount, DECIMALS);
             const isAToB = poolData.tokenA?.address === fromAsset.address ? true : false;
 
             const swapAmount = await calculateSwap({
@@ -557,7 +598,7 @@ const SwapWidget = () => {
   }, []);
 
   // Helper functions
-  const getTokenBalance = async (asset: SwappableToken, isFrom: boolean) => {
+  const getTokenBalanceFromContext = async (asset: SwappableToken, isFrom: boolean) => {
     try {
       if (isFrom) {
         setFromBalanceLoading(true);
@@ -565,11 +606,7 @@ const SwapWidget = () => {
         setToBalanceLoading(true);
       }
 
-      const res = await api.get(
-        `/tokens/balance?address=eq.${asset.address}`
-      );
-
-      const balance = res?.data?.[0]?.balance || "0";
+      const balance = await getTokenBalance(asset.address);
 
       if (isFrom) {
         setFromAsset({ ...asset, balance });
@@ -634,7 +671,7 @@ const SwapWidget = () => {
         return;
       }
       
-      const parsedValue = parseUnits(inputAmount, DECIMALS);
+      const parsedValue = safeParseUnits(inputAmount, DECIMALS);
 
       if (isFromInput) {
         // Forward calculation: input -> output
@@ -762,7 +799,7 @@ const SwapWidget = () => {
         return;
       }
 
-      const parsed = parseUnits(preservedAmount, DECIMALS);
+      const parsed = safeParseUnits(preservedAmount, DECIMALS);
       const isAToB = pool.tokenA?.address === (newEditingField === 'from' ? fromAsset?.address : toAsset?.address) ? true : false;
 
       try {
@@ -803,14 +840,14 @@ const SwapWidget = () => {
         throw new Error("Invalid amount values");
       }
 
-      const toAmountInWei = parseUnits(toAmount, DECIMALS);
+      const toAmountInWei = safeParseUnits(toAmount, DECIMALS);
       const slippageBps = Math.round(slippage * 100);
       const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
         poolAddress: pool.address,
         isAToB,
-        amountIn: parseUnits(fromAmount, DECIMALS).toString(),
+        amountIn: safeParseUnits(fromAmount, DECIMALS).toString(),
         minAmountOut: minTokens.toString(),
       });
 
@@ -828,8 +865,8 @@ const SwapWidget = () => {
 
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        getTokenBalance(fromAsset, true),
-        getTokenBalance(toAsset, false),
+        getTokenBalanceFromContext(fromAsset, true),
+        getTokenBalanceFromContext(toAsset, false),
         fetchUsdstBalance(userAddress),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
@@ -837,11 +874,7 @@ const SwapWidget = () => {
       ]);
     } catch (error) {
       console.error("Swap error:", error);
-      toast({
-        title: "Error",
-        description: "Swap failed. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setSwapLoading(false);
     }
@@ -849,7 +882,7 @@ const SwapWidget = () => {
 
   // Validation helpers
   const isSwapDisabled = () => {
-    const feeAmount = parseUnits(SWAP_FEE, DECIMALS);
+    const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
     // Basic validations
@@ -869,7 +902,7 @@ const SwapWidget = () => {
         return true;
       }
       
-      const fromAmountWei = parseUnits(fromAmount, DECIMALS);
+      const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
       const balance = BigInt(fromAsset.balance || "0");
 
       if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
@@ -886,6 +919,28 @@ useEffect(() => {
   }
 }, [fromAsset, toAsset, fromAmount, pool]);
 
+const handleMaxClick = (isFrom: boolean) => {
+  const asset = isFrom ? fromAsset : toAsset;
+  if (!asset) return;
+
+  let balance = BigInt(asset.balance) || 0n;
+
+
+   if (asset?.address === usdstAddress) {
+    const fee = safeParseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
+    if (balance > fee) {
+      balance -= fee;
+    } else {
+      balance = 0n;
+    }
+  }
+
+  const formatted = formatUnits(balance.toString() || 0,18);
+  
+
+  handleAmountChange(isFrom, formatted); // will auto-calculate the other amount
+};
+
   return (
     <div className="space-y-6">
       <TokenInput
@@ -896,16 +951,17 @@ useEffect(() => {
         isLoading={fromBalanceLoading}
         wrongAmount={wrongAmount}
         insufficientPoolBalance={insufficientPoolBalance}
-        onSelect={(asset) => getTokenBalance(asset, true)}
+        onSelect={(asset) => getTokenBalanceFromContext(asset, true)}
         tokens={swappableTokens}
         isOpen={fromPopoverOpen}
         onOpenChange={setFromPopoverOpen}
         label="From"
         onFocus={() => setEditingField('from')}
-        usdstBalance={usdstBalance}
         isFromInput={true}
         pool={pool}
         fromAsset={fromAsset}
+        showMaxButton={!!fromAsset?.balance}
+        onMaxClick={() => handleMaxClick(true)}
       />
 
       <div className="flex justify-center">
@@ -927,29 +983,56 @@ useEffect(() => {
         isLoading={toBalanceLoading}
         wrongAmount={false}
         insufficientPoolBalance={false}
-        onSelect={(asset) => getTokenBalance(asset, false)}
+        onSelect={(asset) => getTokenBalanceFromContext(asset, false)}
         tokens={pairableTokens}
         isOpen={toPopoverOpen}
         onOpenChange={setToPopoverOpen}
         label="To"
         onFocus={() => setEditingField('to')}
-        usdstBalance={usdstBalance}
         isFromInput={false}
         pool={pool}
         fromAsset={fromAsset}
+        showMaxButton={false}
+        onMaxClick={() => handleMaxClick(false)}
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Exchange Rate</span>
+          <span className="text-gray-600 decoration-2">Exchange Rate</span>
           <span className="font-medium">
             1 {fromAsset?._symbol || ""} ≈ {formatAmount(exchangeRate)} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Exchange Rate (Spot)</span>
+          <span className="font-medium text-gray-400">
+            {oracleLoading ? (
+              <LoadingSpinner />
+            ) : oracleExchangeRate === "0" ? (
+              "Price data unavailable"
+            ) : (
+              <>1 {oracleDisplayFromSymbol} ≈ {formatAmount(oracleExchangeRate)} {oracleDisplayToSymbol}</>
+            )}
+          </span>
+        </div>
+        <div className="my-3"></div>
+        <div className="flex justify-between text-sm">
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST</span>
         </div>
+        
+        {/* Fee Warnings */}
+        {hasInsufficientUsdstForFee && (
+          <p className="text-yellow-600 text-sm mt-1">
+            Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+          </p>
+        )}
+        {isLowBalanceWarning && (
+          <p className="text-yellow-600 text-sm mt-1">
+            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+          </p>
+        )}
+        
         <SlippageControl
           slippage={slippage}
           autoSlippage={autoSlippage}

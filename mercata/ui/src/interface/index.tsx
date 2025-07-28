@@ -248,6 +248,7 @@ export interface CollateralData {
   _owner: string;
   _symbol: string;
   _totalSupply: string;
+  images?: Array<{ value: string }>;
   asset?: string;
   maxRepay?: string;
   symbol?: string;
@@ -276,6 +277,7 @@ export interface LiquidityData {
   borrowAPY: number;
   exchangeRate: string;
   supplyAPY: number;
+  maxSupplyAPY: number;
   supplyable: TokenInfo;
   withdrawable: TokenInfo;
   totalBorrowed: string;
@@ -300,12 +302,36 @@ export interface LiquidationBonusItem {
   bonus: string;
 }
 
+export interface AssetConfig {
+  interestRate: string;
+  liquidationBonus: string;
+  liquidationThreshold: string;
+  ltv: string;
+  reserveFactor: string;
+}
+
 export interface LendData {
   lendingPool: {
-    collateralRatio: CollateralRatioItem[];
-    interestRate: InterestRateItem[];
-    liquidationBonus: LiquidationBonusItem[];
+    assetConfigs: Record<string, AssetConfig>;
   }
+}
+
+// Backend response structure for lending pool data
+// This is the actual structure returned by the API which may differ from LendData
+export interface LendingPoolResponse {
+  registry?: unknown;
+  pool?: {
+    assetConfigs: Array<{
+      asset: string;
+      AssetConfig: AssetConfig;
+    }> | Record<string, AssetConfig>;
+  };
+  lendingPool?: {
+    assetConfigs: Array<{
+      asset: string;
+      AssetConfig: AssetConfig;
+    }> | Record<string, AssetConfig>;
+  };
 }
 
 export interface LiquidityPool {
@@ -322,6 +348,9 @@ export interface LiquidityPool {
   tokenAPrice: string;
   tokenBPrice: string;
   lpTokenPrice: string;
+  totalLiquidityUSD?: string;
+  tradingVolume24h?: string;
+  apy?: string;
   _name?: string;
   _symbol?: string;
 }
@@ -332,6 +361,7 @@ export type NewLoanData = {
   lastIntCalculated: string;
   lastUpdated: string;
   healthFactor: number;
+  healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
   accruedInterest: string;
   interestRate: number;
@@ -416,4 +446,35 @@ export interface Pool {
   };
   _name?: string;
   _symbol?: string;
+}
+
+export interface SwapHistoryEntry {
+  id: string;
+  timestamp: Date;
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  amountOut: string;
+  impliedPrice: string;
+  sender: string;
+}
+
+export interface PriceHistoryEntry {
+  id: string;
+  timestamp: Date;
+  asset: string;
+  price: string;
+  blockTimestamp: Date;
+}
+
+export interface PriceHistoryResponse {
+  data: PriceHistoryEntry[];
+  totalCount: number;
+}
+
+export interface HealthImpactData {
+  currentHealthFactor: number;
+  newHealthFactor: number;
+  healthImpact: number;
+  isHealthy: boolean;
 }

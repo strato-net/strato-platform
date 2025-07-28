@@ -88,8 +88,6 @@ const AllTokensTable = () => {
     return tokenStatus === statusFilter;
   });
 
-  console.log('Rendering AllTokensTable', tokens);
-
   if (loading || lendLoading) {
     return (
       <Card>

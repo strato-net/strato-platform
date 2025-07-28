@@ -75,11 +75,7 @@ export const DepositForm = () => {
         }
       } catch (error) {
         console.error("Error while getting listings:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch available listings. Please try again.",
-          variant: "destructive",
-        });
+        // Error toast is now handled globally by axios interceptor
       }
     };
     fetchData();
@@ -117,11 +113,7 @@ export const DepositForm = () => {
       }
     } catch (error) {
       console.error("Failed to lock on-ramp amount:", error);
-      toast({
-        title: "Error",
-        description: "Failed to process deposit. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setLoading(false);
     }
@@ -133,7 +125,7 @@ export const DepositForm = () => {
     : false;
 
   return (
-    <div className="space-y-6 py-4">
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="amount">Amount of USDST to purchase</Label>
         <div className="relative">
@@ -188,15 +180,13 @@ export const DepositForm = () => {
         <p>• Instant USDST credit to your account</p>
         <p>• 1% processing fee applies</p>
       </div>
-      <div className="flex justify-end gap-2">
-        <Button
-          onClick={handleDeposit}
-          disabled={loading || !amount || exceedsMax}
-          className="bg-strato-blue hover:bg-strato-blue/90"
-        >
-          {loading ? "Processing..." : "Continue to Payment"}
-        </Button>
-      </div>
+      <Button
+        onClick={handleDeposit}
+        disabled={loading || !amount || exceedsMax}
+        className="w-full bg-strato-blue hover:bg-strato-blue/90 mt-6"
+      >
+        {loading ? "Processing..." : "Continue to Payment"}
+      </Button>
     </div>
   );
 };

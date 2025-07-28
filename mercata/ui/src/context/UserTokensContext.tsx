@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useMemo, useCallback } from
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
-import { usdstAddress } from "@/lib/contants";
+import { usdstAddress } from "@/lib/constants";
 
 type UserTokensContextType = {
   activeTokens: Token[];
@@ -53,15 +53,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       
       setUsdstBalance(res?.data?.[0]?.balance || "0");
     } catch (err) {
-      if (
-        axios.isCancel?.(err) ||
-        err?.name === "CanceledError" ||
-        err?.code === "ERR_CANCELED" ||
-        err?.message === "canceled"
-      ) {
-        return;
-      }
-      console.error('Error fetching USDST balance:', err);
+      return;
     } finally {
       if (!signal?.aborted) {
         setLoadingUsdstBalance(false);
@@ -96,8 +88,6 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       ) {
         return;
       }
-      console.error("Failed to fetch tokens:", err);
-      setError("Failed to fetch token data");
       setActiveTokens([]);
       setInactiveTokens([]);
     } finally {
@@ -126,8 +116,6 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       ) {
         return;
       }
-      console.error("Failed to fetch all active tokens:", err);
-      setError("Failed to fetch all active token data");
       setAllActiveTokens([]);
     } finally {
       if (!signal?.aborted) {

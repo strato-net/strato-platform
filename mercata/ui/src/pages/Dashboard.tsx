@@ -35,13 +35,27 @@ const Dashboard = () => {
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
   const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
 
+  // Add visibility states to prevent flashing
+  const [isComponentMounted, setIsComponentMounted] = useState(false);
+  const [isDataInitialized, setIsDataInitialized] = useState(false);
+
   useEffect(() => {
     document.title = "Dashboard | STRATO Mercata";
-    setTimeout(() => {
-      fetchTokens();
-    }, 500);
+    
+    // Set mounted state immediately to prevent flash
+    setIsComponentMounted(true);
+    
+    // Remove the timeout to prevent loading flash
+    fetchTokens();
     refreshLoans();
     fetchLpTokensPositions();
+
+    // Mark data as initialized after a brief delay to ensure proper rendering
+    const initTimer = setTimeout(() => {
+      setIsDataInitialized(true);
+    }, 100);
+
+    return () => clearTimeout(initTimer);
   }, [userAddress]);
 
   useEffect(() => {
@@ -98,13 +112,9 @@ const Dashboard = () => {
     setCataBalance(cataTotal);
   }, [tokens, loans]);
 
-  function formatBalance(value: number): string {
-    if (typeof value !== "number" || isNaN(value) || !isFinite(value)) return "0.00";
-
-    return value.toLocaleString("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 2,
-    });
+  // Don't render anything until component is properly mounted
+  if (!isComponentMounted) {
+    return null;
   }
 
   return (
@@ -148,23 +158,39 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="mb-8">
-            <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} />
-          </div>
+          {/* Only render lower sections after data initialization to prevent flash */}
+          {isDataInitialized && (
+            <>
+              <div className="mb-8">
+                <AssetsList 
+                  loading={loading} 
+                  tokens={tokens} 
+                  inActiveTokens={inactiveTokens} 
+                  shouldPreventFlash={true}
+                />
+              </div>
 
-          <div className="mb-8">
-            <BorrowingSection 
-              loanData={loans}
-            />
-          </div>
+              <div className="mb-8">
+                <BorrowingSection 
+                  loanData={loans}
+                />
+              </div>
 
-          <div className="mb-8">
-            <MyPoolParticipationSection loadingLpTokens={loadingLpTokens} loadingLiquidity={loadingLiquidity} liquidityInfo={liquidityInfo} lpTokens={lpTokens} /> 
-          </div>
+              <div className="mb-8">
+                <MyPoolParticipationSection 
+                  loadingLpTokens={loadingLpTokens} 
+                  loadingLiquidity={loadingLiquidity} 
+                  liquidityInfo={liquidityInfo} 
+                  lpTokens={lpTokens}
+                  shouldPreventFlash={true}
+                /> 
+              </div>
 
-          <div className="mb-8">
-            <DashboardFAQ />
-          </div>
+              <div className="mb-8">
+                <DashboardFAQ />
+              </div>
+            </>
+          )}
         </main>
       </div>
     </div>

@@ -50,9 +50,6 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
         address: token.address,
         status: data.status,
       };
-
-      console.log('Setting token status with payload:', payload);
-
       await setTokenStatus(payload);
 
       toast({
@@ -65,12 +62,7 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
     } catch (error: unknown) {
       const axiosError = error as AxiosError<ApiErrorResponse>;
       console.error('Token status error:', axiosError);
-      
-      toast({
-        title: 'Error Setting Token Status',
-        description: axiosError.response?.data?.message || (error as Error)?.message || 'Failed to set token status. Please try again.',
-        variant: 'destructive',
-      });
+      // Error toast is now handled globally by axios interceptor
     }
   };
 

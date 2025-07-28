@@ -1,1 +1,3 @@
 for i in {1..5}; do scp "$1" mercata-testnet-node$i:/datadrive/testnet/strato-getting-started/docker-compose.yml && ssh mercata-testnet-node$i "cd /datadrive/testnet/strato-getting-started && sudo ./strato --pull && sudo ./strato --wipe && sudo ./strato-run.sh"; done
+scp "$1" mercata-testnet-buildtest:/datadrive/testnet/strato-getting-started/docker-compose.yml && ssh mercata-testnet-buildtest "cd /datadrive/testnet/strato-getting-started && sudo ./strato --pull && sudo ./strato --wipe && sudo ./strato-run.sh"
+scp "$1" mercata-testnet-node-public:/datadrive/testnet/strato-getting-started/docker-compose.yml && ssh mercata-testnet-node-public "cd /datadrive/testnet/strato-getting-started && sudo ./strato --pull && sudo ./strato --wipe && sudo ./strato-run.sh"

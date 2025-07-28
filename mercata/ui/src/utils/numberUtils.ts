@@ -1,4 +1,4 @@
-import { parseUnits } from "ethers";
+import { parseUnits, formatUnits } from "ethers";
 
 /**
  * Safely parses a string to BigInt using parseUnits, handling edge cases
@@ -11,9 +11,19 @@ import { parseUnits } from "ethers";
 export const safeParseUnits = (value: string, decimals: number): bigint => {
   try {
     // Handle edge cases that parseUnits can't handle
-    if (!value || value === '.' || value === '0.' || value.endsWith('.')) {
+    if (!value || value === '.') {
       return 0n;
     }
+    
+    // Handle incomplete decimal inputs (e.g., "35.") by treating as "35"
+    if (value.endsWith('.')) {
+      const numericValue = value.slice(0, -1);
+      if (!numericValue) {
+        return 0n;
+      }
+      return parseUnits(numericValue, decimals);
+    }
+    
     return parseUnits(value, decimals);
   } catch {
     return 0n;
@@ -88,4 +98,101 @@ export const addCommasToInput = (value: string): string => {
   }
   
   return integerPart;
-}; 
+};
+
+/**
+ * Formats a transaction hash to show first 6 and last 4 characters
+ */
+export const formatHash = (hash: string): string => {
+  if (hash.length > 10) {
+    return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+  }
+  return hash;
+};
+
+/**
+ * Formats an amount string with proper decimal handling and locale formatting
+ */
+export const formatAmount = (amount: string): string => {
+  if (!amount) return "";
+  const value = Number(amount);
+  const roundedDown = Math.floor(value * 1000000) / 1000000;
+  return roundedDown.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  });
+};
+
+/**
+  * Formats a balance with symbol, from wei/smallest unit into a human-readable string.
+ */
+export const formatBalance = (
+  balance: string | number | bigint,
+  symbol?: string,
+  decimals: number = 18,
+  minPrecision?: number,
+  maxPrecision?: number,
+  isPrice?: boolean
+): string => {
+  const raw = BigInt(balance.toString());
+
+  if (raw === 0n) {
+    const zero = minPrecision !== undefined ? `0.${"0".repeat(minPrecision)}` : "0";
+    const withSymbol = symbol ? `${zero} ${symbol}` : zero;
+    return isPrice ? `$${withSymbol}` : withSymbol;
+  }
+  
+  const formatted = formatUnits(raw, decimals); // e.g., "1234.56789"
+
+  let [int, dec = ""] = formatted.split(".");
+
+  if (maxPrecision !== undefined) {
+    const rounded = Number(formatted).toFixed(maxPrecision);
+    [int, dec = ""] = rounded.split(".");
+  }
+
+  if (minPrecision !== undefined && dec.length < minPrecision) {
+    dec = dec.padEnd(minPrecision, "0");
+  }
+
+  const localized = Number(int).toLocaleString();
+  const result = dec ? `${localized}.${dec}` : localized;
+
+  const withSymbol = symbol ? `${result} ${symbol}` : result;
+  return isPrice ? `$${withSymbol}` : withSymbol;
+};
+
+/**
+ * Formats a Wei amount to human readable format with decimal cleanup
+ */
+export const formatWeiAmount = (weiAmount: string, decimals: number = 18): string => {
+  try {
+    const formatted = formatUnits(BigInt(weiAmount), decimals);
+    // Remove trailing zeros after decimal point and limit to 6 decimal places
+    if (formatted.includes('.')) {
+      const cleaned = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
+      // Limit to 6 decimal places
+      const parts = cleaned.split('.');
+      if (parts.length === 2 && parts[1].length > 6) {
+        return `${parts[0]}.${parts[1].substring(0, 6)}`;
+      }
+      return cleaned;
+    }
+    return formatted;
+  } catch (error) {
+    console.error('Error formatting wei amount:', error);
+    return weiAmount; // Return original if formatting fails
+  }
+};
+
+/**
+ * Formats currency values with proper locale formatting
+ */
+export const formatCurrency = (value: string | number): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return "0.00";
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
+};

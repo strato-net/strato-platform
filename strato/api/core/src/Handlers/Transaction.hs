@@ -55,6 +55,7 @@ import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
 import qualified Data.Text as T
+import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import MaybeNamed
 import Numeric.Natural
@@ -81,8 +82,13 @@ type API =
     :> QueryParam "minvalue" Natural
     :> QueryParam "maxvalue" Natural
     :> QueryParam "blocknumber" Natural
+    :> QueryParam "minblocknumber" Natural
+    :> QueryParam "maxblocknumber" Natural
     :> QueryParam "chainid" (MaybeNamed ChainId)
     :> QueryParams "chainids" ChainId
+    :> QueryParam "limit" Natural
+    :> QueryParam "offset" Natural
+    :> QueryParam "search" T.Text
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [RawTransaction']
     :<|> "transaction"
@@ -104,8 +110,13 @@ data TxsFilterParams = TxsFilterParams
     qtMinValue :: Maybe Natural,
     qtMaxValue :: Maybe Natural,
     qtBlockNumber :: Maybe Natural,
+    qtMinBlockNumber :: Maybe Natural,
+    qtMaxBlockNumber :: Maybe Natural,
     qtChainId :: Maybe (MaybeNamed ChainId),
     qtChainIds :: [ChainId],
+    qtLimit :: Maybe Natural,
+    qtOffset :: Maybe Natural,
+    qtSearch :: Maybe T.Text,
     qtSortby :: Maybe Sortby
   }
   deriving (Eq, Ord, Show)
@@ -128,7 +139,12 @@ txsFilterParams =
     Nothing
     Nothing
     Nothing
+    Nothing
+    Nothing
     []
+    Nothing
+    Nothing
+    Nothing
     Nothing
 
 server :: (MonadLogger m, HasSQL m) => Int -> ServerT API m
@@ -152,7 +168,19 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
                       fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> qtGasLimit),
                       fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> qtMinGasLimit),
                       fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> qtMaxGasLimit),
-                      fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber)
+                      fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber),
+                      fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.>=. E.val v) (fromIntegral <$> qtMinBlockNumber),
+                      fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.<=. E.val v) (fromIntegral <$> qtMaxBlockNumber),
+                      fmap (\search ->
+                          let isWhiteSpace c = c `elem` [' ', '\n', '\t']
+                              searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
+                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionFromAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionToAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionArgs) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (rawTx E.^. RawTransactionFuncName `E.like` E.val (Just $ "%" <> v <> "%"))
+                                         E.||. (rawTx E.^. RawTransactionContractName `E.like` E.val (Just $ "%" <> v <> "%"))) <$> searches
+                           in foldr (E.||.) (E.val False) queries
+                        ) qtSearch
                     ]
 
             E.where_ ((foldl1 (E.&&.) criteria)) -- map (getTransFilter rawTx) $ getParameters ))
@@ -160,7 +188,8 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
             E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) [criteria]))
 
             -- E.offset $ (limit * offset)
-            E.limit $ appFetchLimit
+            E.offset . fromIntegral $ fromMaybe 0 qtOffset
+            E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qtLimit
             E.orderBy $
               [ (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionBlockNumber),
                 (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionNonce)
@@ -262,12 +291,17 @@ getTransaction ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
   Maybe (MaybeNamed ChainId) ->
   [ChainId] ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe T.Text ->
   Maybe Sortby ->
   m [RawTransaction']
-getTransaction a b c d e f g h i j k l m n o p q =
-  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q)
+getTransaction a b c d e f g h i j k l m n o p q r s t u v =
+  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t u v)
 
 getTransaction' ::
   Selectable TxsFilterParams [RawTransaction] m =>
@@ -291,10 +325,15 @@ transactionQueryParams =
     "minvalue",
     "maxvalue",
     "blocknumber",
+    "minblocknumber",
+    "maxblocknumber",
     -- "index",
     --"rejected",
     "[chainids]",
-    "chainid"
+    "chainid",
+    "limit",
+    "offset",
+    "search"
   ]
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()

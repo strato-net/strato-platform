@@ -27,23 +27,43 @@ export const contractCall = async (
     },
   };
 
-  const response = await axios.post(
-    `${process.env.NODE_URL}/strato/v2.3/transaction/parallel?resolve=true`,
-    txPayload,
-    {
-      headers: {
-        accept: "application/json;charset=utf-8",
-        "content-type": "application/json;charset=utf-8",
-        authorization: `Bearer ${accessToken}`,
-      },
-      timeout: 30000,
-      maxContentLength: 50 * 1024 * 1024,
-      maxBodyLength: 50 * 1024 * 1024,
-    }
-  );
+  let response;
+  try {
+    response = await axios.post(
+      `${process.env.NODE_URL}/strato/v2.3/transaction/parallel?resolve=true`,
+      txPayload,
+      {
+        headers: {
+          accept: "application/json;charset=utf-8",
+          "content-type": "application/json;charset=utf-8",
+          authorization: `Bearer ${accessToken}`,
+        },
+        timeout: 30000,
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024,
+      }
+    );
 
-  if (response.status !== 200) {
-    throw new Error(`Strato error: ${response.statusText}`);
+    if (response.status !== 200) {
+      throw new Error(`Strato error: ${response.statusText}`);
+    }
+  } catch (error: any) {
+    // Handle blockchain errors and preserve the original error message
+    if (error.response?.status === 422) {
+      const errorData = error.response.data;
+      
+      if (errorData && typeof errorData === 'string') {
+        // Look for Solidity error messages in the response
+        const solidityMatch = errorData.match(/SString "([^"]+)"/);
+        
+        if (solidityMatch) {
+          console.log("solidityMatch errrorrr in contract call",solidityMatch[1]);
+          throw solidityMatch[1]; // Throw just the original blockchain error
+      
+        }
+      }
+    }
+    throw error; // Re-throw other errors
   }
 
   if (!response.data || !Array.isArray(response.data)) {

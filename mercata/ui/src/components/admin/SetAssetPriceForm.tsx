@@ -47,9 +47,6 @@ const SetAssetPriceForm = () => {
 
       await setPrice(payload);
 
-      console.log('Setting price with payload:', payload);
-      console.log('Selected token:', selectedToken);
-
       toast({
         title: 'Price Updated Successfully',
         description: `Price for ${selectedToken?._symbol} has been set to $${data.price}`,
@@ -59,11 +56,7 @@ const SetAssetPriceForm = () => {
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
       const errMsg = (axiosError.response?.data as ApiErrorResponse)?.message;
-      toast({
-        title: 'Error Setting Price',
-        description: errMsg || 'Failed to set price. Please try again.',
-        variant: 'destructive',
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setLoading(false);
     }
