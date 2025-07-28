@@ -471,3 +471,10 @@ export interface PriceHistoryResponse {
   data: PriceHistoryEntry[];
   totalCount: number;
 }
+
+export interface HealthImpactData {
+  currentHealthFactor: number;
+  newHealthFactor: number;
+  healthImpact: number;
+  isHealthy: boolean;
+}

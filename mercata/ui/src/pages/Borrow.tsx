@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { formatBalance, safeParseFloat, safeParseUnits } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
@@ -20,17 +20,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { HelpCircle, ArrowDownCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
 import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
 
-import { CollateralData } from "@/interface";
+import { CollateralData, HealthImpactData, NewLoanData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
+import { getHealthFactorColor} from "@/utils/misc"
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -63,6 +64,12 @@ const Borrow = () => {
   const [supplyLoading, setSupplyLoading] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [healthImpact, setHealthImpact] = useState<HealthImpactData>({
+    currentHealthFactor: 0,
+    newHealthFactor: 0,
+    healthImpact: 0,
+    isHealthy: true,
+  });
   
   // Embedded form states
   const [borrowAmount, setBorrowAmount] = useState<string>("");
@@ -323,6 +330,60 @@ const Borrow = () => {
     }
   };
 
+  // Calculate health impact of supply
+  const calculateHealthImpact = (
+    borrowAmount: number,
+    loanData: NewLoanData
+  ) => {
+    if (!borrowAmount || !loanData) {
+      return {
+        currentHealthFactor: 0,
+        newHealthFactor: 0,
+        healthImpact: 0,
+        isHealthy: true,
+      };
+    }
+  
+    // Current values from backend
+    const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
+    const currentHealthFactor = loanData?.healthFactor || 0;
+    const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
+  
+    // If there's no outstanding loan, supply is always healthy
+    if (currentTotalBorrowValue === 0n) {
+      return {
+        currentHealthFactor: Infinity,
+        newHealthFactor: Infinity,
+        healthImpact: 0,
+        isHealthy: true,
+      };
+    }
+  
+    const borrowAmountWei = safeParseUnits(borrowAmount.toString(),18);
+  
+     let totalBorrowValue = currentTotalBorrowValue + borrowAmountWei;
+
+     if (totalBorrowValue < 0n) totalBorrowValue = 0n;
+  
+    // Calculate new health factor
+    const newHealthFactor = totalBorrowValue === 0n ? Infinity : safeParseFloat(formatUnits(currentCollateralValue, 18)) / safeParseFloat(formatUnits(totalBorrowValue, 18));
+  
+    const healthImpact = newHealthFactor - currentHealthFactor;
+    const isHealthy = newHealthFactor >= 1.0;
+  
+    return {
+      currentHealthFactor,
+      newHealthFactor,
+      healthImpact,
+      isHealthy,
+    };
+  };
+
+  useEffect(()=>{
+    const res = calculateHealthImpact(safeParseFloat(borrowAmount),loans)    
+    setHealthImpact(res)
+  },[borrowAmount, loans])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
@@ -501,6 +562,38 @@ const Borrow = () => {
 
                       {/* Transaction Fee */}
                       <div className="px-4 py-3 bg-gray-50 rounded-md">
+                        {borrowAmount && !!healthImpact?.newHealthFactor &&
+                          <div>
+                             <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Current Health Factor</span>
+                              <span className={`font-medium 
+                              ${getHealthFactorColor(
+                                healthImpact.currentHealthFactor
+                              )}
+                              `}>{healthImpact?.currentHealthFactor?.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">New Health Factor</span>
+                              <span className={`font-medium 
+                              ${getHealthFactorColor(
+                                healthImpact.newHealthFactor
+                              )}
+                              `}>{healthImpact?.newHealthFactor?.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Change:</span>
+                              <span
+                                className={`font-medium ${healthImpact.healthImpact >= 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                  }`}
+                              >
+                                {healthImpact.healthImpact >= 0 ? "+" : ""}
+                                {healthImpact.healthImpact.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        }
                         <div className="flex justify-between text-sm mb-2">
                           <span className="text-gray-600">Transaction Fee</span>
                           <span className="font-medium">{BORROW_FEE} USDST</span>
@@ -523,6 +616,8 @@ const Borrow = () => {
                         onClick={executeEmbeddedBorrow}
                         disabled={
                           !borrowAmount ||
+                          isNaN(Number(borrowAmount)) || 
+                          Number(borrowAmount) <= 0 ||
                           borrowLoading ||
                           safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
                           (() => {
