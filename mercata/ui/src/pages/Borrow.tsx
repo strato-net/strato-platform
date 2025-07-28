@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatBalance, safeParseFloat, safeParseUnits } from "@/utils/numberUtils";
+import { safeParseUnits } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
@@ -19,21 +19,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ArrowDownCircle } from "lucide-react";
+import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
 import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
 
-import { CollateralData, HealthImpactData, NewLoanData } from "@/interface";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/borrow/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/borrow/WithdrawCollateral";
+import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-import { getHealthFactorColor} from "@/utils/misc"
-import BorrowForm from "@/components/borrow/BorrowForm";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -306,55 +305,6 @@ const Borrow = () => {
       });
       setRepayLoading(false);
     }
-  };
-
-  // Calculate health impact of supply
-  const calculateHealthImpact = (
-    borrowAmount: number,
-    loanData: NewLoanData
-  ) => {
-    if (!borrowAmount || !loanData) {
-      return {
-        currentHealthFactor: 0,
-        newHealthFactor: 0,
-        healthImpact: 0,
-        isHealthy: true,
-      };
-    }
-  
-    // Current values from backend
-    const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
-    const currentHealthFactor = loanData?.healthFactor || 0;
-    const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
-  
-    // If there's no outstanding loan, supply is always healthy
-    if (currentTotalBorrowValue === 0n) {
-      return {
-        currentHealthFactor: Infinity,
-        newHealthFactor: Infinity,
-        healthImpact: 0,
-        isHealthy: true,
-      };
-    }
-  
-    const borrowAmountWei = safeParseUnits(borrowAmount.toString(),18);
-  
-     let totalBorrowValue = currentTotalBorrowValue + borrowAmountWei;
-
-     if (totalBorrowValue < 0n) totalBorrowValue = 0n;
-  
-    // Calculate new health factor
-    const newHealthFactor = totalBorrowValue === 0n ? Infinity : safeParseFloat(formatUnits(currentCollateralValue, 18)) / safeParseFloat(formatUnits(totalBorrowValue, 18));
-  
-    const healthImpact = newHealthFactor - currentHealthFactor;
-    const isHealthy = newHealthFactor >= 1.0;
-  
-    return {
-      currentHealthFactor,
-      newHealthFactor,
-      healthImpact,
-      isHealthy,
-    };
   };
 
   return (
