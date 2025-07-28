@@ -76,12 +76,6 @@ contract record Pool is Ownable {
     /// @notice Current balance of tokenB in the pool
     uint public tokenBBalance;
 
-    /// @notice Accumulated fees per LP token share (scaled by 1e18)
-    uint256 public feePerShare;
-    
-    /// @notice Mapping of user addresses to their reward debt for fee calculations
-    mapping(address => uint256) public record rewardDebt;
-
     /// @notice Pool-specific swap fee rate in basis points (0 = use factory default)
     uint256 public swapFeeRate;
     
@@ -207,7 +201,6 @@ contract record Pool is Ownable {
 
             require(maxTokenAAmount >= tokenAAmount, "Insufficient tokenA amount");
             lpToken.mint(msg.sender, liquidityMinted);
-            rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
 
             require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
             require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
@@ -221,7 +214,6 @@ contract record Pool is Ownable {
             uint256 tokenAAmount = maxTokenAAmount;
             uint256 initialLiquidity = tokenBAmount;
             lpToken.mint(msg.sender, initialLiquidity);
-            rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
 
             require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
             require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
@@ -263,7 +255,6 @@ contract record Pool is Ownable {
         emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
         lpToken.burn(msg.sender, lpTokenAmount);
-        rewardDebt[msg.sender] = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
 
         _updateStateVars();
 
@@ -315,11 +306,6 @@ contract record Pool is Ownable {
         uint256 protocolFee = fee - lpFee;
 
         uint256 netInput = amountIn - fee;
-        uint256 totalSupply = ERC20(lpToken).totalSupply();
-
-        if (totalSupply > 0) {
-            feePerShare += (lpFee * 1e18) / totalSupply;
-        }
 
         // Transfer full amount to pool
         require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Input transfer failed");
@@ -335,20 +321,6 @@ contract record Pool is Ownable {
         _updateStateVars();
 
         emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
-    }
-
-    // ============ FEE MANAGEMENT ============
-    
-    /// @notice Claim accumulated swap fees for the caller
-    /// @dev Calculates the user's share of accumulated fees based on their LP token balance
-    /// @dev Updates the user's reward debt to prevent double-claiming
-    /// @dev Fees are paid in tokenA
-    function claimFees() external {
-        uint256 accrued = (ERC20(lpToken).balanceOf(msg.sender) * feePerShare) / 1e18;
-        uint256 pending = accrued - rewardDebt[msg.sender];
-        rewardDebt[msg.sender] = accrued;
-
-        require(ERC20(tokenA).transfer(msg.sender, pending), "Claim transfer failed");
     }
 
     // ============ ADMIN FUNCTIONS ============
