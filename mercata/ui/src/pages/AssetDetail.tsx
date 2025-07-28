@@ -156,10 +156,47 @@ const AssetDetail = () => {
   const [swapPriceData, setSwapPriceData] = useState<SwapPricePoint[]>([]);
   const [swapPriceDataLoading, setSwapPriceDataLoading] = useState(false);
   const [showPriceTooltip, setShowPriceTooltip] = useState(false);
+  const [isChartsAreaHovered, setIsChartsAreaHovered] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
-  const PRICE_WINDOW = 30; // Number of days to show in the price chart
+  const PRICE_WINDOW = 30;
+
+  const handleChartsWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const element = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = element;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 5;
+    const isAtTop = scrollTop <= 5;
+    
+    if (e.deltaY > 0 && isAtBottom) {
+      document.body.style.overflow = 'auto';
+      return;
+    }
+    
+    if (e.deltaY < 0 && isAtTop) {
+      document.body.style.overflow = 'auto';
+      return;
+    }
+    
+    e.stopPropagation();
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleChartsMouseEnter = () => {
+    setIsChartsAreaHovered(true);
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleChartsMouseLeave = () => {
+    setIsChartsAreaHovered(false);
+    document.body.style.overflow = 'auto';
+  };
+
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
   
   const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
     if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
@@ -441,30 +478,35 @@ const AssetDetail = () => {
               </div>
             </div>
 
-            {/* Charts and Description */}
             <div className="lg:col-span-2">
+              <div 
+                className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400"
+                onWheel={handleChartsWheel}
+                onMouseEnter={handleChartsMouseEnter}
+                onMouseLeave={handleChartsMouseLeave}
+              >
+                <PriceChart
+                  data={priceData}
+                  loading={priceDataLoading}
+                  title="Spot Price History"
+                  subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
+                  loadingMessage="Loading price history..."
+                  emptyMessage="No price history available for this asset"
+                  chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
+                  gradientId="colorPrice"
+                />
 
-              <PriceChart
-                data={priceData}
-                loading={priceDataLoading}
-                title="Spot Price History"
-                subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
-                loadingMessage="Loading price history..."
-                emptyMessage="No price history available for this asset"
-                chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
-                gradientId="colorPrice"
-              />
-
-              <PriceChart
-                data={swapPriceData}
-                loading={swapPriceDataLoading}
-                title="Swap Pool Price History"
-                subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
-                loadingMessage="Loading swap pool prices..."
-                emptyMessage="No swap pool data available for this asset"
-                chartColor={getSwapChartColor(swapPriceData)}
-                gradientId="colorSwapPrice"
-              />
+                <PriceChart
+                  data={swapPriceData}
+                  loading={swapPriceDataLoading}
+                  title="Swap Pool Price History"
+                  subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
+                  loadingMessage="Loading swap pool prices..."
+                  emptyMessage="No swap pool data available for this asset"
+                  chartColor={getSwapChartColor(swapPriceData)}
+                  gradientId="colorSwapPrice"
+                />
+              </div>
             </div>
           </div>
         </main>
