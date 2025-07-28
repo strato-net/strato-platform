@@ -13,6 +13,7 @@ import { WITHDRAW_COLLATERAL_FEE } from "@/lib/constants";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
+import { getHealthFactorColor } from "@/utils/misc";
 
 interface WithdrawModalProps {
   withdrawLoading: boolean;
@@ -33,14 +34,6 @@ const addCommasToInput = (value: string) => {
     return integerPart + "." + parts[1];
   }
   return integerPart;
-};
-
-// Calculate health factor color based on value
-const getHealthFactorColor = (healthFactor: number) => {
-  if (healthFactor >= 1.5) return "text-green-600";
-  if (healthFactor >= 1.2) return "text-yellow-600";
-  if (healthFactor >= 1.0) return "text-orange-600";
-  return "text-red-600";
 };
 
 // Calculate health impact of withdrawal using BigInt and healthFactorRaw
