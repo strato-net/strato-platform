@@ -214,14 +214,8 @@ const Borrow = () => {
         fetchUsdstBalance(userAddress || ""),
       ]);
     } catch (error) {
-      console.log(error, "error");
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
-      toast({
-        title: "Supply Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
     }
   };
 
@@ -259,11 +253,7 @@ const Borrow = () => {
       console.log(error, "error");
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
-      toast({
-        title: "Withdraw Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     }
   };
 

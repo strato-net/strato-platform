@@ -25,6 +25,7 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import BridgeWalletStatus from './BridgeWalletStatus';
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { parseUnits } from "ethers";
 
 interface Token {
   name: string;
@@ -65,6 +66,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
+  const [balanceError, setBalanceError] = useState<string>("");
   const [fromChain, setFromChain] = useState<string>(
     showTestnet ? "Sepolia" : "Ethereum"
   );
@@ -78,16 +80,26 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         if (!selectedToken && tokens.length > 0) {
           setSelectedToken(tokens[0]);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching bridge in tokens:", error);
+        toast({
+          title: "Token Fetch Error",
+          description: "Failed to load available tokens. Please refresh the page and try again.",
+          variant: "destructive",
+        });
       }
     };
 
     loadBridgeInTokens();
-  }, [fetchBridgeInTokens]);
+  }, [fetchBridgeInTokens, toast]);
+
+  // Clear balance error when token changes or connection status changes
+  useEffect(() => {
+    setBalanceError("");
+  }, [selectedToken, isConnected, address]);
 
   // Balance fetching hooks
-  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
+  const { data: nativeBalance, refetch: refetchNativeBalance, isError: isNativeBalanceError, isLoading: isNativeBalanceLoading } = useBalance({
     address,
     chainId: selectedToken?.chainId,
     query: {
@@ -100,7 +112,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     },
   });
 
-  const { data: tokenBalanceData, refetch: refetchTokenBalance } = useBalance({
+  const { data: tokenBalanceData, refetch: refetchTokenBalance, isError: isTokenBalanceError, isLoading: isTokenBalanceLoading } = useBalance({
     address,
     token: selectedToken?.tokenAddress as `0x${string}` | undefined,
     chainId: selectedToken?.chainId,
@@ -132,12 +144,31 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   useEffect(() => {
     let mounted = true;
     let isInitialFetch = true;
+    let loadingTimeout: NodeJS.Timeout;
 
     const updateBalance = async () => {
       try {
         if (isInitialFetch) {
           setIsBalanceLoading(true);
           setTokenBalance("0");
+          setBalanceError("");
+          
+          // Set a timeout to stop loading if it takes too long
+          loadingTimeout = setTimeout(() => {
+            if (mounted && isBalanceLoading) {
+              setIsBalanceLoading(false);
+            }
+          }, 10000); // 10 second timeout
+        }
+
+        // Check if we should be loading based on wagmi hook states
+        const shouldBeLoading = isConnected && address && selectedToken && (
+          (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
+          (selectedToken?.symbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
+        );
+
+        if (mounted && shouldBeLoading) {
+          setIsBalanceLoading(true);
         }
 
         if (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
@@ -148,6 +179,27 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             );
             if (mounted) {
               setTokenBalance(formattedBalance);
+              setBalanceError("");
+              clearTimeout(loadingTimeout); // Clear timeout on successful fetch
+            }
+          } else if (isInitialFetch && isConnected && address && isNativeBalanceError) {
+            // Only show error if the hook is actually in error state
+            const errorMessage = "Failed to fetch ETH balance. Please check your wallet connection.";
+            if (mounted) {
+              setBalanceError(errorMessage);
+              toast({
+                title: "Balance Fetch Error",
+                description: errorMessage,
+                variant: "destructive",
+              });
+              clearTimeout(loadingTimeout); // Clear timeout on error
+            }
+          } else if (isInitialFetch && !isConnected) {
+            // Don't show error if user is not connected
+            if (mounted) {
+              setTokenBalance("0");
+              setBalanceError("");
+              clearTimeout(loadingTimeout); // Clear timeout
             }
           }
         } else if (selectedToken?.tokenAddress) {
@@ -158,17 +210,53 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             );
             if (mounted) {
               setTokenBalance(formattedBalance);
+              setBalanceError("");
+              clearTimeout(loadingTimeout); // Clear timeout on successful fetch
+            }
+          } else if (isInitialFetch && isConnected && address && isTokenBalanceError) {
+            // Only show error if the hook is actually in error state
+            const errorMessage = `Failed to fetch ${selectedToken.symbol} balance. Please check your wallet connection.`;
+            if (mounted) {
+              setBalanceError(errorMessage);
+              toast({
+                title: "Balance Fetch Error",
+                description: errorMessage,
+                variant: "destructive",
+              });
+              clearTimeout(loadingTimeout); // Clear timeout on error
+            }
+          } else if (isInitialFetch && !isConnected) {
+            // Don't show error if user is not connected
+            if (mounted) {
+              setTokenBalance("0");
+              setBalanceError("");
+              clearTimeout(loadingTimeout); // Clear timeout
             }
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching balance:", error);
         if (mounted) {
           setTokenBalance("0");
+          const errorMessage = error?.message || "Failed to fetch balance. Please try again.";
+          setBalanceError(errorMessage);
+          toast({
+            title: "Balance Fetch Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
         }
       } finally {
         if (mounted) {
-          setIsBalanceLoading(false);
+          // Only stop loading if the hooks are not loading
+          const shouldBeLoading = isConnected && address && selectedToken && (
+            (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
+            (selectedToken?.symbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
+          );
+          
+          if (!shouldBeLoading) {
+            setIsBalanceLoading(false);
+          }
           isInitialFetch = false;
         }
       }
@@ -183,6 +271,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(loadingTimeout); // Clear timeout on component unmount
     };
   }, [
     isConnected,
@@ -191,6 +280,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     nativeBalance,
     tokenBalanceData,
     chainId,
+    toast,
+    isNativeBalanceError,
+    isTokenBalanceError,
+    isNativeBalanceLoading,
+    isTokenBalanceLoading,
   ]);
 
   const validateAmount = (value: string): boolean => {
@@ -258,33 +352,45 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     try {
       let hash: `0x${string}` | undefined;
 
-      if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
-        const txHash = await sendTransactionAsync({
-          to: safeAddress as `0x${string}`,
-          value: parseEther(amount),
+      // MetaMask transaction - handle wallet errors with toasts
+      try {
+        if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
+          const txHash = await sendTransactionAsync({
+            to: safeAddress as `0x${string}`,
+            value: parseEther(amount),
+          });
+          hash = txHash as `0x${string}`;
+        } else {
+          const txHash = await writeContractAsync({
+            address: tokenAddress as `0x${string}`,
+            abi: [
+              {
+                name: "transfer",
+                type: "function",
+                stateMutability: "nonpayable",
+                inputs: [
+                  { name: "recipient", type: "address" },
+                  { name: "amount", type: "uint256" },
+                ],
+                outputs: [{ name: "", type: "bool" }],
+              },
+            ],
+            functionName: "transfer",
+            args: [safeAddress as `0x${string}`, parseUnits(amount, 6)],
+            chain: showTestnet ? sepolia : mainnet,
+            account: address as `0x${string}`,
+          });
+          hash = txHash as `0x${string}`;
+        }
+      } catch (walletError: any) {
+        console.error("MetaMask wallet error:", walletError);
+        
+        toast({
+          title: "Wallet Error",
+          description: walletError?.message || "Transaction failed",
+          variant: "destructive",
         });
-        hash = txHash as `0x${string}`;
-      } else {
-        const txHash = await writeContractAsync({
-          address: tokenAddress as `0x${string}`,
-          abi: [
-            {
-              name: "transfer",
-              type: "function",
-              stateMutability: "nonpayable",
-              inputs: [
-                { name: "recipient", type: "address" },
-                { name: "amount", type: "uint256" },
-              ],
-              outputs: [{ name: "", type: "bool" }],
-            },
-          ],
-          functionName: "transfer",
-          args: [safeAddress as `0x${string}`, safeParseUnits(amount, 6)],
-          chain: showTestnet ? sepolia : mainnet,
-          account: address as `0x${string}`,
-        });
-        hash = txHash as `0x${string}`;
+        return;
       }
 
       const client = createPublicClient({
@@ -337,11 +443,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       }
     } catch (error) {
       console.error("Bridge transaction failed:", error);
-      toast({
-        title: "Failed to initiate transfer",
-        description: error.message || "Please try again later",
-        variant: "destructive",
-      });
+      // API errors are handled globally by fetch wrapper
     } finally {
       setIsLoading(false);
     }
@@ -377,7 +479,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         <Select
           value={selectedToken?.symbol || ""}
           onValueChange={(value) => {
-            const token = bridgeInTokens.find((t) => t.symbol === value);
+            const token = bridgeInTokens?.find((t) => t.symbol === value);
             if (token) {
               setSelectedToken(token);
             }
@@ -428,6 +530,26 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
               <p className="text-sm text-gray-500">Fetching balance...</p>
+            </div>
+          ) : balanceError ? (
+            <div className="space-y-2">
+              <div className="text-sm text-red-500">
+                {balanceError}
+              </div>
+              <button
+                onClick={() => {
+                  setBalanceError("");
+                  // Trigger balance refetch
+                  if (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
+                    refetchNativeBalance();
+                  } else {
+                    refetchTokenBalance();
+                  }
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Retry
+              </button>
             </div>
           ) : (
             tokenBalance && (

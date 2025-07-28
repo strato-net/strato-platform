@@ -33,7 +33,7 @@ type LiquidationContextType = {
   error: string | null;
   fetchLiquidatable: (signal?: AbortSignal) => Promise<void>;
   fetchWatchlist: (signal?: AbortSignal) => Promise<void>;
-  executeLiquidation: (id: string) => Promise<void>;
+  executeLiquidation: (id: string, collateralAsset?: string, repayAmount?: string) => Promise<void>;
   refreshData: () => Promise<void>;
 };
 
@@ -54,7 +54,6 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       setLiquidatable(res.data || []);
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      console.error('Error fetching liquidatable loans:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch liquidatable loans');
     } finally {
       setLoading(false);
@@ -69,40 +68,40 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       setWatchlist(res.data || []);
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      console.error('Error fetching watchlist loans:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch watchlist loans');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const executeLiquidation = useCallback(async (id: string) => {
+  const refreshData = useCallback(async () => {
+    await Promise.all([
+      fetchLiquidatable(),
+      fetchWatchlist(),
+    ]);
+  }, [fetchLiquidatable, fetchWatchlist]);
+
+  const executeLiquidation = useCallback(async (id: string, collateralAsset?: string, repayAmount?: string) => {
     setLoading(true);
     setError(null);
     try {
-      await api.post(`/lend/liquidate/${id}`);
+      if (collateralAsset && repayAmount) {
+        // Extended liquidation with specific collateral and amount
+        await api.post(`/lend/liquidate/${id}`, {
+          collateralAsset,
+          repayAmount,
+        });
+      } else {
+        // Simple liquidation (existing behavior)
+        await api.post(`/lend/liquidate/${id}`);
+      }
       // Refresh data after successful liquidation
       await refreshData();
     } catch (err) {
-      console.error('Liquidation failed:', err);
-      const backendMsg = err.response?.data?.message || err.response?.data?.error?.message || err.message;
-      // rethrow a clean Error so the UI layer can surface it
-      throw new Error(backendMsg);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const refreshData = useCallback(async () => {
-    try {
-      await Promise.all([
-        fetchLiquidatable(),
-        fetchWatchlist(),
-      ]);
-    } catch (err) {
-      console.error('Error refreshing liquidation data:', err);
-    }
-  }, [fetchLiquidatable, fetchWatchlist]);
+  }, [refreshData]);
 
   useEffect(() => {
     if (isLoggedIn) {
