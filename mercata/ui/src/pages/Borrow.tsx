@@ -9,7 +9,21 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
+import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/borrow/SupplyCollateral";
@@ -18,6 +32,80 @@ import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
 
+const LoadingSpinner = () => (
+  <div className="flex justify-center items-center h-12">
+    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+  </div>
+);
+
+// Optimized InfoTooltip component using hook
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('borrow-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative borrow-tooltip-container">
+        <div 
+          className="inline-flex items-center gap-1 cursor-help"
+          onClick={handleToggle}
+        >
+          {children}
+          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </div>
+        {showTooltip && (
+          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="inline-flex items-center gap-1 cursor-help">
+          {children}
+          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+// Optimized ButtonTooltip component using hook
+const ButtonTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('borrow-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative borrow-tooltip-container">
+        <div onClick={handleToggle}>
+          {children}
+        </div>
+        {showTooltip && (
+          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const Borrow = () => {
   const { userAddress } = useUser();
@@ -110,14 +198,8 @@ const Borrow = () => {
         fetchUsdstBalance(userAddress || ""),
       ]);
     } catch (error) {
-      console.log(error, "error");
       setSupplyLoading(false);
       setIsSupplyModalOpen(false);
-      toast({
-        title: "Supply Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
     }
   };
 
@@ -155,11 +237,7 @@ const Borrow = () => {
       console.log(error, "error");
       setWithdrawLoading(false);
       setIsWithdrawModalOpen(false);
-      toast({
-        title: "Withdraw Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     }
   };
 

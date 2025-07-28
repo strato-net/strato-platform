@@ -59,11 +59,7 @@ const CreatePoolForm = () => {
 
       form.reset();
     } catch (error) {
-      toast({
-        title: 'Error Creating Pool',
-        description: error?.message || 'Failed to create pool. Please try again.',
-        variant: 'destructive',
-      });
+      // Error toast is now handled globally by axios interceptor
     }
   };
 

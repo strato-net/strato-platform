@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { api } from '@/lib/axios';
 
 interface Token {
   name: string;
@@ -85,24 +86,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBridgeConfig = useCallback(async (): Promise<BridgeConfig> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/config`);
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to fetch bridge config');
+      const response = await api.get(`/bridge/config`);
+      let bridgeConfig = response.data.data.data;
+      if (!bridgeConfig) {
+        bridgeConfig = response.data;
       }
-      
-      const bridgeConfig = responseData.data.data;
       setConfig(bridgeConfig);
       return bridgeConfig;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge config';
-      setError(errorMessage);
-      console.error('Error fetching bridge config:', err);
-      throw err;
+      throw err ;
     } finally {
       setLoading(false);
     }
@@ -110,23 +104,20 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBridgeInTokens = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeInTokens`);
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to fetch bridge in tokens');
+      const response = await api.get(`/bridge/bridgeInTokens`);
+      // Get tokens from the correct path
+      let tokens = response.data.data.data.bridgeInTokens;
+      // Ensure tokens is always an array
+      if (!Array.isArray(tokens)) {
+        tokens = [];
       }
       
-      const tokens = responseData.data.data.bridgeInTokens;
       setBridgeInTokens(tokens);
       return tokens;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge in tokens';
-      setError(errorMessage);
-      console.error('Error fetching bridge in tokens:', err);
+      setBridgeInTokens([]);
       return [];
     } finally {
       setLoading(false);
@@ -135,31 +126,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const bridgeIn = useCallback(async (params: BridgeInParams): Promise<BridgeResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeIn`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(params),
-      });
-
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || "Bridge transaction failed");
-      }
+      const response = await api.post(`/bridge/bridgeIn`, params);
 
       return {
         success: true,
-        data: responseData.data
+        data: response.data
       };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Bridge transaction failed";
-      setError(errorMessage);
-      console.error("Bridge API error:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -168,23 +143,21 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBridgeOutTokens = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeOutTokens`);
-      const responseData = await response.json();
+      const response = await api.get(`/bridge/bridgeOutTokens`);
+      // Get tokens from the correct path
+      let tokens = response.data.data.data.bridgeOutTokens;
       
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to fetch bridge out tokens');
+      // Ensure tokens is always an array
+      if (!Array.isArray(tokens)) {
+        tokens = [];
       }
       
-      const tokens = responseData.data.data.bridgeOutTokens;
       setBridgeOutTokens(tokens);
       return tokens;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch bridge out tokens';
-      setError(errorMessage);
-      console.error('Error fetching bridge out tokens:', err);
+      setBridgeOutTokens([]);
       return [];
     } finally {
       setLoading(false);
@@ -193,31 +166,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const bridgeOut = useCallback(async (params: BridgeOutParams): Promise<BridgeResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await fetch(`/api/bridge/bridgeOut`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(params),
-      });
-
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || "Bridge transaction failed");
-      }
+      const response = await api.post(`/bridge/bridgeOut`, params);
 
       return {
         success: true,
-        data: responseData.data
+        data: response.data
       };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Bridge transaction failed";
-      setError(errorMessage);
-      console.error("Bridge API error:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -226,30 +183,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   const getBalance = useCallback(async (tokenAddress: string): Promise<BalanceResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
       const formattedTokenAddress = tokenAddress.startsWith("0x")
         ? tokenAddress
         : `0x${tokenAddress}`;
-      const response = await fetch(`/api/bridge/balance/${formattedTokenAddress}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || "Failed to fetch balance");
-      }
-      
-      return responseData.data;
+      const response = await api.get(`/bridge/balance/${formattedTokenAddress}`);
+      return { balance: response.data.data.balance };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || "Failed to fetch balance";
-      setError(errorMessage);
-      console.error("Balance API error:", err);
       throw err;
     } finally {
       setLoading(false);

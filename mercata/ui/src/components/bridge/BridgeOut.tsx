@@ -217,11 +217,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       }
     } catch (error) {
       console.error("Bridge transaction failed:", error);
-      toast({
-        title: "Failed to initiate transfer",
-        description: error.message || "Please try again later",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by fetch wrapper
     } finally {
       setIsLoading(false);
     }
@@ -355,7 +351,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       <div className="flex justify-end gap-4">
         <Button
           onClick={showConfirmModal}
-          disabled={Boolean(isLoading || !amount || !selectedToken || !isConnected)}
+          disabled={Boolean(isLoading || !amount || !selectedToken || !isConnected || amountError)}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Bridge Assets"}
