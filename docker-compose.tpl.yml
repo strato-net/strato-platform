@@ -17,7 +17,6 @@ volumes:
 services:
   mercata-backend:
     depends_on:
-      - strato
       - postgrest
     build: ./mercata/backend
     image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
@@ -55,7 +54,6 @@ services:
     - apex
     - postgrest
     - prometheus
-    - strato
     environment:
     - NODE_HOST=${NODE_HOST}
     - NODE_NAME=${NODE_NAME}
@@ -72,7 +70,6 @@ services:
     depends_on:
     - postgres
     - prometheus
-    - strato
     environment:
     - ADMIN_EMAIL=${ADMIN_EMAIL}
     - postgres_host=postgres
@@ -104,101 +101,8 @@ services:
         max-file: "3"
     volumes:
       - redisdata:/data
-  strato:
-    depends_on:
-    - kafka
-    - postgres
-    - redis
-    environment:
-    - addBootnodes=${addBootnodes}
-    - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
-    - appFetchLimit=${appFetchLimit}
-    - averageTxsPerBlock=${averageTxsPerBlock}
-    - blockstanbul=${blockstanbul}
-    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
-    - blockTime=${blockTime}
-    - bootnode=${bootnode}
-    - connectionTimeout=${connectionTimeout}
-    - debugFail=${debugFail}
-    - debugPort=${debugPort}
-    - debugWSHost=${debugWSHost}
-    - debugWSPort=${debugWSPort}
-    - validatorBehavior=${validatorBehavior:-true}
-    - evmDebugMode=${evmDebugMode}
-    - FILE_SERVER_URL=${FILE_SERVER_URL}
-    - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
-    - gasLimit=${gasLimit}
-    - generateKey=${generateKey:-true}
-    # - idServerUrl=${idServerUrl}
-    - INSTRUMENTATION=${INSTRUMENTATION:-false}
-    - kafkaHost=kafka
-    - kafkaPort=9092
-    - lazyBlocks=${lazyBlocks}
-    - maxConn=${maxConn}
-    - maxReturnedHeaders=${maxReturnedHeaders}
-    - maxTxsPerBlock=${maxTxsPerBlock}
-    - minBlockDifficulty=${minBlockDifficulty}
-    - network=${network}
-    - networkID=${networkID}
-    - NOTIFICATION_SERVER_URL=${NOTIFICATION_SERVER_URL}
-    - numMinPeers=${numMinPeers}
-    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
-    - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
-    - P2P_DEBUG_LOG=${P2P_DEBUG_LOG}
-    - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
-    - postgres_port=5432
-    - postgres_slipstream_db=cirrus
-    - postgres_user=postgres
-    - PROCESS_MONITORING=${PROCESS_MONITORING:-true}
-    - redisBDBNumber=${redisBDBNumber}
-    - redisHost=redis
-    - redisPort=6379
-    - seqEventsBatchSize=${seqEventsBatchSize}
-    - seqEventsCostHeuristic=${seqEventsCostHeuristic}
-    - seqMaxEventsPerIter=${seqMaxEventsPerIter}
-    - seqMaxUsPerIter=${seqMaxUsPerIter}
-    - seqRTSOPTs=${seqRTSOPTs}
-    - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
-    - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
-    - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
-    - strictBlockstanbul=${strictBlockstanbul}
-    - strictGas=${strictGas}
-    - strictGasLimit=${strictGasLimit}
-    - svmTrace=${svmTrace}
-    - sqlDiff=${sqlDiff}
-    - svmDev=${svmDev}
-    - test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
-    - txSizeLimit=${txSizeLimit}
-    - userRegistryAddress=${userRegistryAddress}
-    - userRegistryCodeHash=${userRegistryCodeHash}
-    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
-    - useCustomGenesis=${useCustomGenesis}
-    - useWalletsByDefault=${useWalletsByDefault}
-    - VAULT_URL=${VAULT_URL}
-    - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
-    - VM_DEBUGGER=${VM_DEBUGGER}
-    - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
-    - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
-    - zkHost=zookeeper
-    build: .
-    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
-    - 30303:30303
-    - 30303:30303/udp
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
-    volumes:
-      - stratodata:/var/lib/strato
+    - 6379:6379
   postgrest:
     depends_on:
     - postgres
@@ -236,6 +140,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+    ports:
+    - 5432:5432
   nginx:
     depends_on:
     - apex
@@ -243,7 +149,6 @@ services:
     - postgrest
     - prometheus
     - smd
-    - strato
     - mercata-backend
     - mercata-ui
     environment:
@@ -310,7 +215,7 @@ services:
     depends_on:
     - zookeeper
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_HOST_NAME: localhost
       KAFKA_ADVERTISED_PORT: 9092
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
@@ -330,6 +235,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+    ports:
+    - 9092:9092
   prometheus:
     build: .
     environment:

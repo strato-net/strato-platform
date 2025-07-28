@@ -111,15 +111,14 @@ build_formatter:
 	@echo building code formatter...
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
 
-build_common: build_buildbase
+build_common:
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack build \
+	cd strato && stack install \
 		--test --no-run-tests \
-		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_profiled: build_buildbase
 	@echo building haskell libraries and creating directories
