@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { NewLoanData } from "@/interface";
+import { RiskLevelIndicator } from "@/components/RiskLevelIndicator";
 
 interface BorrowingSectionProps {
   loanData?: NewLoanData;
@@ -32,34 +33,6 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
     ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18))
     : 0;
 
-  // Calculate LTV ratio for risk assessment
-  let ltvRatio = availableBorrowingPower > 0 ? currentBorrowed / availableBorrowingPower : 0;
-  if(availableBorrowingPower === 0 && currentBorrowed > 0){
-    ltvRatio = 1;
-  }else if(availableBorrowingPower === 0 && currentBorrowed === 0){
-    ltvRatio = 0;
-  }
-
-  const riskPercentage = Math.min(ltvRatio * 100, 100); // cap at 100%
-
-  // Risk level mapping
-  let riskLevel = 'Low';
-  let riskColor = '#22c55e'; // green
-  let badgeColor = 'bg-green-50 text-green-600';
-
-  if (ltvRatio >= 0.3 && ltvRatio < 0.6) {
-    riskLevel = 'Moderate';
-    riskColor = '#facc15'; // yellow
-    badgeColor = 'bg-yellow-50 text-yellow-600';
-  } else if (ltvRatio >= 0.6) {
-    riskLevel = 'High';
-    riskColor = '#ef4444'; // red
-    badgeColor = 'bg-red-50 text-red-600';
-  }
-
-  // Assume liquidation threshold is at 80%
-  const liquidationThreshold = 80;
-
   return (
     <Card className="border border-gray-100 shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-2 sm:space-y-0">
@@ -76,35 +49,15 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
       <CardContent>
         <div className="py-4">
           <div className="space-y-6">
-            {/* Bar graph now appears first */}
+            {/* Risk Level Indicator */}
             <div className="mb-2">
-              {/* Dynamic risk bar */}
-              <div className="w-[97%] bg-gray-200 rounded-full h-2 relative mb-3">
-                <div className="h-2 rounded-full" style={{ width: `${riskPercentage}%`, backgroundColor: riskColor,}}></div>
-
-                {/* Collateral Value Marker */}
-                <div className="absolute right-0 top-0 flex flex-col items-center" style={{ transform: 'translateX(50%)' }}>
-                  <div className="h-4 w-0.5 bg-blue-500"></div>
-                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap hidden sm:block">Collateral Value</div>
-                  <div className="mt-1 text-xs text-blue-600 whitespace-nowrap sm:hidden">Collateral</div>
-                </div>
-
-                {/* Liquidation Marker */}
-                <div className="absolute top-0 flex flex-col items-center" style={{ left: `${liquidationThreshold}%`, transform: 'translateX(-50%)' }}>
-                  <div className="h-4 w-0.5 bg-red-500"></div>
-                  <div className="mt-1 text-xs text-red-600 whitespace-nowrap">Liquidation</div>
-                </div>
-              </div>
-
-              {/* Risk Level Label */}
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 space-y-2 sm:space-y-0">
-                <div className="flex items-center">
-                  <span className="text-gray-600 mr-2 text-sm sm:text-base">Risk Level:</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>
-                    {riskLevel}
-                  </span>
-                </div>
-              </div>
+              <RiskLevelIndicator
+                totalBorrowed={loanData?.totalAmountOwed?.toString() || "0"}
+                collateralValue={loanData?.totalCollateralValueUSD?.toString() || "0"}
+                maxAvailableToBorrow={loanData?.maxAvailableToBorrowUSD?.toString()}
+                showMarkers={true}
+                variant="detailed"
+              />
             </div>
 
             {/* Added extra spacing with mt-8 to separate indicators from data */}

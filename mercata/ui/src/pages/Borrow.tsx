@@ -31,6 +31,7 @@ import PositionSection from "@/components/Positions";
 import SupplyCollateralModal from "@/components/SupplyCollateral";
 import WithdrawCollateralModal from "@/components/WithdrawCollateral";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
+import { RiskLevelIndicator } from "@/components/RiskLevelIndicator";
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
@@ -69,10 +70,7 @@ const Borrow = () => {
   const [borrowDisplayAmount, setBorrowDisplayAmount] = useState("");
   const [repayAmount, setRepayAmount] = useState<string>("");
   const [repayDisplayAmount, setRepayDisplayAmount] = useState("");
-  const [riskLevel, setRiskLevel] = useState(0);
   const [repayLoading, setRepayLoading] = useState(false);
-
-
   const { toast } = useToast();
   const {
     refreshLoans,
@@ -86,25 +84,28 @@ const Borrow = () => {
     repayLoan: repayLoanFn
   } = useLendingContext();
 
-  // Calculate risk level for borrow form
-  useEffect(() => {
+  // Calculate projected risk level for borrow form
+  const projectedRiskLevel = (() => {
     try {
       const existingBorrowedBigInt = BigInt(loans?.totalAmountOwed || 0);
       const newBorrowAmountBigInt = safeParseUnits(borrowAmount || "0", 18);
       const totalBorrowedBigInt = existingBorrowedBigInt + newBorrowAmountBigInt;
       const collateralValueBigInt = BigInt(loans?.totalCollateralValueUSD || 0);
 
+
       if (collateralValueBigInt === 0n) {
-        setRiskLevel(0);
-        return;
+        return 0;
       }
 
       const risk = Number((totalBorrowedBigInt * 10000n) / collateralValueBigInt) / 100;
-      setRiskLevel(Math.min(risk, 100));
-    } catch {
-      setRiskLevel(0);
+      const finalRisk = Math.min(risk, 100);
+      
+      return finalRisk;
+    } catch (error) {
+      console.error("  - Error calculating projected risk:", error);
+      return 0;
     }
-  }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
+  })();
 
   useEffect(() => {
     document.title = "Borrow Assets | STRATO Mercata";
@@ -214,17 +215,6 @@ const Borrow = () => {
   };
 
   // Helper functions for embedded forms
-  const getRiskColor = () => {
-    if (riskLevel < 30) return "bg-green-500";
-    if (riskLevel < 70) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
-  const getRiskText = () => {
-    if (riskLevel < 30) return "Low";
-    if (riskLevel < 70) return "Moderate";
-    return "High";
-  };
 
   const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
@@ -471,23 +461,23 @@ const Borrow = () => {
                           <span>Risk Level:</span>
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${riskLevel < 30
+                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${projectedRiskLevel < 30
                                   ? "bg-green-50 text-green-700"
-                                  : riskLevel < 70
+                                  : projectedRiskLevel < 70
                                     ? "bg-yellow-50 text-yellow-700"
                                     : "bg-red-50 text-red-700"
                                 }`}
                             >
-                              {getRiskText()}
+                              {projectedRiskLevel < 30 ? "Low" : projectedRiskLevel < 70 ? "Moderate" : "High"}
                             </span>
                           </div>
                         </div>
 
                         <div className="relative">
-                          <Progress value={riskLevel} className="h-2">
+                          <Progress value={projectedRiskLevel} className="h-2">
                             <div
-                              className={`absolute inset-0 ${getRiskColor()} h-full rounded-full`}
-                              style={{ width: `${riskLevel}%` }}
+                              className={`absolute inset-0 ${projectedRiskLevel < 30 ? "bg-green-500" : projectedRiskLevel < 70 ? "bg-yellow-500" : "bg-red-500"} h-full rounded-full`}
+                              style={{ width: `${projectedRiskLevel}%` }}
                             />
                           </Progress>
 
