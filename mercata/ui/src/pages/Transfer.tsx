@@ -21,7 +21,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
-import { validateRecipientAddress } from "@/utils/misc";
+import { validateRecipientAddress } from "@/utils/validationUtils";
 
 const Transfer = () => {
   const { userAddress } = useUser();
