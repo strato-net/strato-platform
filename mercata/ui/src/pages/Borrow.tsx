@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { safeParseUnits } from "@/utils/numberUtils";
-import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
@@ -24,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
 import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
-
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
