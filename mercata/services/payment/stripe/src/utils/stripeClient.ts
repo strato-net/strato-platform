@@ -7,6 +7,7 @@ export const stripe = new Stripe(stripeSecretKey || "");
 
 export async function createCheckoutSession({
   token,
+  tokenSymbol,
   amount,
   tokenAmount,
   tokenAddress,
@@ -21,8 +22,8 @@ export async function createCheckoutSession({
         price_data: {
           currency: "usd",
           product_data: {
-            name: `Token Purchase - USDST`,
-            description: `Purchase of USDST tokens to be used on BlockApps Mercata Testnet.`,
+            name: `Token Purchase - ${tokenSymbol}`,
+            description: `Purchase of ${tokenSymbol} tokens to be used on BlockApps Mercata Testnet.`,
           },
           unit_amount: amount,
         },
