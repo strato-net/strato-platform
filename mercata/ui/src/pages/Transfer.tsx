@@ -21,6 +21,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
+import { validateRecipientAddress } from "@/utils/misc";
 
 const Transfer = () => {
   const { userAddress } = useUser();
@@ -119,16 +120,7 @@ const Transfer = () => {
   const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
     setRecipient(value);
-
-    if (!value) {
-      setErrorMessage(""); // Clear error if input is empty
-    } else if (!isAddress(value)) {
-      setErrorMessage("Invalid address");
-    } else if (value.toLowerCase() === userAddress.toLowerCase()) {
-      setErrorMessage("You cannot transfer to your own address.");
-    } else {
-      setErrorMessage(""); // Clear error if input is valid and not self
-    }
+    setErrorMessage(validateRecipientAddress(value, userAddress));
   };
 
 
