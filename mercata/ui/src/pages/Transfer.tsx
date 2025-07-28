@@ -5,10 +5,11 @@ import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
-import {api} from "@/lib/axios";
+
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { formatUnits, isAddress } from "ethers";
+import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
@@ -24,6 +25,7 @@ import { ChevronDown } from "lucide-react";
 const Transfer = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
+  const { getUserTokensWithBalance, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -45,14 +47,14 @@ const Transfer = () => {
 
   const fetchUserTokens = useCallback(async () => {
     try {
-      const res = await api.get(`/tokens/balance?value=gt.0`);
-      setTokens(res.data);
-      return res.data;
+      const tokens = await getUserTokensWithBalance();
+      setTokens(tokens);
+      return tokens;
     } catch (err) {
       console.error("Failed to fetch tokens:", err);
       return [];
     }
-  }, []);
+  }, [getUserTokensWithBalance]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -81,7 +83,7 @@ const Transfer = () => {
     try {
       setSwapLoading(true);
       setShowConfirmModal(false);
-      await api.post("/tokens/transfer", {
+      await transferToken({
         address: fromAsset.address,
         to: recipient,
         value: safeParseUnits(fromAmount, 18).toString(),
@@ -107,12 +109,8 @@ const Transfer = () => {
         await fetchUsdstBalance(userAddress);
       }
     } catch (error) {
-      const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Error handling is now done globally by axios interceptor
+      console.error("Transfer error:", error);
     } finally {
       setSwapLoading(false);
     }

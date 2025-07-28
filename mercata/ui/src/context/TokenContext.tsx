@@ -17,6 +17,7 @@ type TokenContextType = {
   getAllTokens: (query?: Record<string, string>) => Promise<void>;
   getActiveTokens: () => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
+  getUserTokensWithBalance: () => Promise<Token[]>;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
@@ -34,12 +35,10 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const getAllTokens = useCallback(async (query: Record<string, string> = {}) => {
     setLoading(true);
-    setError(null);
     try {
       const res = await api.get<Token[]>('/tokens', { params: query });
       setTokens(res.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to fetch tokens');
     } finally {
       setLoading(false);
     }
@@ -47,12 +46,10 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const getActiveTokens = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
       setActiveTokens(res.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to fetch active tokens');
     } finally {
       setLoading(false);
     }
@@ -60,13 +57,23 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const getToken = useCallback(async (address: string): Promise<Token | null> => {
     setLoading(true);
-    setError(null);
     try {
       const res = await api.get<Token>(`/tokens/${address}`);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to fetch token');
       return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getUserTokensWithBalance = useCallback(async (): Promise<Token[]> => {
+    setLoading(true);
+    try {
+      const res = await api.get<Token[]>(`/tokens/balance?value=gt.0`);
+      return res.data || [];
+    } catch (err) {
+      return [];
     } finally {
       setLoading(false);
     }
@@ -74,7 +81,6 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
-    setError(null);
     try {
       const payload = {
         name: token.name,
@@ -88,7 +94,6 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       };
       await api.post('/tokens', payload);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to create token');
       throw err;
     } finally {
       setLoading(false);
@@ -97,11 +102,9 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const transferToken = useCallback(async (payload: { address: string; to: string; value: string }) => {
     setLoading(true);
-    setError(null);
     try {
       await api.post('/tokens/transfer', payload);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to transfer token');
       throw err;
     } finally {
       setLoading(false);
@@ -110,11 +113,9 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const approveToken = useCallback(async (payload: { address: string; spender: string; value: string }) => {
     setLoading(true);
-    setError(null);
     try {
       await api.post('/tokens/approve', payload);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to approve token');
       throw err;
     } finally {
       setLoading(false);
@@ -123,11 +124,9 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const transferFromToken = useCallback(async (payload: { address: string; from: string; to: string; value: string }) => {
     setLoading(true);
-    setError(null);
     try {
       await api.post('/tokens/transferFrom', payload);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to transfer from token');
       throw err;
     } finally {
       setLoading(false);
@@ -136,13 +135,11 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   const setTokenStatus = useCallback(async (payload: { address: string; status: number }) => {
     setLoading(true);
-    setError(null);
     try {
       await api.post('/tokens/setStatus', payload);
       // Refresh tokens to reflect the status change immediately
       await getAllTokens();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to set token status');
       throw err;
     } finally {
       setLoading(false);
@@ -163,6 +160,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getAllTokens,
         getActiveTokens,
         getToken,
+        getUserTokensWithBalance,
         createToken,
         transferToken,
         approveToken,

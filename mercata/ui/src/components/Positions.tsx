@@ -4,26 +4,81 @@ import { HelpCircle } from "lucide-react";
 import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance } from "@/utils/numberUtils";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
   loanData: NewLoanData;
 }
 
-// Reusable InfoTooltip component
-const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <div className="inline-flex items-center gap-1 cursor-help">
-        {children}
-        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+// Optimized InfoTooltip component using hook
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('positions-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative positions-tooltip-container">
+        <div 
+          className="inline-flex items-center gap-1 cursor-help"
+          onClick={handleToggle}
+        >
+          {children}
+          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </div>
+        {showTooltip && (
+          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
       </div>
-    </TooltipTrigger>
-    <TooltipContent className="max-w-xs">
-      <p>{content}</p>
-    </TooltipContent>
-  </Tooltip>
-);
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="inline-flex items-center gap-1 cursor-help">
+          {children}
+          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+// Optimized ButtonTooltip component using hook
+const ButtonTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('positions-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative positions-tooltip-container">
+        <div onClick={handleToggle}>
+          {children}
+        </div>
+        {showTooltip && (
+          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) => {
 
