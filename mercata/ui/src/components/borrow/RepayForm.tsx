@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatUnits } from "ethers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { REPAY_FEE } from "@/lib/constants";
 import { safeParseUnits, addCommasToInput, formatCurrency } from "@/utils/numberUtils";
 import { NewLoanData } from "@/interface";
+import { calculateRepayHealthImpact } from "@/utils/lendingUtils";
+import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
+import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 
 interface RepayFormProps {
   loans: NewLoanData | null;
@@ -16,6 +19,45 @@ interface RepayFormProps {
 const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProps) => {
   const [repayAmount, setRepayAmount] = useState<string>("");
   const [repayDisplayAmount, setRepayDisplayAmount] = useState("");
+  const [riskLevel, setRiskLevel] = useState(0);
+  const [healthImpact, setHealthImpact] = useState({
+    currentHealthFactor: 0,
+    newHealthFactor: 0,
+    healthImpact: 0,
+    isHealthy: true,
+  });
+
+  // Calculate risk level when repay amount changes
+  useEffect(() => {
+    try {
+      if (!loans?.totalCollateralValueUSD || !loans?.totalAmountOwed) {
+        setRiskLevel(0);
+        return;
+      }
+
+      const totalBorrowedBigInt = BigInt(loans.totalAmountOwed);
+      const collateralValueBigInt = BigInt(loans.totalCollateralValueUSD);
+      const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+      const newBorrowedAmount = totalBorrowedBigInt - repayAmountWei;
+      
+      if (newBorrowedAmount <= 0n) {
+        setRiskLevel(0);
+        return;
+      }
+
+      const risk = Number((newBorrowedAmount * 10000n) / collateralValueBigInt) / 100;
+      setRiskLevel(Math.min(risk, 100));
+    } catch {
+      setRiskLevel(0);
+    }
+  }, [repayAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
+
+  // Calculate health impact when repay amount changes
+  useEffect(() => {
+    const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+    const impact = calculateRepayHealthImpact(repayAmountWei, loans);
+    setHealthImpact(impact);
+  }, [repayAmount, loans]);
 
   const handleRepayAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
@@ -179,6 +221,12 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           })}
         </div>
       </div>
+
+      {/* Risk Level */}
+      <RiskLevelProgress riskLevel={riskLevel} />
+
+      {/* Health Impact Section */}
+      <HealthImpactDisplay healthImpact={healthImpact} />
 
       {/* Payment Summary */}
       <div className="space-y-2 pt-3 border-t">
