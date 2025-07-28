@@ -71,11 +71,7 @@ const SwapPoolsSection = () => {
       const enrichedPools = enrichPools(tempPools);
       setPools(enrichedPools);
     } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch pools",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch pools:", err);
     } finally {
       setLoading(false);
     }

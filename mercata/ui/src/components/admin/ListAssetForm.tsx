@@ -112,13 +112,7 @@ const ListAssetForm = () => {
       fetchData();
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } };
-      toast({
-        title: "Error Creating Listing",
-        description:
-          apiError.response?.data?.message ||
-          "Failed to list asset. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setLoading(false);
     }

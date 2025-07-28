@@ -48,6 +48,7 @@ type SwapContextType = {
     tokenBBalance: string;
     usdstBalance: string;
   }>;
+  getTokenBalance: (tokenAddress: string) => Promise<string>;
   enrichPools: (pools: LiquidityPool[]) => LiquidityPool[];
   lpTokens: LiquidityPool[]
   fetchLpTokensPositions: () => Promise<void>;
@@ -121,37 +122,21 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     reverse?: boolean;
     signal?: AbortSignal;
   }) => {
-    try {
-      const { data } = await api.get(
-        `/swap/quote?poolAddress=${poolAddress}&isAToB=${isAToB}&amountIn=${amountIn}&reverse=${reverse}`,
-        { signal }
-      );
-      return data;
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
-      throw new Error(err.response?.data?.message || err.message || 'Failed to calculate swap');
-    }
+    const { data } = await api.get(
+      `/swap/quote?poolAddress=${poolAddress}&isAToB=${isAToB}&amountIn=${amountIn}&reverse=${reverse}`,
+      { signal }
+    );
+    return data;
   }, []); 
 
   const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
-    try {
-      const res = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
-      return res.data?.[0] || null;
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
-      setError(err.response?.data?.message || err.message || 'Failed to get pool');
-      return null;
-    }
+    const res = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
+    return res.data?.[0] || null;
   }, []);
 
   const getPoolByAddress = useCallback(async (address: string) => {
-    try {
-      const res = await api.get(`/swap-pools/${address}`);
-      return res.data || null;
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to get pool');
-      return null;
-    }
+    const res = await api.get(`/swap-pools/${address}`);
+    return res.data || null;
   }, []);
 
   const swap = useCallback(async (data: {
@@ -160,12 +145,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     amountIn: string;
     minAmountOut: string;
   }) => {
-    try {
-      const res = await api.post("/swap", data);
-      return res.data;
-    } catch (err) {
-      throw new Error(err.response?.data?.message || err.message || "Swap transaction failed");
-    }
+    const res = await api.post("/swap", data);
+    return res.data;
   }, []);
 
   const fetchPools = useCallback(async () => {
@@ -223,35 +204,31 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const fetchTokenBalances = useCallback(async (pool: LiquidityPool, userAddress: string, usdstAddress: string) => {
-    try {
-      const [balanceA, balanceB, balanceUsdst] = await Promise.all([
-        api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
-        api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
-        api.get(`/tokens/balance?address=eq.${usdstAddress}`)
-      ]);
-      
-      return {
-        tokenABalance: balanceA?.data[0]?.balance || "0",
-        tokenBBalance: balanceB?.data[0]?.balance || "0",
-        usdstBalance: balanceUsdst?.data[0]?.balance || "0"
-      };
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to fetch token balances');
-      throw err;
-    }
+    const [balanceA, balanceB, balanceUsdst] = await Promise.all([
+      api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
+      api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
+      api.get(`/tokens/balance?address=eq.${usdstAddress}`)
+    ]);
+    
+    return {
+      tokenABalance: balanceA?.data[0]?.balance || "0",
+      tokenBBalance: balanceB?.data[0]?.balance || "0",
+      usdstBalance: balanceUsdst?.data[0]?.balance || "0"
+    };
+  }, []);
+
+  const getTokenBalance = useCallback(async (tokenAddress: string) => {
+    const res = await api.get(`/tokens/balance?address=eq.${tokenAddress}`);
+    return res.data[0]?.balance || "0";
   }, []);
 
   const fetchLpTokensPositions = useCallback(async () => {
+    setLoading(true)
     try {
-      setLoading(true)
       const res = await api.get('/swap-pools/positions')
       setLpTokens(res?.data || [])
+    } finally {
       setLoading(false)
-    } catch (err) {
-      setLoading(false)
-      setError(err.response?.data?.message || err.message || 'Failed to fetch Lp Token Positions');
-      console.log(error);
-      
     }
   },[]);
 
@@ -266,21 +243,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const fetchSwapHistory = useCallback(async (poolAddress: string, params?: Record<string, string>): Promise<{ data: SwapHistoryEntry[]; totalCount: number }> => {
     if (!poolAddress) return { data: [], totalCount: 0 };
     
-    try {
-      // Fetch swap history with total count from the updated backend service
-      const response = await api.get(`/swap-history/${poolAddress}`, { params });
-      
-      // Convert timestamp strings back to Date objects
-      const data = response.data.data.map((item: any) => ({
-        ...item,
-        timestamp: new Date(item.timestamp)
-      }));
-      
-      return { data, totalCount: response.data.totalCount };
-    } catch (err) {
-      console.error('Error fetching swap history:', err);
-      throw new Error(err.response?.data?.message || err.message || 'Failed to fetch swap history');
-    }
+    // Fetch swap history with total count from the updated backend service
+    const response = await api.get(`/swap-history/${poolAddress}`, { params });
+    
+    // Convert timestamp strings back to Date objects
+    const data = response.data.data.map((item: any) => ({
+      ...item,
+      timestamp: new Date(item.timestamp)
+    }));
+    
+    return { data, totalCount: response.data.totalCount };
   }, []);
 
   useEffect(() => {
@@ -313,6 +285,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         addLiquidity,
         removeLiquidity,
         fetchTokenBalances,
+        getTokenBalance,
         enrichPools,
         lpTokens,
         fetchLpTokensPositions,
