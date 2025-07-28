@@ -47,3 +47,5 @@ strato/hpc
 *.cabal
 *~
 rewards-server/src/config/latestBlock.json
+bridge_image_tag*
+stripe_image_tag*
