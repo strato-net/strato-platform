@@ -181,8 +181,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         onClick={handleBorrow}
         disabled={
           !borrowAmount ||
-          isNaN(Number(borrowAmount)) || 
-          Number(borrowAmount) <= 0 ||
+          safeParseUnits(borrowAmount, 18) <= 0n ||
           borrowLoading ||
           safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
           (() => {
