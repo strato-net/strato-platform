@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { formatUnits } from "ethers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { BORROW_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, safeParseFloat, formatWeiAmount } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, formatWeiAmount, safeParseFloat } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
-import { getHealthFactorColor } from "@/utils/misc";
+import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
+import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
+import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -47,18 +48,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     }
   }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
 
-  const getRiskColor = () => {
-    if (riskLevel < 30) return "bg-green-500";
-    if (riskLevel < 70) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
-  const getRiskText = () => {
-    if (riskLevel < 30) return "Low";
-    if (riskLevel < 70) return "Moderate";
-    return "High";
-  };
-
   const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
@@ -78,57 +67,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     setBorrowDisplayAmount("");
   };
 
-   // Calculate health impact of supply
-  const calculateHealthImpact = (
-    borrowAmount: number,
-    loanData: NewLoanData
-  ) => {
-    if (!borrowAmount || !loanData) {
-      return {
-        currentHealthFactor: 0,
-        newHealthFactor: 0,
-        healthImpact: 0,
-        isHealthy: true,
-      };
-    }
-
-    // Current values from backend
-    const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
-    const currentHealthFactor = loanData?.healthFactor || 0;
-    const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
-
-    // If there's no outstanding loan, supply is always healthy
-    if (currentTotalBorrowValue === 0n) {
-      return {
-        currentHealthFactor: Infinity,
-        newHealthFactor: Infinity,
-        healthImpact: 0,
-        isHealthy: true,
-      };
-    }
-
-    const borrowAmountWei = safeParseUnits(borrowAmount.toString(),18);
-
-     let totalBorrowValue = currentTotalBorrowValue + borrowAmountWei;
-
-     if (totalBorrowValue < 0n) totalBorrowValue = 0n;
-
-    // Calculate new health factor
-    const newHealthFactor = totalBorrowValue === 0n ? Infinity : safeParseFloat(formatUnits(currentCollateralValue, 18)) / safeParseFloat(formatUnits(totalBorrowValue, 18));
-
-    const healthImpact = newHealthFactor - currentHealthFactor;
-    const isHealthy = newHealthFactor >= 1.0;
-
-    return {
-      currentHealthFactor,
-      newHealthFactor,
-      healthImpact,
-      isHealthy,
-    };
-  };
-
   useEffect(()=>{
-    const res = calculateHealthImpact(safeParseFloat(borrowAmount),loans)    
+    const borrowAmountWei = safeParseUnits(borrowAmount || "0", 18);
+    const res = calculateBorrowHealthImpact(borrowAmountWei, loans)    
     setHealthImpact(res)
   },[borrowAmount, loans])
 
@@ -213,69 +154,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
       </div>
 
       {/* Risk Level */}
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <span>Risk Level:</span>
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${riskLevel < 30
-                  ? "bg-green-50 text-green-700"
-                  : riskLevel < 70
-                    ? "bg-yellow-50 text-yellow-700"
-                    : "bg-red-50 text-red-700"
-                }`}
-            >
-              {getRiskText()}
-            </span>
-          </div>
-        </div>
-
-        <div className="relative">
-          <Progress value={riskLevel} className="h-2">
-            <div
-              className={`absolute inset-0 ${getRiskColor()} h-full rounded-full`}
-              style={{ width: `${riskLevel}%` }}
-            />
-          </Progress>
-
-          <div className="flex justify-between mt-1 text-xs text-gray-500">
-            <span>Safe</span>
-            <span>Risk Increases →</span>
-            <span>Liquidation</span>
-          </div>
-        </div>
-      </div>
+      <RiskLevelProgress riskLevel={riskLevel} />
 
       {/* Transaction Fee */}
       <div className="px-4 py-3 bg-gray-50 rounded-md">
-        {borrowAmount && !!healthImpact?.newHealthFactor &&
-          <div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Current Health Factor</span>
-              <span className={`font-medium ${getHealthFactorColor(healthImpact.currentHealthFactor)}`}>
-                {healthImpact?.currentHealthFactor?.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">New Health Factor</span>
-              <span className={`font-medium ${getHealthFactorColor(healthImpact.newHealthFactor)}`}>
-                {healthImpact?.newHealthFactor?.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Change:</span>
-              <span
-                className={`font-medium ${healthImpact.healthImpact >= 0
-                  ? "text-green-600"
-                  : "text-red-600"
-                  }`}
-              >
-                {healthImpact.healthImpact >= 0 ? "+" : ""}
-                {healthImpact.healthImpact.toFixed(2)}
-              </span>
-            </div>
-          </div>
-        }
+        <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="mb-4" />
         <div className="flex justify-between text-sm mb-2">
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{BORROW_FEE} USDST</span>
