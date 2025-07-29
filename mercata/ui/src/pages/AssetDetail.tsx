@@ -263,8 +263,8 @@ const AssetDetail = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Asset Summary Card */}
             <div className="lg:col-span-1">
-              <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
-                <Card className="mb-6">
+              <div className="lg:sticky lg:top-6 space-y-6">
+                <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
