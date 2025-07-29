@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -12,7 +12,6 @@ import { formatUnits, isAddress } from "ethers";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
-import TransferConfirmationModal from "../components/TransferConfirmationModal";
 import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput, formatBalance } from "@/utils/numberUtils";
 
 import {
@@ -22,6 +21,9 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
 import { validateRecipientAddress } from "@/utils/validationUtils";
+
+// Lazy load the TransferConfirmationModal
+const TransferConfirmationModal = lazy(() => import("../components/TransferConfirmationModal"));
 
 const Transfer = () => {
   const { userAddress } = useUser();
@@ -368,15 +370,17 @@ const Transfer = () => {
             </Button>
           </div>
 
-          <TransferConfirmationModal
-            open={showConfirmModal}
-            onOpenChange={setShowConfirmModal}
-            fromAsset={fromAsset}
-            fromAmount={fromAmount}
-            recipient={recipient}
-            swapLoading={swapLoading}
-            onConfirm={handleConfirmTransfer}
-          />
+          <Suspense fallback={<div>Loading...</div>}>
+            <TransferConfirmationModal
+              open={showConfirmModal}
+              onOpenChange={setShowConfirmModal}
+              fromAsset={fromAsset}
+              fromAmount={fromAmount}
+              recipient={recipient}
+              swapLoading={swapLoading}
+              onConfirm={handleConfirmTransfer}
+            />
+          </Suspense>
         </main>
       </div>
     </div>

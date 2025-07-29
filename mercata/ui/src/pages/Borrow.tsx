@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
@@ -10,12 +10,15 @@ import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollateralData } from "@/interface";
-import PositionSection from "@/components/Positions";
+import { lazy, Suspense } from "react";
 import CollateralModal from "@/components/borrow/CollateralModal";
 import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
 import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
+
+// Lazy load the PositionSection component
+const PositionSection = lazy(() => import("@/components/Positions"));
 
 const Borrow = () => {
   const { userAddress } = useUser();
@@ -257,7 +260,9 @@ const Borrow = () => {
 
             {/* Right Column - Your Position */}
             <div>
-              <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+              <Suspense fallback={<div>Loading Position Section...</div>}>
+                <PositionSection loanData={loans} userCollaterals={collateralInfo} />
+              </Suspense>
             </div>
           </div>
           <CollateralManagementTable
