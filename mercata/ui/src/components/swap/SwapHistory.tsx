@@ -5,12 +5,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Copy } from 'lucide-react';
 import { useSwapContext } from '@/context/SwapContext';
 import { formatWeiAmount, formatHash } from '@/utils/numberUtils';
-import { SwapHistoryEntry } from '@/interface';
 
 const SwapHistory: React.FC = () => {
-  const { fetchSwapHistory, fromAsset, toAsset, pool } = useSwapContext();
+  const { refreshSwapHistory, fromAsset, toAsset, pool, swapHistory, swapHistoryCount} = useSwapContext();
   const tableRef = useRef<HTMLDivElement>(null);
-  
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -20,61 +19,47 @@ const SwapHistory: React.FC = () => {
       console.error('Failed to copy text: ', err);
     }
   };
-  
+
   // State
-  const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
+  const itemsPerPage = 10;
   const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
   const [swapHistoryError, setSwapHistoryError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalSwaps, setTotalSwaps] = useState(0);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
-  const itemsPerPage = 10;
+  const totalPages = Math.ceil(swapHistoryCount / itemsPerPage);
 
-  // Reset page when pool changes
+   // Reset page when pool changes
   useEffect(() => {
     setCurrentPage(0);
   }, [pool?.address, fromAsset?.address, toAsset?.address]);
 
   // Fetch swap history when pool address changes
   useEffect(() => {
-    if (pool?.address && fromAsset && toAsset) {
-      setSwapHistoryLoading(true);
-      setSwapHistoryError(null);
-      
-      const offset = currentPage * itemsPerPage;
-      const params = {
-        limit: itemsPerPage.toString(),
-        offset: offset.toString()
-      };
-      
-      fetchSwapHistory(pool.address, params)
-        .then(({ data: history, totalCount }) => {
-          setSwapHistory(history);
-          setTotalSwaps(totalCount);
-          setTotalPages(Math.ceil(totalCount / itemsPerPage));
-        })
-        .catch((error) => {
-          console.error('Error fetching swap history:', error);
+    const fetch = async () => {
+      if (pool?.address && fromAsset && toAsset) {
+        setSwapHistoryLoading(true);
+        setSwapHistoryError(null);
+        
+        try {
+          await refreshSwapHistory({
+            limit: itemsPerPage.toString(),
+            offset: (currentPage * itemsPerPage).toString(),
+          });
+        } catch (error) {
+          console.error('Error refreshing swap history:', error);
           setSwapHistoryError('Failed to load swap history');
-          setSwapHistory([]);
-        })
-        .finally(() => {
+        } finally {
           setSwapHistoryLoading(false);
-        });
-    } else {
-      setSwapHistory([]);
-      setSwapHistoryError(null);
-      setCurrentPage(0);
-      setTotalPages(0);
-      setTotalSwaps(0);
-    }
-  }, [pool?.address, fromAsset?.address, toAsset?.address, currentPage, fetchSwapHistory, itemsPerPage]);
+        }
+      }
+    };
+    fetch();
+  }, [pool?.address, fromAsset?.address, toAsset?.address, currentPage, refreshSwapHistory]);
 
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Swap History</h3>
-      
+
       {fromAsset && toAsset ? (
         <div ref={tableRef} className="bg-white rounded-lg border">
           <Table>
@@ -99,16 +84,16 @@ const SwapHistory: React.FC = () => {
               ) : swapHistory.length > 0 ? (
                 swapHistory.map((swap) => (
                   <TableRow key={swap.id}>
-                                          <TableCell className="text-sm">
-                        {swap.timestamp.toLocaleDateString([], {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
+                    <TableCell className="text-sm">
+                      {swap.timestamp.toLocaleDateString([], {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
                           hour12: false
-                        })}
-                      </TableCell>
+                      })}
+                    </TableCell>
                     <TableCell className="font-medium text-sm">
                       {swap.tokenIn}
                     </TableCell>
@@ -156,41 +141,41 @@ const SwapHistory: React.FC = () => {
               )}
             </TableBody>
           </Table>
-              
-              {/* Pagination Controls */}
-              <div className="flex items-center justify-between px-6 py-4 border-t">
-                <div className="text-sm text-gray-500">
-                  {totalPages > 1 ? (
-                    `Showing ${currentPage * itemsPerPage + 1} to ${Math.min((currentPage + 1) * itemsPerPage, totalSwaps)} of ${totalSwaps} swaps`
-                  ) : (
-                    `Showing ${swapHistory.length} swap${swapHistory.length !== 1 ? 's' : ''}`
-                  )}
-                </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-                      disabled={currentPage === 0 || swapHistoryLoading}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-gray-600">
-                      Page {currentPage + 1} of {totalPages}
-                      {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
-                      disabled={currentPage === totalPages - 1 || swapHistoryLoading}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between px-6 py-4 border-t">
+            <div className="text-sm text-gray-500">
+              {totalPages > 1 ? (
+                `Showing ${currentPage * itemsPerPage + 1} to ${Math.min((currentPage + 1) * itemsPerPage, swapHistoryCount)} of ${swapHistoryCount} swaps`
+              ) : (
+                `Showing ${swapHistory.length} swap${swapHistory.length !== 1 ? 's' : ''}`
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                  disabled={currentPage === 0 || swapHistoryLoading}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-600">
+                  Page {currentPage + 1} of {totalPages}
+                  {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+                  disabled={currentPage === totalPages - 1 || swapHistoryLoading}
+                >
+                  Next
+                </Button>
               </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="bg-gray-50 rounded-lg p-6 text-center">
@@ -201,4 +186,4 @@ const SwapHistory: React.FC = () => {
   );
 };
 
-export default SwapHistory; 
+export default SwapHistory;
