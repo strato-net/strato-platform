@@ -165,11 +165,6 @@ const Borrow = () => {
       ]);
     } catch (error) {
       setBorrowLoading(false);
-      toast({
-        title: "Borrow Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
     }
   };
 
@@ -202,11 +197,6 @@ const Borrow = () => {
       ]);
     } catch (error) {
       console.error("Error repaying loan:", error);
-      toast({
-        title: "Error",
-        description: `Repay Error - ${error}`,
-        variant: "destructive",
-      });
       setRepayLoading(false);
     }
   };
