@@ -134,12 +134,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
             const percentageAmount = percentage === 100 
               ? maxAvailable 
               : (safeParseFloat(maxAvailable) * (percentage / 100)).toFixed(18);
-            const isDisabled = safeParseFloat(maxAvailable) === 0;
+            const isDisabled = safeParseFloat(maxAvailable) === 0;            
             
             return (
               <Button
                 key={percentage}
-                variant="outline"
+                variant={borrowAmount === percentageAmount ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleBorrowPercentage(percentageAmount)}
                 disabled={isDisabled}

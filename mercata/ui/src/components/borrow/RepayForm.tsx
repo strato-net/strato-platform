@@ -208,7 +208,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             return (
               <Button
                 key={percentage}
-                variant="outline"
+                variant={repayAmount === formatUnits((maxAmount * BigInt(percentage)) / 100n, 18) ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleRepayPercentage(BigInt(percentage))}
                 disabled={isDisabled}
