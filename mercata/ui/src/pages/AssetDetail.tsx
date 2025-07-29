@@ -159,7 +159,6 @@ const AssetDetail = () => {
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
-  const PRICE_WINDOW = 30; // Number of days to show in the price chart
   
   const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
     if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
@@ -441,30 +440,28 @@ const AssetDetail = () => {
               </div>
             </div>
 
-            {/* Charts and Description */}
             <div className="lg:col-span-2">
+                <PriceChart
+                  data={priceData}
+                  loading={priceDataLoading}
+                  title="Spot Price History"
+                  subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
+                  loadingMessage="Loading price history..."
+                  emptyMessage="No price history available for this asset"
+                  chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
+                  gradientId="colorPrice"
+                />
 
-              <PriceChart
-                data={priceData}
-                loading={priceDataLoading}
-                title="Spot Price History"
-                subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
-                loadingMessage="Loading price history..."
-                emptyMessage="No price history available for this asset"
-                chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
-                gradientId="colorPrice"
-              />
-
-              <PriceChart
-                data={swapPriceData}
-                loading={swapPriceDataLoading}
-                title="Swap Pool Price History"
-                subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
-                loadingMessage="Loading swap pool prices..."
-                emptyMessage="No swap pool data available for this asset"
-                chartColor={getSwapChartColor(swapPriceData)}
-                gradientId="colorSwapPrice"
-              />
+                <PriceChart
+                  data={swapPriceData}
+                  loading={swapPriceDataLoading}
+                  title="Swap Pool Price History"
+                  subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
+                  loadingMessage="Loading swap pool prices..."
+                  emptyMessage="No swap pool data available for this asset"
+                  chartColor={getSwapChartColor(swapPriceData)}
+                  gradientId="colorSwapPrice"
+                />
             </div>
           </div>
         </main>
