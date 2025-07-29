@@ -51,6 +51,7 @@ export const constants = (() => {
     "address",
     "_owner",
     "swapFeeRate",
+    "lpSharePercent",
     "aToBRatio::text", 
     "bToARatio::text",
     `tokenA:tokenA_fkey(${tokenSelectFields.join(',')})`,

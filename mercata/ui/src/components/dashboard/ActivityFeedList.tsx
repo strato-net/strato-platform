@@ -26,7 +26,8 @@ import {
   FileText,
   ArrowUpRight,
   ArrowDownLeft,
-  Minus
+  Minus,
+  Download
 } from "lucide-react";
 import { formatUnits } from "viem";
 import { activityFeedApi, BlockchainEvent } from "@/lib/activityFeed";
@@ -185,6 +186,104 @@ const ActivityFeedList = () => {
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page when filters change
   }, []);
+
+  const downloadCSV = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Get all events without pagination
+      const apiFilters = {
+        ...filters,
+        contract_name: filters.contract_name ? `eq.${filters.contract_name}` : undefined,
+        event_name: filters.event_name ? `eq.${filters.event_name}` : undefined,
+        transaction_sender: filters.transaction_sender ? `eq.${filters.transaction_sender}` : undefined
+      };
+      
+      const response = await activityFeedApi.getEvents({
+        limit: totalEvents || 10000, // Get all events or a large number
+        offset: 0,
+        ...apiFilters
+      });
+      
+      const allEvents = response.events || [];
+      
+      if (allEvents.length === 0) {
+        alert('No data to export');
+        return;
+      }
+      
+      // Create CSV headers
+      const headers = [
+        'Event Name',
+        'Contract Name',
+        'Application',
+        'Block Number',
+        'Block Timestamp',
+        'Transaction Hash',
+        'Transaction Sender',
+        'Contract Address',
+        'Event Index'
+      ];
+      
+      // Add dynamic attribute headers
+      const attributeKeys = new Set<string>();
+      allEvents.forEach(event => {
+        Object.keys(event.attributes).forEach(key => attributeKeys.add(key));
+      });
+      
+      headers.push(...Array.from(attributeKeys).sort());
+      
+      // Create CSV rows
+      const csvRows = [
+        headers.join(','), // Header row
+        ...allEvents.map(event => {
+          const baseData = [
+            `"${event.event_name}"`,
+            `"${event.contract_name}"`,
+            `"${event.application}"`,
+            event.block_number,
+            `"${formatTimestamp(event.block_timestamp)}"`,
+            `"${event.transaction_hash}"`,
+            `"${event.transaction_sender}"`,
+            `"${event.address}"`,
+            event.event_index
+          ];
+          
+          // Add attribute values in the same order as headers
+          const attributeValues = Array.from(attributeKeys).map(key => {
+            const value = event.attributes[key] || '';
+            // Format values if they contain numeric data or addresses
+            if (key.toLowerCase().includes('value')) {
+              return `"${formatValue(value)}"`;
+            }
+            return `"${value}"`;
+          });
+          
+          return [...baseData, ...attributeValues].join(',');
+        })
+      ];
+      
+      // Create and download the CSV file
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `blockchain-events-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      alert('Failed to download CSV. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, totalEvents, formatTimestamp, formatValue]);
 
   // Memoized computed values to prevent unnecessary recalculations
   const paginationInfo = useMemo(() => {
@@ -388,6 +487,16 @@ const ActivityFeedList = () => {
               </span>
             )}
           </div>
+          <Button 
+            onClick={downloadCSV}
+            disabled={loading || events.length === 0}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download CSV
+          </Button>
         </div>
       </div>
 
