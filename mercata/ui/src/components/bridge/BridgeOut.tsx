@@ -12,10 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { roundToDecimals } from "@/utils/numberUtils";
+import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 
 interface Token {
@@ -35,10 +36,12 @@ interface BridgeOutProps {
 
 const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const {
+    bridgeInTokens,
     bridgeOutTokens,
     loading: contextLoading,
     fetchBridgeOutTokens,
@@ -53,8 +56,17 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
+  const [networkError, setNetworkError] = useState<string>("");
   const [fromChain, setFromChain] = useState<string>("STRATO");
   const [toChain, setToChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
+
+  // Expected network validation - use chainId from bridgeInTokens API response
+  // BridgeOut should validate against the same network as BridgeIn
+  const expectedChainId = bridgeInTokens?.[0]?.chainId; // Get chainId from first bridgeInToken
+  const expectedNetworkName = bridgeInTokens?.[0]?.name || "STRATO"; // Get network name from first bridgeInToken
+  const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
+  
+ 
 
   // Fetch network tokens
   useEffect(() => {
@@ -71,6 +83,26 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
 
     loadBridgeOutTokens();
   }, [fetchBridgeOutTokens]);
+
+  // Network validation - following existing error handling pattern
+  useEffect(() => {
+    if (isConnected && chainId && expectedChainId) {
+      if (chainId !== expectedChainId) {
+        setNetworkError(getNetworkErrorMessage({
+          networkName: expectedNetworkName,
+          tokenSymbol: selectedToken?.symbol || "tokens",
+          direction: "out"
+        }));
+      } else {
+        setNetworkError("");
+      }
+    } else if (isConnected && !selectedToken) {
+      setNetworkError(getTokenSelectionErrorMessage("out"));
+    } else {
+      setNetworkError("");
+    }
+  }, [chainId, isConnected, selectedToken, expectedChainId, expectedNetworkName]);
+
 
   // Balance update effect
   useEffect(() => {
@@ -164,6 +196,20 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   };
 
   const showConfirmModal = () => {
+    // Network validation - following existing error handling pattern
+    if (!isCorrectNetwork) {
+      toast({
+        title: "Wrong Network",
+        description: getNetworkErrorMessage({
+          networkName: expectedNetworkName,
+          tokenSymbol: selectedToken?.symbol || "tokens",
+          direction: "out"
+        }),
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedToken?.tokenAddress || !address) {
       toast({
         title: "Error",
@@ -180,6 +226,21 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
   };
 
   const handleBridgeOut = async () => {
+    // Network validation - following existing error handling pattern
+    if (!isCorrectNetwork) {
+      toast({
+        title: "Wrong Network",
+        description: getNetworkErrorMessage({
+          networkName: expectedNetworkName,
+          tokenSymbol: selectedToken?.symbol || "tokens",
+          direction: "out"
+        }),
+        variant: "destructive",
+      });
+      setIsModalOpen(false);
+      return;
+    }
+
     setIsModalOpen(false);
     setIsLoading(true);
     toast({
@@ -217,11 +278,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       }
     } catch (error) {
       console.error("Bridge transaction failed:", error);
-      toast({
-        title: "Failed to initiate transfer",
-        description: error.message || "Please try again later",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by fetch wrapper
     } finally {
       setIsLoading(false);
     }
@@ -355,12 +412,15 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
       <div className="flex justify-end gap-4">
         <Button
           onClick={showConfirmModal}
-          disabled={Boolean(isLoading || !amount || !selectedToken || !isConnected)}
+          disabled={Boolean(isLoading || !amount || !selectedToken || !isConnected || amountError || !isCorrectNetwork)}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Bridge Assets"}
         </Button>
       </div>
+      {networkError && (
+        <p className="text-sm text-red-500">{networkError}</p>
+      )}
       {!isConnected && (
         <div className="text-center">
           <p className="text-sm text-red-500">

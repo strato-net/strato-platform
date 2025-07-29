@@ -48,3 +48,5 @@ strato/hpc
 !strato/simulator/strato-obelisk/**/*.cabal
 *~
 rewards-server/src/config/latestBlock.json
+bridge_image_tag*
+stripe_image_tag*

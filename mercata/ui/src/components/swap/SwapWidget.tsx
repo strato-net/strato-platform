@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { LiquidityPool, SwappableToken, Token } from "@/interface";
-import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
@@ -371,7 +370,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 const SwapWidget = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance } = useSwapContext();
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -432,13 +431,9 @@ const SwapWidget = () => {
   const initialTokenSetup = async () => {
     try {
       setFromBalanceLoading(true)
-      const res = await api.get(
-         `/tokens/balance?address=eq.${swappableTokens[0].address}`
-       );
- 
-       const balance = res?.data?.[0]?.balance || "0";
-       setFromAsset({...swappableTokens[0], balance})
-       setFromBalanceLoading(false)
+      const balance = await getTokenBalance(swappableTokens[0].address);
+      setFromAsset({...swappableTokens[0], balance})
+      setFromBalanceLoading(false)
     } catch (error) {
       setFromBalanceLoading(false)
       console.log(error);
@@ -603,7 +598,7 @@ const SwapWidget = () => {
   }, []);
 
   // Helper functions
-  const getTokenBalance = async (asset: SwappableToken, isFrom: boolean) => {
+  const getTokenBalanceFromContext = async (asset: SwappableToken, isFrom: boolean) => {
     try {
       if (isFrom) {
         setFromBalanceLoading(true);
@@ -611,11 +606,7 @@ const SwapWidget = () => {
         setToBalanceLoading(true);
       }
 
-      const res = await api.get(
-        `/tokens/balance?address=eq.${asset.address}`
-      );
-
-      const balance = res?.data?.[0]?.balance || "0";
+      const balance = await getTokenBalance(asset.address);
 
       if (isFrom) {
         setFromAsset({ ...asset, balance });
@@ -874,8 +865,8 @@ const SwapWidget = () => {
 
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        getTokenBalance(fromAsset, true),
-        getTokenBalance(toAsset, false),
+        getTokenBalanceFromContext(fromAsset, true),
+        getTokenBalanceFromContext(toAsset, false),
         fetchUsdstBalance(userAddress),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
@@ -883,11 +874,7 @@ const SwapWidget = () => {
       ]);
     } catch (error) {
       console.error("Swap error:", error);
-      toast({
-        title: "Error",
-        description: "Swap failed. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setSwapLoading(false);
     }
@@ -964,7 +951,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isLoading={fromBalanceLoading}
         wrongAmount={wrongAmount}
         insufficientPoolBalance={insufficientPoolBalance}
-        onSelect={(asset) => getTokenBalance(asset, true)}
+        onSelect={(asset) => getTokenBalanceFromContext(asset, true)}
         tokens={swappableTokens}
         isOpen={fromPopoverOpen}
         onOpenChange={setFromPopoverOpen}
@@ -996,7 +983,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isLoading={toBalanceLoading}
         wrongAmount={false}
         insufficientPoolBalance={false}
-        onSelect={(asset) => getTokenBalance(asset, false)}
+        onSelect={(asset) => getTokenBalanceFromContext(asset, false)}
         tokens={pairableTokens}
         isOpen={toPopoverOpen}
         onOpenChange={setToPopoverOpen}

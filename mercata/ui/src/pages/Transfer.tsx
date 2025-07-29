@@ -5,10 +5,11 @@ import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
-import {api} from "@/lib/axios";
+
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { formatUnits } from "ethers";
+import { formatUnits, isAddress } from "ethers";
+import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
@@ -20,10 +21,12 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
+import { validateRecipientAddress } from "@/utils/validationUtils";
 
 const Transfer = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
+  const { getUserTokensWithBalance, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -39,19 +42,20 @@ const Transfer = () => {
   const [wrongAmount, setWrongAmount] = useState(false);
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("")
 
   const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
 
   const fetchUserTokens = useCallback(async () => {
     try {
-      const res = await api.get(`/tokens/balance?value=gt.0`);
-      setTokens(res.data);
-      return res.data;
+      const tokens = await getUserTokensWithBalance();
+      setTokens(tokens);
+      return tokens;
     } catch (err) {
       console.error("Failed to fetch tokens:", err);
       return [];
     }
-  }, []);
+  }, [getUserTokensWithBalance]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -80,7 +84,7 @@ const Transfer = () => {
     try {
       setSwapLoading(true);
       setShowConfirmModal(false);
-      await api.post("/tokens/transfer", {
+      await transferToken({
         address: fromAsset.address,
         to: recipient,
         value: safeParseUnits(fromAmount, 18).toString(),
@@ -106,15 +110,17 @@ const Transfer = () => {
         await fetchUsdstBalance(userAddress);
       }
     } catch (error) {
-      const errorMessage = error?.response?.data?.error?.message || error?.message || "An unexpected error occurred during transfer";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Error handling is now done globally by axios interceptor
+      console.error("Transfer error:", error);
     } finally {
       setSwapLoading(false);
     }
+  };
+
+  const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.trim();
+    setRecipient(value);
+    setErrorMessage(validateRecipientAddress(value, userAddress));
   };
 
 
@@ -186,10 +192,11 @@ const Transfer = () => {
               <Input
                 type="text"
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={handleRecipientAddress}
                 placeholder="..."
                 className="w-full p-2 border rounded"
               />
+              {errorMessage && <span className="text-red-600 text-sm">{errorMessage}</span>}
             </div>
 
             {/* Amount */}
@@ -331,6 +338,7 @@ const Transfer = () => {
                 !fromAmount ||
                 wrongAmount ||
                 swapLoading ||
+                !!errorMessage ||
                 // Check if amount is invalid (just ".", or not a valid number, or 0)
                 (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0) ||
                 (() => {
