@@ -177,6 +177,8 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VM_DEBUGGER=${VM_DEBUGGER}
     build: .
+    extra_hosts:
+    - "host.docker.internal:172.17.0.1"
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
