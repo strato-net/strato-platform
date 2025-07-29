@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -13,11 +13,7 @@ const SwapPoolsTable = () => {
 
   const { fetchPools, enrichPools } = useSwapContext();
 
-  useEffect(() => {
-    fetchAndEnrichPools();
-  }, [fetchPools]);
-
-  const fetchAndEnrichPools = async () => {
+  const fetchAndEnrichPools = useCallback(async () => {
     try {
       setLoading(true);
       const tempPools = await fetchPools();
@@ -28,7 +24,11 @@ const SwapPoolsTable = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchPools, enrichPools]);
+
+  useEffect(() => {
+    fetchAndEnrichPools();
+  }, [fetchAndEnrichPools]);
 
   const filteredPools = pools.filter(pool => 
     pool._name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -64,6 +64,8 @@ const SwapPoolsTable = () => {
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-medium">Pool</th>
                   <th className="text-left py-3 px-4 font-medium">Liquidity</th>
+                  <th className="text-left py-3 px-4 font-medium">Swap Fee Rate</th>
+                  <th className="text-left py-3 px-4 font-medium">LP Share %</th>
                   <th className="text-left py-3 px-4 font-medium">APY</th>
                 </tr>
               </thead>
@@ -111,6 +113,16 @@ const SwapPoolsTable = () => {
                     <td className="py-4 px-4">
                       <div className="font-medium">
                         {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="font-medium">
+                        {pool.swapFeeRate !== undefined && pool.swapFeeRate !== null ? `${(pool.swapFeeRate / 100).toFixed(2)}%` : "N/A"}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="font-medium">
+                        {pool.lpSharePercent !== undefined && pool.lpSharePercent !== null ? `${(pool.lpSharePercent / 100).toFixed(1)}%` : "N/A"}
                       </div>
                     </td>
                     <td className="py-4 px-4">
