@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Tabs } from 'antd';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import BridgeIn from './BridgeIn';
-import BridgeOut from './BridgeOut';
 import { useBridgeContext } from '@/context/BridgeContext';
+import { AntTabs, AntLoadingFallback } from '@/components/lazy/antd';
+import { BridgeIn, BridgeOut, ModalLoadingFallback } from '@/components/lazy/components';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
@@ -37,31 +36,35 @@ const BridgeWidget = () => {
       </div>
       
       <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
-        <Tabs
-          activeKey={activeTab}
-          items={[
-            {
-              key: 'bridgeIn',
-              label: 'Bridge In',
-            },
-            {
-              key: 'bridgeOut',
-              label: 'Bridge Out',
-            },
-          ]}
-          onChange={(value) => setActiveTab(value)}
-          className="custom-tabs"
-          style={{
-            '--ant-primary-color': '#3b82f6',
-            '--ant-primary-color-hover': '#2563eb',
-          } as React.CSSProperties}
-        />
+        <Suspense fallback={<AntLoadingFallback />}>
+          <AntTabs
+            activeKey={activeTab}
+            items={[
+              {
+                key: 'bridgeIn',
+                label: 'Bridge In',
+              },
+              {
+                key: 'bridgeOut',
+                label: 'Bridge Out',
+              },
+            ]}
+            onChange={(value) => setActiveTab(value)}
+            className="custom-tabs"
+            style={{
+              '--ant-primary-color': '#3b82f6',
+              '--ant-primary-color-hover': '#2563eb',
+            } as React.CSSProperties}
+          />
+        </Suspense>
         <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
-          {activeTab === 'bridgeIn' ? (
-            <BridgeIn showTestnet={showTestnet} />
-          ) : (
-            <BridgeOut showTestnet={showTestnet} />
-          )}
+          <Suspense fallback={<ModalLoadingFallback />}>
+            {activeTab === 'bridgeIn' ? (
+              <BridgeIn showTestnet={showTestnet} />
+            ) : (
+              <BridgeOut showTestnet={showTestnet} />
+            )}
+          </Suspense>
         </div>
       </div>
     </div>

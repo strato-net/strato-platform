@@ -1,12 +1,11 @@
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
-import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
+import { LendingPoolSection as LazyLendingPoolSection, LiquidationsSection as LazyLiquidationsSection, ComponentLoadingFallback } from '@/components/lazy/components';
 
 const Pools = () => {
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations">("lending");
@@ -47,13 +46,17 @@ const Pools = () => {
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="lending">
-                  <LendingPoolSection />
+                  <Suspense fallback={<ComponentLoadingFallback />}>
+                    <LazyLendingPoolSection />
+                  </Suspense>
                 </TabsContent>
                 <TabsContent value="swap">
                   <SwapPoolsSection />
                 </TabsContent>
                 <TabsContent value="liquidations">
-                  <LiquidationsSection />
+                  <Suspense fallback={<ComponentLoadingFallback />}>
+                    <LazyLiquidationsSection />
+                  </Suspense>
                 </TabsContent>
               </Tabs>
             </CardContent>

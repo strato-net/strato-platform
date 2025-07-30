@@ -1,15 +1,13 @@
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog } from 'lucide-react';
-import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
-import ListAssetForm from '@/components/admin/ListAssetForm';
-import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
+import { CreateTokenForm as LazyCreateTokenForm, ListAssetForm as LazyListAssetForm, TokenConfigTable as LazyTokenConfigTable, ComponentLoadingFallback } from '@/components/lazy/components';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -92,7 +90,9 @@ const Admin = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CreateTokenForm />
+                <Suspense fallback={<ComponentLoadingFallback />}>
+                  <LazyCreateTokenForm />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -126,7 +126,9 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="configs" className="space-y-6">
-            <TokenConfigTable />
+            <Suspense fallback={<ComponentLoadingFallback />}>
+              <LazyTokenConfigTable />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="status" className="space-y-6">
@@ -142,7 +144,9 @@ const Admin = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ListAssetForm />
+                <Suspense fallback={<ComponentLoadingFallback />}>
+                  <LazyListAssetForm />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>

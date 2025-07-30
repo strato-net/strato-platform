@@ -1,7 +1,7 @@
 import { DepositForm } from '@/components/dashboard/DepositModal';
-import BridgeWidget from '@/components/bridge/BridgeWidget';
-import SwapWidget from '@/components/swap/SwapWidget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Suspense } from 'react';
+import { SwapWidget as LazySwapWidget, BridgeWidget as LazyBridgeWidget, ModalLoadingFallback } from '@/components/lazy/components';
 
 const ExchangeCart = () => {
   return (
@@ -18,11 +18,15 @@ const ExchangeCart = () => {
           </div>
         </TabsContent>
         <TabsContent value="bridge">
-          <BridgeWidget />
+          <Suspense fallback={<ModalLoadingFallback />}>
+            <LazyBridgeWidget />
+          </Suspense>
         </TabsContent>
         <TabsContent value="swap">
           <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-            <SwapWidget />
+            <Suspense fallback={<ModalLoadingFallback />}>
+              <LazySwapWidget />
+            </Suspense>
           </div>
         </TabsContent>
       </Tabs>

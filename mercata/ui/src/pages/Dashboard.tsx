@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import AssetSummary from "../components/dashboard/AssetSummary";
-import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield } from "lucide-react";
@@ -16,6 +15,7 @@ import { formatUnits } from "viem";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
+import { AssetsList as LazyAssetsList, ComponentLoadingFallback } from "@/components/lazy/components";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -162,12 +162,14 @@ const Dashboard = () => {
           {isDataInitialized && (
             <>
               <div className="mb-8">
-                <AssetsList 
-                  loading={loading} 
-                  tokens={tokens} 
-                  inActiveTokens={inactiveTokens} 
-                  shouldPreventFlash={true}
-                />
+                <Suspense fallback={<ComponentLoadingFallback />}>
+                  <LazyAssetsList 
+                    loading={loading} 
+                    tokens={tokens} 
+                    inActiveTokens={inactiveTokens} 
+                    shouldPreventFlash={true}
+                  />
+                </Suspense>
               </div>
 
               <div className="mb-8">

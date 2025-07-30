@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -15,8 +15,8 @@ import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
-import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
+import { AssetsList as LazyAssetsList, ComponentLoadingFallback } from '@/components/lazy/components';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
@@ -85,7 +85,9 @@ const DepositsPage = () => {
               <ExchangeCart />
             </div>
             <div className="flex-1 min-w-0 max-w-full">
-              <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
+              <Suspense fallback={<ComponentLoadingFallback />}>
+                <LazyAssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
+              </Suspense>
             </div>
           </div>
           {/* Assets List */}

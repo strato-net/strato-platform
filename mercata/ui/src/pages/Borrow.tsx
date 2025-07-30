@@ -11,11 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollateralData } from "@/interface";
 import { lazy, Suspense } from "react";
-import CollateralModal from "@/components/borrow/CollateralModal";
 import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
 import BorrowForm from "@/components/borrow/BorrowForm";
-import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
+import { RepayForm as LazyRepayForm, CollateralModal as LazyCollateralModal, ComponentLoadingFallback } from "@/components/lazy/components";
 
 // Lazy load the PositionSection component
 const PositionSection = lazy(() => import("@/components/Positions"));
@@ -247,12 +246,14 @@ const Borrow = () => {
                     />
                   </TabsContent>
                   <TabsContent value="repay">
-                    <RepayForm
-                      loans={loans}
-                      repayLoading={repayLoading}
-                      onRepay={executeEmbeddedRepay}
-                      usdstBalance={usdstBalance}
-                    />
+                    <Suspense fallback={<ComponentLoadingFallback />}>
+                      <LazyRepayForm
+                        loans={loans}
+                        repayLoading={repayLoading}
+                        onRepay={executeEmbeddedRepay}
+                        usdstBalance={usdstBalance}
+                      />
+                    </Suspense>
                   </TabsContent>
                 </Tabs>
               </CardContent>
@@ -277,23 +278,25 @@ const Borrow = () => {
 
 
       {modalState.isOpen && modalState.type && (
-        <CollateralModal 
-            type={modalState.type}
-            loading={modalLoading}
-            asset={selectedAsset}
-            loanData={loans}
-            isOpen={modalState.isOpen}
-            onClose={closeModal}
-            onAction={(amount) => {
-              if (modalState.type === "supply") {
-                executeSupply(selectedAsset, amount);
-              } else if (modalState.type === "withdraw") {
-                executeWithdraw(selectedAsset, amount);
-              }
-            }}
-            usdstBalance={usdstBalance}
-            transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
-        />
+        <Suspense fallback={<ComponentLoadingFallback />}>
+          <LazyCollateralModal 
+              type={modalState.type}
+              loading={modalLoading}
+              asset={selectedAsset}
+              loanData={loans}
+              isOpen={modalState.isOpen}
+              onClose={closeModal}
+              onAction={(amount) => {
+                if (modalState.type === "supply") {
+                  executeSupply(selectedAsset, amount);
+                } else if (modalState.type === "withdraw") {
+                  executeWithdraw(selectedAsset, amount);
+                }
+              }}
+              usdstBalance={usdstBalance}
+              transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+          />
+        </Suspense>
       )}
 
     </div>

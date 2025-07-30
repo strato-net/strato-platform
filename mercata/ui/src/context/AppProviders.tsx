@@ -11,7 +11,11 @@ import { OnRampProvider } from "./OnRampContext";
 import { TransactionProvider } from "@/context/TransactionContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./LiquidationContext";
-import { ReactNode } from "react";
+import { ReactNode, lazy, Suspense } from "react";
+
+// Lazy load non-critical providers
+const LazyLiquidationProvider = lazy(() => import("./LiquidationContext").then(module => ({ default: module.LiquidationProvider })));
+const LazyOnRampProvider = lazy(() => import("./OnRampContext").then(module => ({ default: module.OnRampProvider })));
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -19,32 +23,50 @@ interface AppProvidersProps {
   wagmiConfig: any;
 }
 
+// Core providers that are needed immediately
+const CoreProviders = ({ children }: { children: ReactNode }) => (
+  <UserProvider>
+    <UserTokensProvider>
+      <LendingProvider>
+        <SwapProvider>
+          <OracleProvider>
+            <TokenProvider>
+              <TransactionProvider>
+                <BridgeProvider>
+                  {children}
+                </BridgeProvider>
+              </TransactionProvider>
+            </TokenProvider>
+          </OracleProvider>
+        </SwapProvider>
+      </LendingProvider>
+    </UserTokensProvider>
+  </UserProvider>
+);
+
+// Optional providers that can be loaded lazily
+const OptionalProviders = ({ children }: { children: ReactNode }) => (
+  <Suspense fallback={null}>
+    <LazyLiquidationProvider>
+      <Suspense fallback={null}>
+        <LazyOnRampProvider>
+          {children}
+        </LazyOnRampProvider>
+      </Suspense>
+    </LazyLiquidationProvider>
+  </Suspense>
+);
+
 const AppProviders = ({ children, queryClient, wagmiConfig }: AppProvidersProps) => {
   return (
     <QueryClientProvider client={queryClient}>
       <WagmiProvider config={wagmiConfig}>
         <RainbowKitProvider>
-          <UserProvider>
-            <UserTokensProvider>
-              <LendingProvider>
-                <SwapProvider>
-                  <OracleProvider>
-                    <TokenProvider>
-                      <OnRampProvider>
-                        <LiquidationProvider>
-                          <TransactionProvider>
-                            <BridgeProvider>
-                              {children}
-                            </BridgeProvider>
-                          </TransactionProvider>
-                        </LiquidationProvider>
-                      </OnRampProvider>
-                    </TokenProvider>
-                  </OracleProvider>
-                </SwapProvider>
-              </LendingProvider>
-            </UserTokensProvider>
-          </UserProvider>
+          <CoreProviders>
+            <OptionalProviders>
+              {children}
+            </OptionalProviders>
+          </CoreProviders>
         </RainbowKitProvider>
       </WagmiProvider>
     </QueryClientProvider>

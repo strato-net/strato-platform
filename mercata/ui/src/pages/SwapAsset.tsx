@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
-import SwapWidget from "@/components/swap/SwapWidget";
-import SwapHistory from "@/components/swap/SwapHistory";
+import { SwapWidget as LazySwapWidget, SwapHistory as LazySwapHistory, ComponentLoadingFallback } from "@/components/lazy/components";
 
 const SwapAsset = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -22,14 +21,18 @@ const SwapAsset = () => {
             {/* Main Swap Widget */}
             <div className="bg-white shadow-md rounded-lg p-6">
               <h2 className="text-xl font-semibold mb-6">Exchange your digital assets</h2>
-              <SwapWidget />
+              <Suspense fallback={<ComponentLoadingFallback />}>
+                <LazySwapWidget />
+              </Suspense>
             </div>
           </div>
           
           {/* Separate Swap History Section - Full Width */}
           <div className="mt-8 max-w-6xl mx-auto">
             <div className="bg-white shadow-md rounded-lg p-6">
-              <SwapHistory />
+              <Suspense fallback={<ComponentLoadingFallback />}>
+                <LazySwapHistory />
+              </Suspense>
             </div>
           </div>
         </main>

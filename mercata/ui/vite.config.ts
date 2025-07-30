@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   define: {
@@ -33,6 +32,39 @@ export default defineConfig(({ mode }) => ({
         secure: false,
       },
     },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks for better caching
+          'react-vendor': ['react', 'react-dom'],
+          'router-vendor': ['react-router-dom'],
+          'blockchain-vendor': [
+            'wagmi',
+            '@rainbow-me/rainbowkit',
+            'ethers',
+            'viem',
+            '@tanstack/react-query',
+          ],
+          'antd-vendor': ['antd', '@ant-design/icons'],
+          'utils-vendor': [
+            'lodash',
+            'lodash.isequal',
+            'date-fns',
+            'clsx',
+            'class-variance-authority',
+            'tailwind-merge',
+            'zod',
+            '@hookform/resolvers',
+            'react-hook-form',
+          ],
+          'charts-vendor': ['recharts'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000, // Increase warning limit for large chunks
+    sourcemap: mode === 'development',
   },
   plugins: [
     react(),

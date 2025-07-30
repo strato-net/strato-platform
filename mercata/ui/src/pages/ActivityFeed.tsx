@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
-import ActivityFeedList from "../components/dashboard/ActivityFeedList";
+import { ActivityFeedList as LazyActivityFeedList, ComponentLoadingFallback } from "@/components/lazy/components";
 import { Activity } from "lucide-react";
 
 const ActivityFeed = () => {
@@ -37,7 +37,9 @@ const ActivityFeed = () => {
             </p>
           </div>
 
-          <ActivityFeedList />
+          <Suspense fallback={<ComponentLoadingFallback />}>
+            <LazyActivityFeedList />
+          </Suspense>
         </main>
       </div>
     </div>

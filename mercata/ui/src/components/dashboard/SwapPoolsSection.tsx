@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
@@ -9,8 +9,7 @@ import { useUserTokens } from '@/context/UserTokensContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { LiquidityPool } from '@/interface';
-import LiquidityDepositModal from './LiquidityDepositModal';
-import LiquidityWithdrawModal from './LiquidityWithdrawModal';
+import { LiquidityDepositModal as LazyLiquidityDepositModal, LiquidityWithdrawModal as LazyLiquidityWithdrawModal, ModalLoadingFallback } from '@/components/lazy/components';
 
 
 const SwapPoolsSection = () => {
@@ -232,21 +231,25 @@ const SwapPoolsSection = () => {
         )}
       </div>
 
-      <LiquidityDepositModal
-        isOpen={isDepositModalOpen}
-        onClose={handleCloseDepositModal}
-        selectedPool={selectedPool}
-        onDepositSuccess={handleDepositSuccess}
-        operationInProgressRef={operationInProgressRef}
-      />
+      <Suspense fallback={<ModalLoadingFallback />}>
+        <LazyLiquidityDepositModal
+          isOpen={isDepositModalOpen}
+          onClose={handleCloseDepositModal}
+          selectedPool={selectedPool}
+          onDepositSuccess={handleDepositSuccess}
+          operationInProgressRef={operationInProgressRef}
+        />
+      </Suspense>
 
-      <LiquidityWithdrawModal
-        isOpen={isWithdrawModalOpen}
-        onClose={handleCloseWithdrawModal}
-        selectedPool={selectedPool}
-        onWithdrawSuccess={handleWithdrawSuccess}
-        operationInProgressRef={operationInProgressRef}
-      />
+      <Suspense fallback={<ModalLoadingFallback />}>
+        <LazyLiquidityWithdrawModal
+          isOpen={isWithdrawModalOpen}
+          onClose={handleCloseWithdrawModal}
+          selectedPool={selectedPool}
+          onWithdrawSuccess={handleWithdrawSuccess}
+          operationInProgressRef={operationInProgressRef}
+        />
+      </Suspense>
     </div>
   );
 };

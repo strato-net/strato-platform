@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
@@ -10,9 +10,11 @@ import { useUserTokens } from '@/context/UserTokensContext';
 import { Token, PriceHistoryEntry, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
-import PriceChart from '@/components/charts/PriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
+
+// Lazy load heavy components
+const PriceChart = React.lazy(() => import('@/components/charts/PriceChart'));
 
 type PricePoint = {
   date: string;
@@ -444,27 +446,31 @@ const AssetDetail = () => {
             {/* Charts and Description */}
             <div className="lg:col-span-2">
 
-              <PriceChart
-                data={priceData}
-                loading={priceDataLoading}
-                title="Spot Price History"
-                subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
-                loadingMessage="Loading price history..."
-                emptyMessage="No price history available for this asset"
-                chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
-                gradientId="colorPrice"
-              />
+              <React.Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
+                <PriceChart
+                  data={priceData}
+                  loading={priceDataLoading}
+                  title="Spot Price History"
+                  subtitle={priceData.length > 0 ? "Hourly price data from first available oracle price to present" : undefined}
+                  loadingMessage="Loading price history..."
+                  emptyMessage="No price history available for this asset"
+                  chartColor={getChartColor(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), priceData)}
+                  gradientId="colorPrice"
+                />
+              </React.Suspense>
 
-              <PriceChart
-                data={swapPriceData}
-                loading={swapPriceDataLoading}
-                title="Swap Pool Price History"
-                subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
-                loadingMessage="Loading swap pool prices..."
-                emptyMessage="No swap pool data available for this asset"
-                chartColor={getSwapChartColor(swapPriceData)}
-                gradientId="colorSwapPrice"
-              />
+              <React.Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
+                <PriceChart
+                  data={swapPriceData}
+                  loading={swapPriceDataLoading}
+                  title="Swap Pool Price History"
+                  subtitle={swapPriceData.length > 0 ? "Actual trading prices from swap pools (Last 30 days)" : undefined}
+                  loadingMessage="Loading swap pool prices..."
+                  emptyMessage="No swap pool data available for this asset"
+                  chartColor={getSwapChartColor(swapPriceData)}
+                  gradientId="colorSwapPrice"
+                />
+              </React.Suspense>
             </div>
           </div>
         </main>

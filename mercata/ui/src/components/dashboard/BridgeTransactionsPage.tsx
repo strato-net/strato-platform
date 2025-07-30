@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { ArrowLeftRight } from 'lucide-react';
-import { Tabs } from 'antd';
-import 'antd/dist/reset.css';
 import './BridgeTransactionsPage.css';
-import DepositTransactionDetails from './DepositTransactionDetails';
-import WithdrawTransactionDetails from './WithdrawTransactionDetails';
+import { AntTabs, AntLoadingFallback } from '@/components/lazy/antd';
+import { ComponentLoadingFallback } from '@/components/lazy/components';
+
+// Lazy load transaction detail components
+const DepositTransactionDetails = React.lazy(() => import('./DepositTransactionDetails'));
+const WithdrawTransactionDetails = React.lazy(() => import('./WithdrawTransactionDetails'));
 
 interface BridgeTransactionsPageProps {
   isOpen: boolean;
@@ -39,24 +41,28 @@ const BridgeTransactionsPage = ({ isOpen, onClose }: BridgeTransactionsPageProps
                   <h1 className="text-2xl font-semibold text-gray-900">Bridge Transactions</h1>
                 </div>
                 <div className="w-full sm:w-[400px] bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
-                  <Tabs
-                    activeKey={transactionType}
-                    items={mainItems}
-                    onChange={(value) => setTransactionType(value as TransactionType)}
-                    className="custom-tabs"
-                    style={{
-                      '--ant-primary-color': '#3b82f6',
-                      '--ant-primary-color-hover': '#2563eb',
-                    } as React.CSSProperties}
-                  />
+                  <Suspense fallback={<AntLoadingFallback />}>
+                    <AntTabs
+                      activeKey={transactionType}
+                      items={mainItems}
+                      onChange={(value) => setTransactionType(value as TransactionType)}
+                      className="custom-tabs"
+                      style={{
+                        '--ant-primary-color': '#3b82f6',
+                        '--ant-primary-color-hover': '#2563eb',
+                      } as React.CSSProperties}
+                    />
+                  </Suspense>
                 </div>
               </div>
 
-              {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails />
-              ) : (
-                <WithdrawTransactionDetails />
-              )}
+              <Suspense fallback={<ComponentLoadingFallback />}>
+                {transactionType === 'DepositRecorded' ? (
+                  <DepositTransactionDetails />
+                ) : (
+                  <WithdrawTransactionDetails />
+                )}
+              </Suspense>
             </div>
           </div>
         </div>

@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { message, Table } from "antd";
-import { CopyOutlined, LinkOutlined, FrownOutlined } from "@ant-design/icons";
 import { useTransactionContext } from "@/context/TransactionContext";
+import { AntTable, AntLoadingFallback, CopyOutlined, LinkOutlined, FrownOutlined, IconLoadingFallback, getAntMessage } from "@/components/lazy/antd";
 
 interface DepositTransaction {
   transaction_hash: string;
@@ -60,9 +59,10 @@ const DepositTransactionDetails = () => {
   const handleCopyToClipboard = async (text: string) => {
     try {
       await copyToClipboard(text);
+      const message = await getAntMessage();
       message.success("Copied to clipboard");
     } catch (error) {
-      message.error("Failed to copy");
+      const message = await getAntMessage();
     }
   };
 
@@ -73,10 +73,12 @@ const DepositTransactionDetails = () => {
         <span className="cursor-pointer">
           {renderTruncatedAddress(address)}
         </span>
-        <CopyOutlined
-          className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
-          onClick={() => handleCopyToClipboard(address)}
-        />
+        <Suspense fallback={<IconLoadingFallback />}>
+          <CopyOutlined
+            className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+            onClick={() => handleCopyToClipboard(address)}
+          />
+        </Suspense>
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
           {address}
         </div>
@@ -92,19 +94,16 @@ const DepositTransactionDetails = () => {
         <span className="cursor-pointer">
           {renderTransactionHash(hash)}
         </span>
-        <CopyOutlined
-          className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
-          onClick={() => handleCopyToClipboard(hash)}
-        />
-        <LinkOutlined
-          className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
-          onClick={() =>
-            window.open(
-              `https://sepolia.etherscan.io/tx/${hashWithPrefix}`,
-              "_blank"
-            )
-          }
-        />
+        <Suspense fallback={<IconLoadingFallback />}>
+          <CopyOutlined
+            className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+            onClick={() => handleCopyToClipboard(hash)}
+          />
+          <LinkOutlined
+            className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+            onClick={() => window.open(`https://etherscan.io/tx/${hashWithPrefix}`, '_blank')}
+          />
+        </Suspense>
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
           {hash}
         </div>
@@ -212,33 +211,37 @@ const DepositTransactionDetails = () => {
 
   return (
     <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-      <Table
-        columns={columns}
-        dataSource={transactions}
-        loading={isLoading}
-        pagination={{
-          current: currentPage,
-          total: totalCount,
-          pageSize: ITEMS_PER_PAGE,
-          onChange: (page) => setCurrentPage(page),
-          showSizeChanger: false,
-          showTotal: (total, range) =>
-            `${range[0]}-${range[1]} of ${total} items`,
-        }}
-        locale={{
-          emptyText: (
-            <div className="py-12 text-center text-gray-500">
-              <div className="flex flex-col items-center justify-center gap-2">
-                <FrownOutlined style={{ fontSize: 48, color: "#bdbdbd" }} />
-                <span className="text-lg font-semibold text-gray-400">
-                  Sorry, no data found
-                </span>
+      <Suspense fallback={<AntLoadingFallback />}>
+        <AntTable
+          columns={columns}
+          dataSource={transactions}
+          loading={isLoading}
+          pagination={{
+            current: currentPage,
+            total: totalCount,
+            pageSize: ITEMS_PER_PAGE,
+            onChange: (page) => setCurrentPage(page),
+            showSizeChanger: false,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} of ${total} items`,
+          }}
+          locale={{
+            emptyText: (
+              <div className="py-12 text-center text-gray-500">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <Suspense fallback={<IconLoadingFallback />}>
+                    <FrownOutlined style={{ fontSize: 48, color: "#bdbdbd" }} />
+                  </Suspense>
+                  <span className="text-lg font-semibold text-gray-400">
+                    Sorry, no data found
+                  </span>
+                </div>
               </div>
-            </div>
-          ),
-        }}
-        rowKey={(record) => record.transaction_hash}
-      />
+            ),
+          }}
+          rowKey={(record: DepositTransaction) => record.transaction_hash}
+        />
+      </Suspense>
     </div>
   );
 };
