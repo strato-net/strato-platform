@@ -1,6 +1,6 @@
 # Mercata Bridge Security Audit - Chapter 7: Payments, Fees & Economics
 
-**Audit Date:** January 2025  
+**Audit Date:** July 2025  
 **Bridge Version:** Current STRATO Platform Implementation  
 **Auditor:** Security Assessment Team  
 

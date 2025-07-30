@@ -1,6 +1,6 @@
 # Mercata Bridge Security Audit - Chapter 13: UI/UX & Developer Surfaces
 
-**Audit Date:** January 2025  
+**Audit Date:** July 2025  
 **Bridge Version:** Current STRATO Platform Implementation  
 **Analysis Scope:** User Interface, API Services, Developer Tools  
 **Auditor:** Security Assessment Team  
@@ -258,7 +258,7 @@ async function signBridgeMessage(message: BridgeMessage): Promise<string> {
   // Present human-readable signing interface
   // "You are bridging 100 USDC from Ethereum to STRATO"
   // "Recipient: 0x123..."
-  // "Expires: January 15, 2025 at 3:30 PM"
+  // "Expires: July 15, 2025 at 3:30 PM"
   // Not implemented
 }
 ```

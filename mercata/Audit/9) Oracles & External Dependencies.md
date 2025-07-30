@@ -1,6 +1,6 @@
 # Mercata Bridge Security Audit - Chapter 9: Oracles & External Dependencies
 
-**Audit Date:** January 2025  
+**Audit Date:** July 2025  
 **Bridge Version:** Current STRATO Platform Implementation  
 **Auditor:** Security Assessment Team  
 

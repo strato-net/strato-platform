@@ -1,6 +1,6 @@
 # Mercata Bridge Security Audit - Chapter 12: Cross-Domain Nuances (Rollups/L2s)
 
-**Audit Date:** January 2025  
+**Audit Date:** July 2025  
 **Bridge Version:** Current STRATO Platform Implementation  
 **Network Architecture:** Ethereum ↔ STRATO (Independent Blockchains)  
 **Auditor:** Security Assessment Team  
