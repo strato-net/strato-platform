@@ -63,6 +63,7 @@ const DepositTransactionDetails = () => {
       message.success("Copied to clipboard");
     } catch (error) {
       const message = await getAntMessage();
+      message.error("Failed to copy");
     }
   };
 
