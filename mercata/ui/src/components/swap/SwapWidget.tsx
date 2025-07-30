@@ -370,7 +370,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 const SwapWidget = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance, refreshSwapHistory } = useSwapContext();
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -863,6 +863,7 @@ const SwapWidget = () => {
       setEditingField(null);
       lastCalculatedFromRef.current = "";
 
+      await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
         getTokenBalanceFromContext(fromAsset, true),

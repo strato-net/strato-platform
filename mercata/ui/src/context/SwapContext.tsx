@@ -53,6 +53,9 @@ type SwapContextType = {
   lpTokens: LiquidityPool[]
   fetchLpTokensPositions: () => Promise<void>;
   fetchSwapHistory: (poolAddress: string, params?: Record<string, string>) => Promise<{ data: SwapHistoryEntry[]; totalCount: number }>;
+  refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
+  swapHistory: SwapHistoryEntry[];
+  swapHistoryCount: number
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -67,6 +70,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [fromAsset, setFromAsset] = useState<SwappableToken | undefined>();
   const [toAsset, setToAsset] = useState<SwappableToken | undefined>();
   const [pool, setPool] = useState<LiquidityPool | null>(null);
+  const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
+  const [swapHistoryCount, setSwapHistoryCount] = useState(0);
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -240,20 +245,36 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, []);
 
-  const fetchSwapHistory = useCallback(async (poolAddress: string, params?: Record<string, string>): Promise<{ data: SwapHistoryEntry[]; totalCount: number }> => {
-    if (!poolAddress) return { data: [], totalCount: 0 };
-    
+ const fetchSwapHistory = useCallback(async (poolAddress: string, params?: Record<string, string>): Promise<{ data: SwapHistoryEntry[]; totalCount: number }> => {
+  if (!poolAddress) return { data: [], totalCount: 0 };
+
     // Fetch swap history with total count from the updated backend service
-    const response = await api.get(`/swap-history/${poolAddress}`, { params });
-    
+  const response = await api.get(`/swap-history/${poolAddress}`, { params });
+
     // Convert timestamp strings back to Date objects
-    const data = response.data.data.map((item: any) => ({
-      ...item,
-      timestamp: new Date(item.timestamp)
-    }));
-    
-    return { data, totalCount: response.data.totalCount };
-  }, []);
+  const data = response.data.data.map((item: any) => ({
+    ...item,
+    timestamp: new Date(item.timestamp)
+  }));
+
+  return { data, totalCount: response.data.totalCount };
+}, []);
+
+const refreshSwapHistory = useCallback(
+  async (params?: Record<string, string>) => {
+    if (!pool?.address) return;
+    try {
+      const { data, totalCount } = await fetchSwapHistory(pool.address, params);
+      setSwapHistory(data);               // ✅ Set new history
+      setSwapHistoryCount(totalCount);   // ✅ Set new count
+    } catch (err) {
+      console.error("Failed to refresh swap history", err);
+      setSwapHistory([]);                // Optional fallback
+      setSwapHistoryCount(0);            // Optional fallback
+    }
+  },
+  [pool?.address, fetchSwapHistory]
+);
 
   useEffect(() => {
     fetchSwappableTokens();
@@ -290,6 +311,9 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         lpTokens,
         fetchLpTokensPositions,
         fetchSwapHistory,
+        refreshSwapHistory,
+        swapHistory,
+        swapHistoryCount
       }}
     >
       {children}
