@@ -132,11 +132,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         <div className="flex gap-2">
           {[10, 25, 50, 100].map((percentage) => {
             const maxAvailable = BigInt(loans?.maxAvailableToBorrowUSD || 0);
-            const availableAfterFee = maxAvailable - safeParseUnits(BORROW_FEE, 18);
-            const percentageAmountRaw = (availableAfterFee * BigInt(percentage)) / 100n;
+            const percentageAmountRaw = (maxAvailable * BigInt(percentage)) / 100n;
             const borrowAmountRaw = safeParseUnits(borrowAmount || "0", 18);
             const isSelected = borrowAmountRaw === percentageAmountRaw;
-            const isDisabled = availableAfterFee <= 0n;
+            const isDisabled = maxAvailable <= 0n;
             
             return (
               <Button
