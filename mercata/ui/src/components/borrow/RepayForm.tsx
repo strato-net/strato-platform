@@ -86,7 +86,6 @@ const handleRepayAmount = (amount: bigint) => {
       </div>
     );
   }
-  
 
   return (
     <div className="space-y-4 pt-4">
@@ -198,19 +197,18 @@ const handleRepayAmount = (amount: bigint) => {
         {/* Percentage Buttons */}
         <div className="flex gap-2">
           {[10, 25, 50, 100].map((percentage) => {
-            const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-            const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
-            const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
-            const isDisabled = maxAmount <= 0n;
+            const maxAvailable = BigInt(loans?.totalAmountOwed || 0);
+            const availableAfterFee = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+            const maxAmount = availableAfterFee > 0n && availableAfterFee < maxAvailable ? availableAfterFee : maxAvailable;
             const percentageAmountRaw = (maxAmount * BigInt(percentage)) / 100n;
+            const repayAmountRaw = safeParseUnits(repayAmount || "0", 18);
+            const isSelected = repayAmountRaw === percentageAmountRaw;
+            const isDisabled = maxAmount <= 0n;
             
             return (
               <Button
                 key={percentage}
-                variant={(() => {
-                  const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-                  return repayAmountWei === percentageAmountRaw ? "default" : "outline";
-                })()}
+                variant={isSelected ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleRepayAmount(percentageAmountRaw)}
                 disabled={isDisabled}
