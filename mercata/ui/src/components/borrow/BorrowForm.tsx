@@ -136,12 +136,14 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
               : (maxAvailable * BigInt(percentage)) / BigInt(100);
 
             const percentageAmount = formatUnits(percentageAmountRaw, 18);
+            const borrowAmountRaw = borrowAmount ? safeParseUnits(borrowAmount, 18) : BigInt(0);
+            const isSelected = borrowAmountRaw === percentageAmountRaw;
             const isDisabled = maxAvailable === BigInt(0);
             
             return (
               <Button
                 key={percentage}
-                variant={borrowAmount === percentageAmount ? "default" : "outline"}
+                variant={isSelected ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleBorrowPercentage(percentageAmount)}
                 disabled={isDisabled}
