@@ -33,6 +33,7 @@ export OAUTH_CLIENT_SECRET
 
 export network=helium
 export VAULT_URL=https://vault.blockapps.net:8093
+export HTTP_PORT=8080 #You can change this to 80 for Linux, Mac seems to forbid it
 
 ####################################
 
