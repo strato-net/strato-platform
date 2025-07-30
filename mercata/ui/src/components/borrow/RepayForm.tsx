@@ -26,6 +26,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     healthImpact: 0,
     isHealthy: true,
   });
+  const [selectedRepayAmount, setSelectedRepayAmount] = useState<bigint>(0n);
 
   // Calculate risk level when repay amount changes
   useEffect(() => {
@@ -67,14 +68,11 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     }
   };
 
-  const handleRepayPercentage = (percent: bigint) => {
-    const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-    const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
-    const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
-    const amount = formatUnits((maxAmount * percent) / 100n, 18);
-    setRepayAmount(amount);
-    setRepayDisplayAmount(addCommasToInput(amount));
-  };
+const handleRepayAmount = (amount: bigint) => {
+  const amountFormatted = formatUnits(amount, 18);
+  setRepayAmount(amountFormatted);
+  setRepayDisplayAmount(addCommasToInput(amountFormatted));
+};
 
   const handleRepay = () => {
     onRepay(repayAmount);
@@ -204,13 +202,17 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
             const maxAmount = available > 0n && available < totalOwed ? available : totalOwed;
             const isDisabled = maxAmount <= 0n;
+            const percentageAmountRaw = (maxAmount * BigInt(percentage)) / 100n;
             
             return (
               <Button
                 key={percentage}
-                variant={repayAmount === formatUnits((maxAmount * BigInt(percentage)) / 100n, 18) ? "default" : "outline"}
+                variant={selectedRepayAmount === percentageAmountRaw ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleRepayPercentage(BigInt(percentage))}
+                onClick={() => {
+                   handleRepayAmount(percentageAmountRaw);
+                   setSelectedRepayAmount(percentageAmountRaw);
+                }}
                 disabled={isDisabled}
                 className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
                 title={isDisabled ? "No amount available to repay" : `Set to ${percentage}% of available amount`}
