@@ -67,11 +67,11 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     }
   };
 
-const handleRepayPercentage = (percentageAmount: bigint) => {
-  const amountFormatted = formatUnits(percentageAmount, 18);
-  setRepayAmount(amountFormatted);
-  setRepayDisplayAmount(addCommasToInput(amountFormatted));
-};
+  const handleRepayPercentage = (percentageAmount: bigint) => {
+    const amountFormatted = formatUnits(percentageAmount, 18);
+    setRepayAmount(amountFormatted);
+    setRepayDisplayAmount(addCommasToInput(amountFormatted));
+  };
 
   const handleRepay = () => {
     onRepay(repayAmount);
