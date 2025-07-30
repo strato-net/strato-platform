@@ -56,9 +56,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     }
   };
 
-  const handleBorrowPercentage = (percentageAmount: string) => {
-    setBorrowAmount(percentageAmount);
-    setBorrowDisplayAmount(addCommasToInput(percentageAmount));
+  const handleBorrowPercentage = (percentageAmount: bigint) => {
+    const amountFormatted = formatUnits(percentageAmount, 18);
+    setBorrowAmount(amountFormatted);
+    setBorrowDisplayAmount(addCommasToInput(amountFormatted));
   };
 
   const handleBorrow = () => {
@@ -131,21 +132,17 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         <div className="flex gap-2">
           {[10, 25, 50, 100].map((percentage) => {
             const maxAvailable = BigInt(loans?.maxAvailableToBorrowUSD || 0);
-            const percentageAmountRaw = percentage === 100
-              ? maxAvailable
-              : (maxAvailable * BigInt(percentage)) / BigInt(100);
-
-            const percentageAmount = formatUnits(percentageAmountRaw, 18);
-            const borrowAmountRaw = borrowAmount ? safeParseUnits(borrowAmount, 18) : BigInt(0);
+            const percentageAmountRaw = (maxAvailable * BigInt(percentage)) / 100n;
+            const borrowAmountRaw = safeParseUnits(borrowAmount || "0", 18);
             const isSelected = borrowAmountRaw === percentageAmountRaw;
-            const isDisabled = maxAvailable === BigInt(0);
+            const isDisabled = maxAvailable === 0n;
             
             return (
               <Button
                 key={percentage}
                 variant={isSelected ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleBorrowPercentage(percentageAmount)}
+                onClick={() => handleBorrowPercentage(percentageAmountRaw)}
                 disabled={isDisabled}
                 className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
                 title={isDisabled ? "No amount available to borrow" : `Set to ${percentage}% of available amount`}

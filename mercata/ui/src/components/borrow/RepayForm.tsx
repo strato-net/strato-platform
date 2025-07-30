@@ -26,7 +26,6 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     healthImpact: 0,
     isHealthy: true,
   });
-  const [selectedRepayAmount, setSelectedRepayAmount] = useState<bigint>(0n);
 
   // Calculate risk level when repay amount changes
   useEffect(() => {
@@ -208,12 +207,12 @@ const handleRepayAmount = (amount: bigint) => {
             return (
               <Button
                 key={percentage}
-                variant={selectedRepayAmount === percentageAmountRaw ? "default" : "outline"}
+                variant={(() => {
+                  const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+                  return repayAmountWei === percentageAmountRaw ? "default" : "outline";
+                })()}
                 size="sm"
-                onClick={() => {
-                   handleRepayAmount(percentageAmountRaw);
-                   setSelectedRepayAmount(percentageAmountRaw);
-                }}
+                onClick={() => handleRepayAmount(percentageAmountRaw)}
                 disabled={isDisabled}
                 className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
                 title={isDisabled ? "No amount available to repay" : `Set to ${percentage}% of available amount`}
