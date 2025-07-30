@@ -67,8 +67,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     }
   };
 
-const handleRepayAmount = (amount: bigint) => {
-  const amountFormatted = formatUnits(amount, 18);
+const handleRepayPercentage = (percentageAmount: bigint) => {
+  const amountFormatted = formatUnits(percentageAmount, 18);
   setRepayAmount(amountFormatted);
   setRepayDisplayAmount(addCommasToInput(amountFormatted));
 };
@@ -210,7 +210,7 @@ const handleRepayAmount = (amount: bigint) => {
                 key={percentage}
                 variant={isSelected ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleRepayAmount(percentageAmountRaw)}
+                onClick={() => handleRepayPercentage(percentageAmountRaw)}
                 disabled={isDisabled}
                 className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
                 title={isDisabled ? "No amount available to repay" : `Set to ${percentage}% of available amount`}
