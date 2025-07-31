@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import routes from "./api/routes";
 import { Request, Response } from "express";
-import { handleStripeWebhook } from "./api/services/onramp.service";
+// import { handleStripeWebhook } from "./api/services/onramp.service";
 import { stripe } from "./utils/stripeClient";
 import { stripeWebhookKey } from "./config/config";
 import { initOpenIdConfig } from "./config/config";
