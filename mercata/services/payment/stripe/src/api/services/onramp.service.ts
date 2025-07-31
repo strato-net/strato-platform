@@ -12,6 +12,10 @@ import { canLockAmount, addLock, removeLock, calculatePaymentAmount } from "../h
 const contractAddress = constants.onRamp!;
 const OnRamp = "OnRamp";
 
+// Idempotency tracking - in production, use Redis/DB
+const processedSessions = new Set<string>();
+const processingInProgress = new Set<string>();
+
 export const get = async (accessToken: string): Promise<RampData> => {
   try {
     const response = await bloc.get(
@@ -72,7 +76,6 @@ export async function checkout(
 
     addLock(token, amount, sessionId);
     
-    // Start polling for session completion in background
     pollAndFulfillSession(sessionId, token, amount).catch(err => {
       console.error(`Error in background fulfillment for session ${sessionId}:`, err);
     });
@@ -85,33 +88,45 @@ export async function checkout(
 }
 
 async function pollAndFulfillSession(sessionId: string, token: string, tokenAmount: string): Promise<void> {
-  const maxAttempts = 60; // Poll for up to 10 minutes (60 * 10s = 10min)
+  if (processedSessions.has(sessionId) || processingInProgress.has(sessionId)) {
+    return;
+  }
+
+  const maxAttempts = 60; // Poll for up to 10 minutes
   const pollInterval = 10000; // 10 seconds
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
       
+      if (processedSessions.has(sessionId)) {
+        return;
+      }
+      
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       
       if (session.payment_status === 'paid') {
-        console.log(`Payment completed for session ${sessionId}, fulfilling order...`);
-        await handleSessionFulfillment(session);
+        // Use idempotency protection for fulfillment
+        if (!processedSessions.has(sessionId) && !processingInProgress.has(sessionId)) {
+          processingInProgress.add(sessionId);
+          try {
+            await handleSessionFulfillment(session);
+            processedSessions.add(sessionId);
+          } catch (error) {
+            console.error(`Failed to fulfill session ${sessionId}:`, error);
+          } finally {
+            processingInProgress.delete(sessionId);
+          }
+        }
         return;
       } else if (session.payment_status === 'unpaid' && session.status === 'expired') {
-        console.log(`Session ${sessionId} expired without payment`);
         removeLock(token, tokenAmount, sessionId);
         return;
       }
       
-      // Continue polling if still open/processing
-      console.log(`Session ${sessionId} status: ${session.payment_status}, continuing to poll...`);
-      
     } catch (error) {
       console.error(`Error polling session ${sessionId}:`, error);
-      // Continue polling unless it's a fatal error
       if (attempt === maxAttempts - 1) {
-        console.error(`Max polling attempts reached for session ${sessionId}`);
         removeLock(token, tokenAmount, sessionId);
       }
     }
@@ -121,14 +136,17 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
 async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promise<void> {
   const token = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
-  const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
-  const stripeSessionId = session.id;
+  const sessionId = session.id;
   
-  if (!token || !buyerAddress || !amount || !tokenAmount) {
-    console.error("Missing required metadata in session");
-    removeLock(token || '', tokenAmount || '', stripeSessionId);
-    return;
+  if (!token || !buyerAddress || !tokenAmount) {
+    console.error("Missing required metadata in session", sessionId);
+    removeLock(token || '', tokenAmount || '', sessionId);
+    throw new Error("Missing required metadata");
+  }
+
+  if (session.payment_status !== 'paid') {
+    throw new Error(`Session ${sessionId} payment status is not 'paid': ${session.payment_status}`);
   }
 
   try {
@@ -145,55 +163,35 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
     );
 
     if (status === "Success") {
-      console.log(`Order ${token} confirmed on-chain: ${hash}`);
+      console.log(`Order ${token} confirmed on-chain: ${hash} for session ${sessionId}`);
     } else {
-      console.error(`On-chain confirmation failed (${status}): ${hash}`);
+      throw new Error(`On-chain confirmation failed (${status}): ${hash}`);
     }
-  } catch (err) {
-    console.error("Error confirming order on-chain:", err);
   } finally {
-    removeLock(token, tokenAmount, stripeSessionId);
+    removeLock(token, tokenAmount, sessionId);
   }
 }
 
-export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
-  const token = session.metadata?.token;
-  const buyerAddress = session.metadata?.buyerAddress;
-  const amount = session.metadata?.amount;
-  const tokenAmount = session.metadata?.tokenAmount;
-  const stripeSessionId = session.id;
+// export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
+//   const sessionId = session.id;
   
-  if (!token || !buyerAddress || !amount || !tokenAmount) {
-    console.error("Missing required metadata in session");
-    removeLock(token || '', tokenAmount || '', stripeSessionId);
-    return;
-  }
+//   // Check idempotency - prevent webhook replay attacks
+//   if (processedSessions.has(sessionId) || processingInProgress.has(sessionId)) {
+//     return;
+//   }
 
-  try {
-    const accessToken = await getServiceToken();
-    const fulfillTx = buildFunctionTx({
-      contractName: OnRamp,
-      contractAddress,
-      method: "fulfillListing",
-      args: { token, buyer: buyerAddress, amount: tokenAmount },
-    });
-    // Set large gas params if more lucrative tx problem persists
-    // fulfillTx.txParams.gasLimit = 999999999999999;
-    // fulfillTx.txParams.gasPrice = 1000000000;
+//   // Only process if payment is completed
+//   if (session.payment_status !== 'paid') {
+//     return;
+//   }
 
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
-    );
-
-    if (status === "Success") {
-      console.log(`Order ${token} confirmed on-chain: ${hash}`);
-    } else {
-      console.error(`On-chain confirmation failed (${status}): ${hash}`);
-    }
-  } catch (err) {
-    console.error("Error confirming order on-chain:", err);
-  } finally {
-    removeLock(token, tokenAmount, stripeSessionId);
-  }
-
-}
+//   processingInProgress.add(sessionId);
+//   try {
+//     await handleSessionFulfillment(session);
+//     processedSessions.add(sessionId);
+//   } catch (error) {
+//     console.error(`Webhook processing failed for session ${sessionId}:`, error);
+//   } finally {
+//     processingInProgress.delete(sessionId);
+//   }
+// }
