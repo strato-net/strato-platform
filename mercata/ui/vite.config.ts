@@ -38,13 +38,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: {
-          // React core
-          'react-vendor': ['react', 'react-dom'],
-          
-          // Web3 and blockchain
-          'web3-vendor': ['wagmi', '@rainbow-me/rainbowkit', 'ethers', 'viem'],
-          
-          // Ant Design components (optimized)
+          // Ant Design components (tree-shaking optimized)
           'antd-components': [
             'antd/es/tabs',
             'antd/es/table', 
@@ -52,37 +46,12 @@ export default defineConfig(({ mode }) => ({
             'antd/es/message'
           ],
           
-          // Ant Design icons
+          // Ant Design icons (tree-shaking optimized)
           'antd-icons': [
             '@ant-design/icons/CopyOutlined',
             '@ant-design/icons/LinkOutlined',
             '@ant-design/icons/FrownOutlined'
           ],
-          
-          // Other UI libraries
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip'
-          ],
-          
-          // Form and validation
-          'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          
-          // Utilities
-          'utils-vendor': ['lodash', 'date-fns', 'clsx', 'tailwind-merge'],
-          
-          // Charts and data visualization
-          'charts-vendor': ['recharts'],
-          
-          // Query and state management
-          'query-vendor': ['@tanstack/react-query'],
-          
-          // Router
-          'router-vendor': ['react-router-dom'],
         }
       }
     },
