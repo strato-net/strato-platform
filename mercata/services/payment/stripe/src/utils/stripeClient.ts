@@ -12,6 +12,7 @@ export async function createCheckoutSession({
   tokenAddress,
   buyerAddress,
   baseUrl,
+  marginBps,
 }: CheckoutSessionParams): Promise<{ sessionId: string; url: string }> {
   // Create a Stripe Checkout Session
   const session = await stripe.checkout.sessions.create({
@@ -36,6 +37,7 @@ export async function createCheckoutSession({
       buyerAddress,
       amount: amount.toString(),
       tokenAmount,
+      marginBps,
     },
     success_url: `${baseUrl}/dashboard?success=true`,
     cancel_url: `${baseUrl}/dashboard?success=false`,

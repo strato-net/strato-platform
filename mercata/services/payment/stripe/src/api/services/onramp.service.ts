@@ -67,7 +67,8 @@ export async function checkout(
       tokenAmount: amount,
       tokenAddress: listing.token,
       buyerAddress,
-      baseUrl
+      baseUrl,
+      marginBps: listing.marginBps.toString()
     });
 
     addLock(token, amount, sessionId);
@@ -83,12 +84,17 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   const buyerAddress = session.metadata?.buyerAddress;
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
-  const stripeSessionId = session.id;
+  const expectedMarginBps = session.metadata?.marginBps;
+  const sessionId = session.id;
   
-  if (!token || !buyerAddress || !amount || !tokenAmount) {
-    console.error("Missing required metadata in session");
-    removeLock(token || '', tokenAmount || '', stripeSessionId);
-    return;
+  if (!token || !buyerAddress || !tokenAmount || !expectedMarginBps) {
+    console.error("Missing required metadata in session", sessionId);
+    removeLock(token || '', tokenAmount || '', sessionId);
+    throw new Error("Missing required metadata");
+  }
+
+  if (session.payment_status !== 'paid') {
+    throw new Error(`Session ${sessionId} payment status is not 'paid': ${session.payment_status}`);
   }
 
   try {
@@ -97,7 +103,12 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
       contractName: OnRamp,
       contractAddress,
       method: "fulfillListing",
-      args: { token, buyer: buyerAddress, amount: tokenAmount },
+      args: { 
+        token, 
+        buyer: buyerAddress, 
+        amount: tokenAmount,
+        expectedMarginBps: parseInt(expectedMarginBps)
+      },
     });
     // Set large gas params if more lucrative tx problem persists
     // fulfillTx.txParams.gasLimit = 999999999999999;
@@ -115,7 +126,7 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   } catch (err) {
     console.error("Error confirming order on-chain:", err);
   } finally {
-    removeLock(token, tokenAmount, stripeSessionId);
+    removeLock(token, tokenAmount, sessionId);
   }
 
 }
