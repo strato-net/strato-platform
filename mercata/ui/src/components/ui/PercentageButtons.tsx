@@ -38,12 +38,19 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
     }
   };
 
+  const percentageValues = useMemo(() => {
+    return percentages.map((percent) => ({
+      percent,
+      percentValue: calculatePercentage(maxValueBigInt, percent),
+    }));
+  }, [percentages, maxValueBigInt]);
+
+  const isDisabled = maxValueBigInt <= 0n;
+  
   return (
     <div className={`flex gap-2 ${className}`}>
-      {percentages.map((percent) => {
-        const percentValue = calculatePercentage(maxValueBigInt, percent);
+      {percentageValues.map(({percent, percentValue}) => {
         const isActive = valueBigInt === percentValue;
-        const isDisabled = maxValueBigInt <= 0n;
 
         return (
           <Button
@@ -51,8 +58,8 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
             variant={isActive ? "default" : "outline"}
             size="sm"
             onClick={() => handlePercentageClick(percent)}
-            disabled={isDisabled}
             className={`flex-1 transition-all duration-200 ${!isDisabled ? "hover:scale-105" : ""}`}
+            disabled={isDisabled}
             title={isDisabled ? "No amount available" : `Set to ${percent * 100}% of available`}
           >
             {Math.round(percent * 100)}%
@@ -63,4 +70,4 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   );
 };
 
-export default PercentageButtons;
+export default PercentageButtons; 
