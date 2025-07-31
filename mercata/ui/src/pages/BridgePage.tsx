@@ -8,7 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import { Tabs } from 'antd';
+import Tabs from 'antd/es/tabs';
 import 'antd/dist/reset.css';
 import './BridgePage.css';
 import BridgeIn from '@/components/bridge/BridgeIn';

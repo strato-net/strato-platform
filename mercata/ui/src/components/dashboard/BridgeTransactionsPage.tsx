@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeftRight } from 'lucide-react';
-import { Tabs } from 'antd';
+import Tabs from 'antd/es/tabs';
 import 'antd/dist/reset.css';
 import './BridgeTransactionsPage.css';
 import DepositTransactionDetails from './DepositTransactionDetails';

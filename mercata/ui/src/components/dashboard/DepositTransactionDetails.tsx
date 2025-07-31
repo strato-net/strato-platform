@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { message, Table } from "antd";
-import { CopyOutlined, LinkOutlined, FrownOutlined } from "@ant-design/icons";
+import message from "antd/es/message";
+import Table from "antd/es/table";
+import CopyOutlined from "@ant-design/icons/CopyOutlined";
+import LinkOutlined from "@ant-design/icons/LinkOutlined";
+import FrownOutlined from "@ant-design/icons/FrownOutlined";
 import { useTransactionContext } from "@/context/TransactionContext";
 
 interface DepositTransaction {

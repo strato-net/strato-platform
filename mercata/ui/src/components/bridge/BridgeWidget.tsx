@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs } from 'antd';
+import Tabs from 'antd/es/tabs';
 import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
