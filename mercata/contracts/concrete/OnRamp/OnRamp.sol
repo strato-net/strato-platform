@@ -211,8 +211,11 @@ contract record OnRamp is Ownable {
         require(amount > 0, "Invalid amount");
         require(listings[token].amount >= amount, "Not enough available tokens");
 
-        IERC20(listings[token].token).transfer(buyer, amount);
+        // Effects: Update state BEFORE external call (prevents reentrancy)
         listings[token].amount -= amount;
+        
+        // Interactions: External call AFTER state update
+        IERC20(listings[token].token).transfer(buyer, amount);
 
         uint256 totalFiat = calculatePrice(listings[token].token, amount, listings[token].marginBps);
         emit ListingFulfilled(listings[token].id, buyer, amount, totalFiat);
