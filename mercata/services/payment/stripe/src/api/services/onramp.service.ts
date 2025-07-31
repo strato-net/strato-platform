@@ -71,10 +71,88 @@ export async function checkout(
     });
 
     addLock(token, amount, sessionId);
+    
+    // Start polling for session completion in background
+    pollAndFulfillSession(sessionId, token, amount).catch(err => {
+      console.error(`Error in background fulfillment for session ${sessionId}:`, err);
+    });
+    
     return { sessionId, url };
   } catch (error) {
     removeLock(token, amount);
     throw error;
+  }
+}
+
+async function pollAndFulfillSession(sessionId: string, token: string, tokenAmount: string): Promise<void> {
+  const maxAttempts = 60; // Poll for up to 10 minutes (60 * 10s = 10min)
+  const pollInterval = 10000; // 10 seconds
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid') {
+        console.log(`Payment completed for session ${sessionId}, fulfilling order...`);
+        await handleSessionFulfillment(session);
+        return;
+      } else if (session.payment_status === 'unpaid' && session.status === 'expired') {
+        console.log(`Session ${sessionId} expired without payment`);
+        removeLock(token, tokenAmount, sessionId);
+        return;
+      }
+      
+      // Continue polling if still open/processing
+      console.log(`Session ${sessionId} status: ${session.payment_status}, continuing to poll...`);
+      
+    } catch (error) {
+      console.error(`Error polling session ${sessionId}:`, error);
+      // Continue polling unless it's a fatal error
+      if (attempt === maxAttempts - 1) {
+        console.error(`Max polling attempts reached for session ${sessionId}`);
+        removeLock(token, tokenAmount, sessionId);
+      }
+    }
+  }
+}
+
+async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promise<void> {
+  const token = session.metadata?.token;
+  const buyerAddress = session.metadata?.buyerAddress;
+  const amount = session.metadata?.amount;
+  const tokenAmount = session.metadata?.tokenAmount;
+  const stripeSessionId = session.id;
+  
+  if (!token || !buyerAddress || !amount || !tokenAmount) {
+    console.error("Missing required metadata in session");
+    removeLock(token || '', tokenAmount || '', stripeSessionId);
+    return;
+  }
+
+  try {
+    const accessToken = await getServiceToken();
+    const fulfillTx = buildFunctionTx({
+      contractName: OnRamp,
+      contractAddress,
+      method: "fulfillListing",
+      args: { token, buyer: buyerAddress, amount: tokenAmount },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
+    );
+
+    if (status === "Success") {
+      console.log(`Order ${token} confirmed on-chain: ${hash}`);
+    } else {
+      console.error(`On-chain confirmation failed (${status}): ${hash}`);
+    }
+  } catch (err) {
+    console.error("Error confirming order on-chain:", err);
+  } finally {
+    removeLock(token, tokenAmount, stripeSessionId);
   }
 }
 
