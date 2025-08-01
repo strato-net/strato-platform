@@ -5,12 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia } from "wagmi/chains";
-import {
-  connectorsForWallets,
-  RainbowKitProvider,
-} from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
-import "@rainbow-me/rainbowkit/styles.css";
+import { metaMask } from "wagmi/connectors";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { SwapProvider } from "@/context/SwapContext";
@@ -30,7 +26,6 @@ import BridgePage from "./pages/BridgePage";
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { metaMaskWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
 import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
@@ -41,10 +36,6 @@ import { LiquidationProvider } from "./context/LiquidationContext";
 import Borrow from "./pages/Borrow";
 
 const queryClient = new QueryClient();
-
-const projectId = "YOUR_PROJECT_ID"; //project_id required for v2wallet connect
-const appName = "Mercata";
-
 const chains = [mainnet, polygon, sepolia] as const;
 const transports = {
   [mainnet.id]: http(),
@@ -52,18 +43,8 @@ const transports = {
   [sepolia.id]: http(),
 };
 
-const connectors = connectorsForWallets(
-  [
-    {
-      groupName: "Recommended",
-      wallets: [metaMaskWallet],
-    },
-  ],
-  { projectId, appName }
-);
-
 const config = createConfig({
-  connectors,
+  connectors: [metaMask()],
   chains,
   transports,
   ssr: true,
@@ -72,123 +53,121 @@ const config = createConfig({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WagmiProvider config={config}>
-      <RainbowKitProvider>
-        <UserProvider>
-          <UserTokensProvider>
-            <LendingProvider>
-              <SwapProvider>
-                <OracleProvider>
-                  <TokenProvider>
-                    <OnRampProvider>
-                      <LiquidationProvider>
-                        <TransactionProvider>
-                          <BridgeProvider>
-                            <TooltipProvider>
-                              <Toaster />
-                              {/* <Sonner /> */}
-                              <BrowserRouter>
-                                <UsdstBalanceBox />
-                                <Routes>
-                                  <Route path="/" element={<Index />} />
-                                  <Route
-                                    path="/dashboard"
-                                    element={
-                                      <ProtectedRoute>
-                                        <Dashboard />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/swap"
-                                    element={
-                                      <ProtectedRoute>
-                                        <SwapAsset />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/deposits"
-                                    element={
-                                      <ProtectedRoute>
-                                        <DepositsPage />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/deposits/:id"
-                                    element={
-                                      <ProtectedRoute>
-                                        <AssetDetail />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/borrow"
-                                    element={
-                                      <ProtectedRoute>
-                                        <Borrow />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/pools"
-                                    element={
-                                      <ProtectedRoute>
-                                        <Pools />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/activity"
-                                    element={
-                                      <ProtectedRoute>
-                                        <ActivityFeed />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/transfer"
-                                    element={
-                                      <ProtectedRoute>
-                                        <Transfer />
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/admin"
-                                    element={
-                                      <ProtectedRoute>
-                                        <AdminRoute>
-                                          <Admin />
-                                        </AdminRoute>
-                                      </ProtectedRoute>
-                                    }
-                                  />
-                                  <Route
-                                    path="/dashboard/bridge"
-                                    element={<BridgePage />}
-                                  />
-                                  <Route
-                                    path="/dashboard/bridge-transactions"
-                                    element={<BridgeTransactionsPage />}
-                                  />
+      <UserProvider>
+        <UserTokensProvider>
+          <LendingProvider>
+            <SwapProvider>
+              <OracleProvider>
+                <TokenProvider>
+                  <OnRampProvider>
+                    <LiquidationProvider>
+                      <TransactionProvider>
+                        <BridgeProvider>
+                          <TooltipProvider>
+                            <Toaster />
+                            {/* <Sonner /> */}
+                            <BrowserRouter>
+                              <UsdstBalanceBox />
+                              <Routes>
+                                <Route path="/" element={<Index />} />
+                                <Route
+                                  path="/dashboard"
+                                  element={
+                                    <ProtectedRoute>
+                                      <Dashboard />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/swap"
+                                  element={
+                                    <ProtectedRoute>
+                                      <SwapAsset />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/deposits"
+                                  element={
+                                    <ProtectedRoute>
+                                      <DepositsPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/deposits/:id"
+                                  element={
+                                    <ProtectedRoute>
+                                      <AssetDetail />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/borrow"
+                                  element={
+                                    <ProtectedRoute>
+                                      <Borrow />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/pools"
+                                  element={
+                                    <ProtectedRoute>
+                                      <Pools />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/activity"
+                                  element={
+                                    <ProtectedRoute>
+                                      <ActivityFeed />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/transfer"
+                                  element={
+                                    <ProtectedRoute>
+                                      <Transfer />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/admin"
+                                  element={
+                                    <ProtectedRoute>
+                                      <AdminRoute>
+                                        <Admin />
+                                      </AdminRoute>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/dashboard/bridge"
+                                  element={<BridgePage />}
+                                />
+                                <Route
+                                  path="/dashboard/bridge-transactions"
+                                  element={<BridgeTransactionsPage />}
+                                />
 
-                                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                                  <Route path="*" element={<NotFound />} />
-                                </Routes>
-                              </BrowserRouter>
-                            </TooltipProvider>
-                          </BridgeProvider>
-                        </TransactionProvider>
-                      </LiquidationProvider>
-                    </OnRampProvider>
-                  </TokenProvider>
-                </OracleProvider>
-              </SwapProvider>
-            </LendingProvider>
-          </UserTokensProvider>
-        </UserProvider>
-      </RainbowKitProvider>
+                                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                                <Route path="*" element={<NotFound />} />
+                              </Routes>
+                            </BrowserRouter>
+                          </TooltipProvider>
+                        </BridgeProvider>
+                      </TransactionProvider>
+                    </LiquidationProvider>
+                  </OnRampProvider>
+                </TokenProvider>
+              </OracleProvider>
+            </SwapProvider>
+          </LendingProvider>
+        </UserTokensProvider>
+      </UserProvider>
     </WagmiProvider>
   </QueryClientProvider>
 );

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Copy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import CustomConnectButton from '@/components/ui/CustomConnectButton';
 
 const BridgeWalletStatus = () => {
   const { address, isConnected } = useAccount();
@@ -61,9 +61,7 @@ const BridgeWalletStatus = () => {
           </TooltipProvider>
         </>
       ) : (
-        <div className="[&>button]:bg-gradient-to-r [&>button]:from-[#1f1f5f] [&>button]:via-[#293b7d] [&>button]:to-[#16737d] [&>button]:text-white [&>button]:px-4 [&>button]:py-2 [&>button]:rounded-xl [&>button]:font-semibold [&>button]:hover:opacity-90 [&>button]:transition-all">
-          <ConnectButton label={"Connect Wallet"} />
-        </div>
+        <CustomConnectButton label="Connect Wallet" />
       )}
     </div>
   );
