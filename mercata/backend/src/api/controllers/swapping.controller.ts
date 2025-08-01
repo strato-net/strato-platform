@@ -24,8 +24,6 @@ import {
   validateSwapHistoryArgs,
 } from "../validators/swapping.validator";
 
-const deadline = Math.floor(Date.now() / 1000) + 60 * 5; // 5 minutes from now
-
 class SwappingController {
   // Getters
   static async get(
@@ -90,6 +88,7 @@ class SwappingController {
     const { accessToken, body, params } = req;
     validateAddLiquidityArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const liquidityParams = {
       ...body,
       poolAddress: params.poolAddress,
@@ -105,6 +104,7 @@ class SwappingController {
     const { accessToken, body, params } = req;
     validateRemoveLiquidityArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const removeLiquidityParams = {
       ...body,
       poolAddress: params.poolAddress,
@@ -121,6 +121,7 @@ class SwappingController {
     const { accessToken, body } = req;
     validateSwapArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const result = await swap(accessToken, { ...body, deadline });
     res.status(200).json(result);
     return next();
