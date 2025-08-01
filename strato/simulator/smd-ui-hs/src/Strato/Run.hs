@@ -104,7 +104,7 @@ runStrato runUI = do
                flags_network
                flags_private_key
                (Validator $ T.pack flags_username)
-               "node"
+               (T.pack flags_username)
                (TCPPort flags_listen)
                (UDPPort flags_listen)
                (Host $ T.pack flags_address)

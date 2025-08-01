@@ -593,7 +593,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                         Just ci -> readOnly ci
                       f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                   return (f', args')
-                _ -> unknownFunction "logFunctionCall" (functionName, "asdf3" :: String) -- contract ^. CC.contractName)
+                _ -> unknownFunction "logFunctionCall" (functionName, argExps) -- contract ^. CC.contractName)
             )
       -- Maybe the function is actually a getter
       _ -> do

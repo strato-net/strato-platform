@@ -79,7 +79,7 @@ runFuzzer :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either Strin
 runFuzzer dSettings compile src = compile src >>= \case
   Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
   Right cc -> do
-    let args = FuzzerArgs src "" "" "" "" Nothing
+    let args = FuzzerArgs src "" [] "" [] Nothing
     runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $
       fmap concat . for (M.toList $ _contracts cc) $ \(cName, c) ->
         if not (describePrefix `T.isPrefixOf` labelToText cName)
@@ -114,7 +114,7 @@ test bh addr fName f =
   if accessible $ _funcVisibility f
     then if null $ _funcArgs f
            then if emptyOrBool $ _funcVals f
-                  then fuzzFunction bh addr (_funcContext f) fName "()"
+                  then fuzzFunction bh addr (_funcContext f) fName []
                   else pure . FuzzerFailure Nothing $ ("Test must return () or (bool).") <$ _funcContext f
            else pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ _funcContext f
     else pure . FuzzerFailure Nothing $ "Test must be a public or external function" <$ _funcContext f
@@ -124,8 +124,8 @@ escapeText =
   T.replace "\"" "\\\""
     . T.replace "\\" "\\\\"
 
-generateArgString :: [Type] -> IO T.Text
-generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse generateArg
+generateArgs :: [Type] -> IO [T.Text]
+generateArgs = traverse generateArg
   where
     generateArg (SVMType.Int _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
     generateArg (SVMType.String _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
@@ -166,15 +166,15 @@ prop bh addr fName f =
     runPropNTimes :: VMBase m => Integer -> FuzzerM m FuzzerResult
     runPropNTimes n | n <= 0 = success $ _funcContext f
     runPropNTimes n = do
-      argString <- liftIO . generateArgString $ indexedTypeType . snd <$> _funcArgs f
-      $logInfoS "runPropNTimes/generateArgString" argString
-      r <- fuzzFunction bh addr (_funcContext f) fName argString
+      args <- liftIO . generateArgs $ indexedTypeType . snd <$> _funcArgs f
+      $logInfoS "runPropNTimes/generateArgs" $ "(" <> T.intercalate ", " args <> ")"
+      r <- fuzzFunction bh addr (_funcContext f) fName args
       case r of
         FuzzerSuccess _ -> runPropNTimes $ n - 1
         _ -> pure r
 
 fuzzContract :: VMBase m => SolidString -> SourceAnnotation a -> (BlockHeader -> Address -> FuzzerM m [FuzzerTestAndResult]) -> FuzzerM m [FuzzerTestAndResult]
-fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArgsCreateArgs .~ "()")) $ do
+fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArgsCreateArgs .~ [])) $ do
   ~FuzzerArgs {..} <- ask
   contractAddress <- liftIO $ generate arbitrary
   let svmErr (Left e) = e
@@ -182,9 +182,9 @@ fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArg
       txArgs =
         def & createNewAddress .~ contractAddress
           & createCode .~ (Code $ T.decodeUtf8 $ BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
+          & createContractName .~ labelToText _fuzzerArgsContractName
+          & createArgs . argsArgs .~ _fuzzerArgsCreateArgs
           & createArgs . argsMetadata ?~ M.empty
-          & createArgs . argsMetadata . _Just . at "name" ?~ labelToText _fuzzerArgsContractName
-          & createArgs . argsMetadata . _Just . at "args" ?~ _fuzzerArgsCreateArgs
       failure txs e = pure [FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ (labelToText cName <> " constructor", e) <$ ctx]
       exception txs = failure txs . T.pack . show
   createResults <- lift $ create txArgs
@@ -192,15 +192,15 @@ fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArg
     Just e -> exception [] $ svmErr e
     Nothing -> f (txArgs ^. createArgs . argsBlockData) contractAddress
 
-fuzzFunction :: VMBase m => BlockHeader -> Address -> SourceAnnotation a -> SolidString -> T.Text -> FuzzerM m FuzzerResult
+fuzzFunction :: VMBase m => BlockHeader -> Address -> SourceAnnotation a -> SolidString -> [T.Text] -> FuzzerM m FuzzerResult
 fuzzFunction bh contractAddress ctx fName args = local ((fuzzerArgsFuncName .~ fName) . (fuzzerArgsCallArgs .~ args)) $ do
   ~FuzzerArgs {..} <- ask
   let txArgs' =
         def & callArgs . argsBlockData .~ bh
           & callCodeAddress .~ contractAddress
+          & callFuncName .~ labelToText _fuzzerArgsFuncName
+          & callArgs . argsArgs .~ _fuzzerArgsCallArgs
           & callArgs . argsMetadata ?~ M.empty
-          & callArgs . argsMetadata . _Just . at "funcName" ?~ labelToText _fuzzerArgsFuncName
-          & callArgs . argsMetadata . _Just . at "args" ?~ _fuzzerArgsCallArgs
   callResults <- lift $ call txArgs'
   let failure txs e = pure . FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ e <$ ctx
       exception txs = failure txs . T.pack . show
@@ -210,5 +210,5 @@ fuzzFunction bh contractAddress ctx fName args = local ((fuzzerArgsFuncName .~ f
   case erException callResults of
     Nothing -> case erReturnVal callResults of
       Just ret | ret == "()" || ret == "(true)" -> success ctx
-      _ -> failure' $ "Test " <> labelToText _fuzzerArgsFuncName <> " failed with arguments " <> _fuzzerArgsCallArgs
+      _ -> failure' $ "Test " <> labelToText _fuzzerArgsFuncName <> " failed with arguments (" <> T.intercalate ", " _fuzzerArgsCallArgs <> ")"
     Just e -> exception' e

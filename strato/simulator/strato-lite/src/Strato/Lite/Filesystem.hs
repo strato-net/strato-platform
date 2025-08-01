@@ -147,7 +147,7 @@ createFilesystemNode ::
   m (FilesystemPeer, CorePeer)
 createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
   dir' <- resolvePath dir''
-  let dir = dir' </> network'
+  let dir = dir' </> network' </> T.unpack name
   privKey <- liftIO $ do
     createDirectoryIfMissing True dir
     setCurrentDirectory dir

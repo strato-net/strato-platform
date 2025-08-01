@@ -16,6 +16,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (isJust, maybeToList)
 import Data.Source
 import Data.Text (Text)
+import Data.Traversable (for)
 import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
@@ -25,18 +26,18 @@ type StateVars = M.Map SolidString (Bool, Bool, VariableDecl)
 
 type LocalVars = [M.Map SolidString (SourceAnnotation ())]
 
-type SSS = State (StateVars, LocalVars)
+type SSS = State (StateVars, LocalVars, Contract)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract {..} =
+contractHelper c@Contract {..} =
   let stateVariables = M.map (False,False,) _storageDefs
-      emptyState = (stateVariables, [])
+      emptyState = (stateVariables, [], c)
       action = traverse functionHelper $ maybeToList _constructor ++ M.elems _functions
-      stateVariables' = fst $ execState action emptyState
+      stateVariables' = (\(a,_,_) -> a) $ execState action emptyState
       findStateAnns name (False, False, a) =
         [("Unused state variable " <> labelToText name <> ".") <$ _varContext a]
       findStateAnns name (True, False, VariableDecl {..}) | _varInitialVal == Nothing = case _varType of
@@ -53,27 +54,34 @@ contractHelper Contract {..} =
    in M.foldMapWithKey findStateAnns stateVariables'
 
 functionHelper :: Func -> SSS [SourceAnnotation Text]
-functionHelper Func {..} = maybe (pure []) statementsHelper _funcContents
+functionHelper Func {..} = do
+  contract <- gets (\(_,_,c) -> c)
+  modifierAnns <- fmap concat . for _funcModifiers $ \(n, es) -> do
+    argAnns <- concat <$> traverse expressionHelper es
+    modAnns <- fmap concat . for (M.lookup n $ _modifiers contract) $ maybe (pure []) statementsHelper . _modifierContents 
+    pure $ argAnns ++ modAnns
+  funcAnns <- maybe (pure []) statementsHelper _funcContents
+  pure $ modifierAnns ++ funcAnns
 
 statementsHelper :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper ss = do
-  modify $ fmap (M.empty :)
+  modify $ \(a,b,c) -> (a, (M.empty : b), c)
   anns <- concat <$> traverse statementHelper ss
-  modify $ fmap $ \case
-    [] -> []
-    (_:xs) -> xs
+  modify $ \(a,b,c) -> case b of
+    [] -> (a,[],c)
+    (_:xs) -> (a,xs,c)
   pure anns
 
 isLocalVariable :: SolidString -> SSS Bool
-isLocalVariable name = foldr lookupVar False <$> gets snd
+isLocalVariable name = foldr lookupVar False <$> gets (\(_,s,_) -> s)
   where
     lookupVar _ True = True
     lookupVar m _ = isJust $ M.lookup name m
 
 pushLocalVariable :: SolidString -> SourceAnnotation () -> SSS ()
-pushLocalVariable name decl = modify . fmap $ \case
+pushLocalVariable name decl = modify $ \(a,b,c) -> case b of
   [] -> error "This can't happen by the laws of physics"
-  (x : xs) -> (M.insert name decl x) : xs
+  (x : xs) -> (a, (M.insert name decl x) : xs, c)
 
 pushLocalVariables :: [VarDefEntry] -> SSS ()
 pushLocalVariables = traverse_ pushEntry

@@ -1,4 +1,4 @@
-import "./Tokens/Token.sol";
+import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 

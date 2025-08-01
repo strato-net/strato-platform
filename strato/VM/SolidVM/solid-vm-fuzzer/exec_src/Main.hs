@@ -19,9 +19,11 @@ import Data.Foldable (traverse_)
 import Data.Source.Map
 import qualified Data.Map.Strict as M
 import Data.Source.Annotation
+import Data.Source.Severity
 import qualified Data.Text as T
 import HFlags
 import SolidVM.Solidity.Fuzzer
+import SolidVM.Solidity.StaticAnalysis
 import UnliftIO
 
 newtype Cli a = Cli { runCli :: IO a }
@@ -39,7 +41,7 @@ main = do
     ["--help"] -> help
     [_] -> putStrLn "No input files given"
     (mode:files) -> runOp mode . SourceMap =<< traverse addFile files
-  where help = putStrLn "Usage: solid-vm-cli (parse|compile|test) filename [filenames]"
+  where help = putStrLn "Usage: solid-vm-cli (parse|compile|analyze|test) filename [filenames]"
         addFile file = do
           contents <- readFile file
           pure (T.pack file, T.pack contents)
@@ -56,6 +58,9 @@ main = do
           "compile" -> runCli (compile srcMap) >>= \case
             Right _ -> pure ()
             Left xs -> putStrLn "Compilation errors:" >> traverse_ print xs
+          "analyze" -> runCli (analyze srcMap) >>= \case
+            [] -> pure ()
+            xs -> putStrLn "Static analysis errors:" >> traverse_ (putStrLn . T.unpack . showTextAnnotation . fmap (\(WithSeverity _ a) -> a)) xs
           _ -> putStrLn $ "Unknown mode: " ++ mode
         parse = fmap concat
               . traverse (uncurry parseSourceWithAnnotations)
@@ -64,5 +69,5 @@ main = do
                 . compileSourceWithAnnotations True
                 . M.fromList
                 . unSourceMap
-        -- analyze = runDetectors parse compile id
+        analyze src = compile src >>= \eCC -> pure $ runDetectors parse (const eCC) id src
         fuzz = runFuzzer Nothing compile

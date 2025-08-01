@@ -17,9 +17,9 @@ import SolidVM.Model.SolidString
 data FuzzerArgs = FuzzerArgs
   { _fuzzerArgsSrc :: SourceMap,
     _fuzzerArgsContractName :: SolidString,
-    _fuzzerArgsCreateArgs :: Text,
+    _fuzzerArgsCreateArgs :: [Text],
     _fuzzerArgsFuncName :: SolidString,
-    _fuzzerArgsCallArgs :: Text,
+    _fuzzerArgsCallArgs :: [Text],
     _fuzzerArgsMaxRuns :: Maybe Integer
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -30,7 +30,7 @@ type FuzzerM m = ReaderT FuzzerArgs m
 
 data FuzzerTx = FuzzerTx
   { _fuzzerTxFuncName :: SolidString,
-    _fuzzerTxArgs :: Text
+    _fuzzerTxArgs :: [Text]
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
@@ -39,7 +39,7 @@ makeLenses ''FuzzerTx
 data FuzzerFailureDetails = FuzzerFailureDetails
   { _failureContractAddress :: Address,
     _failureContractName :: SolidString,
-    _failureCreateArgs :: Text,
+    _failureCreateArgs :: [Text],
     _failureTxs :: [FuzzerTx]
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)

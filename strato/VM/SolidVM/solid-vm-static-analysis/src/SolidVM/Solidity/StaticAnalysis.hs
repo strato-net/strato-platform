@@ -17,7 +17,6 @@ import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowi
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite as WriteAfterWrite
 import qualified SolidVM.Solidity.StaticAnalysis.Trivial as Trivial
-import qualified SolidVM.Solidity.StaticAnalysis.Typechecker as Typechecker
 import SolidVM.Solidity.StaticAnalysis.Types
 import qualified SolidVM.Solidity.StaticAnalysis.Variables.StateVariables as StateVariables
 
@@ -39,11 +38,6 @@ compilerWarningDetectors =
     StateVariables.detector
   ]
 
-compilerErrorDetectors :: [CompilerDetector]
-compilerErrorDetectors =
-  [ Typechecker.detector
-  ]
-
 runDetectors ::
   (Applicative (f a), Bifoldable f) =>
   (SourceMap -> f a [SourceUnit]) ->
@@ -58,12 +52,6 @@ runDetectors parse compile handleErrors source =
           . (parserDetectors <*>)
           . (: [])
           <$> parse source
-      compilerErrors =
-        map (withSeverity Error)
-          . concat
-          . (compilerErrorDetectors <*>)
-          . (: [])
-          <$> compile source
       compilerWarnings =
         map (withSeverity Warning)
           . concat
@@ -71,7 +59,6 @@ runDetectors parse compile handleErrors source =
           . (: [])
           <$> compile source
    in bifoldMap (map (withSeverity Error) . handleErrors) id $
-        (\p e w -> concat [p, e, w])
+        (\p w -> concat [p, w])
           <$> parserAnnotations
-          <*> compilerErrors
           <*> compilerWarnings
