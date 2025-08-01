@@ -43,7 +43,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     TokenStatus public status;
     TokenFactory public tokenFactory;
     RewardsManager public rewardsManager;
-    
+
     event StatusChanged(TokenStatus newStatus);
 
     modifier onlyTokenFactory() {
@@ -95,7 +95,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
 
     function mint(address to, uint256 amount) external {
         require(
-            TokenAccess(this).isMinter(msg.sender), 
+            TokenAccess(this).isMinter(msg.sender),
             "Token: Caller is not a minter"
         );
         _mint(to, amount);
@@ -121,7 +121,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
     function setAttribute(string key, string value) external onlyOwner {
         _setAttribute(key, value);
     }
-    
+
     function decimals() external view virtual override returns (uint8) {
         return customDecimals;
     }
