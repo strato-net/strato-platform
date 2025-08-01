@@ -21,6 +21,15 @@ import "./utils/Context.sol";
  * instead returning `false` on failure. This behavior is nonetheless
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
+ *
+ * WARNING: CRITICAL DEPENDENCY - READ BEFORE MODIFYING
+ * =====================================================
+
+ * This ERC20 implementation uses "revert-on-failure" behavior (instead of returning false).
+ * Many contracts in this codebase depend on this behavior and will break if changed.
+ * See detailed explanation in: ../../concrete/Tokens/Token.sol (FYI comment at top).
+ * Any modifications to transfer/transferFrom error handling MUST be coordinated with
+ * all dependent contracts to prevent silent failure vulnerabilities.
  */
 abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
     mapping(address => uint256) public record _balances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream

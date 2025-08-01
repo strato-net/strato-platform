@@ -10,6 +10,7 @@ import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
 import ListAssetForm from '@/components/admin/ListAssetForm';
 import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
+import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -109,6 +110,7 @@ const Admin = () => {
                 <CreatePoolForm />
               </CardContent>
             </Card>
+            <SwapPoolsTable />
           </TabsContent>
 
           <TabsContent value="pricing" className="space-y-6">

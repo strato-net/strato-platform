@@ -10,7 +10,7 @@ sslCertFileType=${sslCertFileType:-pem}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-VM_DEBUG=${VM_DEBUGGER:-false}
+VM_DEBUGGER=${VM_DEBUGGER:-false}
 debugPort=${debugPort:-8051}
 debugWSHost=${debugWSHost:-strato}
 debugWSPort=${debugWSPort:-8052}
@@ -62,7 +62,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
 
-  if [ "$VM_DEBUG" != true ]; then
+  if [ "$VM_DEBUGGER" != true ]; then
     sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
   fi
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
