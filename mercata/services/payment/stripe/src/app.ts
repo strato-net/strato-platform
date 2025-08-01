@@ -6,6 +6,7 @@ import { Request, Response } from "express";
 import { stripe } from "./utils/stripeClient";
 import { stripeWebhookKey } from "./config/config";
 import { initOpenIdConfig } from "./config/config";
+import { recoverPendingSessions } from "./api/services/onramp.service";
 
 const PORT = process.env.PORT || 3002;
 
@@ -63,6 +64,11 @@ app.use("/", routes);
 (async () => {
   try {
     await initOpenIdConfig();
+    
+    // Recover any pending sessions from database after restart
+    console.log('Recovering pending sessions...');
+    await recoverPendingSessions();
+    
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });
