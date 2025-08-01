@@ -20,6 +20,14 @@ The following environment variables are required to run the Stripe payment servi
 
 - `ONRAMP`: On Ramp contract address to use as part of the server
 
+### Database Configuration
+
+- `DB_HOST`: PostgreSQL host (default: localhost)
+- `DB_PORT`: PostgreSQL port (default: 5432)  
+- `DB_NAME`: Database name (default: mercata_stripe)
+- `DB_USER`: Database username (default: postgres)
+- `DB_PASSWORD`: Database password (default: password)
+
 ## Running the App
 
 Ensure all required environment variables are set before running the service.
