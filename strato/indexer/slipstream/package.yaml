@@ -57,9 +57,10 @@ library:
     - ordered-containers
 
 executables:
-  slipstream:
+  Slipstream:
     source-dirs: exec_src/
     main: Main.hs
+    executable: slipstream
     dependencies:
       - base
       - bloc2
