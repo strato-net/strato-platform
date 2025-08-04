@@ -222,13 +222,11 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
           let storageDiff = case storage d of
                 SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                 EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
-              theMetadata =
-                getMetadata
-                ( case cp of
+              genesisBlockCodePtr = case cp of
                     ExternallyOwned ch' -> ch'
                     SolidVMCode _ ch' -> ch'
                     _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
-                )
+              theMetadata =getMetadata genesisBlockCodePtr
               lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
               lookupSolidDiff _ _                 = Nothing
               mCreator' = (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing) . rlpDecode . rlpDeserialize =<< lookupSolidDiff ".:creator" storageDiff
