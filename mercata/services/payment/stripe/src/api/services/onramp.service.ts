@@ -92,7 +92,7 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
     return;
   }
 
-  const maxAttempts = 60; // Poll for up to 10 minutes
+  const maxAttempts = 126; // Poll for up to 21 minutes
   const pollInterval = 10000; // 10 seconds
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
