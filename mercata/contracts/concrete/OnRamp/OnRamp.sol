@@ -3,8 +3,9 @@ import "../Lending/PriceOracle.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Voucher/Voucher.sol";
+import "../../abstract/ERC20/utils/ReentrancyGuard.sol";
 
-contract record OnRamp is Ownable {
+contract record OnRamp is Ownable, ReentrancyGuard {
     event SellerApprovalUpdated(address seller, bool approved);
     event ListingCreated(uint256 listingId, address seller, address token, uint256 amount, uint256 margin);
     event ListingUpdated(uint256 listingId, uint256 newAmount, uint256 newMargin);
@@ -46,9 +47,6 @@ contract record OnRamp is Ownable {
     // Voucher contract
     Voucher public voucher;
 
-    /// @notice Reentrancy guard to prevent recursive calls
-    bool private locked;
-
     // Constructor
     constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry, address _voucher) Ownable(_owner) {
         require(_oracle != address(0), "Invalid oracle");
@@ -86,15 +84,6 @@ contract record OnRamp is Ownable {
         }
         require(found, "Not a provider");
         _;
-    }
-
-    /// @notice Prevents reentrant calls to functions
-    /// @dev Uses a simple boolean lock to prevent recursive calls
-    modifier nonReentrant() {
-        require(!locked, "REENTRANT");
-        locked = true;
-        _;
-        locked = false;
     }
     
     function isPaymentProvider(address provider) public view returns (bool) {

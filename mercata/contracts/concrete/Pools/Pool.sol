@@ -5,6 +5,7 @@ import "../Tokens/TokenFactory.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/utils/ReentrancyGuard.sol";
 
 /**
  * @title Pool
@@ -26,7 +27,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * @author Mercata Protocol
  * @version 1.0.0
  */
-contract record Pool is Ownable {
+contract record Pool is Ownable, ReentrancyGuard {
     
     // ============ EVENTS ============
     
@@ -59,10 +60,7 @@ contract record Pool is Ownable {
     Token public tokenB;
     
     /// @notice The liquidity provider token representing ownership in the pool
-    Token public lpToken;
-
-    /// @notice Reentrancy guard to prevent recursive calls
-    bool private locked;   
+    Token public lpToken;   
     
     /// @notice Current exchange rate from tokenA to tokenB
     decimal public aToBRatio;
@@ -83,15 +81,6 @@ contract record Pool is Ownable {
     uint256 public lpSharePercent;
     
     // ============ MODIFIERS ============
-    
-    /// @notice Prevents reentrant calls to functions
-    /// @dev Uses a simple boolean lock to prevent recursive calls
-    modifier nonReentrant() {
-        require(!locked, "REENTRANT");
-        locked = true;
-        _;
-        locked = false;
-    }
 
     // ============ INTERNAL FUNCTIONS ============
     
