@@ -68,7 +68,7 @@ export async function checkout(
       tokenAddress: listing.token,
       buyerAddress,
       baseUrl,
-      marginBps: listing.marginBps.toString()
+      marginBps: listing.marginBps
     });
 
     addLock(token, amount, sessionId);
@@ -107,7 +107,7 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
         token, 
         buyer: buyerAddress, 
         amount: tokenAmount,
-        expectedMarginBps: parseInt(expectedMarginBps)
+        expectedMarginBps: expectedMarginBps
       },
     });
     // Set large gas params if more lucrative tx problem persists
