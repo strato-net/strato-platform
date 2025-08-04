@@ -8,57 +8,13 @@ import { Stripe } from "stripe";
 import { getServiceToken } from "../../utils/authHelper";
 import { RampData } from "../../types/types";
 import { canLockAmount, addLock, removeLock, calculatePaymentAmount } from "../helpers/onramp.helper";
-import { savePendingSession, removePendingSession, isPendingSession, getAllPendingSessions } from "../../utils/dbClient";
 
 const contractAddress = constants.onRamp!;
 const OnRamp = "OnRamp";
 
-// In-memory tracking for immediate duplicate prevention within single process
+// Idempotency tracking - in production, use Redis/DB
+const processedSessions = new Set<string>();
 const processingInProgress = new Set<string>();
-
-/**
- * Resume polling for any sessions that were pending when the service restarted
- * Call this on service startup to recover from crashes/restarts
- */
-export async function recoverPendingSessions(): Promise<void> {
-  try {
-    const pendingSessions = await getAllPendingSessions();
-    
-    if (pendingSessions.length === 0) {
-      console.log('No pending sessions to recover');
-      return;
-    }
-    
-    console.log(`Recovering ${pendingSessions.length} pending sessions from database`);
-    
-    for (const sessionData of pendingSessions) {
-      // Check if session is still valid with Stripe before resuming
-      try {
-        const session = await stripe.checkout.sessions.retrieve(sessionData.sessionId);
-        
-        if (session.payment_status === 'paid') {
-          console.log(`Resuming polling for paid session ${sessionData.sessionId}`);
-          pollAndFulfillSession(sessionData.sessionId, sessionData.token, sessionData.tokenAmount).catch(err => {
-            console.error(`Error resuming session ${sessionData.sessionId}:`, err);
-          });
-        } else if (session.status === 'expired' || session.payment_status === 'unpaid') {
-          console.log(`Cleaning up expired/unpaid session ${sessionData.sessionId}`);
-          await removePendingSession(sessionData.sessionId);
-        } else {
-          console.log(`Resuming polling for pending session ${sessionData.sessionId}`);
-          pollAndFulfillSession(sessionData.sessionId, sessionData.token, sessionData.tokenAmount).catch(err => {
-            console.error(`Error resuming session ${sessionData.sessionId}:`, err);
-          });
-        }
-      } catch (error) {
-        console.error(`Failed to check session ${sessionData.sessionId} with Stripe, cleaning up:`, error);
-        await removePendingSession(sessionData.sessionId);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to recover pending sessions:', error);
-  }
-}
 
 export const get = async (accessToken: string): Promise<RampData> => {
   try {
@@ -118,22 +74,13 @@ export async function checkout(
       baseUrl
     });
 
-    // Save session to database for persistent idempotency tracking
-    await savePendingSession(sessionId, token, buyerAddress, amount);
+    addLock(token, amount, sessionId);
     
-    try {
-      addLock(token, amount, sessionId);
-      
-      pollAndFulfillSession(sessionId, token, amount).catch(err => {
-        console.error(`Error in background fulfillment for session ${sessionId}:`, err);
-      });
-      
-      return { sessionId, url };
-    } catch (error) {
-      // Clean up database if something fails after session creation
-      await removePendingSession(sessionId);
-      throw error;
-    }
+    pollAndFulfillSession(sessionId, token, amount).catch(err => {
+      console.error(`Error in background fulfillment for session ${sessionId}:`, err);
+    });
+    
+    return { sessionId, url };
   } catch (error) {
     removeLock(token, amount);
     throw error;
@@ -141,14 +88,8 @@ export async function checkout(
 }
 
 async function pollAndFulfillSession(sessionId: string, token: string, tokenAmount: string): Promise<void> {
-  // Check if session is already being processed in this instance
-  if (processingInProgress.has(sessionId)) {
+  if (processedSessions.has(sessionId) || processingInProgress.has(sessionId)) {
     return;
-  }
-
-  // Check if session has already been processed (database check)
-  if (!(await isPendingSession(sessionId))) {
-    return; // Session was already processed and removed from database
   }
 
   const maxAttempts = 60; // Poll for up to 10 minutes
@@ -158,8 +99,7 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
     try {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
       
-      // Re-check if session is still pending (another process might have completed it)
-      if (!(await isPendingSession(sessionId))) {
+      if (processedSessions.has(sessionId)) {
         return;
       }
       
@@ -167,10 +107,11 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
       
       if (session.payment_status === 'paid') {
         // Use idempotency protection for fulfillment
-        if (!processingInProgress.has(sessionId)) {
+        if (!processedSessions.has(sessionId) && !processingInProgress.has(sessionId)) {
           processingInProgress.add(sessionId);
           try {
             await handleSessionFulfillment(session);
+            processedSessions.add(sessionId);
           } catch (error) {
             console.error(`Failed to fulfill session ${sessionId}:`, error);
           } finally {
@@ -179,8 +120,6 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
         }
         return;
       } else if (session.payment_status === 'unpaid' && session.status === 'expired') {
-        // Remove expired session from database and unlock
-        await removePendingSession(sessionId);
         removeLock(token, tokenAmount, sessionId);
         return;
       }
@@ -188,8 +127,6 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
     } catch (error) {
       console.error(`Error polling session ${sessionId}:`, error);
       if (attempt === maxAttempts - 1) {
-        // Remove failed session from database and unlock
-        await removePendingSession(sessionId);
         removeLock(token, tokenAmount, sessionId);
       }
     }
@@ -227,8 +164,6 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
 
     if (status === "Success") {
       console.log(`Order ${token} confirmed on-chain: ${hash} for session ${sessionId}`);
-      // Remove session from database after successful fulfillment
-      await removePendingSession(sessionId);
     } else {
       throw new Error(`On-chain confirmation failed (${status}): ${hash}`);
     }
@@ -240,8 +175,8 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
 // export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
 //   const sessionId = session.id;
   
-//   // Check idempotency - prevent webhook replay attacks and already processed sessions
-//   if (processingInProgress.has(sessionId) || !(await isPendingSession(sessionId))) {
+//   // Check idempotency - prevent webhook replay attacks
+//   if (processedSessions.has(sessionId) || processingInProgress.has(sessionId)) {
 //     return;
 //   }
 
@@ -253,6 +188,7 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
 //   processingInProgress.add(sessionId);
 //   try {
 //     await handleSessionFulfillment(session);
+//     processedSessions.add(sessionId);
 //   } catch (error) {
 //     console.error(`Webhook processing failed for session ${sessionId}:`, error);
 //   } finally {
