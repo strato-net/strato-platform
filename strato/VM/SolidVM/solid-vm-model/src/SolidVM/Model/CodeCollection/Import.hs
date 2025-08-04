@@ -92,11 +92,3 @@ instance Arbitrary a => Arbitrary (FileImportF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
 type FileImport = Positioned FileImportF
-
--- instance ToSchema FileImport where
---   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
---      & mapped.name ?~ "FileImport schema"
---      & mapped.schema.description ?~ "Xabi of an file import declaration"
---      & mapped.schema.example ?~ toJSON sampleFileImport
---      where sampleFileImport :: FileImportF ()
---            sampleFileImport = Qualified (StringLiteral () "./Foo.sol") "F" ()

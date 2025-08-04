@@ -24,7 +24,6 @@ module Handlers.Transaction
   )
 where
 
--- import           Servant.Client
 
 import BlockApps.Logging
 import Blockchain.DB.SQLDB

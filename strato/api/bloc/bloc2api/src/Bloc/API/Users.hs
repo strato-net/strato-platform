@@ -134,8 +134,6 @@ instance ToSchema UploadContractDetails where
             contractAddress = Just $ Address 0xdeadbeef
           }
 
---instance Arbitrary BlocTransactionData where
---  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON BlocTransactionData where
   toJSON btd = case btd of
@@ -216,8 +214,6 @@ data BlocTransactionResult = BlocTransactionResult
   }
   deriving (Eq, Show, Generic)
 
---instance Arbitrary BlocTransactionResult where
---  arbitrary = BlocTransactionResult <$> arbitrary <*> arbitrary <*> pure Nothing <*> arbitrary
 
 instance ToJSON BlocTransactionResult where
   toJSON = genericToJSON (aesonDrop 15 camelCase)
