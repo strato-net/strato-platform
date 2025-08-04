@@ -26,7 +26,7 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 
 // Import dashboard components
-import BridgePage from "./pages/BridgePage";
+
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -164,13 +164,14 @@ const App = () => (
                                       </ProtectedRoute>
                                     }
                                   />
-                                  <Route
-                                    path="/dashboard/bridge"
-                                    element={<BridgePage />}
-                                  />
+
                                   <Route
                                     path="/dashboard/bridge-transactions"
-                                    element={<BridgeTransactionsPage />}
+                                    element={
+                                      <ProtectedRoute>
+                                        <BridgeTransactionsPage />
+                                      </ProtectedRoute>
+                                    }
                                   />
 
                                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
