@@ -140,7 +140,7 @@ initializeGenesisBlock = do
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
-  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators 
+  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
@@ -192,7 +192,6 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   sr <- getStateRoot genesisChainId
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
-
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
   let acctInfoAddress (NonContract a _) = a
