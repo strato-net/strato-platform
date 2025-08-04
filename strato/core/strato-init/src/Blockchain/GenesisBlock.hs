@@ -212,7 +212,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
     -- platform for one client)
     let acct = address
         filteredAddressState =
-          if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
+          if address /= Ad.Address 0x7000000000000000000000000000000000000000
             then fullAddressState
             else fullAddressState {addressStateContractRoot = MP.blankStateRoot}
         fullAddrStates = [(acct, fullAddressState)]
