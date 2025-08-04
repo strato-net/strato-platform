@@ -46,6 +46,9 @@ contract record OnRamp is Ownable {
     // Voucher contract
     Voucher public voucher;
 
+    /// @notice Reentrancy guard to prevent recursive calls
+    bool private locked;
+
     // Constructor
     constructor(address _oracle, address _owner, address _tokenFactory, address _adminRegistry, address _voucher) Ownable(_owner) {
         require(_oracle != address(0), "Invalid oracle");
@@ -83,6 +86,15 @@ contract record OnRamp is Ownable {
         }
         require(found, "Not a provider");
         _;
+    }
+
+    /// @notice Prevents reentrant calls to functions
+    /// @dev Uses a simple boolean lock to prevent recursive calls
+    modifier nonReentrant() {
+        require(!locked, "REENTRANT");
+        locked = true;
+        _;
+        locked = false;
     }
     
     function isPaymentProvider(address provider) public view returns (bool) {
@@ -207,7 +219,7 @@ contract record OnRamp is Ownable {
         emit ListingCanceled(listing.id);
     }
 
-    function fulfillListing(address token, address buyer, uint256 amount) external onlyProvider(token) {
+    function fulfillListing(address token, address buyer, uint256 amount) external onlyProvider(token) nonReentrant {
         require(amount > 0, "Invalid amount");
         require(listings[token].amount >= amount, "Not enough available tokens");
 
