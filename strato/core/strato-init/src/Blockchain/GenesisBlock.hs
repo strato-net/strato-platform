@@ -206,9 +206,10 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
 
     $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
 
-    --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
-    --since this contract has giant arrays that would choke strato
-    --(yes, this temprary feature is hardcoded into the whole platform for one client)
+    -- For now, we are just clumsily filtering out any state changes for the
+    -- Vitu vehicle manager, since this contract has giant arrays that would
+    -- choke strato (yes, this temprary feature is hardcoded into the whole
+    -- platform for one client)
     let acct = address
         -- fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
         filteredAddressState =
@@ -239,7 +240,10 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
           appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
           (abstrs, maps, arrs, cc) <- case cp of
             SolidVMCode contractName' codeHash' -> do
-              cc <- codeCollectionFromHash True codeHash' -- Maybe the typechecking should be done elsewhere, but this will allow us to prevent faulty code collections from going into the genesis block
+              -- Maybe the typechecking should be done elsewhere, but this will
+              -- allow us to prevent faulty code collections from going into the
+              -- genesis block
+              cc <- codeCollectionFromHash True codeHash'
               case cc ^. CC.contracts . at contractName' of
                 Nothing -> do
                   $logWarnS "populateStorageDBs/toAction" . T.pack $ "Couldn't find a contract named " ++ contractName' ++ " in code collection " ++ format codeHash'
