@@ -211,7 +211,6 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
     -- choke strato (yes, this temprary feature is hardcoded into the whole
     -- platform for one client)
     let acct = address
-        -- fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
         filteredAddressState =
           if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
             then fullAddressState
