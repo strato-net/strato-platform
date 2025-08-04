@@ -244,14 +244,20 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
               cc <- codeCollectionFromHash True codeHash'
               case cc ^. CC.contracts . at contractName' of
                 Nothing -> do
-                  $logWarnS "populateStorageDBs/toAction" . T.pack $ "Couldn't find a contract named " ++ contractName' ++ " in code collection " ++ format codeHash'
+                  $logWarnS "populateStorageDBs/toAction" . T.pack $
+                    "Couldn't find a contract named " ++ contractName' ++
+                    " in code collection " ++ format codeHash'
                   pure (Map.empty, [], [], cc)
                 Just contract' -> do
                   let !abstracts' = getAbstractParentsFromContract contract' cc
                       !mappings = getMapNamesFromContract contract'
                       !arrays = getArrayNamesFromContract contract'
-                  $logInfoS "populateStorageDBs/toAction" . T.pack $ "creator: " ++ T.unpack creator' ++ ", app: " ++ T.unpack appName'
-                  $logInfoS "populateStorageDBs/toAction" . T.pack $ "creatorAddress: " ++ T.unpack creatorAddress' ++ ", originAddress: " ++ T.unpack originAddress'
+                  $logInfoS "populateStorageDBs/toAction" . T.pack $
+                    "creator: " ++ T.unpack creator' ++ ", app: "
+                    ++ T.unpack appName'
+                  $logInfoS "populateStorageDBs/toAction" . T.pack $
+                    "creatorAddress: " ++ T.unpack creatorAddress' ++
+                    ", originAddress: " ++ T.unpack originAddress'
                   !abstrs' <- Map.fromList <$> traverse (resolveNameParts a creator' appName') abstracts'
                   pure (abstrs', mappings, arrays, cc)
             _ -> pure (Map.empty, [], [], emptyCodeCollection)
@@ -260,9 +266,12 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
                 _ -> Nothing
               act = Just . NewAction $ A.Action
                 { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
-                  A._blockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock,
-                  A._blockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock,
-                  A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
+                  A._blockTimestamp =
+                    blockHeaderTimestamp $ blockHeader genesisBlock,
+                  A._blockNumber =
+                    blockHeaderBlockNumber $ blockHeader genesisBlock,
+                  A._transactionHash =
+                    unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
                   A._transactionSender = Ad.Address 0,
                   A._actionData =
                     OMap.singleton (a,
@@ -294,7 +303,8 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
             { StateDiff.chainId = genesisChainId,
               blockNumber = 0,
               StateDiff.blockHash = blockHash genesisBlock,
-              StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
+              StateDiff.stateRoot =
+                MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
               createdAccounts = ad,
               deletedAccounts = Map.empty,
               updatedAccounts = Map.empty
