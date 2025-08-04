@@ -73,21 +73,5 @@ data AddNodeParams = AddNodeParams
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
--- type PutPause = "pause" :> Put '[JSON] DebuggerStatus
--- type PutResume = "resume" :> Put '[JSON] DebuggerStatus
--- type GetBreakpoints = "breakpoints" :> Get '[JSON] [Breakpoint]
--- type PutBreakpoints = "breakpoints" :> ReqBody '[JSON] [Breakpoint] :> Put '[JSON] DebuggerStatus
--- type DeleteBreakpoints = "breakpoints" :> ReqBody '[JSON] [Breakpoint] :> Delete '[JSON] DebuggerStatus
--- type DeleteBreakpointsPath = "breakpoints" :> Capture "file" T.Text :> Delete '[JSON] DebuggerStatus
--- type PostStepIn = "step-in" :> Post '[JSON] DebuggerStatus
--- type PostStepOver = "step-over" :> Post '[JSON] DebuggerStatus
--- type PostStepOut = "step-out" :> Post '[JSON] DebuggerStatus
--- type GetStackTrace = "stack-trace" :> Get '[JSON] [SourcePosition]
--- type GetVariables = "variables" :> Get '[JSON] (M.Map T.Text (M.Map T.Text EvaluationResponse))
--- type GetWatches = "watches" :> Get '[JSON] (M.Map EvaluationRequest EvaluationResponse)
--- type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON] DebuggerStatus
--- type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
--- type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
-
 stratoLiteRestAPI :: Proxy StratoLiteRestAPI
 stratoLiteRestAPI = Proxy

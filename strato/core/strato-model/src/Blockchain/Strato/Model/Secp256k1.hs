@@ -27,7 +27,6 @@ module Blockchain.Strato.Model.Secp256k1
   )
 where
 
--- import qualified Data.ByteString.Conversion       as BSC
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Util (bytes2Integer)

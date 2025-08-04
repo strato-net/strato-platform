@@ -24,7 +24,6 @@ module Bloc.Server.TransactionResult
   )
 where
 
--- import qualified Data.Text.Encoding                as Text
 
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers

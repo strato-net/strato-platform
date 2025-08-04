@@ -759,7 +759,6 @@ createEventArrayTable (creator, a, n, e) (arr, arrType) = do
   $logInfoS "createEventArrayTable/(creator, a, n, e) " (T.pack $ show (creator, a, n, e))
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   yield $ (createEventArrayTableQuery (creator, a, n, e, arr))
-  -- let list = ["key", "value"]
   let fkeys1 = getDeferredForeignKeysForEventCollection tableName creator a
       fkeys2 = getDeferredForeignKeysForCollectionType tableName creator a arrType
   return $ fkeys1 ++ fkeys2

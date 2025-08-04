@@ -98,7 +98,6 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff (StateDiff)
--- import Blockchain.Stream.VMEvent
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VM.SolidException
 import Blockchain.VMOptions

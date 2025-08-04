@@ -33,7 +33,6 @@ import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
--- import Blockchain.Blockstanbul.Model.Authentication
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)

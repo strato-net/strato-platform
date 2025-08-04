@@ -39,7 +39,6 @@ import qualified Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
--- import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
@@ -52,14 +51,12 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
--- import SolidVM.Model.Value
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
--- import Blockchain.SolidVM.SM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -398,29 +395,17 @@ addTransaction ::
 addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
 
-  let --isHomestead = blockIsHomestead $ number b
---      intrinsicGas' = intrinsicGas isHomestead t
-      bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
-
---  when flags_debug $ do
-    -- $logDebugS "addTx" . T.pack $ "bytes cost: " ++ show (gTXDATAZERO * fromIntegral (zeroBytesLength t) + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - fromIntegral (zeroBytesLength t)))
-    -- $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
-    -- $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
-
-  let -- txCost = transactionValue bt
---      realIG = fromIntegral intrinsicGas'
-      maxGas = fromIntegral (maxBound :: Int)
-
+  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
---  when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
   when (txSize >= toInteger flags_txSizeLimit)
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
-  
+
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
@@ -503,7 +488,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               (txArgs ut)
         else do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
-          
+
           lift $
             SolidVM.call
                   False  --isRCC

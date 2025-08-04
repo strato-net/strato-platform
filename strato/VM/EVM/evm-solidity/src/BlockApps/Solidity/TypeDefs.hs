@@ -16,7 +16,6 @@ import GHC.Generics
 type EnumSet = Bimap Int Text
 
 --instance (NFData a, NFData b) => NFData (Bimap a b) where
---  rnf = rnf . toList
 
 data TypeDefs = TypeDefs
   { enumDefs :: Map Text EnumSet,

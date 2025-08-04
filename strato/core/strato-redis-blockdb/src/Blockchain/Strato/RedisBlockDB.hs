@@ -58,10 +58,3 @@ runStratoRedisIO r = liftIO $ do
   conn <- checkedConnect lookupRedisBlockDBConfig
   runRedis conn r
 
--- Retrieve a organization name and unit associated with an address
--- addressToOrg :: Address -> Redis (Maybe ChainMember)
--- addressToOrg addr = do
---     cIs <- getCertificate addr
---     case cIs of
---         Nothing -> return Nothing
---         Just c  -> return . Just $ (orgName &&& orgUnit) c

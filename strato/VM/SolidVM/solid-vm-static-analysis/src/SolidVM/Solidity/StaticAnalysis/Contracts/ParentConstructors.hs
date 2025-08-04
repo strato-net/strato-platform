@@ -17,7 +17,6 @@ import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
 import SolidVM.Solidity.StaticAnalysis.Types
 
--- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector cc@CodeCollection {..} = M.foldMapWithKey (contractHelper cc) _contracts
 

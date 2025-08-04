@@ -34,7 +34,6 @@ import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
--- import qualified LabeledError
 
 import SQLM
 import Servant
@@ -276,8 +275,6 @@ accountQueryParams =
     "search"
   ]
 
--- toCode :: Text -> BC.ByteString
--- toCode v = LabeledError.b16Decode "toCode" $ BC.pack $ (T.unpack v)
 
 type CodeAPI =
   "code" :> Capture "codeHash" Keccak256

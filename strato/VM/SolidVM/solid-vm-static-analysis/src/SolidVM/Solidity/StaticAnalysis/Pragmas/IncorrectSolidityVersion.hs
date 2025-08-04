@@ -14,7 +14,6 @@ import SolidVM.Model.CodeCollection (invalidPragmasUsedBy)
 import SolidVM.Solidity.Parse.Declarations (SourceUnit, SourceUnitF (..))
 import SolidVM.Solidity.StaticAnalysis.Types
 
--- type ParserDetector = [SourceUnit] -> [SourceAnnotation T.Text]
 detector :: ParserDetector
 detector = map (uncurry toAnnotation)
          . invalidPragmasUsedBy snd
