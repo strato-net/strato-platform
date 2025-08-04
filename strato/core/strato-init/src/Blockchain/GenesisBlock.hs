@@ -194,11 +194,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
     assertStateDiffTopicCreation
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
-  let acctInfoAddress (NonContract a _) = a
-      acctInfoAddress (ContractNoStorage a _ _) = a
-      acctInfoAddress (ContractWithStorage a _ _ _) = a
-      acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
-      addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
+  let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
   for_ addresses $ \address -> do
     -- address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
