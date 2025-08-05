@@ -8,15 +8,12 @@ module SolidVM.Model.CodeCollection.VarDef where
 import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
--- import qualified Data.Map.Strict as M
--- import qualified Data.HashMap.Lazy         as HashMap
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Binary
 import Data.Int (Int32)
 import Data.Swagger
 import GHC.Generics
 import qualified Generic.Random as GR
--- import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.Type
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()

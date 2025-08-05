@@ -199,10 +199,6 @@ hashIdx theMask x = (y `unsafeShiftR` logBitsInHash) :* (y .&. hashMask)
     hashMask = 31 -- bitsInHash - 1
     y = fromIntegral x .&. theMask
 
--- -- | Hash the given value, returning a list of (word offset, bit
--- -- offset) pairs, one per hash value.
--- hashesM :: MBloom s a -> a -> [Int :* Int]
--- hashesM mb elt = hashIdx (MB.mask mb) `map` MB.hashes mb elt
 
 -- | Hash the given value, returning a list of (word offset, bit
 -- offset) pairs, one per hash value.
@@ -365,12 +361,6 @@ fromList hashes numBits = unfold hashes numBits convert
         convert _      = Nothing
 -}
 
--- -- | Slow, crummy way of computing the integer log of an integer known
--- -- to be a power of two.
--- logPower2 :: Int -> Int
--- logPower2 k = go 0 k
---     where go j 1 = j
---           go j n = go (j+1) (n `unsafeShiftR` 1)
 
 -- $overview
 --

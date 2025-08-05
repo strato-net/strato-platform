@@ -31,14 +31,6 @@ checkParentChildValidity Block {blockBlockData = c} parentBSum = do
     then Nothing
     else Just $ UnexpectedBlockNumber (BlockDelta (number c) (bSumNumber parentBSum + 1))
 
--- verifyTransactionRoot' :: Block -> (Bool, MP.StateRoot)
--- verifyTransactionRoot' Block {blockBlockData = bd, blockReceiptTransactions = txs} =
---   let tVal = transactionsVerificationValue (otBaseTx <$> txs) in (transactionsRoot bd == tVal, tVal)
-
--- verifyTransactionRoot :: HasStateDB m => Block -> m (Bool, MP.StateRoot)
--- verifyTransactionRoot Block {blockBlockData = bd, blockReceiptTransactions = txs} = do
---   sr <- MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] $ (otBaseTx <$> txs)
---   return (transactionsRoot bd == sr, sr)
 
 verifyOmmersRoot :: HasStateDB m => Block -> m (Maybe BlockVerificationFailureDetails)
 verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} = 

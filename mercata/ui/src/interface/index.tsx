@@ -338,6 +338,7 @@ export interface LiquidityPool {
   address: string;
   _owner: string;
   swapFeeRate: number;
+  lpSharePercent: number;
   aToBRatio: string;
   bToARatio: string;
   tokenABalance: string;
