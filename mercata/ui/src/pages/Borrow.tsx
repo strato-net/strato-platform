@@ -9,113 +9,24 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { BORROW_FEE, REPAY_FEE } from "@/lib/constants";
-import { addCommasToInput, formatCurrency } from "@/utils/numberUtils";
-import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import { CollateralData } from "@/interface";
 import PositionSection from "@/components/Positions";
-import SupplyCollateralModal from "@/components/borrow/SupplyCollateral";
-import WithdrawCollateralModal from "@/components/borrow/WithdrawCollateral";
+import CollateralModal from "@/components/borrow/CollateralModal";
+import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
 import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-
-const LoadingSpinner = () => (
-  <div className="flex justify-center items-center h-12">
-    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-  </div>
-);
-
-// Optimized InfoTooltip component using hook
-const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
-  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('borrow-tooltip-container');
-
-  if (isMobile) {
-    return (
-      <div className="relative borrow-tooltip-container">
-        <div 
-          className="inline-flex items-center gap-1 cursor-help"
-          onClick={handleToggle}
-        >
-          {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-        </div>
-        {showTooltip && (
-          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
-            <p>{content}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="inline-flex items-center gap-1 cursor-help">
-          {children}
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-        </div>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs">
-        <p>{content}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-};
-
-// Optimized ButtonTooltip component using hook
-const ButtonTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
-  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('borrow-tooltip-container');
-
-  if (isMobile) {
-    return (
-      <div className="relative borrow-tooltip-container">
-        <div onClick={handleToggle}>
-          {children}
-        </div>
-        {showTooltip && (
-          <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
-            <p>{content}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{content}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-};
 
 const Borrow = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
-  const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [supplyLoading, setSupplyLoading] = useState(false);
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: "supply" | "withdraw" | null;
+  }>({ isOpen: false, type: null });
+  const [modalLoading, setModalLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
@@ -168,18 +79,23 @@ const Borrow = () => {
   }, [collateralInfo])
 
   const handleSupply = (asset) => {
-    setSelectedAsset(asset)
-    setIsSupplyModalOpen(true)
-  }
+    setSelectedAsset(asset);
+    setModalState({ isOpen: true, type: "supply" });
+  };
 
-  const closeSupplyModal = () => {
+  const handleWithdraw = (asset) => {
+    setSelectedAsset(asset);
+    setModalState({ isOpen: true, type: "withdraw" });
+  };
+
+  const closeModal = () => {
     setSelectedAsset(null);
-    setIsSupplyModalOpen(false);
+    setModalState({ isOpen: false, type: null });
   };
 
   const executeSupply = async (asset: CollateralData, amount: string) => {
     try {
-      setSupplyLoading(true);
+      setModalLoading(true);
       await supplyCollateral({
         asset: asset.address,
         amount: safeParseUnits(amount, 18).toString(),
@@ -189,8 +105,8 @@ const Borrow = () => {
         description: `You supplied ${amount} ${asset._symbol}`,
         variant: "success",
       });
-      setSupplyLoading(false);
-      setIsSupplyModalOpen(false);
+      setModalLoading(false);
+      setModalState({ isOpen: false, type: null });
       // Refresh all data after successful supply
       await Promise.all([
         refreshLoans(),
@@ -198,24 +114,14 @@ const Borrow = () => {
         fetchUsdstBalance(userAddress || ""),
       ]);
     } catch (error) {
-      setSupplyLoading(false);
-      setIsSupplyModalOpen(false);
+      setModalLoading(false);
+      setModalState({ isOpen: false, type: null });
     }
-  };
-
-    const handleWithdraw = (asset) => {
-    setSelectedAsset(asset)
-    setIsWithdrawModalOpen(true)
-  }
-
-  const closeWithdrawModal = () => {
-    setSelectedAsset(null);
-    setIsWithdrawModalOpen(false);
   };
 
   const executeWithdraw = async (asset: CollateralData, amount: string) => {
     try {
-      setWithdrawLoading(true);
+      setModalLoading(true);
       await withdrawCollateral({
         asset: asset.address,
         amount: safeParseUnits(amount, 18).toString(),
@@ -225,8 +131,8 @@ const Borrow = () => {
         description: `You withdrew ${amount} ${asset._symbol}`,
         variant: "success",
       });
-      setWithdrawLoading(false);
-      setIsWithdrawModalOpen(false);
+      setModalLoading(false);
+      setModalState({ isOpen: false, type: null });
       // Refresh all data after successful withdraw
       await Promise.all([
         refreshLoans(),
@@ -235,8 +141,8 @@ const Borrow = () => {
       ]);
     } catch (error) {
       console.log(error, "error");
-      setWithdrawLoading(false);
-      setIsWithdrawModalOpen(false);
+      setModalLoading(false);
+      setModalState({ isOpen: false, type: null });
       // Error toast is now handled globally by axios interceptor
     }
   };
@@ -259,11 +165,6 @@ const Borrow = () => {
       ]);
     } catch (error) {
       setBorrowLoading(false);
-      toast({
-        title: "Borrow Error",
-        description: `Something went wrong - ${error?.message || "Please try again later."}`,
-        variant: "destructive",
-      });
     }
   };
 
@@ -296,11 +197,6 @@ const Borrow = () => {
       ]);
     } catch (error) {
       console.error("Error repaying loan:", error);
-      toast({
-        title: "Error",
-        description: `Repay Error - ${error}`,
-        variant: "destructive",
-      });
       setRepayLoading(false);
     }
   };
@@ -365,25 +261,25 @@ const Borrow = () => {
       </div>
 
 
-      <SupplyCollateralModal 
-          supplyLoading={supplyLoading}
-          asset={selectedAsset}
-          loanData={loans}
-          isOpen={isSupplyModalOpen}
-          onClose={closeSupplyModal}
-          onSupply={(amount) => executeSupply(selectedAsset, amount)}
-          usdstBalance={usdstBalance}
-      />
-
-       <WithdrawCollateralModal 
-          withdrawLoading={withdrawLoading}
-          asset={selectedAsset}
-          loanData={loans}
-          isOpen={isWithdrawModalOpen}
-          onClose={closeWithdrawModal}
-          onWithdraw={(amount) => executeWithdraw(selectedAsset, amount)}
-          usdstBalance={usdstBalance}
-      />
+      {modalState.isOpen && modalState.type && (
+        <CollateralModal 
+            type={modalState.type}
+            loading={modalLoading}
+            asset={selectedAsset}
+            loanData={loans}
+            isOpen={modalState.isOpen}
+            onClose={closeModal}
+            onAction={(amount) => {
+              if (modalState.type === "supply") {
+                executeSupply(selectedAsset, amount);
+              } else if (modalState.type === "withdraw") {
+                executeWithdraw(selectedAsset, amount);
+              }
+            }}
+            usdstBalance={usdstBalance}
+            transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+        />
+      )}
 
     </div>
   );

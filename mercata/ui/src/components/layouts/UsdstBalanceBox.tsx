@@ -96,6 +96,7 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
+    if (loadingUsdstBalance) return "border-blue-200 bg-white/95";
     if (isCriticalBalance) return "border-red-300 bg-red-200/95";
     if (isLowBalance) return "border-orange-300 bg-orange-200/95";
     return "border-blue-200 bg-white/95";
@@ -118,6 +119,11 @@ const UsdstBalanceBox: React.FC = () => {
           className={`${sizeClasses[size]} rounded-full object-cover`}
         />
       );
+    }
+
+    // Don't show warning icons when loading
+    if (loadingUsdstBalance) {
+      return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
     }
 
     // Fallback to warning/normal icons
@@ -161,7 +167,9 @@ const UsdstBalanceBox: React.FC = () => {
         <div className="flex items-center space-x-2">
           <div
             className={`p-1.5 rounded-full ${
-              isCriticalBalance
+              loadingUsdstBalance
+                ? "bg-blue-100"
+                : isCriticalBalance
                 ? "bg-red-100"
                 : isLowBalance
                 ? "bg-orange-100"
