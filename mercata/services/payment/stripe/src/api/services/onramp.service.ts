@@ -12,10 +12,6 @@ import { canLockAmount, addLock, removeLock, calculatePaymentAmount } from "../h
 const contractAddress = constants.onRamp!;
 const OnRamp = "OnRamp";
 
-// Idempotency tracking - in production, use Redis/DB
-const processedSessions = new Set<string>();
-const processingInProgress = new Set<string>();
-
 export const get = async (accessToken: string): Promise<RampData> => {
   try {
     const response = await bloc.get(
@@ -88,10 +84,6 @@ export async function checkout(
 }
 
 async function pollAndFulfillSession(sessionId: string, token: string, tokenAmount: string): Promise<void> {
-  if (processedSessions.has(sessionId) || processingInProgress.has(sessionId)) {
-    return;
-  }
-
   const maxAttempts = 126; // Poll for up to 21 minutes
   const pollInterval = 10000; // 10 seconds
   
@@ -99,24 +91,13 @@ async function pollAndFulfillSession(sessionId: string, token: string, tokenAmou
     try {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
       
-      if (processedSessions.has(sessionId)) {
-        return;
-      }
-      
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       
       if (session.payment_status === 'paid') {
-        // Use idempotency protection for fulfillment
-        if (!processedSessions.has(sessionId) && !processingInProgress.has(sessionId)) {
-          processingInProgress.add(sessionId);
-          try {
-            await handleSessionFulfillment(session);
-            processedSessions.add(sessionId);
-          } catch (error) {
-            console.error(`Failed to fulfill session ${sessionId}:`, error);
-          } finally {
-            processingInProgress.delete(sessionId);
-          }
+        try {
+          await handleSessionFulfillment(session);
+        } catch (error) {
+          console.error(`Failed to fulfill session ${sessionId}:`, error);
         }
         return;
       } else if (session.payment_status === 'unpaid' && session.status === 'expired') {
@@ -171,27 +152,3 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
     removeLock(token, tokenAmount, sessionId);
   }
 }
-
-// export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
-//   const sessionId = session.id;
-  
-//   // Check idempotency - prevent webhook replay attacks
-//   if (processedSessions.has(sessionId) || processingInProgress.has(sessionId)) {
-//     return;
-//   }
-
-//   // Only process if payment is completed
-//   if (session.payment_status !== 'paid') {
-//     return;
-//   }
-
-//   processingInProgress.add(sessionId);
-//   try {
-//     await handleSessionFulfillment(session);
-//     processedSessions.add(sessionId);
-//   } catch (error) {
-//     console.error(`Webhook processing failed for session ${sessionId}:`, error);
-//   } finally {
-//     processingInProgress.delete(sessionId);
-//   }
-// }
