@@ -173,6 +173,50 @@ initializeGenesisBlock = do
   populateStorageDBs findMetadata genesisInfo genesisBlock genesisChainId
   $logInfoS "initgen" "populateStorageDBs is done"
 
+
+  -- | Populate storage databases with genesis block state and generate
+  -- corresponding events
+  --
+  -- This function performs several critical initialization tasks for the
+  -- genesis block:
+  --
+  -- 1. **State Root Management**: Retrieves current state root and temporarily
+  --    replaces it during processing to ensure consistent state handling
+  --
+  -- 2. **Kafka Topic Setup**: Ensures StateDiff topic exists in Kafka for event
+  -- streaming
+  --
+  -- 3. **Address Processing**: Iterates through all genesis account addresses
+  -- and:
+  --
+  --    - Fetches full address state from the state database
+  --    - Applies special filtering for Vitu vehicle manager contract (0x7000...0000)
+  --      to prevent performance issues with large arrays
+  --
+  -- 4. **State Diff Generation**: Creates SQL database diffs representing
+  --    account creation events for the genesis block, including:
+  --
+  --    - Block metadata (chain ID, block number, block hash, state root)
+  --    - Account state changes (all accounts are marked as "created")
+  --
+  -- 5. **VM Event Production**: Generates and publishes VM events to Kafka,
+  -- including:
+  --
+  --    - Contract deployment events for SolidVM contracts
+  --    - Action events with transaction metadata
+  --    - Code collection information and storage diffs
+  --    - Creator and origin address tracking
+  --
+  -- 6. **Contract Metadata Processing**: For SolidVM contracts, extracts and
+  -- processes:
+  --
+  --    - Abstract parent contracts
+  --    - Contract mappings and arrays
+  --    - Source code and contract names from metadata
+  --
+  -- The function ensures that both the SQL database and Kafka event stream are
+  -- properly initialized with the genesis block state, enabling proper
+  -- blockchain operation.
 populateStorageDBs ::
   ( MonadLogger m,
     HasSQLDB m,
@@ -188,18 +232,26 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
+  -- Step 1: State Root Management - Retrieve current state root and temporarily replace it
   sr <- getStateRoot genesisChainId
+
+  -- Step 2: Kafka Topic Setup - Ensure StateDiff topic exists for event streaming
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
+
+  -- Step 3: Address Processing - Iterate through all genesis account addresses
   let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
   for_ addresses $ \address -> do
+    -- Fetch full address state from the state database
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
     $logInfoS "initgen" $ T.pack $
       "##################### writing to DBs: " ++ format address
 
+    -- Apply special filtering for Vitu vehicle manager contract (0x7000...0000)
+    -- to prevent performance issues with large arrays
     -- For now, we are just clumsily filtering out any state changes for the
     -- Vitu vehicle manager, since this contract has giant arrays that would
     -- choke strato (yes, this temprary feature is hardcoded into the whole
@@ -213,7 +265,9 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
         filteredAddrStates = [(acct, filteredAddressState)]
         squashMap f = fmap concat . mapM (uncurry f) . Map.toList
 
+    -- Step 4: State Diff Generation - Create SQL database diffs for account creation
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
+    -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     vmEvents <- squashMap toAction =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
     commitSqlDiffs (mkStateDiff fullAccountDiffs)
     _ <- produceVMEvents vmEvents
