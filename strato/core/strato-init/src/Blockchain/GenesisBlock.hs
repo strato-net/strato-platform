@@ -195,7 +195,6 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
   let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
   for_ addresses $ \address -> do
-    -- address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
     $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
