@@ -197,7 +197,8 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   for_ addresses $ \address -> do
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
-    $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
+    $logInfoS "initgen" $ T.pack $
+      "##################### writing to DBs: " ++ format address
 
     -- For now, we are just clumsily filtering out any state changes for the
     -- Vitu vehicle manager, since this contract has giant arrays that would
