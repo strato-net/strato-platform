@@ -293,9 +293,9 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                       : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
-                        ? formatBalance(liquidityInfo.withdrawable.maxWithdrawableUSDST || 0n, "USDST", 18, 2, 2)
+                        ? formatBalance(liquidityInfo.withdrawable.maxWithdrawableUSDST || 0n, undefined, 18, 2)
                         : "0.00"}{" "}
-                    ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
+                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
