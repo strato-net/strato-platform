@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { oauthClient } from './oauth';
-import { logInfo, logError } from './logger';
+import { logError } from './logger';
 import { TransactionResult, CallListArg } from '../types';
 
 // Constants
@@ -25,7 +25,7 @@ const MAX_RETRIES = 3;
 
 async function callListAndWait(callListArgs: CallListArg[], retryCount: number = 0): Promise<TransactionResult> {
     try {
-        const accessToken = await oauthClient.getAccessToken();
+        const accessToken = await oauthClient().getAccessToken();
         
         const response = await axios.post(
             `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
@@ -51,7 +51,6 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
         );
 
         const txHash = extractTransactionHash(response.data);
-        logInfo('OraclePusher', `Transaction submitted: ${txHash}`);
 
         return await waitForTransaction(txHash);
     } catch (error: any) {
@@ -60,7 +59,6 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
         
         if (errorMessage.includes('Rejected from mempool') && retryCount < MAX_RETRIES) {
             const delay = RETRY_DELAYS.INITIAL + (retryCount * RETRY_DELAYS.INCREMENT);
-            logInfo('OraclePusher', `Transaction rejected from mempool (attempt ${retryCount + 1}/${MAX_RETRIES + 1}). Retrying after ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             return await callListAndWait(callListArgs, retryCount + 1);
         }
@@ -83,12 +81,6 @@ function extractTransactionHash(data: any): string {
 
 export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
     try {
-        logInfo('OraclePusher', `Preparing to push ${assets.length} asset prices...`);
-        
-        assets.forEach((asset, index) => {
-            logInfo('OraclePusher', `${asset} → ${prices[index]} (${(prices[index] / 1e18).toFixed(8)} USD)`);
-        });
-
         const callListArgs: CallListArg[] = assets.map((asset, index) => ({
             contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
             method: "setAssetPrice",
@@ -101,7 +93,6 @@ export async function pushAssetPrices(assets: string[], prices: number[]): Promi
             throw new Error(`Transaction failed with status: ${result.status}. Transaction hash: ${result.hash}`);
         }
 
-        logInfo('OraclePusher', `Transaction completed → TX: ${result.hash}`);
         return result;
     } catch (error: any) {
         logError('OraclePusher', new Error(`Error pushing prices: ${error.message}`));
@@ -114,7 +105,7 @@ async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     
     while (Date.now() - startTime < TIMEOUTS.TRANSACTION_WAIT) {
         try {
-            const accessToken = await oauthClient.getAccessToken();
+            const accessToken = await oauthClient().getAccessToken();
             
             const response = await axios.get(
                 `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/${txHash}/result`,

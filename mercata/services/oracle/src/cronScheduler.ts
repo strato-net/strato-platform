@@ -2,23 +2,61 @@ import cron from 'node-cron';
 import { fetchGenericPrice } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { logFeedUpdate, logError, logInfo } from './utils/logger';
-import * as feedsConfig from './config/feeds.json';
-import * as sourcesConfig from './config/sources.json';
+const feedsConfig = require('./config/feeds.json');
+const sourcesConfig = require('./config/sources.json');
 import { SourceConfig } from './types';
 
+function buildApiParams(sourceConfig: SourceConfig, feed: any, source: any): Record<string, any> {
+    const params: Record<string, any> = {};
+    
+    // Check what parameters the source expects based on its configuration
+    const urlTemplate = sourceConfig.urlTemplate || '';
+    const parsePath = sourceConfig.parsePath || '';
+    
+    // Check for tokenAddress parameter
+    if (urlTemplate.includes('${tokenAddress}') || parsePath.includes('${tokenAddress}')) {
+        if (feed.tokenAddress) {
+            params.tokenAddress = feed.tokenAddress;
+        }
+    }
+    
+    // Check for symbol parameter
+    if (urlTemplate.includes('${symbol}') || parsePath.includes('${symbol}')) {
+        if (feed.symbol) {
+            params.symbol = feed.symbol;
+        }
+    }
+    
+    // Check for metal parameter (for metals feeds)
+    if (urlTemplate.includes('${metal}') || parsePath.includes('${metal}')) {
+        if (source.apiParams?.metal) {
+            params.metal = source.apiParams.metal;
+        }
+    }
+    
+    // If no parameters were found, fall back to the original logic
+    if (Object.keys(params).length === 0) {
+        if (feed.tokenAddress) {
+            params.tokenAddress = feed.tokenAddress;
+        } else if (feed.symbol) {
+            params.symbol = feed.symbol;
+        } else if (source.apiParams) {
+            Object.assign(params, source.apiParams);
+        }
+    }
+    
+    return params;
+}
+
 export function startCronScheduler(): void {
-    logInfo('CronScheduler', '=== Starting Oracle Service (Cron Mode, Batch Push) ===');
-    logInfo('CronScheduler', `Loaded ${feedsConfig.feeds.length} feeds from configuration`);
+    logInfo('CronScheduler', `Starting Oracle Service with ${feedsConfig.feeds.length} feeds`);
 
     for (const feed of feedsConfig.feeds) {
-        logInfo('CronScheduler', `Scheduling ${feed.name} → cron: ${feed.cron}`);
-
-        cron.schedule(feed.cron, async () => {
+        // Create the job function
+        const jobFunction = async () => {
             try {
-                logInfo('CronScheduler', `Starting update for ${feed.name}`);
-                
                 // Prepare parallel fetch tasks
-                const fetchTasks = feed.sources.map(async (source) => {
+                const fetchTasks = feed.sources.map(async (source: any) => {
                     try {
                         const sourceConfig = sourcesConfig[source.name as keyof typeof sourcesConfig] as SourceConfig;
                         if (!sourceConfig) {
@@ -30,37 +68,22 @@ export function startCronScheduler(): void {
                             source: source.name,
                             targetAssetAddress: feed.targetAssetAddress,
                             cron: feed.cron,
-                            apiParams: feed.tokenAddress 
-                                ? { tokenAddress: feed.tokenAddress }
-                                : (source as any).apiParams || { symbol: feed.symbol }
+                            apiParams: buildApiParams(sourceConfig, feed, source)
                         };
 
                         const { price, feedTimestamp } = await fetchGenericPrice(feedConfig, sourceConfig);
-                        
-                        logInfo('CronScheduler', `${feed.name} from ${source.name}: ${(price / 1e18).toFixed(8)} USD`);
                         
                         return { price, feedTimestamp, source: source.name, success: true };
                         
                     } catch (err) {
                         const error = err as Error;
-                        const errorType = error.message.includes('network') ? 'Network' : 
-                                        error.message.includes('timeout') ? 'Timeout' :
-                                        error.message.includes('Invalid price') ? 'Data Validation' :
-                                        error.message.includes('API') ? 'API' : 'Unknown';
-                        
-                        logError('CronScheduler', new Error(`[${errorType}] Error fetching ${feed.name} from ${source.name}: ${error.message}`));
-                        logInfo('CronScheduler', `Skipping ${source.name} for ${feed.name} due to ${errorType.toLowerCase()} error`);
-                        
+                        logError('CronScheduler', new Error(`${feed.name} from ${source.name}: ${error.message}`));
                         return { price: 0, feedTimestamp: '', source: source.name, success: false, error: error.message };
                     }
                 });
 
-                // Execute all fetches in parallel with timeout
-                logInfo('CronScheduler', `Fetching ${feed.name} from ${feed.sources.length} sources in parallel...`);
-                const timeoutMs = 30000; // 30 second timeout
-                const startTime = Date.now();
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Parallel fetch timeout')), timeoutMs)
+                    setTimeout(() => reject(new Error('Parallel fetch timeout')), 30000)
                 );
                 
                 try {
@@ -72,7 +95,7 @@ export function startCronScheduler(): void {
                     // Process results
                     const prices: number[] = [];
                     const timestamps: string[] = [];
-                    const successfulSources: string[] = [];
+                    const successfulSources: Array<{name: string, price: number}> = [];
                     const failedSources: string[] = [];
                     
                     results.forEach((result, index) => {
@@ -81,7 +104,7 @@ export function startCronScheduler(): void {
                         if (result.status === 'fulfilled' && result.value.success) {
                             prices.push(result.value.price);
                             timestamps.push(result.value.feedTimestamp);
-                            successfulSources.push(sourceName);
+                            successfulSources.push({name: sourceName, price: result.value.price});
                         } else {
                             const error = result.status === 'rejected' ? result.reason : result.value?.error || 'Unknown error';
                             failedSources.push(sourceName);
@@ -100,33 +123,30 @@ export function startCronScheduler(): void {
                     // Push to blockchain
                     const result = await pushAssetPrices([feed.targetAssetAddress], [averagePrice]);
 
-                    // Log success with parallel fetch summary
-                    const fetchDuration = Date.now() - startTime;
-                    logFeedUpdate(feed.name, averagePrice, latestTimestamp, result.hash);
-                    logInfo('CronScheduler', `✅ ${feed.name}: Successfully fetched from ${successfulSources.length}/${feed.sources.length} sources in ${fetchDuration}ms`);
-                    logInfo('CronScheduler', `   Successful: ${successfulSources.join(', ')}`);
-                    if (failedSources.length > 0) {
-                        logInfo('CronScheduler', `   Failed: ${failedSources.join(', ')}`);
-                    }
-                    logInfo('CronScheduler', `   Average price: ${(averagePrice / 1e18).toFixed(8)} USD, TX: ${result.hash}`);
+                    // Log success with source breakdown
+                    logFeedUpdate(feed.name, averagePrice, successfulSources, result.hash);
                     
                 } catch (timeoutError) {
                     if (timeoutError instanceof Error && timeoutError.message === 'Parallel fetch timeout') {
-                        logError('CronScheduler', new Error(`Parallel fetch timeout for ${feed.name} after ${timeoutMs}ms`));
-                        throw new Error(`Timeout: No prices received for ${feed.name} within ${timeoutMs}ms`);
+                        logError('CronScheduler', new Error(`${feed.name}: Timeout after 30000ms`));
                     }
                     throw timeoutError;
                 }
 
             } catch (err) {
                 const error = err as Error;
-                logError('CronScheduler', new Error(`Error updating ${feed.name}: ${error.message}`));
-                logInfo('CronScheduler', `Feed ${feed.name} update failed, will retry on next cron cycle`);
+                logError('CronScheduler', new Error(`${feed.name}: ${error.message}`));
             }
-        });
-    }
+        };
 
-    logInfo('CronScheduler', 'All cron jobs scheduled successfully');
+        // Schedule the job
+        cron.schedule(feed.cron, jobFunction);
+        
+        // Run the job immediately on startup
+        setTimeout(() => {
+            jobFunction();
+        }, 1000); // Small delay to ensure everything is initialized
+    }
 }
 
 // Graceful shutdown

@@ -1,50 +1,36 @@
 import dotenv from 'dotenv';
-import * as feedsConfig from '../config/feeds.json';
-import * as sourcesConfig from '../config/sources.json';
 import cron from 'node-cron';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
 import { SourceConfig } from '../types';
 
+// Configurable minimum interval (in minutes)
+const MIN_UPDATE_INTERVAL_MINUTES = parseInt(process.env.MIN_UPDATE_INTERVAL_MINUTES || '15');
+
+const feedsConfig = require('../config/feeds.json');
+const sourcesConfig = require('../config/sources.json');
+
 dotenv.config();
 
 export async function validateConfig(): Promise<boolean> {
-    logInfo('ConfigValidator', '=== Validating Oracle Configuration ===');
-    
-    let errors: string[] = [];
-    let warnings: string[] = [];
+    const errors: string[] = [];
+    const warnings: string[] = [];
 
-    // Validate environment variables
-    logInfo('ConfigValidator', '1. Checking Environment Variables...');
-    const baseRequiredEnvVars = [
-        'STRATO_NODE_URL',
-        'OAUTH_DISCOVERY_URL',
-        'OAUTH_CLIENT_ID',
-        'OAUTH_CLIENT_SECRET',
-        'USERNAME',
-        'PASSWORD',
-        'PRICE_ORACLE_ADDRESS'
+    const requiredEnvVars = [
+        'STRATO_NODE_URL', 'OAUTH_DISCOVERY_URL', 'OAUTH_CLIENT_ID',
+        'OAUTH_CLIENT_SECRET', 'USERNAME', 'PASSWORD', 'PRICE_ORACLE_ADDRESS'
     ];
 
-    baseRequiredEnvVars.forEach(varName => {
+    requiredEnvVars.forEach(varName => {
         if (!process.env[varName]) {
             errors.push(`Missing required environment variable: ${varName}`);
-        } else {
-            logInfo('ConfigValidator', `   ✅ ${varName}: Set`);
         }
     });
 
-    // Validate OAuth configuration
-    logInfo('ConfigValidator', '2. Checking OAuth Configuration...');
     if (process.env.OAUTH_DISCOVERY_URL && process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET) {
-        logInfo('ConfigValidator', '   ✅ OAuth credentials configured');
-        
-        // Test OAuth connection
         try {
-            const isValid = await oauthClient.validateToken();
-            if (isValid) {
-                logInfo('ConfigValidator', '   ✅ OAuth connection test successful');
-            } else {
+            const isValid = await oauthClient().validateToken();
+            if (!isValid) {
                 warnings.push('OAuth connection test failed - check credentials');
             }
         } catch (error) {
@@ -54,15 +40,11 @@ export async function validateConfig(): Promise<boolean> {
         errors.push('Incomplete OAuth configuration');
     }
 
-    // Validate feeds configuration
-    logInfo('ConfigValidator', '3. Checking Feeds Configuration...');
     const usedSources = new Set<string>();
     
     if (!feedsConfig.feeds || !Array.isArray(feedsConfig.feeds)) {
         errors.push('feeds.json must contain a "feeds" array');
     } else {
-        logInfo('ConfigValidator', `   ✅ Found ${feedsConfig.feeds.length} feeds`);
-        
         feedsConfig.feeds.forEach((feed: any, index: number) => {
             const feedPrefix = `   Feed ${index + 1} (${feed.name}):`;
             
@@ -95,9 +77,6 @@ export async function validateConfig(): Promise<boolean> {
             }
             
             // Validate feed structure consistency
-            if (feed.tokenAddress && feed.symbol) {
-                errors.push(`${feedPrefix} Cannot have both tokenAddress and symbol`);
-            }
             if (!feed.tokenAddress && !feed.symbol) {
                 errors.push(`${feedPrefix} Must have either tokenAddress (for crypto) or symbol (for metals)`);
             }
@@ -115,7 +94,15 @@ export async function validateConfig(): Promise<boolean> {
             // Validate cron frequency (prevent too frequent updates)
             if (feed.cron) {
                 const cronParts = feed.cron.split(' ');
-                if (cronParts.length >= 2 && cronParts[1] === '*') {
+                // Check minutes field (first position) - allow */X but prevent too frequent updates
+                if (cronParts.length >= 1 && cronParts[0].includes('/')) {
+                    const divisor = parseInt(cronParts[0].split('/')[1]);
+                    if (divisor < MIN_UPDATE_INTERVAL_MINUTES) {
+                        errors.push(`${feedPrefix} Cron expression too frequent (less than ${MIN_UPDATE_INTERVAL_MINUTES} minutes): ${feed.cron}`);
+                    }
+                }
+                // Prevent every minute (*) in minutes field
+                if (cronParts.length >= 1 && cronParts[0] === '*') {
                     errors.push(`${feedPrefix} Cron expression too frequent (every minute): ${feed.cron}`);
                 }
             }
@@ -125,21 +112,10 @@ export async function validateConfig(): Promise<boolean> {
                 errors.push(`${feedPrefix} minPrice must be less than maxPrice`);
             }
             
-            // Log validation result for this feed
-            const feedErrors = errors.filter(error => error.includes(feedPrefix));
-            if (feedErrors.length === 0) {
-                logInfo('ConfigValidator', `   ✅ ${feed.name}: Valid (${feed.sources?.length || 0} sources)`);
-            } else {
-                logInfo('ConfigValidator', `   ❌ ${feed.name}: ${feedErrors.length} error(s)`);
-            }
         });
     }
 
-    // Validate sources configuration
-    logInfo('ConfigValidator', '4. Checking Sources Configuration...');
     const sourceNames = Object.keys(sourcesConfig);
-    logInfo('ConfigValidator', `   ✅ Found ${sourceNames.length} sources: ${sourceNames.join(', ')}`);
-    
     const typedSourcesConfig = sourcesConfig as Record<string, SourceConfig>;
     sourceNames.forEach(sourceName => {
         const source = typedSourcesConfig[sourceName];
@@ -169,43 +145,23 @@ export async function validateConfig(): Promise<boolean> {
         }
     });
 
-    // Validate API keys for sources that are actually used
-    logInfo('ConfigValidator', '5. Checking API Keys for Used Sources...');
-    
     usedSources.forEach(sourceName => {
         const source = typedSourcesConfig[sourceName];
-        if (source && source.apiKeyEnvVar) {
-            if (!process.env[source.apiKeyEnvVar]) {
-                errors.push(`Missing required API key for source ${sourceName}: ${source.apiKeyEnvVar}`);
-            } else {
-                logInfo('ConfigValidator', `   ✅ ${sourceName}: API key available`);
-            }
-        } else if (source) {
-            logInfo('ConfigValidator', `   ✅ ${sourceName}: No API key required`);
+        if (source && source.apiKeyEnvVar && !process.env[source.apiKeyEnvVar]) {
+            errors.push(`Missing required API key for source ${sourceName}: ${source.apiKeyEnvVar}`);
         }
     });
 
-    // Print results
-    logInfo('ConfigValidator', '=== Validation Results ===');
-    
     if (errors.length > 0) {
-        logError('ConfigValidator', new Error(`\n❌ ERRORS:\n${errors.map(error => `   ${error}`).join('\n')}`));
+        logError('ConfigValidator', new Error(`Configuration errors:\n${errors.map(error => `   ${error}`).join('\n')}`));
+        return false;
     }
     
     if (warnings.length > 0) {
-        logInfo('ConfigValidator', `\n⚠️  WARNINGS:\n${warnings.map(warning => `   ${warning}`).join('\n')}`);
+        logInfo('ConfigValidator', `Warnings:\n${warnings.map(warning => `   ${warning}`).join('\n')}`);
     }
     
-    if (errors.length === 0) {
-        logInfo('ConfigValidator', '\n✅ Configuration is valid!');
-        if (warnings.length === 0) {
-            logInfo('ConfigValidator', '✅ No warnings found.');
-        }
-        return true;
-    } else {
-        logError('ConfigValidator', new Error(`\n❌ Found ${errors.length} error(s) and ${warnings.length} warning(s)`));
-        return false;
-    }
+    return true;
 }
 
 if (require.main === module) {

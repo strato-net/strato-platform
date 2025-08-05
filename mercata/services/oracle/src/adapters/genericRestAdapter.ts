@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { logInfo, logError } from '../utils/logger';
+import { logError } from '../utils/logger';
 import { FeedConfig, SourceConfig } from '../types';
 
 export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: SourceConfig): Promise<{
@@ -8,14 +8,12 @@ export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: So
 }> {
     try {
         const apiKey = sourceConfig.apiKeyEnvVar ? process.env[sourceConfig.apiKeyEnvVar] : '';
+        
         const url = replacePlaceholders(sourceConfig.urlTemplate, feedConfig.apiParams, apiKey || '');
-        const requestOptions = buildRequestOptions(sourceConfig, url, apiKey);
-
-        // Sanitize URL for logging by removing sensitive parameters
-        const sanitizedUrl = url.replace(/\?.*/, '') + '***';
-        logInfo('GenericAdapter', `Fetching ${feedConfig.name} from ${sanitizedUrl} (${requestOptions.method})`);
-
+        const requestOptions = buildRequestOptions(sourceConfig, url, apiKey, feedConfig.apiParams);
+        
         const response = await axios(requestOptions);
+        
         const parsePath = replacePlaceholders(sourceConfig.parsePath, feedConfig.apiParams);
         const priceUSD = extractNestedProperty(response.data, parsePath);
         const feedTimestamp = sourceConfig.feedTimestampPath 
@@ -29,8 +27,6 @@ export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: So
         const price = Math.floor(parseFloat(priceUSD) * 1e18);
 
         validatePriceBounds(feedConfig, price);
-
-        logInfo('GenericAdapter', `${feedConfig.name} → $${priceUSD} @ feedTimestamp: ${feedTimestamp}`);
 
         return { price, feedTimestamp };
 
@@ -56,7 +52,7 @@ function replacePlaceholders(template: string, params: Record<string, any>, apiK
     return result;
 }
 
-function buildRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: string = ''): any {
+function buildRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: string = '', apiParams: Record<string, any> = {}): any {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -84,7 +80,7 @@ function buildRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: st
     // Handle POST request body
     if (sourceConfig.requestBody) {
         const requestBodyStr = JSON.stringify(sourceConfig.requestBody);
-        const processedBodyStr = replacePlaceholders(requestBodyStr, {}, apiKey);
+        const processedBodyStr = replacePlaceholders(requestBodyStr, apiParams, apiKey);
         requestOptions.data = JSON.parse(processedBodyStr);
     }
 

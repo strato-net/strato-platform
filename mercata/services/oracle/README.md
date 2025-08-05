@@ -17,15 +17,16 @@ The service uses a **generic adapter pattern** that makes it extremely easy to a
 ## 🚀 Features
 
 - ✅ **Zero-Code Feed Addition**: Add new price feeds by just updating JSON config
-- ✅ **Multiple API Sources**: Alchemy, Metals.dev, LBMA, CoinGecko support built-in
+- ✅ **Multiple API Sources**: Alchemy, CoinMarketCap, Metals.dev, MetalPriceAPI support built-in
 - ✅ **OAuth2 Authentication**: Secure STRATO blockchain integration
-- ✅ **Flexible Scheduling**: Individual cron schedules per feed
+- ✅ **Flexible Scheduling**: Individual cron schedules per feed (minimum 15-minute intervals)
 - ✅ **Price Validation**: Configurable min/max price bounds per feed
 - ✅ **Batch Updates**: Efficient blockchain transactions
 - ✅ **Error Handling**: Robust error handling with detailed logging
 - ✅ **Configuration Validation**: Built-in config validation utility
 - ✅ **Token Caching**: Smart OAuth2 token management with 90% expiry safety margin
 - ✅ **TypeScript**: Full type safety and modern development experience
+- ✅ **Enhanced Logging**: Tree-structured logs with source price breakdown
 
 ## 📁 Project Structure
 
@@ -72,7 +73,14 @@ ORACLE_CONTRACT_NAME=PriceOracle
 # API Keys
 ALCHEMY_API_KEY=your_alchemy_api_key_here
 METALS_API_KEY=your_metals_api_key_here
-COINGECKO_API_KEY=your_coingecko_api_key_here
+METALPRICE_API_KEY=your_metalprice_api_key_here
+COINMARKETCAP_API_KEY=your_coinmarketcap_api_key_here
+
+# Health Check Configuration
+HEALTH_PORT=3000
+
+# Update Interval Configuration (in minutes)
+MIN_UPDATE_INTERVAL_MINUTES=15
 ```
 
 ### Feed Configuration (`src/config/feeds.json`)
@@ -107,6 +115,19 @@ Each source defines:
 - **apiKeyEnvVar**: Environment variable name for API key
 - **parsePath**: JSONPath to extract price from response
 - **feedTimestampPath**: JSONPath to extract timestamp (optional)
+
+### Update Interval Configuration
+
+The service enforces a minimum update interval to prevent excessive API calls and blockchain transactions. This is configurable via the `MIN_UPDATE_INTERVAL_MINUTES` environment variable:
+
+- **Default**: 15 minutes
+- **Minimum**: 1 minute (not recommended for production)
+- **Recommended**: 15-30 minutes for production use
+
+**Examples:**
+- `MIN_UPDATE_INTERVAL_MINUTES=15` - Allows `*/15 * * * *` cron expressions
+- `MIN_UPDATE_INTERVAL_MINUTES=30` - Allows `*/30 * * * *` cron expressions
+- `MIN_UPDATE_INTERVAL_MINUTES=5` - Allows `*/5 * * * *` cron expressions (development only)
 
 ```json
 {
