@@ -42,7 +42,7 @@ import Borrow from "./pages/Borrow";
 
 const queryClient = new QueryClient();
 
-const projectId = import.meta.env.VITE_PROJECT_ID; //project_id required for v2wallet connect
+const projectId = import.meta.env.VITE_PROJECT_ID || 'strato-mercata'; //project_id required for v2wallet connect
 const appName = "Mercata";
 
 const chains = [mainnet, polygon, sepolia] as const;
