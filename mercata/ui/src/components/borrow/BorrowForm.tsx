@@ -8,6 +8,7 @@ import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
 import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
+import PercentageButtons from "../ui/PercentageButtons";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -128,29 +129,14 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
         </div>
-        <div className="flex gap-2">
-          {[10, 25, 50, 100].map((percentage) => {
-            const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
-            const percentageAmount = percentage === 100 
-              ? maxAvailable 
-              : (safeParseFloat(maxAvailable) * (percentage / 100)).toFixed(18);
-            const isDisabled = safeParseFloat(maxAvailable) === 0;
-            
-            return (
-              <Button
-                key={percentage}
-                variant="outline"
-                size="sm"
-                onClick={() => handleBorrowPercentage(percentageAmount)}
-                disabled={isDisabled}
-                className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
-                title={isDisabled ? "No amount available to borrow" : `Set to ${percentage}% of available amount`}
-              >
-                {percentage}%
-              </Button>
-            );
-          })}
-        </div>
+        <PercentageButtons
+          value={borrowAmount}
+          maxValue={loans?.maxAvailableToBorrowUSD || "0"}
+          onChange={(val) => {
+            handleBorrowPercentage(val);
+          }}
+          className="mt-2"
+        />
       </div>
 
       {/* Risk Level */}
@@ -181,8 +167,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         onClick={handleBorrow}
         disabled={
           !borrowAmount ||
-          isNaN(Number(borrowAmount)) || 
-          Number(borrowAmount) <= 0 ||
+          safeParseUnits(borrowAmount, 18) <= 0n ||
           borrowLoading ||
           safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
           (() => {
