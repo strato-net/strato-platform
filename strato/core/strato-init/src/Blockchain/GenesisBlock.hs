@@ -47,6 +47,7 @@ import Blockchain.SolidVM.SM
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
+import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
@@ -142,7 +143,7 @@ initializeGenesisBlock = do
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
-  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators 
+  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
@@ -175,7 +176,50 @@ initializeGenesisBlock = do
   populateStorageDBs findMetadata genesisInfo genesisBlock genesisChainId
   $logInfoS "initgen" "populateStorageDBs is done"
 
---------------------------------------
+
+  -- | Populate storage databases with genesis block state and generate
+  -- corresponding events
+  --
+  -- This function performs several critical initialization tasks for the
+  -- genesis block:
+  --
+  -- 1. **State Root Management**: Retrieves current state root and temporarily
+  --    replaces it during processing to ensure consistent state handling
+  --
+  -- 2. **Kafka Topic Setup**: Ensures StateDiff topic exists in Kafka for event
+  -- streaming
+  --
+  -- 3. **Address Processing**: Iterates through all genesis account addresses
+  -- and:
+  --
+  --    - Fetches full address state from the state database
+  --    - Applies special filtering for Vitu vehicle manager contract (0x7000...0000)
+  --      to prevent performance issues with large arrays
+  --
+  -- 4. **State Diff Generation**: Creates SQL database diffs representing
+  --    account creation events for the genesis block, including:
+  --
+  --    - Block metadata (chain ID, block number, block hash, state root)
+  --    - Account state changes (all accounts are marked as "created")
+  --
+  -- 5. **VM Event Production**: Generates and publishes VM events to Kafka,
+  -- including:
+  --
+  --    - Contract deployment events for SolidVM contracts
+  --    - Action events with transaction metadata
+  --    - Code collection information and storage diffs
+  --    - Creator and origin address tracking
+  --
+  -- 6. **Contract Metadata Processing**: For SolidVM contracts, extracts and
+  -- processes:
+  --
+  --    - Abstract parent contracts
+  --    - Contract mappings and arrays
+  --    - Source code and contract names from metadata
+  --
+  -- The function ensures that both the SQL database and Kafka event stream are
+  -- properly initialized with the genesis block state, enabling proper
+  -- blockchain operation.
 populateStorageDBs ::
   ( MonadLogger m,
     HasSQLDB m,
@@ -191,9 +235,12 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
+  -- Step 1: State Root Management - Retrieve current state root and temporarily replace it
+  sr <- getStateRoot genesisChainId
+
+  -- Step 2: Kafka Topic Setup - Ensure StateDiff topic exists for event streaming
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
-  sr <- getStateRoot genesisChainId
   diffsAndEvents <- populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr
   for_ diffsAndEvents $ \(sd, vmes) -> do
     commitSqlDiffs sd
@@ -217,112 +264,172 @@ populateStorageDBs' ::
 populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr = do
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
-  let acctInfoAddress (NonContract a _) = a
-      acctInfoAddress (ContractNoStorage a _ _) = a
-      acctInfoAddress (ContractWithStorage a _ _ _) = a
-      acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
-      addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
+
+  -- Step 3: Address Processing - Iterate through all genesis account addresses
+  let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
+      events = genesisInfoEvents genesisInfo
+
   diffAndEvents <- for addresses $ \address -> do
-    -- address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
+    -- Fetch full address state from the state database
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
-    $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
+    $logInfoS "initgen" $ T.pack $
+      "##################### writing to DBs: " ++ format address
 
-    --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
-    --since this contract has giant arrays that would choke strato
-    --(yes, this temprary feature is hardcoded into the whole platform for one client)
+    -- Apply special filtering for Vitu vehicle manager contract (0x7000...0000)
+    -- to prevent performance issues with large arrays
+    -- For now, we are just clumsily filtering out any state changes for the
+    -- Vitu vehicle manager, since this contract has giant arrays that would
+    -- choke strato (yes, this temprary feature is hardcoded into the whole
+    -- platform for one client)
     let acct = address
-        -- fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
         filteredAddressState =
-          if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
+          if address /= Ad.Address 0x7000000000000000000000000000000000000000
             then fullAddressState
             else fullAddressState {addressStateContractRoot = MP.blankStateRoot}
         fullAddrStates = [(acct, fullAddressState)]
         filteredAddrStates = [(acct, filteredAddressState)]
-        toAction a d = do
-          let ch = codeHash d
-          cp <- fromMaybe ch <$> resolveCodePtr ch
-          let storageDiff = case storage d of
-                SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
-                EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
-              theMetadata =
-                getMetadata
-                ( case cp of
-                    ExternallyOwned ch' -> ch'
-                    SolidVMCode _ ch' -> ch'
-                    _ -> error $ "Could not resolve code ptr in genesis block" ++ show cp
-                )
-              lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
-              lookupSolidDiff _ _                 = Nothing
-              mCreator' = (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing) . rlpDecode . rlpDeserialize =<< lookupSolidDiff ".:creator" storageDiff
-              creator' = fromMaybe "" mCreator'
-              creatorAddress' = (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "") . maybe BDefault (rlpDecode . rlpDeserialize) $ lookupSolidDiff ".:creatorAddress" storageDiff
-              originAddress' = (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "") . maybe BDefault (rlpDecode . rlpDeserialize) $ lookupSolidDiff ".:originAddress" storageDiff
-          appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
-          (abstrs, maps, arrs, cc) <- case cp of
-            SolidVMCode contractName' codeHash' -> do
-              cc <- codeCollectionFromHash True codeHash' -- Maybe the typechecking should be done elsewhere, but this will allow us to prevent faulty code collections from going into the genesis block
-              case cc ^. CC.contracts . at contractName' of
-                Nothing -> do
-                  $logWarnS "populateStorageDBs/toAction" . T.pack $ "Couldn't find a contract named " ++ contractName' ++ " in code collection " ++ format codeHash'
-                  pure (Map.empty, [], [], cc)
-                Just contract' -> do
-                  let !abstracts' = getAbstractParentsFromContract contract' cc
-                      !mappings = getMapNamesFromContract contract'
-                      !arrays = getArrayNamesFromContract contract'
-                  $logInfoS "populateStorageDBs/toAction" . T.pack $ "creator: " ++ T.unpack creator' ++ ", app: " ++ T.unpack appName'
-                  $logInfoS "populateStorageDBs/toAction" . T.pack $ "creatorAddress: " ++ T.unpack creatorAddress' ++ ", originAddress: " ++ T.unpack originAddress'
-                  !abstrs' <- Map.fromList <$> traverse (resolveNameParts a creator' appName') abstracts'
-                  pure (abstrs', mappings, arrays, cc)
-            _ -> pure (Map.empty, [], [], emptyCodeCollection)
-          let cca = case ch of
-                SolidVMCode n _ -> Just $ CodeCollectionAdded (const () <$> cc) ch creator' (T.pack n) abstrs maps
-                _ -> Nothing
-              act = Just . NewAction $ A.Action
-                { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
-                  A._blockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock,
-                  A._blockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock,
-                  A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
-                  A._transactionSender = Ad.Address 0,
-                  A._actionData =
-                    OMap.singleton (a,
-                      A.ActionData
-                        cp
-                        emptyCodeCollection
-                        creator'
-                        mCreator'
-                        originAddress'
-                        appName'
-                        storageDiff
-                        abstrs maps arrs
-                        [A.Create]),
-                  A._src = join $ fmap (Map.lookup "src") theMetadata,
-                  A._name = join $ fmap (Map.lookup "name") theMetadata,
-                  A._events = S.empty,
-                  A._delegatecalls = S.empty
-                }
-          pure $ catMaybes [cca, act]
-        fromDiff :: Diff a 'Eventual -> a
-        fromDiff (Value v) = v
         squashMap f = fmap concat . mapM (uncurry f) . Map.toList
 
+    -- Step 4: State Diff Generation - Create SQL database diffs for account creation
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
-    vmEvents <- squashMap toAction =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
+    -- Step 5: VM Event Production - Generate and publish VM events to Kafka
+    let addressEvents = Map.findWithDefault S.empty address  events
+    vmEvents <- squashMap (toAction addressEvents) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
+    pure (mkStateDiff fullAccountDiffs, vmEvents)
 
-    let statediff ad =
-          StateDiff
-            { StateDiff.chainId = genesisChainId,
-              blockNumber = 0,
-              StateDiff.blockHash = blockHash genesisBlock,
-              StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
-              createdAccounts = ad,
-              deletedAccounts = Map.empty,
-              updatedAccounts = Map.empty
-            }
-
-    return (statediff fullAccountDiffs, vmEvents)
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   pure diffAndEvents
+
+  where
+
+    mkStateDiff ad =
+      StateDiff
+        { StateDiff.chainId = genesisChainId,
+          blockNumber = 0,
+          StateDiff.blockHash = blockHash genesisBlock,
+          StateDiff.stateRoot =
+            MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
+          createdAccounts = ad,
+          deletedAccounts = Map.empty,
+          updatedAccounts = Map.empty
+        }
+
+    toAction ::
+      ( MonadLogger m
+      , MonadIO m
+      , HasCodeDB m
+      , HasStorageDB m
+      , Selectable Ad.Address AddressState m
+      )
+      => S.Seq Event
+      -> Ad.Address
+      -> AccountDiff 'Eventual
+      -> m [VMEvent]
+    toAction addressEvents a d = do
+      let ch = codeHash d
+      cPtr <- fromMaybe ch <$> resolveCodePtr ch
+      let
+          theMetadata = getMetadata $ genesisBlockCodePtr cPtr
+          creator' = fromMaybe "" mkCreator
+          creatorAddress' = mkCreatorAddress
+          originAddress' = mkOriginAddress
+
+      appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
+      (abstrs, maps, arrs, cc) <- case cPtr of
+        SolidVMCode contractName' codeHash' -> do
+          -- Maybe the typechecking should be done elsewhere, but this will
+          -- allow us to prevent faulty code collections from going into the
+          -- genesis block
+          cc <- codeCollectionFromHash True codeHash'
+          case cc ^. CC.contracts . at contractName' of
+            Nothing -> do
+              $logWarnS "populateStorageDBs/toAction" . T.pack $
+                "Couldn't find a contract named " ++ contractName' ++
+                " in code collection " ++ format codeHash'
+              pure (Map.empty, [], [], cc)
+            Just contract' -> do
+              let !abstracts' = getAbstractParentsFromContract contract' cc
+                  !mappings = getMapNamesFromContract contract'
+                  !arrays = getArrayNamesFromContract contract'
+              $logInfoS "populateStorageDBs/toAction" . T.pack $
+                "creator: " ++ T.unpack creator' ++ ", app: "
+                ++ T.unpack appName'
+              $logInfoS "populateStorageDBs/toAction" . T.pack $
+                "creatorAddress: " ++ T.unpack creatorAddress' ++
+                ", originAddress: " ++ T.unpack originAddress'
+              !abstrs' <- Map.fromList <$> traverse (resolveNameParts a creator' appName') abstracts'
+              pure (abstrs', mappings, arrays, cc)
+        _ -> pure (Map.empty, [], [], emptyCodeCollection)
+      let cca = case ch of
+            SolidVMCode n _ ->
+              let
+                application' = T.pack n
+                codeCollection' = () <$ cc
+                codeCollectionAdded =
+                  CodeCollectionAdded codeCollection' ch creator' application' abstrs maps
+              in Just codeCollectionAdded
+            ExternallyOwned _ -> Nothing
+            CodeAtAccount {} -> Nothing
+          act = Just . NewAction $ A.Action
+            { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
+              A._blockTimestamp =
+                blockHeaderTimestamp $ blockHeader genesisBlock,
+              A._blockNumber =
+                blockHeaderBlockNumber $ blockHeader genesisBlock,
+              A._transactionHash =
+                unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
+              A._transactionSender = Ad.Address 0,
+              A._actionData =
+                OMap.singleton (a,
+                  A.ActionData
+                    cPtr
+                    emptyCodeCollection
+                    creator'
+                    mkCreator
+                    originAddress'
+                    appName'
+                    storageDiff
+                    abstrs maps arrs
+                    [A.Create]),
+              A._src = join $ fmap (Map.lookup "src") theMetadata,
+              A._name = join $ fmap (Map.lookup "name") theMetadata,
+              A._events = addressEvents,
+              A._delegatecalls = S.empty
+            }
+      pure $ catMaybes [cca, act]
+      where
+
+        fromDiff :: Diff a 'Eventual -> a
+        fromDiff (Value v) = v
+
+        mkCreator =
+            (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing)
+          . rlpDecode
+          . rlpDeserialize =<< lookupSolidDiff ".:creator" storageDiff
+
+        mkCreatorAddress =
+            (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "")
+          . maybe BDefault (rlpDecode . rlpDeserialize)
+          $ lookupSolidDiff ".:creatorAddress" storageDiff
+
+        mkOriginAddress =
+            (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "")
+          . maybe BDefault (rlpDecode . rlpDeserialize)
+          $ lookupSolidDiff ".:originAddress" storageDiff
+
+        storageDiff = case storage d of
+          SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
+          EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
+
+        genesisBlockCodePtr (ExternallyOwned ch') = ch'
+        genesisBlockCodePtr (SolidVMCode _ ch') = ch'
+        genesisBlockCodePtr cp =
+          error $ "Could not resolve code ptr in genesis block" ++ show cp
+
+        lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
+        lookupSolidDiff _ _                 = Nothing
+
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do

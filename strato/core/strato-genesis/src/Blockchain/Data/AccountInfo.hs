@@ -3,7 +3,8 @@
 
 module Blockchain.Data.AccountInfo
   ( AccountInfo (..),
-    accountExtractor
+    accountExtractor,
+    acctInfoAddress
   )
 where
 
@@ -30,6 +31,12 @@ data AccountInfo
   | ContractWithStorage Address Integer CodePtr [(Word256, Word256)]
   | SolidVMContractWithStorage Address Integer CodePtr [(B.ByteString, BasicValue)]
   deriving (Show, Eq, Read)
+
+acctInfoAddress :: AccountInfo ->  Address
+acctInfoAddress (NonContract a _) = a
+acctInfoAddress (ContractNoStorage a _ _) = a
+acctInfoAddress (ContractWithStorage a _ _ _) = a
+acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
 
 instance Format AccountInfo where
   format (NonContract addr nonce) =

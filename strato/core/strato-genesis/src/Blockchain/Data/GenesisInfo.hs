@@ -20,6 +20,8 @@ where
 
 import Blockchain.Data.AccountInfo
 import Blockchain.Data.CodeInfo
+import Blockchain.Strato.Model.Event
+import Blockchain.Strato.Model.Address
 import qualified Blockchain.Data.AccountInfoOld as OLD
 import qualified Blockchain.Data.CodeInfoOld as OLD
 import qualified Blockchain.Data.GenesisInfoOld as OLD
@@ -40,6 +42,8 @@ import GHC.Generics (Generic)
 import qualified LabeledError
 import Text.Format
 import Text.Tools
+import qualified Data.Map.Strict as M
+import qualified Data.Sequence as S
 
 data GenesisInfo = GenesisInfo
   { genesisInfoParentHash :: Keccak256,
@@ -57,7 +61,8 @@ data GenesisInfo = GenesisInfo
     genesisInfoTimestamp :: UTCTime,
     genesisInfoExtraData :: Integer,
     genesisInfoMixHash :: Keccak256,
-    genesisInfoNonce :: Word64
+    genesisInfoNonce :: Word64,
+    genesisInfoEvents :: M.Map Address (S.Seq Event)
   }
   deriving (Show, Read, Eq, Generic)
 
@@ -111,7 +116,8 @@ defaultGenesisInfo =
       genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC" :: UTCTime,
       genesisInfoExtraData = 0,
       genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
-      genesisInfoNonce = 42
+      genesisInfoNonce = 42,
+      genesisInfoEvents = M.empty
     }
 
 instance FromJSON GenesisInfo where
@@ -133,6 +139,7 @@ instance FromJSON GenesisInfo where
       <*> o .: "extraData"
       <*> o .: "mixHash"
       <*> o .: "nonce"
+      <*> o .:? "events" .!= M.empty
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
@@ -158,6 +165,7 @@ genesisParser =
     <*> "extraData" JS..: JS.value
     <*> "mixHash" JS..: JS.value
     <*> "nonce" JS..: JS.value
+    <*> ("events" JS..: JS.value JS..| M.empty)
 
 getGenesisInfo :: MonadIO m => m GenesisInfo
 getGenesisInfo = do
@@ -186,6 +194,7 @@ convertFromOld OLD.GenesisInfo{..} =
     genesisInfoExtraData
     genesisInfoMixHash
     genesisInfoNonce
+    M.empty
   where
     convertFromOldAccountInfo :: OLD.AccountInfo -> AccountInfo
     convertFromOldAccountInfo (OLD.NonContract address nonce) = NonContract address nonce
