@@ -95,6 +95,55 @@ contract Describe_Mercata {
         require(l1 > 0, "Failed to add liquidity to pool 1");
         require(u1.callApprove(t1, p1, u1t1Amt), "Approval failed for u1");
         uint o1 = u1.callSwap(p1, true, u1t1Amt, 2000e18);
-        require(o1 == 0, "Swap 1 returned less money than expected: " + string(o1));
+        require(o1 > 0, "Swap 1 returned less money than expected: " + string(o1));
+    }
+
+    function it_can_hash_last_piecewise_transaction_data() {
+        uint ver = 2;
+        uint nonce = 1620;
+        uint gasLimit = 150000;
+        address to = address(0x000000000000000000000000000000000000100e);
+        string funcName = "mint";
+        string[] args = ["0xac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7","10000000000000000000"];
+        string network = "mercata";
+        uint v = 0x1c;
+        uint r = 0xa3a96e57d33654b676751ba4e4e39fa2ba6d870ad9932c31e8485f5011f701e9;
+        uint s = 0x11d7a39195e4eea4f66e735455db97d63b1e48f3d5af34c54c39264cef9d4f19;
+
+        string h = keccak256(ver, nonce, gasLimit, to, funcName, args, network, v, r, s);
+        string u = keccak256(ver, nonce, gasLimit, to, funcName, args, network);
+        address from = ecrecover(u, v, r, s);
+        require(from == address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce), "Signed tx hash: " + h + ", unsigned tx hash: " + u + ", Signer: 0x" + string(from) + " didn't match 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce");
+    }
+
+    struct Transaction {
+        uint aversion;
+        uint bnonce;
+        uint cgasLimit;
+        address dto;
+        string efuncName;
+        string[] fargs;
+        string gnetwork;
+        uint hv;
+        uint ir;
+        uint js;
+    }
+
+    function it_can_hash_transaction_data() {
+        uint ver = 2;
+        uint nonce = 1620;
+        uint gasLimit = 150000;
+        address to = address(0x000000000000000000000000000000000000100e);
+        string funcName = "mint";
+        string[] args = ["0xac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7","10000000000000000000"];
+        string network = "mercata";
+        uint v = 0x1c;
+        uint r = 0xa3a96e57d33654b676751ba4e4e39fa2ba6d870ad9932c31e8485f5011f701e9;
+        uint s = 0x11d7a39195e4eea4f66e735455db97d63b1e48f3d5af34c54c39264cef9d4f19;
+        Transaction t = Transaction(ver, nonce, gasLimit, to, funcName, args, network, v, r, s);
+
+        string h = keccak256(ver, nonce, gasLimit, to, funcName, args, network, v, r, s);
+        string h2 = keccak256(t);
+        require(h == h2, "Hashes don't match");
     }
 }

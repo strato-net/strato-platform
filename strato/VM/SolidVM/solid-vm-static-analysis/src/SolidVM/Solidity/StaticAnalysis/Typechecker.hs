@@ -1343,13 +1343,13 @@ byteArgs :: SourceAnnotation Text -> Type'
 byteArgs x = intType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
-keccak256Args x = MultiVariate (stringType' x) x
+keccak256Args x = topType' x
 
 sha256Args :: SourceAnnotation Text -> Type'
-sha256Args x = MultiVariate (stringType' x) x
+sha256Args x = topType' x
 
 ripemd160Args :: SourceAnnotation Text -> Type'
-ripemd160Args x = MultiVariate (stringType' x) x
+ripemd160Args x = topType' x
 
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
@@ -1387,7 +1387,11 @@ blockhashArgs :: SourceAnnotation Text -> Type'
 blockhashArgs x = intType' x
 
 ecrecoverArgs :: SourceAnnotation Text -> Type'
-ecrecoverArgs x = Product [stringType' x, intType' x, stringType' x, stringType' x] x
+ecrecoverArgs x = Product [ stringType' x
+                          , intType' x
+                          , Sum $ (stringType' x) :| [intType' x]
+                          , Sum $ (stringType' x) :| [intType' x]
+                          ] x
 
 addmodArgs :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x

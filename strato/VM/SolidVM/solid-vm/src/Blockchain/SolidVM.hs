@@ -35,6 +35,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
+import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Builtins as Builtins
@@ -2567,52 +2568,30 @@ callBuiltin "decimal" args _ = return $ decimalBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
-callBuiltin "keccak256" args Nothing = do
-  let allStrings [] = True
-      allStrings ((SString _) : xs) = True && (allStrings xs)
-      allStrings _ = False
-      customConcat :: [Value] -> String 
-      customConcat [] = ""
-      customConcat ((SString str) : ys) = str ++ customConcat ys
-      customConcat _ = invalidArguments "cannot use a non string arguments in keccak256" args
-  case allStrings args of
-    False -> invalidArguments "cannot use a non string arguments in keccak256" args
-    True -> return . SString . keccak256ToHex . hash . BC.pack $ customConcat args
-callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = case B16.decode (BC.pack h) of
+callBuiltin "keccak256" args Nothing = SString . keccak256ToHex . hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "ecrecover" [SString h, SInteger v, r', s'] _ = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)
   Right bytestringHash -> do
-    rIntHash <- case Numeric.readHex r of
-      [(x, "")] -> return x
-      _ -> invalidArguments "parseHex: error parsing r: " r
-    sIntHash <- case Numeric.readHex s of
-      [(y, "")] -> return y
-      _ -> invalidArguments "parseHex: error parsing s: " s
+    rIntHash <- case r' of
+      SInteger r -> pure r
+      SString r -> case Numeric.readHex r of
+        [(x, "")] -> return x
+        _ -> invalidArguments "parseHex: error parsing r: " r
+      _ -> invalidArguments "ecrecover: r must be a hex string or an integer" r'
+    sIntHash <- case s' of
+      SInteger s -> pure s
+      SString s -> case Numeric.readHex s of
+        [(y, "")] -> return y
+        _ -> invalidArguments "parseHex: error parsing s: " s
+      _ -> invalidArguments "ecrecover: s must be a hex string or an integer" s'
     let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
     let theZero :: Integer
         theZero = 0
     case theSignerAddress of
       Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
       Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
-callBuiltin ("sha256") args Nothing = do
-  let allStrings [] = True
-      allStrings ((SString _) : xs) = True && (allStrings xs)
-      allStrings _ = False
-      customConcat [] = ""
-      customConcat ((SString str) : ys) = str ++ customConcat ys
-      customConcat _ = invalidArguments "cannot use a non string arguments in sha256" args
-  case allStrings args of
-    False -> invalidArguments "cannot use a non string arguments in sha256" args
-    True -> return . SString . BC.unpack . SHA256.hash . BC.pack $ customConcat args
-callBuiltin ("ripemd160") args Nothing = do
-  let allStrings [] = True
-      allStrings ((SString _) : xs) = True && (allStrings xs)
-      allStrings _ = False
-      customConcat [] = ""
-      customConcat ((SString str) : ys) = str ++ customConcat ys
-      customConcat _ = invalidArguments "cannot use a non string arguments in ripemd160" args
-  case allStrings args of
-    False -> invalidArguments "cannot use a non string arguments in ripemd160" args
-    True -> return . SString . BC.unpack . RIPEMD160.hash . BC.pack $ customConcat args
+callBuiltin "sha256" args Nothing = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "ripemd160" args Nothing = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin ("payable") [SAccount a _] _ = return $ SAccount a True
 callBuiltin "require" (SBool cond : msg) Nothing = do
   case msg of
