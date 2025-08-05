@@ -1,39 +1,94 @@
 import Joi from "@hapi/joi";
-import { normalizeAddress } from "../../utils/utils";
 export function validateBuyArgs(args: any) {
-  args.token = normalizeAddress(args.token);
-  args.paymentProviderAddress = normalizeAddress(args.paymentProviderAddress);
+  
+  if (!args || typeof args !== "object") {
+    throw new Error("Invalid input: args must be an object.");
+  }
 
-  const schema = Joi.object({
-    token: Joi.string().pattern(/^0x[a-fA-F0-9]{40}$/).required(), // Ethereum address
-    amount: Joi.string().pattern(/^\d+$/).required(),
-    paymentProviderAddress: Joi.string().pattern(/^0x[a-fA-F0-9]{40}$/).required(),
+  // First validate required fields are present
+  const baseSchema = Joi.object({
+    token: Joi.string().required(),
+    amount: Joi.string().required(),
+    paymentProviderAddress: Joi.string().required(),
   }).strict();
 
-  const { error } = schema.validate(args);
-  if (error) throw new Error("Buy Argument Validation Error: " + error.message);
+  const { error: baseError } = baseSchema.validate(args);
+  if (baseError) {
+    throw new Error("Buy Argument Validation Error: " + baseError.message);
+  }
 
-  if (BigInt(args.amount) <= 0n) {
-    throw new Error("Amount must be a positive integer");
+  // Post-normalization validation
+  const finalSchema = Joi.object({
+    token: Joi.string()
+      .pattern(/^[a-fA-F0-9]{40}$/)
+      .required()
+      .messages({
+        "string.pattern.base": "Token address must be a valid Ethereum address.",
+      }),
+    amount: Joi.string()
+      .pattern(/^\d+$/)
+      .required()
+      .custom((value, helpers) => {
+        const big = BigInt(value);
+        if (big <= 0n) {
+          return helpers.error("any.invalid");
+        }
+        return value;
+      }, "Positive amount check")
+      .messages({
+        "string.pattern.base": "Amount must be a numeric string.",
+        "any.invalid": "Amount must be greater than 0.",
+      }),
+    paymentProviderAddress: Joi.string()
+      .pattern(/^[a-fA-F0-9]{40}$/)
+      .required()
+      .messages({
+        "string.pattern.base": "Payment provider address must be a valid Ethereum address.",
+      }),
+  }).strict();
+
+  const { error } = finalSchema.validate(args);
+  if (error) {
+    throw new Error("Buy Argument Validation Error: " + error.message);
   }
 }
 
 export function validateSellArgs(args: any) {
-  args.token = normalizeAddress(args.token);
-  args.providerAddresses = args.providerAddresses.map(normalizeAddress);
-  const schema = Joi.object({
+  if (!args || typeof args !== "object") {
+    throw new Error("Invalid input: args must be an object.");
+  }
+
+  // Step 1: Initial basic validation
+  const baseSchema = Joi.object({
+    token: Joi.string().required(),
+    amount: Joi.string().required(),
+    marginBps: Joi.string().required(),
+    providerAddresses: Joi.array().items(Joi.string().required()).min(1).required(),
+  }).strict();
+
+  const { error: baseError } = baseSchema.validate(args);
+  if (baseError) {
+    throw new Error("Sell Argument Validation Error: " + baseError.message);
+  }
+
+  const finalSchema = Joi.object({
     token: Joi.string()
-      .pattern(/^0x[a-fA-F0-9]{40}$/)
+      .pattern(/^[a-fA-F0-9]{40}$/)
       .required()
       .messages({
-        "string.pattern.base": "Token address must be a valid 0x-prefixed Ethereum address.",
+        "string.pattern.base": "Token address must be a valid Ethereum address.",
       }),
 
     amount: Joi.string()
       .pattern(/^\d+$/)
       .required()
+      .custom((value, helpers) => {
+        if (BigInt(value) <= 0n) return helpers.error("any.invalid");
+        return value;
+      }, "positive amount check")
       .messages({
         "string.pattern.base": "Amount must be a numeric string.",
+        "any.invalid": "Amount must be greater than 0.",
       }),
 
     marginBps: Joi.string()
@@ -53,9 +108,9 @@ export function validateSellArgs(args: any) {
     providerAddresses: Joi.array()
       .items(
         Joi.string()
-          .pattern(/^0x[a-fA-F0-9]{40}$/)
+          .pattern(/^[a-fA-F0-9]{40}$/)
           .messages({
-            "string.pattern.base": "Each provider address must be a valid 0x-prefixed Ethereum address.",
+            "string.pattern.base": "Each provider address must be a valid Ethereum address.",
           })
       )
       .required()
@@ -66,12 +121,8 @@ export function validateSellArgs(args: any) {
       }),
   }).strict();
 
-  const { error } = schema.validate(args);
+  const { error } = finalSchema.validate(args);
   if (error) {
     throw new Error("Sell Argument Validation Error: " + error.message);
-  }
-
-  if (BigInt(args.amount) <= 0n) {
-    throw new Error("Amount must be a positive value.");
   }
 }
