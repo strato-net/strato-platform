@@ -44,8 +44,6 @@ import qualified Data.Aeson as Aeson
 import Data.Bifunctor (bimap, first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
--- import           System.Clock
--- import qualified Data.Cache                          as DC
 import qualified Data.Cache.LRU as LRU
 import Data.Default
 import Data.Foldable (foldrM)

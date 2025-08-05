@@ -113,16 +113,6 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
     Just f@TFKnownFailedTX {} -> recoverable f
     Just f@TFTransactionGasExceeded {} -> recoverable f
 
--- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [BlockHeader] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
--- rewardCoinbases us uncles ourNumber = do
---     _ <- addToBalance (Account us Nothing) $ rewardBase flags_testnet
---     forM_ uncles $ \uncle -> do
---         _ <- addToBalance (Account us Nothing) (rewardBase flags_testnet `quot` 32)
---         _ <- addToBalance (Account (beneficiary uncle) Nothing) ((rewardBase flags_testnet * (8+number uncle - ourNumber )) `quot` 8)
---         return ()
---     flushMemStorageDB
---     flushMemAddressStateDB
---     A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
 
 -- todo batch insert results
 txsDroppedCallback :: MonadBagger m => [TxRejection] -> [Keccak256] -> m () -- called when a Tx is dropped from/rejected by the pool

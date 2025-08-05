@@ -71,8 +71,6 @@ import Executable.EthereumVM2
 import SolidVM.Model.CodeCollection
 import Text.Format (format)
 
--- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
---   deriving (Eq, Ord, Show)
 
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do

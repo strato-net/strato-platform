@@ -98,9 +98,3 @@ f (dataset, fullSize', mixhashes, s) i mix = do
     v1 <- MA.readArray mix $ k + 16
     v2 <- MA.readArray data2 k
     MA.writeArray mix (k + 16) (fnv v1 v2)
-  where
-
---hashimotoFull :: Int -> Dataset -> SHA -> Int
---hashimotoFull fullSize dataset header nonce = undefined
-
--- mixHash ::  -> SHA
