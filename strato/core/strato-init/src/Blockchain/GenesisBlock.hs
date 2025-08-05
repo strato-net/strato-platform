@@ -173,7 +173,6 @@ initializeGenesisBlock = do
   populateStorageDBs findMetadata genesisInfo genesisBlock genesisChainId
   $logInfoS "initgen" "populateStorageDBs is done"
 
---------------------------------------
 populateStorageDBs ::
   ( MonadLogger m,
     HasSQLDB m,
