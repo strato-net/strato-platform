@@ -1,16 +1,34 @@
-pragma solidvm 12.0;
+import "../concrete/BaseCodeCollection.sol";
 
-import "../abstract/BaseCodeCollection.sol";
+contract User {
+    function do(address a, string f, variadic args) public returns (variadic) {
+        variadic result = address(a).call(f, args);
+        return result;
+    }
+    
+    function callApprove(address a, address to, uint amount) public returns (bool) {
+        return ERC20(a).approve(to, amount);
+    }
+    
+    function callSwap(address a, bool isAToB, uint amountIn, uint minAmountOut) public returns (uint) {
+        return Pool(a).swap(isAToB, amountIn, minAmountOut);
+    }
+}
 
 contract Describe_Mercata {
+    constructor() {
+    }
+
+    Mercata m;
     function beforeAll() {
+        m = new Mercata();
+        require(address(m) != address(0), "Mercata address is 0");
     }
 
     function beforeEach() {
     }
 
     function it_can_deploy_Mercata() {
-        Mercata m = new Mercata();
         require(address(m) != address(0), "address is 0");
     }
 
