@@ -41,8 +41,6 @@ instance FromJSON PostTransaction where
 instance ToJSON PostTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
---instance Arbitrary PostTransaction where
---  arbitrary = GR.genericArbitrary GR.uniform
 
 {-
 instance ToSample PostTransaction where

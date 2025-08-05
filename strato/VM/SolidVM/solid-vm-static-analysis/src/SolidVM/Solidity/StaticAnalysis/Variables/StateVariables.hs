@@ -27,7 +27,6 @@ type LocalVars = [M.Map SolidString (SourceAnnotation ())]
 
 type SSS = State (StateVars, LocalVars)
 
--- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
