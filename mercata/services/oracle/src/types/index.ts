@@ -1,23 +1,35 @@
-export interface SourceConfig {
-    name?: string;
-    apiKeyEnvVar?: string;
-    apiKeyType?: 'bearer' | 'url' | 'header';
-    urlTemplate: string;
-    parsePath: string;
-    feedTimestampPath?: string;
-    headers?: Record<string, string>;
-    method?: string;
-    requestBody?: any;
+export interface Asset {
+    name: string;
+    tokenAddress?: string;
+    targetAssetAddress: string;
+}
+
+export interface BatchPriceResult {
+    [assetName: string]: {
+        price: number;
+        feedTimestamp: string;
+    };
 }
 
 export interface FeedConfig {
     name: string;
-    source: string;
-    targetAssetAddress: string;
+    sources: string[];
+    assets: string[]; // Array of asset keys
     cron: string;
-    apiParams: Record<string, any>;
     minPrice?: number;
     maxPrice?: number;
+}
+
+export interface SourceConfig {
+    url: string;
+    method?: string;
+    params?: string; // Comma-separated URL parameters
+    headers?: string; // Comma-separated header names
+    body?: string; // Request body key
+    parse: string; // Price parsing pattern
+    timestamp?: string; // Timestamp parsing pattern
+    batchMode?: boolean;
+    apiKeyEnvVar?: string; // Environment variable name for API key
 }
 
 export interface SourcesConfig {

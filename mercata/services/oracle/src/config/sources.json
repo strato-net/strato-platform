@@ -1,42 +1,34 @@
 {
   "Alchemy": {
-    "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
-    "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "apiKeyType": "bearer",
+    "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
     "method": "POST",
-    "requestBody": {
-      "addresses": [
-        {
-          "network": "eth-mainnet",
-          "address": "${tokenAddress}"
-        }
-      ]
-    },
-    "parsePath": "data[0].prices[0].value",
-    "feedTimestampPath": "data[0].prices[0].lastUpdatedAt"
-  },
-  "Metals.dev": {
-    "urlTemplate": "https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&unit=toz",
-    "apiKeyEnvVar": "METALS_API_KEY",
-    "apiKeyType": "url",
-    "parsePath": "metals.${metal}",
-    "feedTimestampPath": "timestamps.metal"
-  },
-  "MetalPriceAPI": {
-    "urlTemplate": "https://api.metalpriceapi.com/v1/latest?api_key=${API_KEY}&base=USD&currencies=EUR,XAU,XAG",
-    "apiKeyEnvVar": "METALPRICE_API_KEY",
-    "apiKeyType": "url",
-    "parsePath": "rates.USD${symbol}",
-    "feedTimestampPath": "timestamp"
+    "body": "addresses",
+    "parse": "data[].prices[0].value",
+    "timestamp": "data[0].prices[0].lastUpdatedAt",
+    "batchMode": true,
+    "apiKeyEnvVar": "ALCHEMY_API_KEY"
   },
   "CoinMarketCap": {
-    "urlTemplate": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?symbol=${symbol}&convert=USD",
-    "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
-    "apiKeyType": "header",
-    "headers": {
-      "X-CMC_PRO_API_KEY": "${API_KEY}"
-    },
-    "parsePath": "data.${symbol}[0].quote.USD.price",
-    "feedTimestampPath": "data.${symbol}[0].quote.USD.last_updated"
+    "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
+    "params": "symbol,convert=USD",
+    "headers": "X-CMC_PRO_API_KEY",
+    "parse": "data.{symbol}[0].quote.USD.price",
+    "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
+    "batchMode": true,
+    "apiKeyEnvVar": "COINMARKETCAP_API_KEY"
+  },
+  "Metals.dev": {
+    "url": "https://api.metals.dev/v1/latest",
+    "params": "api_key,currency=USD,unit=toz",
+    "parse": "metals.{metal}",
+    "timestamp": "timestamps.metal",
+    "apiKeyEnvVar": "METALS_API_KEY"
+  },
+  "MetalPriceAPI": {
+    "url": "https://api.metalpriceapi.com/v1/latest",
+    "params": "api_key,base=USD,currencies=XAU,XAG",
+    "parse": "rates.USD{symbol}",
+    "timestamp": "timestamp",
+    "apiKeyEnvVar": "METALPRICE_API_KEY"
   }
 } 

@@ -1,152 +1,196 @@
 import cron from 'node-cron';
-import { fetchGenericPrice } from './adapters/genericRestAdapter';
+import { logInfo, logError, logFeedUpdate } from './utils/logger';
+import { fetchBatchPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
-import { logFeedUpdate, logError, logInfo } from './utils/logger';
-const feedsConfig = require('./config/feeds.json');
-const sourcesConfig = require('./config/sources.json');
-import { SourceConfig } from './types';
+import { ConfigLoader } from './utils/configLoader';
+import { Asset } from './types';
 
-function buildApiParams(sourceConfig: SourceConfig, feed: any, source: any): Record<string, any> {
-    const params: Record<string, any> = {};
+// Process all feeds in parallel and combine results
+async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
+    const resolvedFeeds = configLoader.getResolvedFeeds();
     
-    // Check what parameters the source expects based on its configuration
-    const urlTemplate = sourceConfig.urlTemplate || '';
-    const parsePath = sourceConfig.parsePath || '';
-    
-    // Check for tokenAddress parameter
-    if (urlTemplate.includes('${tokenAddress}') || parsePath.includes('${tokenAddress}')) {
-        if (feed.tokenAddress) {
-            params.tokenAddress = feed.tokenAddress;
+    // Process all feeds in parallel
+    const feedPromises = resolvedFeeds.map(async (feed) => {
+        try {
+            return await processBatchFeed(feed, configLoader);
+        } catch (err) {
+            const error = err as Error;
+            logError('CronScheduler', new Error(`${feed.name}: ${error.message}`));
+            return null;
         }
-    }
+    });
+
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Parallel feed processing timeout')), 60000)
+    );
     
-    // Check for symbol parameter
-    if (urlTemplate.includes('${symbol}') || parsePath.includes('${symbol}')) {
-        if (feed.symbol) {
-            params.symbol = feed.symbol;
+    try {
+        const results = await Promise.race([
+            Promise.allSettled(feedPromises),
+            timeoutPromise
+        ]) as PromiseSettledResult<any>[];
+        
+        // Collect all successful results
+        const allAssetPrices: Record<string, number> = {};
+        const allAssetAddresses: Record<string, string> = {};
+        const allAssetSources: Record<string, string[]> = {};
+        
+        results.forEach((result) => {
+            if (result.status === 'fulfilled' && result.value) {
+                const { assetPrices, assetAddresses, assetSources } = result.value;
+                
+                // Merge results from all feeds
+                Object.keys(assetPrices).forEach(assetName => {
+                    allAssetPrices[assetName] = assetPrices[assetName];
+                    allAssetAddresses[assetName] = assetAddresses[assetName];
+                    allAssetSources[assetName] = assetSources[assetName];
+                });
+            }
+        });
+        
+        if (Object.keys(allAssetPrices).length === 0) {
+            throw new Error('No valid prices received from any feed');
         }
-    }
-    
-    // Check for metal parameter (for metals feeds)
-    if (urlTemplate.includes('${metal}') || parsePath.includes('${metal}')) {
-        if (source.apiParams?.metal) {
-            params.metal = source.apiParams.metal;
+
+        // Push all assets to blockchain in single transaction
+        const assetNames = Object.keys(allAssetPrices);
+        const assetAddresses = assetNames.map(name => allAssetAddresses[name]);
+        const assetPriceValues = assetNames.map(name => allAssetPrices[name]);
+        
+        const result = await pushAssetPrices(assetAddresses, assetPriceValues);
+
+        // Log success for each asset
+        assetNames.forEach(assetName => {
+            const price = allAssetPrices[assetName];
+            const sources = allAssetSources[assetName];
+            
+            logFeedUpdate(assetName, price, sources.map(s => ({ name: s, price })), result.hash);
+        });
+        
+    } catch (timeoutError) {
+        if (timeoutError instanceof Error && timeoutError.message === 'Parallel feed processing timeout') {
+            logError('CronScheduler', new Error(`Feed processing timeout after 60000ms`));
         }
+        throw timeoutError;
     }
-    
-    // If no parameters were found, fall back to the original logic
-    if (Object.keys(params).length === 0) {
-        if (feed.tokenAddress) {
-            params.tokenAddress = feed.tokenAddress;
-        } else if (feed.symbol) {
-            params.symbol = feed.symbol;
-        } else if (source.apiParams) {
-            Object.assign(params, source.apiParams);
+}
+
+async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<{
+    assetPrices: Record<string, number>;
+    assetAddresses: Record<string, string>;
+    assetSources: Record<string, string[]>;
+}> {
+    const resolvedFeed = configLoader.getResolvedFeeds().find(f => f.name === feed.name);
+    if (!resolvedFeed) {
+        throw new Error(`Feed ${feed.name} not found in resolved configuration`);
+    }
+
+    // Prepare parallel fetch tasks for batch sources
+    const fetchTasks = resolvedFeed.sources.map(async (sourceName: string) => {
+        try {
+            const sourceConfig = configLoader.getSourceConfig(sourceName);
+            const batchResult = await fetchBatchPrices(resolvedFeed.assets, sourceConfig);
+            
+            return { batchResult, source: sourceName, success: true };
+            
+        } catch (err) {
+            const error = err as Error;
+            logError('CronScheduler', new Error(`${feed.name} from ${sourceName}: ${error.message}`));
+            return { batchResult: {}, source: sourceName, success: false, error: error.message };
         }
-    }
+    });
+
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Parallel fetch timeout')), 30000)
+    );
     
-    return params;
+    try {
+        const results = await Promise.race([
+            Promise.allSettled(fetchTasks),
+            timeoutPromise
+        ]) as PromiseSettledResult<any>[];
+        
+        // Process batch results
+        const allSuccessfulSources: Array<{name: string, prices: Record<string, number>}> = [];
+        const failedSources: string[] = [];
+        
+        results.forEach((result) => {
+            if (result.status === 'fulfilled' && (result as PromiseFulfilledResult<any>).value.success) {
+                const value = (result as PromiseFulfilledResult<any>).value;
+                allSuccessfulSources.push({
+                    name: value.source,
+                    prices: value.batchResult
+                });
+            } else {
+                const error = result.status === 'rejected' ? (result as PromiseRejectedResult).reason : 'Unknown error';
+                failedSources.push('unknown');
+                logError('CronScheduler', new Error(`Failed to fetch ${feed.name}: ${error}`));
+            }
+        });
+        
+        if (allSuccessfulSources.length === 0) {
+            throw new Error(`No valid prices received for ${feed.name} from any source`);
+        }
+
+        // Calculate average prices for each asset across sources
+        const assetPrices: Record<string, number> = {};
+        const assetAddresses: Record<string, string> = {};
+        const assetSources: Record<string, string[]> = {};
+        
+        resolvedFeed.assets.forEach((asset: Asset) => {
+            const prices: number[] = [];
+            const sources: string[] = [];
+            
+            allSuccessfulSources.forEach(source => {
+                const assetResult = source.prices[asset.name] as any;
+                if (assetResult && assetResult.price && assetResult.feedTimestamp) {
+                    prices.push(assetResult.price);
+                    sources.push(source.name);
+                }
+            });
+            
+            if (prices.length > 0) {
+                const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
+                
+                assetPrices[asset.name] = averagePrice;
+                assetAddresses[asset.name] = asset.targetAssetAddress;
+                assetSources[asset.name] = sources;
+            }
+        });
+
+        return { assetPrices, assetAddresses, assetSources };
+        
+    } catch (timeoutError) {
+        if (timeoutError instanceof Error && timeoutError.message === 'Parallel fetch timeout') {
+            logError('CronScheduler', new Error(`${feed.name}: Timeout after 30000ms`));
+        }
+        throw timeoutError;
+    }
 }
 
 export function startCronScheduler(): void {
-    logInfo('CronScheduler', `Starting Oracle Service with ${feedsConfig.feeds.length} feeds`);
+    const configLoader = new ConfigLoader();
+    const resolvedFeeds = configLoader.getResolvedFeeds();
+    
+    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (parallel execution)`);
 
-    for (const feed of feedsConfig.feeds) {
-        // Create the job function
-        const jobFunction = async () => {
-            try {
-                // Prepare parallel fetch tasks
-                const fetchTasks = feed.sources.map(async (source: any) => {
-                    try {
-                        const sourceConfig = sourcesConfig[source.name as keyof typeof sourcesConfig] as SourceConfig;
-                        if (!sourceConfig) {
-                            throw new Error(`Unknown source: ${source.name}`);
-                        }
+    // Single cron job that processes all feeds in parallel
+    const jobFunction = async () => {
+        try {
+            await processAllFeeds(configLoader);
+        } catch (err) {
+            const error = err as Error;
+            logError('CronScheduler', new Error(`Feed processing error: ${error.message}`));
+        }
+    };
 
-                        const feedConfig = {
-                            name: `${feed.name}-${source.name}`,
-                            source: source.name,
-                            targetAssetAddress: feed.targetAssetAddress,
-                            cron: feed.cron,
-                            apiParams: buildApiParams(sourceConfig, feed, source)
-                        };
-
-                        const { price, feedTimestamp } = await fetchGenericPrice(feedConfig, sourceConfig);
-                        
-                        return { price, feedTimestamp, source: source.name, success: true };
-                        
-                    } catch (err) {
-                        const error = err as Error;
-                        logError('CronScheduler', new Error(`${feed.name} from ${source.name}: ${error.message}`));
-                        return { price: 0, feedTimestamp: '', source: source.name, success: false, error: error.message };
-                    }
-                });
-
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Parallel fetch timeout')), 30000)
-                );
-                
-                try {
-                    const results = await Promise.race([
-                        Promise.allSettled(fetchTasks),
-                        timeoutPromise
-                    ]) as PromiseSettledResult<any>[];
-                    
-                    // Process results
-                    const prices: number[] = [];
-                    const timestamps: string[] = [];
-                    const successfulSources: Array<{name: string, price: number}> = [];
-                    const failedSources: string[] = [];
-                    
-                    results.forEach((result, index) => {
-                        const sourceName = feed.sources[index].name;
-                        
-                        if (result.status === 'fulfilled' && result.value.success) {
-                            prices.push(result.value.price);
-                            timestamps.push(result.value.feedTimestamp);
-                            successfulSources.push({name: sourceName, price: result.value.price});
-                        } else {
-                            const error = result.status === 'rejected' ? result.reason : result.value?.error || 'Unknown error';
-                            failedSources.push(sourceName);
-                            logError('CronScheduler', new Error(`Failed to fetch ${feed.name} from ${sourceName}: ${error}`));
-                        }
-                    });
-                    
-                    if (prices.length === 0) {
-                        throw new Error(`No valid prices received for ${feed.name} from any source`);
-                    }
-
-                    // Calculate average price from all sources
-                    const averagePrice = Math.floor(prices.reduce((sum, price) => sum + price, 0) / prices.length);
-                    const latestTimestamp = timestamps.sort().pop() || new Date().toISOString();
-
-                    // Push to blockchain
-                    const result = await pushAssetPrices([feed.targetAssetAddress], [averagePrice]);
-
-                    // Log success with source breakdown
-                    logFeedUpdate(feed.name, averagePrice, successfulSources, result.hash);
-                    
-                } catch (timeoutError) {
-                    if (timeoutError instanceof Error && timeoutError.message === 'Parallel fetch timeout') {
-                        logError('CronScheduler', new Error(`${feed.name}: Timeout after 30000ms`));
-                    }
-                    throw timeoutError;
-                }
-
-            } catch (err) {
-                const error = err as Error;
-                logError('CronScheduler', new Error(`${feed.name}: ${error.message}`));
-            }
-        };
-
-        // Schedule the job
-        cron.schedule(feed.cron, jobFunction);
-        
-        // Run the job immediately on startup
-        setTimeout(() => {
-            jobFunction();
-        }, 1000); // Small delay to ensure everything is initialized
-    }
+    // Schedule the job - all feeds run together
+    cron.schedule('*/15 * * * *', jobFunction);
+    
+    // Run the job immediately on startup
+    setTimeout(() => {
+        jobFunction();
+    }, 1000); // Small delay to ensure everything is initialized
 }
 
 // Graceful shutdown

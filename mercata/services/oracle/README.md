@@ -17,6 +17,7 @@ The service uses a **generic adapter pattern** that makes it extremely easy to a
 ## 🚀 Features
 
 - ✅ **Zero-Code Feed Addition**: Add new price feeds by just updating JSON config
+- ✅ **Batch API Optimization**: Efficient batch requests for multiple assets in single API calls
 - ✅ **Multiple API Sources**: Alchemy, CoinMarketCap, Metals.dev, MetalPriceAPI support built-in
 - ✅ **OAuth2 Authentication**: Secure STRATO blockchain integration
 - ✅ **Flexible Scheduling**: Individual cron schedules per feed (minimum 15-minute intervals)
@@ -27,6 +28,7 @@ The service uses a **generic adapter pattern** that makes it extremely easy to a
 - ✅ **Token Caching**: Smart OAuth2 token management with 90% expiry safety margin
 - ✅ **TypeScript**: Full type safety and modern development experience
 - ✅ **Enhanced Logging**: Tree-structured logs with source price breakdown
+- ✅ **Dynamic Configuration**: Support for both individual and batch feed configurations
 
 ## 📁 Project Structure
 
@@ -85,7 +87,10 @@ MIN_UPDATE_INTERVAL_MINUTES=15
 
 ### Feed Configuration (`src/config/feeds.json`)
 
-Each feed defines:
+The service supports both **individual feeds** and **batch feeds** for optimal API efficiency:
+
+#### Individual Feeds
+Each individual feed defines:
 - **name**: Human-readable feed name
 - **source**: Which API source to use (must exist in sources.json)
 - **targetAssetAddress**: Blockchain asset address to update
@@ -99,10 +104,43 @@ Each feed defines:
       "name": "ETH-USD",
       "source": "Alchemy",
       "targetAssetAddress": "0xETHAssetAddress",
-      "cron": "*/5 * * * *",
+      "cron": "*/15 * * * *",
       "apiParams": {
         "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
       }
+    }
+  ]
+}
+```
+
+#### Batch Feeds (Recommended)
+Batch feeds group multiple assets for efficient API calls:
+- **name**: Human-readable batch name
+- **sources**: Array of API sources to use
+- **assets**: Array of assets with individual configurations
+- **cron**: Cron expression for update schedule
+
+```json
+{
+  "feeds": [
+    {
+      "name": "crypto-batch",
+      "sources": ["Alchemy", "CoinMarketCap"],
+      "assets": [
+        {
+          "name": "ETH-USD",
+          "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "symbol": "ETH",
+          "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c"
+        },
+        {
+          "name": "WBTC-USD", 
+          "tokenAddress": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+          "symbol": "WBTC",
+          "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
+        }
+      ],
+      "cron": "*/15 * * * *"
     }
   ]
 }
@@ -115,6 +153,7 @@ Each source defines:
 - **apiKeyEnvVar**: Environment variable name for API key
 - **parsePath**: JSONPath to extract price from response
 - **feedTimestampPath**: JSONPath to extract timestamp (optional)
+- **batchMode**: Set to `true` for sources that support batch requests (optional)
 
 ### Update Interval Configuration
 
@@ -226,26 +265,42 @@ chmod +x start.sh
 
 ## 📊 Supported Price Sources
 
+### Batch API Optimization
+
+The service now supports **batch API requests** for optimal efficiency:
+
+- **Cost Reduction**: Single API call fetches multiple asset prices
+- **Rate Limit Efficiency**: Reduces API calls by grouping assets
+- **Performance**: Faster updates with fewer network requests
+- **Flexibility**: Supports both individual and batch configurations
+
 ### Alchemy (Crypto)
 - **Use Case**: Real-time cryptocurrency prices
-- **Update Frequency**: Every 5 minutes
+- **Update Frequency**: Every 15 minutes
 - **Supported**: ETH, WBTC, USDC, USDT, PAXG
 - **Authentication**: Bearer token (API key)
+- **Batch Support**: ✅ Yes (recommended)
 
 ### Metals.dev (Precious Metals)
 - **Use Case**: Gold and silver spot prices
-- **Update Frequency**: Twice daily (9:30 AM, 3:30 PM UTC)
+- **Update Frequency**: Every 15 minutes
 - **Supported**: XAU (Gold), XAG (Silver)
 - **Authentication**: API key in header
+- **Batch Support**: ✅ Yes (recommended)
 
-### LBMA (London Fix)
-- **Use Case**: Official London Fix prices
-- **Update Frequency**: Daily at fix times
-- **Supported**: Gold AM/PM Fix, Silver Fix
+### CoinMarketCap (Crypto)
+- **Use Case**: Comprehensive cryptocurrency prices
+- **Update Frequency**: Every 15 minutes
+- **Supported**: All major cryptocurrencies
+- **Authentication**: API key in header
+- **Batch Support**: ✅ Yes (recommended)
 
-### CoinGecko (Fallback)
-- **Use Case**: Backup crypto price source
-- **Rate Limits**: Free tier available
+### MetalPriceAPI (Precious Metals)
+- **Use Case**: Real-time metals pricing
+- **Update Frequency**: Every 15 minutes
+- **Supported**: XAU (Gold), XAG (Silver)
+- **Authentication**: API key in URL
+- **Batch Support**: ✅ Yes (recommended)
 
 ## 🔄 Adding New Feeds
 
@@ -257,22 +312,41 @@ Edit `src/config/sources.json`:
     "urlTemplate": "https://api.example.com/price?symbol=${symbol}",
     "apiKeyEnvVar": "NEW_API_KEY",
     "parsePath": "data.price",
-    "feedTimestampPath": "data.timestamp"
+    "feedTimestampPath": "data.timestamp",
+    "batchMode": true
   }
 }
 ```
 
 ### 2. Add New Feed
+
+#### Individual Feed
 Edit `src/config/feeds.json`:
 ```json
 {
   "name": "NEW-TOKEN-USD",
   "source": "NewAPI",
   "targetAssetAddress": "0xNewTokenAddress",
-  "cron": "*/10 * * * *",
+  "cron": "*/15 * * * *",
   "apiParams": {
     "symbol": "NEWTOKEN"
   }
+}
+```
+
+#### Batch Feed (Recommended)
+```json
+{
+  "name": "new-tokens-batch",
+  "sources": ["NewAPI"],
+  "assets": [
+    {
+      "name": "NEW-TOKEN-USD",
+      "symbol": "NEWTOKEN",
+      "targetAssetAddress": "0xNewTokenAddress"
+    }
+  ],
+  "cron": "*/15 * * * *"
 }
 ```
 

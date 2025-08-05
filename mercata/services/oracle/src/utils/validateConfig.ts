@@ -50,10 +50,6 @@ export async function validateConfig(): Promise<boolean> {
             
             // Check required fields
             if (!feed.name) errors.push(`${feedPrefix} Missing name`);
-            if (!feed.sources || !Array.isArray(feed.sources)) {
-                errors.push(`${feedPrefix} Missing or invalid sources array`);
-            }
-            if (!feed.targetAssetAddress) errors.push(`${feedPrefix} Missing targetAssetAddress`);
             if (!feed.cron) errors.push(`${feedPrefix} Missing cron`);
             
             // Validate cron expression
@@ -61,34 +57,94 @@ export async function validateConfig(): Promise<boolean> {
                 errors.push(`${feedPrefix} Invalid cron expression: ${feed.cron}`);
             }
             
-            // Validate sources array
-            if (feed.sources && Array.isArray(feed.sources)) {
-                feed.sources.forEach((source: any, sourceIndex: number) => {
-                    const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
-                    
-                    if (!source.name) {
-                        errors.push(`${sourcePrefix} Missing source name`);
-                    } else if (!(sourcesConfig as any)[source.name]) {
-                        errors.push(`${sourcePrefix} Unknown source: ${source.name}`);
-                    } else {
-                        usedSources.add(source.name);
-                    }
-                });
-            }
+            // Check if this is a batch feed
+            const isBatchFeed = feed.assets && Array.isArray(feed.assets);
             
-            // Validate feed structure consistency
-            if (!feed.tokenAddress && !feed.symbol) {
-                errors.push(`${feedPrefix} Must have either tokenAddress (for crypto) or symbol (for metals)`);
-            }
-            
-            // Validate tokenAddress format (if present)
-            if (feed.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(feed.tokenAddress)) {
-                errors.push(`${feedPrefix} Invalid tokenAddress format: ${feed.tokenAddress}`);
-            }
-            
-            // Validate targetAssetAddress format
-            if (feed.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(feed.targetAssetAddress)) {
-                errors.push(`${feedPrefix} Invalid targetAssetAddress format: ${feed.targetAssetAddress}`);
+            if (isBatchFeed) {
+                // Validate batch feed structure
+                if (!feed.sources || !Array.isArray(feed.sources)) {
+                    errors.push(`${feedPrefix} Missing or invalid sources array`);
+                }
+                
+                // Validate sources array for batch feeds
+                if (feed.sources && Array.isArray(feed.sources)) {
+                    feed.sources.forEach((sourceName: string, sourceIndex: number) => {
+                        const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
+                        
+                        if (!sourceName) {
+                            errors.push(`${sourcePrefix} Missing source name`);
+                        } else if (!(sourcesConfig as any)[sourceName]) {
+                            errors.push(`${sourcePrefix} Unknown source: ${sourceName}`);
+                        } else {
+                            usedSources.add(sourceName);
+                        }
+                    });
+                }
+                
+                // Validate assets array (now just asset keys)
+                if (!feed.assets || !Array.isArray(feed.assets) || feed.assets.length === 0) {
+                    errors.push(`${feedPrefix} Missing or invalid assets array`);
+                } else {
+                    // Load assets registry to validate asset keys
+                    const assetsConfig = require('../config/assets.json');
+                    feed.assets.forEach((assetKey: string, assetIndex: number) => {
+                        const assetPrefix = `${feedPrefix} Asset ${assetIndex + 1}:`;
+                        
+                        if (!assetKey) {
+                            errors.push(`${assetPrefix} Missing asset key`);
+                        } else if (!assetsConfig.assets[assetKey]) {
+                            errors.push(`${assetPrefix} Unknown asset key: ${assetKey}`);
+                        } else {
+                            const asset = assetsConfig.assets[assetKey];
+                            
+                            // Validate targetAssetAddress format
+                            if (asset.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddress)) {
+                                errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
+                            }
+                            
+                            // Validate tokenAddress format for crypto assets
+                            if (asset.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(asset.tokenAddress)) {
+                                errors.push(`${assetPrefix} Invalid tokenAddress format: ${asset.tokenAddress}`);
+                            }
+                        }
+                    });
+                }
+            } else {
+                // Validate individual feed structure (legacy)
+                if (!feed.sources || !Array.isArray(feed.sources)) {
+                    errors.push(`${feedPrefix} Missing or invalid sources array`);
+                }
+                if (!feed.targetAssetAddress) errors.push(`${feedPrefix} Missing targetAssetAddress`);
+                
+                // Validate sources array
+                if (feed.sources && Array.isArray(feed.sources)) {
+                    feed.sources.forEach((source: any, sourceIndex: number) => {
+                        const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
+                        
+                        if (!source.name) {
+                            errors.push(`${sourcePrefix} Missing source name`);
+                        } else if (!(sourcesConfig as any)[source.name]) {
+                            errors.push(`${sourcePrefix} Unknown source: ${source.name}`);
+                        } else {
+                            usedSources.add(source.name);
+                        }
+                    });
+                }
+                
+                // Validate feed structure consistency
+                if (!feed.tokenAddress && !feed.symbol) {
+                    errors.push(`${feedPrefix} Must have either tokenAddress (for crypto) or symbol (for metals)`);
+                }
+                
+                // Validate tokenAddress format (if present)
+                if (feed.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(feed.tokenAddress)) {
+                    errors.push(`${feedPrefix} Invalid tokenAddress format: ${feed.tokenAddress}`);
+                }
+                
+                // Validate targetAssetAddress format
+                if (feed.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(feed.targetAssetAddress)) {
+                    errors.push(`${feedPrefix} Invalid targetAssetAddress format: ${feed.targetAssetAddress}`);
+                }
             }
             
             // Validate cron frequency (prevent too frequent updates)
@@ -115,39 +171,22 @@ export async function validateConfig(): Promise<boolean> {
         });
     }
 
+    // Validate sources
     const sourceNames = Object.keys(sourcesConfig);
-    const typedSourcesConfig = sourcesConfig as Record<string, SourceConfig>;
     sourceNames.forEach(sourceName => {
-        const source = typedSourcesConfig[sourceName];
+        const source = sourcesConfig[sourceName];
         const sourcePrefix = `   Source ${sourceName}:`;
         
-        if (!source.urlTemplate) {
-            errors.push(`${sourcePrefix} Missing urlTemplate`);
-        } else {
-            // Validate URL template has required placeholders
-            if (source.apiKeyEnvVar && !source.urlTemplate.includes('${API_KEY}') && source.apiKeyType !== 'header') {
-                errors.push(`${sourcePrefix} urlTemplate missing API_KEY placeholder`);
-            }
+        if (!source.url) {
+            errors.push(`${sourcePrefix} Missing url`);
         }
-        
-        if (!source.parsePath) {
-            errors.push(`${sourcePrefix} Missing parsePath`);
-        } else {
-            // Validate parse path format
-            if (!source.parsePath.includes('.') && !source.parsePath.includes('[')) {
-                errors.push(`${sourcePrefix} parsePath should use dot notation or array indexing`);
-            }
-        }
-        
-        // Validate API key configuration
-        if (source.apiKeyEnvVar && !source.apiKeyType) {
-            errors.push(`${sourcePrefix} apiKeyEnvVar specified but apiKeyType missing`);
-        }
-    });
 
-    usedSources.forEach(sourceName => {
-        const source = typedSourcesConfig[sourceName];
-        if (source && source.apiKeyEnvVar && !process.env[source.apiKeyEnvVar]) {
+        if (!source.parse) {
+            errors.push(`${sourcePrefix} Missing parse pattern`);
+        }
+
+        // Check if API key environment variable exists
+        if (source.apiKeyEnvVar && !process.env[source.apiKeyEnvVar]) {
             errors.push(`Missing required API key for source ${sourceName}: ${source.apiKeyEnvVar}`);
         }
     });
