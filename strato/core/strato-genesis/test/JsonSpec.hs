@@ -7,6 +7,7 @@ import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
+import qualified Data.Map.Strict as M
 import Blockchain.Strato.Model.Keccak256
 import Data.Aeson
 import qualified Data.ByteString as BS
@@ -124,7 +125,9 @@ spec = do
                   genesisInfoTimestamp = UTCTime (fromGregorian 1970 0 1) (secondsToDiffTime 0),
                   genesisInfoExtraData = 0,
                   genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
-                  genesisInfoNonce = 42
+                  genesisInfoNonce = 42,
+                  genesisInfoEvents = M.empty
+
                 }
           got = eitherDecode input
        in got `shouldBe` want
@@ -181,8 +184,10 @@ spec = do
                   genesisInfoTimestamp = UTCTime (fromGregorian 1970 0 1) (secondsToDiffTime 0),
                   genesisInfoExtraData = 0,
                   genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
-                  genesisInfoNonce = 42
+                  genesisInfoNonce = 42,
+                  genesisInfoEvents = M.empty
                 }
             ]
           got = JS.parseLazyByteString genesisParser input
+
        in got `shouldBe` want

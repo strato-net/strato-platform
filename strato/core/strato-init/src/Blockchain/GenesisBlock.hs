@@ -46,6 +46,7 @@ import Blockchain.SolidVM.SM
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
+import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
@@ -243,6 +244,8 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
 
   -- Step 3: Address Processing - Iterate through all genesis account addresses
   let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
+      events = genesisInfoEvents genesisInfo
+
   for_ addresses $ \address -> do
     -- Fetch full address state from the state database
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
@@ -268,7 +271,8 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
     -- Step 4: State Diff Generation - Create SQL database diffs for account creation
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
-    vmEvents <- squashMap toAction =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
+    let addressEvents = Map.findWithDefault S.empty address  events
+    vmEvents <- squashMap (toAction addressEvents) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
     commitSqlDiffs (mkStateDiff fullAccountDiffs)
     void $ produceVMEvents vmEvents
 
@@ -294,8 +298,12 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
       , HasCodeDB m
       , HasStorageDB m
       , Selectable Ad.Address AddressState m
-      ) => Ad.Address -> AccountDiff 'Eventual -> m [VMEvent]
-    toAction a d = do
+      )
+      => S.Seq Event
+      -> Ad.Address
+      -> AccountDiff 'Eventual
+      -> m [VMEvent]
+    toAction addressEvents a d = do
       let ch = codeHash d
       cPtr <- fromMaybe ch <$> resolveCodePtr ch
       let
@@ -363,7 +371,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
                     [A.Create]),
               A._src = join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
-              A._events = S.empty,
+              A._events = addressEvents,
               A._delegatecalls = S.empty
             }
       pure $ catMaybes [cca, act]
