@@ -267,21 +267,16 @@ const LendingPoolSection = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const rawMax = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
-                        const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000");
-                        const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
+                        const maxWithdrawableUSDST = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
                         const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
                         const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
 
-                        if (!rawMax || usdstBalanceWei < feeWei) return;
+                        if (!maxWithdrawableUSDST || usdstBalanceWei < feeWei) return;
 
-                        const maxWithdrawableViaMToken = (userMTokenBalanceWei * exchangeRateWei) / (10n ** 18n);
-                        const rawMaxWei = BigInt(rawMax);
-                        const safeMaxWei = rawMaxWei < maxWithdrawableViaMToken ? rawMaxWei : maxWithdrawableViaMToken;
+                        const maxWithdrawableWei = BigInt(maxWithdrawableUSDST);
+                        if (maxWithdrawableWei <= 0n) return;
 
-                        if (safeMaxWei <= 0n) return;
-
-                        const formatted = formatUnits(safeMaxWei, 18);
+                        const formatted = formatUnits(maxWithdrawableWei, 18);
                         const [w, f = ""] = formatted.split(".");
                         const clamped = f.length > 18 ? `${w}.${f.slice(0, 18)}` : formatted;
                         const clampedClean = clamped.replace(/\.?0+$/, "");
