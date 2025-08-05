@@ -2,6 +2,7 @@
   "Alchemy": {
     "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
+    "apiKeyType": "bearer",
     "method": "POST",
     "requestBody": {
       "addresses": [
@@ -17,6 +18,7 @@
   "Metals.dev": {
     "urlTemplate": "https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&unit=toz",
     "apiKeyEnvVar": "METALS_API_KEY",
+    "apiKeyType": "url",
     "parsePath": "metals.${metal}",
     "feedTimestampPath": "timestamps.metal"
   },

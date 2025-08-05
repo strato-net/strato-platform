@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { logInfo, logError } from '../utils/logger';
 
-export interface FeedConfig {
+interface FeedConfig {
     name: string;
     source: string;
     targetAssetAddress: string;
@@ -11,9 +11,10 @@ export interface FeedConfig {
     maxPrice?: number;
 }
 
-export interface SourceConfig {
+interface SourceConfig {
     name?: string;
     apiKeyEnvVar?: string;
+    apiKeyType?: 'bearer' | 'url';
     urlTemplate: string;
     parsePath: string;
     feedTimestampPath?: string;
@@ -28,97 +29,86 @@ export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: So
 }> {
     try {
         const apiKey = sourceConfig.apiKeyEnvVar ? process.env[sourceConfig.apiKeyEnvVar] : '';
-        let url = sourceConfig.urlTemplate;
-
-        // Replace placeholders in URL
-        for (const paramKey in feedConfig.apiParams) {
-            url = url.replace(`\${${paramKey}}`, String(feedConfig.apiParams[paramKey]));
-        }
-        if (apiKey) {
-            url = url.replace('${API_KEY}', apiKey);
-        }
-
-        // Prepare request options
-        const requestOptions: any = {
-            method: sourceConfig.method || 'GET',
-            url: url,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...sourceConfig.headers,
-            }
-        };
-
-        // Add authorization header if API key exists
-        if (apiKey && sourceConfig.apiKeyEnvVar) {
-            if (sourceConfig.name === 'Alchemy') {
-                requestOptions.headers['Authorization'] = `Bearer ${apiKey}`;
-            }
-        }
-
-        // Handle POST request body if present
-        if (sourceConfig.requestBody) {
-            let requestBody = JSON.parse(JSON.stringify(sourceConfig.requestBody)); // Deep clone
-            
-            // Replace placeholders in request body
-            const bodyStr = JSON.stringify(requestBody);
-            let processedBodyStr = bodyStr;
-            
-            for (const paramKey in feedConfig.apiParams) {
-                processedBodyStr = processedBodyStr.replace(new RegExp(`\\$\\{${paramKey}\\}`, 'g'), String(feedConfig.apiParams[paramKey]));
-            }
-            processedBodyStr = processedBodyStr.replace(/\$\{API_KEY\}/g, apiKey || '');
-            
-            requestOptions.data = JSON.parse(processedBodyStr);
-        }
+        const url = replacePlaceholders(sourceConfig.urlTemplate, feedConfig.apiParams, apiKey || '');
+        const requestOptions = buildRequestOptions(sourceConfig, url, apiKey);
 
         logInfo('GenericAdapter', `Fetching ${feedConfig.name} from ${url.replace(apiKey || 'NO_API_KEY', '***')} (${requestOptions.method})`);
 
         const response = await axios(requestOptions);
-
-        // Handle dynamic parse path replacement (e.g., metals.${metal})
-        let parsePath = sourceConfig.parsePath;
-        for (const paramKey in feedConfig.apiParams) {
-            parsePath = parsePath.replace(`\${${paramKey}}`, String(feedConfig.apiParams[paramKey]));
-        }
-
-        // Debug logging for metals API
-        if (feedConfig.source === 'Metals.dev') {
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - Original parsePath: ${sourceConfig.parsePath}`);
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - Final parsePath: ${parsePath}`);
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - metals.gold: ${response.data.metals?.gold}`);
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - metals.silver: ${response.data.metals?.silver}`);
-        }
-
+        const parsePath = replacePlaceholders(sourceConfig.parsePath, feedConfig.apiParams);
         const priceUSD = extractNestedProperty(response.data, parsePath);
         const feedTimestamp = sourceConfig.feedTimestampPath 
-            ? extractNestedProperty(response.data, sourceConfig.feedTimestampPath) || new Date().toISOString()
+            ? extractNestedProperty(response.data, replacePlaceholders(sourceConfig.feedTimestampPath!, feedConfig.apiParams)) || new Date().toISOString()
             : new Date().toISOString();
 
         if (!priceUSD || isNaN(parseFloat(priceUSD))) {
             throw new Error(`Invalid price data received for ${feedConfig.name}: ${priceUSD}`);
         }
 
-        const price = Math.floor(parseFloat(priceUSD) * 1e18); // Convert to 18-decimal format
+        const price = Math.floor(parseFloat(priceUSD) * 1e18);
 
-        // Validate price bounds if specified
-        if (feedConfig.minPrice !== undefined && price < feedConfig.minPrice) {
-            throw new Error(`Price ${price} for ${feedConfig.name} is below minimum bound ${feedConfig.minPrice}`);
-        }
-        if (feedConfig.maxPrice !== undefined && price > feedConfig.maxPrice) {
-            throw new Error(`Price ${price} for ${feedConfig.name} is above maximum bound ${feedConfig.maxPrice}`);
-        }
+        validatePriceBounds(feedConfig, price);
 
         logInfo('GenericAdapter', `${feedConfig.name} → $${priceUSD} @ feedTimestamp: ${feedTimestamp}`);
 
-        return {
-            price,
-            feedTimestamp
-        };
+        return { price, feedTimestamp };
 
     } catch (error) {
         logError('GenericAdapter', error as Error);
         throw error;
+    }
+}
+
+function replacePlaceholders(template: string, params: Record<string, any>, apiKey: string = ''): string {
+    let result = template;
+    
+    // Replace API parameters
+    for (const [key, value] of Object.entries(params)) {
+        result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), String(value));
+    }
+    
+    // Replace API key
+    if (apiKey) {
+        result = result.replace(/\$\{API_KEY\}/g, apiKey);
+    }
+    
+    return result;
+}
+
+function buildRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: string = ''): any {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...sourceConfig.headers,
+    };
+
+    // Add authorization header based on configuration
+    if (apiKey && sourceConfig.apiKeyType === 'bearer') {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const requestOptions: any = {
+        method: sourceConfig.method || 'GET',
+        url,
+        headers,
+    };
+
+    // Handle POST request body
+    if (sourceConfig.requestBody) {
+        const requestBodyStr = JSON.stringify(sourceConfig.requestBody);
+        const processedBodyStr = replacePlaceholders(requestBodyStr, {}, apiKey);
+        requestOptions.data = JSON.parse(processedBodyStr);
+    }
+
+    return requestOptions;
+}
+
+function validatePriceBounds(feedConfig: FeedConfig, price: number): void {
+    if (feedConfig.minPrice !== undefined && price < feedConfig.minPrice) {
+        throw new Error(`Price ${price} for ${feedConfig.name} is below minimum bound ${feedConfig.minPrice}`);
+    }
+    if (feedConfig.maxPrice !== undefined && price > feedConfig.maxPrice) {
+        throw new Error(`Price ${price} for ${feedConfig.name} is above maximum bound ${feedConfig.maxPrice}`);
     }
 }
 

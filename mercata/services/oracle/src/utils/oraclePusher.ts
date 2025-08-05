@@ -1,14 +1,26 @@
-import dotenv from 'dotenv';
 import axios from 'axios';
 import { oauthClient } from './oauth';
+import { logInfo, logError } from './logger';
 
-dotenv.config();
-
-// STRATO transaction builder utilities
+// Constants
 const DEFAULT_GAS_PARAMS = {
     gasLimit: 32_100_000_000,
-    gasPrice: 10, // Increased from 1 to 10 for faster confirmation
+    gasPrice: 10,
 };
+
+const TIMEOUTS = {
+    TRANSACTION_SUBMIT: 30000,
+    TRANSACTION_WAIT: 120000,
+    STATUS_CHECK: 10000,
+};
+
+const RETRY_DELAYS = {
+    INITIAL: 2000,
+    INCREMENT: 3000,
+    STATUS_CHECK: 2000,
+};
+
+const MAX_RETRIES = 3;
 
 interface TransactionResult {
     hash: string;
@@ -22,31 +34,10 @@ interface CallListArg {
     args: Record<string, any>;
 }
 
-function buildFunctionTx({ contractName, contractAddress, method, args }: {
-    contractName: string;
-    contractAddress: string;
-    method: string;
-    args: Record<string, any>;
-}) {
-    const tx = {
-        type: "FUNCTION",
-        payload: { contractName, contractAddress, method, args },
-    };
-
-    return {
-        txs: [tx],
-        txParams: DEFAULT_GAS_PARAMS,
-    };
-}
-
-// STRATO interaction utilities
 async function callListAndWait(callListArgs: CallListArg[], retryCount: number = 0): Promise<TransactionResult> {
-    const maxRetries = 3;
-    
     try {
         const accessToken = await oauthClient.getAccessToken();
         
-        // Submit transaction to STRATO using the parallel endpoint
         const response = await axios.post(
             `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
             {
@@ -66,86 +57,72 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                timeout: 30000
+                timeout: TIMEOUTS.TRANSACTION_SUBMIT
             }
         );
 
-        // Handle different response formats
-        let txHash: string;
-        if (Array.isArray(response.data) && response.data.length > 0) {
-            txHash = response.data[0].hash || response.data[0];
-        } else if (response.data && response.data.hash) {
-            txHash = response.data.hash;
-        } else if (typeof response.data === 'string') {
-            txHash = response.data;
-        } else {
-            throw new Error('No transaction hash returned from STRATO');
-        }
+        const txHash = extractTransactionHash(response.data);
+        logInfo('OraclePusher', `Transaction submitted: ${txHash}`);
 
-        console.log(`[OraclePusher] Transaction submitted: ${txHash}`);
-
-        // Wait for transaction confirmation
         return await waitForTransaction(txHash);
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || error.message;
         
-        // Check if this is a mempool rejection and we can retry
-        if (errorMessage.includes('Rejected from mempool') && retryCount < maxRetries) {
-            console.log(`[OraclePusher] Transaction rejected from mempool (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying after delay...`);
-            
-            // Wait longer between retries to avoid nonce conflicts
-            const delay = 2000 + (retryCount * 3000); // 2s, 5s, 8s delays
+        if (errorMessage.includes('Rejected from mempool') && retryCount < MAX_RETRIES) {
+            const delay = RETRY_DELAYS.INITIAL + (retryCount * RETRY_DELAYS.INCREMENT);
+            logInfo('OraclePusher', `Transaction rejected from mempool (attempt ${retryCount + 1}/${MAX_RETRIES + 1}). Retrying after ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
-            
             return await callListAndWait(callListArgs, retryCount + 1);
         }
         
-        console.error(`[OraclePusher] Error in callListAndWait:`, errorMessage);
+        logError('OraclePusher', new Error(`Error in callListAndWait: ${errorMessage}`));
         throw error;
     }
+}
+
+function extractTransactionHash(data: any): string {
+    if (Array.isArray(data) && data.length > 0) {
+        return data[0].hash || data[0];
+    } else if (data && data.hash) {
+        return data.hash;
+    } else if (typeof data === 'string') {
+        return data;
+    }
+    throw new Error('No transaction hash returned from STRATO');
 }
 
 export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
     try {
-        console.log(`[OraclePusher] Preparing to push ${assets.length} asset prices...`);
+        logInfo('OraclePusher', `Preparing to push ${assets.length} asset prices...`);
         
-        // Log the assets and prices being pushed
-        for (let i = 0; i < assets.length; i++) {
-            console.log(`[OraclePusher] ${assets[i]} → ${prices[i]} (${(prices[i] / 1e18).toFixed(8)} USD)`);
-        }
+        assets.forEach((asset, index) => {
+            logInfo('OraclePusher', `${asset} → ${prices[index]} (${(prices[index] / 1e18).toFixed(8)} USD)`);
+        });
 
-        // Build STRATO transaction call list
         const callListArgs: CallListArg[] = assets.map((asset, index) => ({
             contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
             method: "setAssetPrice",
-            args: {
-                asset: asset,
-                price: prices[index],
-            },
+            args: { asset, price: prices[index] },
         }));
 
-        // Submit transaction to STRATO
         const result = await callListAndWait(callListArgs);
 
-        // Check if the transaction was successful
         if (result.status !== "Success") {
             throw new Error(`Transaction failed with status: ${result.status}. Transaction hash: ${result.hash}`);
         }
 
-        console.log(`[OraclePusher] Transaction completed → TX: ${result.hash}`);
-
+        logInfo('OraclePusher', `Transaction completed → TX: ${result.hash}`);
         return result;
     } catch (error: any) {
-        console.error(`[OraclePusher] Error pushing prices:`, error.message);
+        logError('OraclePusher', new Error(`Error pushing prices: ${error.message}`));
         throw error;
     }
 }
 
-// Wait for transaction confirmation
-async function waitForTransaction(txHash: string, timeout: number = 120000): Promise<TransactionResult> { // Increased from 60s to 120s
+async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     const startTime = Date.now();
     
-    while (Date.now() - startTime < timeout) {
+    while (Date.now() - startTime < TIMEOUTS.TRANSACTION_WAIT) {
         try {
             const accessToken = await oauthClient.getAccessToken();
             
@@ -156,48 +133,20 @@ async function waitForTransaction(txHash: string, timeout: number = 120000): Pro
                         'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
                     },
-                    timeout: 10000
+                    timeout: TIMEOUTS.STATUS_CHECK
                 }
             );
 
-            if (response.data && response.data.status && response.data.status !== "Pending") {
+            if (response.data?.status && response.data.status !== "Pending") {
                 return response.data;
             }
             
-            // Wait 2 seconds before checking again
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS.STATUS_CHECK));
         } catch (error: any) {
-            console.error(`[OraclePusher] Error checking transaction status:`, error.response?.data || error.message);
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            logError('OraclePusher', new Error(`Error checking transaction status: ${error.response?.data || error.message}`));
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS.STATUS_CHECK));
         }
     }
     
-    throw new Error(`Transaction ${txHash} did not confirm within ${timeout}ms`);
-}
-
-export async function getAssetPrice(assetAddress: string): Promise<string> {
-    try {
-        const accessToken = await oauthClient.getAccessToken();
-        
-        // Query STRATO contract state using the correct API endpoint
-        const response = await axios.get(
-            `${process.env.STRATO_NODE_URL}/bloc/v2.2/contracts/PriceOracle/${process.env.PRICE_ORACLE_ADDRESS}/state`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 10000
-            }
-        );
-
-        if (response.data && response.data.prices && response.data.prices[assetAddress]) {
-            return response.data.prices[assetAddress].toString();
-        } else {
-            throw new Error(`No price found for asset: ${assetAddress}`);
-        }
-    } catch (error: any) {
-        console.error(`[OraclePusher] Error getting asset price:`, error.message);
-        throw error;
-    }
+    throw new Error(`Transaction ${txHash} did not confirm within ${TIMEOUTS.TRANSACTION_WAIT}ms`);
 } 
