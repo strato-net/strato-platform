@@ -44,6 +44,8 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    environment:
+      - NODE_HOST=${NODE_HOST:-'4f2dbe3559a75e1b2372f897bb7fdafc'}
     restart: unless-stopped
     logging:
       driver: "json-file"
