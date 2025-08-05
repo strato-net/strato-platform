@@ -4,6 +4,7 @@ import * as sourcesConfig from '../config/sources.json';
 import cron from 'node-cron';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
+import { SourceConfig } from '../types';
 
 dotenv.config();
 
@@ -67,24 +68,56 @@ export async function validateConfig(): Promise<boolean> {
             
             // Check required fields
             if (!feed.name) errors.push(`${feedPrefix} Missing name`);
-            if (!feed.source) errors.push(`${feedPrefix} Missing source`);
+            if (!feed.sources || !Array.isArray(feed.sources)) {
+                errors.push(`${feedPrefix} Missing or invalid sources array`);
+            }
             if (!feed.targetAssetAddress) errors.push(`${feedPrefix} Missing targetAssetAddress`);
             if (!feed.cron) errors.push(`${feedPrefix} Missing cron`);
-            if (!feed.apiParams) errors.push(`${feedPrefix} Missing apiParams`);
             
             // Validate cron expression
             if (feed.cron && !cron.validate(feed.cron)) {
                 errors.push(`${feedPrefix} Invalid cron expression: ${feed.cron}`);
             }
             
-            // Check if source exists
-            if (feed.source && !(sourcesConfig as any)[feed.source]) {
-                errors.push(`${feedPrefix} Unknown source: ${feed.source}`);
+            // Validate sources array
+            if (feed.sources && Array.isArray(feed.sources)) {
+                feed.sources.forEach((source: any, sourceIndex: number) => {
+                    const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
+                    
+                    if (!source.name) {
+                        errors.push(`${sourcePrefix} Missing source name`);
+                    } else if (!(sourcesConfig as any)[source.name]) {
+                        errors.push(`${sourcePrefix} Unknown source: ${source.name}`);
+                    } else {
+                        usedSources.add(source.name);
+                    }
+                });
             }
             
-            // Collect used sources
-            if (feed.source) {
-                usedSources.add(feed.source);
+            // Validate feed structure consistency
+            if (feed.tokenAddress && feed.symbol) {
+                errors.push(`${feedPrefix} Cannot have both tokenAddress and symbol`);
+            }
+            if (!feed.tokenAddress && !feed.symbol) {
+                errors.push(`${feedPrefix} Must have either tokenAddress (for crypto) or symbol (for metals)`);
+            }
+            
+            // Validate tokenAddress format (if present)
+            if (feed.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(feed.tokenAddress)) {
+                errors.push(`${feedPrefix} Invalid tokenAddress format: ${feed.tokenAddress}`);
+            }
+            
+            // Validate targetAssetAddress format
+            if (feed.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(feed.targetAssetAddress)) {
+                errors.push(`${feedPrefix} Invalid targetAssetAddress format: ${feed.targetAssetAddress}`);
+            }
+            
+            // Validate cron frequency (prevent too frequent updates)
+            if (feed.cron) {
+                const cronParts = feed.cron.split(' ');
+                if (cronParts.length >= 2 && cronParts[1] === '*') {
+                    errors.push(`${feedPrefix} Cron expression too frequent (every minute): ${feed.cron}`);
+                }
             }
             
             // Validate price bounds
@@ -92,8 +125,12 @@ export async function validateConfig(): Promise<boolean> {
                 errors.push(`${feedPrefix} minPrice must be less than maxPrice`);
             }
             
-            if (errors.length === 0) {
-                logInfo('ConfigValidator', `   ✅ ${feed.name}: Valid`);
+            // Log validation result for this feed
+            const feedErrors = errors.filter(error => error.includes(feedPrefix));
+            if (feedErrors.length === 0) {
+                logInfo('ConfigValidator', `   ✅ ${feed.name}: Valid (${feed.sources?.length || 0} sources)`);
+            } else {
+                logInfo('ConfigValidator', `   ❌ ${feed.name}: ${feedErrors.length} error(s)`);
             }
         });
     }
@@ -103,15 +140,32 @@ export async function validateConfig(): Promise<boolean> {
     const sourceNames = Object.keys(sourcesConfig);
     logInfo('ConfigValidator', `   ✅ Found ${sourceNames.length} sources: ${sourceNames.join(', ')}`);
     
+    const typedSourcesConfig = sourcesConfig as Record<string, SourceConfig>;
     sourceNames.forEach(sourceName => {
-        const source = (sourcesConfig as any)[sourceName];
+        const source = typedSourcesConfig[sourceName];
         const sourcePrefix = `   Source ${sourceName}:`;
         
         if (!source.urlTemplate) {
             errors.push(`${sourcePrefix} Missing urlTemplate`);
+        } else {
+            // Validate URL template has required placeholders
+            if (source.apiKeyEnvVar && !source.urlTemplate.includes('${API_KEY}') && source.apiKeyType !== 'header') {
+                errors.push(`${sourcePrefix} urlTemplate missing API_KEY placeholder`);
+            }
         }
+        
         if (!source.parsePath) {
             errors.push(`${sourcePrefix} Missing parsePath`);
+        } else {
+            // Validate parse path format
+            if (!source.parsePath.includes('.') && !source.parsePath.includes('[')) {
+                errors.push(`${sourcePrefix} parsePath should use dot notation or array indexing`);
+            }
+        }
+        
+        // Validate API key configuration
+        if (source.apiKeyEnvVar && !source.apiKeyType) {
+            errors.push(`${sourcePrefix} apiKeyEnvVar specified but apiKeyType missing`);
         }
     });
 
@@ -119,7 +173,7 @@ export async function validateConfig(): Promise<boolean> {
     logInfo('ConfigValidator', '5. Checking API Keys for Used Sources...');
     
     usedSources.forEach(sourceName => {
-        const source = (sourcesConfig as any)[sourceName];
+        const source = typedSourcesConfig[sourceName];
         if (source && source.apiKeyEnvVar) {
             if (!process.env[source.apiKeyEnvVar]) {
                 errors.push(`Missing required API key for source ${sourceName}: ${source.apiKeyEnvVar}`);
@@ -158,7 +212,7 @@ if (require.main === module) {
     validateConfig().then(isValid => {
         process.exit(isValid ? 0 : 1);
     }).catch(error => {
-        console.error('Validation error:', error);
+        logError('ConfigValidator', new Error(`Validation error: ${error}`));
         process.exit(1);
     });
 } 

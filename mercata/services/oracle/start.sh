@@ -11,7 +11,11 @@ export USERNAME
 export PASSWORD
 export STRATO_NODE_URL
 export PRICE_ORACLE_ADDRESS
+export ORACLE_CONTRACT_NAME
 export ALCHEMY_API_KEY
+export METALS_API_KEY
+export METALPRICE_API_KEY
+export COINMARKETCAP_API_KEY
 
 # Build and start the service
 npm run build

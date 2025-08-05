@@ -22,13 +22,21 @@
     "parsePath": "metals.${metal}",
     "feedTimestampPath": "timestamps.metal"
   },
-  "LBMA": {
-    "urlTemplate": "https://api.lbma.org.uk/json/lbma-${metal}",
-    "parsePath": "0.usd",
-    "feedTimestampPath": "0.date"
+  "MetalPriceAPI": {
+    "urlTemplate": "https://api.metalpriceapi.com/v1/latest?api_key=${API_KEY}&base=USD&currencies=EUR,XAU,XAG",
+    "apiKeyEnvVar": "METALPRICE_API_KEY",
+    "apiKeyType": "url",
+    "parsePath": "rates.${symbol}",
+    "feedTimestampPath": "timestamp"
   },
-  "CoinGecko": {
-    "urlTemplate": "https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&precision=full",
-    "parsePath": "${coinId}.usd"
+  "CoinMarketCap": {
+    "urlTemplate": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?address=${tokenAddress}&convert=USD",
+    "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
+    "apiKeyType": "header",
+    "headers": {
+      "X-CMC_PRO_API_KEY": "${API_KEY}"
+    },
+    "parsePath": "data.${tokenAddress}.quote.USD.price",
+    "feedTimestampPath": "data.${tokenAddress}.quote.USD.last_updated"
   }
 } 

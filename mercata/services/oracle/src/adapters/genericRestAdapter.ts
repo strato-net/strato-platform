@@ -1,27 +1,6 @@
 import axios from 'axios';
 import { logInfo, logError } from '../utils/logger';
-
-interface FeedConfig {
-    name: string;
-    source: string;
-    targetAssetAddress: string;
-    cron: string;
-    apiParams: Record<string, any>;
-    minPrice?: number;
-    maxPrice?: number;
-}
-
-interface SourceConfig {
-    name?: string;
-    apiKeyEnvVar?: string;
-    apiKeyType?: 'bearer' | 'url';
-    urlTemplate: string;
-    parsePath: string;
-    feedTimestampPath?: string;
-    headers?: Record<string, string>;
-    method?: string;
-    requestBody?: any;
-}
+import { FeedConfig, SourceConfig } from '../types';
 
 export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: SourceConfig): Promise<{
     price: number;
@@ -32,7 +11,9 @@ export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: So
         const url = replacePlaceholders(sourceConfig.urlTemplate, feedConfig.apiParams, apiKey || '');
         const requestOptions = buildRequestOptions(sourceConfig, url, apiKey);
 
-        logInfo('GenericAdapter', `Fetching ${feedConfig.name} from ${url.replace(apiKey || 'NO_API_KEY', '***')} (${requestOptions.method})`);
+        // Sanitize URL for logging by removing sensitive parameters
+        const sanitizedUrl = url.replace(/\?.*/, '') + '***';
+        logInfo('GenericAdapter', `Fetching ${feedConfig.name} from ${sanitizedUrl} (${requestOptions.method})`);
 
         const response = await axios(requestOptions);
         const parsePath = replacePlaceholders(sourceConfig.parsePath, feedConfig.apiParams);
@@ -85,6 +66,13 @@ function buildRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: st
     // Add authorization header based on configuration
     if (apiKey && sourceConfig.apiKeyType === 'bearer') {
         headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    // Replace API key placeholders in headers
+    if (apiKey && sourceConfig.apiKeyType === 'header') {
+        for (const [key, value] of Object.entries(headers)) {
+            headers[key] = value.replace(/\$\{API_KEY\}/g, apiKey);
+        }
     }
 
     const requestOptions: any = {

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logInfo, logError } from './logger';
 
 class OAuthClient {
     private discoveryUrl: string;
@@ -25,7 +26,7 @@ class OAuthClient {
         }
 
         try {
-            console.log('[OAuth] Discovering token endpoint...');
+            logInfo('OAuth', 'Discovering token endpoint...');
             const response = await axios.get(this.discoveryUrl, { timeout: 10000 });
             this.tokenEndpoint = response.data.token_endpoint;
             
@@ -33,10 +34,10 @@ class OAuthClient {
                 throw new Error('Token endpoint not found in discovery document');
             }
             
-            console.log(`[OAuth] Token endpoint discovered: ${this.tokenEndpoint}`);
+            logInfo('OAuth', `Token endpoint discovered: ${this.tokenEndpoint}`);
             return this.tokenEndpoint;
         } catch (error: any) {
-            console.error('[OAuth] Error discovering token endpoint:', error.message);
+            logError('OAuth', new Error(`Error discovering token endpoint: ${error.message}`));
             throw new Error(`OAuth discovery failed: ${error.message}`);
         }
     }
@@ -44,7 +45,7 @@ class OAuthClient {
     async getAccessToken(): Promise<string> {
         // Return cached token if still valid
         if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
-            console.log('[OAuth] Using cached access token');
+            logInfo('OAuth', 'Using cached access token');
             return this.accessToken;
         }
 
@@ -55,7 +56,7 @@ class OAuthClient {
 
     async refreshToken(): Promise<string> {
         try {
-            console.log(`[OAuth] Requesting new access token for user: ${this.username}...`);
+            logInfo('OAuth', `Requesting new access token for user: ${this.username}...`);
 
             // Get the token endpoint from discovery
             const tokenEndpoint = await this.getTokenEndpoint();
@@ -82,16 +83,16 @@ class OAuthClient {
                 const expiresIn = response.data.expires_in || 3600; // Default 1 hour
                 this.tokenExpiry = Date.now() + (expiresIn * 1000 * 0.9);
                 
-                console.log(`[OAuth] Access token obtained successfully for ${this.username} (expires in ${expiresIn}s)`);
+                logInfo('OAuth', `Access token obtained successfully for ${this.username} (expires in ${expiresIn}s)`);
                 return this.accessToken!;
             } else {
                 throw new Error('No access token in response');
             }
         } catch (error: any) {
-            console.error('[OAuth] Error getting access token:', error.response?.data || error.message);
+            logError('OAuth', new Error(`Error getting access token: ${error.response?.data || error.message}`));
             
             // Try fallback to client credentials if password grant fails
-            console.log('[OAuth] Trying fallback to client credentials...');
+            logInfo('OAuth', 'Trying fallback to client credentials...');
             try {
                 const tokenData = new URLSearchParams();
                 tokenData.append('grant_type', 'client_credentials');
@@ -110,11 +111,11 @@ class OAuthClient {
                     const expiresIn = fallbackResponse.data.expires_in || 3600;
                     this.tokenExpiry = Date.now() + (expiresIn * 1000 * 0.9);
                     
-                    console.log(`[OAuth] Fallback client credentials successful (expires in ${expiresIn}s)`);
+                    logInfo('OAuth', `Fallback client credentials successful (expires in ${expiresIn}s)`);
                     return this.accessToken!;
                 }
             } catch (fallbackError: any) {
-                console.error('[OAuth] Fallback also failed:', fallbackError.message);
+                logError('OAuth', new Error(`Fallback also failed: ${fallbackError.message}`));
             }
             
             throw new Error(`OAuth authentication failed: ${error.message}`);
@@ -126,7 +127,7 @@ class OAuthClient {
             const token = await this.getAccessToken();
             return !!token;
         } catch (error: any) {
-            console.error('[OAuth] Token validation failed:', error.message);
+            logError('OAuth', new Error(`Token validation failed: ${error.message}`));
             return false;
         }
     }

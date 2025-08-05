@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
+import { TransactionResult, CallListArg } from '../types';
 
 // Constants
 const DEFAULT_GAS_PARAMS = {
@@ -21,18 +22,6 @@ const RETRY_DELAYS = {
 };
 
 const MAX_RETRIES = 3;
-
-interface TransactionResult {
-    hash: string;
-    status: string;
-    timestamp?: string;
-}
-
-interface CallListArg {
-    contract: { address: string; name: string };
-    method: string;
-    args: Record<string, any>;
-}
 
 async function callListAndWait(callListArgs: CallListArg[], retryCount: number = 0): Promise<TransactionResult> {
     try {
@@ -67,6 +56,7 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
         return await waitForTransaction(txHash);
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || error.message;
+        const statusCode = error.response?.status;
         
         if (errorMessage.includes('Rejected from mempool') && retryCount < MAX_RETRIES) {
             const delay = RETRY_DELAYS.INITIAL + (retryCount * RETRY_DELAYS.INCREMENT);
@@ -75,7 +65,7 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
             return await callListAndWait(callListArgs, retryCount + 1);
         }
         
-        logError('OraclePusher', new Error(`Error in callListAndWait: ${errorMessage}`));
+        logError('OraclePusher', new Error(`Error in callListAndWait (HTTP ${statusCode}): ${errorMessage}`));
         throw error;
     }
 }
