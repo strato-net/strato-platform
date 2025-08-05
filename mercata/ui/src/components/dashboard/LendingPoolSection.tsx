@@ -301,6 +301,20 @@ const LendingPoolSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
                   </div>
+                  {/* Withdraw Amount Warning */}
+                  {(() => {
+                    const withdrawAmountWei = withdrawAmount ? safeParseUnits(withdrawAmount, 18) : 0n;
+                    const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+                    
+                    // Check if withdraw amount exceeds withdrawable limit
+                    const isInsufficientWithdrawable = withdrawAmountWei > 0n && withdrawAmountWei > maxWithdrawableWei;
+                    
+                    return isInsufficientWithdrawable ? (
+                      <p className="text-red-600 text-sm mt-1">
+                        Insufficient balance - amount exceeds withdrawable limit ({formatBalance(maxWithdrawableWei, "USDST", 18, 2)} available)
+                      </p>
+                    ) : null;
+                  })()}
                   {/* Fee Warning */}
                   {(() => {
                     const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
