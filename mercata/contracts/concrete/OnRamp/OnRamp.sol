@@ -19,7 +19,6 @@ contract record OnRamp is Ownable {
         uint256 id;
         address token;
         address seller;
-        string symbol;
         uint256 amount;
         uint256 marginBps; // e.g. 500 = +5%
         address[] providers;
@@ -139,7 +138,7 @@ contract record OnRamp is Ownable {
     }
 
     // Listing management functions
-    function createListing(address token, string symbol, uint256 amount, uint256 marginBps, address[] providerAddresses)
+    function createListing(address token, uint256 amount, uint256 marginBps, address[] providerAddresses)
         external onlyApprovedSeller onlyApprovedToken(token)
     {
         require(amount > 0, "Zero amount");
@@ -159,7 +158,6 @@ contract record OnRamp is Ownable {
             listingId,
             token,
             msg.sender,
-            symbol,
             amount,
             marginBps,
             providerAddresses
@@ -168,7 +166,7 @@ contract record OnRamp is Ownable {
         emit ListingCreated(listingId, msg.sender, token, amount, marginBps);
     }
 
-    function updateListing(address token, string symbol, uint256 amount, uint256 marginBps, address[] providerAddresses) external {
+    function updateListing(address token, uint256 amount, uint256 marginBps, address[] providerAddresses) external {
         require(listings[token].seller != address(0), "Closed");
         require(msg.sender == listings[token].seller, "Not seller");
         require(providerAddresses.length > 0, "No providers specified");
@@ -189,7 +187,6 @@ contract record OnRamp is Ownable {
             IERC20(listing.token).transfer(msg.sender, delta);
         }
 
-        listing.symbol = symbol;
         listing.amount = amount;
         listing.marginBps = marginBps;
         listing.providers = providerAddresses;

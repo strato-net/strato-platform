@@ -59,7 +59,6 @@ export interface Listing {
   token: string;
   marginBps: number;
   amount: string;
-  symbol: string;
 }
 
 export interface RampData {
@@ -70,7 +69,6 @@ export interface RampData {
 // ---------------- Checkout Session Types ----------------
 export interface CheckoutSessionParams {
   token: string;
-  tokenSymbol: string;
   amount: number;
   tokenAmount: string;
   tokenAddress: string;
