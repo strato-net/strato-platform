@@ -270,9 +270,10 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     vmEvents <- squashMap toAction =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
     commitSqlDiffs (mkStateDiff fullAccountDiffs)
-    _ <- produceVMEvents vmEvents
-    return ()
+    void $ produceVMEvents vmEvents
+
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+
   where
 
     mkStateDiff ad =
