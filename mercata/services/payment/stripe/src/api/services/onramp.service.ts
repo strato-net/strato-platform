@@ -63,7 +63,6 @@ export async function checkout(
     const totalAmount = calculatePaymentAmount(amount, price, listing.marginBps);
     const { sessionId, url } = await createCheckoutSession({
       token,
-      tokenSymbol: listing.symbol,
       amount: totalAmount,
       tokenAmount: amount,
       tokenAddress: listing.token,
