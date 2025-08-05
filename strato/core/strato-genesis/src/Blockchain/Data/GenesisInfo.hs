@@ -165,7 +165,7 @@ genesisParser =
     <*> "extraData" JS..: JS.value
     <*> "mixHash" JS..: JS.value
     <*> "nonce" JS..: JS.value
-    <*> ("codeInfo" JS..: JS.value JS..| M.empty)
+    <*> ("events" JS..: JS.value JS..| M.empty)
 
 getGenesisInfo :: MonadIO m => m GenesisInfo
 getGenesisInfo = do
