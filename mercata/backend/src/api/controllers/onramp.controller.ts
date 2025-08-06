@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { get, sell, buy } from "../services/onramp.service";
+import { validateBuyArgs, validateSellArgs } from "../validators/onramp.validator";
 
 class OnRampController {
   static async get(
@@ -25,6 +26,7 @@ class OnRampController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
+      validateSellArgs(body);
 
       const result = await sell(accessToken, body);
       res.status(RestStatus.OK).json(result);
@@ -41,6 +43,7 @@ class OnRampController {
 
     try {
       const { accessToken, address, body } = req;
+      validateBuyArgs(body)
 
       const result = await buy(accessToken, address, body);
 
