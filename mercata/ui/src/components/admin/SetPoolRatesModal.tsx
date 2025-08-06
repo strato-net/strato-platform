@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LiquidityPool } from '@/interface';
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/axios';
+import { useSwapContext } from '@/context/SwapContext';
 
 interface SetPoolRatesFormValues {
   swapFeeRate: string;
@@ -31,6 +31,7 @@ const SetPoolRatesModal = ({
 }: SetPoolRatesModalProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { setPoolRates } = useSwapContext();
   
   const form = useForm<SetPoolRatesFormValues>();
 
@@ -67,15 +68,13 @@ const SetPoolRatesModal = ({
       return;
     }
     
-    const payload = {
-      poolAddress: pool.address,
-      swapFeeRate: Math.round(parseFloat(data.swapFeeRate) * 100), // Convert to basis points
-      lpSharePercent: Math.round(parseFloat(data.lpSharePercent) * 100),
-    };
-
     try {
       setLoading(true);
-      await api.post('/swap-pools/set-rates', payload);
+      await setPoolRates({
+        poolAddress: pool.address,
+        swapFeeRate: Math.round(parseFloat(data.swapFeeRate) * 100),
+        lpSharePercent: Math.round(parseFloat(data.lpSharePercent) * 100),
+      });
 
       toast({
         title: 'Pool Rates Updated',
