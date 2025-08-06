@@ -38,7 +38,7 @@ export VAULT_URL=https://vault.blockapps.net:8093
 
 function cleanup {
     docker compose -p strato down -v -t 0 --remove-orphans
-    #killall blockapps-vault-proxy-server
+    killall blockapps-vault-proxy-server
 }
 
 trap 'cleanup' INT
@@ -69,7 +69,7 @@ cd $1
 
 mkdir logs
 
-blockapps-vault-proxy-server --OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration --OAUTH_CLIENT_ID=hq1 --OAUTH_CLIENT_SECRET=2d67202d-76bd-4cc4-b2ab-75b4fea54f6b --OAUTH_RESERVE_SECONDS=13 --VAULT_URL=https://vault.blockapps.net:8093 --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=false & > logs/blockapps-vault-proxy-server
+blockapps-vault-proxy-server --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --VAULT_URL=$VAULT_URL & > logs/blockapps-vault-proxy-server
 
 echo "Running setup"
 strato-setup -p api -K localhost --network=helium > logs/strato-setup 2>&1
