@@ -15,6 +15,7 @@ services:
       - ONRAMP=${ONRAMP}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
       - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+      - VITE_PROJECT_ID=${VITE_PROJECT_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"
