@@ -39,4 +39,4 @@ When adding new scripts to this directory:
 1. Create a new subdirectory for related functionality
 2. Include a README.md with usage instructions
 3. Follow the existing patterns for error handling and logging
-4. Use the shared utilities from `../deploy/util.js` 
+4. Use the shared utilities from `../deploy/util.js`

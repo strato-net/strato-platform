@@ -115,38 +115,38 @@ Add an address using the following information from the JSON body:
 **Returns** the `id` of the newly added address in the table.
 
 ##### GET `/customer/address/id/:id`
-Gets an address given the table `id` of the address. 
+Gets an address given the table `id` of the address.
 **Returns** the address in the `data` field of the response.
 
 ##### DELETE `/customer/address/id/:id`
-Deletes an address given the table `id` of the address.  
+Deletes an address given the table `id` of the address.
 **Returns** the number of `changes` made after the deletion.
 
 ---
 ### Stripe Endpoints
 
 ##### GET `/stripe/onboard?:username&:redirectUrl`
-Onboard a user, `username` and `redirectUrl` required.  
+Onboard a user, `username` and `redirectUrl` required.
 **Returns** a redirect to the Stripe hosted connect link for the user.
 
 ##### GET `/stripe/status?:username`
-Get the status of a stripe account given the `username` as a parameter.  
+Get the status of a stripe account given the `username` as a parameter.
 **Returns** the status of `chargesEnabled`, `detailsSubmitted`, and `payoutsEnabled` of the Stripe account.
 
 ##### GET `/stripe/checkout?:token&:redirectUrl`
-Create and redirect to a Stripe hosted checkout session given the token of the order and a redirect back to the Marketplace.  
+Create and redirect to a Stripe hosted checkout session given the token of the order and a redirect back to the Marketplace.
 **Returns** a redirect to the Stripe checkout session for the provided order.
 
 ##### GET `/stripe/checkout/confirm?:token&:redirectUrl`
-Confirms the payment of the order associated with the given token and performs the onchain transfer of the assets.  
+Confirms the payment of the order associated with the given token and performs the onchain transfer of the assets.
 **Returns** a redirect back to the Marketplace (redirectUrl) along with the list of assets that were transferred.
 
 ##### GET `/stripe/checkout/cancel?:token&:redirectUrl`
-Cancels the order associated with the given token.  
+Cancels the order associated with the given token.
 **Returns** a redirect back to the Martkeplace (redirectUrl).
 
 ##### GET `/stripe/order/status?:tokens`
-Get the most recent statuses of the orders associated with a given list of tokens.  
+Get the most recent statuses of the orders associated with a given list of tokens.
 **Returns** a key/value pair of token to payment status.
 
 ## Dependencies
@@ -155,7 +155,7 @@ Get the most recent statuses of the orders associated with a given list of token
 2. Docker Compose V2
 3. NodeJS 14+
 
-*NOTE*  
+*NOTE*
 Report and update dependencies if needed.
 
 ## Running
@@ -175,7 +175,7 @@ The server **requires** the following environmental variables to run in non-dock
 
 ```
 
-If running non-dockerized, use `npm run start` or `npm run dev`.  
+If running non-dockerized, use `npm run start` or `npm run dev`.
 If running dockerized, provide a `docker-compose.payment-server.yml` file and use `docker-compose -f docker-compose.payment-server.yml up -d --remove-orphans`.
 
 ## Script

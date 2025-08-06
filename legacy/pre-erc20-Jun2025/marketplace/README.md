@@ -33,7 +33,7 @@ HOST_IP=host.docker.internal docker-compose up -d --build
 cd backend
 ```
 
-1. Create a `.env` file with the below credentials: (In local development, Please make sure the value of `GLOBAL_ADMIN_NAME` `<globalAdminUserName>` is set to the login that you will be using to login to the app) 
+1. Create a `.env` file with the below credentials: (In local development, Please make sure the value of `GLOBAL_ADMIN_NAME` `<globalAdminUserName>` is set to the login that you will be using to login to the app)
 ```
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
@@ -56,7 +56,7 @@ TEST_SELLER_PASSWORD=<sellerPassword>
 
 In `config/localhost.config.yaml` file change the `url` value (under `nodes[0]`) to be a full url to a STRATO node (e.g. https://example.com, or https://example.com:8080 if STRATO is running on custom port)
 
-3. Install dependencies: 
+3. Install dependencies:
 ```
 yarn install
 ```
@@ -96,11 +96,11 @@ docker compose down
 
 
 ## Cypress Tests
-There are two options: 
+There are two options:
 1. Using explorer
 ```
 cd ui
-yarn run cypress open 
+yarn run cypress open
 ```
 *NOTE: Select E2E testing in the dialog*
 
@@ -143,7 +143,7 @@ sudo docker compose build
     ```
     chmod +x run-app.sh
     ```
-   
+
 3. Wait for all docker containers to become healthy (`sudo docker ps`)
 
 *NOTE: Running the command `sudo docker compose down -vt0 && sudo ./run-app.sh` will clean the app data and then run the app from scratch*
@@ -171,7 +171,7 @@ Secondary node is the one that connects to the existing Dapp contract on the blo
     export MP_API_DEBUG='true'
     export MP_SERVER_HOST='<MP_SERVER_HOST>'                                # ex: localhost
     export SERVER_IP='<SERVER_IP>'                                          # ex: 123.123.123.123
-    export NODE_LABEL='<NODE_LABEL>                                         # ex: tcommerce_secondary                         
+    export NODE_LABEL='<NODE_LABEL>                                         # ex: tcommerce_secondary
     export OAUTH_APP_TOKEN_COOKIE_NAME='<OAUTH_APP_TOKEN_COOKIE_NAME>'      # ex: tCommerce-node1-session
     export OAUTH_OPENID_DISCOVERY_URL='<OAUTH_OPENID_DISCOVERY_URL>'        # ex: https://<oauth provider url>/.well-known/openid-configuration
     export OAUTH_CLIENT_ID='<OAUTH_CLIENT_ID>'                              # ex: abcdef
@@ -184,7 +184,7 @@ Secondary node is the one that connects to the existing Dapp contract on the blo
     export SSL_CERT_TYPE=pem
     export DAEMONS_ENABLED='true'
     ```
-    (For additional parameters or further information, see "docker-compose.yml env vars reference" below)  
+    (For additional parameters or further information, see "docker-compose.yml env vars reference" below)
 
     *NOTE: If you are getting a bash error saying "`Permission denied`". You may need to run (`chmod +x run-app-secondary.sh`) before running the script again.*
 
@@ -203,7 +203,7 @@ SERVER_IP                   - (required) IP address of the machine (preferably p
 NODE_LABEL                  - (required) String representing the node identificator (e.g. tCommerce-node1)
 STRATO_NODE_PROTOCOL        - (default: 'http') Protocol of the STRATO node (http|https)
 STRATO_NODE_HOST            - (default: 'nginx', no port defaults to 80) host (hostname:port) of the STRATO node. By default - call STRATO node in the linked docker network (see bottom of docker-compose.yml)
-STRATO_LOCAL_IP             - (default: empty string, optional) Useful for Prod when STRATO is running on https and we have to call it by real DNS name (SSL requirement) but need to resolve it through the local network (e.g. STRATO port is closed to the world). Non-empty value will create /etc/hosts record in container to resolve hostname provided in STRATO_HOST to STRATO_LOCAL_IP. Example: `172.17.0.1` (docker0 IP of machine - see `ifconfig`). Otherwise - will resolve hostname with public DNS. 
+STRATO_LOCAL_IP             - (default: empty string, optional) Useful for Prod when STRATO is running on https and we have to call it by real DNS name (SSL requirement) but need to resolve it through the local network (e.g. STRATO port is closed to the world). Non-empty value will create /etc/hosts record in container to resolve hostname provided in STRATO_HOST to STRATO_LOCAL_IP. Example: `172.17.0.1` (docker0 IP of machine - see `ifconfig`). Otherwise - will resolve hostname with public DNS.
 NODE_PUBLIC_KEY             - (default: dummy hex public key) STRATO node's blockstanbul public key
 OAUTH_APP_TOKEN_COOKIE_NAME - (default: 'tCommerce_session') Browser session cookie name for the node, e.g. tCommerce-node1-session'
 OAUTH_OPENID_DISCOVERY_URL  - (required) OpenID discovery .well-known link
@@ -221,8 +221,8 @@ SSL_CERT_TYPE               - (default: 'crt') SSL cert file type ('crt'|'pem') 
 #### SSL cert letsencrypt tool (optional - for production deployments)
 
 The tool automates the process of obtaining the real SSL certificate using certbot and letsencrypt to use for running application on https:// for production.
-Certs are valid for 3 months and should be auto-updated. 
-To run the Application we need the first (initial) certificate to provide it to the container. 
+Certs are valid for 3 months and should be auto-updated.
+To run the Application we need the first (initial) certificate to provide it to the container.
 After that, when the Application is already running, the certificate will be automatically renewed (see "Setup auto-renewal")
 
 For steps to use letsencrypt tool please refer to tCommerce/nginx-docker/letsencrypt/README.md
@@ -234,7 +234,7 @@ In the `yarn deploy` step the application is programmatically fetching the acces
 
 During development you may also want to obtain the token of the specific user using some of the standard OAuth2 flows.
 
-The token can be obtained by using the `token-getter` utility packaged in `blockapps-rest`. 
+The token can be obtained by using the `token-getter` utility packaged in `blockapps-rest`.
 To use this utility, run `sudo yarn token-getter` from the `backend` directory:
 
 ```
@@ -247,7 +247,7 @@ sudo yarn token-getter
 This command launches a small web server on the same host (hostname and port) specified in the `redirectUri` field of `config/localhost.config.yaml`. This field was filled in by the app-framework utility from the configuration parameters it collected from the user.
 - Copy the URL shown by the `token-getter` utility and enter it into your browser.
 - Log in with your OAuth provider credentials.
-- Once logged in, the web server will display the token on a web page. 
+- Once logged in, the web server will display the token on a web page.
 - Copy the "Access Token".
 - Hit `CTRL+C` to quit the `token-getter`.
 

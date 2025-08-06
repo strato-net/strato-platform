@@ -1,6 +1,6 @@
 ## Mirror Repository Warning
-This repository is a mirror of the development repository maintained by BlockApps. This repository contains a 
-code of the versions released to [npm](https://www.npmjs.com/package/blockapps-rest). 
+This repository is a mirror of the development repository maintained by BlockApps. This repository contains a
+code of the versions released to [npm](https://www.npmjs.com/package/blockapps-rest).
 We do not accept or merge any pull requests in this repository.
 
 ## Introduction

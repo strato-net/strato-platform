@@ -22,12 +22,12 @@ so that they could be properly moved to their respective version's subsection.
 - Total difficulty now refers to block number (corresponds to ethVersion now being 63)
 
 ### Fixed
-- Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
+- Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers
 
 ### Removed
 - Removed private chain endpoints
 
-## [12.2] - 10/28/2024 
+## [12.2] - 10/28/2024
 ### Added
 - Added block.proposer to SolidVM
 - Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
@@ -97,7 +97,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Removed
 
-## [11.3.1] - 7/10/2024 
+## [11.3.1] - 7/10/2024
 ### Added
 
 ### Changed
@@ -144,7 +144,7 @@ so that they could be properly moved to their respective version's subsection.
 - Removed block_data table from `eth` database
 
 
-## [11.2.0] - 5/15/2024 
+## [11.2.0] - 5/15/2024
 ### Added
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 - `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
@@ -183,7 +183,7 @@ so that they could be properly moved to their respective version's subsection.
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 - Jenkins test to ensure slipstream post sync is consistent with boot node
 
-### Changed 
+### Changed
 - When a transaction fails, the `<failed>` message blinks :^)
 - `keccak256` built-in function should return hex-encoded value instead of bytestring
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
@@ -192,7 +192,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Fixed
 - Mappings within a struct within a `(type => Struct)` mapping can be accessed
-- Constructor arguments are passed by value instead of reference 
+- Constructor arguments are passed by value instead of reference
 - Escaped quotes for slipstream values
 - Properly escape `"` and `\` string arguments in `strato-api`
 - `sendOutEvent` inconsistenly encoding code pointer hash

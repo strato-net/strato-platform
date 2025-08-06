@@ -151,10 +151,10 @@ Each source defines:
    ```bash
    # Production (recommended)
    ./start.sh
-   
+
    # Development
    npm run dev
-   
+
    # Alternative (requires manual environment setup)
    npm start
    ```
@@ -299,7 +299,7 @@ The service provides comprehensive logging:
    ```bash
    # Check OAuth discovery URL
    curl https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
-   
+
    # Test OAuth credentials
    curl -X POST https://keycloak.blockapps.net/auth/realms/mercata/protocol/openid-connect/token \
      -d "grant_type=client_credentials" \
@@ -316,7 +316,7 @@ The service provides comprehensive logging:
    ```bash
    # Check TypeScript errors
    npm run build
-   
+
    # Run in development mode for better error messages
    npm run dev
    ```
@@ -345,7 +345,7 @@ DEBUG=* ./start.sh
    ```bash
    # Install PM2
    npm install -g pm2
-   
+
    # Start with PM2
    pm2 start start.sh --name "oracle-service"
    ```
@@ -375,4 +375,4 @@ For issues and questions:
 - Create an issue in the repository
 - Check the troubleshooting section
 - Review the configuration examples
-- Ensure you're using `./start.sh` for startup 
+- Ensure you're using `./start.sh` for startup

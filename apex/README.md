@@ -20,7 +20,7 @@
    ```
     (this is the list of vars passed to apex docker container in docker-compose.yml + some vars are added with set-aux-env-vars.sh in prod / tests)
 
-  
+
 ### Run Apex tests locally (development mode):
 (have prep steps 1 and 2 done)
 5. ```
@@ -42,9 +42,9 @@
 1. ```
    docker exec -t -e NODE_ENV=test strato-apex-1 ./run-tests.sh
    ```
-   
+
 ### Run server (production mode)
-See: 
+See:
 - Dockerfile for how we build
 - docker-run.sh for how we run
 - docker-compose.yml (docker-compose.tpl.yml) for the env vars passed

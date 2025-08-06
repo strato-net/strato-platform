@@ -1,4 +1,4 @@
-# STRATO IDE 
+# STRATO IDE
 
 This extension interfaces with a running STRATO node using STRATO's API and a debugging API. The extension allows developers to interact with the STRATO blockchain and manage their STRATO dApps from a VS Code workspace.
 
@@ -56,18 +56,18 @@ Cirrus can be used to query data in specific contracts using state data as param
 ## Debugger Setup
 **NOTE: The following are required in order to use the debugger:**
 - The STRATO node must be started with `VM_DEBUGGER=true`
-- The version of STRATO must be 7.0 or higher  
+- The version of STRATO must be 7.0 or higher
 
-To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 
+To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow.
 
-In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.   
+In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.
 ![Add confugration](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/add_configuration.png)
 
-Click **Debug SolidVM** in the dropdown.   
+Click **Debug SolidVM** in the dropdown.
 ![Debug SolidVM](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/launch_json.png)
 ![Configuration Set](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/strato_launch.png)
 
-Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.  
+Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.
 ![Run and Debug SolidVM](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/debug_solidvm.png)
 ![Press Play](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/press_play.png)
 
@@ -79,5 +79,5 @@ Try pressing the pause button in the debugger control panel again
 
 **I have configured my extension correctly, but I am still not able to connect to my node.**
 
-Check to make sure that the OAuth configuration in your `config.yaml` file matches 
+Check to make sure that the OAuth configuration in your `config.yaml` file matches
 the OAuth configuration used on your selected node.

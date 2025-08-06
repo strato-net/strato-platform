@@ -69,4 +69,4 @@ All token addresses are hardcoded (without 0x prefix):
 ## Dependencies
 
 - `ethers` - For wei conversion and BigInt handling
-- `blockapps-rest` - For blockchain interactions 
+- `blockapps-rest` - For blockchain interactions

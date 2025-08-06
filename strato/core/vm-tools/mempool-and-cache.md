@@ -28,12 +28,12 @@
 2. Now that we have a fast way to keep track of all eligible
    transactions to be mined, we can optimize the mining process to
    only run new incoming transactions on an "incremental" basis. The
-   only time we have to re-run ALL pending transactions is if a new 
+   only time we have to re-run ALL pending transactions is if a new
    chain head comes in, meaning we have to start mining from a new
    stateroot anyway, or if a transaction that we mined incrementally
    earlier gets trumped by another transaction from its original sender
    with the same nonce but a higher gas price. There's no real way to "undo"
-   a single transaction at an arbitrary point in the block as it may 
+   a single transaction at an arbitrary point in the block as it may
    influence balances/storages/behaviors of later transactions in the
    same block.
 
@@ -45,7 +45,7 @@
 ### Architectural changes
 
 1. Quarry effectively has to be rewritten from the ground-up, as it
-   was designed with SQL in mind, and has little carry-over to the 
+   was designed with SQL in mind, and has little carry-over to the
    mempool model.
 
 2. To avoid having to change a lot of architectural documents, this
@@ -55,7 +55,7 @@
 3. The introduction of a monadic typeclass that the EVM implementation
    conforms to, effectively a glorified State monad transformer, which
    requires the VM to implement a handful of necessary functions to
-   store and retrieve the Bagger state, and execute certain operations 
+   store and retrieve the Bagger state, and execute certain operations
    against a given StateRoot. These functions enable the Bagger MT to
    add new functionality to the VM, allowing a simple interface to be
    used to work against the mempool and tx result cache.
@@ -76,7 +76,7 @@ type GL  = Integer          -- The remaining gas that can be used to execute TXs
                             -- in a given block
 type BH  = BlockData        -- A block header (Blockchain.Data.DataDefs.BlockData)
 type RAE = RunAttemptError  -- used by to report errors in running certain TXs
-                            -- to the Bagger 
+                            -- to the Bagger
 ```
 
 ### MonadBagger minimal complete definition
@@ -93,7 +93,7 @@ need to be implemented by the VM context to enable it to work.
    either an error, or a new gas limit and stateroot". We need the ability to run transactions from
    an arbitrary stateroot as we may be running transactions "incrementally" from an intermediate SR,
    or from the SR of an new block that comes in which we deem the parent of the block we are trying to mine.
-   Certain opcodes in the EVM require access to the block header of the block they will be in, so we need 
+   Certain opcodes in the EVM require access to the block header of the block they will be in, so we need
    to provide a temporary BH for the transaction to be able to use. Of course, we want to run some arbitrary
    amount of transactions, so that's the next argument. Lastly, the function either returns an RAE
    which may be something like `CantFindStateRoot` or `GasLimitReached`, which indicates a problem with the
@@ -108,7 +108,7 @@ need to be implemented by the VM context to enable it to work.
    the final stateroot to put in the newly formed BH.
 
 Naturally, functions 1 and 2 are the minimal complete definition for a state monad, and all state monad laws apply
-to `getBaggerState` and `putBaggerState`. Functions 3 and 4 enable the Bagger to actually execute VM transactions 
+to `getBaggerState` and `putBaggerState`. Functions 3 and 4 enable the Bagger to actually execute VM transactions
 and cache the information necessary for building blocks.
 
 ### MonadBagger API
@@ -154,7 +154,7 @@ three core actions:
 
 6. Likewise, upon startup, the EVM should call `processNewBestBlock` with, at the very least, the SHA and BH of
    the genesis block so that the miner has some block header (and thus stateroot), and gas limit to supply to
-   `runFromStateRoot` when creating blocks. 
+   `runFromStateRoot` when creating blocks.
 
 ## Nitty-gritty implementation details
 
@@ -166,7 +166,7 @@ three core actions:
 2. The BaggerState maintains two different set of transactions, which are implemented as
    `Map Address (Map Nonce TX))` for optimization purposes. There is a `pending` set, which holds transactions
    that have been added to the mempool, but not yet put into a block, and a `queued` set, which holds transactions
-   that are due to be mined in the next block. Two helper functions `promoteTransactions` and `demoteTransactions` 
+   that are due to be mined in the next block. Two helper functions `promoteTransactions` and `demoteTransactions`
    move transactions in between these sets.
 
 3. There are only two necessary indicators to determine if a transaction can be included in a block. The last used
@@ -192,7 +192,7 @@ three core actions:
    operation -- where `n = cachedTransactions` and `m = unminedTransactions` -- to determine if it was trumped. Because
    Haskell's `Data.Map` is implemented as a binary tree, and trumped transactions get removed from `seen`, this reduces
    the cost of the check to O(n log2 n). "Seen" is a bit of a misnomer, as it doesnt keep track of all transactions that
-   were seen, but rather of transactions which are being managed by the pool. 
+   were seen, but rather of transactions which are being managed by the pool.
 
 6. Lastly, there is a `miningCache` field in the `BaggerState` record type. This is used to keep track of what
    transactions were executed in the currently pending block, and which have yet to be.
@@ -206,4 +206,4 @@ three core actions:
    all times for a block that is being mined.
 
 
-[1]: https://en.wikipedia.org/wiki/Bagger_288 "Wikipedia - Bagger 288" 
+[1]: https://en.wikipedia.org/wiki/Bagger_288 "Wikipedia - Bagger 288"

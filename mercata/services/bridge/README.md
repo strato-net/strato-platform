@@ -159,4 +159,4 @@ Logs are written to both console and files:
 
 ## License
 
-MIT 
+MIT

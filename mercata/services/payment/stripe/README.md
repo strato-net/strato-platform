@@ -6,17 +6,17 @@ This service integrates Stripe payment processing into the Mercata Testnet2 envi
 
 The following environment variables are required to run the Stripe payment service:
 
-- `CLIENT_SECRET`: Secret key used for authentication  
+- `CLIENT_SECRET`: Secret key used for authentication
 
-- `CLIENT_ID`: The client identifier used for OAuth flows  
+- `CLIENT_ID`: The client identifier used for OAuth flows
 
-- `OAUTH_DISCOVERY_URL`: The OAuth 2.0/OpenID Connect discovery document URL  
+- `OAUTH_DISCOVERY_URL`: The OAuth 2.0/OpenID Connect discovery document URL
 
-- `NODE_URL`: The URL of the Mercata testnet node  
+- `NODE_URL`: The URL of the Mercata testnet node
 
-- `STRIPE_SECRET_KEY`: Secret key for authenticating Stripe API calls  
+- `STRIPE_SECRET_KEY`: Secret key for authenticating Stripe API calls
 
-- `STRIPE_WEBHOOK_SECRET`: Secret used to verify incoming webhooks from Stripe  
+- `STRIPE_WEBHOOK_SECRET`: Secret used to verify incoming webhooks from Stripe
 
 - `ONRAMP`: On Ramp contract address to use as part of the server
 
@@ -62,9 +62,9 @@ This assumes you are **not** relying on Stripe's remote webhooks.
 
    1. Fetch a JWT via **Postman**:
 
-       • Open Postman and switch to the **Mercata** workspace (Workspaces → Mercata).  
-       • In the *jwt* collection run the request **`get testnet jwt token`**.  
-       • Fill out Auth section using `CLIENT_ID` and `CLIENT_SECRET`. 
+       • Open Postman and switch to the **Mercata** workspace (Workspaces → Mercata).
+       • In the *jwt* collection run the request **`get testnet jwt token`**.
+       • Fill out Auth section using `CLIENT_ID` and `CLIENT_SECRET`.
        • The call returns a JSON object – copy the value of `access_token`.
 
    2. Get the Strato address for that token (use the same Postman workspace):

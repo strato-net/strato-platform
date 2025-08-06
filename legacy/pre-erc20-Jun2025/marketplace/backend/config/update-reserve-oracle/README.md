@@ -12,7 +12,7 @@
   configDirPath: /config
   serverHost: http://localhost
   dockerized: true
-  
+
   nodes:
   - id: 0
     label:
@@ -34,7 +34,7 @@
 - Edit config.sh
   - Edit the oracle addresses
     - to obtain the oracle addresses, check oracle deployment log or oracle_deploy.yaml in the oracle container/volume.
-  - Edit the reserve addresses 
+  - Edit the reserve addresses
     - to obtain the reserve addresses, check cirrus at https://node1.mercata.blockapps.net/cirrus/search/BlockApps-Mercata-Reserve?creator=in.(BlockApps,mercata_usdst)&isActive=eq.true&select=address,name,creator,oracle
   - Edit the admin user username (mercata_usdt for prod, blockapps for testnet2)
 

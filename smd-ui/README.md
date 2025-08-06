@@ -44,7 +44,7 @@ To run the React dev server locally with all features enabled, add the `SMD_DEV_
     ```
     (The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
 
-4. Open `localhost:8080/` (**NOTE: PORT 8080, NOT THE 3000!!**) in the browser, login and start making changes in SMD code to see updates live in browser. 
+4. Open `localhost:8080/` (**NOTE: PORT 8080, NOT THE 3000!!**) in the browser, login and start making changes in SMD code to see updates live in browser.
 
 Alternatively, this may done manually by changing the Nginx config inside the Nginx container after it has already been started and restarting the service:
 
@@ -60,7 +60,7 @@ Alternatively, this may done manually by changing the Nginx config inside the Ng
     ```
 
     Replace the existing `location / {...}` block with the following, replacing the IP with the correct IP based on your OS:
-    
+
     ```
     location / {
       set $is_ui "true";
@@ -81,7 +81,7 @@ Alternatively, this may done manually by changing the Nginx config inside the Ng
     }
     ```
 3. Validate and reload config:
-    
+
     ```
     openresty -t   # check for validation errors
     openresty -s reload

@@ -144,4 +144,4 @@
 
 ---
 
-**This plan covers all key lending and liquidation flows, error cases, profitability checks, and multi-user interactions, with preconditions noted for each scenario.** 
+**This plan covers all key lending and liquidation flows, error cases, profitability checks, and multi-user interactions, with preconditions noted for each scenario.**

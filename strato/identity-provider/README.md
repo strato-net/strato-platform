@@ -39,7 +39,7 @@ HTTP_PORT=8080 \
 
 Like all our getting-started scripts, this should be run within the same directory where the identity server's docker-compose, `docker-compose.identity.yml`, is located.
 
-3. Keep in mind that due to the identity server's reliance on the `company` claim in the provided bearer token, we ideally want to have our realms support this claim. The identity server can function without this claim being in the token, but these certs may take a different form than is expected (for example, if the `company` claim is missing, the cert created may have a suprising value for the `organization` field). 
+3. Keep in mind that due to the identity server's reliance on the `company` claim in the provided bearer token, we ideally want to have our realms support this claim. The identity server can function without this claim being in the token, but these certs may take a different form than is expected (for example, if the `company` claim is missing, the cert created may have a suprising value for the `organization` field).
 
 [!IMPORTANT]
 The information below is important!
@@ -48,7 +48,7 @@ The information below is important!
 
 5.  The `strato-getting-started` directory has an `identity-provider` subdirectory from which files will be mounted onto the docker container. These files include `identity-provider/certs/rootPriv.pem`, `identity-provider/certs/rootCert.pem`, and `identity-provider/idconf.yaml`. These files are not included in the docker image for security reasons, as they contain sensitive information. If you do not provide these files within the `identity-provider` subdirectory, the identity docker images will not build.
 
-6. The configuration file `identity-provider/idconf.yaml` contains a list of realm-specific information. Each realm's details is grouped in a single yaml list element. The minimum realm details to provide are 
+6. The configuration file `identity-provider/idconf.yaml` contains a list of realm-specific information. Each realm's details is grouped in a single yaml list element. The minimum realm details to provide are
   a. `discoveryUrl` for the realm (needed to extract the issuer information and token endpoint)
   b. `clientId` for the identity server
   c. `clientSecret` for the identity server
@@ -56,7 +56,7 @@ In addition, you may also choose to specifiy
   d. `realmName` for readability's sake (does not affect functionality)
   e. `nodeUrl` of the STRATO node to query and post transactions to. By default this will be `https://node2.<realmName>.blockapps.net`
   f. `fallbackNodeUrl` of another STRATO node in case the first one is unresponsive. By default this will be `https://node1.<realmName>.blockapps.net`
-  g. `userRegistryAddress` the address of the UserRegistry contract. By default this will be the location hardcoded in new genesis blocks: `0x720`. 
+  g. `userRegistryAddress` the address of the UserRegistry contract. By default this will be the location hardcoded in new genesis blocks: `0x720`.
     *Note:* if using an older genesis block, you will not have this contract and should manually post it to the network, noting the address, code hash, and associated table name in cirrus.
   h. `userRegistryCodeHash` the code hash of the UserRegistry contract mentioned above. By default this will be the code hash of the hardcoded contract. If using an older genesis block, please see the note under `userRegistryAddress`
   i. `userTableName` the associated table name in cirrus for `User` contracts. By default this will be `User`. If using an older genesis block, please see the note under `userRegistryAddress`
@@ -64,6 +64,6 @@ In addition, you may also choose to specifiy
 7. Keep in mind the client credentials you provide use MUST already have keys within the vault specified, and have a cert registered on the associated network.
 
 ### Things to consider when updating/restarting an identity server
-1. The main reason for wanting to update the identity server is to update the realms it supports. To do this, add a list element in `identity-provider/idconf.yaml` and specify at minimum a `clientId`, `clientSecret`, and `discoveryUrl` for the realm. You will need to explicitly stop the docker containers and restart them in order to have the identity server read in the new realm information. 
+1. The main reason for wanting to update the identity server is to update the realms it supports. To do this, add a list element in `identity-provider/idconf.yaml` and specify at minimum a `clientId`, `clientSecret`, and `discoveryUrl` for the realm. You will need to explicitly stop the docker containers and restart them in order to have the identity server read in the new realm information.
 
 2. The identity server is fairly stateless (with the exception of some caches stored in-memory), so it's quite safe to wipe and restart the server arbitrarily.

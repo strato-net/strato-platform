@@ -51,7 +51,7 @@ In Docker for Mac "Preferences" -> "Advanced" allocate at least *2 CPU cores, 6 
     <CONFIG_VARS> make docker-compose
     ```
 ### Debugging
-- GHC/Stack provides a tool called "profiling" which allows you to create a report of how much memory and cycles a process is using for each function, etc. 
+- GHC/Stack provides a tool called "profiling" which allows you to create a report of how much memory and cycles a process is using for each function, etc.
   [GHC Profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html)
 - Modify the `doit.sh` script so that the program you are profiling has the following args:
 

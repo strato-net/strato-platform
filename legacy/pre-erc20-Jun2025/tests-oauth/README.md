@@ -33,7 +33,7 @@ CONFIG_FILE=<CONFIG_FILE_PATH> yarn load:test
 
 #### Config file setup:
 
-This testcases is genralised and you can add any contract and run for load test. Config should be like this: 
+This testcases is genralised and you can add any contract and run for load test. Config should be like this:
 
 ```
 apiDebug: false
@@ -45,14 +45,14 @@ batchSize: 10
 # NOTE: mention nodes excluding current node
 multinode:
   runTest: true
-  nodes: 
+  nodes:
     - http://multinode201.ci.blockapps.net
     - http://multinode202.ci.blockapps.net
 
-contract: 
+contract:
   name: 'AgreementManager'
   filePath: './contracts/beanstalk/agreement/AgreementManager.sol'
-  args: 
+  args:
     _dappAddress: 2383914a2cffe7bb97e0b622481b945858e08188
     _permissionManager: '2383914a2cffe7bb97e0b622481b945858e08188'
     _programManager: '2383914a2cffe7bb97e0b622481b945858e08188'
