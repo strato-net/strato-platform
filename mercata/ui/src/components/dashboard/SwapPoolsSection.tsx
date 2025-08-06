@@ -71,11 +71,7 @@ const SwapPoolsSection = () => {
       const enrichedPools = enrichPools(tempPools);
       setPools(enrichedPools);
     } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch pools",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch pools:", err);
     } finally {
       setLoading(false);
     }
@@ -196,7 +192,7 @@ const SwapPoolsSection = () => {
                     <div>
                       <h3 className="font-medium">{pool._name}</h3>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)}</span>
+                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
                     </div>
                   </div>

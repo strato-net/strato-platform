@@ -902,7 +902,6 @@ const' :: Type' -> Type' -> Type'
 const' _ (Bottom e) = Bottom e
 const' t _ = t
 
--- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector cc =
   let cc'@CodeCollection {..} = (\sa -> sa {_sourceAnnotationAnnotation = ""}) <$> cc

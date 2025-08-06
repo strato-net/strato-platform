@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
 import { LiquidityPool, SwappableToken, Token } from "@/interface";
-import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
@@ -53,7 +52,25 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
       <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
-        <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        <div className="flex items-center gap-2">
+          {asset ? (
+            asset.images?.[0]?.value ? (
+              <img
+                src={asset.images[0].value}
+                alt={asset._name}
+                className="w-4 h-4 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                style={{ backgroundColor: "red" }}
+              >
+                {asset._symbol?.slice(0, 1)}
+              </div>
+            )
+          ) : null}
+          <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
+        </div>
         <ChevronDown className="h-4 w-4 flex-shrink-0" />
       </Button>
     </PopoverTrigger>
@@ -70,7 +87,23 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
                 onSelect(token);
               }}
             >
-              <span>{token._symbol}</span>
+              <div className="flex items-center gap-2">
+                {token.images?.[0]?.value ? (
+                  <img
+                    src={token.images[0].value}
+                    alt={token._name}
+                    className="w-4 h-4 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                    style={{ backgroundColor: "red" }}
+                  >
+                    {token._symbol?.slice(0, 1)}
+                  </div>
+                )}
+                <span>{token._symbol}</span>
+              </div>
               {token._symbol === asset?._symbol && <Check className="h-4 w-4 ml-auto" />}
             </Button>
           ))
@@ -337,7 +370,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 const SwapWidget = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance, refreshSwapHistory } = useSwapContext();
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -398,13 +431,9 @@ const SwapWidget = () => {
   const initialTokenSetup = async () => {
     try {
       setFromBalanceLoading(true)
-      const res = await api.get(
-         `/tokens/balance?address=eq.${swappableTokens[0].address}`
-       );
- 
-       const balance = res?.data?.[0]?.balance || "0";
-       setFromAsset({...swappableTokens[0], balance})
-       setFromBalanceLoading(false)
+      const balance = await getTokenBalance(swappableTokens[0].address);
+      setFromAsset({...swappableTokens[0], balance})
+      setFromBalanceLoading(false)
     } catch (error) {
       setFromBalanceLoading(false)
       console.log(error);
@@ -569,7 +598,7 @@ const SwapWidget = () => {
   }, []);
 
   // Helper functions
-  const getTokenBalance = async (asset: SwappableToken, isFrom: boolean) => {
+  const getTokenBalanceFromContext = async (asset: SwappableToken, isFrom: boolean) => {
     try {
       if (isFrom) {
         setFromBalanceLoading(true);
@@ -577,11 +606,7 @@ const SwapWidget = () => {
         setToBalanceLoading(true);
       }
 
-      const res = await api.get(
-        `/tokens/balance?address=eq.${asset.address}`
-      );
-
-      const balance = res?.data?.[0]?.balance || "0";
+      const balance = await getTokenBalance(asset.address);
 
       if (isFrom) {
         setFromAsset({ ...asset, balance });
@@ -838,10 +863,11 @@ const SwapWidget = () => {
       setEditingField(null);
       lastCalculatedFromRef.current = "";
 
+      await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
-        getTokenBalance(fromAsset, true),
-        getTokenBalance(toAsset, false),
+        getTokenBalanceFromContext(fromAsset, true),
+        getTokenBalanceFromContext(toAsset, false),
         fetchUsdstBalance(userAddress),
         fetchTokens(),           // Refresh UserTokensContext
         refreshLoans(),          // Refresh LendingContext
@@ -849,11 +875,7 @@ const SwapWidget = () => {
       ]);
     } catch (error) {
       console.error("Swap error:", error);
-      toast({
-        title: "Error",
-        description: "Swap failed. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is now handled globally by axios interceptor
     } finally {
       setSwapLoading(false);
     }
@@ -930,7 +952,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isLoading={fromBalanceLoading}
         wrongAmount={wrongAmount}
         insufficientPoolBalance={insufficientPoolBalance}
-        onSelect={(asset) => getTokenBalance(asset, true)}
+        onSelect={(asset) => getTokenBalanceFromContext(asset, true)}
         tokens={swappableTokens}
         isOpen={fromPopoverOpen}
         onOpenChange={setFromPopoverOpen}
@@ -962,7 +984,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isLoading={toBalanceLoading}
         wrongAmount={false}
         insufficientPoolBalance={false}
-        onSelect={(asset) => getTokenBalance(asset, false)}
+        onSelect={(asset) => getTokenBalanceFromContext(asset, false)}
         tokens={pairableTokens}
         isOpen={toPopoverOpen}
         onOpenChange={setToPopoverOpen}

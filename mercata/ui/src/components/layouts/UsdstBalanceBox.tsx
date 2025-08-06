@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
-import { Card, CardContent } from "./card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Coins, AlertTriangle, HelpCircle, Minus } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -10,10 +10,45 @@ import {
   formatCurrency,
   safeParseFloat,
 } from "@/utils/numberUtils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
-import { Button } from "./button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
 import { usdstAddress } from "@/lib/constants";
+import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+
+// Optimized InfoTooltip component using hook
+const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('usdst-balance-tooltip-container');
+
+  if (isMobile) {
+    return (
+      <div className="relative usdst-balance-tooltip-container">
+        <div 
+          className="cursor-help"
+          onClick={handleToggle}
+        >
+          {children}
+        </div>
+        {showTooltip && (
+          <div className="absolute bottom-full left-0 mb-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
+            <p>{content}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p>{content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress } = useUser();
@@ -61,6 +96,7 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
+    if (loadingUsdstBalance) return "border-blue-200 bg-white/95";
     if (isCriticalBalance) return "border-red-300 bg-red-200/95";
     if (isLowBalance) return "border-orange-300 bg-orange-200/95";
     return "border-blue-200 bg-white/95";
@@ -83,6 +119,11 @@ const UsdstBalanceBox: React.FC = () => {
           className={`${sizeClasses[size]} rounded-full object-cover`}
         />
       );
+    }
+
+    // Don't show warning icons when loading
+    if (loadingUsdstBalance) {
+      return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
     }
 
     // Fallback to warning/normal icons
@@ -126,7 +167,9 @@ const UsdstBalanceBox: React.FC = () => {
         <div className="flex items-center space-x-2">
           <div
             className={`p-1.5 rounded-full ${
-              isCriticalBalance
+              loadingUsdstBalance
+                ? "bg-blue-100"
+                : isCriticalBalance
                 ? "bg-red-100"
                 : isLowBalance
                 ? "bg-orange-100"
@@ -138,17 +181,9 @@ const UsdstBalanceBox: React.FC = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
               <p className="text-xs font-medium text-gray-600">USDST Balance</p>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>
-                    USDST is used to pay for gas fees on the STRATO Mercata
-                    network
-                  </p>
-                </TooltipContent>
-              </Tooltip>
+              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network">
+                <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+              </InfoTooltip>
             </div>
             <p className="text-sm font-semibold text-gray-900 truncate">
               {loadingUsdstBalance ? (

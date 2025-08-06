@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import UsdstBalanceBox from "@/components/ui/UsdstBalanceBox";
+import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
@@ -22,14 +22,15 @@ import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
+import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 
 // Import dashboard components
-import BridgePage from "./pages/BridgePage";
+
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { metaMaskWallet } from "@rainbow-me/rainbowkit/wallets";
+import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
 import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
@@ -41,7 +42,7 @@ import Borrow from "./pages/Borrow";
 
 const queryClient = new QueryClient();
 
-const projectId = "YOUR_PROJECT_ID"; //project_id required for v2wallet connect
+const projectId = import.meta.env.VITE_PROJECT_ID || 'strato-mercata'; //project_id required for v2wallet connect
 const appName = "Mercata";
 
 const chains = [mainnet, polygon, sepolia] as const;
@@ -55,7 +56,7 @@ const connectors = connectorsForWallets(
   [
     {
       groupName: "Recommended",
-      wallets: [metaMaskWallet],
+      wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
     },
   ],
   { projectId, appName }
@@ -138,6 +139,14 @@ const App = () => (
                                     }
                                   />
                                   <Route
+                                    path="/dashboard/activity"
+                                    element={
+                                      <ProtectedRoute>
+                                        <ActivityFeed />
+                                      </ProtectedRoute>
+                                    }
+                                  />
+                                  <Route
                                     path="/dashboard/transfer"
                                     element={
                                       <ProtectedRoute>
@@ -155,13 +164,14 @@ const App = () => (
                                       </ProtectedRoute>
                                     }
                                   />
-                                  <Route
-                                    path="/dashboard/bridge"
-                                    element={<BridgePage />}
-                                  />
+
                                   <Route
                                     path="/dashboard/bridge-transactions"
-                                    element={<BridgeTransactionsPage />}
+                                    element={
+                                      <ProtectedRoute>
+                                        <BridgeTransactionsPage />
+                                      </ProtectedRoute>
+                                    }
                                   />
 
                                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

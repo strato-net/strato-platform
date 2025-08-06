@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
-import { RawDepositData, RawWithdrawData } from '@/interface/index'
+import { RawDepositData, RawWithdrawData } from '@/interface/index';
+import { api } from '@/lib/axios';
 
 interface Transaction {
   transaction_hash: string;
@@ -64,19 +64,19 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     limit?: number;
   }): Promise<TransactionResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await axios.get(`/api/bridge/depositStatus/${status}`, {
-        params: {
-          limit,
-          pageNo: page,
-          orderBy: 'block_timestamp',
-          orderDirection: 'desc',
-        },
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        pageNo: page.toString(),
+        orderBy: 'block_timestamp',
+        orderDirection: 'desc',
       });
 
-      const depositData = response.data?.data?.data.data || [];
+      const response = await api.get(`/bridge/depositStatus/${status}?${params}`);
+      const responseData = response.data;
+
+      const depositData = responseData?.data?.data.data || [];
       
       const transformedData = Array.isArray(depositData)
         ? depositData.map((item: RawDepositData) => ({
@@ -103,7 +103,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
           }))
         : [];
 
-      const totalCount = response.data?.data?.data?.totalCount || 0;
+      const totalCount = responseData?.data?.data?.totalCount || 0;
       
       setDepositTransactions(transformedData);
       
@@ -112,9 +112,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         totalCount
       };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch deposit transactions';
-      setError(errorMessage);
-      console.error('Error fetching deposit transactions:', err);
+  
       return {
         data: [],
         totalCount: 0
@@ -134,19 +132,19 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     limit?: number;
   }): Promise<TransactionResponse> => {
     setLoading(true);
-    setError(null);
     
     try {
-      const response = await axios.get(`/api/bridge/withdrawalStatus/${status}`, {
-        params: {
-          limit,
-          pageNo: page,
-          orderBy: 'block_timestamp',
-          orderDirection: 'desc',
-        },
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        pageNo: page.toString(),
+        orderBy: 'block_timestamp',
+        orderDirection: 'desc',
       });
 
-      const withdrawalData = response.data?.data?.data.data || [];
+      const response = await api.get(`/bridge/withdrawalStatus/${status}?${params}`);
+      const responseData = response.data;
+
+      const withdrawalData = responseData?.data?.data.data || [];
       
       const transformedData = Array.isArray(withdrawalData)
         ? withdrawalData.map((item: RawWithdrawData) => ({
@@ -173,7 +171,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
           }))
         : [];
 
-      const totalCount = response.data?.data?.data?.totalCount || 0;
+      const totalCount = responseData?.data?.data?.totalCount || 0;
       
       setWithdrawTransactions(transformedData);
       
@@ -182,9 +180,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         totalCount
       };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch withdraw transactions';
-      setError(errorMessage);
-      console.error('Error fetching withdraw transactions:', err);
       return {
         data: [],
         totalCount: 0
@@ -217,18 +212,12 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
       return relativeTime;
     } catch (error) {
-      console.error("Error formatting date:", error);
       return dateString;
     }
   }, []);
 
   const copyToClipboard = useCallback(async (text: string): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-      throw error;
-    }
+    await navigator.clipboard.writeText(text);
   }, []);
 
   const renderTruncatedAddress = useCallback((address: string): string => {

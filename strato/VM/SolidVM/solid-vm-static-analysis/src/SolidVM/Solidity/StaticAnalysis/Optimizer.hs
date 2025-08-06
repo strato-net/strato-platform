@@ -184,8 +184,8 @@ simpleStatementFHelper' (Return (Just expr) b) = do
   pure $ Return (Just x) b
 simpleStatementFHelper' a = pure $ a
 
-getVariableByName :: SolidString -> SSS (Maybe Expression) --VariableDeclF (SourceAnnotation ()) -- Maybe SVMType.Type
-getVariableByName name = do
+_getVariableByName :: SolidString -> SSS (Maybe Expression) --VariableDeclF (SourceAnnotation ()) -- Maybe SVMType.Type
+_getVariableByName name = do
   mc <- asks contract
   case mc of
     Just c -> do
@@ -238,7 +238,7 @@ optimizeExpression (Binary x "*" a b) t = do
 optimizeExpression (Binary x "/" a b) t = do
   a' <- optimizeExpression a t
   b' <- optimizeExpression b t
-  let varType' = fromMaybe (SVMType.Int Nothing Nothing) t 
+  let varType' = fromMaybe (SVMType.Int Nothing Nothing) t
   case (a', b', varType') of
     (NumberLiteral y valA _, NumberLiteral z valB _, SVMType.Decimal) ->
       if valB == 0
@@ -270,140 +270,9 @@ optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap")
       _ -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
 
---This needs further research before letting loose on the code base
---This function as of now is neutured
-optimizeExpression (Variable x name) _ = do
-  var <- getVariableByName name
-  case var of _ -> pure $ (Variable x name)
---case var  of Just y -> optimizeExpression y; Nothing -> pure $ (Variable x name )
+-- This needs further research before letting loose on the code base
+-- This function as of now is neutured
+-- See git blame for code that was here before
+optimizeExpression (Variable x name) _ = pure $ Variable x name
 
--- optimizeExpression (MemberAccess loc base fieldName) = do
---   case base of
---     (FunctionCall spot (Variable _ "type") (OrderedArgs [(Variable _ nam)])) -> do --Note type is a special reserved function
---         cc <- asks codeCollection
---         if (M.member nam (_contracts cc) )
---         then case fieldName of
---           "name" -> pure $ (StringLiteral spot nam)
---           --"int"  -> pure $ ()--To Implement for another ticket
---           "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contrct -> (StringLiteral spot (unparseContract  contrct));  _ ->  (MemberAccess loc base fieldName);
---           "runtimeCode" -> pure $ (MemberAccess loc base fieldName)
---           _ -> pure $ (MemberAccess loc base fieldName)
---         else  pure $ (MemberAccess loc base fieldName)
---     (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName)
---     _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
-
--- optimizeExpression e = pure e
-
--- optimizeExpression (Binary x "|" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "&" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "^" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "**" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "<<" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x ">>" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x ">>>" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x ">>>=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x ">>=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "<<=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "+=" a b) =
---   sumType' (intType' x) (stringType' x)  ~> (checkIfImmuteOperationValid a) <~> optimizeExpression b
--- optimizeExpression (Binary x "-=" a b) =
---   intType' x ~> (checkIfImmuteOperationValid a) <~> optimizeExpression b
--- optimizeExpression (Binary x "*=" a b) =
---   intType' x ~> (checkIfImmuteOperationValid a) <~> optimizeExpression b
--- optimizeExpression (Binary x "/=" a b) =
---   intType' x ~> (checkIfImmuteOperationValid a) <~> optimizeExpression b
--- optimizeExpression (Binary x "%=" a b) =
---   intType' x ~> (checkIfImmuteOperationValid a) <~> optimizeExpression b
--- optimizeExpression (Binary x "|=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "&=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "^=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "||" a b) =
---   boolType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "&&" a b) =
---   boolType' x ~> optimizeExpression a <~> optimizeExpression b
--- optimizeExpression (Binary x "!=" a b) =
---   optimizeExpression a <~> optimizeExpression b !> pure (boolType' x)
--- optimizeExpression (Binary x "==" a b) =
---   optimizeExpression a <~> optimizeExpression b !> pure (boolType' x)
--- optimizeExpression (Binary x "<" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b !> pure (boolType' x)
--- optimizeExpression (Binary x ">" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b !> pure (boolType' x)
--- optimizeExpression (Binary x ">=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b !> pure (boolType' x)
--- optimizeExpression (Binary x "<=" a b) =
---   intType' x ~> optimizeExpression a <~> optimizeExpression b !> pure (boolType' x)
--- optimizeExpression (Binary _ "=" a b) =
---   (checkIfImmuteOperationValid a) <~> optimizeExpression b
--- optimizeExpression (Binary _ _ a b) =
---   (optimizeExpression a <~> optimizeExpression b)
--- optimizeExpression (PlusPlus x a) =
---   intType' x ~> optimizeExpression a
--- optimizeExpression (MinusMinus x a) = do
---   intType' x ~> optimizeExpression a
--- optimizeExpression (NewExpression x b@SVMType.Bytes{}) = pure $ Static b x
--- optimizeExpression (NewExpression x a@SVMType.Array{}) = pure $ Static a x
--- optimizeExpression (NewExpression x (SVMType.UnknownLabel l _)) = getConstructorType' x l
--- optimizeExpression (NewExpression x (SVMType.Contract l)) = getConstructorType' x l
--- optimizeExpression (NewExpression x t) = pure . bottom $ ("Cannot use keyword 'new' in conjuction with type " <> showType t) <$ x
--- optimizeExpression (IndexAccess _ a (Just b)) = do
---   a' <- optimizeExpression a
---   b' <- optimizeExpression b
---   typecheckIndex a' b'
--- optimizeExpression (IndexAccess _ a Nothing) = optimizeExpression a
-
--- optimizeExpression (MemberAccess loc base fieldName) = do
---   case base of
---     (FunctionCall spot (Variable _ "type") (OrderedArgs [(Variable _ nam)])) -> do --Note type is a special reserved function
---         cc <- asks codeCollection
---         if (M.member nam (_contracts cc) )
---         then case fieldName of
---           "name" -> pure $ (StringLiteral spot nam)
---           --"int"  -> pure $ ()--To Implement for another ticket
---           "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract));  _ ->  (MemberAccess loc base fieldName);
---           "runtimeCode" -> pure $ (MemberAccess loc base fieldName)
---           _ -> pure $ (MemberAccess loc base fieldName)
---         else  pure $ (MemberAccess loc base fieldName)
---     (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName)
---     _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
-
--- optimizeExpression (FunctionCall x expr args) = do
---   e <- optimizeExpression expr
---   a <- case args of
---          OrderedArgs es -> productType' x <$> traverse optimizeExpression es
---          NamedArgs es -> productType' x <$> traverse (optimizeExpression . snd) es
---   apply e a
--- optimizeExpression (Unitary x "-" a) = intType' x ~> optimizeExpression a
--- optimizeExpression (Unitary x "++" a) = intType' x ~> optimizeExpression a
--- optimizeExpression (Unitary x "--" a) = intType' x ~> optimizeExpression a
--- optimizeExpression (Unitary x "!" a) = boolType' x ~> optimizeExpression a
--- optimizeExpression (Unitary x "delete" a) = optimizeExpression a !> pure (Product [] x)
--- optimizeExpression (Unitary _ _ a) = optimizeExpression a
--- optimizeExpression (Ternary x a b c) =
---    boolType' x ~> optimizeExpression a !> optimizeExpression b <~> optimizeExpression c
--- optimizeExpression (BoolLiteral x _) = pure $ boolType' x
--- optimizeExpression (NumberLiteral x _ _) = pure $ intType' x
--- optimizeExpression (StringLiteral x _) = pure $ stringType' x
--- optimizeExpression (TupleExpression x es) =
---   productType' x <$> traverse (maybe (pure $ topType' x) optimizeExpression) es
--- optimizeExpression (ArrayExpression x es) = do
---   t' <- foldr (<~>) (pure $ topType' x) $ optimizeExpression <$> es
---   pure $ case t' of
---     (Static t _) -> Static (SVMType.Array t Nothing) x
---     _ -> t'
--- optimizeExpression (Variable x name) = getVarType' (labelToString name) x
--- optimizeExpression (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x
 optimizeExpression e _ = pure e

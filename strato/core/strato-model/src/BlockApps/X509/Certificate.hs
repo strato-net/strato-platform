@@ -99,10 +99,6 @@ import Text.Format
 import Text.Tools
 import Time.System
 
--- import           Blockchain.Data.PubKey
--- import           Data.ASN1.Encoding
--- import           Data.ASN1.BinaryEncoding
--- import           Data.ASN1.Types
 
 -----------------------------------------------------------------------------------------------
 --------------------------------- TYPES AND TYPECLASS INSTANCES -------------------------------

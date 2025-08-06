@@ -338,6 +338,7 @@ export interface LiquidityPool {
   address: string;
   _owner: string;
   swapFeeRate: number;
+  lpSharePercent: number;
   aToBRatio: string;
   bToARatio: string;
   tokenABalance: string;
@@ -470,4 +471,11 @@ export interface PriceHistoryEntry {
 export interface PriceHistoryResponse {
   data: PriceHistoryEntry[];
   totalCount: number;
+}
+
+export interface HealthImpactData {
+  currentHealthFactor: number;
+  newHealthFactor: number;
+  healthImpact: number;
+  isHealthy: boolean;
 }

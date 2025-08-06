@@ -58,8 +58,6 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
         
         return null;
           } catch (error) {
-        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
-        setError(axiosError.response?.data?.message || axiosError.message || 'Failed to fetch oracle price');
         return null;
     } finally {
       setLoading(false);
@@ -85,8 +83,7 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
         setPrices(priceMap);
       }
           } catch (error) {
-        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
-        setError(axiosError.response?.data?.message || axiosError.message || 'Failed to fetch oracle prices');
+
     } finally {
       setLoading(false);
     }
