@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard } from "lucide-react";
+import { useOnRampPolling } from "@/hooks/useSmartPolling";
 
 interface PaymentProvider {
   name: string;
@@ -42,44 +43,36 @@ export const DepositForm = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { get, buy } = useOnRampContext();
+  const { userAddress } = useUser();
 
   const [selectedListing, setSelectedListing] = useState<ListingInfo | null>(null);
   const [availablePaymentProviders, setAvailablePaymentProviders] = useState<PaymentProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider | null>(null);
-  const { userAddress } = useUser();
 
+  // Use the optimized polling hook
+  const { startPolling, stopPolling, fetchData } = useOnRampPolling(
+    get,
+    (amount) => amount && parseFloat(amount) > 0
+  );
+
+  // Load initial data
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await get();
-        const listings = data?.listings || [];
-        const usdstListing = listings.find(
-          (listing) => listing.ListingInfo._name === "USDST"
-        );
-        if (usdstListing) {
-          const listingInfo = usdstListing.ListingInfo;
-          setSelectedListing(listingInfo);
-          const providers = (listingInfo.providers || [])
-            .filter(
-              (p) =>
-                p &&
-                typeof p.providerAddress === "string" &&
-                typeof p.name === "string"
-            )
-            .map((p) => ({ 
-              name: p.name, 
-              providerAddress: p.providerAddress 
-            }));
-          setAvailablePaymentProviders(providers);
-          setSelectedProvider(providers[0] || null);
-        }
-      } catch (error) {
-        console.error("Error while getting listings:", error);
-        // Error toast is now handled globally by axios interceptor
+    fetchData().then(result => {
+      if (result) {
+        setSelectedListing(result.listingInfo);
+        setAvailablePaymentProviders(result.providers);
+        setSelectedProvider(result.providers[0] || null);
       }
-    };
-    fetchData();
-  }, [toast, get]);
+    });
+  }, [fetchData]);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAmount(value);
+    
+    // Smart polling based on amount
+    value && parseFloat(value) > 0 ? startPolling() : stopPolling();
+  };
 
   const handleDeposit = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -100,54 +93,43 @@ export const DepositForm = () => {
     }
     setLoading(true);
     try {
-      const payload = {
+      const { url: stripeUrl } = await buy({
         token: selectedListing.token,
         amount: amount,
         paymentProviderAddress: selectedProvider.providerAddress,
-      };
-      const { url: stripeUrl } = await buy(payload, userAddress);
-      if (stripeUrl) {
-        window.location.href = stripeUrl;
-      } else {
-        throw new Error("No checkout URL returned.");
-      }
+      }, userAddress);
+      
+      if (stripeUrl) window.location.href = stripeUrl;
+      else throw new Error("No checkout URL returned.");
     } catch (error) {
       console.error("Failed to lock on-ramp amount:", error);
-      // Error toast is now handled globally by axios interceptor
     } finally {
       setLoading(false);
+      stopPolling();
     }
   };
 
   const exceedsMax = selectedListing?.amount
-    ? Number(amount) > Number(ethers.formatUnits(selectedListing.amount, 18)) ||
-      Number(amount) < 0.5
+    ? Number(amount) > Number(ethers.formatUnits(selectedListing.amount, 18)) || Number(amount) < 0.5
     : false;
 
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="amount">Amount of USDST to purchase</Label>
-        <div className="relative">
-          <Input
-            id="amount"
-            type="number"
-            placeholder="e.g. 7"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="pl-8"
-          />
-          {selectedListing?.amount && (
-            <p
-              className={`text-xs mt-1 ${
-                exceedsMax ? "text-red-500" : "text-gray-500"
-              }`}
-            >
-              Max available: {ethers.formatUnits(selectedListing.amount, 18)}{" "}
-              USDST — Min: 0.5 USDST
-            </p>
-          )}
-        </div>
+        <Input
+          id="amount"
+          type="number"
+          placeholder="e.g. 7"
+          value={amount}
+          onChange={handleAmountChange}
+          className="pl-8"
+        />
+        {selectedListing?.amount && (
+          <p className={`text-xs mt-1 ${exceedsMax ? "text-red-500" : "text-gray-500"}`}>
+            Max available: {ethers.formatUnits(selectedListing.amount, 18)} USDST — Min: 0.5 USDST
+          </p>
+        )}
       </div>
       <div className="bg-gray-50 rounded-md">
         <h4 className="font-medium mb-2">Payment Method</h4>
@@ -182,7 +164,7 @@ export const DepositForm = () => {
       </div>
       <Button
         onClick={handleDeposit}
-        disabled={loading || !amount || exceedsMax}
+        disabled={loading || exceedsMax || !selectedProvider}
         className="w-full bg-strato-blue hover:bg-strato-blue/90 mt-6"
       >
         {loading ? "Processing..." : "Continue to Payment"}

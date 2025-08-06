@@ -25,10 +25,25 @@ const DepositsPage = () => {
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Add visibility states to prevent flashing
+  const [isComponentMounted, setIsComponentMounted] = useState(false);
+  const [isDataInitialized, setIsDataInitialized] = useState(false);
+
   useEffect(() => {
+    // Set mounted state immediately to prevent flash
+    setIsComponentMounted(true);
+    
+    // Fetch data
     fetchTokens();
     fetchAllActiveTokens();
-  }, [userAddress]);
+
+    // Mark data as initialized after a brief delay to ensure proper rendering
+    const initTimer = setTimeout(() => {
+      setIsDataInitialized(true);
+    }, 100);
+
+    return () => clearTimeout(initTimer);
+  }, [userAddress, fetchTokens, fetchAllActiveTokens]);
 
   useEffect(() => {
     if (!tokens || tokens.length === 0) return;
@@ -61,6 +76,11 @@ const DepositsPage = () => {
     setTotalBalance(netBalance);
   }, [tokens, loans]);
 
+  // Don't render anything until component is properly mounted
+  if (!isComponentMounted) {
+    return null;
+  }
+
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
       <DashboardSidebar />
@@ -85,7 +105,16 @@ const DepositsPage = () => {
               <ExchangeCart />
             </div>
             <div className="flex-1 min-w-0 max-w-full">
-              <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
+              {/* Only render AssetsList after data initialization to prevent flash */}
+              {isDataInitialized && (
+                <AssetsList 
+                  loading={loading} 
+                  tokens={tokens} 
+                  inActiveTokens={inactiveTokens} 
+                  isDashboard={false}
+                  shouldPreventFlash={true}
+                />
+              )}
             </div>
           </div>
           {/* Assets List */}

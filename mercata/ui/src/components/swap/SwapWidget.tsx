@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useSwapPolling } from "@/hooks/useSmartPolling";
 
 // Constants
 const DEFAULT_SLIPPAGE = 4; // 4%
@@ -399,6 +400,23 @@ const SwapWidget = () => {
 
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
+  const lastCalculatedFromRef = useRef<string>("");
+
+  // Use specialized swap polling hook
+  const { startPolling, stopPolling } = useSwapPolling({
+    fromAsset,
+    toAsset,
+    fromAmount,
+    editingField,
+    getPoolByTokenPair,
+    calculateSwap,
+    setPool,
+    setToAsset,
+    setToAmount,
+    setExchangeRate,
+    lastCalculatedFromRef,
+    interval: POLL_INTERVAL
+  });
 
   // Fee warning logic
   const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
@@ -415,7 +433,6 @@ const SwapWidget = () => {
     const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
     return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
   })();
-  const lastCalculatedFromRef = useRef<string>("");
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -501,92 +518,23 @@ const SwapWidget = () => {
     fetchOracleExchangeRate();
   }, [fromAsset?.address, toAsset?.address, fetchPrice]);
 
-  // Combined effect: fetch pool, update rate, and poll for updates
+  // Start/stop polling based on amount changes
   useEffect(() => {
-    if (!fromAsset?.address || !toAsset?.address) return;
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      startPolling();
+    } else {
+      stopPolling();
+    }
+  }, [fromAmount, startPolling, stopPolling]);
 
-    let isMounted = true;
-    let pollInterval: NodeJS.Timeout | null = null;
-    let currentRequestId = 0;
-    let abortController: AbortController | null = null;
-
-    const fetchAndUpdatePool = async () => {
-      const requestId = ++currentRequestId;
-
-      // Abort previous request if still pending
-      if (abortController) {
-        abortController.abort();
-      }
-      abortController = new AbortController();
-
-      try {
-        const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address, abortController.signal);
-
-        // Check if this is still the current request
-        if (!isMounted || requestId !== currentRequestId) return;
-
-        if (poolData) {
-          setPool(poolData);
-
-          // Update exchange rate immediately
-          const rate = poolData.tokenA?.address === fromAsset.address
-            ? poolData.aToBRatio
-            : poolData.bToARatio;
-          setExchangeRate(rate || "0");
-
-          // Recalculate if not actively editing and we have a preserved amount
-          if (fromAmount && fromAmount === lastCalculatedFromRef.current && editingField === null) {
-            const parsedValue = safeParseUnits(fromAmount, DECIMALS);
-            const isAToB = poolData.tokenA?.address === fromAsset.address ? true : false;
-
-            const swapAmount = await calculateSwap({
-              poolAddress: poolData.address,
-              isAToB,
-              amountIn: parsedValue.toString(),
-              signal: abortController.signal,
-            });
-
-            setToAmount(formatUnits(BigInt(swapAmount || "0"), DECIMALS));
-          }
-        } else {
-          setPool(null);
-          setToAsset(undefined);
-          setToAmount("");
-          setExchangeRate("0");
-        }
-      } catch (error) {
-        // Don't handle aborted requests as errors
-        if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') return;
-
-        // Only handle errors for the current request
-        if (isMounted && requestId === currentRequestId) {
-          console.error("Error fetching pool:", error);
-          setPool(null);
-          setToAsset(undefined);
-          setToAmount("");
-          setExchangeRate("0");
-        }
-      }
-    };
-
-    // Initial fetch
-    fetchAndUpdatePool();
-
-    // Set up polling
-    pollInterval = setInterval(fetchAndUpdatePool, POLL_INTERVAL);
-
-    // Cleanup
-    return () => {
-      isMounted = false;
-      currentRequestId++; // Invalidate any pending requests
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-      if (abortController) {
-        abortController.abort();
-      }
-    };
-  }, [fromAsset?.address, toAsset?.address, fromAmount, editingField, getPoolByTokenPair, calculateSwap]);
+  // Start/stop polling based on amount changes
+  useEffect(() => {
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      startPolling();
+    } else {
+      stopPolling();
+    }
+  }, [fromAmount, startPolling, stopPolling]);
 
   // Cleanup on unmount
   useEffect(() => {

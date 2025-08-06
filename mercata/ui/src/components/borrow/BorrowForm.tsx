@@ -15,9 +15,11 @@ interface BorrowFormProps {
   onBorrow: (amount: string) => void;
   usdstBalance: string;
   collateralInfo: CollateralData[] | null;
+  startPolling?: () => void;
+  stopPolling?: () => void;
 }
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralInfo }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralInfo, startPolling, stopPolling }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowDisplayAmount, setBorrowDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
@@ -53,18 +55,32 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     if (/^\d*\.?\d*$/.test(value)) {
       setBorrowDisplayAmount(addCommasToInput(value));
       setBorrowAmount(value);
+      
+      // Smart polling based on amount - only use parent polling functions
+      if (value && parseFloat(value) > 0) {
+        startPolling?.();
+      } else {
+        stopPolling?.();
+      }
     }
   };
 
   const handleBorrowPercentage = (percentageAmount: string) => {
     setBorrowAmount(percentageAmount);
     setBorrowDisplayAmount(addCommasToInput(percentageAmount));
+    
+    // Start polling when percentage is selected
+    if (percentageAmount && parseFloat(percentageAmount) > 0) {
+      startPolling?.();
+    }
   };
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
     setBorrowAmount("");
     setBorrowDisplayAmount("");
+    // Stop polling after borrow action
+    stopPolling?.();
   };
 
   useEffect(()=>{
@@ -109,6 +125,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
                 const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
                 setBorrowAmount(availableToBorrowFormatted);
                 setBorrowDisplayAmount(addCommasToInput(availableToBorrowFormatted));
+                // Start polling when max is clicked
+                if (safeParseFloat(availableToBorrowFormatted) > 0) {
+                  startPolling?.();
+                }
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
               className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"

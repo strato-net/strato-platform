@@ -479,3 +479,40 @@ export interface HealthImpactData {
   healthImpact: number;
   isHealthy: boolean;
 }
+
+/*-------- Polling Interfaces --------*/
+
+export interface PollingConfig {
+  fetchFn: () => Promise<any>;
+  shouldPoll?: (amount: string) => boolean;
+  onDataUpdate?: (data: any) => void;
+  interval?: number;
+  autoStart?: boolean;
+  transformData?: (data: any) => any;
+  onError?: (error: any) => void;
+  enabled?: boolean;
+}
+
+export interface PollingReturn {
+  startPolling: () => void;
+  stopPolling: () => void;
+  isPolling: boolean;
+  fetchData: () => Promise<any>;
+  lastData: any;
+  error: any;
+}
+
+export interface SwapPollingConfig {
+  fromAsset?: any; 
+  toAsset?: any; 
+  fromAmount: string; 
+  editingField: 'from' | 'to' | null;
+  getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
+  calculateSwap: (params: any) => Promise<any>;
+  setPool: (pool: any) => void; 
+  setToAsset: (asset: any) => void; 
+  setToAmount: (amount: string) => void; 
+  setExchangeRate: (rate: string) => void;
+  lastCalculatedFromRef: React.MutableRefObject<string>; 
+  interval?: number;
+}
