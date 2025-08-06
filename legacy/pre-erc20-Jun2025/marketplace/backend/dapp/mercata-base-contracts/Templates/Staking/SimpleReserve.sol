@@ -2,9 +2,9 @@ import <BASE_CODE_COLLECTION>;
 
 contract SimpleReserve is Reserve{
     constructor(
-        address _assetOracle, 
-        string _name, 
-        address _assetRootAddress, 
+        address _assetOracle,
+        string _name,
+        address _assetRootAddress,
         decimal _unitConversionRate,
         address _usdstToken,
         decimal _usdstPrice,

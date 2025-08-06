@@ -15,7 +15,7 @@ contract Permit {
     adrs = _adrs;
     permissions = _permissions;
   }
-  
+
   function setPermissions(uint _permissions) {
     // require(owner == msg.sender);
     permissions = _permissions;
@@ -226,7 +226,7 @@ contract PermissionManager is RestStatus, EventLogType {
     }
     return (RestStatus.OK, permit.permissions());
   }
-  
+
   function applyPermission(string _id, address _address, uint _permissions) public returns (uint, uint) {
     // call grant
     var(restStatus, permitPermissions) = _applyPermission(_id, _address, _permissions);

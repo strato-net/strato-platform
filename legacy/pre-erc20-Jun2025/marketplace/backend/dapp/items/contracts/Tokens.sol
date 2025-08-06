@@ -26,7 +26,7 @@ contract Tokens is LendingToken, MinterAuthorization {
     function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
         Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, decimals, status, address(redemptionService), paymentServiceCreator);
-        return UTXO(address(newToken)); 
+        return UTXO(address(newToken));
     }
 
     modifier fromPaymentService(string action) {
@@ -37,7 +37,7 @@ contract Tokens is LendingToken, MinterAuthorization {
         require(ps.tokenAddress() == this.root && address(ps).creator == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
         _;
     }
-    
+
     function purchaseTransfer(address _newOwner, uint _quantity, uint _transferNumber, decimal _price) public fromPaymentService("make a purchase") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         require(_quantity > 0, "Quantity must be greater than 0");

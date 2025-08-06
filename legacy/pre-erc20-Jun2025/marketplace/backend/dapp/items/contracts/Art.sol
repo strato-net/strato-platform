@@ -21,7 +21,7 @@ contract Art is Redeemable {
     }
     function mint(uint splitQuantity) internal override returns (UTXO) {
         Art a = new Art(name, description, images, files, fileNames, createdDate, splitQuantity, decimals, artist, status, address(redemptionService));
-        return UTXO(address(a)); 
+        return UTXO(address(a));
     }
 }
 

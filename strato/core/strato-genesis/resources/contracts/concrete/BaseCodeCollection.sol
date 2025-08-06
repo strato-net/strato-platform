@@ -82,11 +82,11 @@ contract record Mercata {
         collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
         liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
         rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(msg.sender); 
+        priceOracle = new PriceOracle(msg.sender);
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
-           
-        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
+
+        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator));
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[]);
         Ownable(poolConfigurator).transferOwnership(msg.sender);
 

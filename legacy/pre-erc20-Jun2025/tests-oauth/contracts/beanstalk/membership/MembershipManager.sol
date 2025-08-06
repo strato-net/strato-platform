@@ -51,7 +51,7 @@ contract record MembershipManager is RestStatus, Util, MembershipEvent, Membersh
       requestMembership(_username, _nodeLabel, _userBlockchainAddress, BeanstalkRole.TECH_PROVIDER);
       handleMembershipEvent(_username, _nodeLabel, MembershipEvent.APPROVE);
       handleMembershipEvent(_username, _nodeLabel, MembershipEvent.PROCESS);
-    } 
+    }
   }
 
   // Request membership

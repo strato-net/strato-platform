@@ -44,7 +44,7 @@ abstract contract UTXO is Asset {
             owner = _newOwner;
             ownerCommonName = getCommonName(_newOwner);
         } catch {
-            
+
             if(_isUserTransfer && _transferNumber>0){
             // Emit ItemTransfers Event
                 emit ItemTransfers(

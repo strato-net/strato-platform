@@ -1,4 +1,4 @@
-contract Utils { 
+contract Utils {
     function getCommonName(address addr) internal returns (string) {
         string commonName = getUserCert(addr)["commonName"];
         if (commonName == ""){

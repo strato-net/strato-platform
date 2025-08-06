@@ -7,7 +7,7 @@ abstract contract record Escrow is Utils {
     address public reserve;
     uint public collateralQuantity;
     uint public collateralValue;
-    uint public maxLoanAmount; 
+    uint public maxLoanAmount;
     uint public liquidationAmount;
     uint public totalCataReward;
     uint public borrowedAmount;

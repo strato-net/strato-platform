@@ -124,10 +124,10 @@ contract record PhysicalRedemptionService is RedemptionService, ERC20Burnable, E
 
         // Transfer tokens from user to contract
         require(ERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
-        
+
         // Burn tokens by sending to a zero addressand emit event for physical redemption processing
         token.transfer(address(0), tokenAmount);
-        
+
         emit Redeemed(msg.sender, tokenAmount);
     }
 
@@ -141,7 +141,7 @@ contract record PhysicalRedemptionService is RedemptionService, ERC20Burnable, E
         require(tokenAmount <= maxRedemptionAmount, "Amount exceeds maximum");
 
         uint256 usdcAmount = (tokenAmount * spotPrice) / 1e18;
-        
+
         // Check if pool has enough depth
         require(ERC20(usdst).balanceOf(address(this)) >= usdcAmount, "Insufficient amount of USDST");
 

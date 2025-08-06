@@ -45,9 +45,9 @@ contract Collectibles is Mintable {
         return UTXO(address(newAsset));
     }
 
-    // TODO: Finish the update function. 
+    // TODO: Finish the update function.
     function updateCollectible(
-        string[] _images, 
+        string[] _images,
         string[] _files,
         string[] _fileNames
     ) public requireOwner("update collectible") returns (uint) {

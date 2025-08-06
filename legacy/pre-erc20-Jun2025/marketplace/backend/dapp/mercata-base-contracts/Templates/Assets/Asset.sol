@@ -71,7 +71,7 @@ abstract contract record Asset is Utils {
         name = _name;
         description = _description;
         images = _images;
-        files = _files; 
+        files = _files;
         fileNames = _fileNames;
         createdDate = _createdDate;
         quantity = _quantity;
@@ -181,7 +181,7 @@ abstract contract record Asset is Utils {
         ownerCommonName = newOwnerCommonName;
         close();
     }
-    
+
     function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) public fromSale("transfer ownership") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         // regular transfer - isUserTransfer: false, transferNumber: 0

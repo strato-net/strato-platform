@@ -22,6 +22,6 @@ contract BridgeableTokens is Tokens, MercataETHBridge {
     function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
         BridgeableTokens newToken = new BridgeableTokens(name, description, images, files, fileNames, createdDate, _quantity, decimals, status, address(redemptionService), paymentServiceCreator);
-        return UTXO(address(newToken)); 
+        return UTXO(address(newToken));
     }
 }

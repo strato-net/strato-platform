@@ -41,9 +41,9 @@ abstract contract Redeemable is UTXO {
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }
-    
+
     function checkCondition() internal virtual override returns (bool){
-        return true;   
+        return true;
     }
 
     function getRedemptionService() internal returns (RedemptionService) {

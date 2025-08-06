@@ -31,11 +31,11 @@ contract CarbonOffset is Mintable {
 
     function mint(uint splitQuantity) internal override returns (UTXO) {
         CarbonOffset c = new CarbonOffset(name,
-                              description, 
-                              images, 
-                              files, 
+                              description,
+                              images,
+                              files,
                               fileNames,
-                              createdDate, 
+                              createdDate,
                               splitQuantity,
                               decimals,
                               status,

@@ -1,7 +1,7 @@
 contract record GasVolumeUnits {
     enum GasVolumeUnits {
         NULL,
-        MMBTU, 
+        MMBTU,
         GJ
     }
 }

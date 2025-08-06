@@ -1,4 +1,4 @@
- 
+
 
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol"
@@ -75,7 +75,7 @@ contract Inventory is InventoryStatus{
       }
 
       return RestStatus.OK;
-    }    
+    }
 
     function updateQuantity(int _quantity) returns(uint){
       availableQuantity = _quantity;

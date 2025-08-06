@@ -23,7 +23,7 @@ contract Metals is Mintable, UnitOfMeasurement{
     //categorical
     UnitOfMeasurement public unitOfMeasurement;
     uint public leastSellableUnits;
-    string public source; 
+    string public source;
     string purity;
 
     constructor(
@@ -52,7 +52,7 @@ contract Metals is Mintable, UnitOfMeasurement{
         _decimals,
         _status,
         _redemptionService
-        ) 
+        )
     {
         unitOfMeasurement = _unitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
@@ -62,11 +62,11 @@ contract Metals is Mintable, UnitOfMeasurement{
 
     function mint(uint splitQuantity) internal override returns (UTXO) {
         Metals newAsset = new Metals(name,
-                              description, 
-                              images, 
-                              files, 
+                              description,
+                              images,
+                              files,
                               fileNames,
-                              createdDate, 
+                              createdDate,
                               splitQuantity,
                               decimals,
                               unitOfMeasurement,
@@ -76,6 +76,6 @@ contract Metals is Mintable, UnitOfMeasurement{
                               status,
                               address(redemptionService)
                               );
-        return UTXO(address(newAsset)); 
+        return UTXO(address(newAsset));
 }
 }

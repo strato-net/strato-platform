@@ -8,7 +8,7 @@ abstract contract record OracleService is Utils {
 
     address public owner;
     string public ownerCommonName;
-    
+
     string public name;
 
     bool public isActive;

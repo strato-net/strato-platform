@@ -1,6 +1,6 @@
 contract EventLogType {
   // event log type
-  enum EventLogType { 
+  enum EventLogType {
     NULL,
     GRANT,
     REVOKE,

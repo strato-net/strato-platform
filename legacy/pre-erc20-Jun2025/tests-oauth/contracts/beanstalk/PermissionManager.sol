@@ -188,7 +188,7 @@ contract record PermissionManager is RestStatus, EventLogType {
     }
     return (result);
   }
-  
+
   // STUB base function - must be overriden
   function canModifyMap(address _address) returns (bool) {
     return false;

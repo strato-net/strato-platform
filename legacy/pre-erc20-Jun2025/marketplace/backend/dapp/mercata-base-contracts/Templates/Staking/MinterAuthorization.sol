@@ -13,7 +13,7 @@ abstract contract record MinterAuthorization is Utils {
 
     event MintedToken(address indexed user, uint amount);
     event BurnedToken(address indexed user, uint amount);
-    
+
     constructor(string _name) {
         owner = msg.sender;
         isActive = true;

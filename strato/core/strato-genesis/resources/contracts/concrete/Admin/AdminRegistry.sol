@@ -6,10 +6,10 @@ import "../../abstract/ERC20/access/Ownable.sol";
  */
 contract record AdminRegistry is Ownable {
     mapping(address => bool) public record isAdmin;
-    
+
     event AdminAdded(address admin);
     event AdminRemoved(address admin);
-    
+
     /**
      * @notice Initializes the registry and sets the initial owner and admin.
      * @param _owner The address to be set as the contract owner and initial admin.
@@ -20,7 +20,7 @@ contract record AdminRegistry is Ownable {
         isAdmin[_owner] = true;
         emit AdminAdded(_owner);
     }
-    
+
     /**
      * @notice Adds an admin account. Only callable by the contract owner.
      * @param admin The address to grant admin access to.
@@ -31,7 +31,7 @@ contract record AdminRegistry is Ownable {
         isAdmin[admin] = true;
         emit AdminAdded(admin);
     }
-    
+
     /**
      * @notice Removes an admin account. Only callable by the contract owner.
      * @param admin The address to remove from the admin list.

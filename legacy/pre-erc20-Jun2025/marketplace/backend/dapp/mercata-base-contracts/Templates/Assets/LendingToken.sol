@@ -17,7 +17,7 @@ abstract contract LendingToken is Mintable, MinterAuthorization {
     function mint(uint _quantity) internal virtual override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
         LendingToken newToken = new LendingToken(name, description, images, files, fileNames, createdDate, _quantity, decimals, status, address(redemptionService));
-        return UTXO(address(newToken)); 
+        return UTXO(address(newToken));
     }
 
     function mintNewUnits(uint _quantity) public override returns (uint) {
@@ -41,9 +41,9 @@ abstract contract LendingToken is Mintable, MinterAuthorization {
 
     function transferByReserve(address _userAddress, uint _quantity) public {
         require(MinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
-        
+
         uint transferNumber = (uint(block.number + 16)) % 1000000;
-        
+
         _transfer(_userAddress, _quantity, true, transferNumber, 0.000000000000000001);
     }
 

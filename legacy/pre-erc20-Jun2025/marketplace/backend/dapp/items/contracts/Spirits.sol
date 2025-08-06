@@ -51,7 +51,7 @@ contract Spirits is Mintable, UnitOfMeasurement {
             _quantity,
             decimals,
             spiritType,
-            unitOfMeasurement, 
+            unitOfMeasurement,
             status,
             address(redemptionService)
         );

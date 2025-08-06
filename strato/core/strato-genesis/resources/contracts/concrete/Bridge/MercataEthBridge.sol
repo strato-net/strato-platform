@@ -49,10 +49,10 @@ contract record MercataEthBridge is Ownable {
 
     // ──────────────────── state ─────────────────────────
     enum WithdrawState { NONE, INITIATED, PENDING_APPROVAL, COMPLETED }
-    mapping(string => WithdrawState) public record withdrawStatus; 
+    mapping(string => WithdrawState) public record withdrawStatus;
 
     enum DepositState { NONE, INITIATED, COMPLETED }
-    mapping(string => DepositState) public record depositStatus; 
+    mapping(string => DepositState) public record depositStatus;
 
     struct DepositBatch {
         string txHash;
@@ -133,7 +133,7 @@ contract record MercataEthBridge is Ownable {
             emit DepositCompleted(d.txHash);
         }
     }
-     
+
     // ────────── STRATO → Ethereum (burn) ──────────────
     // txHash = Safe TX hash, from = Safe wallet address, to = Eth address of recipient
     // mercataUser = Mercata user address of user initiating the withdrawal
@@ -159,13 +159,13 @@ contract record MercataEthBridge is Ownable {
         require(withdrawStatus[txHash] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
         withdrawStatus[txHash] = WithdrawState.COMPLETED;
         emit WithdrawalCompleted(txHash);
-    } 
+    }
 
     function batchConfirmWithdrawals(string[] txHashes) external onlyRelayer {
         for (uint256 i = 0; i < txHashes.length; i++) {
             require(withdrawStatus[txHashes[i]] == WithdrawState.PENDING_APPROVAL, "BAD_STATE");
             withdrawStatus[txHashes[i]] = WithdrawState.COMPLETED;
             emit WithdrawalCompleted(txHashes[i]);
-        }   
+        }
     }
 }

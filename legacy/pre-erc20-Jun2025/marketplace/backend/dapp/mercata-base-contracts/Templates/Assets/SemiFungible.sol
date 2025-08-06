@@ -31,11 +31,11 @@ abstract contract SemiFungible is Mintable {
 
     function mint(uint splitQuantity) internal override returns (UTXO) {
         SemiFungible sf = new SemiFungible(name,
-                              description, 
-                              images, 
-                              files, 
+                              description,
+                              images,
+                              files,
                               fileNames,
-                              createdDate, 
+                              createdDate,
                               splitQuantity,
                               decimals,
                               status,
@@ -59,7 +59,7 @@ abstract contract SemiFungible is Mintable {
             // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
             Asset(newAsset).transferOwnership(_newOwner, unit, false, 0, 0);
         }
-        
+
         // If there's a remainder, mint it as a separate token.
         if (remainder > 0) {
             UTXO newAsset = mint(remainder);
@@ -68,6 +68,6 @@ abstract contract SemiFungible is Mintable {
     }
 
     function checkCondition() internal virtual override returns (bool){
-        return true;   
+        return true;
     }
 }

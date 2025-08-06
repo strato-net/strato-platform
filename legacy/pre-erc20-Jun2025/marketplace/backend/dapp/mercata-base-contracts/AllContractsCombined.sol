@@ -161,7 +161,7 @@ abstract contract record Asset is Utils {
         ownerCommonName = newOwnerCommonName;
         close();
     }
-    
+
     function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) public fromSale("transfer ownership") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         // regular transfer - isUserTransfer: false, transferNumber: 0
@@ -231,7 +231,7 @@ abstract contract UTXO is Asset {
             owner = _newOwner;
             ownerCommonName = getCommonName(_newOwner);
         } catch {
-            
+
             if(_isUserTransfer && _transferNumber>0){
             // Emit ItemTransfers Event
                 emit ItemTransfers(
@@ -300,11 +300,11 @@ abstract contract SemiFungible is Mintable {
 
     function mint(uint splitQuantity) internal override returns (UTXO) {
         SemiFungible sf = new SemiFungible(name,
-                              description, 
-                              images, 
-                              files, 
+                              description,
+                              images,
+                              files,
                               fileNames,
-                              createdDate, 
+                              createdDate,
                               splitQuantity,
                               decimals);
         return UTXO(address(sf)); // Typechecker won't let me cast directly to UTXO
@@ -316,11 +316,11 @@ abstract contract SemiFungible is Mintable {
             // regular transfer - isUserTransfer: false, transferNumber: 0
             Asset(newAsset).transferOwnership(_newOwner, 1, false, 0);
         }
-        
+
     }
 
     function checkCondition() internal virtual override returns (bool){
-        return true;   
+        return true;
     }
 }
 
@@ -382,15 +382,15 @@ abstract contract Mintable is UTXO {
         quantity += _quantity;
         return RestStatus.OK;
     }
-    
+
     function _callMint(address _newOwner, uint _quantity) internal virtual override{
         UTXO newAsset = mint(_quantity);
         // regular transfer - isUserTransfer: false, transferNumber: 0
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0);
     }
-    
+
     function checkCondition() internal virtual override returns (bool){
-        return true;   
+        return true;
     }
 }
 
@@ -442,7 +442,7 @@ abstract contract record Order is Utils {
 
     constructor(
         uint _orderId,
-        address[] _saleAddresses, 
+        address[] _saleAddresses,
         uint[] _quantities,
         uint _createdDate,
         uint _shippingAddressId,
@@ -524,15 +524,15 @@ abstract contract record Order is Utils {
         if(status == OrderStatus.AWAITING_FULFILLMENT){
             if (_status == OrderStatus.AWAITING_SHIPMENT) {
                 status = _status;
-            } 
+            }
         }else if(status == OrderStatus.AWAITING_SHIPMENT){
             if (_status == OrderStatus.CLOSED) {
                 status = _status;
-            } 
+            }
         }else if(status == OrderStatus.PAYMENT_PENDING){
             if (_status == OrderStatus.AWAITING_FULFILLMENT) {
                 status = _status;
-            } 
+            }
         }
         return RestStatus.OK;
     }
@@ -620,7 +620,7 @@ abstract contract record BasePaymentProvider is Utils {
     }
 }
 
-abstract contract record Sale is Utils { 
+abstract contract record Sale is Utils {
     Asset public assetToBeSold;
     uint public price;
     uint public quantity;
@@ -635,7 +635,7 @@ abstract contract record Sale is Utils {
         uint _price,
         uint _quantity,
         address[] _paymentProviders
-    ) {    
+    ) {
         assetToBeSold = Asset(_assetToBeSold);
         price = _price;
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
@@ -808,7 +808,7 @@ abstract contract record Sale is Utils {
     }
 }
 
-contract Utils { 
+contract Utils {
     function getCommonName(address addr) internal returns (string) {
         string commonName = getUserCert(addr)["commonName"];
         if (commonName == ""){

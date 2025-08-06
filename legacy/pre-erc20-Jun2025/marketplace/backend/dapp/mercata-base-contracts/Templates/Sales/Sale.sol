@@ -4,7 +4,7 @@ import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 import "../Structs/Structs.sol";
 
-abstract contract record Sale is Utils, Structs { 
+abstract contract record Sale is Utils, Structs {
 
     Asset public assetToBeSold;
     decimal public price;
@@ -20,7 +20,7 @@ abstract contract record Sale is Utils, Structs {
         decimal _price,
         uint _quantity,
         PaymentServiceInfo[] _paymentServices
-    ) {    
+    ) {
         assetToBeSold = Asset(_assetToBeSold);
         require(_quantity > 0, "Quantity must be greater than 0");
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");

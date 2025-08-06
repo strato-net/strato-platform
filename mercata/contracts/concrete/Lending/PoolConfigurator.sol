@@ -10,7 +10,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
  */
 
 contract record PoolConfigurator is Ownable {
-   
+
     LendingRegistry public immutable registry;
 
     event AssetConfigured(address indexed asset, uint256 ltv, uint256 liquidationThreshold, uint256 liquidationBonus, uint256 interestRate);
@@ -52,11 +52,11 @@ contract record PoolConfigurator is Ownable {
     ) external onlyOwner {
         // Set all registry components
         registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
-        
+
         // Set token factory
         LendingPool lendingPool = LendingPool(registry.getLendingPool());
         lendingPool.setTokenFactory(tokenFactory);
-        
+
         // Configure all assets if provided
         if (assets.length > 0) {
             // Validate array lengths match
@@ -65,13 +65,13 @@ contract record PoolConfigurator is Ownable {
             require(liquidationBonuses.length == assets.length, "Liquidation bonuses length mismatch");
             require(interestRates.length == assets.length, "Interest rates length mismatch");
             require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
-            
+
             for (uint256 i = 0; i < assets.length; i++) {
                 lendingPool.configureAsset(
-                    assets[i], 
-                    ltvs[i], 
-                    liquidationThresholds[i], 
-                    liquidationBonuses[i], 
+                    assets[i],
+                    ltvs[i],
+                    liquidationThresholds[i],
+                    liquidationBonuses[i],
                     interestRates[i],
                     reserveFactors[i]
                 );
@@ -104,14 +104,14 @@ contract record PoolConfigurator is Ownable {
         require(liquidationBonuses.length == assets.length, "Liquidation bonuses length mismatch");
         require(interestRates.length == assets.length, "Interest rates length mismatch");
         require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
-        
+
         for (uint256 i = 0; i < assets.length; i++) {
             LendingPool lendingPool = LendingPool(registry.getLendingPool());
             lendingPool.configureAsset(
-                assets[i], 
-                ltvs[i], 
-                liquidationThresholds[i], 
-                liquidationBonuses[i], 
+                assets[i],
+                ltvs[i],
+                liquidationThresholds[i],
+                liquidationBonuses[i],
                 interestRates[i],
                 reserveFactors[i]
             );
@@ -182,5 +182,5 @@ contract record PoolConfigurator is Ownable {
         LendingPool lendingPool = LendingPool(registry.getLendingPool());
         lendingPool.setMToken(mToken);
     }
-    
-} 
+
+}

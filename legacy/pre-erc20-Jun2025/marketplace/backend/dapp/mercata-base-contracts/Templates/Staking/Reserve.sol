@@ -32,7 +32,7 @@ abstract contract record Reserve is Utils, Structs {
     decimal public lastUpdatedOraclePrice = 0;
 
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
-    
+
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal usdstLoan);
     event StakeUnlocked(address indexed user, address escrow, uint quantity);
     event CataTransferred(address indexed from, address indexed to, uint amount);
@@ -83,7 +83,7 @@ abstract contract record Reserve is Utils, Structs {
             require(address(escrow).creator == this.creator || address(escrow).creator == "BlockApps", "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
-            
+
             try {
                 if (escrow.version() == "2.0") {
                 escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
@@ -92,7 +92,7 @@ abstract contract record Reserve is Utils, Structs {
             catch {
                 escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
             }
-            
+
             //get cata reward from escrow
             if (delta > 0) {
                 decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
@@ -121,7 +121,7 @@ abstract contract record Reserve is Utils, Structs {
         Asset _assetToBeSold = Asset(_assets[0]);
         require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the assets can stake the assets");
         require(_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
-        
+
         (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
         _oraclePrice = _oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = _oraclePrice;
@@ -151,7 +151,7 @@ abstract contract record Reserve is Utils, Structs {
                 }
             }
             catch {
-                
+
                     escrow.attachAssets(
                         _assets,
                         _collateralQuantity,
@@ -164,7 +164,7 @@ abstract contract record Reserve is Utils, Structs {
 
         uint escrowQuantity = escrow.collateralQuantity();
 
-        emit StakeCreated(escrow.borrower(), address(escrow), escrowQuantity, escrow.maxLoanAmount()); 
+        emit StakeCreated(escrow.borrower(), address(escrow), escrowQuantity, escrow.maxLoanAmount());
         return address(escrow);
     }
 
@@ -172,9 +172,9 @@ abstract contract record Reserve is Utils, Structs {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
         require(_borrowAmount <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
-        
+
         mintUSDST(escrow.borrower(), _borrowAmount);
-        
+
         // Update borrowed amount in escrow
         escrow.updateBorrowedAmount(_borrowAmount, true);//change
     }
@@ -199,7 +199,7 @@ abstract contract record Reserve is Utils, Structs {
 
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
-    
+
 
     function setCATAToken(address _newCATAToken) public requireOwner("update USDST token") {
         cataToken = Asset(_newCATAToken);
@@ -300,7 +300,7 @@ abstract contract record Reserve is Utils, Structs {
 
         uint endingQuantity = escrow.collateralQuantity();
         uint releasedQuantity = startingQuantity - endingQuantity;
-        
+
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress, releasedQuantity);
     }
@@ -312,10 +312,10 @@ abstract contract record Reserve is Utils, Structs {
     ) internal view returns (decimal) {
         // Calculate the reward in CATA using the new formula
         decimal secondsPerYear = 31536000.0000000000000000000; // Number of seconds in a year
-        return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
+        return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) /
                (priceOfCATA * secondsPerYear);
     }
-    
+
     //Called by Old Reserve oi.e creator of the escrow
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
         for (uint i = 0; i < _escrows.length; i++) {
@@ -334,7 +334,7 @@ abstract contract record Reserve is Utils, Structs {
             catch{
                 (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
                 _oraclePrice = _oraclePrice / unitConversionRate;
-                escrow.updateOnPriceChange((_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);    
+                escrow.updateOnPriceChange((_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);
             }
         }
     }

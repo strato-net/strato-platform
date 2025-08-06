@@ -2,9 +2,9 @@ import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Clothing assets
 contract Clothing is Mintable {
-    string public clothingType; 
-    string public size; 
-    string public skuNumber; 
+    string public clothingType;
+    string public size;
+    string public skuNumber;
     string public condition;
     string public brand;
 
@@ -61,11 +61,11 @@ contract Clothing is Mintable {
         return UTXO(address(newAsset));
     }
 
-    // TODO: Finish the update function. 
+    // TODO: Finish the update function.
     function updateClothing(
-        string[] _images, 
+        string[] _images,
         string[] _files,
-        string[] _fileNames, 
+        string[] _fileNames,
         string _clothingType
     ) public requireOwner("update clothing") returns (uint) {
         clothingType = _clothingType;

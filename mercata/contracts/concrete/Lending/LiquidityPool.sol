@@ -130,11 +130,11 @@ contract record LiquidityPool is Ownable  {
      */
     function transferReserve(uint256 reserveAmount, address feeCollector) external onlyLendingPool {
         require(reserveAmount > 0 && feeCollector != address(0), "Invalid reserve transfer");
-        
+
         address asset = _getAsset();
         uint256 currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= reserveAmount, "Insufficient liquidity to transfer to reserve");
-        
+
         // Transfer reserve to fee collector
         require(IERC20(asset).transfer(feeCollector, reserveAmount), "Reserve transfer failed");
     }
@@ -154,4 +154,4 @@ contract record LiquidityPool is Ownable  {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
     }
-} 
+}

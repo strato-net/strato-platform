@@ -1,13 +1,13 @@
   /***************************************************************
   *                                                              *
-  *      FISCAL FACTORY CONTRACT WITH GENERATOR FUNCTION  
+  *      FISCAL FACTORY CONTRACT WITH GENERATOR FUNCTION
   *                 USING SOLDITIY EVENTS
   *                                                              *
   ***************************************************************/
 
 contract record FiscalFactoryEvent {
-    
-    
+
+
     event FiscalEvent(
         string src_countryCode
         , string src_currencyCode
@@ -30,7 +30,7 @@ contract record FiscalFactoryEvent {
         , bool   fakeTransaction
     );
 
-    
+
     function createFiscal( string src_countryCode
                        , string src_currencyCode
                        , string src_phoneNumber
@@ -76,7 +76,7 @@ contract record FiscalFactoryEvent {
 
         );
 
-  } 
+  }
 
   function generateFiscal( string src_countryCode
                          , string src_currencyCode

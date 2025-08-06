@@ -1,5 +1,5 @@
 contract record Fiscal {
-  
+
   struct Business {
     string countryCode;
     string currencyCode;
@@ -116,9 +116,9 @@ contract record FiscalFactory {
                          , datasetSpecificFields_interest
                          , datasetSpecificFields_details
                          , fakeTransaction
-                         );   
+                         );
 
-  } 
+  }
 
   function generateFiscal( string src_countryCode
                          , string src_currencyCode

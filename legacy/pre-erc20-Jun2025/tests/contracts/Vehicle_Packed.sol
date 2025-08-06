@@ -101,7 +101,7 @@ contract record Vehicle_Packed {
               var s2 = 2 ** s1;
               var s3 = s2 - 1;
               var s4 = ~s3;
-              
+
               assembly {
                   let mask := not(sub(exp(2, mul(8, sub(32, needlelen))), 1))
                   let needledata := and(mload(needleptr), mask)
@@ -131,7 +131,7 @@ contract record Vehicle_Packed {
       }
       return selfptr + selflen;
   }
-  
+
       function count(slice self, slice needle) internal returns (uint cnt) {
         uint ptr = findPtr(self._len, self._ptr, needle._len, needle._ptr) + needle._len;
         while (ptr <= self._ptr + self._len) {

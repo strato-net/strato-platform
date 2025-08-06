@@ -42,7 +42,7 @@ contract record OnRamp is Ownable {
     PriceOracle public priceOracle;
     // Listing management
     mapping(address => Listing) public record listings;
-    
+
     // Voucher contract
     Voucher public voucher;
 
@@ -84,7 +84,7 @@ contract record OnRamp is Ownable {
         require(found, "Not a provider");
         _;
     }
-    
+
     function isPaymentProvider(address provider) public view returns (bool) {
         return paymentProviders[provider].exists;
     }
@@ -201,7 +201,7 @@ contract record OnRamp is Ownable {
         Listing listing = listings[token];
         uint256 remaining = listing.amount;
         IERC20(listing.token).transfer(msg.sender, remaining);
-        
+
         delete listings[token];
 
         emit ListingCanceled(listing.id);

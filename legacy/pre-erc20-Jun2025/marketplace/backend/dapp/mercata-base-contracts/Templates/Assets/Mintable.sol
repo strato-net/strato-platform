@@ -68,7 +68,7 @@ abstract contract Mintable is Redeemable {
         quantity += _quantity;
         return RestStatus.OK;
     }
-    
+
     function _callMint(address _newOwner, uint _quantity) internal virtual override{
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
@@ -76,9 +76,9 @@ abstract contract Mintable is Redeemable {
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }
-    
+
     function checkCondition() internal virtual override returns (bool){
-        return true;   
+        return true;
     }
 
 

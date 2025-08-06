@@ -28,7 +28,7 @@ abstract contract record PaymentService is Utils {
     event Checkout (
         string checkoutHash,                /* Unique hash of the order details for payment server lookup to
                                                avoid having to send all the order details in the request. */
-        string checkoutId,                  // checkoutId 
+        string checkoutId,                  // checkoutId
         address purchaser,                  // Purchaser address on the blockchain for ownershipTransfer
         string purchasersCommonName,        // Purchaser common name for lookup purposes
         address[] saleAddresses,            // List of the sale contracts for the assets in the checkout
@@ -38,7 +38,7 @@ abstract contract record PaymentService is Utils {
     );
 
     event Order (
-        string orderHash,             /* Unique hash of the order details for payment server lookup to 
+        string orderHash,             /* Unique hash of the order details for payment server lookup to
                                          avoid having to send all the order details in the request. */
         string orderId,               // Same orderId funtionality as the current marketplace
         address purchaser,            // Purchaser address on the blockchain for ownershipTransfer
@@ -219,7 +219,7 @@ abstract contract record PaymentService is Utils {
             }
         }
         emit Checkout (
-            _checkoutHash,              
+            _checkoutHash,
             _checkoutId,
             _purchaser,
             _purchasersCommonName,
@@ -410,7 +410,7 @@ abstract contract record PaymentService is Utils {
             _quantities
         );
     }
-    
+
     function _discardCheckoutQuantity (
         string _checkoutHash,
         address _purchaser,
@@ -520,7 +520,7 @@ abstract contract record PaymentService is Utils {
         return 1.0;
     }
 
-                            
+
 
     function update(
         string _imageURL

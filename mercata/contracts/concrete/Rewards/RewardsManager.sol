@@ -45,7 +45,7 @@ contract record RewardsManager is Ownable {
     mapping (address => mapping (address => RewardBalance)) rewardBalances;
 
     address public rewardDelegate;
-    
+
     constructor(
         RewardsManagerArgs _args,
         address _rewardsCreator

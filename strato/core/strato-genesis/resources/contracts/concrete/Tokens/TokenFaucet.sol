@@ -58,7 +58,7 @@ contract record TokenFaucet {
             tokenNames[i] = "";
         }
         tokenNames.length = 0;
-        
+
         for (uint j = 0; j < _tokens.length; j++) {
             string _tokenName = _tokens[j].tokenName;
             tokens[_tokenName].tokenName = string(_tokens[j].tokenName);

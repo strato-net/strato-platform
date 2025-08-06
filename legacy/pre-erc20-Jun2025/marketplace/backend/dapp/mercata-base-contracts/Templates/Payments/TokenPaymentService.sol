@@ -67,7 +67,7 @@ contract TokenPaymentService is PaymentService {
             }
 
             // Calculate gross, net, and fee amounts in dollars
-            decimal gross = s.price() * decimal(quantity); 
+            decimal gross = s.price() * decimal(quantity);
             decimal fee = 0.000000000000000000;
             decimal primarySaleFee = 10.000000000000000000;
             decimal secondarySaleFee = 3.000000000000000000;

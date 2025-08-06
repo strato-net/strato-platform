@@ -1,5 +1,5 @@
 contract record Voucher is ERC20, Ownable, TokenAccess {
-    
+
     constructor(
         string _name,
         string _symbol
@@ -24,7 +24,7 @@ contract record Voucher is ERC20, Ownable, TokenAccess {
 
     function mint(address to, uint256 amount) external {
         require(
-            TokenAccess(this).isMinter(msg.sender), 
+            TokenAccess(this).isMinter(msg.sender),
             "Token: Caller is not a minter"
         );
         _mint(to, amount);
@@ -33,7 +33,7 @@ contract record Voucher is ERC20, Ownable, TokenAccess {
     function burn(address from, uint256 amount) external {
         _burn(msg.sender, amount);
     }
-    
+
     function decimals() external view override returns (uint8) {
         return 18;
     }

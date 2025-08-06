@@ -30,9 +30,9 @@ interface ITokenAccess {
 
 /// @notice Pool factory contract
 contract record PoolFactory is Ownable {
-    
+
     // ============ EVENTS ============
-    
+
     /// @notice Event emitted when a new pool is created
     event NewPool(address tokenA, address tokenB, address pool);
 
@@ -55,7 +55,7 @@ contract record PoolFactory is Ownable {
     event PoolFeeParametersUpdated(address poolAddress, uint256 newSwapFeeRate, uint256 newLpSharePercent);
 
     // ============ STATE VARIABLES ============
-    
+
     /// @notice Mapping of tokenA/tokenB pairs to pool addresses
     mapping(address => mapping(address => address)) public record pools;
 
@@ -64,21 +64,21 @@ contract record PoolFactory is Ownable {
 
     /// @notice Admin registry contract address
     address public adminRegistry;
-    
+
     /// @notice Token factory contract address
     address public tokenFactory;
-    
+
     /// @notice Fee collector address
     address public feeCollector;
-    
+
     /// @notice Swap fee rate in basis points (e.g., 30 = 0.3%)
     uint256 public swapFeeRate;
-    
+
     /// @notice LP share percentage in basis points (e.g., 7000 = 70%)
     uint256 public lpSharePercent;
 
     // ============ CONSTRUCTOR ============
-    
+
     /// @notice Constructor
     /// @param initialOwner The initial owner of the contract
     /// @param _tokenFactory The address of the token factory
@@ -88,7 +88,7 @@ contract record PoolFactory is Ownable {
         require(_adminRegistry != address(0), "Zero admin registry address");
         require(_tokenFactory  != address(0), "Zero token factory address");
         require(_feeCollector  != address(0), "Zero fee collector address");
-        
+
         adminRegistry = _adminRegistry;
         tokenFactory = _tokenFactory;
         feeCollector = _feeCollector;
@@ -102,13 +102,13 @@ contract record PoolFactory is Ownable {
     }
 
     // ============ MODIFIERS ============
-    
+
     /// @notice Modifier to check if the caller is the owner or an admin
-    modifier onlyOwnerOrAdmin() { 
+    modifier onlyOwnerOrAdmin() {
         require(msg.sender == owner() || AdminRegistry(adminRegistry).isAdminAddress(msg.sender), "PoolFactory: caller is not owner or admin");
         _;
     }
-    
+
     /// @notice Modifier to check if tokens are active
     /// @param tokenA First token address
     /// @param tokenB Second token address
@@ -118,7 +118,7 @@ contract record PoolFactory is Ownable {
     }
 
     // ============ ADMIN FUNCTIONS ============
-    
+
     /// @notice Update the admin registry address (owner only)
     function setAdminRegistry(address _adminRegistry) external onlyOwner {
         require(_adminRegistry != address(0), "Zero admin registry address");
@@ -141,7 +141,7 @@ contract record PoolFactory is Ownable {
         require(newFeeCollector != address(0), "Zero fee collector address");
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
-        
+
         emit FeeCollectorsUpdated(newFeeCollector);
     }
 
@@ -155,10 +155,10 @@ contract record PoolFactory is Ownable {
         require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
         require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
         require(newLpSharePercent > 0, "LP share must be greater than 0");
-        
+
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
-        
+
         emit FeeParametersUpdated(newSwapFeeRate, newLpSharePercent);
     }
 
@@ -177,29 +177,29 @@ contract record PoolFactory is Ownable {
         require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
         require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
         require(newLpSharePercent > 0, "LP share must be greater than 0");
-        
+
         // Verify the pool is owned by this factory
         require(Ownable(poolAddress).owner() == address(this), "Pool not owned by factory");
-        
+
         // Call the pool's single setFeeParameters function
         Pool(poolAddress).setFeeParameters(newSwapFeeRate, newLpSharePercent);
-        
+
         emit PoolFeeParametersUpdated(poolAddress, newSwapFeeRate, newLpSharePercent);
     }
 
     // ============ POOL MANAGEMENT ============
-    
+
     /// @notice Create a new pool for tokenA/tokenB
     function createPool(address tokenA, address tokenB) external onlyOwnerOrAdmin tokensActive(tokenA, tokenB) returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
         require(AdminRegistry(adminRegistry).isAdminAddress(address(this)), "PoolFactory is not admin");
-        
+
         // deploy new lp token
         string lpName = ERC20(tokenA).name() + "-" + ERC20(tokenB).name() + " LP Token";
         string lpSymbol = ERC20(tokenA).symbol() + "-" + ERC20(tokenB).symbol() + "-LP";
-        
+
         address lpTokenAddress = TokenFactory(tokenFactory).createToken(
             lpName,
             "Liquidity Provider Token",
@@ -226,12 +226,12 @@ contract record PoolFactory is Ownable {
         pools[tokenA][tokenB] = pool;
         pools[tokenB][tokenA] = pool; // support both directions
         allPools.push(pool);
-        
+
         emit NewPool(tokenA, tokenB, pool);
 
         return pool;
     }
-    
+
     /// @notice Transfer all pools to a new factory
     /// @param newFactory Address of the new factory
     function transferPoolsToFactory(address newFactory) external onlyOwnerOrAdmin {
@@ -250,15 +250,15 @@ contract record PoolFactory is Ownable {
     function registerPoolsFromFactory(address[] poolAddresses) external onlyOwnerOrAdmin {
         for (uint256 i = 0; i < poolAddresses.length; i++) {
             address pool = poolAddresses[i];
-            
+
             // Verify the pool belongs to this factory
             require(Ownable(pool).owner() == address(this), "Pool does not belong to this factory");
-            
+
             // Get tokenA and tokenB from the pool contract
             Pool poolContract = Pool(pool);
             address tokenA = address(poolContract.tokenA());
             address tokenB = address(poolContract.tokenB());
-            
+
             // Only register if pool doesn't already exist
             if (pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0)) {
                 pools[tokenA][tokenB] = pool;

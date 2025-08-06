@@ -47,7 +47,7 @@ contract Hashmap is UnsafeHashmap {
       return false;
     }
 
-    return super.contains(_key);    
+    return super.contains(_key);
   }
 
   /**
