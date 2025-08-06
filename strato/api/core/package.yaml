@@ -41,7 +41,7 @@ library:
   - seqevents
   - servant-client
   - servant-multipart
-  - servant-multipart-client  
+  - servant-multipart-client
 #  - servant-swagger-tags
   - source-tools
   - sql-monad

@@ -61,7 +61,7 @@ executables:
       - wai
       - warp
     ghc-options: -threaded
-      
+
 tests:
   vault-proxy-spec:
     source-dirs: test/

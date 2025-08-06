@@ -75,7 +75,7 @@ executables:
       - wai-extra
       - wai-middleware-prometheus
       - warp
-    ghc-options: -threaded 
+    ghc-options: -threaded
 
 tests:
   highway-spec:
@@ -86,7 +86,7 @@ tests:
       - blockapps-highway-api
       - blockapps-highway-client
       - blockapps-highway-server
-      - bytestring 
+      - bytestring
       - hflags
       - HUnit
       - hspec

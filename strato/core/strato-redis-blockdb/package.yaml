@@ -26,7 +26,7 @@ library:
   - mtl
   - strato-conf
   - strato-model
-  
+
 # I am removing this executable because the package `diagrams-html5` has not been upgraded, and
 # won't work with newer stack lts' versions.
 # I don't think anyone uses this package (I asked on slack, no one knew what it is)....  If I

@@ -18,7 +18,7 @@ services:
     build: .
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
-    volumes: 
+    volumes:
       - ./identity-provider/certs:/identity-provider/certs:ro
       - ./identity-provider/idconf.yaml:/identity-provider/idconf.yaml:ro
     logging:

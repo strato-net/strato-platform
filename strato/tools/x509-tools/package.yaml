@@ -35,7 +35,7 @@ executables:
     dependencies:
       - aeson
       - strato-model
-    
+
   x509-info:
     source-dirs: exec_src/
     main: X509CertInfo.hs

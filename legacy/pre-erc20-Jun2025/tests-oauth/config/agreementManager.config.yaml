@@ -7,14 +7,14 @@ batchSize: 10
 # NOTE: mention node excluding current node
 multinode:
   runTest: false
-  nodes: 
+  nodes:
     - http://multinode201.ci.blockapps.net
     - http://multinode202.ci.blockapps.net
 
-contract: 
+contract:
   name: 'AgreementManager'
   filePath: './contracts/beanstalk/agreement/AgreementManager.sol'
-  args: 
+  args:
     _dappAddress: 2383914a2cffe7bb97e0b622481b945858e08188
     _permissionManager: '2383914a2cffe7bb97e0b622481b945858e08188'
     _programManager: '2383914a2cffe7bb97e0b622481b945858e08188'

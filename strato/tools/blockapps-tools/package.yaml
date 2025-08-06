@@ -75,7 +75,7 @@ executables:
       - bytestring
       - labeled-error
     other-modules: []
-   
+
   modifyDate:
     source-dirs: exec_src/
     main: ModifyDate.hs

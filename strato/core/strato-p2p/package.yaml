@@ -28,7 +28,7 @@ executables:
       - vm-tools
       - wai-middleware-prometheus
       - warp
-      
+
 library:
   source-dirs: src
   ghc-options: -Wall -O2

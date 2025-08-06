@@ -17,7 +17,7 @@ library:
   dependencies:
     - containers
     - text
-  
+
 executables:
   process-monitor-exe:
     source-dirs: exec_src/

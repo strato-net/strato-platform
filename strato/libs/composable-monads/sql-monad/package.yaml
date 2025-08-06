@@ -7,7 +7,7 @@ dependencies:
 
 library:
   source-dirs: src
-  dependencies: 
+  dependencies:
   - blockapps-data
   - composable-monads-base
   - monad-logger
@@ -15,5 +15,5 @@ library:
   - persistent-postgresql
   - strato-conf
   - unliftio-core
-  
-  
+
+

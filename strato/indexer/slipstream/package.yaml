@@ -22,7 +22,7 @@ dependencies:
 
 library:
   source-dirs: src/
-  dependencies: 
+  dependencies:
     - aeson
     - base16-bytestring
     - binary
