@@ -132,7 +132,7 @@ const SwapPoolsTable = () => {
                       </div>
                     </td>
                     <td className="py-4 px-2 md:px-4">
-                      <div className="font-medium">
+                      <div className="font-medium text-sm">
                         {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}
                       </div>
                     </td>

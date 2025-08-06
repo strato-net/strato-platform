@@ -32,12 +32,7 @@ const SetPoolRatesModal = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   
-  const form = useForm<SetPoolRatesFormValues>({
-    defaultValues: {
-      swapFeeRate: '0.30',
-      lpSharePercent: '70.0',
-    },
-  });
+  const form = useForm<SetPoolRatesFormValues>();
 
   useEffect(() => {
     if (open && pool) {
@@ -167,8 +162,8 @@ const SetPoolRatesModal = ({
                   rules={{ 
                     required: 'Swap fee rate is required',
                     pattern: {
-                      value: /^\d+(\.\d{1,2})?$/,
-                      message: 'Enter a valid percentage (e.g., 0.30)'
+                      value: /^\d*\.?\d{1,2}$/,
+                      message: 'Enter a valid percentage (e.g., 0.30 or .30)'
                     }
                   }}
                   render={({ field }) => (
@@ -201,8 +196,8 @@ const SetPoolRatesModal = ({
                   rules={{ 
                     required: 'LP share percentage is required',
                     pattern: {
-                      value: /^\d+(\.\d{1,2})?$/,
-                      message: 'Enter a valid percentage (e.g., 70.0)'
+                      value: /^\d*\.?\d{1,2}$/,
+                      message: 'Enter a valid percentage (e.g., 70.0 or .5)'
                     }
                   }}
                   render={({ field }) => (
