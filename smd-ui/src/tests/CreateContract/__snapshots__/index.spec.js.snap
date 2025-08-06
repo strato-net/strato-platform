@@ -216,6 +216,7 @@ Object {
   },
   "codeType": "SolidVM",
   "contract": "",
+  "contractAddress": undefined,
   "contractName": "Cloner",
   "createDisabled": false,
   "initialValues": Object {
