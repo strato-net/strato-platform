@@ -33,6 +33,7 @@ services:
       - ONRAMP=${ONRAMP}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
       - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -44,8 +45,7 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
-    environment:
-      - VITE_PROJECT_ID=${VITE_PROJECT_ID}
+   
     restart: unless-stopped
     logging:
       driver: "json-file"
