@@ -126,3 +126,61 @@ export function validateSellArgs(args: any) {
     throw new Error("Sell Argument Validation Error: " + error.message);
   }
 }
+
+export function validateAddPaymentProviderArgs(args: any) {
+  if (!args || typeof args !== "object") {
+    throw new Error("Invalid input: args must be an object.");
+  }
+
+  const schema = Joi.object({
+    providerAddress: Joi.string()
+      .pattern(/^0x[a-fA-F0-9]{40}$/)
+      .required()
+      .messages({
+        "string.pattern.base": "Provider address must be a valid Ethereum address (0x followed by 40 hex characters).",
+        "any.required": "Provider address is required.",
+      }),
+    name: Joi.string()
+      .min(2)
+      .max(100)
+      .required()
+      .messages({
+        "string.min": "Provider name must be at least 2 characters.",
+        "string.max": "Provider name must not exceed 100 characters.",
+        "any.required": "Provider name is required.",
+      }),
+    endpoint: Joi.string()
+      .pattern(/^https?:\/\/.+/)
+      .required()
+      .messages({
+        "string.pattern.base": "Endpoint must be a valid HTTP or HTTPS URL.",
+        "any.required": "Endpoint URL is required.",
+      }),
+  }).strict();
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Add Payment Provider Validation Error: " + error.message);
+  }
+}
+
+export function validateRemovePaymentProviderArgs(args: any) {
+  if (!args || typeof args !== "object") {
+    throw new Error("Invalid input: args must be an object.");
+  }
+
+  const schema = Joi.object({
+    providerAddress: Joi.string()
+      .pattern(/^0x[a-fA-F0-9]{40}$/)
+      .required()
+      .messages({
+        "string.pattern.base": "Provider address must be a valid Ethereum address (0x followed by 40 hex characters).",
+        "any.required": "Provider address is required.",
+      }),
+  }).strict();
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Remove Payment Provider Validation Error: " + error.message);
+  }
+}

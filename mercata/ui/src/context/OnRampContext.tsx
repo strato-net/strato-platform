@@ -52,6 +52,20 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   };
 
+  const addPaymentProvider = async (providerData: {
+    providerAddress: string;
+    name: string;
+    endpoint: string;
+  }) => {
+    const res = await api.post("/onramp/addPaymentProvider", providerData);
+    return res.data;
+  };
+
+  const removePaymentProvider = async (providerAddress: string) => {
+    const res = await api.post("/onramp/removePaymentProvider", { providerAddress });
+    return res.data;
+  };
+
   return (
     <OnRampContext.Provider
       value={{
@@ -64,6 +78,8 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         sell,
         lock,
         unlockTokens,
+        addPaymentProvider,
+        removePaymentProvider,
         
       }}
     >

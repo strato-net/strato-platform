@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Info, Plus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useOnRampContext } from "@/context/OnRampContext";
 
 interface AddPaymentProviderFormValues {
   name: string;
@@ -25,6 +25,7 @@ interface AddPaymentProviderFormValues {
 const AddPaymentProviderForm = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { addPaymentProvider } = useOnRampContext();
 
   const form = useForm<AddPaymentProviderFormValues>({
     defaultValues: {
@@ -37,23 +38,26 @@ const AddPaymentProviderForm = () => {
   const onSubmit = async (data: AddPaymentProviderFormValues) => {
     setLoading(true);
     try {
-      // TODO: Implement payment provider creation API call
-      console.log("Adding payment provider:", data);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await addPaymentProvider({
+        providerAddress: data.providerAddress,
+        name: data.name,
+        endpoint: data.endpoint,
+      });
       
       toast({
         title: "Success",
-        description: "Payment provider added successfully!",
+        description: result.message || "Payment provider added successfully!",
       });
       
       form.reset();
-    } catch (error) {
+      
+      // Optionally refresh the page or provider list
+      window.location.reload();
+    } catch (error: any) {
       console.error("Error adding payment provider:", error);
       toast({
         title: "Error",
-        description: "Failed to add payment provider. Please try again.",
+        description: error?.response?.data?.message || error?.message || "Failed to add payment provider. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -66,8 +70,11 @@ const AddPaymentProviderForm = () => {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Add a new payment provider to enable fiat-to-crypto purchases. 
-          The provider address should be a valid blockchain address that can process payments.
+          <div className="space-y-2">
+            <p>Add a new payment provider to enable fiat-to-crypto purchases.</p>
+            <p className="text-sm font-semibold">Note: You must be an OnRamp admin to add payment providers.</p>
+            <p className="text-sm">The provider address should be a valid blockchain address that can process payments.</p>
+          </div>
         </AlertDescription>
       </Alert>
 
@@ -89,7 +96,7 @@ const AddPaymentProviderForm = () => {
                   <FormLabel>Provider Name</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="e.g., Stripe, PayPal, Coinbase"
+                      placeholder="e.g., Local Stripe Service"
                       {...field}
                     />
                   </FormControl>
@@ -116,12 +123,12 @@ const AddPaymentProviderForm = () => {
                   <FormLabel>Provider Address</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="0x..."
+                      placeholder="0x... (e.g., service-signer address)"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    The blockchain address of the payment provider
+                    The blockchain address of the payment provider (service signer)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -144,7 +151,7 @@ const AddPaymentProviderForm = () => {
                 <FormLabel>API Endpoint</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="https://api.provider.com/payments"
+                    placeholder="e.g., http://localhost:3002/checkout"
                     {...field}
                   />
                 </FormControl>

@@ -9,6 +9,64 @@ import axios from "axios";
 const contractAddress = constants.onRamp!;
 const { OnRamp, onRampSelectFields, Token } = constants;
 
+// Add a payment provider
+export const addPaymentProvider = async (
+  accessToken: string,
+  providerData: {
+    providerAddress: string;
+    name: string;
+    endpoint: string;
+  }
+) => {
+  const { providerAddress, name, endpoint } = providerData;
+  
+  const args = {
+    provider: providerAddress,
+    name,
+    endpoint,
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "addPaymentProvider",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, tx);
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: `Payment provider ${name} added successfully`,
+  };
+};
+
+// Remove a payment provider
+export const removePaymentProvider = async (
+  accessToken: string,
+  providerAddress: string
+) => {
+  const args = {
+    provider: providerAddress,
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "removePaymentProvider",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, tx);
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: "Payment provider removed successfully",
+  };
+};
+
 // Get all tokens with optional filtering
 export const get = async (accessToken: string) => {
   try {

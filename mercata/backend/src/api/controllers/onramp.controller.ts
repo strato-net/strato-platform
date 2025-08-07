@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { get, sell, buy } from "../services/onramp.service";
-import { validateBuyArgs, validateSellArgs } from "../validators/onramp.validator";
+import { get, sell, buy, addPaymentProvider, removePaymentProvider } from "../services/onramp.service";
+import { validateBuyArgs, validateSellArgs, validateAddPaymentProviderArgs, validateRemovePaymentProviderArgs } from "../validators/onramp.validator";
 
 class OnRampController {
   static async get(
@@ -48,6 +48,38 @@ class OnRampController {
       const result = await buy(accessToken, address, body);
 
       res.status(RestStatus.OK).json({ url: result.url });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async addPaymentProvider(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateAddPaymentProviderArgs(body);
+
+      const result = await addPaymentProvider(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removePaymentProvider(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateRemovePaymentProviderArgs(body);
+
+      const result = await removePaymentProvider(accessToken, body.providerAddress);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

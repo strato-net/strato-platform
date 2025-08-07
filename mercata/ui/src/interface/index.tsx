@@ -197,6 +197,12 @@ export interface OnRampContextType {
   sell: (body) => Promise<void>;
   lock: (body) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<void>;
+  addPaymentProvider: (providerData: {
+    providerAddress: string;
+    name: string;
+    endpoint: string;
+  }) => Promise<any>;
+  removePaymentProvider: (providerAddress: string) => Promise<any>;
 }
 
 export interface RawWithdrawData {

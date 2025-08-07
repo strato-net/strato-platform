@@ -7,20 +7,7 @@ import ListAssetForm from './ListAssetForm';
 const OnRampTab = () => {
   return (
     <div className="space-y-6">
-      {/* First Row - Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-        {/* Payment Providers List */}
-        <div className="bg-card border-r border-t border-l border-b lg:border-r-0 rounded-l-lg p-6">
-          <PaymentProvidersTable />
-        </div>
-        
-        {/* OnRamp Listings List */}
-        <div className="bg-card border-r border-t border-b rounded-r-lg p-6">
-          <OnRampListingsTable />
-        </div>
-      </div>
-
-      {/* Second Row - Configuration Forms */}
+      {/* First Row - Configuration Forms */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
         {/* Add Payment Provider Form */}
         <div className="bg-card border-r border-t border-l border-b lg:border-r-0 rounded-l-lg p-6">
@@ -50,6 +37,19 @@ const OnRampTab = () => {
               <ListAssetForm />
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      {/* Second Row - Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+        {/* Payment Providers List */}
+        <div className="bg-card border-r border-t border-l border-b lg:border-r-0 rounded-l-lg p-6">
+          <PaymentProvidersTable />
+        </div>
+        
+        {/* OnRamp Listings List */}
+        <div className="bg-card border-r border-t border-b rounded-r-lg p-6">
+          <OnRampListingsTable />
         </div>
       </div>
     </div>

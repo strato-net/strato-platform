@@ -51,6 +51,8 @@ router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.se
 router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
 router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.buy);
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.sell);
+router.post("/onramp/addPaymentProvider", authHandler.authorizeRequest(), OnRampController.addPaymentProvider);
+router.post("/onramp/removePaymentProvider", authHandler.authorizeRequest(), OnRampController.removePaymentProvider);
 
 // ----- Bridge Routes -----
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
