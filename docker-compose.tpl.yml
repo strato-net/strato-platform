@@ -45,7 +45,6 @@ services:
       - mercata-backend
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
-   
     restart: unless-stopped
     logging:
       driver: "json-file"
