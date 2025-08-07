@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { get, sell, buy, addPaymentProvider, removePaymentProvider } from "../services/onramp.service";
+import { get, sell, buy, addPaymentProvider, removePaymentProvider, cancelListing } from "../services/onramp.service";
 import { validateBuyArgs, validateSellArgs, validateAddPaymentProviderArgs, validateRemovePaymentProviderArgs } from "../validators/onramp.validator";
 
 class OnRampController {
@@ -79,6 +79,25 @@ class OnRampController {
       validateRemovePaymentProviderArgs(body);
 
       const result = await removePaymentProvider(accessToken, body.providerAddress);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async cancelListing(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      // Validate that token is provided
+      if (!body.token) {
+        throw new Error("Token address is required");
+      }
+
+      const result = await cancelListing(accessToken, body.token);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

@@ -51,6 +51,39 @@ export const addPaymentProvider = async (
 };
 
 // Remove a payment provider
+// Cancel a listing
+export const cancelListing = async (
+  accessToken: string,
+  token: string
+) => {
+  // Remove 0x prefix if present for STRATO
+  let normalizedToken = token.toLowerCase();
+  if (normalizedToken.startsWith('0x')) {
+    normalizedToken = normalizedToken.slice(2);
+  }
+  
+  const args = {
+    token: normalizedToken,
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "cancelListing",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: "Listing cancelled successfully",
+  };
+};
+
 export const removePaymentProvider = async (
   accessToken: string,
   providerAddress: string

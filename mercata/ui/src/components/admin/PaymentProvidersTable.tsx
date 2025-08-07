@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, ExternalLink, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOnRampContext } from "@/context/OnRampContext";
@@ -17,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const PaymentProvidersTable = () => {
+const PaymentProvidersTable = forwardRef((props, ref) => {
   const [providers, setProviders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,7 +40,7 @@ const PaymentProvidersTable = () => {
       }));
       
       setProviders(formattedProviders);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching providers:", error);
       toast({
         title: "Error",
@@ -55,7 +54,7 @@ const PaymentProvidersTable = () => {
   };
 
   const handleDeleteClick = (providerAddress: string, providerName: string) => {
-    setProviderToDelete({ address: providerAddress, name: providerName });
+    setProviderToDelete({ address: providerAddress, name: providerName || "Unknown Provider" });
     setDeleteDialogOpen(true);
   };
 
@@ -64,22 +63,45 @@ const PaymentProvidersTable = () => {
     
     try {
       const result = await removePaymentProvider(providerToDelete.address);
+      
+      // Ensure description is a string
+      let successMessage = "Payment provider removed successfully";
+      if (result?.message) {
+        successMessage = typeof result.message === 'string' 
+          ? result.message 
+          : JSON.stringify(result.message);
+      }
+      
       toast({
         title: "Success",
-        description: result.message || "Payment provider removed successfully",
+        description: successMessage,
       });
       
-      // Add a small delay to ensure the blockchain state is updated
+      // Refresh providers after a short delay
       setTimeout(() => {
         fetchProviders();
-      }, 1000);
+      }, 500);
     } catch (error: any) {
-      console.error("Error deleting provider:", error);
       // Handle the specific error from backend about provider being in use
-      const errorMessage = error?.response?.data?.message || 
-                          error?.response?.data?.error || 
-                          error?.message || 
-                          "Failed to delete payment provider";
+      let errorMessage = "Failed to delete payment provider";
+      
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.response?.data) {
+        const responseData = error.response.data;
+        if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        } else if (responseData.error && typeof responseData.error === 'object' && responseData.error.message) {
+          // Handle the error handler format: {error: {message, status, type}}
+          errorMessage = responseData.error.message;
+        } else if (responseData.message && typeof responseData.message === 'string') {
+          errorMessage = responseData.message;
+        } else if (responseData.error && typeof responseData.error === 'string') {
+          errorMessage = responseData.error;
+        }
+      } else if (error?.message && typeof error.message === 'string') {
+        errorMessage = error.message;
+      }
       
       toast({
         title: "Cannot Remove Provider",
@@ -95,6 +117,11 @@ const PaymentProvidersTable = () => {
   useEffect(() => {
     fetchProviders();
   }, []);
+  
+  // Expose the refresh function to parent components
+  useImperativeHandle(ref, () => ({
+    refresh: fetchProviders
+  }), []);
 
   const formatAddress = (address: string) => {
     if (!address) return "N/A";
@@ -151,19 +178,22 @@ const PaymentProvidersTable = () => {
               </div>
             ) : (
               <div className="space-y-2 p-2">
-                {providers.map((provider) => (
-                  <div
-                    key={provider.key}
-                    className="p-4 rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="font-semibold">{provider.value.name}</h4>
-                          <Badge variant={provider.value.exists ? "default" : "secondary"}>
-                            {provider.value.exists ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
+                {providers.map((provider) => {
+                  // Skip invalid providers
+                  if (!provider || !provider.value) {
+                    return null;
+                  }
+                  
+                  return (
+                    <div
+                      key={provider.key}
+                      className="p-4 rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-semibold">{provider.value.name || "Unknown Provider"}</h4>
+                          </div>
                         
                         <div className="text-sm text-muted-foreground space-y-1">
                           <div>
@@ -172,23 +202,11 @@ const PaymentProvidersTable = () => {
                               {formatAddress(provider.value.providerAddress || provider.key)}
                             </code>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">Endpoint:</span>
-                            <span className="truncate max-w-[200px]">
+                          <div>
+                            <span className="font-medium">Endpoint:</span>{" "}
+                            <span className="break-all">
                               {provider.value.endpoint || "N/A"}
                             </span>
-                            {provider.value.endpoint && 
-                             provider.value.endpoint !== "0000000000000000000000000000000000000000" && 
-                             provider.value.endpoint.startsWith("http") && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => window.open(provider.value.endpoint, '_blank')}
-                                className="h-6 w-6 p-0"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </Button>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -196,7 +214,7 @@ const PaymentProvidersTable = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteClick(provider.key, provider.value.name)}
+                        onClick={() => handleDeleteClick(provider.key, provider.value?.name || "Unknown")}
                         className="text-destructive hover:text-destructive ml-2"
                         title="Remove provider"
                       >
@@ -204,26 +222,35 @@ const PaymentProvidersTable = () => {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        setDeleteDialogOpen(open);
+        if (!open) {
+          setProviderToDelete(null);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Payment Provider</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove <strong>{providerToDelete?.name}</strong>?
+              Are you sure you want to remove <strong>{providerToDelete?.name || "this provider"}</strong>?
               This action cannot be undone and will remove the provider from the OnRamp contract.
               <br /><br />
               <span className="text-sm font-semibold">Note: You must be an OnRamp admin to remove payment providers.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProviderToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setProviderToDelete(null);
+            }}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteProvider} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Remove Provider
             </AlertDialogAction>
@@ -232,6 +259,8 @@ const PaymentProvidersTable = () => {
       </AlertDialog>
     </>
   );
-};
+});
+
+PaymentProvidersTable.displayName = 'PaymentProvidersTable';
 
 export default PaymentProvidersTable;

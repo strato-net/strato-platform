@@ -1,19 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, DollarSign } from "lucide-react";
+import { Loader2, RefreshCw, DollarSign, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOnRampContext } from "@/context/OnRampContext";
 import { formatUnits } from "viem";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-const OnRampListingsTable = () => {
+const OnRampListingsTable = forwardRef((props, ref) => {
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [listingToDelete, setListingToDelete] = useState<{ token: string; symbol: string } | null>(null);
   const { toast } = useToast();
-  const { get } = useOnRampContext();
+  const { get, cancelListing } = useOnRampContext();
 
   const fetchListings = async () => {
     try {
@@ -48,6 +60,70 @@ const OnRampListingsTable = () => {
   useEffect(() => {
     fetchListings();
   }, []);
+  
+  // Expose the refresh function to parent components
+  useImperativeHandle(ref, () => ({
+    refresh: fetchListings
+  }), []);
+
+  const handleDeleteClick = (token: string, symbol: string) => {
+    setListingToDelete({ token, symbol: symbol || "Unknown" });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCancelListing = async () => {
+    if (!listingToDelete) return;
+    
+    try {
+      const result = await cancelListing(listingToDelete.token);
+      
+      // Ensure description is a string
+      let successMessage = "Listing cancelled successfully";
+      if (result?.message) {
+        successMessage = typeof result.message === 'string' 
+          ? result.message 
+          : JSON.stringify(result.message);
+      }
+      
+      toast({
+        title: "Success",
+        description: successMessage,
+      });
+      
+      // Refresh listings after a short delay
+      setTimeout(() => {
+        fetchListings();
+      }, 500);
+    } catch (error: any) {
+      // Handle the specific error from backend
+      let errorMessage = "Failed to cancel listing";
+      
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.response?.data) {
+        const responseData = error.response.data;
+        if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        } else if (responseData.error && typeof responseData.error === 'object' && responseData.error.message) {
+          // Handle the error handler format: {error: {message, status, type}}
+          errorMessage = responseData.error.message;
+        } else if (responseData.message && typeof responseData.message === 'string') {
+          errorMessage = responseData.message;
+        }
+      } else if (error?.message && typeof error.message === 'string') {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Cannot Cancel Listing",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setListingToDelete(null);
+    }
+  };
 
   const formatAddress = (address: string) => {
     if (!address) return "N/A";
@@ -214,6 +290,16 @@ const OnRampListingsTable = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(info.token, info._symbol)}
+                        className="text-destructive hover:text-destructive ml-2"
+                        title="Cancel listing"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 );
@@ -223,7 +309,38 @@ const OnRampListingsTable = () => {
         </div>
       </CardContent>
     </Card>
+
+    <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+      setDeleteDialogOpen(open);
+      if (!open) {
+        setListingToDelete(null);
+      }
+    }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancel Listing</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to cancel the listing for <strong>{listingToDelete?.symbol || "this token"}</strong>?
+            This action will return the remaining tokens to the seller and remove the listing from the OnRamp.
+            <br /><br />
+            <span className="text-sm font-semibold">Note: Only the seller can cancel their own listings.</span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => {
+            setDeleteDialogOpen(false);
+            setListingToDelete(null);
+          }}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleCancelListing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Cancel Listing
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
-};
+});
+
+OnRampListingsTable.displayName = 'OnRampListingsTable';
 
 export default OnRampListingsTable;

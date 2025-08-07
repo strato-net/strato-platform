@@ -203,6 +203,7 @@ export interface OnRampContextType {
     endpoint: string;
   }) => Promise<any>;
   removePaymentProvider: (providerAddress: string) => Promise<any>;
+  cancelListing: (token: string) => Promise<any>;
 }
 
 export interface RawWithdrawData {

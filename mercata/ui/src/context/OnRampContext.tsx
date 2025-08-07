@@ -58,11 +58,28 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     endpoint: string;
   }) => {
     const res = await api.post("/onramp/addPaymentProvider", providerData);
+    // Ensure we return a consistent format
+    if (typeof res.data === 'string') {
+      return { message: res.data };
+    }
     return res.data;
   };
 
   const removePaymentProvider = async (providerAddress: string) => {
     const res = await api.post("/onramp/removePaymentProvider", { providerAddress });
+    // Ensure we return a consistent format
+    if (typeof res.data === 'string') {
+      return { message: res.data };
+    }
+    return res.data;
+  };
+
+  const cancelListing = async (token: string) => {
+    const res = await api.post("/onramp/cancelListing", { token });
+    // Ensure we return a consistent format
+    if (typeof res.data === 'string') {
+      return { message: res.data };
+    }
     return res.data;
   };
 
@@ -80,6 +97,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         unlockTokens,
         addPaymentProvider,
         removePaymentProvider,
+        cancelListing,
         
       }}
     >

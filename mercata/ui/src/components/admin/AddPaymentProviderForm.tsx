@@ -12,8 +12,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Info, Plus } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Plus } from "lucide-react";
 import { useOnRampContext } from "@/context/OnRampContext";
 
 interface AddPaymentProviderFormValues {
@@ -22,7 +21,11 @@ interface AddPaymentProviderFormValues {
   providerAddress: string;
 }
 
-const AddPaymentProviderForm = () => {
+interface AddPaymentProviderFormProps {
+  onSuccess?: () => void;
+}
+
+const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { addPaymentProvider } = useOnRampContext();
@@ -50,20 +53,46 @@ const AddPaymentProviderForm = () => {
         endpoint: data.endpoint,
       });
       
+      // Ensure description is a string
+      let successMessage = "Payment provider added successfully!";
+      if (result?.message) {
+        successMessage = typeof result.message === 'string' 
+          ? result.message 
+          : JSON.stringify(result.message);
+      }
+      
       toast({
         title: "Success",
-        description: result.message || "Payment provider added successfully!",
+        description: successMessage,
       });
       
       form.reset();
       
-      // Optionally refresh the page or provider list
-      window.location.reload();
+      // Call the onSuccess callback after a short delay to ensure blockchain state is updated
+      if (onSuccess) {
+        setTimeout(() => {
+          onSuccess();
+        }, 500);
+      }
     } catch (error: any) {
-      console.error("Error adding payment provider:", error);
+      let errorMessage = "Failed to add payment provider. Please try again.";
+      if (error?.response?.data) {
+        const responseData = error.response.data;
+        if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        } else if (responseData.error && typeof responseData.error === 'object' && responseData.error.message) {
+          // Handle the error handler format: {error: {message, status, type}}
+          errorMessage = responseData.error.message;
+        } else if (responseData.message && typeof responseData.message === 'string') {
+          errorMessage = responseData.message;
+        }
+      } else if (error?.message && typeof error.message === 'string') {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error?.response?.data?.message || error?.message || "Failed to add payment provider. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -73,16 +102,7 @@ const AddPaymentProviderForm = () => {
 
   return (
     <div className="space-y-6">
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          <div className="space-y-2">
-            <p>Add a new payment provider to enable fiat-to-crypto purchases.</p>
-            <p className="text-sm font-semibold">Note: You must be an OnRamp admin to add payment providers.</p>
-            <p className="text-sm">The provider address should be a valid blockchain address that can process payments.</p>
-          </div>
-        </AlertDescription>
-      </Alert>
+
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
