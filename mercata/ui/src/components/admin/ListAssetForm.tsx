@@ -94,14 +94,6 @@ const ListAssetForm = () => {
       }
 
       const selectedToken = approvedTokens.find((t) => t.token === data.tokenAddress);
-    
-
-      const response = await sell({
-        token: data.tokenAddress,
-        amount: data.amount,
-        marginBps: parseInt(data.marginBps).toString(),
-        providerAddresses: data.selectedProviders,
-      });
 
       toast({
         title: "Asset Listed Successfully",
