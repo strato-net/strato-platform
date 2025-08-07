@@ -12,6 +12,8 @@ import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import AddPaymentProviderForm from '@/components/admin/AddPaymentProviderForm';
+import PaymentProvidersTable from '@/components/admin/PaymentProvidersTable';
+import OnRampListingsTable from '@/components/admin/OnRampListingsTable';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -138,29 +140,49 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="listing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Payment Provider</CardTitle>
-                <CardDescription>
-                  Configure new payment providers for fiat-to-crypto transactions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AddPaymentProviderForm />
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>List Assets for Sale</CardTitle>
-                <CardDescription>
-                  List tokens for direct purchase with fiat using configured payment providers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ListAssetForm />
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Payment Providers Column */}
+              <div className="space-y-6">
+                <div className="bg-background border rounded-lg p-6">
+                  <PaymentProvidersTable />
+                  
+                  <div className="mt-6">
+                    <Card className="border-0">
+                      <CardHeader>
+                        <CardTitle>Add Payment Provider</CardTitle>
+                        <CardDescription>
+                          Configure new payment providers for fiat-to-crypto transactions
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <AddPaymentProviderForm />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+
+              {/* OnRamp Listings Column */}
+              <div className="space-y-6">
+                <div className="bg-background border rounded-lg p-6">
+                  <OnRampListingsTable />
+                  
+                  <div className="mt-6">
+                    <Card className="border-0">
+                      <CardHeader>
+                        <CardTitle>List Assets for Sale</CardTitle>
+                        <CardDescription>
+                          List tokens for direct purchase with fiat using configured payment providers
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ListAssetForm />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
