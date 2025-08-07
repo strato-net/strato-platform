@@ -27,9 +27,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		const nodes = config.nodes || []
 		if (nodes.length === 0) {
 			vscode.window.showWarningMessage('Please add STRATO node information to your config file.')
-			return undefined 
+			return undefined
 		}
-		
+
 		// Take a user and password through input boxes
 		const user = await vscode.window.showInputBox({
 			prompt: `Enter your STRATO Mercata username.`
@@ -135,13 +135,13 @@ export async function activate(context: vscode.ExtensionContext) {
 						for (let i = 0; i < argNames.length; i++) {
 							const argInput = await vscode.window.showInputBox({
 								placeHolder: '',
-								prompt: 
+								prompt:
 									constr.args[argNames[i]].tag === 'Array' ?
 									`Enter a value from ${argNames[i]} with comma-separated values`:
 									`Enter a value for ${argNames[i]}.`
 							});
 							if (!argInput && constr.args[argNames[i]].tag != 'Array') return;
-							args = { 
+							args = {
 								...args,
 								[argNames[i]]: coerceType(constr.args[argNames[i]], argInput || "")
 							}
@@ -241,7 +241,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		console.debug(`refreshEntry/userSelect: ${userSelect}`)
 
 		fp = userSelect && userSelect[0] ? userSelect[0].fsPath : ''
-		if (!fp.endsWith('.yaml') && !fp.endsWith('.yml')) { 
+		if (!fp.endsWith('.yaml') && !fp.endsWith('.yml')) {
 			vscode.window.showErrorMessage('Please select a valid YAML file.')
 			return
 		}
@@ -249,7 +249,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		await vscode.workspace.getConfiguration().update('strato-vscode.configPath', fp, true)
 		nodesProvider.refresh()
 	})
-	
+
 	// Open the STRATO settings page
 	vscode.commands.registerCommand('nodes.settings', async () => {
 		// Open the user settings file
@@ -267,7 +267,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		contractsProvider.refresh()
 		vscode.window.showInformationMessage(`Set active node to ${element.tooltip}.`)
 	})
-	
+
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Register clipboard copier
@@ -285,7 +285,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const sampleConfig =
 /**
  * Bare minimum configuration to get the VS Code extension features running
- * 
+ *
  * TODO: make SolidVM the default VM in the API so "VM: SolidVM" can be removed
  */
 `# STRATO VS Code Extension Node Configuration
@@ -359,7 +359,7 @@ function runCommand(cmd: string) {
 
 function coerceType(argument: any, input: string) {
 	switch(argument.tag) {
-		case "Array": return input.split(',').map(c => {return coerceType(argument.entry, c)}) 
+		case "Array": return input.split(',').map(c => {return coerceType(argument.entry, c)})
 		case "Int": return parseInt(input)
 		case "Contract": return parseInt(input)
 		case "UnknownLabel": return parseInt(input) // Enums are accessed through one-based indexing

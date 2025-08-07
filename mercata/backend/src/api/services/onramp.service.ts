@@ -165,7 +165,7 @@ export async function buy(
 ): Promise<{ sessionId: string; url: string }> {
   try {
     const ramp = await get(accessToken);
-    
+
     const listing = ramp.listings.find((l: { key: string }) => String(l.key) === String(token));
     if (!listing) {
       throw new Error(`Listing for token ${token} not found. Available tokens: ${ramp.listings.map((l: any) => l.ListingInfo?.token).join(', ')}`);
@@ -178,7 +178,7 @@ export async function buy(
     if (!paymentProvider) {
       throw new Error("Payment provider not found");
     }
-    
+
     try {
       const { data } = await axios.post(paymentProvider.endpoint, {
         token,

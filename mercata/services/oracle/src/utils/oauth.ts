@@ -6,7 +6,7 @@ class OAuthClient {
     private clientSecret: string;
     private username: string;
     private password: string;
-    
+
     private accessToken: string | null = null;
     private tokenExpiry: number | null = null;
     private tokenEndpoint: string | null = null;
@@ -28,11 +28,11 @@ class OAuthClient {
             console.log('[OAuth] Discovering token endpoint...');
             const response = await axios.get(this.discoveryUrl, { timeout: 10000 });
             this.tokenEndpoint = response.data.token_endpoint;
-            
+
             if (!this.tokenEndpoint) {
                 throw new Error('Token endpoint not found in discovery document');
             }
-            
+
             console.log(`[OAuth] Token endpoint discovered: ${this.tokenEndpoint}`);
             return this.tokenEndpoint;
         } catch (error: any) {
@@ -81,7 +81,7 @@ class OAuthClient {
                 // Set expiry to 90% of actual expiry for safety margin
                 const expiresIn = response.data.expires_in || 3600; // Default 1 hour
                 this.tokenExpiry = Date.now() + (expiresIn * 1000 * 0.9);
-                
+
                 console.log(`[OAuth] Access token obtained successfully for ${this.username} (expires in ${expiresIn}s)`);
                 return this.accessToken!;
             } else {
@@ -89,7 +89,7 @@ class OAuthClient {
             }
         } catch (error: any) {
             console.error('[OAuth] Error getting access token:', error.response?.data || error.message);
-            
+
             // Try fallback to client credentials if password grant fails
             console.log('[OAuth] Trying fallback to client credentials...');
             try {
@@ -109,14 +109,14 @@ class OAuthClient {
                     this.accessToken = fallbackResponse.data.access_token;
                     const expiresIn = fallbackResponse.data.expires_in || 3600;
                     this.tokenExpiry = Date.now() + (expiresIn * 1000 * 0.9);
-                    
+
                     console.log(`[OAuth] Fallback client credentials successful (expires in ${expiresIn}s)`);
                     return this.accessToken!;
                 }
             } catch (fallbackError: any) {
                 console.error('[OAuth] Fallback also failed:', fallbackError.message);
             }
-            
+
             throw new Error(`OAuth authentication failed: ${error.message}`);
         }
     }
@@ -140,4 +140,4 @@ class OAuthClient {
 }
 
 // Export singleton instance
-export const oauthClient = new OAuthClient(); 
+export const oauthClient = new OAuthClient();

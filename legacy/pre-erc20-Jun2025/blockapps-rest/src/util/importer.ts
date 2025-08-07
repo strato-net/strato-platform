@@ -248,8 +248,8 @@ function combine(filename:string, toObject:boolean = false, relativePath:string|
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let res: any = ''
-    res = toObject 
-      ? readFileLinesToObject({}, filename, relativePath) 
+    res = toObject
+      ? readFileLinesToObject({}, filename, relativePath)
       : readFileLinesToArray([], filename, relativePath)
     resolve(res);
   });
@@ -265,7 +265,7 @@ function combineToString(filename:string, relativePath:string|undefined = undefi
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let res: any = ''
-    res = readFileLinesToString(filename, relativePath) 
+    res = readFileLinesToString(filename, relativePath)
     resolve(res);
   });
 }

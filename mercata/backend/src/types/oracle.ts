@@ -10,4 +10,4 @@ export interface PriceHistoryEntry {
 export interface PriceHistoryResponse {
   data: PriceHistoryEntry[];
   totalCount: number;
-} 
+}

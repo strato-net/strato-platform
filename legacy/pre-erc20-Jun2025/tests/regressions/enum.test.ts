@@ -167,7 +167,7 @@ describe.skip('enum data type: illegal values:', function () {
 
   before(async() => {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
-    let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();  
+    let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     adminUser = await rest.createUser(ouser, options);
     contract = await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: constructorArgs}, options);
   });

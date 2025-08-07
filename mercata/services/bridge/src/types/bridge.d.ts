@@ -24,4 +24,4 @@ declare module '../events/bridgeOut' {
   }
 
   export function bridgeOut(event: BridgeOutEvent): Promise<void>;
-} 
+}

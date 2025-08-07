@@ -54,13 +54,13 @@ export const calculateAccruedInterest = (
 
   // Calculate new total owed
   const newTotalOwed = (
-    toBig(loan.principalBalance) + 
+    toBig(loan.principalBalance) +
     totalAccruedInterest
   ).toString();
 
-  return { 
-    accruedInterest: totalAccruedInterest.toString(), 
-    newTotalOwed 
+  return {
+    accruedInterest: totalAccruedInterest.toString(),
+    newTotalOwed
   };
 };
 
@@ -85,7 +85,7 @@ export const calculateTotalCollateralValueForHealth = (
 
     const price = toBig(config.price);
     const liqThreshold = BigInt(config.liquidationThreshold);
-    
+
     if (price === 0n || liqThreshold === 0n) continue;
 
     // Calculate: (collateralAmount * price * liqThreshold) / (1e18 * 10000)
@@ -170,7 +170,7 @@ export const simulateLoan = (
       config.price,
       config.ltv || 0
     );
-    
+
     maxBorrowingPowerUSD += toBig(metrics.maxBorrowingPower);
   }
 
@@ -185,7 +185,7 @@ export const simulateLoan = (
     interestOwed: actualLoan.interestOwed,
     lastIntCalculated: actualLoan.lastIntCalculated,
     lastUpdated: actualLoan.lastUpdated,
-    
+
     // Calculated values
     healthFactor: healthFactorToPercentage(healthFactor),
     healthFactorRaw: healthFactor,
@@ -245,7 +245,7 @@ export const calculateCollateralMetrics = (
   // Calculate values in USD (18 decimals)
   const userBalanceValue = ((balance * price) / DECIMALS).toString();
   const collateralizedAmountValue = ((collateralized * price) / DECIMALS).toString();
-  
+
   // Calculate max borrowing power using LTV: (collateralizedAmount * price * ltv) / (1e18 * 10000)
   const maxBorrowingPower = ((collateralized * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
 
@@ -268,11 +268,11 @@ export const calculateExchangeRate = (
 ): string => {
   const mTokenSupply = toBig(totalMTokenSupply);
   const underlying = toBig(totalUSDSTSupplied);
-  
+
   if (mTokenSupply === 0n || underlying === 0n) {
     return DECIMALS.toString(); // Default 1:1 ratio
   }
-  
+
   // Exchange rate = totalUSDSTSupplied / totalMTokenSupply (scaled by 1e18)
   return ((underlying * DECIMALS) / mTokenSupply).toString();
 };
@@ -289,7 +289,7 @@ export const calculateTotalUSDSTSupplied = (
 ): string => {
   const mTokenSupply = toBig(totalMTokenSupply);
   const rate = toBig(exchangeRate);
-  
+
   return ((mTokenSupply * rate) / DECIMALS).toString();
 };
 
@@ -306,7 +306,7 @@ export const calculateTotalBorrowed = (
   currentTime: number
 ): string => {
   let totalBorrowed = 0n;
-  
+
   for (const loanEntry of loans) {
     const loan = loanEntry.LoanInfo;
     if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {
@@ -323,7 +323,7 @@ export const calculateTotalBorrowed = (
       totalBorrowed += toBig(newTotalOwed);
     }
   }
-  
+
   return totalBorrowed.toString();
 };
 
@@ -339,9 +339,9 @@ export const calculateUtilizationRate = (
 ): number => {
   const borrowed = toBig(totalBorrowed);
   const supplied = toBig(totalSupplied);
-  
+
   if (supplied === 0n) return 0;
-  
+
   return Number((borrowed * 10000n) / supplied) / 100;
 };
 
@@ -360,13 +360,13 @@ export const calculateTotalCollateralValue = (
   borrowableAsset: string
 ): string => {
   let totalValue = 0n;
-  
+
   for (const config of assetConfigs) {
     if (config.asset === borrowableAsset) continue;
-    
+
     const price = prices.get(config.asset) || "0";
     if (price === "0" || !config.AssetConfig?.liquidationThreshold) continue;
-    
+
     // Sum all collateral for this asset across all users
     let totalAssetCollateral = 0n;
     for (const collateral of allCollaterals) {
@@ -374,17 +374,17 @@ export const calculateTotalCollateralValue = (
         totalAssetCollateral += toBig(collateral.amount);
       }
     }
-    
+
     if (totalAssetCollateral > 0n) {
       const collateralValue = (
-        totalAssetCollateral * 
-        toBig(price) * 
+        totalAssetCollateral *
+        toBig(price) *
         BigInt(config.AssetConfig.liquidationThreshold)
       ) / (DECIMALS * 10000n);
       totalValue += collateralValue;
     }
   }
-  
+
   return totalValue.toString();
 };
 

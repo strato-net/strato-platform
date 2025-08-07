@@ -11,7 +11,7 @@ router.get("/pools", authHandler.authorizeRequest(true), LendingController.get);
 // ----- User Balances & Positions -----
 // Get user's collateral and balance information
 router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
- 
+
 // Get user's liquidity and balance information
 router.get("/liquidity", authHandler.authorizeRequest(), LendingController.getLiquidityAndBalance);
 
@@ -56,4 +56,4 @@ router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingControll
 // Configure asset with all parameters
 router.post("/admin/configure-asset", authHandler.authorizeRequest(), LendingController.configureAsset);
 
-export default router; 
+export default router;

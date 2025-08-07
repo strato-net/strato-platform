@@ -20,4 +20,4 @@ export const getNetworkErrorMessage = ({ networkName, tokenSymbol, direction }: 
  */
 export const getTokenSelectionErrorMessage = (direction: 'in' | 'out'): string => {
   return `Please select a token to bridge ${direction}`;
-}; 
+};

@@ -66,7 +66,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     this.selectedContractAddresses.push(address)
     this.selectedContractAddresses = Array.from(new Set(this.selectedContractAddresses))
     this.refresh()
-    return this.selectedContractAddresses 
+    return this.selectedContractAddresses
   }
 
   async removeContract(address) {

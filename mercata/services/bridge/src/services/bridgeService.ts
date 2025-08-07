@@ -171,15 +171,15 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
     "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
     "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
   ];
-  
+
   const validDeposits = depositStatus.filter((deposit: any) => {
     const tokenAddress = deposit.token.toLowerCase().replace("0x", "");
     const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
-    
+
     if (isInvalid) {
       console.warn(`Skipping deposit with invalid token address: ${deposit.txHash} (token: ${tokenAddress})`);
     }
-    
+
     return !isInvalid;
   });
 
@@ -200,7 +200,7 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
 
     if (result && result.status === "Success") {
       console.log("✅ Bridge deposits confirmed successfully, minting vouchers...");
-      
+
       try {
         await mintVouchersForDeposits(validDeposits);
       } catch (voucherError) {
@@ -235,10 +235,10 @@ export const confirmBridgeIn = async (tx: any) => {
     "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
     "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
   ];
-  
+
   const tokenAddress = depositStatus.token.toLowerCase().replace("0x", "");
   const isInvalidToken = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
-  
+
   if (isInvalidToken) {
     console.warn(`Skipping single deposit with invalid token address: ${depositStatus.txHash} (token: ${tokenAddress})`);
     return null;
@@ -286,12 +286,12 @@ export const confirmBridgeOut = async (tx: any) => {
 
 export const confirmBridgeOutSafePolling = async (txs: string[]) => {
   console.log("confirmBridgeOutSafePolling ", txs);
-  
+
   if (!txs || txs.length === 0) {
     console.log("No withdrawal transactions to process");
     return;
   }
-  
+
   const bridgeContract = new BridgeContractCall();
   await bridgeContract.batchConfirmWithdrawals({
     txHashes: txs,

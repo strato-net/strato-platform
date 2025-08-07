@@ -13,4 +13,4 @@ router.get('/config', BridgeController.getBridgeConfig);
 router.get('/userDepositStatus/:status',verifyAccessToken(), BridgeController.userDepositStatus);
 router.get('/userWithdrawalStatus/:status',verifyAccessToken(), BridgeController.userWithdrawalStatus);
 
-export default router; 
+export default router;

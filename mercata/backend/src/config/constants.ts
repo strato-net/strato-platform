@@ -25,7 +25,7 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const Event = "event";
-  
+
   const tokenSelectFields = [
     "address",
     "_name",
@@ -52,7 +52,7 @@ export const constants = (() => {
     "_owner",
     "swapFeeRate",
     "lpSharePercent",
-    "aToBRatio::text", 
+    "aToBRatio::text",
     "bToARatio::text",
     `tokenA:tokenA_fkey(${tokenSelectFields.join(',')})`,
     "tokenABalance::text",
@@ -91,15 +91,15 @@ export const constants = (() => {
     "block_timestamp",
     "sender",
     "tokenIn",
-    "tokenOut", 
+    "tokenOut",
     "amountIn::text",
     "amountOut::text",
     "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))",
   ];
-  
+
   const priceHistorySelectFields = [
     "address",
-    "id", 
+    "id",
     "block_timestamp",
     "asset",
     "price::text",

@@ -33,7 +33,7 @@ describe('OAuth Util', function() {
     assert.isArray(urlParts)
     assert.equal(urlParts.length,2)
     assert.equal(
-      urlParts[0], 
+      urlParts[0],
       oauthUtilInstance.openIdConfig.authorization_endpoint,
       'Sign in url should match the auth url in open id config'
     )
@@ -46,7 +46,7 @@ describe('OAuth Util', function() {
     assert.isArray(urlParts)
     assert.equal(urlParts.length,2)
     assert.equal(
-      urlParts[0], 
+      urlParts[0],
       oauthUtilInstance.openIdConfig.end_session_endpoint,
       'logout url should match the end session url in open id config'
     )
@@ -57,7 +57,7 @@ describe('OAuth Util', function() {
     assert.equal(cookieName, config.nodes[0].oauth.appTokenCookieName)
   })
 
-  
+
   it(`should be able to get valid access token using client credential grant`, async () => {
     const tokenResponse = await oauthUtilInstance.getAccessTokenByClientSecret()
     assert.isDefined(tokenResponse)
@@ -69,8 +69,8 @@ describe('OAuth Util', function() {
     assert.includeMembers(token.scope.split(' '), config.nodes[0].oauth.scope.split(' '))
     const isTokenExpired = oauthUtilInstance.isTokenExpired(token.access_token)
     assert.isNotOk(isTokenExpired)
-    const isTokenValid = oauthUtilInstance.isTokenValid(token.access_token) 
-    assert.isOk(isTokenValid) 
+    const isTokenValid = oauthUtilInstance.isTokenValid(token.access_token)
+    assert.isOk(isTokenValid)
   })
 
 })

@@ -33,7 +33,7 @@ export const isUserAdmin = async (
   } catch (error) {
     return false;
   }
-}; 
+};
 
 export const getAdmin = async (
   accessToken: string

@@ -1,6 +1,6 @@
 import Joi from "@hapi/joi";
 export function validateBuyArgs(args: any) {
-  
+
   if (!args || typeof args !== "object") {
     throw new Error("Invalid input: args must be an object.");
   }

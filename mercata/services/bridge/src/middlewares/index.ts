@@ -42,9 +42,9 @@ export const verifyAccessToken = () => {
       }
 
       // Verify the token synchronously using cached key (no HTTP calls)
-      jwt.verify(token, publicKey, { 
-        algorithms: ["RS256"], 
-        issuer 
+      jwt.verify(token, publicKey, {
+        algorithms: ["RS256"],
+        issuer
       }, async (err: jwt.VerifyErrors | null, decoded: any) => {
         if (err) {
           console.error("Token verification failed:", err);

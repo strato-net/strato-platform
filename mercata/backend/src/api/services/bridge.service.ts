@@ -35,7 +35,7 @@ export class BridgeService {
           }
         }
       );
-  
+
       return {
         status: response.data.status,
         hash: response.data.hash,
@@ -51,7 +51,7 @@ export class BridgeService {
       }
     }
   }
-  
+
 
   public async bridgeOut(params: BridgeOutParams): Promise<any> {
     try {
@@ -72,8 +72,8 @@ export class BridgeService {
 
       return response.data;
     } catch (error: any) {
-  
-      
+
+
       // Extract error message from axios error response
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
@@ -194,7 +194,7 @@ export class BridgeService {
       }
     }
   }
-  
+
   public async getBridgeInTokens(params: {
     accessToken: string;
     type: string;

@@ -52,7 +52,7 @@ class OnRampController {
       next(error);
     }
   }
-  
+
 }
 
 export default OnRampController;

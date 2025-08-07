@@ -146,7 +146,7 @@ const run = async function() {
   const signinUri = oauth.getSigninURL();
   async function requestListener(req, res) {
     // TODO: better route matching
-    
+
     if (req.url === '/') {
       res.writeHead(302, {
         'Location': signinUri
@@ -156,7 +156,7 @@ const run = async function() {
     }
 
     const callbackPath = redirectUriParsed.pathname;
-    
+
     if (req.url.indexOf(callbackPath) !== 0 ) {
       if (req.url !== '/favicon.ico') {
         console.log('Unknown URI was called: ' + req.url);
@@ -165,7 +165,7 @@ const run = async function() {
       res.end();
       return
     }
-    
+
     const urlParts = req.url.split("?");
     if (urlParts.length < 2) {
       console.error("Missing query string in redirectUri callback url.");

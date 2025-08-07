@@ -109,7 +109,7 @@ function toTableName(contractName){
 
 describe('Solid VM: Contract uploads', function() {
   this.timeout(config.timeout);
-  
+
   before(async () => {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     const accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
@@ -199,14 +199,14 @@ describe('Solid VM: Contract uploads', function() {
 
     console.log(`Single: ${JSON.stringify(single)}`);
     assert.equal(single, "how are you?");
-    console.log(`StringTup: ${JSON.stringify(stringTup)}`); 
+    console.log(`StringTup: ${JSON.stringify(stringTup)}`);
     assert.equal(stringTup[0], "I'm fine thanks,");
     assert.equal(stringTup[1], "how have you been?");
-    console.log(`MixedTup: ${JSON.stringify(mixedTup)}`); 
+    console.log(`MixedTup: ${JSON.stringify(mixedTup)}`);
     assert.equal(mixedTup[0], 42);
     assert.equal(mixedTup[1], "the meaning of life");
     assert.equal(mixedTup[3], "STRATO");
-   
+
 
   });
 })

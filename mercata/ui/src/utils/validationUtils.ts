@@ -12,4 +12,4 @@ export const validateRecipientAddress = (
     return "You cannot transfer to your own address.";
 
   return ""; // No error
-}; 
+};

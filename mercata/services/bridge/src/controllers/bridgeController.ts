@@ -3,11 +3,11 @@ import BigNumber from "bignumber.js";
 import { Alchemy, Network } from 'alchemy-sdk';
 import logger from "../utils/logger";
 import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus, getBridgeInTokens, getBridgeOutTokens } from "../services/bridgeService";
-import { 
-  config, 
-  TESTNET_ETH_STRATO_TOKEN_MAPPING, 
-  MAINNET_ETH_STRATO_TOKEN_MAPPING, 
-  MAINNET_STRATO_TOKENS, 
+import {
+  config,
+  TESTNET_ETH_STRATO_TOKEN_MAPPING,
+  MAINNET_ETH_STRATO_TOKEN_MAPPING,
+  MAINNET_STRATO_TOKENS,
   TESTNET_STRATO_TOKENS,
   TESTNET_ERC20_TOKEN_CONTRACTS,
   MAINNET_ERC20_TOKEN_CONTRACTS
@@ -48,13 +48,13 @@ function isERC20Token(tokenAddress: string): boolean {
 async function waitForTransactionMined(ethHash: string, maxWaitTime: number = 60000): Promise<boolean> {
   const startTime = Date.now();
   const pollInterval = 2000; // Check every 2 seconds
-  
+
   console.log(`⏳ Waiting for transaction to be mined: ${ethHash}`);
 
   while (Date.now() - startTime < maxWaitTime) {
     try {
       const receipt = await alchemy.core.getTransactionReceipt(ethHash);
-      
+
       if (receipt) {
         // Check if transaction was successful (status === 1 means success)
         if (receipt.status === 1) {
@@ -85,9 +85,9 @@ async function fetchTransactionDetails(ethHash: string) {
     if (!isMined) {
       throw new Error('Transaction was not mined within timeout period or failed on blockchain');
     }
-    
+
     const transaction = await alchemy.core.getTransaction(ethHash);
-    
+
     if (!transaction) {
       throw new Error('Transaction not found');
     }
@@ -105,22 +105,22 @@ function decodeERC20Transfer(input: string) {
     // ERC-20 transfer function signature: transfer(address,uint256)
     // Method ID: 0xa9059cbb
     const transferMethodId = '0xa9059cbb';
-    
+
     if (!input.startsWith(transferMethodId)) {
       return null;
     }
 
     // Remove method ID (4 bytes = 8 hex characters)
     const data = input.slice(10); // Remove '0xa9059cbb'
-    
+
     // Extract recipient address (32 bytes = 64 hex characters)
     const recipientHex = data.slice(0, 64);
     const recipient = '0x' + recipientHex.slice(24); // Remove padding
-    
+
     // Extract amount (32 bytes = 64 hex characters)
     const amountHex = data.slice(64, 128);
     const amount = new BigNumber('0x' + amountHex);
-    
+
     return {
       recipient: recipient.toLowerCase(),
       amount: amount.toString()
@@ -142,7 +142,7 @@ function validateTransactionDetails(
 
   // Check if this is a native ETH transfer or ERC-20 transfer
   const isERC20 = isERC20Token(expectedTokenAddress);
-  
+
   if (!isERC20) {
     // For native ETH transfers - validate to address
     if (transaction.to?.toLowerCase() !== expectedToAddress.toLowerCase()) {
@@ -154,7 +154,7 @@ function validateTransactionDetails(
     const actualValue = transaction.value ? new BigNumber(transaction.value.toString()) : new BigNumber(0);
     // Convert expected amount to wei (18 decimals)
     const expectedValue = new BigNumber(expectedAmount).multipliedBy(10 ** 18);
-    
+
     if (!actualValue.eq(expectedValue)) {
       const error = `Invalid amount. Expected: ${expectedValue.toString()} wei, Got: ${actualValue.toString()}`;
       errors.push(error);
@@ -191,7 +191,7 @@ function validateTransactionDetails(
     const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[expectedTokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || expectedTokenAddress;
     const tokenDecimals = getTokenDecimals(stratoTokenAddress);
     const expectedValue = new BigNumber(expectedAmount).multipliedBy(10 ** tokenDecimals);
-    
+
     if (!actualAmount.eq(expectedValue)) {
       const error = `Invalid amount in ERC-20 transfer. Expected: ${expectedValue.toString()}, Got: ${actualAmount.toString()}`;
       errors.push(error);
@@ -212,9 +212,9 @@ class BridgeController {
 
       // Validate required fields
       if (!ethHash) {
-        res.status(400).json({ 
-          success: false, 
-          message: 'Missing ethHash parameter' 
+        res.status(400).json({
+          success: false,
+          message: 'Missing ethHash parameter'
         });
         return;
       }
@@ -224,16 +224,16 @@ class BridgeController {
       try {
         transactionDetails = await fetchTransactionDetails(ethHash);
       } catch (error: any) {
-        res.status(400).json({ 
-          success: false, 
-          message: `Failed to fetch transaction details: ${error.message}` 
+        res.status(400).json({
+          success: false,
+          message: `Failed to fetch transaction details: ${error.message}`
         });
         return;
       }
 
       // Validate transaction details
       const expectedToAddress = config.safe.address || '';
-      
+
       const validationErrors = validateTransactionDetails(
         transactionDetails,
         amount,
@@ -242,8 +242,8 @@ class BridgeController {
       );
 
       if (validationErrors.length > 0) {
-        res.status(400).json({ 
-          success: false, 
+        res.status(400).json({
+          success: false,
           message: 'Invalid amount or tokenAddress',
           errors: validationErrors
         });
@@ -257,12 +257,12 @@ class BridgeController {
       }
 
       const toAddress = config.safe.address || '';
-  
+
       const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
-      
+
       // Convert to 18 decimal places regardless of token's native decimals
       const amountInWei = new BigNumber(amount).multipliedBy(10 ** 18).toString();
-    
+
       const bridgeInResponse = await bridgeIn(
         ethHash,
         stratoTokenAddress,
@@ -271,19 +271,19 @@ class BridgeController {
         toAddress,
         userAddress
       );
-      
+
       res.json({
         success: true,
         bridgeInResponse,
       });
     } catch (error: any) {
       logger.error("Error in bridgeIn:", error?.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -304,7 +304,7 @@ class BridgeController {
       }
 
       const fromAddress = config.safe.address || '';
-      
+
       // Convert to destination token's native decimals
       const tokenDecimals = getTokenDecimals(tokenAddress);
       const bridgeOutResponse = await bridgeOut(
@@ -323,11 +323,11 @@ class BridgeController {
       // Extract just the error message for logging
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
       console.error("Error in bridgeOut controller 2 :", errorMessage);
-      
+
       // Return the error message in HTTP response instead of using next(error)
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -356,12 +356,12 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in stratoToBalance:", error.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -380,12 +380,12 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching bridge in networks:", error?.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -403,12 +403,12 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching bridge out networks:", error?.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -442,12 +442,12 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching deposit status:", error?.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -473,12 +473,12 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching deposit status:", error?.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }
@@ -500,12 +500,12 @@ class BridgeController {
       });
     } catch (error: any) {
       logger.error("Error in fetching bridge config:", error?.message);
-      
+
       // Return the error message in HTTP response instead of using next(error)
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
+      res.status(400).json({
+        success: false,
+        message: errorMessage
       });
     }
   }

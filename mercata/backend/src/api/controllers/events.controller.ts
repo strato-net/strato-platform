@@ -30,7 +30,7 @@ class EventsController {
             name: "LendingPool",
             events: [
               "Deposited",
-              "Withdrawn", 
+              "Withdrawn",
               "Borrowed",
               "Repaid",
               "Liquidated",
@@ -75,7 +75,7 @@ class EventsController {
             events: [
               "RewardTokenAdded",
               "RewardTokenRemoved",
-              "EligibleTokenAdded", 
+              "EligibleTokenAdded",
               "EligibleTokenRemoved",
               "RewardFactorSet",
               "RewardBalanceUpdated",
@@ -126,4 +126,4 @@ class EventsController {
   }
 }
 
-export default EventsController; 
+export default EventsController;

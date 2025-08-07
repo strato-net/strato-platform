@@ -204,7 +204,7 @@ export const fetchDepositInitiated = async (txHash: string): Promise<any | null>
   } catch (error: any) {
     return null;
   }
-}; 
+};
 export const fetchDepositInitiatedTransactions= async (
   transactionHashes: string[]
 ): Promise<any[]> => {

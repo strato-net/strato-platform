@@ -362,7 +362,7 @@ function stringValue(uid, index) {
 
 function modifyContractWithCN(contract) {
   const { name, ...restArgs } = contract;
-  return { name: commonName + "-" + name, ...restArgs } 
+  return { name: commonName + "-" + name, ...restArgs }
 }
 
 describe("search until", function () {

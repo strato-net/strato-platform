@@ -79,7 +79,7 @@ contract ${name} {
   uint var_uint;
   constructor(uint _arg_uint) {
     var_uint = _arg_uint;
-  }   
+  }
 }
 `;
   return { name, source, args: util.usc(args) }; // TODO flow contractArgs object

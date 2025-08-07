@@ -44,7 +44,7 @@ export function calculatePaymentAmount(amount: string, price: string, marginBps:
   const divisor = BigInt(10 ** 34);
   const marginMultiplier = BigInt(10000 + Number(marginBps));
   const marginDivisor = BigInt(10000);
-  
+
   const rawAmount = (amountBigInt * priceBigInt * marginMultiplier + (divisor * marginDivisor) / 2n) / (divisor * marginDivisor);
   return Math.max(Number(rawAmount.toString()), 50);
 }

@@ -32,4 +32,4 @@ export interface LiquidityParams {
 export interface RemoveLiquidityParams {
   poolAddress: string;
   lpTokenAmount: string;
-} 
+}

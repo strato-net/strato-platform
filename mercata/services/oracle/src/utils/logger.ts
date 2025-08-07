@@ -11,4 +11,4 @@ export function logError(context: string, error: Error): void {
 export function logInfo(context: string, message: string): void {
     const logTime = new Date().toISOString();
     console.log(`[InfoLogger] ${logTime} | ${context} | ${message}`);
-} 
+}

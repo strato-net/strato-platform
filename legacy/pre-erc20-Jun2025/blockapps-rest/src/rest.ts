@@ -685,7 +685,7 @@ async function createOrGetKey(user, options:Options) {
     if (getKeyResponse.address) return getKeyResponse.address;
   }
   catch(e) {
-  
+
     if (e.response && e.response.status==400) { //user doesn't already exist, create user
       const createKeyResponse = await api.createKey(user, options);
       return createKeyResponse.address;

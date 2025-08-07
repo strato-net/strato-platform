@@ -81,7 +81,7 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
     try {
       const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.2&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
       console.log("🚀 url: step1", url);
-      
+
       const { data } = await axios.get(url, {
         headers: { Authorization: `Bearer ${await getBAUserToken()}` },
       });
@@ -95,7 +95,7 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
       const txHashes = data.map(({ key }: { key: string }) => `0x${key}`);
       console.log("🚀 txHashes: step1", txHashes);
       const approvedTxHashes = [];
-      
+
       for (const txHash of txHashes) {
         try {
           const safeTransaction = await apiKit.getTransaction(txHash);
@@ -108,7 +108,7 @@ export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 
           console.error(`❌ Failed to process transaction ${txHash}:`, err);
         }
       }
-      
+
       const strippedHashes = stripHexPrefix(approvedTxHashes);
       console.log("🚀 strippedHashes: step4", strippedHashes);
       await confirmBridgeOutSafePolling(strippedHashes);

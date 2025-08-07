@@ -144,7 +144,7 @@ describe("Send Transaction Test", function() {
         if(txResult.status != 'Success') {
           console.log(txResult);
         }
-        
+
         return txResult;
     }
 

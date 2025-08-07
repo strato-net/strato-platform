@@ -19,4 +19,4 @@ export const isAuthenticated = async (): Promise<boolean> => {
 // Logout function that redirects to external logout endpoint
 export const logout = (): void => {
   window.location.href = '/auth/logout';
-}; 
+};

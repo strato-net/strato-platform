@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 import bridgeRoutes from "./routes/bridgeRoutes";
 import bodyParser from "body-parser";
-// import { initializeSockets } from "./sockets/initializeSockets";   
+// import { initializeSockets } from "./sockets/initializeSockets";
 import { initializeAlchemyPolling } from "./polling/initializePolling";
 import { initializeOAuth } from "./config";
 import { initOpenIdConfig } from "./auth";

@@ -25,7 +25,7 @@ interface Config {
   VM?:"SolidVM" | "EVM",
   timeout?:number,
   contractsPath?:string
-}  
+}
 
 interface Node {
   url:string,

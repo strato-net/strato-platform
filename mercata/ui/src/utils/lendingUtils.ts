@@ -172,7 +172,7 @@ export const calculateBorrowOperationHealthImpact = (
       : (currentCollateralValue * 10n ** 18n) / newBorrowValue;
 
   // Calculate health impact and isHealthy using raw values
-  const healthImpact = newBorrowValue === 0n 
+  const healthImpact = newBorrowValue === 0n
     ? Number(10n ** 20n - currentHealthFactorRaw) / 1e18  // Large positive number when fully repaid
     : Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
   const isHealthy = newBorrowValue === 0n || newHealthFactorRaw >= 10n ** 18n;
@@ -199,4 +199,4 @@ export const calculateBorrowHealthImpact = (
   loanData: NewLoanData
 ) => {
   return calculateBorrowOperationHealthImpact(borrowAmountWei, loanData, true);
-}; 
+};

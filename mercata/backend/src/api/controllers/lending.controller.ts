@@ -194,7 +194,7 @@ class LendingController {
         res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
         return;
       }
-      
+
       const result = await getLoan(accessToken, address as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {

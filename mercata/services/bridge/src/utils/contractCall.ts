@@ -51,15 +51,15 @@ export const contractCall = async (
     // Handle blockchain errors and preserve the original error message
     if (error.response?.status === 422) {
       const errorData = error.response.data;
-      
+
       if (errorData && typeof errorData === 'string') {
         // Look for Solidity error messages in the response
         const solidityMatch = errorData.match(/SString "([^"]+)"/);
-        
+
         if (solidityMatch) {
           console.log("solidityMatch errrorrr in contract call",solidityMatch[1]);
           throw solidityMatch[1]; // Throw just the original blockchain error
-      
+
         }
       }
     }
@@ -97,7 +97,7 @@ export const contractCall = async (
     });
 
     console.log("🚀 res", res.data);
-        
+
     return res.data;
   };
 
@@ -116,7 +116,7 @@ export const until = async (
 
   // Make initial call to get current status
   let result = await action();
-  
+
   // If predicate is already satisfied, return immediately
   if (predicate(result)) {
     return result;
@@ -135,7 +135,7 @@ export const until = async (
     // Only call action if status is still Pending
     // Check if any result still has "Pending" status
     const hasPendingStatus = result.some((r: any) => r.status === "Pending");
-    
+
     if (hasPendingStatus) {
       result = await action();
     }

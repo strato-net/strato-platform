@@ -126,7 +126,7 @@ class SwappingController {
   static async calculateSwap(req: Request, res: Response, next: NextFunction): Promise<void> {
     const { accessToken, query } = req;
     validateCalculateSwapArgs(query);
-    
+
     const poolAddress = query.poolAddress as string;
     const isAToB = query.isAToB === "true";
     const amountIn = query.amountIn as string;
@@ -179,7 +179,7 @@ class SwappingController {
       const pools = await getPools(accessToken, address);
 
       const tokenMap = new Map();
-      
+
       pools.forEach((pool: any) => {
         [pool.tokenA, pool.tokenB].forEach((token: any) => {
           if (!tokenMap.has(token.address)) {

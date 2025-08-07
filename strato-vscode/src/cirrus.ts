@@ -26,7 +26,7 @@ export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
   }
 
   async callCirrus(name, query): Promise<string[]> {
-    const options = getOptions() 
+    const options = getOptions()
     const appUser = await getApplicationUser()
     const results = await rest.search(appUser, { name }, { ...options, query })
     return results

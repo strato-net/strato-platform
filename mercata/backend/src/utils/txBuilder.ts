@@ -26,7 +26,7 @@ export function buildFunctionTx(
   inputs: FunctionInput | FunctionInput[]
 ): BuiltTx {
   const inputArray = Array.isArray(inputs) ? inputs : [inputs];
-  
+
   const txs = inputArray.map(input => ({
     type: "FUNCTION" as const,
     payload: {

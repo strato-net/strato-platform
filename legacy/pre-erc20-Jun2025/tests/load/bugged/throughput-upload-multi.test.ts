@@ -34,7 +34,7 @@ describe('Throughput - upload', function () {
 
 	    for(let node of nodes) {
 	      const user = users[node.id];
-	      const txs = createBatchTx();      
+	      const txs = createBatchTx();
 	      generators.push(rest.uploadContractList(user, txs, true, node.id));
 	    }
 
@@ -111,10 +111,10 @@ describe('Throughput - upload', function () {
     }
     const counts = yield Promise.all(promises);
     return counts.reduce((check, count) => {
-      return check && count == config.batchSize; 
+      return check && count == config.batchSize;
     }, true);
   }
-  
+
 
   function * getContractCount(user, node) {
     const results = yield api.strato.transaction(`from=${user.address}`, node.id);

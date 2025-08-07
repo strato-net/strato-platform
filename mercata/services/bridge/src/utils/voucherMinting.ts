@@ -9,7 +9,7 @@ import { contractCall } from "./contractCall";
  */
 export const mintVouchers = async (userAddress: string, voucherCount: number = 10) => {
   const voucherContractAddress = config.voucher.contractAddress;
-  
+
   if (!voucherContractAddress) {
     throw new Error("Voucher contract address not configured");
   }
@@ -60,4 +60,4 @@ export const mintVouchersForDeposits = async (deposits: any[]) => {
 
   await Promise.allSettled(mintPromises);
   console.log(`🎉 Voucher minting completed for all deposits`);
-}; 
+};

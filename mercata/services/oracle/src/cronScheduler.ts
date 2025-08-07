@@ -17,16 +17,16 @@ interface SourcesConfig {
 function loadConfig(): { feedsConfig: FeedsConfig; sourcesConfig: SourcesConfig } {
     const feedsPath = path.join(__dirname, 'config', 'feeds.json');
     const sourcesPath = path.join(__dirname, 'config', 'sources.json');
-    
+
     const feedsConfig: FeedsConfig = JSON.parse(fs.readFileSync(feedsPath, 'utf8'));
     const sourcesConfig: SourcesConfig = JSON.parse(fs.readFileSync(sourcesPath, 'utf8'));
-    
+
     return { feedsConfig, sourcesConfig };
 }
 
 export function startCronScheduler(): void {
     console.log(`=== Starting Oracle Service (Cron Mode, Batch Push) ===`);
-    
+
     const { feedsConfig, sourcesConfig } = loadConfig();
     logInfo('CronScheduler', `Loaded ${feedsConfig.feeds.length} feeds from configuration`);
 
@@ -48,7 +48,7 @@ export function startCronScheduler(): void {
         cron.schedule(feed.cron, async () => {
             try {
                 logInfo('CronScheduler', `Starting update for ${feed.name}`);
-                
+
                 // Reload configurations fresh for each execution
                 const { feedsConfig: freshFeedsConfig, sourcesConfig: freshSourcesConfig } = loadConfig();
                 const freshFeed = freshFeedsConfig.feeds.find(f => f.name === feed.name);
@@ -56,7 +56,7 @@ export function startCronScheduler(): void {
                     throw new Error(`Feed ${feed.name} not found in fresh config`);
                 }
                 const freshSourceConfig = freshSourcesConfig[freshFeed.source];
-                
+
                 const { price, feedTimestamp } = await fetchGenericPrice(freshFeed, freshSourceConfig);
 
                 // Push to blockchain
@@ -84,4 +84,4 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
     console.log('\n[CronScheduler] Received SIGTERM, shutting down gracefully...');
     process.exit(0);
-}); 
+});

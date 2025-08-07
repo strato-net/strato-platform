@@ -361,7 +361,7 @@ describe("history", function() {
     const result = await rest.call(admin, callArgs, options);
     console.log(result);
 
-      
+
     const contractHistory = await rest.searchUntil(
       admin,
       { name: `history@Test-TestHistory` },

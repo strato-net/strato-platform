@@ -60,10 +60,10 @@ export async function fetchOpenIdTokenEndpoint(openIdDiscoveryUrl: string | unde
     if (!openIdDiscoveryUrl) {
       throw new Error("OpenID Discovery URL is not defined");
     }
-    
+
     const response = await axios.get(openIdDiscoveryUrl);
     const { token_endpoint } = response.data;
-    
+
     if (!token_endpoint) {
       throw new Error("Token endpoint not found in OpenID discovery document");
     }

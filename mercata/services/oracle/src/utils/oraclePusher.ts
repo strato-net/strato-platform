@@ -42,10 +42,10 @@ function buildFunctionTx({ contractName, contractAddress, method, args }: {
 // STRATO interaction utilities
 async function callListAndWait(callListArgs: CallListArg[], retryCount: number = 0): Promise<TransactionResult> {
     const maxRetries = 3;
-    
+
     try {
         const accessToken = await oauthClient.getAccessToken();
-        
+
         // Submit transaction to STRATO using the parallel endpoint
         const response = await axios.post(
             `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
@@ -88,18 +88,18 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
         return await waitForTransaction(txHash);
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || error.message;
-        
+
         // Check if this is a mempool rejection and we can retry
         if (errorMessage.includes('Rejected from mempool') && retryCount < maxRetries) {
             console.log(`[OraclePusher] Transaction rejected from mempool (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying after delay...`);
-            
+
             // Wait longer between retries to avoid nonce conflicts
             const delay = 2000 + (retryCount * 3000); // 2s, 5s, 8s delays
             await new Promise(resolve => setTimeout(resolve, delay));
-            
+
             return await callListAndWait(callListArgs, retryCount + 1);
         }
-        
+
         console.error(`[OraclePusher] Error in callListAndWait:`, errorMessage);
         throw error;
     }
@@ -108,7 +108,7 @@ async function callListAndWait(callListArgs: CallListArg[], retryCount: number =
 export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
     try {
         console.log(`[OraclePusher] Preparing to push ${assets.length} asset prices...`);
-        
+
         // Log the assets and prices being pushed
         for (let i = 0; i < assets.length; i++) {
             console.log(`[OraclePusher] ${assets[i]} → ${prices[i]} (${(prices[i] / 1e18).toFixed(8)} USD)`);
@@ -144,11 +144,11 @@ export async function pushAssetPrices(assets: string[], prices: number[]): Promi
 // Wait for transaction confirmation
 async function waitForTransaction(txHash: string, timeout: number = 120000): Promise<TransactionResult> { // Increased from 60s to 120s
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeout) {
         try {
             const accessToken = await oauthClient.getAccessToken();
-            
+
             const response = await axios.get(
                 `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/${txHash}/result`,
                 {
@@ -163,7 +163,7 @@ async function waitForTransaction(txHash: string, timeout: number = 120000): Pro
             if (response.data && response.data.status && response.data.status !== "Pending") {
                 return response.data;
             }
-            
+
             // Wait 2 seconds before checking again
             await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (error: any) {
@@ -171,14 +171,14 @@ async function waitForTransaction(txHash: string, timeout: number = 120000): Pro
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
-    
+
     throw new Error(`Transaction ${txHash} did not confirm within ${timeout}ms`);
 }
 
 export async function getAssetPrice(assetAddress: string): Promise<string> {
     try {
         const accessToken = await oauthClient.getAccessToken();
-        
+
         // Query STRATO contract state using the correct API endpoint
         const response = await axios.get(
             `${process.env.STRATO_NODE_URL}/bloc/v2.2/contracts/PriceOracle/${process.env.PRICE_ORACLE_ADDRESS}/state`,
@@ -200,4 +200,4 @@ export async function getAssetPrice(assetAddress: string): Promise<string> {
         console.error(`[OraclePusher] Error getting asset price:`, error.message);
         throw error;
     }
-} 
+}

@@ -46,7 +46,7 @@ function toTableName(contractName){
 
 describe('Slipstream', function () {
   this.timeout(config.timeout);
-  
+
   const newContract = `
 contract record X {
   uint public z = 7624;
@@ -108,7 +108,7 @@ contract record EventTest {
   it("Will create and insert into tables for valid solidity events", async () => {
     // MUST USE SOLIDVM - EVM does not know about events
     let vmOptions = {config};
-    vmOptions.config.VM = 'SolidVM'; 
+    vmOptions.config.VM = 'SolidVM';
 
 
     // multiple inserts with a single contract instance
@@ -127,10 +127,10 @@ contract record EventTest {
     res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
     res = await rest.search(user, {...contract, name: toTableName("EventTest-SlipstreamTest")}, {...vmOptions, query: {magic: "eq.99"}});
-   
+
     assert.equal(res[0].magic, magic)
-    
-    
+
+
     // insert with a different instance of the same contract (same table)
     const [user2,contract2] = await upload("EventTest", eventsContract, vmOptions);
     magic = 97;
@@ -156,7 +156,7 @@ contract record KeywordEventTest {
   it("Will create and insert into event tables using escaped SQL keywords", async () => {
     // MUST USE SOLIDVM - EVM does not know about events
     let vmOptions = {config};
-    vmOptions.config.VM = 'SolidVM'; 
+    vmOptions.config.VM = 'SolidVM';
 
     // multiple inserts with a single contract instance
     const [user,contract] = await upload("KeywordEventTest", keywordEventsContract, vmOptions);

@@ -25,7 +25,7 @@ const contractFilename = (name) => {return path.join(config.contractsPath, name)
 
 describe('ImportAndUpload with Constructor - smoke', function() {
   this.timeout(config.timeout);
-  
+
   let ouser
   var alice;
 
@@ -53,7 +53,7 @@ describe('ImportAndUpload with Constructor - smoke', function() {
 
 describe('ImportAndUpload with Constructor - regular', function() {
   this.timeout(config.timeout);
-  
+
   var alice;
 
   before(async() => {
@@ -84,7 +84,7 @@ describe('ImportAndUpload with Constructor - regular', function() {
 
 describe('ImportAndUpload with Constructor - transitive', function() {
   this.timeout(config.timeout);
-  
+
   var alice;
 
   before(async() => {
@@ -116,7 +116,7 @@ describe('ImportAndUpload with Constructor - transitive', function() {
 describe('ImportAndUpload with Constructor - relative', function() {
 
   this.timeout(config.timeout);
-  
+
   var alice;
 
   before(async() => {
@@ -166,7 +166,7 @@ describe('ImportAndUpload with Constructor - relative', function() {
 
 describe('ImportAndUpload with Constructor - circular', function() {
   this.timeout(config.timeout);
-  
+
   var alice;
   const contractCName = 'C';
   const contractDName = 'D';

@@ -46,7 +46,7 @@ describe('Throughput - upload', function () {
         const state = yield api.bloc.state(r.fst.contractName, r.snd.address);
         const _x = `${state.vin};${state.vehicleType};${state.vehicleYear}`;
         const _y = `${state.vehicleMake};${state.vehicleModel};${state.vehicleStyle}`;
-        
+
         assert.equal(_x, r.fst.args.x, "Contract x is not correct");
         assert.equal(_y, r.fst.args.y, "Contract y is not correct");
       }

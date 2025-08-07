@@ -77,7 +77,7 @@ export const getPriceHistory = async (
     const registry = await getPool(accessToken, undefined, {
       select: "priceOracle",
     });
-    
+
     if (!registry.priceOracle) {
       throw new Error("Price oracle not found");
     }
@@ -96,8 +96,8 @@ export const getPriceHistory = async (
       select: rawParams.select || priceHistorySelectFields.join(','),
       order: rawParams.order || 'block_timestamp.asc',
       ...Object.fromEntries(
-        Object.entries(rawParams).filter(([key, value]) => 
-          value !== undefined && 
+        Object.entries(rawParams).filter(([key, value]) =>
+          value !== undefined &&
           !['select', 'order'].includes(key)
         )
       )
@@ -108,12 +108,12 @@ export const getPriceHistory = async (
         console.error(`[getPriceHistory] Error querying ${PriceOracleEvents}:`, err);
         return { data: [] };
       }),
-      cirrus.get(accessToken, `/${PriceOracleEvents}`, { 
-        params: { 
-          address: `eq.${oracleAddress}`, 
+      cirrus.get(accessToken, `/${PriceOracleEvents}`, {
+        params: {
+          address: `eq.${oracleAddress}`,
           asset: `eq.${assetAddress}`,
           block_timestamp: `gte.${oneMonthAgoISO}`,
-          select: 'id.count()' 
+          select: 'id.count()'
         }
       }).catch(err => {
         console.error(`[getPriceHistory] Error counting events:`, err);
@@ -134,7 +134,7 @@ export const getPriceHistory = async (
     priceEvents.forEach((event: any) => {
       const blockTimestamp = new Date(event.block_timestamp);
       const eventTimestamp = new Date(parseInt(event.timestamp) * 1000);
-      
+
       // Create hourly bucket (round down to the hour)
       const hourBucket = new Date(blockTimestamp);
       hourBucket.setMinutes(0, 0, 0);
@@ -162,26 +162,26 @@ export const getPriceHistory = async (
     const sortedEvents = Array.from(hourlyPrices.values()).sort(
       (a, b) => a.blockTimestamp.getTime() - b.blockTimestamp.getTime()
     );
-    
+
     const earliestDataPoint = sortedEvents[0];
     const latestDataPoint = sortedEvents[sortedEvents.length - 1];
-    
+
     // Start from the earliest actual data point (rounded to hour)
     const startTime = new Date(earliestDataPoint.blockTimestamp);
     startTime.setMinutes(0, 0, 0);
-    
+
     // End at current time (or latest data point if it's more recent)
     const now = new Date();
     const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
 
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
-    
+
     // Generate hourly timestamps from first data point to now
     let hoursGenerated = 0;
     for (let currentHour = new Date(startTime); currentHour <= endTime; currentHour.setHours(currentHour.getHours() + 1)) {
       const hourKey = currentHour.toISOString();
-      
+
       if (hourlyPrices.has(hourKey)) {
         // We have actual data for this hour
         const actualData = hourlyPrices.get(hourKey)!;
@@ -200,7 +200,7 @@ export const getPriceHistory = async (
       hoursGenerated++;
     }
 
-    
+
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
     console.error('Error fetching price history:', error);

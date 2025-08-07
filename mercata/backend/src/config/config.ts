@@ -21,7 +21,7 @@ if (!process.env.NODE_URL) {
 
 export let openIdTokenEndpoint: string | undefined;
 /**
- * Init function to be called from the App.js to make sure the app is served after the token endpoint is asynchronously fetched from OpenID Discovery URL 
+ * Init function to be called from the App.js to make sure the app is served after the token endpoint is asynchronously fetched from OpenID Discovery URL
  */
 export async function initOpenIdConfig() {
   openIdTokenEndpoint = await fetchOpenIdTokenEndpoint(process.env.OAUTH_DISCOVERY_URL);

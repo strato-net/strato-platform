@@ -22,14 +22,14 @@ describe('Throughput', function () {
   });
 
   it('should calculate send throughput for network', function * () {
-    
+
 for(var j=0;j < 1000; j++) {
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
-      const txs = createBatchTx(userPairs[node.id].bob);      
+      const txs = createBatchTx(userPairs[node.id].bob);
       generators.push(rest.sendList(userPairs[node.id].alice, txs, true, node.id));
     }
 
@@ -72,7 +72,7 @@ for(var j=0;j < 1000; j++) {
       console.log(`Creating user ${aliceName} on node ${node.id}`);
       const alice = yield rest.createUser(aliceName, password, false, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
-      console.log(`Creating user ${bobName} on node ${node.id}`);      
+      console.log(`Creating user ${bobName} on node ${node.id}`);
       const bob = yield rest.createUser(bobName, password, true, node.id);
       userPairs.push({alice: alice, bob: bob});
     }

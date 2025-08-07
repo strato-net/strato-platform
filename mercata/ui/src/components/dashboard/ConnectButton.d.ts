@@ -9,4 +9,4 @@ export interface ConnectButtonProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   onClick?: () => void;
-} 
+}

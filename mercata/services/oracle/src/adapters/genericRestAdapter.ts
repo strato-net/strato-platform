@@ -59,16 +59,16 @@ export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: So
         // Handle POST request body if present
         if (sourceConfig.requestBody) {
             let requestBody = JSON.parse(JSON.stringify(sourceConfig.requestBody)); // Deep clone
-            
+
             // Replace placeholders in request body
             const bodyStr = JSON.stringify(requestBody);
             let processedBodyStr = bodyStr;
-            
+
             for (const paramKey in feedConfig.apiParams) {
                 processedBodyStr = processedBodyStr.replace(new RegExp(`\\$\\{${paramKey}\\}`, 'g'), String(feedConfig.apiParams[paramKey]));
             }
             processedBodyStr = processedBodyStr.replace(/\$\{API_KEY\}/g, apiKey || '');
-            
+
             requestOptions.data = JSON.parse(processedBodyStr);
         }
 
@@ -91,7 +91,7 @@ export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: So
         }
 
         const priceUSD = extractNestedProperty(response.data, parsePath);
-        const feedTimestamp = sourceConfig.feedTimestampPath 
+        const feedTimestamp = sourceConfig.feedTimestampPath
             ? extractNestedProperty(response.data, sourceConfig.feedTimestampPath) || new Date().toISOString()
             : new Date().toISOString();
 
@@ -130,4 +130,4 @@ export function extractNestedProperty(obj: any, path: string): any {
         const accessKey = key.replace(/\[(\d+)\]/g, '.$1');
         return accessKey.split('.').reduce((nested, k) => nested?.[k], o);
     }, obj);
-} 
+}

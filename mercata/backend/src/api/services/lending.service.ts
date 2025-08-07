@@ -5,10 +5,10 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { 
-  simulateLoan, 
-  CollateralInfo, 
-  AssetConfig, 
+import {
+  simulateLoan,
+  CollateralInfo,
+  AssetConfig,
   calculateCollateralMetrics,
   calculateExchangeRate,
   calculateTotalBorrowed,
@@ -178,7 +178,7 @@ export const borrow = async (
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
-  
+
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -233,7 +233,7 @@ export const collateralAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const registry = await getPool(accessToken, undefined, { 
+  const registry = await getPool(accessToken, undefined, {
     select: `lendingPool:lendingPool_fkey(assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),borrowableAsset),collateralVault:collateralVault_fkey(userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(prices:${PriceOracle}-prices(asset:key,price:value::text))`,
     "collateralVault.userCollaterals.key": `eq.${userAddress}`
   });
@@ -254,7 +254,7 @@ export const collateralAndBalance = async (
   // Create maps for asset configs and prices
   const assetConfigMap = new Map();
   const priceMap = new Map();
-  
+
   // Build asset config map
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     assetConfigMap.set(config.asset, config.AssetConfig);
@@ -313,7 +313,7 @@ export const liquidityAndBalance = async (
 ) => {
   // Fetch pool data with optimized query
   const registry = await getPool(accessToken, undefined);
-  
+
   const { borrowableAsset, mToken, assetConfigs, userLoan, totalBorrowPrincipal } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
 
@@ -322,8 +322,8 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, { 
-    address: `in.(${borrowableAsset},${mToken})`, 
+  const tokenData = await getTokens(accessToken, {
+    address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
     "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
   });
@@ -344,12 +344,12 @@ export const liquidityAndBalance = async (
 
   // Build price map from oracle data
   const priceMap = new Map<string, string>();
-  
+
   // Add prices from oracle data
   (registry.oracle?.prices || []).forEach((price: any) => {
     priceMap.set(price.asset, price.price);
   });
-  
+
   // Add fallback prices for borrowable asset and mToken from token data
   if (!priceMap.has(borrowableAsset)) {
     priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
@@ -361,7 +361,7 @@ export const liquidityAndBalance = async (
   // Calculate all pool metrics in parallel
   const currentTime = Math.floor(Date.now() / 1000);
   const totalUSDSTSupplied = (toBig(availableLiquidity) + toBig(totalBorrowPrincipal)).toString();
-  
+
   const [
     exchangeRate,
     totalBorrowed,
@@ -370,14 +370,14 @@ export const liquidityAndBalance = async (
   ] = await Promise.all([
     Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied)),
     Promise.resolve(calculateTotalBorrowed(
-      userLoan || [], 
-      borrowableAssetConfig?.interestRate || 0, 
+      userLoan || [],
+      borrowableAssetConfig?.interestRate || 0,
       currentTime
     )),
     Promise.resolve(calculateTotalCollateralValue(
-      assetConfigs || [], 
-      allCollaterals, 
-      priceMap, 
+      assetConfigs || [],
+      allCollaterals,
+      priceMap,
       borrowableAsset
     )),
     Promise.resolve(calculateAPYs(
@@ -392,15 +392,15 @@ export const liquidityAndBalance = async (
   const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
   // Calculate max withdrawable amount considering both user's mUSDST balance and pool's available liquidity
   const userMTokenBalance = BigInt(mTokenBalance);
-  const userUSDSTValue = userMTokenBalance > 0n 
+  const userUSDSTValue = userMTokenBalance > 0n
     ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
     : 0n;
-  
+
   // Pool's available liquidity (cash in the pool)
   const poolAvailableLiquidity = BigInt(availableLiquidity);
-  
+
   // Max withdrawable is the minimum of user's USDST value and pool's available liquidity
-  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
+  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
 
@@ -438,16 +438,16 @@ export const getLoan = async (
 ): Promise<any> => {
   // If userAddress is undefined, get all data without filtering by user
   const registry = await getPool(
-    accessToken, 
-    userAddress, 
+    accessToken,
+    userAddress,
     userAddress ? {} : { select: registrySelectFields.join(",") }
   );
-  
+
   const currentTime = Math.floor(Date.now() / 1000);
-  
+
   // Build asset configs map from the actual mapping
   const assetConfigs = new Map<string, AssetConfig>();
-  
+
   // Add all asset configs from the mapping
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     const price = registry.oracle?.prices?.find((p: any) => p.asset === config.asset)?.price || "0";
@@ -478,14 +478,14 @@ export const getLoan = async (
 
   // If userAddress is undefined, return simulated loans for all users
   const allLoans: any[] = [];
-  
+
   // Get all user loans
   const allUserLoans = registry.lendingPool?.userLoan || [];
-  
+
   for (const loanEntry of allUserLoans) {
     const userLoan = loanEntry.LoanInfo;
     const userAddr = loanEntry.user;
-    
+
     if (!userLoan || !userAddr) continue;
 
     // Get user's collaterals
@@ -498,7 +498,7 @@ export const getLoan = async (
 
     // Simulate loan for this user
     const simulatedLoan = simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
-    
+
     // Add user address to the result
     allLoans.push({
       user: userAddr,
@@ -530,7 +530,7 @@ export const executeLiquidation = async (
 
   // User's collaterals from CollateralVault mapping
   const userCollaterals = (registry.collateralVault?.userCollaterals || []).map((c: any) => ({ asset: c.asset, amount: c.amount }));
- 
+
   // choose collateral asset: if client supplied via body use it, else first collateral
   const chosenCollateral = options.collateralAsset || userCollaterals[0]?.asset;
 
@@ -617,8 +617,8 @@ export const configureAsset = async (
   body: Record<string, string | number>
 ) => {
   // Validate required parameters
-  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
-      body.liquidationBonus === undefined || body.interestRate === undefined || 
+  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined ||
+      body.liquidationBonus === undefined || body.interestRate === undefined ||
       body.reserveFactor === undefined) {
     throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor");
   }
@@ -655,7 +655,7 @@ export const configureAsset = async (
   // Get pool configurator address from lending registry
   const registry = await getPool(accessToken, undefined, { select: "_owner" });
   const poolConfiguratorAddress = registry._owner;
-  
+
   if (!poolConfiguratorAddress) {
     throw new Error("Pool configurator address not found in lending registry");
   }
@@ -734,13 +734,13 @@ export const listLoansForLiquidation = async (
 
   // Build helper maps
   const priceMap = new Map<string, string>(pricesArr.map((p: any) => [p.asset, p.price]));
-  
+
   // Build asset config map
   const assetConfigMap = new Map<string, any>();
   assetConfigsArr.forEach((cfg: any) => {
     assetConfigMap.set(cfg.asset, cfg.AssetConfig);
   });
-  
+
   // Group collaterals by user for quick lookup
   const collMap = new Map<string, CollateralInfo[]>();
   for (const c of collateralsArr) {
@@ -791,7 +791,7 @@ export const listLoansForLiquidation = async (
 
     // Calculate total owed amount with interest
     const totalOwed = toBig(sim.totalAmountOwed);
-    
+
     // Determine close factor based on health factor
     // HF <= 0.95: 100% liquidation allowed (position is in danger)
     // 0.95 < HF < 1: 50% liquidation allowed (position is less risky)
@@ -804,11 +804,11 @@ export const listLoansForLiquidation = async (
       const collateralValueWei = (toBig(col.amount) * toBig(price)) / constants.DECIMALS;
       const usdVal = collateralValueWei.toString();
       const tokenInfo = tokenInfoMap.get(col.asset);
-      
+
       // Get liquidation bonus from asset config (default 5% = 10500 basis points)
       const assetConfig = assetConfigMap.get(col.asset);
       const liquidationBonus = assetConfig?.liquidationBonus || 10500;
-      
+
       // Calculate collateral-specific limit: how much debt can be repaid with this collateral
       // Contract formula rearranged:
       // maxDebtToCover = (collateralAmount * priceCollateral * 10000) / (priceDebt * liquidationBonus)
@@ -820,14 +820,14 @@ export const listLoansForLiquidation = async (
       if (priceDebt > 0n && priceCollBig > 0n) {
         collateralLimit = (collateralAmtBig * priceCollBig * 10000n) / (priceDebt * BigInt(liquidationBonus));
       }
-       
+
       // The actual max repay is the minimum of debt limit and collateral limit
       const effectiveMaxRepay = debtLimit < collateralLimit ? debtLimit : collateralLimit;
-      
+
       // Calculate expected profit: (liquidation_bonus - 1) × effective_max_repay
       const profitFactor = BigInt(liquidationBonus - 10000); // e.g., 500 for 5% bonus
       const expectedProfit = (effectiveMaxRepay * profitFactor) / 10000n;
-      
+
       return {
         asset: col.asset,
         symbol: tokenInfo?._symbol || tokenInfo?._name,

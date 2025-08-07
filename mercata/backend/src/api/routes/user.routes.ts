@@ -10,4 +10,4 @@ router.get("/admin", authHandler.authorizeRequest(), UserController.admin);
 router.post("/admin", authHandler.authorizeRequest(), UserController.addAdmin);
 router.delete("/admin", authHandler.authorizeRequest(), UserController.removeAdmin);
 
-export default router; 
+export default router;

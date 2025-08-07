@@ -22,15 +22,15 @@ export const getEvents = async (
       offset: undefined,
       order: undefined
     };
-    
-    const countResponse = await cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
-      params: countParams 
+
+    const countResponse = await cirrus.get(accessToken, `/${constants.Event}?select=count()`, {
+      params: countParams
     });
     const total = countResponse.data?.[0]?.count || 0;
 
     // Get events with pagination
     const { data } = await cirrus.get(accessToken, `/${constants.Event}`, { params });
-    
+
     return {
       events: data || [],
       total: total
@@ -39,4 +39,4 @@ export const getEvents = async (
     console.error("Error fetching events:", error);
     throw new Error("Failed to fetch events from the blockchain");
   }
-}; 
+};

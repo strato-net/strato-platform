@@ -31,7 +31,7 @@ export class AlchemyWebSocket {
       this.alchemy.ws.on(
         {
           method: AlchemySubscription.MINED_TRANSACTIONS,
-          addresses: [{ 
+          addresses: [{
             to: config.safe.address,
             from: undefined
           }],

@@ -25,7 +25,7 @@ let ouser:OAuthUser;
 
 describe("Create User", function() {
   this.timeout(config.timeout);
-  
+
   before(async () => {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     ouser = await oauth.getAccessTokenByClientSecret();
@@ -34,7 +34,7 @@ describe("Create User", function() {
   it('should create a new user and get an address', async () => {
     // create user
     const user:BlockChainUser = await rest.createUser(ouser, options);
-    
+
     assert.isDefined(user, "should exist");
     assert.isDefined(user.address, "should be defined");
     assert.notEqual(user.address, 0, "should be a nonzero address");

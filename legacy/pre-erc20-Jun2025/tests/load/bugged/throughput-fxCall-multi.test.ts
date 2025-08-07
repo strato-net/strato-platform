@@ -28,14 +28,14 @@ describe('Throughput - fx call', function () {
   });
 
   it('should calculate method call throughput for network', function * () {
-   for(var k = 0; k < 1000; k++) {    
+   for(var k = 0; k < 1000; k++) {
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
       const user = users[node.id];
-      const txs = yield createBatchTx(user, contracts[node.id]);      
+      const txs = yield createBatchTx(user, contracts[node.id]);
       generators.push(rest.callList(user, user.address, txs, true, node.id));
     }
 

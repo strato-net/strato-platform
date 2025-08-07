@@ -70,7 +70,7 @@ describe('Strato Load Test', function() {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
       factory_createCallList(contractAddress, batchSize, i, batchCopies);
       const blocStartTime = moment();
-      const results = await rest.callList(admin, 
+      const results = await rest.callList(admin,
         txs.slice(batchSize * i, batchSize * i + batchSize), {...options, isAsync: true, cacheNonce: true});
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');

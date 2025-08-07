@@ -21,7 +21,7 @@ async function getTokenSymbol(tokenAddress: string): Promise<string> {
     if (tokenData && tokenData.length > 0 && tokenData[0]._symbol) {
       return tokenData[0]._symbol;
     }
-    
+
     return "<Token Symbol Unavailable>";
   } catch (error) {
     console.error("Error fetching token symbol:", error);
@@ -39,7 +39,7 @@ export async function createCheckoutSession({
 }: CheckoutSessionParams): Promise<{ sessionId: string; url: string }> {
   // Fetch token symbol from Cirrus
   const tokenSymbol = await getTokenSymbol(tokenAddress);
-  
+
   // Create a Stripe Checkout Session
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],

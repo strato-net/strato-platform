@@ -8,12 +8,12 @@ import { LOADIPHLPAPI } from 'dns';
 let validationCounter: number = 0;
 
 /**
- * Analyzes the text document for problems. 
+ * Analyzes the text document for problems.
  * This demo diagnostic problem provider finds all mentions of 'emoji'.
  * @param doc text document to analyze
  * @param emojiDiagnostics diagnostic collection
  */
-export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {  
+export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
   if (doc.uri.path.slice(-4) === '.sol') {
     validationCounter = (validationCounter + 1) % 10000;
     const thisCounter = validationCounter;
@@ -22,12 +22,12 @@ export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagn
 }
 
 /**
- * Analyzes the text document for dead code. 
+ * Analyzes the text document for dead code.
  * This detector finds all instances of dead code.
  * @param doc text document to analyze
  */
 
-async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {  
+async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {
   let privFuncs = Array();
   let searchFuncs = Array();
   let deadFuncs = Array();
@@ -37,16 +37,16 @@ async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise
 
     const contractFunctions = contractAST._contracts[contractName]._functions;                  //Save JSON object containing functions of a contract
 
-    for (let key in contractFunctions) {      
+    for (let key in contractFunctions) {
       searchFuncs.push(contractAST._contracts[contractName]._functions[key].funcContents);    //Save functions from JSON to an array.
       if(contractFunctions[key].funcVisibility === 'Internal') {                                 // Distinguish which functions are not Public
         privFuncs.push({
-          'funcName': key, 
+          'funcName': key,
           'start': {
-            'line': contractFunctions[key].funcContext.start.line, 
-            'column': contractFunctions[key].funcContext.start.column, 
+            'line': contractFunctions[key].funcContext.start.line,
+            'column': contractFunctions[key].funcContext.start.column,
             'name': contractFunctions[key].funcContext.start.name
-          }, 
+          },
           'end': {
             'line': contractFunctions[key].funcContext.end.line,
             'column':  contractFunctions[key].funcContext.end.column,
@@ -61,7 +61,7 @@ async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise
         if(searchFuncs[j].length != 0) {
           for(let k = 0; k < searchFuncs[j].length; ++k) {
             if(searchFuncs[j][k].contents[0].contents.tag === 'FunctionCall') {
-              
+
               // If the private function is used, it is not dead code. Remove from array.
               // original if statement is searchFuncs[j][k].contents[0].contents.contents[0].contents
               if(searchFuncs[j][k].contents[0].contents.contents[1].contents[1] == privFuncs[i].funcName) {
@@ -100,14 +100,14 @@ async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise
     privFuncs = Array();
     searchFuncs = Array();
   }
-  
+
   return deadFuncs;
 }
 
 async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {
 
-  // Loop through all the contracts and find the ones that don't 
-  // have any '_parents' and its constructor doesn't call on 
+  // Loop through all the contracts and find the ones that don't
+  // have any '_parents' and its constructor doesn't call on
   // another contract's constructor
   const baseCons = Array();
   for(let contractName in contractAST._contracts) {
@@ -141,7 +141,7 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
       if(contractAST._contracts[contractName] == baseCons[baseContractIndex]) {              // Break loop if contractName matches the name of one of the base constructors
         break;
       }
-      for(let parentIndex in contractAST._contracts[contractName]._parents) {       
+      for(let parentIndex in contractAST._contracts[contractName]._parents) {
         if(baseCons[baseContractIndex] === contractAST._contracts[contractName]._parents[parentIndex]) {
           parentChild.push({'parent': contractAST._contracts[contractName]._parents[parentIndex], 'child': contractName});
         }
@@ -151,12 +151,12 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
 
   let reusedBaseCons = Array();
   // Loop through all contracts and find reused base constructor
-  for(let contractName in contractAST._contracts)  {    
+  for(let contractName in contractAST._contracts)  {
 
     // Check if the contract being looked at is a base contract, if it is, skip it
     let isBaseContract = false
-    for(let baseContractIndex in baseCons) {      
-      
+    for(let baseContractIndex in baseCons) {
+
       if(contractName == baseCons[baseContractIndex]) {
         isBaseContract = true;
         break;
@@ -178,7 +178,7 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
     // Check how many contracts are being inherited.
     let inheritedCount = contractAST._contracts[contractName]._parents.length;
 
-    // If only 1 contract is inherited, check if it is a child of a baseContract. 
+    // If only 1 contract is inherited, check if it is a child of a baseContract.
     // If it is, check if the constructor of contract constructs the base constructor again.
     // If it does, send error message about reused base contracts.
     let foundReusedBaseCont = false;
@@ -268,7 +268,7 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
     // If they do, send error message about reused base contracts.
     if(inheritedCount > 1) {
       for(let parentChildIndex in parentChild) {
-        
+
         for(let i = parseInt(parentChildIndex)+1; i < parentChild.length; ++i){
           if(parentChild[parentChildIndex].parent === parentChild[i].parent){
             foundReusedBaseCont = true;
@@ -305,7 +305,7 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
 async function validate(counter: number, doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
   if (validationCounter === counter) {
     try {
-      const diagnostics: vscode.Diagnostic[] = []; 
+      const diagnostics: vscode.Diagnostic[] = [];
       const user = await getApplicationUser();
       const options = getOptions() || {}
       let srcMap = {[doc.uri.path]: doc.getText()};
@@ -334,7 +334,7 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       const reusedBaseCons = await findReusedBaseCons(doc, contractAST);
       for(let i = 0; i < reusedBaseCons.length; ++i) {
         annotations.push(reusedBaseCons[i]);
-      }      
+      }
 
       for (let ann in annotations) {
         const mDiag = createDiagnostic(doc, annotations[ann]);
@@ -415,7 +415,7 @@ function createFuzzDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagno
   }
 }
 
-export async function subscribeToDocumentChanges(context: vscode.ExtensionContext, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {  
+export async function subscribeToDocumentChanges(context: vscode.ExtensionContext, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
   if (vscode.window.activeTextEditor) {
     await refreshDiagnostics(vscode.window.activeTextEditor.document, solidityDiagnostics);
   }

@@ -22,10 +22,10 @@ export const createCompletePriceMap = async (
     const pools = await getPools(accessToken, undefined);
     for (const pool of pools) {
       if (!pool.lpToken?.address || !pool.lpToken?._totalSupply) continue;
-      
+
       const tokenAPrice = priceMap.get(pool.tokenA?.address) || 0;
       const tokenBPrice = priceMap.get(pool.tokenB?.address) || 0;
-      
+
       const lpTokenPrice = calculateLPTokenPrice(
         pool.tokenABalance || "0",
         pool.tokenBBalance || "0",
@@ -33,7 +33,7 @@ export const createCompletePriceMap = async (
         tokenBPrice.toString(),
         pool.lpToken._totalSupply
       );
-      
+
       if (lpTokenPrice !== "0") {
         priceMap.set(pool.lpToken.address, lpTokenPrice.toString());
       }
@@ -48,10 +48,10 @@ export const createCompletePriceMap = async (
       select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,totalBorrowPrincipal::text),liquidityPool:liquidityPool_fkey(address)"
     });
     const { borrowableAsset, mToken, totalBorrowPrincipal } = lendingData.lendingPool || {};
-    
+
     if (borrowableAsset && mToken && lendingData.liquidityPool?.address) {
       const borrowableAssetPrice = priceMap.get(borrowableAsset) || "0";
-      
+
       if (borrowableAssetPrice !== "0") {
         // Get token data to calculate exchange rate
         const tokenParams = {
@@ -59,22 +59,22 @@ export const createCompletePriceMap = async (
           select: `address,_totalSupply::text,balances:${Token}-_balances(user:key,balance:value::text)`,
           "balances.key": `in.(${lendingData.liquidityPool.address})`
         };
-        
+
         const tokenResponse = await cirrus.get(accessToken, "/" + Token, { params: tokenParams });
         const tokenData = tokenResponse.data || [];
-        
+
         const borrowableToken = tokenData.find((token: any) => token.address === borrowableAsset);
         const mTokenInfo = tokenData.find((token: any) => token.address === mToken);
-        
+
         const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
         const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === lendingData.liquidityPool.address)?.balance || "0";
-        
+
         const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(totalBorrowPrincipal || "0")).toString();
         const exchangeRate = calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied);
-        
+
         // mToken price = borrowable asset price * exchange rate
         const mTokenPrice = (BigInt(borrowableAssetPrice.toString()) * BigInt(exchangeRate)) / BigInt(10 ** 18);
-        
+
         priceMap.set(mToken, mTokenPrice.toString());
       }
     }
@@ -83,4 +83,4 @@ export const createCompletePriceMap = async (
   }
 
   return priceMap;
-}; 
+};

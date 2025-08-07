@@ -143,14 +143,14 @@ export const MAINNET_STRATO_TOKENS = [
 ];
 
 export const TESTNET_ETH_STRATO_TOKEN_MAPPING = {
-  '0x0000000000000000000000000000000000000000': '0x93fb7295859b2d70199e0a4883b7c320cf874e6c', // ETH        
+  '0x0000000000000000000000000000000000000000': '0x93fb7295859b2d70199e0a4883b7c320cf874e6c', // ETH
   '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x3d351a4a339f6eef7371b0b1b025b3a434ad0399' // USDC
 }
-  
+
 export const MAINNET_ETH_STRATO_TOKEN_MAPPING = {
   '0x0000000000000000000000000000000000000000': '0x0000000000000000000000000000000000000000',
   '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
-} 
+}
 
 export const TESTNET_ERC20_TOKEN_CONTRACTS = [
   '0x3d351a4a339f6eef7371b0b1b025b3a434ad0399', // USDCST
@@ -226,11 +226,11 @@ export const initializeOAuth = async () => {
   try {
     console.log("🔍 Fetching OpenID configuration from:", config.auth.openIdDiscoveryUrl);
     const response = await fetch(config.auth.openIdDiscoveryUrl);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch OpenID configuration: ${response.status} ${response.statusText}`);
     }
-    
+
     const discovery = await response.json();
 
     if (!discovery.jwks_uri || !discovery.issuer) {
@@ -246,7 +246,7 @@ export const initializeOAuth = async () => {
     if (!jwksResponse.ok) {
       throw new Error(`Failed to fetch JWKS: ${jwksResponse.status} ${jwksResponse.statusText}`);
     }
-    
+
     const jwks = await jwksResponse.json();
     if (!jwks.keys || !Array.isArray(jwks.keys)) {
       throw new Error("Invalid JWKS response - missing keys array");

@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { fsUtil, 
-  rest, 
-  assert, 
-  Config, 
-  oauthUtil, 
+import { fsUtil,
+  rest,
+  assert,
+  Config,
+  oauthUtil,
   AccessToken,
   OAuthUser,
   BlockChainUser } from 'blockapps-rest';

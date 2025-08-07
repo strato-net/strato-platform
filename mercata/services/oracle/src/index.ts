@@ -29,7 +29,7 @@ async function main(): Promise<void> {
         logInfo('Main', 'Starting Price Oracle Service...');
         logInfo('Main', `STRATO Node: ${process.env.STRATO_NODE_URL}`);
         logInfo('Main', `Oracle Address: ${process.env.PRICE_ORACLE_ADDRESS}`);
-        
+
         // Test OAuth connection
         try {
             logInfo('Main', 'Testing OAuth connection...');
@@ -42,12 +42,12 @@ async function main(): Promise<void> {
             logError('Main', new Error(`OAuth test failed: ${(error as Error).message}`));
             process.exit(1);
         }
-        
+
         // Start the cron scheduler
         startCronScheduler();
-        
+
         logInfo('Main', 'Price Oracle Service started successfully');
-        
+
     } catch (error) {
         logError('Main', error as Error);
         process.exit(1);
@@ -74,4 +74,4 @@ app.listen(PORT, () => {
 });
 
 // Start the service
-main(); 
+main();

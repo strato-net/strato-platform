@@ -45,9 +45,9 @@ export const getPools = async (
   const { oracle: { prices } } = await getLendingRegistry(accessToken, undefined, {
     select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
   });
-  
+
   const priceMap = new Map<string, string>(
-    Array.isArray(prices) 
+    Array.isArray(prices)
       ? prices
           .map((p: any) => [p.key, p.value])
           .filter(([key, value]) => key && typeof value === 'string') as [string, string][]
@@ -56,15 +56,15 @@ export const getPools = async (
 
   const poolAddresses = poolData.map((pool: any) => pool.address);
   const volumeMap = await getTradingVolume24hForPools(accessToken, poolAddresses, priceMap);
-  
+
   return poolData.map((pool: any) => {
     const tokenAPrice = priceMap.get(pool.tokenA?.address) || "0";
     const tokenBPrice = priceMap.get(pool.tokenB?.address) || "0";
-    
+
     const tokenAValue = (BigInt(pool.tokenABalance || "0") * BigInt(tokenAPrice)) / BigInt(10 ** 18);
     const tokenBValue = (BigInt(pool.tokenBBalance || "0") * BigInt(tokenBPrice)) / BigInt(10 ** 18);
     const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
-    
+
     const lpTokenPrice = calculateLPTokenPrice(
       pool.tokenABalance || "0",
       pool.tokenBBalance || "0",
@@ -72,14 +72,14 @@ export const getPools = async (
       tokenBPrice,
       pool.lpToken?._totalSupply || "0"
     );
-    
+
     const tradingVolume24h = volumeMap.get(pool.address) || "0";
     const swapFeeRate = pool.swapFeeRate || 30;
     const lpSharePercent = pool.lpSharePercent || 7000;
-    
+
     const fees24h = calculateLPFees24h(tradingVolume24h, swapFeeRate, lpSharePercent);
     const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
-    
+
     return {
       ...pool,
       tokenAPrice,
@@ -127,7 +127,7 @@ export const addLiquidity = async (
 ) => {
   try {
     const { poolAddress, tokenBAmount, maxTokenAAmount } = params;
-    
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -180,7 +180,7 @@ export const removeLiquidity = async (
 ) => {
   try {
     const { poolAddress, lpTokenAmount } = removeLiquidityParams;
-    
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
     });
@@ -240,7 +240,7 @@ export const swap = async (
 ) => {
   try {
     const { poolAddress, isAToB, amountIn, minAmountOut } = swapParams;
-    
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -290,7 +290,7 @@ export const calculateSwap = async (
   }
 ) => {
   const { poolAddress, isAToB, amountIn } = calculateSwapParams;
-  
+
   const pools = await getPools(accessToken, undefined, {
     address: "eq." + poolAddress,
     select: "tokenABalance,tokenBBalance,swapFeeRate",
@@ -303,7 +303,7 @@ export const calculateSwap = async (
   const pool = pools[0];
   const fee = (BigInt(amountIn) * BigInt(pool.swapFeeRate)) / BigInt(10000);
   const netInput = BigInt(amountIn) - fee;
-  const [inputReserve, outputReserve] = isAToB 
+  const [inputReserve, outputReserve] = isAToB
     ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
     : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
 
@@ -319,7 +319,7 @@ export const calculateSwapReverse = async (
   }
 ) => {
   const { poolAddress, isAToB, amountIn } = calculateSwapReverseParams;
-  
+
   const pools = await getPools(accessToken, undefined, {
     address: "eq." + poolAddress,
     select: "tokenABalance,tokenBBalance",
@@ -330,7 +330,7 @@ export const calculateSwapReverse = async (
   }
 
   const pool = pools[0];
-  const [inputReserve, outputReserve] = isAToB 
+  const [inputReserve, outputReserve] = isAToB
     ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
     : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
 
@@ -349,7 +349,7 @@ export const getTradingVolume24hForPools = async (
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
   const timestamp24hAgo = oneDayAgo.toISOString();
-  
+
   const params = {
     select: swapHistorySelectFields.join(","),
     address: `in.(${poolAddresses.join(',')})`,
@@ -393,8 +393,8 @@ export const getSwapHistory = async (
       select: rawParams.select || swapHistorySelectFields.join(','),
       order: rawParams.order || 'block_timestamp.desc',
       ...Object.fromEntries(
-        Object.entries(rawParams).filter(([key, value]) => 
-          value !== undefined && 
+        Object.entries(rawParams).filter(([key, value]) =>
+          value !== undefined &&
           !['select', 'order'].includes(key)
         )
       )
@@ -402,7 +402,7 @@ export const getSwapHistory = async (
 
     const [swapEventsResponse, countResponse] = await Promise.all([
       cirrus.get(accessToken, `/${PoolSwap}`, { params }),
-      cirrus.get(accessToken, `/${PoolSwap}`, { 
+      cirrus.get(accessToken, `/${PoolSwap}`, {
         params: { address: `eq.${poolAddress}`, select: 'id.count()' }
       })
     ]);
@@ -417,7 +417,7 @@ export const getSwapHistory = async (
     const swapHistory = swapEvents.map((event: any) => {
       const { tokenA, tokenB } = event.pool;
       const isAToB = event.tokenIn === tokenA.address;
-      
+
       return {
         id: event.id.toString(),
         timestamp: new Date(event.block_timestamp),

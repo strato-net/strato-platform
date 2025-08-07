@@ -93,7 +93,7 @@ export const getBAUserToken = async (): Promise<string> => {
     // Type assertion for token object
     const token = tokenObj.token[oauthConfig.tokenField] as string;
     const expiresAt = Math.floor((tokenObj.token.expires_at as number) / 1000);
-    
+
     // Cache the new token
     CACHED_DATA[cacheKey] = { token, expiresAt };
     return token;

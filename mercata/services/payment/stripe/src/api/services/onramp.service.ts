@@ -45,7 +45,7 @@ export async function checkout(
   try {
     const accessToken = await getServiceToken();
     const ramp = await get(accessToken);
-    
+
     const listing = ramp.listings[token];
     if (!listing) {
       throw new Error(`Listing ${token} not found`);
@@ -84,7 +84,7 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
   const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
   const stripeSessionId = session.id;
-  
+
   if (!token || !buyerAddress || !amount || !tokenAmount) {
     console.error("Missing required metadata in session");
     removeLock(token || '', tokenAmount || '', stripeSessionId);

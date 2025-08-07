@@ -58,11 +58,11 @@ describe('Throughput - upload', function () {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
       factory_createCallList(batchSize, i);
       const blocStartTime = moment();
-      
+
       const results = await rest.callList(admin,
         txs.slice(batchSize * i, batchSize * i + batchSize),
       	{...options, isAsync: true, config: {...options.config, VM: "SolidVM"}});
-      
+
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
       console.log(`Received ${results.length} receipts`);

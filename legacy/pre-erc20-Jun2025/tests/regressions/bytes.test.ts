@@ -145,7 +145,7 @@ describe('bytes data type', function () {
     await rest.call(adminUser, {contract, method: setMethodName, args: setMethodArgs}, options);
     const resultWithValue = await rest.call(adminUser, {contract, method: methodName, args: methodArgs, value: new BigNumber(etherToSend)}, options);
     assert.equal(resultWithValue[0], constructorArgs._storedData, "method call with value should execute");
-    
+
     const accounts = await rest.getAccounts(adminUser, {...options, params: {address: contract.address}})
     const contractBalance = accounts[0].balance;
     const expectedBalance = (new BigNumber(etherToSend)).multipliedBy(constants.ETHER);
@@ -154,17 +154,17 @@ describe('bytes data type', function () {
 });
 
 
-function toBytes32(x) { 
+function toBytes32(x) {
   if (x === undefined) return undefined;
-  return (hexEncode8(x)+"0".repeat(64)).slice(0,64); 
+  return (hexEncode8(x)+"0".repeat(64)).slice(0,64);
 }
 
-function hexEncode8(text) {  
-  var hex, i;  
-  var result = "";  
-  for (i = 0; i < text.length; i++) {    
-    hex = text.charCodeAt(i).toString(16);    
-    result += ("0" + hex).slice(-2);  
-  }  
+function hexEncode8(text) {
+  var hex, i;
+  var result = "";
+  for (i = 0; i < text.length; i++) {
+    hex = text.charCodeAt(i).toString(16);
+    result += ("0" + hex).slice(-2);
+  }
   return result
 }

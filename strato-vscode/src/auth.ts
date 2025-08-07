@@ -26,14 +26,14 @@ export async function applicationUserLogin(context: vscode.ExtensionContext, use
     const req = {
       method: 'post',
       url: oauth.openIdConfig.token_endpoint,
-      headers: { 
-        'Content-Type': 'application/x-www-form-urlencoded', 
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': getBasicHeader(nodeOauth.clientId, nodeOauth.clientSecret)
       },
       data: `grant_type=password&username=${username}&password=${password}`
     };
 
-    const res = await axios(req) 
+    const res = await axios(req)
     context.secrets.delete('access_token_data')
     context.secrets.store('access_token_data', JSON.stringify({
       access_token: res.data.access_token,
@@ -43,7 +43,7 @@ export async function applicationUserLogin(context: vscode.ExtensionContext, use
       console.debug('Access token data has been stored in context.secrets')
     })
   } catch(e: any) {
-    e.code === 'ERR_BAD_REQUEST' ? 
+    e.code === 'ERR_BAD_REQUEST' ?
       vscode.window.showErrorMessage('Login failed - invalid username or password.') :
       vscode.window.showErrorMessage(`Error: ${e}`)
     return undefined
@@ -68,8 +68,8 @@ export async function getApplicationUser(mNodeId?: number, tokens?: any): Promis
         const req = {
           method: 'post',
           url: oauth.openIdConfig.token_endpoint,
-          headers: { 
-            'Content-Type': 'application/x-www-form-urlencoded', 
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
             'Authorization': getBasicHeader(nodeOauth.clientId, nodeOauth.clientSecret)
           },
           data: `grant_type=refresh_token&refresh_token=${tokens.refresh_token}`
@@ -85,8 +85,8 @@ export async function getApplicationUser(mNodeId?: number, tokens?: any): Promis
     const req = {
       method: 'post',
       url: oauth.openIdConfig.token_endpoint,
-      headers: { 
-        'Content-Type': 'application/x-www-form-urlencoded', 
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': getBasicHeader(nodeOauth.clientId, nodeOauth.clientSecret)
       },
       data: 'grant_type=client_credentials'

@@ -31,21 +31,21 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     }
     return childrenArray;
   }
-  
+
   getMenu(element?: any) {
     let menus: any = [];
     let elements = Object.keys(element)
     for(let i in elements) {
       if(typeof element[elements[i]] == "object") {
         menus.push(new Node(
-          { label: `${elements[i]}` }, 
-          vscode.TreeItemCollapsibleState.Expanded, 
+          { label: `${elements[i]}` },
+          vscode.TreeItemCollapsibleState.Expanded,
           this.getMenu(element[elements[i]])
         ));
       } else {
         menus.push(new Node({
-          label: `${elements[i]}`, 
-          tooltip: `${element[elements[i]]}`, 
+          label: `${elements[i]}`,
+          tooltip: `${element[elements[i]]}`,
           description: `${element[elements[i]]}`
         }, vscode.TreeItemCollapsibleState.None))
       }
@@ -113,11 +113,11 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
       const prefix = connected ? (dep.healthStatus === 'HEALTHY' ? '✅ ' : '⚠️ ') : '❌ ';
       const prefixedLabel = `${prefix}${dep.label ? dep.label : dep.url}`;
       return new Node(
-        { 
-          ...dep, 
-          label: prefixedLabel, 
-          tooltip: dep.url, 
-          description: dep.label ? dep.url : undefined 
+        {
+          ...dep,
+          label: prefixedLabel,
+          tooltip: dep.url,
+          description: dep.label ? dep.url : undefined
         },
         connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
         undefined,

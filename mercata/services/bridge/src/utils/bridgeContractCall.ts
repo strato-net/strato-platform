@@ -46,16 +46,16 @@ class BridgeContractCall {
     const batchConfirmWithdrawalsResponse = await contractCall(bridgeContractName, bridgeContractAddress, "batchConfirmWithdrawals", args);
     console.log("batchConfirmWithdrawals contract Response",batchConfirmWithdrawalsResponse);
     return batchConfirmWithdrawalsResponse;
-  } 
+  }
 
-  async batchConfirmDeposits(args: any) {  
+  async batchConfirmDeposits(args: any) {
     const response = await contractCall(
       bridgeContractName,
       bridgeContractAddress,
       "batchConfirmDeposits",
-      args 
+      args
     );
-  
+
     return response;
   }
 }

@@ -175,7 +175,7 @@ function replaceKeyIfExists(obj:object, key:string, rep:string) {
 function errorFormatter(err) {
   // If the error comes from the REST server, we should include the server's error description
   if (err.response) return err.toString() + ": " + err.response.data;
-  
+
   return err.toString();
 }
 

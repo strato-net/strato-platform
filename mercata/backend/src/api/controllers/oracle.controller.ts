@@ -45,7 +45,7 @@ class OracleController {
     try {
       const { accessToken, params, query } = req;
       const { assetAddress } = params;
-      
+
       if (!assetAddress) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Asset address is required" });
         return;

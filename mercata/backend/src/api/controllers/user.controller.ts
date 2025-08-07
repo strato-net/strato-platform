@@ -11,7 +11,7 @@ class UserController {
     try {
       const { address: userAddress, accessToken, userName } = req;
       const isAdmin = await isUserAdmin(accessToken, userAddress);
-      
+
       res.status(RestStatus.OK).json({ userAddress, isAdmin, userName });
       next();
     } catch (e) {
@@ -49,8 +49,8 @@ class UserController {
       }
 
       const result = await addAdmin(accessToken, userAddress);
-      res.status(RestStatus.CREATED).json({ 
-        message: "Admin added successfully", 
+      res.status(RestStatus.CREATED).json({
+        message: "Admin added successfully",
         userAddress,
         status: result.status,
         hash: result.hash
@@ -76,8 +76,8 @@ class UserController {
       }
 
       const result = await removeAdmin(accessToken, userAddress);
-      res.status(RestStatus.OK).json({ 
-        message: "Admin removed successfully", 
+      res.status(RestStatus.OK).json({
+        message: "Admin removed successfully",
         userAddress,
         status: result.status,
         hash: result.hash

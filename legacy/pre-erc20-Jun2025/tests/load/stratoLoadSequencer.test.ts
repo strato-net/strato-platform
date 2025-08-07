@@ -28,7 +28,7 @@ describe('Strato Load Test', function() {
   const batchSize = util.getArgInt('--batchSize', 1);
   const batchCount = util.getArgInt('--batchCount', 1);
   const batchDelay = util.getArgInt('--batchDelay', 0);
-  
+
 
   before(function * () {
     console.log(`Creating admin user and contract`);
@@ -47,7 +47,7 @@ describe('Strato Load Test', function() {
       const results = yield api.bloc.uploadList({
         password: adminPassword,
         contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
-        resolve: false 
+        resolve: false
       }, admin.name, admin.address, false);
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
@@ -65,10 +65,10 @@ describe('Strato Load Test', function() {
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);    
+    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);
 
   });
-  
+
 });
 
 function * waitResult(address, batchSize, batchCount) {

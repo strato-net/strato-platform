@@ -19,7 +19,7 @@ app.post(
 
     let event: any;
     const signature = request.headers["stripe-signature"] as string;
-    
+
   try {
     event = stripe.webhooks.constructEvent(
       request.body,
@@ -31,7 +31,7 @@ app.post(
     response.sendStatus(400);
     return;
   }
-    
+
   try {
     event = JSON.parse(request.body.toString());
   } catch (err) {

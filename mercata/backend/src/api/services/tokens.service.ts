@@ -122,7 +122,7 @@ export const getBalance = async (
     const lendingInfo = await getLendingRegistry(accessToken, undefined, {
       select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
     });
-  
+
     const rawPrices = lendingInfo.oracle?.prices || [];
     const priceMap = await createCompletePriceMap(accessToken, rawPrices);
 

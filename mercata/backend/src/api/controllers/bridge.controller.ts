@@ -176,7 +176,7 @@ export class BridgeController {
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
-    
+
   ) => {
     try {
       const { accessToken } = req;

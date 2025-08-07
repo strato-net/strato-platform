@@ -7,7 +7,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/tokens/transferFrom": "Transfer From Error",
   "/tokens/setStatus": "Token Status Error",
   "/tokens": "Token Error",
-  
+
   // Lending operations
   "/lending/collateral": "Supply Collateral Error",
   "/lending/loans": "Loan Error",
@@ -20,10 +20,10 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/lend/liquidate": "Liquidation Error",
   "/lend/admin/configure-asset": "Asset Configuration Error",
   "/lend/liquidate/near-unhealthy": "Liquidation Watchlist Error",
-  
+
   // Oracle operations
   "/oracle/price": "Price Error",
-  
+
   // Swap operations
   "/swap-pools": "Swap Error",
   "/swap-pools/tokens": "Token Pair Error",
@@ -31,15 +31,15 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/swap": "Swap Transaction Error",
   "/swap/quote": "Swap Quote Error",
   "/swap-pools/liquidity": "Liquidity Operation Error",
-  
+
   // OnRamp operations
   "/onramp": "OnRamp Error",
   "/onramp/buy": "Buy Error",
   "/onramp/sell": "Sell Error",
   "/onramp/lock": "Lock Error",
   "/onramp/unlock": "Unlock Error",
-  
-  // Bridge operations 
+
+  // Bridge operations
   "/bridge/config": "Bridge Configuration Error",
   "/bridge/bridgeInTokens": "Bridge In Tokens Error",
   "/bridge/bridgeOutTokens": "Bridge Out Tokens Error",
@@ -48,11 +48,11 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/bridge/balance": "Bridge Balance Error",
   "/bridge/depositStatus": "Deposit Status Error",
   "/bridge/withdrawalStatus": "Withdrawal Status Error",
-  
+
   // User operations
   "/user": "User Error",
   "/user/me": "User Profile Error",
-  
+
   // Default
   "default": "API Error"
 };
@@ -65,7 +65,7 @@ export function getErrorTitle(url: string): string {
       return title;
     }
   }
-  
+
   // Return default if no match found
   return API_ERROR_TITLES.default;
-} 
+}

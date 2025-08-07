@@ -41,11 +41,11 @@ export const activityFeedApi = {
    */
   getEvents: async (filters: EventsFilters = {}): Promise<EventsResponse> => {
     const params = new URLSearchParams();
-    
+
     // Add pagination parameters
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.offset) params.append('offset', filters.offset.toString());
-    
+
     // Add filter parameters
     if (filters.contract_name) params.append('contract_name', filters.contract_name);
     if (filters.event_name) params.append('event_name', filters.event_name);
@@ -53,10 +53,10 @@ export const activityFeedApi = {
 
     // Backend endpoint: /events (since baseURL is already /api)
     const response = await api.get(`/events?${params.toString()}`);
-    
+
     // If the backend returns a different format, we can transform it here
     const data = response.data;
-    
+
     // Handle different response formats
     if (Array.isArray(data)) {
       // If backend returns just an array of events
@@ -69,7 +69,7 @@ export const activityFeedApi = {
         totalPages: Math.ceil(data.length / (filters.limit || 10))
       };
     }
-    
+
     // If backend returns the new format with events and total
     if (data.events && typeof data.total === 'number') {
       const currentPage = Math.floor((filters.offset || 0) / (filters.limit || 10)) + 1;
@@ -81,7 +81,7 @@ export const activityFeedApi = {
         totalPages: Math.ceil(data.total / (filters.limit || 10))
       };
     }
-    
+
     // If backend returns the expected format
     return data;
   },
@@ -89,25 +89,24 @@ export const activityFeedApi = {
   /**
    * Get contract names and event names for filtering
    */
-  getFilterOptions: async (): Promise<{ 
-    contractNames: string[]; 
+  getFilterOptions: async (): Promise<{
+    contractNames: string[];
     eventNames: Array<{ name: string; contract: string }>;
   }> => {
     const response = await api.get('/events/contracts');
     const data = response.data as { contracts: Array<{ name: string; events: string[] }> };
-    
+
     const contractNames = data.contracts.map(contract => contract.name);
-    
+
     // Create events with contract association
-    const eventNames = data.contracts.flatMap(contract => 
+    const eventNames = data.contracts.flatMap(contract =>
       contract.events.map(eventName => ({
         name: eventName,
         contract: contract.name
       }))
     );
-    
+
     return { contractNames, eventNames };
   }
 };
 
- 

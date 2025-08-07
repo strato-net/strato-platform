@@ -24,7 +24,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error?.config?.url || "";
-    
+
     // Show toast for all API errors (except 401 which is handled separately)
     if (error.response?.status !== 401) {
       const errorMessage = extractApiErrorMessage(error);
@@ -37,7 +37,7 @@ api.interceptors.response.use(
         variant: "destructive",
       });
     }
-    
+
     if (error.response?.status === 401 && url !== '/user/me') {
       toast({
         title: "Session Expired",
