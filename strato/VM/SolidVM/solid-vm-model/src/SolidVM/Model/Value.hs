@@ -9,6 +9,9 @@ module SolidVM.Model.Value
     Typo (..),
     ValList (..),
     IndexType (..),
+    rlpEncodeVariable,
+    rlpEncodeValue,
+    rlpEncodeValues,
     createVar,
     coerceType,
     apSnoc,
@@ -150,6 +153,26 @@ instance RLPSerializable Value where
   rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = todo "Value/rlpDecode" x
+
+rlpEncodeVariable :: MonadIO m => Variable -> m RLPObject
+rlpEncodeVariable (Variable r) = rlpEncodeValue =<< liftIO (readIORef r)
+rlpEncodeVariable (Constant v) = rlpEncodeValue v
+
+rlpEncodeValue :: MonadIO m => Value -> m RLPObject
+rlpEncodeValue (SInteger i) = pure $ rlpEncode i
+rlpEncodeValue (SString s) = pure $ rlpEncode s
+rlpEncodeValue (SDecimal decimal) = pure $ rlpEncode $ show decimal
+rlpEncodeValue (SBool b) = pure $ rlpEncode b
+rlpEncodeValue (SAccount a _) = pure $ rlpEncode a
+rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
+rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
+rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue (SArray _ v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue _ = pure $ RLPArray []
+
+rlpEncodeValues :: MonadIO m => [Value] -> m RLPObject
+rlpEncodeValues [x] = rlpEncodeValue x
+rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 
 -- coerceFromInt is useful to force integer literals
 -- to assume the type that was intended for them, once
