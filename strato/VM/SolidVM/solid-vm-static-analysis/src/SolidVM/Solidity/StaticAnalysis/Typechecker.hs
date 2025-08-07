@@ -414,6 +414,9 @@ simpleType' x =
            enumType' x
          ]
 
+arrayType' :: SourceAnnotation Text -> Type'
+arrayType' x = Function (Static (SVMType.Int Nothing Nothing) x) (topType' x) x [] [] False
+
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
 sumType' (Sum t1) t2 = Sum (t1 <> (t2 :| []))
@@ -488,6 +491,8 @@ typecheck' unify r1 r2 = case (r1, r2) of
       (Bottom es, _) -> Bottom es
       (_, Bottom ess) -> Bottom ess
       _ -> Function a v x [] [] False
+  (f@Function{}, Static t x) -> typecheck' unify f (toFunctionType t x)
+  (Static t x, f@Function{}) -> typecheck' unify (toFunctionType t x) f
   (a, b) ->
     pure . bottom $
       ( T.concat
@@ -576,6 +581,22 @@ string' :: (Eq a, IsString a) => [a] -> a
 string' [] = fromString ""
 string' ("" : as) = string' as
 string' (a : _) = a
+
+toFunctionType :: SVMType.Type -> SourceAnnotation Text -> Type'
+toFunctionType (SVMType.Array t _) x = case toFunctionType t x of
+  f@Function{} -> case functionArgType f of
+    Product ts y -> f{functionArgType = Product ((Static (SVMType.Int Nothing Nothing) x):ts) y}
+    u@(Static _ y) -> f{functionArgType = Product [Static (SVMType.Int Nothing Nothing) x,u] y}
+    _ -> Bottom $ x :| []
+  _ -> Bottom $ x :| []
+toFunctionType (SVMType.Mapping _ k v) x = case toFunctionType v x of
+  f@Function{} -> case functionArgType f of
+    Product ts y -> f{functionArgType = Product ((Static k x):ts) y}
+    t@(Static _ y) -> f{functionArgType = Product [Static (SVMType.Int Nothing Nothing) x,t] y}
+    _ -> Bottom $ x :| []
+  _ -> Bottom $ x :| []
+toFunctionType SVMType.Variadic x = Function (Product [] x) (topType' x) x [] [] False
+toFunctionType t x = Function (Product [] x) (Static t x) x [] [] False
 
 typecheckStatic :: Type -> Type -> Either Text Type
 typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
@@ -1347,7 +1368,7 @@ accountArgs x =
          ]
 
 deleteArgs :: SourceAnnotation Text -> Type'
-deleteArgs x = sumType' (simpleType' x) $ Static (SVMType.Struct Nothing "") x
+deleteArgs x = sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
 
 boolArgs :: SourceAnnotation Text -> Type'
 boolArgs x =
