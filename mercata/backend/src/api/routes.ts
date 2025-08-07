@@ -8,6 +8,7 @@ import TokensController from "./controllers/tokens.controller";
 import OnRampController from "./controllers/onramp.controller";
 import { BridgeController } from "./controllers/bridge.controller";
 import OracleController from "./controllers/oracle.controller";
+import ConfigController from "./controllers/config.controller";
 import userRoutes from "./routes/user.routes";
 import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
@@ -21,6 +22,7 @@ router.use("/user", userRoutes);
 
 // ----- Token Routes -----
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
+router.get("/config", authHandler.authorizeRequest(), ConfigController.getConfig);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/tokens/", authHandler.authorizeRequest(), TokensController.create);

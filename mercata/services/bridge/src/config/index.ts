@@ -170,13 +170,9 @@ export const getExchangeTokenInfoBridgeIn = (
       showTestnet ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING
     ).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()])
   );
-  console.log("map in getExchangeTokenInfoBridgeIn", map);
   const stratoTokenAddress = map[tokenAddress.toLowerCase()];
-  console.log("stratoTokenAddress in getExchangeTokenInfoBridgeIn", stratoTokenAddress);
   const tokens = showTestnet ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
-  console.log("tokens in getExchangeTokenInfoBridgeIn", tokens);
   const token = tokens.find(t => t.tokenAddress.toLowerCase() === stratoTokenAddress);
-  // console.log("token in getExchangeTokenInfoBridgeIn", token);
   return {
     exchangeTokenName: token?.name || '',
     exchangeTokenSymbol: token?.symbol || ''
@@ -215,7 +211,6 @@ let isInitialized = false;
 
 export const initializeOAuth = async () => {
   if (isInitialized) {
-    console.log("✅ OAuth config already initialized");
     return;
   }
 
@@ -224,7 +219,6 @@ export const initializeOAuth = async () => {
   }
 
   try {
-    console.log("🔍 Fetching OpenID configuration from:", config.auth.openIdDiscoveryUrl);
     const response = await fetch(config.auth.openIdDiscoveryUrl);
     
     if (!response.ok) {
@@ -238,10 +232,8 @@ export const initializeOAuth = async () => {
     }
 
     issuer = discovery.issuer;
-    console.log("✅ Issuer configured:", issuer);
 
     // Pre-fetch and cache all JWKS keys
-    console.log("🔑 Fetching and caching all JWKS keys...");
     const jwksResponse = await fetch(discovery.jwks_uri);
     if (!jwksResponse.ok) {
       throw new Error(`Failed to fetch JWKS: ${jwksResponse.status} ${jwksResponse.statusText}`);
@@ -260,17 +252,13 @@ export const initializeOAuth = async () => {
         try {
           const pem = jwkToPem(key);
           keyCache.set(key.kid, pem);
-          console.log(`✅ Cached key: ${key.kid}`);
         } catch (error) {
           console.warn(`⚠️ Failed to convert key ${key.kid} to PEM:`, error);
         }
       }
     }
 
-    console.log(`✅ Cached ${keyCache.size} JWKS keys`);
-
     isInitialized = true;
-    console.log("✅ OAuth config initialized successfully with pre-cached keys");
   } catch (error) {
     console.error("❌ Failed to initialize OAuth config:", error);
     throw error;
