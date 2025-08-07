@@ -140,46 +140,50 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="listing" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Payment Providers Column */}
-              <div className="space-y-6">
-                <div className="bg-card border rounded-lg p-6">
+            <div className="space-y-6">
+              {/* First Row - Lists */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+                {/* Payment Providers List */}
+<div className="bg-card border-r border-t border-l border-b lg:border-r-0 rounded-l-lg p-6">
                   <PaymentProvidersTable />
-                  
-                  <div className="mt-6">
-                    <Card className="border-0">
-                      <CardHeader>
-                        <CardTitle>Add Payment Provider</CardTitle>
-                        <CardDescription>
-                          Configure new payment providers for fiat-to-crypto transactions
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <AddPaymentProviderForm />
-                      </CardContent>
-                    </Card>
-                  </div>
+                </div>
+                
+                {/* OnRamp Listings List */}
+                <div className="bg-card border-r border-t border-b rounded-r-lg p-6">
+                  <OnRampListingsTable />
                 </div>
               </div>
 
-              {/* OnRamp Listings Column */}
-              <div className="space-y-6">
-                <div className="bg-card border rounded-lg p-6">
-                  <OnRampListingsTable />
-                  
-                  <div className="mt-6">
-                    <Card className="border-0">
-                      <CardHeader>
-                        <CardTitle>List Assets for Sale</CardTitle>
-                        <CardDescription>
-                          List tokens for direct purchase with fiat using configured payment providers
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ListAssetForm />
-                      </CardContent>
-                    </Card>
-                  </div>
+              {/* Second Row - Configuration Forms */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+                {/* Add Payment Provider Form */}
+                <div className="bg-card border-r border-t border-l border-b lg:border-r-0 rounded-l-lg p-6">
+                  <Card className="border-0">
+                    <CardHeader>
+                      <CardTitle>Add Payment Provider</CardTitle>
+                      <CardDescription>
+                        Configure new payment providers for fiat-to-crypto transactions
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <AddPaymentProviderForm />
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* List Assets Form */}
+                <div className="bg-card border-r border-t border-b rounded-r-lg p-6">
+                  <Card className="border-0">
+                    <CardHeader>
+                      <CardTitle>List Assets for Sale</CardTitle>
+                      <CardDescription>
+                        List tokens for direct purchase with fiat using configured payment providers
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ListAssetForm />
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </div>
