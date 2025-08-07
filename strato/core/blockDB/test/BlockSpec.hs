@@ -51,7 +51,7 @@ predicate _ = False
 main :: IO ()
 main = hspecWith (configAddFilter predicate defaultConfig) spec
 
-spec :: Spec  
+spec :: Spec
 spec = do
   describe "ExtraData txcounts" $ do
     it "does not parse a legacy extradata" $

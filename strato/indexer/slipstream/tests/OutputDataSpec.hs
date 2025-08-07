@@ -49,7 +49,7 @@ createInserts :: OutputM m
               => (SE.ProcessedContract, ContractF())
               -> ConduitM () T.Text m ()
 createInserts  (a,b) = do
-    let cc = createDummyCodeCollection b 
+    let cc = createDummyCodeCollection b
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     createHistoryTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     insertIndexTable $ (a,[])
@@ -72,11 +72,11 @@ createInsertsAbstract abstract inherited = do
     let contract = snd abstract
         cc = createDummyCodeCollection contract
     _ <- createAbstractTable  (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
-    unless (null inherited) $ do 
+    unless (null inherited) $ do
       insertAbstractTable inherited
 
 createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
-createDummyContract v = 
+createDummyContract v =
   let createVariableDecl t = VariableDecl{
         _varType=t,
         _varIsPublic=True,
@@ -155,9 +155,9 @@ spec = do
                   [ ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ]
               )
-            
 
-      --  
+
+      --
       [vehicleCreate, _, _, _, vehicleInsert] <- runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
@@ -228,8 +228,8 @@ spec = do
                   [ ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ]
               )
-            
-       
+
+
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert] <-
         runLoggingT . runConduit $ createInserts  input .| sinkList
@@ -340,9 +340,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
                   [ ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                   ]
               )
-            
 
-       
+
+
       [vehicleCreate, _, _, _, vehicleInsert] <-
         runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
@@ -439,9 +439,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
                   ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                 ]
             )
-          
 
-     
+
+
     [swissArmyCreate, _, _, _, swissArmyInsert] <-
       runLoggingT . runConduit $ createInserts  input .| sinkList
 
@@ -589,7 +589,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
               ]
           )
         cc =  createDummyCodeCollection (snd input)
-     
+
 
     (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input, []) .| sinkList
@@ -653,9 +653,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
                   ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                 ]
             )
-          
 
-     
+
+
     [swissArmyCreate, _, _, _, swissArmyInsert] <-
       runLoggingT . runConduit $ createInserts  input .| sinkList
 
@@ -745,7 +745,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           collectionDataValue = V.SimpleValue $ V.ValueString "hi-value"
           }     ]
 
-     
+
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
         runLoggingT . runConduit $ createInsertsCollection  input .| sinkList
 
@@ -844,7 +844,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           }, [], T.pack "SwissArmy", [])]
 
 
-     
+
     [swissArmyCreateAbstract, swissArmyInsertAbstract] <-
         runLoggingT . runConduit $ createInsertsAbstract  input inherited .| sinkList
 

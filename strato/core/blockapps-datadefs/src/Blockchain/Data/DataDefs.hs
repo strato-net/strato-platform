@@ -33,7 +33,7 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
-import Control.DeepSeq  
+import Control.DeepSeq
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Binary as BIN
 import qualified Data.ByteString as BS

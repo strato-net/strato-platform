@@ -59,7 +59,7 @@ instance ToParam (QueryFlag "queue") where
   toParam _ =
     DocQueryParam "queue" ["true", "false", ""] "flag for queueing a transaction request" Flag
 
-type PostBlocTransactionParallelCommon tokenHeaderName = 
+type PostBlocTransactionParallelCommon tokenHeaderName =
   "transaction"
     :> "parallel"
     :> S.Header tokenHeaderName Text

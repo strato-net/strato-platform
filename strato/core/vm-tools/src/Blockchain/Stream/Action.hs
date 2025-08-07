@@ -34,7 +34,7 @@ module Blockchain.Stream.Action (
   actionDataMappings,
   actionDataArrays,
   actionDataCallTypes,
-  
+
   CallType(..),
   DataDiff(..),
   Delegatecall(..),

@@ -110,7 +110,7 @@ contract record Certificate {
     address public parent;
     address[] public record children;
 
-    
+
     // Store all the fields of a certificate in a Cirrus record
     string public commonName;
     string public country;
@@ -138,23 +138,23 @@ contract record Certificate {
         parent = address(parsedCert["parent"]);
         children = [];
     }
-    
+
     function addChild(address _child) public {
         require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
-        
+
         children.push(_child);
     }
-    
+
     function revoke() public returns (int){
         require(msg.sender == owner,"You don't have permission to CALL revoke!");
 
         isValid = false;
         return children.length;
     }
-    
+
     function getChild(int index) public returns (address){
         require(msg.sender == owner,"You don't have permission to get children!");
-        
+
         return children[index];
     }
 }
@@ -168,18 +168,18 @@ contract record CertificateRegistry {
 
     event CertificateRegistered(string certificate);
     event CertificateRevoked(address userAddress);
-    
+
     function registerCertificate(string newCertificateString) returns (int) {
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
         Certificate parentContract = Certificate(addressToCertMap[account(parentUserAddress)]);
-        
+
         if (address(parentContract) != address(0) && parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())) {
             // Create the new Certificate record
             Certificate c = new Certificate(newCertificateString);
 
             if (parentUserAddress != address(0x0)){
-                parentContract.addChild(c.userAddress());    
+                parentContract.addChild(c.userAddress());
             }
 
             addressToCertMap[c.userAddress()] = address(c);
@@ -192,15 +192,15 @@ contract record CertificateRegistry {
     function getUserCert(address _address) returns (Certificate) {
         return Certificate(addressToCertMap[account(_address)]);
     }
-    
+
     function getCertByAddress(address _address) returns (Certificate) {
         return Certificate(getCertByAccount(account(_address)));
     }
-    
+
     function getCertByAccount(address _account) returns (Certificate) {
         return Certificate(addressToCertMap[account(_account)]);
     }
-    
+
     function revokeCert(address userAddress){
         Certificate myCert = Certificate(addressToCertMap[account(userAddress)]);
         require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
@@ -209,21 +209,21 @@ contract record CertificateRegistry {
         for (int i = 0; i < childrenLength; i += 1) {
             revokeCert(myCert.getChild(i));
         }
-        
+
         emit CertificateRevoked(userAddress);
     }
-    
+
     function isChild(string pCert, address certUserAddress) returns (bool) {
         Certificate myCert = Certificate(addressToCertMap[account(certUserAddress)]);
         address parentUserAddress = myCert.parent();
         if(myCert.parent() != address(0x0) && pCert ==  Certificate(addressToCertMap[account(parentUserAddress)]).certificateString()){
             return true;
         }
-        
+
         if(myCert.parent() != address(0x0)){
             return isChild(pCert, parentUserAddress);
         }
-        
+
         return false;
     }
 }|]

@@ -264,7 +264,7 @@ contract record MercataGovernance {
 
     event ValidatorAdded(string commonName);
     event ValidatorRemoved(string commonName);
-    
+
     function voteToAddValidator(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a validator requires having a valid X.509 certificate");
@@ -274,10 +274,10 @@ contract record MercataGovernance {
         MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for validators");
         require(a.isActive(), "Only registered network admins can vote for validators");
-        
+
         MercataValidator v = validatorMap[_commonName];
         require(address(v) == address(0), "Votes to add cannot be counted for current validators");
-        
+
         uint voteIndex = validatorVoteMap[_commonName][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _commonName);
         MercataValidatorVote newVote = new MercataValidatorVote(originName, _commonName, true);
@@ -303,7 +303,7 @@ contract record MercataGovernance {
             emit ValidatorAdded(_commonName);
         }
     }
-    
+
     function voteToRemoveValidator(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a validator requires having a valid X.509 certificate");
@@ -313,10 +313,10 @@ contract record MercataGovernance {
         MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for validators");
         require(a.isActive(), "Only registered network admins can vote for validators");
-        
+
         MercataValidator v = validatorMap[_commonName];
         require(address(v) != address(0), "Votes to remove can only be counted for current validators");
-        
+
         uint voteIndex = validatorVoteMap[_commonName][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _commonName);
         MercataValidatorVote newVote = new MercataValidatorVote(originName, _commonName, false);
@@ -342,7 +342,7 @@ contract record MercataGovernance {
             emit ValidatorRemoved(_commonName);
         }
     }
-    
+
     function voteToAddAdmin(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a network admin requires having a valid X.509 certificate");
@@ -352,10 +352,10 @@ contract record MercataGovernance {
         MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for admins");
         require(a.isActive(), "Only registered network admins can vote for admins");
-        
+
         MercataAdmin v = adminMap[_commonName];
         require(address(v) == address(0), "Votes to add cannot be counted for current admins");
-        
+
         uint voteIndex = adminVoteMap[_commonName][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _commonName);
         MercataAdminVote newVote = new MercataAdminVote(originName, _commonName, true);
@@ -380,7 +380,7 @@ contract record MercataGovernance {
             adminCount++;
         }
     }
-    
+
     function voteToRemoveAdmin(string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add an admin requires having a valid X.509 certificate");
@@ -390,10 +390,10 @@ contract record MercataGovernance {
         MercataAdmin a = adminMap[originName];
         require(address(a) != address(0), "Only registered network admins can vote for admins");
         require(a.isActive(), "Only registered network admins can vote for admins");
-        
+
         MercataAdmin v = adminMap[_commonName];
         require(address(v) != address(0), "Votes to remove can only be counted for current admins");
-        
+
         uint voteIndex = adminVoteMap[_commonName][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _commonName);
         MercataAdminVote newVote = new MercataAdminVote(originName, _commonName, false);

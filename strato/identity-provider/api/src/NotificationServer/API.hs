@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 
-module NotificationServer.API 
+module NotificationServer.API
     (
         NotificationServerAPI,
         PutSubscribe,
@@ -31,7 +31,7 @@ data NotifyBody = NotifyBody {usernames :: [Text], message :: EmailMessage}
 instance ToJSON NotifyBody where
 instance FromJSON NotifyBody where
 
-type PutSubscribe = 
+type PutSubscribe =
     "subscribe"
         :> Header' '[Required, Strict] "Authorization" Text
         :> ReqBody '[JSON] Username

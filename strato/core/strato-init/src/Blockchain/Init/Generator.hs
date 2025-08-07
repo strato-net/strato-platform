@@ -46,7 +46,7 @@ import UnliftIO.Directory
 
 createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo network = do
-  let genesisInfo = 
+  let genesisInfo =
         case network of
           "helium" -> HELIUM.genesisBlock
           "mercata-uranium" -> URANIUM.genesisBlock

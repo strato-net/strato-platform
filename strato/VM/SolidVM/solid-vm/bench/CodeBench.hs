@@ -47,11 +47,11 @@ wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 wingsCC :: CodeCollection
 wingsCC = do
   let srcMap = M.singleton "Wings.sol" $ T.pack wingsContract
-  let compiled = runIdentity . runMemCompilerT $ compileSource False srcMap 
+  let compiled = runIdentity . runMemCompilerT $ compileSource False srcMap
   case compiled of
     Left err -> error $ show err
     Right cc -> cc
-   
+
 strBench :: Benchmark
 strBench =
   bench "time to pack the wings contract" $
@@ -133,7 +133,7 @@ sipCCBench =
 readCC :: BC.ByteString -> CodeCollection
 readCC bStr = do
   let srcMap = M.singleton "Wings.sol" $ T.pack $ BC.unpack bStr
-  let compiled = runIdentity . runMemCompilerT $ compileSource False srcMap 
+  let compiled = runIdentity . runMemCompilerT $ compileSource False srcMap
   case compiled of
     Left err -> error $ show err
     Right cc -> cc

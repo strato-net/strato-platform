@@ -66,7 +66,7 @@ import UnliftIO hiding (Handler)
 data IdentityError
   = IdentityError Text
   deriving (Show, Exception)
-  
+
 getSubject ::
   ( MonadIO m,
     MonadLogger m
@@ -223,7 +223,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
                   createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
                   registerUserWalletAsync realmToken rd name' realm uuid' a
                   -- subscribe if can and should
-                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of
                     (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
                     (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
@@ -244,7 +244,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
               createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
               registerUserWalletAsync realmToken rd name' realm uuid' a
               -- subscribe if can and should
-              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of
                 (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
                 (_, _) -> return ()
               return a
@@ -379,7 +379,7 @@ walletInCirrus
       cirrusSearchPath = do
         let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just . show $ OrderedVals [SString $ commonName])
             derivedAddr' = show derivedAddr
-            path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr' 
+            path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr'
         $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'
         $logDebugS "walletInCirrus/cirrusSearchPath" $ "Cirrus search path is " <> T.pack path
         return path
@@ -468,12 +468,12 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
         then $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response
         else do -- got a pending or failure
           let pending = [hash | BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash} <- response]
-          if (not $ null pending) 
-            then do 
+          if (not $ null pending)
+            then do
               eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
-              case eresponse2 of 
+              case eresponse2 of
                 Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response2
-                err -> do 
+                err -> do
                   $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show err
                   throwIO $ IdentityError "Failed to register cert"
             else do -- must've all been failures
@@ -558,14 +558,14 @@ registerUserWallet
             return True
           else do -- got a pending or failure
             let pending = [hash | BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash} <- response]
-            if (not $ null pending) 
-              then do 
+            if (not $ null pending)
+              then do
                 eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
                 case eresponse2 of
                   Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
                     $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
                     return True
-                  err -> do 
+                  err -> do
                     $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show err
                     return False
               else do -- must've all been failures

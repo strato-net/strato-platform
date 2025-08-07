@@ -25,9 +25,9 @@ defineFlag "userRegistryCodeHash" ("02946aa18081cd1c540f931e600d58e1c1e21a447620
 defineFlag "useBuiltinUserRegistry" (True :: Bool) "Whether to use the code hash for the standard UserRegistry contracts"
 defineFlag "useWalletsByDefault" (False :: Bool) "Whether to redirect transactions to user wallet contracts by default"
 
-getIdentityServerUrl :: String 
+getIdentityServerUrl :: String
 getIdentityServerUrl = if null flags_identityServerUrl
-    then case computeNetworkID of 
+    then case computeNetworkID of
         7596898649924658542 -> "https://identity.mercata-testnet2.blockapps.net"
         6909499098523985262 -> "https://identity.blockapps.net"
         114784819836269 -> "https://identity.mercata-testnet.blockapps.net"

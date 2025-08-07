@@ -257,9 +257,9 @@ spec = do
                             (peers !! 0, peers !! 2),
                             (peers !! 1, peers !! 2)
                           ]
-  
+
         registryTs <- liftIO getCurrentMicrotime
-  
+
         let runForSeconds n = void . timeout (n * 1000000)
             toIetx = IETx registryTs . IngestTx Origin.API
             chainMember1 = ChainMembers $ Set.singleton $ (Org (T.pack "BlockApps") True)
@@ -307,14 +307,14 @@ spec = do
                     }
                 )
                 txMd'
-  
+
             src =
               [r|
   contract A {
     event OrgAdded(string name);
-  
+
     constructor() {}
-  
+
     function addOrg(string _name) {
       emit OrgAdded(_name);
     }
@@ -360,7 +360,7 @@ spec = do
               threadDelay 500000
               flip postEvent (peers !! 0) $ UnseqEvent ietx
               for_ peers $ postEvent (TimerFire 0)
-  
+
         runForSeconds 15 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
@@ -389,29 +389,29 @@ spec = do
                             (peers !! 0, peers !! 2),
                             (peers !! 1, peers !! 2)
                           ]
-  
+
         let src =
               [r|
   contract A {
     event OrgAdded(string name);
     uint x = 0;
-  
+
     constructor() {}
-  
+
     function addMember(string _name) {
       emit OrgAdded(_name);
     }
-  
+
     function incX() {
       x++;
     }
-  
+
   }|]
             contractName = "A"
             --           mainChainSrc = [r|
             -- contract B {
             --   uint y;
-  
+
             --   constructor() {
             --     y = 47;
             --   }
@@ -554,7 +554,7 @@ spec = do
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId
               threadDelay 5000000
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId2
-  
+
         void . timeout 100000000 $ concurrently_ (runNetworkOld peers connections') routine
         cId <- readIORef cIdRef
         cInfo <- readIORef cInfoRef
@@ -598,10 +598,10 @@ spec = do
                           ]
         let src =
               [r|
-  
+
   contract RegisterCert {
     event CertificateRegistered(string cert);
-  
+
     constructor(address _user, string _cert) {
       emit CertificateRegistered(_cert);
     }
@@ -816,7 +816,7 @@ spec = do
               [r|
   contract B {
     uint y;
-  
+
     constructor() {
       y = 47;
     }
@@ -849,7 +849,7 @@ spec = do
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
               threadDelay 10000000
               runNetworkOld (drop 3 peers) (drop 3 connections')
-  
+
         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
@@ -873,7 +873,7 @@ spec = do
         privKey <- newPrivateKey
         let validatorAddress = fromPrivateKey privKey
             validatorInfo = CommonName "BlockApps" "Engineering" "Admin" True
-        cert <- selfSignCert privKey validatorInfo 
+        cert <- selfSignCert privKey validatorInfo
         validator <- createPeer' privKey validatorInfo [(validatorAddress, validatorInfo)] [cert] "node1" "1.1.1.1"
         ts <- liftIO getCurrentMicrotime
         let toIetx = IETx ts . IngestTx Origin.API
@@ -900,9 +900,9 @@ spec = do
     it "will not add a canonical block that causes a stateroot mismatch" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 2]
         let validatorAddresses = fromPrivateKey <$> privKeys
-            validatorInfos = 
+            validatorInfos =
               [
-                CommonName "BlockApps" "Validator" "Node1" True, 
+                CommonName "BlockApps" "Validator" "Node1" True,
                 CommonName "BlockApps" "Validator" "Node2" True
               ]
             zippedValidators = zip validatorAddresses validatorInfos
@@ -914,7 +914,7 @@ spec = do
               [ ("node1", "1.2.3.4"),
                 ("node2", "5.6.7.8")
               ]
-        
+
         ts <- liftIO getCurrentMicrotime
         let toIetx = IETx ts . IngestTx Origin.API
             src = "contract Test{}"
@@ -934,13 +934,13 @@ spec = do
               flip postEvent (peers !! 0) . UnseqEvent . toIetx $ signedTx 1 n
               threadDelay 500000
               routine (n + 1)
-        
-        let corruptPBFT p2pev = case p2pev of 
+
+        let corruptPBFT p2pev = case p2pev of
               -- sneakily add on an extra tx
               P2pBlockstanbul (WireMessage auth (Preprepare v b)) -> P2pBlockstanbul (WireMessage auth (Preprepare v b{blockReceiptTransactions = (signedTx 0 0) : blockReceiptTransactions b}))
               msg -> msg
         conn <- createConnectionWithModifications (peers !! 0) (peers !! 1) corruptPBFT corruptPBFT -- oh no someone is corrupting msgs! :0
-        
+
         void . timeout 2000000 $ concurrently_ (runNetworkOld peers [conn]) (routine 0)
         ctx <- atomically $ readTVar . _p2pTestContext $ peers !! 0
         Block.bestBlockNumber (_bestBlock ctx) `shouldBe` -1 -- no canonical blocks added (val starts at -1, not 0)
@@ -1088,13 +1088,13 @@ spec = do
                   U.unsignedTransactionChainId = Nothing
                 }
             signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
-  
+
             mainChainSrc =
               [r|
   contract B {
     uint y;
     string powPow = "Example of Different States";
-  
+
     constructor() {
       y = 47;
     }
@@ -1119,7 +1119,7 @@ spec = do
       x = address(_add).delegatecall("gg(int, int)", 333333333, 333333333);
       yes =  _add.delegatecall("gg()");
       _add.delegatecall("ggg()");
-      //1.delegatecall("ggg()"); //This will make error.... because we shouldn't be able to call delegate on anything but an address type 
+      //1.delegatecall("ggg()"); //This will make error.... because we shouldn't be able to call delegate on anything but an address type
     }
   }
   |]
@@ -1148,12 +1148,12 @@ spec = do
             mkMainChainTx =
               let utx = mainChainUtx {U.unsignedTransactionNonce = Nonce 1}
                in mkSignedTx (privKeys !! 1) utx mainChainTxMd
-  
+
             mainChainRoutine n = do
               threadDelay 200000
               flip postEvent (peers !! 1) . UnseqEvent . toIetx $ mkMainChainTx
               let x = getNewAddress_unsafe (fromPrivateKey (privKeys !! 1)) 1
-  
+
               let args' = "(0x" <> T.pack (formatAddressWithoutColor x) <> ")"
               --liftIO $ putStrLn $ "Can I print here" ++ (show args') ++"\n\t" ++ (show  $ Account x Nothing) -- ++ "\n\t" ++ (show  $ xxx) -- Delete this for later
               let mainChainTxMdC = M.fromList [("src", mainChainSrcC), ("name", mainChainContractNameC), ("args", args')]
@@ -1161,9 +1161,9 @@ spec = do
                     let utx = mainChainUtx2 {U.unsignedTransactionNonce = Nonce n'}
                      in mkSignedTx (privKeys !! 1) utx mainChainTxMdC
               flip postEvent (peers !! 1) . UnseqEvent . toIetx $ mkMainChainTx2 n
-  
+
               mainChainRoutine $ n + 1
-  
+
             routine = do
               threadDelay 200000
               for_ peers $ postEvent (TimerFire 0)
@@ -1171,9 +1171,9 @@ spec = do
               flip postEvent (peers !! 0) . UnseqEvent $ toIetx signedTx
               threadDelay 10000000
               runNetworkOld (drop 3 peers) (drop 3 connections')
-  
+
         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
-  
+
         bHash <- fmap (bestBlockHash . _bestBlock) . readTVarIO . _p2pTestContext $ peers !! 1
         let varsToLookUp = [".powPow", ".getMoney", ".y"]
         (contractA'sStateVars, contractB'sStateVars) <- runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
@@ -1183,6 +1183,6 @@ spec = do
           valsOfB <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) contractBLookup
           let fToPreform = map (\xxx' -> case xxx' of Just xxx -> Just $ fromVal xxx; Nothing -> Nothing)
           pure $ (fToPreform valsOfA, fToPreform valsOfB)
-  
+
         contractA'sStateVars `shouldBe` [Just (BString "Example of Different States"), Nothing, Just (BInteger 47)]
         contractB'sStateVars `shouldBe` [Just (BString "Other Example of different states"), Just (BString "Nice I did this"), Just (BInteger 5)]

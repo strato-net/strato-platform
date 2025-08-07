@@ -94,7 +94,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
               "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
                 ++ " is not a known validator"
     IMsg (MsgAuth addr _) (Commit _ di seal) -> do
-      csOrError <- runExceptT $ verifyCommitmentSeal di seal 
+      csOrError <- runExceptT $ verifyCommitmentSeal di seal
       case csOrError of
         Left _ -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
         Right signatory -> do
@@ -282,7 +282,7 @@ eventLoop ctx = execStateC ctx $
             ForcedSequence s ->
               if s >= _sequence v
                 then nextRound (Sequence s)
-                else 
+                else
                   $logErrorS "blockstanbul/config_change" . T.pack $
                     printf "Refusing to move sequence backwards in time %d to %d" (_sequence v) s
         PreviousBlock blk -> do
@@ -344,8 +344,8 @@ eventLoop ctx = execStateC ctx $
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
                   yieldR $ RunPreprepare realSealed
-        PreprepareResponse decision -> case decision of 
-            AcceptPreprepare bh -> do 
+        PreprepareResponse decision -> case decision of
+            AcceptPreprepare bh -> do
               self <- use selfCert
               valB <- use validatorBehavior
               when (isJust self && valB) $ do
@@ -608,7 +608,7 @@ validatorTimingHackMercata = \case
   11804 -> modify' $ validators %~ S.insert "coach.instanodes.io"
   11805 -> modify' $ validators %~ S.insert "joyz.openwealthfi.com"
   _ -> return ()
-  
+
 
 validatorTimingHackMercataHydrogen :: (MonadState BlockstanbulContext m)  =>
                                Integer -> m ()

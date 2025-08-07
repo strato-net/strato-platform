@@ -275,7 +275,7 @@ getParentName address = fromMaybeM (return "") $
 
 create' :: MonadSM m => Address -> Maybe Code -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
 create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch cc contractName' argExps createBuiltinCall = do
-  
+
   -- Get parentName and cc_creator from maybeCodePtr or creator
   (parentName, cc_creator) <- case maybeCodePtr of
                   (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
@@ -288,7 +288,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
                   _ -> do
                       parentName <- getParentName creator
                       return (parentName, Nothing)
-  
+
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
@@ -347,7 +347,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) newAddress
-    
+
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAddress
   -- I'm showing these strings because I like them to be in quotes in the logs :)
@@ -693,7 +693,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                        x'' <- expToVar' x' Nothing
                        getVar x''
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
-    convertValueToStoragePathPiece v = 
+    convertValueToStoragePathPiece v =
       case v of
         SInteger i -> Just $ MS.MapIndex $ MS.INum i
         SString s -> Just $ MS.MapIndex $ MS.IText $ UTF8.fromString s
@@ -727,7 +727,7 @@ setCreator creator originAddress contract _ _ = do
     then putCreatorField _cn
     else do
       $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty creator field"
-  
+
   putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount $ NamedAccount originAddress MainChain)
 
 getCreator :: MonadSM m => Address -> m (Address, Address, String) -- (creatorAddress, originAddress, creatorName)
@@ -1310,8 +1310,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value -> 
-                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other")) 
+          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value ->
+                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other"))
                      (CC._eventLogs ev) expStrs
                 where
                   isTypeArray :: SVMType.Type -> Bool
@@ -2335,17 +2335,17 @@ decMod a b = fromRational (toRational a `mod'` toRational b)
   where
     mod' x y = x - (fromIntegral (floor (x / y) :: Integer)) * y
 
-expToVarArith :: MonadSM m => 
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+expToVarArith :: MonadSM m =>
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   Maybe SVMType.Type ->
   m Variable
 expToVarArith intOp decOp expr1 expr2 valType = do
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
-  let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
+  let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType
   case (i1, i2, valType') of
     (SInteger a, SInteger b, (SVMType.Int _ _)) -> return . Constant . SInteger $ a `intOp` b
     (SInteger a, SInteger b, SVMType.Decimal) -> return . Constant . SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)
@@ -2362,21 +2362,21 @@ expToVarArith intOp decOp expr1 expr2 valType = do
           result = (Decimal 0 a) `decOp` b
       return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "expToVarArith" (i1, i2)
-  
-expToVarDivide :: MonadSM m => 
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+
+expToVarDivide :: MonadSM m =>
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   Maybe SVMType.Type ->
   m Variable
 expToVarDivide intOp decOp expr1 expr2 valType = do
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
-  let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
+  let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType
   case (i1, i2, valType') of
     (SInteger a, SInteger b, (SVMType.Int _ _)) -> return . Constant . SInteger $ a `intOp` b
-    (SInteger a, SInteger b, SVMType.Decimal) -> 
+    (SInteger a, SInteger b, SVMType.Decimal) ->
       return $ Constant $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
@@ -2398,11 +2398,11 @@ expToVarInteger expr1 o expr2 retType = do
   i2 <- getInt =<< expToVar expr2 Nothing
   return . Constant . retType $ i1 `o` i2
 
-binopAssign' :: MonadSM m => 
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+binopAssign' :: MonadSM m =>
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   Maybe SVMType.Type ->
   m Variable
 binopAssign' intOp decOp lhs rhs valType = do
@@ -2431,10 +2431,10 @@ binopAssign' intOp decOp lhs rhs valType = do
   return $ Constant next
 
 binopDivide :: MonadSM m =>
-  (Integer -> Integer -> Integer) -> 
-  (Decimal -> Decimal -> Decimal) -> 
-  CC.Expression -> 
-  CC.Expression -> 
+  (Integer -> Integer -> Integer) ->
+  (Decimal -> Decimal -> Decimal) ->
+  CC.Expression ->
+  CC.Expression ->
   Maybe SVMType.Type ->
   m Variable
 binopDivide intOp decOp lhs rhs valType = do
@@ -2445,7 +2445,7 @@ binopDivide intOp decOp lhs rhs valType = do
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType
   next <- case (curValue, delta, valType') of
     (SInteger c, SInteger d, (SVMType.Int _ _)) -> pure . SInteger $ c `intOp` d
-    (SInteger a, SInteger b, SVMType.Decimal) -> 
+    (SInteger a, SInteger b, SVMType.Decimal) ->
       return $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
@@ -2524,7 +2524,7 @@ parseBaseInt s n =
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
 castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
-castToAncestor a _ = 
+castToAncestor a _ =
     return $ SAccount (NamedAccount (a^.namedAccountAddress) MainChain) False
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> Maybe Value -> m Value
@@ -2602,7 +2602,7 @@ callBuiltin "keccak256" args Nothing = do
   let allStrings [] = True
       allStrings ((SString _) : xs) = True && (allStrings xs)
       allStrings _ = False
-      customConcat :: [Value] -> String 
+      customConcat :: [Value] -> String
       customConcat [] = ""
       customConcat ((SString str) : ys) = str ++ customConcat ys
       customConcat _ = invalidArguments "cannot use a non string arguments in keccak256" args
@@ -2765,11 +2765,11 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
   case erNewContractAddress execResults of
     Just nca -> do
-      when (not isRunningTests) $ 
-      
-        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+      when (not isRunningTests) $
+
+        void $ VME.produceVMEvents [ VME.CodeCollectionAdded
                                      (const () <$> cc)
-                                     (SolidVMCode contractName' hsh) 
+                                     (SolidVMCode contractName' hsh)
                                      (T.pack ctrName)
                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
                                      M.empty
@@ -2805,11 +2805,11 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
   case erNewContractAddress execResults of
     Just nca -> do
-      when (not isRunningTests) $ 
-        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+      when (not isRunningTests) $
+        void $ VME.produceVMEvents [ VME.CodeCollectionAdded
                                       (const () <$> cc)
-                                      (SolidVMCode contractName' hsh) 
-                                      (T.pack ctrName) 
+                                      (SolidVMCode contractName' hsh)
+                                      (T.pack ctrName)
                                       (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
                                       M.empty
                                       []
@@ -3025,8 +3025,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
   unlessM (validateFunctionArguments theFunction argVals) $
    typeError
-     "the argument values do not match up with the function signature" 
-     (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
+     "the argument values do not match up with the function signature"
+     (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys
       in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args = case argVals of
@@ -3201,7 +3201,7 @@ encodeForReturn' (STuple items) = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
-encodeForReturn' (SDecimal d) = return $ show d 
+encodeForReturn' (SDecimal d) = return $ show d
 encodeForReturn' (SStruct _ vs) = do
   let encodePair k v = fmap (\v' -> show (labelToString k) ++ ": " ++ v')
                      . encodeForReturn' =<< forceLoadVar =<< getVar v
@@ -3310,7 +3310,7 @@ solidityExceptionHandlerHelperAssert cbm  = do
               return res
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
-solidityExceptionHandler catchBlockMap ex = 
+solidityExceptionHandler catchBlockMap ex =
   case ex of
     (InternalError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 1 internalError
@@ -3352,7 +3352,7 @@ solidityExceptionHandler catchBlockMap ex =
       res <- solidityExceptionHandlerHelperRequire catchBlockMap s1
       return res
     (Assert) -> do
-      res <- solidityExceptionHandlerHelperAssert catchBlockMap 
+      res <- solidityExceptionHandlerHelperAssert catchBlockMap
       return res
     (MissingCodeCollection s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 13 missingCodeCollection
@@ -3420,8 +3420,8 @@ solidityExceptionHandler catchBlockMap ex =
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
-        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
+        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError
+        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError
         Just (Just (name', type'), block) -> do
           mapM_ (\x -> addLocalVariable type' name' x) $ map fromBasic vals
           res <- runStatementBlock block
@@ -3688,7 +3688,7 @@ solidVMExceptionHandler catchBlockMap ex =
         Nothing -> solidVMExceptionHelper catchBlockMap $ oldForeignPragmaError s1 s2
         Just (_, block) -> do
           res <- runStatementBlock block
-          return res   
+          return res
     (UserDefinedError s1 s2) -> do
       case M.lookup "UserDefinedError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ userDefinedError s1 s2
@@ -3769,13 +3769,13 @@ validateFunctionArguments func argVals = do
       doArgsMatch <- mapM testNameAndTypes argMapping
       pure $
         (testValidVariadic tf) ||
-        ((length argMapping) == (length $ CC._funcArgs tf)) && 
-        ((length argMapping) == argValsLength) && 
+        ((length argMapping) == (length $ CC._funcArgs tf)) &&
+        ((length argMapping) == argValsLength) &&
         (all (== True) doArgsMatch)
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
       case unsnoc (map snd (CC._funcArgs tf)) of
-        Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True  
+        Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True
         Just (xs, x) | CC.indexedTypeType x == SVMType.Variadic -> argValsLength >= length xs
         _ -> False
     testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool

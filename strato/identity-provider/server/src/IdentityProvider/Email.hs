@@ -78,6 +78,6 @@ subscribeUser :: (MonadIO m, MonadLogger m, HasNotification m) => T.Text -> T.Te
 subscribeUser auth user = do
   NotificationData url mgr <- access Proxy
   eResp <- liftIO $ runClientM (putSubscribe ("Bearer " <> auth) (Username user)) (mkClientEnv mgr url)
-  case eResp of 
+  case eResp of
     Right _ -> $logInfoS "subscribeUser" $ "Successfully subscribed user " <> user
     Left err -> $logErrorS "subscribeUser" $ "Error while trying to subscribe" <> user <> ": " <> (T.pack $ show err)

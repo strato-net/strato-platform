@@ -8,7 +8,7 @@ import qualified Data.ByteString.Char8 as BC
 
 getCert :: [String] -> X509Certificate
 getCert certLines =
-  let eCert = 
+  let eCert =
         bytesToCert $
           BC.pack $
             unlines certLines
@@ -103,7 +103,7 @@ jpowellCert =
 
 
 chessCert :: [String]
-chessCert = 
+chessCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBrTCCAVGgAwIBAgIQaAF1HrTNFSIN2/7p1QOppjAMBggqhkjOPQQDAgUAMEgx",
@@ -130,7 +130,7 @@ chessCert =
     "-----END CERTIFICATE-----"
   ]
 
-  
+
 --15da843f489440e9b7f47d824b295f698b4a112a
 aaaCert :: [String]
 aaaCert =
@@ -158,7 +158,7 @@ aaaCert =
     "N8txKc8G9R27ZYAUuz15zF0=",
     "-----END CERTIFICATE-----"
   ]
-  
+
 --75c42fe751cc3dd9ce4bfdbedba99e75c034377a
 dsnallapuCert :: [String]
 dsnallapuCert =
@@ -353,10 +353,10 @@ drewbabyCert =
     "N8txKc8G9R27ZYAUuz15zF0=",
     "-----END CERTIFICATE-----"
   ]
- 
+
 
 michaelCert :: [String]
-michaelCert = 
+michaelCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBqzCCAVCgAwIBAgIRALvn+fwsfRF8yAeDvQbyr5swDAYIKoZIzj0EAwIFADBI",
@@ -384,7 +384,7 @@ michaelCert =
 
 
 drebbelCert :: [String]
-drebbelCert = 
+drebbelCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBqzCCAU+gAwIBAgIQAeRpQD5XarisNXjqDcvVGDAMBggqhkjOPQQDAgUAMEgx",
@@ -412,7 +412,7 @@ drebbelCert =
 
 
 keepethCert :: [String]
-keepethCert = 
+keepethCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBqzCCAU+gAwIBAgIQT3bwSp8OGlKesLtvhr0TzDAMBggqhkjOPQQDAgUAMEgx",
@@ -440,7 +440,7 @@ keepethCert =
 
 
 mercataDGSCert :: [String]
-mercataDGSCert = 
+mercataDGSCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBlzCCATygAwIBAgIRAJCkh5op10we2lqvpgAI3NUwDAYIKoZIzj0EAwIFADBI",
@@ -468,7 +468,7 @@ mercataDGSCert =
 
 
 goldbergCert :: [String]
-goldbergCert = 
+goldbergCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBrTCCAVKgAwIBAgIRAK9BV4vILe62O4hgjhdPiH8wDAYIKoZIzj0EAwIFADBI",
@@ -497,7 +497,7 @@ goldbergCert =
 
 
 hasanCert :: [String]
-hasanCert = 
+hasanCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIB2TCCAX6gAwIBAgIRAM57i/ALvYS3hhSu7AsFsIUwDAYIKoZIzj0EAwIFADBI",
@@ -526,7 +526,7 @@ hasanCert =
 
 
 numbatCert :: [String]
-numbatCert = 
+numbatCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIB0zCCAXegAwIBAgIQBwuDoh/QpQDDS09jTJhKpTAMBggqhkjOPQQDAgUAMEgx",
@@ -583,7 +583,7 @@ jaimeCert =
 
 
 jacoboCert :: [String]
-jacoboCert = 
+jacoboCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBrjCCAVKgAwIBAgIRAPrEt+ogxcJgTF03LmQ/J5gwDAYIKoZIzj0EAwIFADBI",
@@ -612,7 +612,7 @@ jacoboCert =
 
 
 zeekCert :: [String]
-zeekCert = 
+zeekCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBpDCCAUmgAwIBAgIQWLLpZK0bVNHWK8l899AcszAMBggqhkjOPQQDAgUAMEgx",
@@ -640,7 +640,7 @@ zeekCert =
 
 
 mecmo4mopmCert :: [String]
-mecmo4mopmCert = 
+mecmo4mopmCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBsDCCAVWgAwIBAgIQdU4Sgkd43QUSy9Anvk+L6zAMBggqhkjOPQQDAgUAMEgx",
@@ -670,7 +670,7 @@ mecmo4mopmCert =
 
 
 goldbackCert :: [String]
-goldbackCert = 
+goldbackCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBtjCCAVugAwIBAgIQLEdXMCAV5SQ/DLzPMYttqTAMBggqhkjOPQQDAgUAMEgx",
@@ -698,7 +698,7 @@ goldbackCert =
   ]
 
 itaugmentationCert :: [String]
-itaugmentationCert = 
+itaugmentationCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBuDCCAV2gAwIBAgIQFEBGklTtJTwqu9dDIaO85TAMBggqhkjOPQQDAgUAMEgx",
@@ -726,7 +726,7 @@ itaugmentationCert =
   ]
 
 vinfraCert :: [String]
-vinfraCert = 
+vinfraCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBqTCCAU2gAwIBAgIQbMMZKaCOd9eJSe3KkhHcNjAMBggqhkjOPQQDAgUAMEgx",
@@ -754,7 +754,7 @@ vinfraCert =
 
 
 bibleCert :: [String]
-bibleCert = 
+bibleCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBpjCCAUugAwIBAgIQYNoyZV6t3o91EfKP0BfdczAMBggqhkjOPQQDAgUAMEgx",
@@ -781,7 +781,7 @@ bibleCert =
   ]
 
 jamroseCert :: [String]
-jamroseCert = 
+jamroseCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBszCCAVigAwIBAgIQBzaBOIqnPR8c2v5EyRTouTAMBggqhkjOPQQDAgUAMEgx",
@@ -809,7 +809,7 @@ jamroseCert =
   ]
 
 dttr1Cert :: [String]
-dttr1Cert = 
+dttr1Cert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBpzCCAUugAwIBAgIQDCdLDHLomyVv5YtFgH/ErjAMBggqhkjOPQQDAgUAMEgx",
@@ -836,7 +836,7 @@ dttr1Cert =
   ]
 
 dttr2Cert :: [String]
-dttr2Cert = 
+dttr2Cert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBpzCCAUugAwIBAgIQJ9tp5q8RzBt0HximVFZQ7jAMBggqhkjOPQQDAgUAMEgx",
@@ -996,7 +996,7 @@ joyzOpenwealthfiCert =
 
 -- testnet certs
 wongwayTestnetCert :: [String]
-wongwayTestnetCert = 
+wongwayTestnetCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBrDCCAVCgAwIBAgIRALcxCPz8/sY2mDwguBzujZcwDAYIKoZIzj0EAwIFADBI",
@@ -1034,7 +1034,7 @@ wongwayTestnetCert =
   ]
 
 kierensNodeTestnetCert :: [String]
-kierensNodeTestnetCert = 
+kierensNodeTestnetCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBvjCCAWKgAwIBAgIQBVrzjO9qo1uvpgdfnQpj4TAMBggqhkjOPQQDAgUAMEgx",
@@ -1062,7 +1062,7 @@ kierensNodeTestnetCert =
   ]
 
 dustinNodeTestnetCert :: [String]
-dustinNodeTestnetCert = 
+dustinNodeTestnetCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBfzCCASOgAwIBAgIQBu4M1uqyyZAO4LVDaTlgNDAMBggqhkjOPQQDAgUAMEgx",
@@ -1089,7 +1089,7 @@ dustinNodeTestnetCert =
   ]
 
 multinode302TestnetCert :: [String]
-multinode302TestnetCert = 
+multinode302TestnetCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBkDCCATWgAwIBAgIRAN97g6SFz1/OnJJPHg0CExIwDAYIKoZIzj0EAwIFADBI",
@@ -1116,7 +1116,7 @@ multinode302TestnetCert =
   ]
 
 dmoneyTestnetCert :: [String]
-dmoneyTestnetCert = 
+dmoneyTestnetCert =
   [
     "-----BEGIN CERTIFICATE-----",
     "MIIBhjCCASugAwIBAgIQB22BFCJXO8hLVHnnkSLlzzAMBggqhkjOPQQDAgUAMEgx",
@@ -1162,7 +1162,7 @@ extraCertsHack =
       kierensNodeCert,
       wongwayCert,
       dustinNodeCert,
-      tysonCert, 
+      tysonCert,
       neelCert,
       drewbabyCert,
       michaelCert,

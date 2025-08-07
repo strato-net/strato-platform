@@ -392,9 +392,9 @@ completeXabi name xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi name c
 
-getSourceMapFromAddress :: 
+getSourceMapFromAddress ::
   ( MonadIO m,
-    (Keccak256 `A.Selectable` SourceMap) m, 
+    (Keccak256 `A.Selectable` SourceMap) m,
     (Address `A.Selectable` AddressState) m
   ) => Address -> m SourceMap
 getSourceMapFromAddress cptr = do

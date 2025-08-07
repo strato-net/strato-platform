@@ -18,13 +18,13 @@ enum IssuerStatus {
 }
 
 contract record UserRegistry {
-    constructor() { 
+    constructor() {
         // create the first issuer approver
         string _commonName = getUserCert(msg.sender)["commonName"];
         User newUser = new User{salt: _commonName}(_commonName);
         newUser.setIsAdmin(true);
     }
-        
+
     function createUser(string _commonName) public returns (address) {
         User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
@@ -105,7 +105,7 @@ contract record User {
         require(issuerStatus != IssuerStatus.AUTHORIZED, "You are already an authorized issuer");
         issuerStatus = IssuerStatus.PENDING_REVIEW;
     }
-    
+
     function authorizeIssuer() public onlyOwner {
         issuerStatus = IssuerStatus.AUTHORIZED;
     }

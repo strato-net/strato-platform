@@ -258,32 +258,32 @@ lookupContractFunction x cName fName = do
                     <$ x
         Just ConstantDecl {..} -> Static _constType x
       Just f -> filterFuncs cc x fName f [Internal, Private]
-      
-  where 
+
+  where
     nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
-    nestedType' y (SVMType.Array t _) = 
+    nestedType' y (SVMType.Array t _) =
         -- For multidimensional arrays, we need to accept multiple indices as a product
         let indicez = collectArrayDimensions t []
             indexType = Static (SVMType.Int (Just False) (Just 32)) y
             indexTypes = replicate (length indicez + 1) indexType
             baseType = getBaseType t
-        in Function (Product [] y) 
-                   (Static (SVMType.Array t Nothing) y) 
-                   y 
-                   [ Function 
+        in Function (Product [] y)
+                   (Static (SVMType.Array t Nothing) y)
+                   y
+                   [ Function
                        (Product indexTypes y)  -- Accept all indices as a product
                        (Static baseType y)     -- Return the base type
-                       y 
-                       [] 
-                       [] 
+                       y
+                       []
+                       []
                        False
                    ]
-                   [] 
+                   []
                    False
       where
         -- Helper to collect all array dimensions
         collectArrayDimensions :: SVMType.Type -> [SVMType.Type] -> [SVMType.Type]
-        collectArrayDimensions (SVMType.Array innerT _) acc = 
+        collectArrayDimensions (SVMType.Array innerT _) acc =
             collectArrayDimensions innerT (innerT : acc)
         collectArrayDimensions _ acc = acc
 
@@ -331,7 +331,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
                      (Static a@(SVMType.Array _ _) x) -> flip Static x $ loop lengthOfArgs a
                      _ -> funcValTypes
       funcValTypes' = case (functionArrayGetter, funcArgTypes, funcValTypes) of
-                        (True, (Product ([(Static (SVMType.Int _ _) _), (Static (SVMType.Variadic) _)]) _), (Static (SVMType.Array _ _) _)) -> arrayLayer  
+                        (True, (Product ([(Static (SVMType.Int _ _) _), (Static (SVMType.Variadic) _)]) _), (Static (SVMType.Array _ _) _)) -> arrayLayer
                         _ -> funcValTypes
   case (p, funcValTypes') of
     (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
@@ -340,7 +340,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
       (x : xs) -> apply' (functionArgType x) (functionReturnType x) xs args argNames (functionArgNames x) functionArrayGetter
     _ -> pure $ funcValTypes'
   where
-    loop count (SVMType.Array t _) = 
+    loop count (SVMType.Array t _) =
       if count == 0
         then t
         else loop (count - 1) t
@@ -661,7 +661,7 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
 typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
-  if alias1 == alias2 
+  if alias1 == alias2
     then typecheckStatic a b
     else
       Left $
@@ -917,7 +917,7 @@ contractHelper ::
   Type'
 contractHelper cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-      funcsAndConstr = constr <> _functions c 
+      funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
@@ -1044,7 +1044,7 @@ modifierHelper ::
   Annotated ContractF ->
   Annotated ModifierF ->
   Type'
-modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = 
+modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
   let r =
         R cc c Nothing Nothing (Just m) $
           map
@@ -1223,7 +1223,7 @@ statementsHelperM args ss = do
                   (pure $ topType' x)
                   (NE.toList rs)
             Just r -> r
-      pure $ reduceType' x $ ret : ts'   
+      pure $ reduceType' x $ ret : ts'
 
 statementsHelper ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
@@ -1287,13 +1287,13 @@ intArgs x =
            decimalType' x,
            Product [stringType' x, intType' x] x
          ]
-    
+
 decimalArgs :: SourceAnnotation Text -> Type'
 decimalArgs x =
   Sum $
     intType' x
       :| [ stringType' x,
-           decimalType' x 
+           decimalType' x
          ]
 
 stringArgs :: SourceAnnotation Text -> Type'
@@ -1702,8 +1702,8 @@ statementHelper (Return mExpr x) = do
         _ -> (ret, locals) :| rest
       pure t'
     (Just _,Nothing) ->
-      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x       
-    (Just _,Just _)  -> 
+      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+    (Just _,Just _)  ->
       pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
 
 statementHelper (Throw e x) = do

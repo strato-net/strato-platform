@@ -93,18 +93,18 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
             -- private txs don't affect stateroot we compute
             otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block]
         mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
-        case mSumm of 
+        case mSumm of
           Nothing -> pure Nothing
           Just summ -> do
             let bHeader' = case bHeader of
                             -- imitate parent block as closely as possible (most important is the stateroot)
-                            BlockHeader {} -> bHeader { 
+                            BlockHeader {} -> bHeader {
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ,
                               gasLimit = bSumGasLimit summ
                             }
-                            BlockHeaderV2 {} -> bHeader { 
+                            BlockHeaderV2 {} -> bHeader {
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ
@@ -119,19 +119,19 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
                                   Just addr ->  return addr
                                   Nothing -> error "no proposer"
                             Nothing -> error "no proposer"
-            res <- Bagger.runFromStateRoot 
+            res <- Bagger.runFromStateRoot
               --account
-              mineTransactions 
-              (bSumGasLimit summ) 
+              mineTransactions
+              (bSumGasLimit summ)
               bHeader'
-              otxs 
+              otxs
               proposer
-            case res of 
-              Right (sr, trrs, _) -> do 
+            case res of
+              Right (sr, trrs, _) -> do
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format (stateRoot bHeader)
                 blockFailures <- verifyBlock block (trrs, Just sr) summ
-                case blockFailures of 
+                case blockFailures of
                   [] -> pure . Just $ AcceptPreprepare bHash
                   _  -> do
                     $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ show blockFailures
@@ -179,10 +179,10 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
-        pure $ Just newBlock 
+        pure $ Just newBlock
       else pure Nothing
-    
-  for_ mNewBlock $ yield . OutBlock 
+
+  for_ mNewBlock $ yield . OutBlock
 
 processBlocks ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>

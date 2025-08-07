@@ -119,7 +119,7 @@ import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM2
 import Executable.StratoP2P
-import Executable.StratoP2PClient 
+import Executable.StratoP2PClient
 import Executable.StratoP2PServer (runEthServerConduit)
 import Network.Socket
 import Text.Read (readMaybe)
@@ -1489,7 +1489,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         atomically . writeTQueue unseqSource $ UnseqEvent <$> ies
 
   memPeerDBEnv <- createMemPeerDBEnv ipAsText $ map (\(IPAsText ip) -> buildPeer (Nothing, T.unpack ip, 30303)) bootNodes
-        
+
   pure $
     P2PPeer
       privKey
@@ -1548,13 +1548,13 @@ createConnectionWithModifications server' client' modifyServerMsgs modifyClientM
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer = runEthServerConduit
-                  (_p2pPeerPPeer client')             
-                  (sourceTQueue clientToServerTQueue) 
-                  (sinkTQueue serverToClientTQueue)   
+                  (_p2pPeerPPeer client')
+                  (sourceTQueue clientToServerTQueue)
+                  (sinkTQueue serverToClientTQueue)
                   (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) (yield . modifyServerMsgs) ))
                   ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-  let rClient = runEthClientConduit         
-                  (_p2pPeerPPeer server')   
+  let rClient = runEthClientConduit
+                  (_p2pPeerPPeer server')
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) (yield . modifyClientMsgs) ))
@@ -1583,8 +1583,8 @@ createGermophobicConnection server' client' = do
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer = pure Nothing -- server is germophobic; will not conduct handshake
-  let rClient = runEthClientConduit         
-                  (_p2pPeerPPeer server')   
+  let rClient = runEthClientConduit
+                  (_p2pPeerPPeer server')
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))

@@ -90,7 +90,7 @@ getRealmMap realmInfos cacheSize = fromList <$> mapM parseRealmMinInfo realmInfo
               realmUserRegAddr = fromMaybe (Address 0x720) $ userRegistryAddress realmInfo,
               realmUserRegCodeHash = userRegistryCodeHash realmInfo,
               realmUserTableName = fromMaybe "User" $ userTableName realmInfo,
-              realmNoficicationServerUrl = notificationServerUrl realmInfo, 
+              realmNoficicationServerUrl = notificationServerUrl realmInfo,
               cacheRef = cRef,
               accessTokenRef = tRef
             }

@@ -158,7 +158,7 @@ cacheRunResults bd (sr, gasRemaining, trrs) = do
   liftIO $ TRC.insert cache bhash (sr, gasRemaining, trrs)
 
 getCachedRunResults :: MonadBagger m => BlockHeader -> m (Maybe (StateRoot, Integer, [TxRunResult]))
-getCachedRunResults bd = do 
+getCachedRunResults bd = do
     cache <- Mod.access (Mod.Proxy @TRC.Cache)
     let pHash = blockHeaderPartialHash bd
     mres <- liftIO $ TRC.lookup cache pHash

@@ -266,12 +266,12 @@ contractResult txHash txResult@TransactionResult {..} name = do
   where
     go :: HasSQL m => Address -> Text -> Integer -> m UploadContractDetails
     go address name' num = do
-      if num >= 100 
+      if num >= 100
         then throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, num=" ++ show num
         else do
           void . liftIO $ threadDelay 100000
-          addressRefs <- 
-            getAccount' 
+          addressRefs <-
+            getAccount'
               accountsFilterParams
                 { _qaAddress = Just address,
                   _qaContractName = Just name',

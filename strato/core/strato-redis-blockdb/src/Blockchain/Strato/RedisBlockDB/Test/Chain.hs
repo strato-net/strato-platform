@@ -101,7 +101,7 @@ buildY seed depth maxSiblings = do
   nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf spread arbitrary :: IO [BlockHeader]
   withUpdates <-
-    return $ fmap 
+    return $ fmap
       (\sibling -> sibling{
           parentHash=blockHeaderHash seed,
           difficulty=nextDifficulty',

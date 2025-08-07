@@ -143,13 +143,13 @@ getTableColumnAndType :: Bool -> CodeCollectionF () -> [(Text, SVMType.Type)] ->
 getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _) = concatMap go . fillFirstEmptyEntries
   where
     go :: (Text, SVMType.Type) -> [(T.Text, T.Text)]
-    go (x, y) = 
+    go (x, y) =
       case solidityTypeToSQLType isEvent Nothing cc y of
         Nothing -> []
-        Just v -> 
+        Just v ->
           let defaultColumn = (columnName x, v)
           in case y of
-            SVMType.UnknownLabel s _ -> case (Map.member s ccs) of 
+            SVMType.UnknownLabel s _ -> case (Map.member s ccs) of
               True ->
                 [ defaultColumn,
                   (columnName (x <> "_fkey"), v)
@@ -425,13 +425,13 @@ createForeignIndexesForJoins foreignKey = do
         , "fk"
         ]
       fkNameHash = T.pack . take 40 . formatKeccak256WithoutColor . hash $ encodeUtf8 fkNameSrcToTarget
-      logMessage = 
+      logMessage =
         "createForeignIndexesForJoins srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
-        ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
+        ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey)
   $logInfoS "createForeignIndexesForJoins" logMessage
   -- Add new foreign key
-  yield $ "ALTER TABLE " <> srcTable 
-          <> " ADD CONSTRAINT " <> wrapDoubleQuotes fkNameHash <> " FOREIGN KEY (" 
+  yield $ "ALTER TABLE " <> srcTable
+          <> " ADD CONSTRAINT " <> wrapDoubleQuotes fkNameHash <> " FOREIGN KEY ("
           <> srcColumns <> ") REFERENCES " <> targetTable <> " (" <> targetColumns <> ");"
 
 notifyPostgREST ::
@@ -444,7 +444,7 @@ notifyPostgREST conn = do
 createExpandHistoryTable ::
   OutputM m =>
   Bool ->
-  
+
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
@@ -680,7 +680,7 @@ expandHistoryTable ::
   ConduitM () Text m ()
 expandHistoryTable isAbstract  contract cc (creator, a, n) = do
   let tableName = historyTableName creator a n
-  void $ 
+  void $
     if isAbstract
       then expandAbstractContractTable contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
       else expandContractTable' contract cc tableName
@@ -756,7 +756,7 @@ expandAbstractContractTable  contract tableName abstracts' cc = do
         ]
     yield $ expandAbstractTableQuery tableName colsCombined
   case tableName of
-    AbstractTableName creator a _ -> getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc 
+    AbstractTableName creator a _ -> getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
     _ -> return $ []
 
 expandTableQuery :: TableName -> TableColumns -> Text
@@ -868,7 +868,7 @@ insertAbstractTable cs@((_, _,abTableName, _) : _) = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
   multilineLog "insertAbstractTable/processedContract" $ show cs
   yieldMany $ insertAbstractTableQuery cs
-  
+
 updateForeignKeysFromNULLAbstract ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
@@ -895,8 +895,8 @@ updateForeignKeysFromNULLArray cs = do
   yieldMany $ updateFkeysQueryArray cs
 
 baseColumnsQuery :: [Text]
-baseColumnsQuery = 
-  [ 
+baseColumnsQuery =
+  [
     "address text",
     "block_hash text",
     "block_timestamp text",
@@ -908,8 +908,8 @@ baseColumnsQuery =
   ]
 
 abstractBaseColumnsQuery :: [Text]
-abstractBaseColumnsQuery = 
-  baseColumnsQuery ++ 
+abstractBaseColumnsQuery =
+  baseColumnsQuery ++
   [
     "contract_name text",
     "data jsonb"
@@ -1055,15 +1055,15 @@ addHistoryUnique (creator, a, n) =
           <> ";"
       ]
 
-insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> Text -- does not accomodate extra _fkey 
-insertIndexTableQuery cs = 
+insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> Text -- does not accomodate extra _fkey
+insertIndexTableQuery cs =
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys) -> ((c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData), fkeys)) cs
         processContract ((contract, list), fkeys) =
-            let tableName = 
-                  indexTableName 
-                    (case (E.cc_creator contract) of 
-                      Just cc_creator' -> cc_creator' 
-                      Nothing -> (E.creator contract)) 
+            let tableName =
+                  indexTableName
+                    (case (E.cc_creator contract) of
+                      Just cc_creator' -> cc_creator'
+                      Nothing -> (E.creator contract))
                     (E.application contract)
                     (E.contractName contract)
                 fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
@@ -1260,14 +1260,14 @@ insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumn
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs =
   concat $
-    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
+    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) ->
                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
      in flip map (map snd $ partitionWith ((\(ab, _, _) -> ab) . snd) cs') $ \case
           [] -> []
           contracts@(((x, list), (abTableName, abColumns, fkeys)) : _) ->
             let contractTableName =
                   abstractTableName (E.creator x) (E.application x) (E.contractName x)
-                list' = Map.toList $ Map.filterWithKey (\k _ -> k `elem` abColumns) list 
+                list' = Map.toList $ Map.filterWithKey (\k _ -> k `elem` abColumns) list
                 fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys, k `elem` abColumns]
                 keysForSQL = map fst list' ++ fkeyColumns
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ keysForSQL
@@ -1282,8 +1282,8 @@ insertAbstractTableQuery cs =
                     E.root
                   ]
                 (vals, dataVals') = unzip $ flip map contracts $ \((row, contractColumns), _) ->
-                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
-                      contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
+                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
+                      contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)]
                       dataVals = [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper (Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns )) <> "::jsonb"]
                       regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
                       fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
@@ -1310,7 +1310,7 @@ insertAbstractTableQuery cs =
                       abTableName,
                       ".data || ",
                       if dataVals'' == "{}"
-                        then "excluded.data::jsonb" 
+                        then "excluded.data::jsonb"
                         else dataVals'',
                       if null keysForSQL then "" else ",\n    ",
                       tableUpsert keysForSQL,
@@ -1321,7 +1321,7 @@ insertAbstractTableQuery cs =
 updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
 updateFkeysQueryAbstract cs =
   concat $
-    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
+    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) ->
                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
      in flip map (map snd $ partitionWith ((\(ab, _, _) -> ab) . snd) cs') $ \case
           [] -> []
@@ -1331,12 +1331,12 @@ updateFkeysQueryAbstract cs =
                 keySt =  wrapAndEscapeDouble . map escapeQuotes $ fkeyColumns
                 keyStForFkeyColumnsWithPostFix = wrapAndEscapeDouble . map escapeQuotes $ fkeyColumnsWithPostFix
                 vals = flip map contracts $ \((_, contractColumns), _) ->
-                  let 
-                    contractValEntries = Map.toList contractColumns 
+                  let
+                    contractValEntries = Map.toList contractColumns
                     fkeyVals = [(snd kv) | kv@(k, _) <- contractValEntries, k `elem` fkeys]
                   in wrapAndEscape fkeyVals
                 inserts = csv $ Set.toList . Set.fromList $ vals
-            in if not (null fkeyColumns) 
+            in if not (null fkeyColumns)
                then (: []) $
                   T.concat $
                     [ "UPDATE ",
@@ -1512,7 +1512,7 @@ aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
 aggEventToCollectionRows ae =
   case Action.evArgs ev of
     [] -> []
-    args -> 
+    args ->
       let (arrayName, arrayElements) = getArraysFromEvents args
       in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
   where
@@ -1543,13 +1543,13 @@ removeArrayEvArgs :: Action.Event -> Action.Event
 removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
 
 getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
-getArraysFromEvents evArgs = do 
+getArraysFromEvents evArgs = do
   let li = [(a, b) | (a, b, c) <- evArgs, c == "Array"]
-  case li of 
+  case li of
     [] -> ("", [])
-    (arrayName, arrayStr):_ -> 
+    (arrayName, arrayStr):_ ->
          let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
-         in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
+         in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..])
                             (map (SimpleValue . ValueString . T.pack) elements))
 
 pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () Text m ()
@@ -1629,7 +1629,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
        , ");"
        ]
 
-insertEventTables :: 
+insertEventTables ::
   OutputM m =>
   [ProcessedCollectionRow] ->
   [AggregateEvent] ->
@@ -1641,18 +1641,18 @@ insertEventTables processedEventArrays processedEventsWithoutArrays = do
   when (not (null processedEventArrays)) $
     yieldMany $ insertEventArrayTableQuery processedEventArrays
 
-getAllEvents :: 
-  AggregateEvent -> 
+getAllEvents ::
+  AggregateEvent ->
   [AggregateEvent]
 getAllEvents aggEvent = do
   let newEvents = processParents aggEvent
     in aggEvent : newEvents
 
-processParents :: 
+processParents ::
   AggregateEvent -> [AggregateEvent]
 processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
   where
-    createNewEvent :: 
+    createNewEvent ::
       ((Address, Text), (Text, Text, [Text])) -> AggregateEvent
     createNewEvent ((_, n'), (c, a, _)) =
       ae { eventEvent = (eventEvent ae) {
@@ -1767,7 +1767,7 @@ valueToSQLText' z (SimpleValue (ValueAddress (Address addr))) =
   if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' z (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) = 
+valueToSQLText' z (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) =
   if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
@@ -1777,7 +1777,7 @@ valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
       Left _ -> decodeUtf8 $ Base16.encode bytes
       Right x -> x
 valueToSQLText' _ (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
-valueToSQLText' z (ValueContract acct@(NamedAccount (Address addr) _)) = 
+valueToSQLText' z (ValueContract acct@(NamedAccount (Address addr) _)) =
   if z && fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct

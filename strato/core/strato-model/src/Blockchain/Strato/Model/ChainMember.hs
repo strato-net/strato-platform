@@ -192,7 +192,7 @@ instance NFData ChainMemberParsedSet where
   rnf (Org a b) = b `seq` a `seq` ()
   rnf (OrgUnit a b c) = c `seq` b `seq` a `seq` ()
   rnf (CommonName a b c d) = d `seq` c `seq` b `seq` a `seq` ()
-  
+
 instance Eq (ChainMemberF BoundedData) where
   (==) (ChainMemberF on1 ou1 cm1 s1) (ChainMemberF on2 ou2 cm2 s2) = (on1 == on2 && ou1 == ou2 && cm1 == cm2 && s1 == s2)
 
@@ -298,7 +298,7 @@ instance RLPSerializable ChainMemberParsedSet where
   rlpDecode (RLPArray [a, b, c]) = OrgUnit (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode (RLPArray [a, b, c, d]) = CommonName (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode d)
   rlpDecode v = error $ "Error in rlpDecode for ChainMemberParsedSet: bad RLPObject: " ++ show v
-  
+
 instance Arbitrary ChainMembers where
   arbitrary = genericArbitrary
 
@@ -309,14 +309,14 @@ instance ToSchema ChainMembers where
   declareNamedSchema _ =
     return $
       NamedSchema (Just "ChainMembers") mempty
-      
+
 instance FromJSON ChainMembers where
   parseJSON (A.Array xs) = ChainMembers . S.fromList <$> traverse parseJSON (V.toList xs)
   parseJSON x = fail $ "couldn't parse JSON for chain members info: " ++ show x
 
 instance ToJSON ChainMembers where
   toJSON (ChainMembers xs) = toJSON (S.toList xs)
-  
+
 instance FromJSON ChainMemberParsedSet where
   parseJSON (A.String s) = pure $ Org s True
   parseJSON (Object o) = do

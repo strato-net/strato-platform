@@ -54,8 +54,8 @@ inNamespace ns k = ns' `S8.append` toKey k
   where
     ns' = namespaceToKeyPrefix ns
 
-namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString 
-namespaceToKeyPrefix ns = case ns of 
+namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString
+namespaceToKeyPrefix ns = case ns of
   Headers -> "h:"
   Transactions -> "t:"
   Numbers -> "n:"

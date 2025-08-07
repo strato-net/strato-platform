@@ -101,9 +101,9 @@ replayHistoricBlock realValidators seqNo blk = do
       blockNo = fromIntegral . number . blockBlockData $ blk
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
-      
+
   signerRes <- S.fromList . catMaybes <$> traverse getValidatorFromAddress signers
-  
+
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
 
@@ -123,7 +123,7 @@ replayHistoricBlock realValidators seqNo blk = do
       "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
-        
+
   unless (signerRes `S.isSubsetOf` realValidators) $ do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
         if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
@@ -139,7 +139,7 @@ replayHistoricBlock realValidators seqNo blk = do
       printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
-        
+
   return (fromIntegral $ seqNo + 1, propValidator)
 
 isHistoricBlock :: Block -> Bool

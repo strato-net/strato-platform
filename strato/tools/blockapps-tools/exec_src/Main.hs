@@ -329,7 +329,7 @@ options =
 
 main :: IO ()
 main = do
-  -- the tools should use /tmp/.ethereumH/ to access levelDB data 
+  -- the tools should use /tmp/.ethereumH/ to access levelDB data
   -- while avoiding the LOCK while the node is running
   let (cmd, args') = ("cp", ["-r", "/var/lib/strato/.ethereumH/", "/tmp/.ethereumH/"])
   (_, _, _, processHandle) <- createProcess (proc cmd args')

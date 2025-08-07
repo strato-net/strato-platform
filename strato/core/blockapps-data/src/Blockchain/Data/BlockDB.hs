@@ -115,7 +115,7 @@ putBlocks blockList makeHashOne = do
           forM_ va $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
           forM_ vr $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
           forM_ ca $ \c -> do
-            let c' = x509CertToCertInfoState c 
+            let c' = x509CertToCertInfoState c
             SQL.insert $ CertificateAddedRef blkDataRefId (T.pack $ commonName c') (userAddress c') (T.pack . BC.unpack . certToBytes $ certificate c')
           forM_ cr $ \(DummyCertRevocation ua) -> do
             SQL.insert $ CertificateRevokedRef blkDataRefId ua

@@ -62,7 +62,7 @@ instance IsString BasicValue where
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
-  
+
 instance JSON.FromJSON BasicValue where
   parseJSON v =
     fmap readOrError $ JSON.parseJSON v
@@ -140,7 +140,7 @@ formatBasicValueForSQL (BContract _ a) = T.pack $ show a
 formatBasicValueForSQL BMappingSentinel = "<MappingSentinel>"
 formatBasicValueForSQL BDefault = ""
 
---function that gives index type, wrap in map index 
+--function that gives index type, wrap in map index
 data IndexType
   = INum Integer
   | IText B.ByteString

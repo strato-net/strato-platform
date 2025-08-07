@@ -138,7 +138,7 @@ rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToCollections row = do
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-        _ -> [] 
+        _ -> []
   return $ (Map.fromList $ newState)
 
 processedContractToProcessedCollectionRows :: Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
@@ -156,7 +156,7 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid creg
           ) $ extractValues value
         ) onlyRecord
       processRecord (n, t, ks, v) = processedCollectionRow n t row abiid cregator ks v
-   in processRecord <$> recordVMs  
+   in processRecord <$> recordVMs
 
 processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> [Value] -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator ks v =
@@ -177,7 +177,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       transactionHash = actionTxHash,
       transactionSender = actionTxSender,
       collectionDataKeys = ks,
-      collectionDataValue = v 
+      collectionDataValue = v
     }
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
@@ -206,7 +206,7 @@ parseEvents = concatMap parseEvent
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
           eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAddress e) $ Action._actionData a,
-          eventEvent = e, 
+          eventEvent = e,
           eventIndex = idx
         }
 
@@ -256,7 +256,7 @@ processTheMessages env conn messages = do
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
   fkeys <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
-        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp)
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         fmap concat $
@@ -276,7 +276,7 @@ processTheMessages env conn messages = do
 
             -- Create collection tables
             deferredForeignKeysForCollections <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
-            
+
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
                 abstractfkeys <- createExpandAbstractTable c nameParts abstracts' cc
@@ -332,7 +332,7 @@ processTheMessages env conn messages = do
                 $logDebugLS "cregator" $ T.pack (show cregator)
                 $logInfoS "Row will be inserted into abstract table: " tableNameText
                 $logInfoS "cols: " $ T.pack (show cols)
-                
+
                 let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
                 $logInfoS "result: " $ T.pack (show result)
                 pure (Just result)
@@ -346,7 +346,7 @@ processTheMessages env conn messages = do
             pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
             recordAction row
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
-      
+
       pure results
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
@@ -355,7 +355,7 @@ processTheMessages env conn messages = do
   let insertsByCodeHash = rights inserts
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-  
+
   outputDataDedup conn $ do
     forM_ insertsByCodeHash $ \ins -> do
       insertIndexTable $ indexInsert ins
@@ -385,13 +385,13 @@ processTheMessages env conn messages = do
          -- TODO: Remove arrays once marketplace switches over to using event
          -- array tables
         processedEventsWithoutArrays = processedEvents
-        
+
     -- Insert the events into the event tables
     outputData conn $ insertEventTables processedEventArrays processedEventsWithoutArrays
 
     -- Insert the events into the global 'events' table
     outputData conn $ pipeInsertGlobalEventTable processedEvents
-    
+
     -- If there are processed event arrays, update the foreign keys
     unless (null processedEventArrays) $
       outputData conn $ updateForeignKeysFromNULLArray processedEventArrays

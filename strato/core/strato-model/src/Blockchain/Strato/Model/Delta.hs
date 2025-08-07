@@ -35,7 +35,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import GHC.Generics
 
-data Delta a b = Delta 
+data Delta a b = Delta
   { _added   :: [a] -> [a]
   , _removed :: [b] -> [b]
   }

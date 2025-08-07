@@ -1,6 +1,6 @@
 
 module Blockchain.Strato.StateDiff.Kafka
-  ( 
+  (
     assertStateDiffTopicCreation,
   )
 where

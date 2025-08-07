@@ -54,7 +54,7 @@ main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
 
   conn <- Redis.checkedConnect lookupRedisBlockDBConfig
-  
+
   bestSequencedBlock <- fmap (fromMaybe (error "no BestSequencedBlock in database")) $ Redis.runRedis conn getBestSequencedBlockInfo
   let validators = bestSequencedBlockValidators bestSequencedBlock
 
@@ -75,9 +75,9 @@ main = do
   selfAddress <- do --send to vm with kafka
     addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
-  
+
   putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
-  
+
   mCtx <-
     if not flags_blockstanbul
       then return Nothing
@@ -88,7 +88,7 @@ main = do
           "--blockstanbul_round_period_s must be positive"
 
         putStrLn $ "ACTUAL validators list: " ++ show validators
-      
+
         let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
 
         return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing

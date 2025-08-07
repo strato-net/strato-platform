@@ -25,6 +25,6 @@ doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = DB.runResourceT $ do
   sdb <-
     DB.open
-      ("/tmp/.ethereumH/" ++ filename) 
+      ("/tmp/.ethereumH/" ++ filename)
       DB.defaultOptions {DB.cacheSize = 1024}
   showVals sdb sr

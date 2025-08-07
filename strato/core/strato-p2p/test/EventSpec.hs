@@ -1432,12 +1432,12 @@ createConnection server' client' = do
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer = Executable.StratoP2PServer.runEthServerConduit
-                  (_p2pPeerPPeer client')             
-                  (sourceTQueue clientToServerTQueue) 
-                  (sinkTQueue serverToClientTQueue)   
+                  (_p2pPeerPPeer client')
+                  (sourceTQueue clientToServerTQueue)
+                  (sinkTQueue serverToClientTQueue)
                   (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                   ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-  let rClient = runEthClientConduit         
+  let rClient = runEthClientConduit
                   (_p2pPeerPPeer server')
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)

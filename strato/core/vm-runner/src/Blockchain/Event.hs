@@ -72,8 +72,8 @@ insertInBatch e b = case e of
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}
   VmSelfAddress sa -> b {selfAddress = Just sa}
-  
-data BlockDelta a = BlockDelta 
+
+data BlockDelta a = BlockDelta
   { _inBlock :: a
   , _derived :: a
   }
