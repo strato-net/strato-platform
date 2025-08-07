@@ -15,7 +15,6 @@ export interface FeedConfig {
     name: string;
     sources: string[];
     assets: string[]; // Array of asset keys
-    cron: string;
     minPrice?: number;
     maxPrice?: number;
 }

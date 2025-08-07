@@ -3,14 +3,12 @@
     {
       "name": "crypto-batch",
       "sources": ["Alchemy", "CoinMarketCap"],
-      "assets": ["ETH", "WBTC", "PAXG", "USDT", "USDC"],
-      "cron": "*/15 * * * *"
+      "assets": ["ETH", "WBTC", "PAXG", "USDT", "USDC"]
     },
     {
       "name": "metals-batch",
       "sources": ["Metals.dev", "MetalPriceAPI"],
-      "assets": ["XAU", "XAG"],
-      "cron": "*/15 * * * *"
+      "assets": ["XAU", "XAG"]
     }
   ]
 } 

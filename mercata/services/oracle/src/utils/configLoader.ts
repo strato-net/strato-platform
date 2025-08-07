@@ -12,7 +12,6 @@ interface ResolvedFeedConfig {
     name: string;
     sources: string[];
     assets: Asset[];
-    cron: string;
     minPrice?: number;
     maxPrice?: number;
 }
@@ -53,7 +52,6 @@ export class ConfigLoader {
                 name: feed.name,
                 sources: feed.sources,
                 assets: resolvedAssets,
-                cron: feed.cron,
                 minPrice: feed.minPrice,
                 maxPrice: feed.maxPrice
             };

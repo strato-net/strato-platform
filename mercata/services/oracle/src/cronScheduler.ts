@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchBatchPrices } from './adapters/genericRestAdapter';
-import { pushAssetPrices } from './utils/oraclePusher';
+import { pushAssetPrices, getRoundDuration } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
 import { Asset } from './types';
 
@@ -52,7 +52,7 @@ async function processAllFeeds(configLoader: ConfigLoader): Promise<void> {
             throw new Error('No valid prices received from any feed');
         }
 
-        // Push all assets to blockchain in single transaction
+        // Submit all assets to the contract - it handles round logic automatically
         const assetNames = Object.keys(allAssetPrices);
         const assetAddresses = assetNames.map(name => allAssetAddresses[name]);
         const assetPriceValues = assetNames.map(name => allAssetPrices[name]);
@@ -95,7 +95,6 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
             
         } catch (err) {
             const error = err as Error;
-            logError('CronScheduler', new Error(`${feed.name} from ${sourceName}: ${error.message}`));
             return { batchResult: {}, source: sourceName, success: false, error: error.message };
         }
     });
@@ -122,15 +121,31 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
                     prices: value.batchResult
                 });
             } else {
-                const error = result.status === 'rejected' ? (result as PromiseRejectedResult).reason : 'Unknown error';
-                failedSources.push('unknown');
-                logError('CronScheduler', new Error(`Failed to fetch ${feed.name}: ${error}`));
+                // Get the actual source name and error details
+                let sourceName = 'unknown';
+                let errorMessage = 'Unknown error';
+                
+                if (result.status === 'fulfilled') {
+                    const value = (result as PromiseFulfilledResult<any>).value;
+                    sourceName = value.source || 'unknown';
+                    errorMessage = value.error || 'Unknown error';
+                } else if (result.status === 'rejected') {
+                    const reason = (result as PromiseRejectedResult).reason;
+                    errorMessage = reason instanceof Error ? reason.message : String(reason);
+                }
+                
+                failedSources.push(sourceName);
+                logError('CronScheduler', new Error(`Failed to fetch ${feed.name} from ${sourceName}: ${errorMessage}`));
             }
         });
         
         if (allSuccessfulSources.length === 0) {
             throw new Error(`No valid prices received for ${feed.name} from any source`);
         }
+
+        // Log summary of source results
+        const successfulSourceNames = allSuccessfulSources.map(s => s.name);
+        logInfo('CronScheduler', `${feed.name}: ${successfulSourceNames.length}/${resolvedFeed.sources.length} sources succeeded. Successful: [${successfulSourceNames.join(', ')}]. Failed: [${failedSources.join(', ')}]`);
 
         // Calculate average prices for each asset across sources
         const assetPrices: Record<string, number> = {};
@@ -168,11 +183,15 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
     }
 }
 
-export function startCronScheduler(): void {
+export async function startCronScheduler(): Promise<void> {
     const configLoader = new ConfigLoader();
     const resolvedFeeds = configLoader.getResolvedFeeds();
     
-    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (parallel execution)`);
+    // Read round duration from contract
+    const roundDurationSeconds = await getRoundDuration();
+    const roundDurationMinutes = Math.ceil(roundDurationSeconds / 60);
+    
+    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (round duration: ${roundDurationMinutes} minutes)`);
 
     // Single cron job that processes all feeds in parallel
     const jobFunction = async () => {
@@ -184,8 +203,11 @@ export function startCronScheduler(): void {
         }
     };
 
-    // Schedule the job - all feeds run together
-    cron.schedule('*/15 * * * *', jobFunction);
+    // Schedule the job based on round duration from contract
+    const cronSchedule = `*/${roundDurationMinutes} * * * *`;
+    logInfo('CronScheduler', `Scheduling oracle updates every ${roundDurationMinutes} minutes (cron: ${cronSchedule})`);
+    
+    cron.schedule(cronSchedule, jobFunction);
     
     // Run the job immediately on startup
     setTimeout(() => {

@@ -1,20 +1,17 @@
 import dotenv from 'dotenv';
-import cron from 'node-cron';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
-import { SourceConfig } from '../types';
-
-// Configurable minimum interval (in minutes)
-const MIN_UPDATE_INTERVAL_MINUTES = parseInt(process.env.MIN_UPDATE_INTERVAL_MINUTES || '15');
 
 const feedsConfig = require('../config/feeds.json');
 const sourcesConfig = require('../config/sources.json');
+const assetsConfig = require('../config/assets.json');
 
 dotenv.config();
 
 export async function validateConfig(): Promise<boolean> {
     const errors: string[] = [];
     const warnings: string[] = [];
+    const usedSources = new Set<string>();
 
     const requiredEnvVars = [
         'STRATO_NODE_URL', 'OAUTH_DISCOVERY_URL', 'OAUTH_CLIENT_ID',
@@ -39,8 +36,6 @@ export async function validateConfig(): Promise<boolean> {
     } else {
         errors.push('Incomplete OAuth configuration');
     }
-
-    const usedSources = new Set<string>();
     
     if (!feedsConfig.feeds || !Array.isArray(feedsConfig.feeds)) {
         errors.push('feeds.json must contain a "feeds" array');
@@ -50,12 +45,6 @@ export async function validateConfig(): Promise<boolean> {
             
             // Check required fields
             if (!feed.name) errors.push(`${feedPrefix} Missing name`);
-            if (!feed.cron) errors.push(`${feedPrefix} Missing cron`);
-            
-            // Validate cron expression
-            if (feed.cron && !cron.validate(feed.cron)) {
-                errors.push(`${feedPrefix} Invalid cron expression: ${feed.cron}`);
-            }
             
             // Check if this is a batch feed
             const isBatchFeed = feed.assets && Array.isArray(feed.assets);
@@ -86,7 +75,6 @@ export async function validateConfig(): Promise<boolean> {
                     errors.push(`${feedPrefix} Missing or invalid assets array`);
                 } else {
                     // Load assets registry to validate asset keys
-                    const assetsConfig = require('../config/assets.json');
                     feed.assets.forEach((assetKey: string, assetIndex: number) => {
                         const assetPrefix = `${feedPrefix} Asset ${assetIndex + 1}:`;
                         
@@ -144,22 +132,6 @@ export async function validateConfig(): Promise<boolean> {
                 // Validate targetAssetAddress format
                 if (feed.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(feed.targetAssetAddress)) {
                     errors.push(`${feedPrefix} Invalid targetAssetAddress format: ${feed.targetAssetAddress}`);
-                }
-            }
-            
-            // Validate cron frequency (prevent too frequent updates)
-            if (feed.cron) {
-                const cronParts = feed.cron.split(' ');
-                // Check minutes field (first position) - allow */X but prevent too frequent updates
-                if (cronParts.length >= 1 && cronParts[0].includes('/')) {
-                    const divisor = parseInt(cronParts[0].split('/')[1]);
-                    if (divisor < MIN_UPDATE_INTERVAL_MINUTES) {
-                        errors.push(`${feedPrefix} Cron expression too frequent (less than ${MIN_UPDATE_INTERVAL_MINUTES} minutes): ${feed.cron}`);
-                    }
-                }
-                // Prevent every minute (*) in minutes field
-                if (cronParts.length >= 1 && cronParts[0] === '*') {
-                    errors.push(`${feedPrefix} Cron expression too frequent (every minute): ${feed.cron}`);
                 }
             }
             

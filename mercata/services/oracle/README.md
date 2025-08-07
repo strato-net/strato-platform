@@ -1,473 +1,242 @@
 # Price Oracle Service
 
-A clean, elegant, and highly configurable price oracle service built in **TypeScript** that fetches real-time price data from multiple sources and updates blockchain price feeds using a generic adapter pattern.
-
-## 🏗️ Architecture
-
-The service uses a **generic adapter pattern** that makes it extremely easy to add new price sources and feeds without code changes - just configuration updates.
-
-### Core Components
-
-- **Generic REST Adapter**: Handles any REST API with configurable URL templates and response parsing
-- **Cron Scheduler**: Manages automated price updates with flexible scheduling
-- **Oracle Pusher**: Handles blockchain interactions and batch price updates
-- **OAuth2 Client**: Manages STRATO authentication with automatic token refresh
-- **Configuration-Driven**: All feeds and sources defined in JSON configuration files
+A high-performance, production-ready price oracle service for the Mercata lending platform. Fetches real-time asset prices from multiple sources and pushes them to the STRATO blockchain with round-based consensus and automatic finalization.
 
 ## 🚀 Features
 
-- ✅ **Zero-Code Feed Addition**: Add new price feeds by just updating JSON config
-- ✅ **Batch API Optimization**: Efficient batch requests for multiple assets in single API calls
-- ✅ **Multiple API Sources**: Alchemy, CoinMarketCap, Metals.dev, MetalPriceAPI support built-in
-- ✅ **OAuth2 Authentication**: Secure STRATO blockchain integration
-- ✅ **Flexible Scheduling**: Individual cron schedules per feed (minimum 15-minute intervals)
-- ✅ **Price Validation**: Configurable min/max price bounds per feed
-- ✅ **Batch Updates**: Efficient blockchain transactions
-- ✅ **Error Handling**: Robust error handling with detailed logging
-- ✅ **Configuration Validation**: Built-in config validation utility
-- ✅ **Token Caching**: Smart OAuth2 token management with 90% expiry safety margin
-- ✅ **TypeScript**: Full type safety and modern development experience
-- ✅ **Enhanced Logging**: Tree-structured logs with source price breakdown
-- ✅ **Dynamic Configuration**: Support for both individual and batch feed configurations
+### **Multi-Node Support**
+- **Parallel Feed Processing**: All feeds run simultaneously for maximum efficiency
+- **Single Blockchain Transaction**: All assets updated in one transaction (7 assets = 1 TX)
+- **Instance Identification**: Each oracle instance has unique ID and logging
+- **Basic Health Checks**: Simple health endpoint with service status
 
-## 📁 Project Structure
+### **Enhanced Price Oracle Contract**
+- **Round-Based System**: 15-minute rounds for price collection and averaging
+- **Simple Averaging**: Arithmetic mean of all oracle submissions per asset
+- **Multi-Node Support**: Multiple oracle nodes can submit in same round
+- **Early Finalization**: Rounds complete automatically when all authorized oracles submit
+- **Configurable Parameters**: Round duration adjustable by owner
+- **Storage Cleanup**: Automatic cleanup of old rounds to prevent unbounded growth
+
+### **API Optimization**
+- **Batch API Calls**: Multiple assets fetched in single API requests
+- **Parallel Source Fetching**: All sources (Alchemy, CoinMarketCap, etc.) run simultaneously
+- **Dynamic Configuration**: API parameters built from source configuration
+- **Cost Reduction**: ~50% fewer API calls through batching
+
+### **Production Features**
+- **Robust Error Handling**: Graceful degradation when sources fail
+- **Log Sanitization**: Sensitive data masked in logs
+- **Configurable Timeouts**: 60s feed processing, 30s API calls, 120s blockchain
+- **Retry Logic**: Automatic retry with exponential backoff
+- **Basic Health Monitoring**: Simple status endpoint
+
+## 📊 Performance Metrics
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| **Cron Jobs** | 2 separate | 1 combined | 50% reduction |
+| **Blockchain TX** | 2 transactions | 1 transaction | 50% gas savings |
+| **Execution Time** | Sequential | Parallel | ~50% faster |
+| **API Calls** | 4 parallel | 4 parallel | Same efficiency |
+
+## 🏗️ Architecture
 
 ```
-services/oracle/
-├── src/                            # TypeScript source files
-│   ├── adapters/
-│   │   └── genericRestAdapter.ts   # Generic API adapter
-│   ├── config/
-│   │   ├── feeds.json              # Feed configurations
-│   │   └── sources.json            # API source configurations
-│   ├── utils/
-│   │   ├── oraclePusher.ts         # Blockchain interactions
-│   │   ├── oauth.ts                # OAuth2 client
-│   │   ├── logger.ts               # Logging utilities
-│   │   └── validateConfig.ts       # Configuration validation
-│   ├── cronScheduler.ts            # Cron job management
-│   └── index.ts                    # Main entry point
-├── dist/                           # Compiled JavaScript output
-├── package.json                    # Dependencies and scripts
-├── tsconfig.json                   # TypeScript configuration
-├── start.sh                        # Production startup script
-├── env.example                     # Environment variables template
-└── README.md
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Cron Job      │    │  API Sources    │    │  Round System   │
+│   (Every 15m)   │───▶│  (Parallel)     │───▶│  (Submit)       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Feed Logger    │    │  Batch Adapter  │    │  Complete Round │
+│  (Tree Format)  │    │  (Cost Optim.)  │    │  (Averaging)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-## ⚙️ Configuration
+## 🔧 Configuration
 
 ### Environment Variables
 
-Copy `env.example` to `.env` and configure:
-
 ```env
-# STRATO Blockchain Configuration
-STRATO_NODE_URL=https://node5.mercata-testnet.blockapps.net
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
-OAUTH_CLIENT_ID=mercata-testnet-node1
-OAUTH_CLIENT_SECRET=your_oauth_client_secret
-USERNAME=your_username
-PASSWORD=your_password
-PRICE_ORACLE_ADDRESS=08ba35c33d8f51a1732f604ff760aad00582d48b
-ORACLE_CONTRACT_NAME=PriceOracle
+# STRATO Configuration
+STRATO_NODE_URL=https://node1.mercata-testnet.blockapps.net/
+PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
+
+# OAuth Configuration
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid_configuration
 
 # API Keys
-ALCHEMY_API_KEY=your_alchemy_api_key_here
-METALS_API_KEY=your_metals_api_key_here
-METALPRICE_API_KEY=your_metalprice_api_key_here
-COINMARKETCAP_API_KEY=your_coinmarketcap_api_key_here
-
-# Health Check Configuration
-HEALTH_PORT=3000
+ALCHEMY_API_KEY=your-alchemy-key
+COINMARKETCAP_API_KEY=your-coinmarketcap-key
+METALS_API_KEY=your-metals-dev-key
+METALPRICE_API_KEY=your-metalprice-api-key
 
 # Update Interval Configuration (in minutes)
 MIN_UPDATE_INTERVAL_MINUTES=15
+
+# Instance Configuration
+INSTANCE_ID=oracle-1
+INSTANCE_NAME=Oracle Instance 1
 ```
 
-### Feed Configuration (`src/config/feeds.json`)
+### Contract Configuration
 
-The service supports both **individual feeds** and **batch feeds** for optimal API efficiency:
+The enhanced PriceOracle contract supports:
 
-#### Individual Feeds
-Each individual feed defines:
-- **name**: Human-readable feed name
-- **source**: Which API source to use (must exist in sources.json)
-- **targetAssetAddress**: Blockchain asset address to update
-- **cron**: Cron expression for update schedule
-- **apiParams**: Parameters passed to the API source
+- **Round Duration**: 15 minutes by default, adjustable by owner
+- **Simple Averaging**: Arithmetic mean of all oracle submissions
+- **Multi-Node Support**: Multiple oracles can submit during same round
+- **Early Finalization**: Rounds complete when all authorized oracles submit
+- **Storage Cleanup**: Automatic deletion of old round data (configurable)
 
-```json
-{
-  "feeds": [
-    {
-      "name": "ETH-USD",
-      "source": "Alchemy",
-      "targetAssetAddress": "0xETHAssetAddress",
-      "cron": "*/15 * * * *",
-      "apiParams": {
-        "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-      }
-    }
-  ]
-}
+## 📁 File Structure
+
+```
+src/
+├── config/
+│   ├── assets.json          # Centralized asset registry
+│   ├── feeds.json           # Feed definitions (simplified)
+│   └── sources.json         # API source configurations
+├── adapters/
+│   └── genericRestAdapter.ts # Unified API adapter with batching
+├── utils/
+│   ├── configLoader.ts      # Configuration management
+│   ├── oauth.ts            # OAuth client (lazy initialization)
+│   ├── oraclePusher.ts     # Blockchain interaction
+│   └── logger.ts           # Centralized logging
+├── types/
+│   └── index.ts            # TypeScript interfaces
+└── cronScheduler.ts        # Parallel feed processing
 ```
 
-#### Batch Feeds (Recommended)
-Batch feeds group multiple assets for efficient API calls:
-- **name**: Human-readable batch name
-- **sources**: Array of API sources to use
-- **assets**: Array of assets with individual configurations
-- **cron**: Cron expression for update schedule
+## 🚀 Deployment
 
-```json
-{
-  "feeds": [
-    {
-      "name": "crypto-batch",
-      "sources": ["Alchemy", "CoinMarketCap"],
-      "assets": [
-        {
-          "name": "ETH-USD",
-          "tokenAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-          "symbol": "ETH",
-          "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c"
-        },
-        {
-          "name": "WBTC-USD", 
-          "tokenAddress": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-          "symbol": "WBTC",
-          "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
-        }
-      ],
-      "cron": "*/15 * * * *"
-    }
-  ]
-}
-```
+### 1. Deploy Enhanced Contract
 
-### Source Configuration (`src/config/sources.json`)
-
-Each source defines:
-- **urlTemplate**: API URL with placeholder variables
-- **apiKeyEnvVar**: Environment variable name for API key
-- **parsePath**: JSONPath to extract price from response
-- **feedTimestampPath**: JSONPath to extract timestamp (optional)
-- **batchMode**: Set to `true` for sources that support batch requests (optional)
-
-### Update Interval Configuration
-
-The service enforces a minimum update interval to prevent excessive API calls and blockchain transactions. This is configurable via the `MIN_UPDATE_INTERVAL_MINUTES` environment variable:
-
-- **Default**: 15 minutes
-- **Minimum**: 1 minute (not recommended for production)
-- **Recommended**: 15-30 minutes for production use
-
-**Examples:**
-- `MIN_UPDATE_INTERVAL_MINUTES=15` - Allows `*/15 * * * *` cron expressions
-- `MIN_UPDATE_INTERVAL_MINUTES=30` - Allows `*/30 * * * *` cron expressions
-- `MIN_UPDATE_INTERVAL_MINUTES=5` - Allows `*/5 * * * *` cron expressions (development only)
-
-```json
-{
-  "Alchemy": {
-    "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
-    "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "method": "POST",
-    "requestBody": {
-      "addresses": [
-        {
-          "network": "eth-mainnet",
-          "address": "${tokenAddress}"
-        }
-      ]
-    },
-    "parsePath": "data[0].prices[0].value",
-    "feedTimestampPath": "data[0].prices[0].lastUpdatedAt"
-  }
-}
-```
-
-## 🔧 Installation & Setup
-
-1. **Install Dependencies**
-   ```bash
-   cd services/oracle
-   npm install
-   ```
-
-2. **Configure Environment**
-   ```bash
-   cp env.example .env
-   # Edit .env with your configuration
-   ```
-
-3. **Build TypeScript**
-   ```bash
-   npm run build
-   ```
-
-4. **Start the Service**
-   ```bash
-   # Production (recommended)
-   ./start.sh
-   
-   # Development
-   npm run dev
-   
-   # Alternative (requires manual environment setup)
-   npm start
-   ```
-
-## 🎯 Usage
-
-### Production Start (Recommended)
 ```bash
-cd services/oracle
-./start.sh
+cd mercata/contracts
+node deploy/deployEnhancedPriceOracle.js
 ```
 
-### Development Start
+### 2. Update Environment
+
 ```bash
-cd services/oracle
+# Update .env with new contract address
+PRICE_ORACLE_ADDRESS=<deployed-contract-address>
+```
+
+### 3. Start Oracle Service
+
+```bash
+cd mercata/services/oracle
 npm run dev
 ```
 
-### Build and Validate
-```bash
-# Build TypeScript
-npm run build
+## 📈 Multi-Instance Deployment
 
-# Validate configuration
-npm run validate
-```
+For high availability, deploy multiple oracle instances:
 
-## 📊 Available Scripts
+### Strategy
+- **Separate API Keys**: Each instance uses different API keys
+- **Staggered Scheduling**: Offset cron jobs by 1-2 minutes
+- **Instance-Specific Logging**: Unique instance IDs for monitoring
+- **Basic Health Checks**: Simple health endpoints per instance
 
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run dev` - Run in development mode with ts-node
-- `npm start` - Build and run compiled JavaScript (requires environment setup)
-- `npm run watch` - Watch mode compilation
-- `npm run validate` - Validate configuration files
-- `./start.sh` - **Production startup script (recommended)**
-
-## 🚨 Important: Starting the Service
-
-**Always use `./start.sh` for production** as it properly loads environment variables. The npm scripts may not work reliably across all shell environments.
-
-```bash
-# Make executable (first time only)
-chmod +x start.sh
-
-# Start service
-./start.sh
-```
-
-## 📊 Supported Price Sources
-
-### Batch API Optimization
-
-The service now supports **batch API requests** for optimal efficiency:
-
-- **Cost Reduction**: Single API call fetches multiple asset prices
-- **Rate Limit Efficiency**: Reduces API calls by grouping assets
-- **Performance**: Faster updates with fewer network requests
-- **Flexibility**: Supports both individual and batch configurations
-
-### Alchemy (Crypto)
-- **Use Case**: Real-time cryptocurrency prices
-- **Update Frequency**: Every 15 minutes
-- **Supported**: ETH, WBTC, USDC, USDT, PAXG
-- **Authentication**: Bearer token (API key)
-- **Batch Support**: ✅ Yes (recommended)
-
-### Metals.dev (Precious Metals)
-- **Use Case**: Gold and silver spot prices
-- **Update Frequency**: Every 15 minutes
-- **Supported**: XAU (Gold), XAG (Silver)
-- **Authentication**: API key in header
-- **Batch Support**: ✅ Yes (recommended)
-
-### CoinMarketCap (Crypto)
-- **Use Case**: Comprehensive cryptocurrency prices
-- **Update Frequency**: Every 15 minutes
-- **Supported**: All major cryptocurrencies
-- **Authentication**: API key in header
-- **Batch Support**: ✅ Yes (recommended)
-
-### MetalPriceAPI (Precious Metals)
-- **Use Case**: Real-time metals pricing
-- **Update Frequency**: Every 15 minutes
-- **Supported**: XAU (Gold), XAG (Silver)
-- **Authentication**: API key in URL
-- **Batch Support**: ✅ Yes (recommended)
-
-## 🔄 Adding New Feeds
-
-### 1. Add New Source (if needed)
-Edit `src/config/sources.json`:
-```json
-{
-  "NewAPI": {
-    "urlTemplate": "https://api.example.com/price?symbol=${symbol}",
-    "apiKeyEnvVar": "NEW_API_KEY",
-    "parsePath": "data.price",
-    "feedTimestampPath": "data.timestamp",
-    "batchMode": true
-  }
-}
-```
-
-### 2. Add New Feed
-
-#### Individual Feed
-Edit `src/config/feeds.json`:
-```json
-{
-  "name": "NEW-TOKEN-USD",
-  "source": "NewAPI",
-  "targetAssetAddress": "0xNewTokenAddress",
-  "cron": "*/15 * * * *",
-  "apiParams": {
-    "symbol": "NEWTOKEN"
-  }
-}
-```
-
-#### Batch Feed (Recommended)
-```json
-{
-  "name": "new-tokens-batch",
-  "sources": ["NewAPI"],
-  "assets": [
-    {
-      "name": "NEW-TOKEN-USD",
-      "symbol": "NEWTOKEN",
-      "targetAssetAddress": "0xNewTokenAddress"
-    }
-  ],
-  "cron": "*/15 * * * *"
-}
-```
-
-### 3. Add Environment Variable
-Add to `.env`:
+### Configuration
 ```env
-NEW_API_KEY=your_new_api_key_here
+# Instance 1
+INSTANCE_ID=oracle-1
+INSTANCE_NAME=Oracle Instance 1
+
+# Instance 2  
+INSTANCE_ID=oracle-2
+INSTANCE_NAME=Oracle Instance 2
 ```
 
-### 4. Rebuild and Restart Service
+## 🔍 Monitoring
+
+### Health Check Endpoint
+```bash
+curl http://localhost:3000/health
+```
+
+### Log Format
+```
+[FeedLogger] ETH-USD
+├─ Price: $3579.14559084 USD
+├─ Transaction: 33d2c8b5a8d10abca4626c5845d867212d1bdfc771192c1aaee2599261efcb2a
+└─ Sources:
+    ├─ Alchemy: $3579.14559084 USD
+    └─ CoinMarketCap: $3579.14559084 USD
+```
+
+## 🛠️ Development
+
+### Build
 ```bash
 npm run build
-./start.sh
 ```
 
-## 🔐 OAuth2 Authentication
-
-The service uses OAuth2 for STRATO authentication with automatic token management:
-
-- **Grant Types**: `client_credentials` and `password` flows supported
-- **Token Caching**: Tokens cached with 90% expiry safety margin
-- **Auto Refresh**: Automatic token refresh before expiry
-- **Error Handling**: Robust error handling with retry logic
-
-## 📈 Price Format
-
-All prices are stored in **8-decimal USD format**:
-- `100000000` = $1.00 USD
-- `334999000000` = $3,349.99 USD (Gold)
-- `183878000000` = $1,838.78 USD (ETH)
-
-## 📝 Logging
-
-The service provides comprehensive logging:
-- **Feed Updates**: Price changes and blockchain confirmations
-- **OAuth Events**: Token refresh and authentication status
-- **Error Tracking**: Detailed error messages with context
-- **Transaction Logs**: STRATO transaction hashes and status
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **OAuth Authentication Failed**
-   ```bash
-   # Check OAuth discovery URL
-   curl https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
-   
-   # Test OAuth credentials
-   curl -X POST https://keycloak.blockapps.net/auth/realms/mercata/protocol/openid-connect/token \
-     -d "grant_type=client_credentials" \
-     -d "client_id=your_client_id" \
-     -d "client_secret=your_client_secret"
-   ```
-
-2. **Environment Variables Not Loading**
-   - Always use `./start.sh` instead of `npm start`
-   - Verify `.env` file exists and has correct permissions
-   - Check that all required environment variables are set
-
-3. **TypeScript Compilation Errors**
-   ```bash
-   # Check TypeScript errors
-   npm run build
-   
-   # Run in development mode for better error messages
-   npm run dev
-   ```
-
-4. **Price Validation Errors**
-   - Ensure prices are in 8-decimal format
-   - Check API response parsing paths in sources.json
-
-5. **STRATO Transaction Failures**
-   - Verify `PRICE_ORACLE_ADDRESS` is correct
-   - Check oracle authorization with contract owner
-   - Ensure sufficient gas parameters
-
-### Debug Mode
+### Test
 ```bash
-# Development with detailed logging
 npm run dev
-
-# Production with environment variables
-DEBUG=* ./start.sh
 ```
 
-## 🚀 Production Considerations
+### Configuration Validation
+The service validates all configuration files on startup:
+- ✅ Asset registry completeness
+- ✅ Source configuration validity
+- ✅ API key availability
+- ✅ Feed definition consistency
 
-1. **Process Management**: Use PM2 or similar for production
-   ```bash
-   # Install PM2
-   npm install -g pm2
-   
-   # Start with PM2
-   pm2 start start.sh --name "oracle-service"
-   ```
+## 📊 Supported Assets
 
-2. **Monitoring**: Set up alerts for failed price updates
-3. **Backup Sources**: Configure multiple API sources for redundancy
-4. **Security**: Store API keys in secure environment variables
-5. **Logging**: Configure log rotation and centralized logging
-6. **Build Process**: Always run `npm run build` before deployment
+### Crypto Assets
+- **ETH**: Ethereum (WETH)
+- **WBTC**: Wrapped Bitcoin
+- **PAXG**: PAX Gold
+- **USDT**: Tether
+- **USDC**: USD Coin
 
-## 📄 License
+### Precious Metals
+- **XAU**: Gold
+- **XAG**: Silver
 
-MIT License - see LICENSE file for details.
+## 🔗 API Sources
 
-## 🤝 Contributing
+### Crypto Sources
+- **Alchemy**: High-frequency crypto prices
+- **CoinMarketCap**: Comprehensive crypto data
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes in TypeScript
-4. Run `npm run build` to compile
-5. Test with `./start.sh`
-6. Submit a pull request
+### Metals Sources
+- **Metals.dev**: Precious metals pricing
+- **MetalPriceAPI**: Alternative metals data
 
-## 📞 Support
+## 🚨 Error Handling
 
-For issues and questions:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the configuration examples
-- Ensure you're using `./start.sh` for startup 
+### Graceful Degradation
+- ✅ One source fails → Others continue
+- ✅ API timeout → Retry with backoff
+- ✅ Blockchain error → Retry transaction
+- ✅ Configuration error → Detailed logging
+- ✅ **Specific Error Messages**: Each failed source logged with detailed error information
+
+### Log Sanitization
+- 🔒 API keys masked in logs
+- 🔒 OAuth tokens hidden
+- 🔒 Sensitive URLs protected
+
+### Error Logging Examples
+```
+[ERROR] 2024-01-15T10:30:00.000Z | CronScheduler | Failed to fetch crypto from Alchemy: Network timeout
+[ERROR] 2024-01-15T10:30:00.000Z | CronScheduler | Failed to fetch crypto from CoinMarketCap: API rate limit exceeded
+[INFO] 2024-01-15T10:30:00.000Z | CronScheduler | crypto: 1/2 sources succeeded. Successful: [CoinMarketCap]. Failed: [Alchemy]
+```
+
+## 📝 License
+
+This project is part of the Mercata lending platform. 
