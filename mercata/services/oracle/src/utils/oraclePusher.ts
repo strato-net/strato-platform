@@ -22,19 +22,6 @@ const RETRY_DELAYS = {
 
 const MAX_RETRIES = 3;
 
-// Create cirrus client like backend
-const createCirrusClient = () => {
-    const baseURL = `${process.env.STRATO_NODE_URL}/cirrus/search`;
-    return axios.create({
-        baseURL,
-        headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-        },
-        timeout: 60_000,
-    });
-};
-
 // Function to get update interval from environment variable
 export async function getUpdateInterval(): Promise<number> {
     const updateIntervalMinutes = parseInt(process.env.UPDATE_INTERVAL_MINUTES || '15');
