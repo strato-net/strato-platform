@@ -176,6 +176,7 @@ const OnRampListingsTable = forwardRef((props, ref) => {
   }
 
   return (
+    <>
     <Card className="border-0">
       <CardHeader>
         <div className="flex items-center justify-between">

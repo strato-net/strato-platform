@@ -4,6 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { baseUrl } from "../../config/config";
+import { ZERO_ADDRESS } from "../helpers/onramp.helper";
 import axios from "axios";
 
 const contractAddress = constants.onRamp!;
@@ -164,9 +165,13 @@ export const get = async (accessToken: string) => {
         .map((p: any) => [p.token, p])
     );
 
-    // Build payment provider map
+    // Build payment provider map, filtering out zero addresses
+    const filteredProviders = (paymentProviders || []).filter((p: any) => 
+      p.key !== ZERO_ADDRESS && p.value?.providerAddress !== ZERO_ADDRESS
+    );
+    
     const providerMap = Object.fromEntries(
-      (paymentProviders || []).map((p: any) => [
+      filteredProviders.map((p: any) => [
         p.key,
         p.value
       ])
@@ -227,6 +232,7 @@ export const get = async (accessToken: string) => {
     return {
       ...onRamp,
       listings: enhancedListings,
+      paymentProviders: filteredProviders, // Return filtered providers instead of raw ones
       approvedTokens: Object.entries(tokenInfoMap).map(([token, info]) => ({
         token,
         _name: info._name,
