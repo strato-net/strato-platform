@@ -17,3 +17,11 @@ export function validateUserAddress(address: any): void {
     throw err;
   }
 }
+
+export const ethereumAddressField = Joi.string()
+  .pattern(/^[a-fA-F0-9]{40}$/)
+  .required()
+  .messages({
+    "string.empty": `"{#label}" is required`,
+    "string.pattern.base": `"{#label}" must be a valid Ethereum address (40 hex chars)`,
+  });
