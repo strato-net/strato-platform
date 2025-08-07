@@ -40,10 +40,8 @@ export class AlchemyWebSocket {
         },
         async (tx) => {
           try {
-            console.log('txxxxx  found', tx);
             // Only process if the transaction is going TO the safe address
             if (tx.transaction.input === '0x') {
-              console.log("calling confirmBridgeIn")
               await confirmBridgeIn(tx.transaction);
             }
             else {
@@ -68,7 +66,6 @@ export class AlchemyWebSocket {
 
         this.alchemy.ws.on(filter, async (log) => {
           try {
-            console.log('ERC-20 Transfer log:', log);
             await confirmBridgeIn({ hash: log.transactionHash }); // or use a separate handler if needed
           } catch (error) {
             logger.error('Error processing ERC-20 transfer:', error);
