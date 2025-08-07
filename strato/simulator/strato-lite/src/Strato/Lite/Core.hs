@@ -56,7 +56,9 @@ import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Monad
+import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.Processor
+import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.ApiIndexer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
@@ -966,7 +968,9 @@ corePeerSlipstream = do
   slipstreamSource <- asks _corePeerSlipstreamSource
   runConduit $
     sourceFlushTQueue slipstreamSource
-      .| ( awaitForever $ processTheMessages . concat
+      .| ( do
+             yield $ Right [CreateTable (IndexTableName "" "" "event") [("address", SqlText),("block_hash", SqlText),("block_timestamp", SqlText),("block_number", SqlText),("transaction_hash", SqlText),("transaction_sender", SqlText),("event_index", SqlDecimal),("creator", SqlText),("application", SqlText),("contract_name", SqlText),("event_name", SqlText),("attributes", SqlText)] ["transaction_hash","event_index"] Nothing]
+             awaitForever $ processTheMessages . concat
          )
       .| ( awaitForever $ \case
            Left txr -> lift $ Mod.yield txr
