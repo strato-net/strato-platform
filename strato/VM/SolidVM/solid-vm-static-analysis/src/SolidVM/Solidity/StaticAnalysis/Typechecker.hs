@@ -400,6 +400,20 @@ certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
 
+simpleType' :: SourceAnnotation Text -> Type'
+simpleType' x =
+  Sum $
+    stringType' x
+      :| [ addressType' x,
+           accountType' x,
+           intType' x,
+           contractType' x,
+           boolType' x,
+           bytesType' x,
+           decimalType' x,
+           enumType' x
+         ]
+
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
 sumType' (Sum t1) t2 = Sum (t1 <> (t2 :| []))
@@ -1332,6 +1346,9 @@ accountArgs x =
            Product [accountType' x, stringType' x] x
          ]
 
+deleteArgs :: SourceAnnotation Text -> Type'
+deleteArgs x = sumType' (simpleType' x) $ Static (SVMType.Struct Nothing "") x
+
 boolArgs :: SourceAnnotation Text -> Type'
 boolArgs x =
   Sum $
@@ -2036,7 +2053,7 @@ tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
-tcExpr (Unitary x "delete" a) = tcExpr a !> pure (Product [] x)
+tcExpr (Unitary x "delete" a) = deleteArgs x ~> tcExpr a !> pure (Product [] x)
 tcExpr (Unitary _ _ a) = tcExpr a
 tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
