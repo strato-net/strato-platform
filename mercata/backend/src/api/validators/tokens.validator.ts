@@ -1,8 +1,25 @@
 import Joi from "@hapi/joi";
 
+const ethereumAddressField = Joi.string()
+  .pattern(/^[a-fA-F0-9]{40}$/)
+  .required()
+  .messages({
+    "string.empty": `"{#label}" is required`,
+    "string.pattern.base": `"{#label}" must be a valid Ethereum address (40 hex chars)`,
+  });
+
+const valueField = Joi.string()
+  .pattern(/^\d+$/)
+  .required()
+  .label("value")
+  .messages({
+    "string.empty": `"value" is required`,
+    "string.pattern.base": `"value" must be a valid numeric string`,
+  });
+
 // Schema definitions
 const addressSchema = Joi.object({
-  address: Joi.string().required(),
+  address: ethereumAddressField.label("address"),
 });
 
 const createTokensSchema = Joi.object({
@@ -22,31 +39,38 @@ const createTokensSchema = Joi.object({
 });
 
 const transferItemSchema = Joi.object({
-  address: Joi.string().required(),
-  to: Joi.string().required(),
-  value: Joi.string().pattern(/^\d+$/).required(),
+  address: ethereumAddressField.label("address"),
+  to: ethereumAddressField.label("to"),
+  value: valueField,
 });
 
 
 const approveArgsSchema = Joi.object({
-  address: Joi.string().required(),
-  spender: Joi.string().required(),
-  value: Joi.string().pattern(/^\d+$/).required(),
+  address: ethereumAddressField.label("address"),
+  spender: ethereumAddressField.label("spender"),
+  value: valueField,
 });
 
 const transferFromArgsSchema = Joi.object({
-  address: Joi.string().required(),
-  from: Joi.string().required(),
-  to: Joi.string().required(),
-  value: Joi.string().pattern(/^\d+$/).required(),
+  address: ethereumAddressField.label("address"),
+  from: ethereumAddressField.label("from"),
+  to: ethereumAddressField.label("to"),
+  value: valueField,
 });
 
+
 const setStatusArgsSchema = Joi.object({
-  address: Joi.string().required(),
-  status: Joi.number().integer().min(1).max(3).required().messages({
-    'number.min': 'Status must be 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)',
-    'number.max': 'Status must be 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)',
-  }),
+  address: ethereumAddressField.label("address"),
+  status: Joi.number()
+    .integer()
+    .valid(1, 2, 3)
+    .required()
+    .messages({
+      "any.only": `"status" must be one of 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)`,
+      "number.base": `"status" must be a number`,
+      "number.integer": `"status" must be an integer`,
+      "any.required": `"status" is required`,
+    }),
 });
 
 const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
@@ -71,7 +95,7 @@ export function validateCreateTokensArgs(args: any) {
 export function validateTransferItemArgs(args: any) {
   const { error } = transferItemSchema.validate(args);
   if (error) {
-    throw new Error("Transfer Item Argument Validation Error");
+    throw new Error("Transfer Item Argument Validation Error: " + error.message);
   }
 }
 
