@@ -85,3 +85,36 @@ export function validateConfigureAssetArgs(args: any) {
     throw new Error("Configure Asset Argument Validation Error: " + error.message);
   }
 }
+
+export function validateLiquidationArgs(args: any) {
+  const schema = Joi.object({
+    id: Joi.string()
+      .required()
+      .messages({
+        "any.required": "Loan ID is required.",
+      }),
+
+    collateralAsset: Joi.string()
+      .pattern(/^[a-fA-F0-9]{40}$/)
+      .optional()
+      .messages({
+        "string.pattern.base": "Invalid collateral asset address format.",
+      }),
+
+    repayAmount: Joi.alternatives()
+      .try(
+        Joi.string().regex(/^\d+$/),
+        Joi.number().min(0),
+        Joi.string().valid("0")
+      )
+      .optional()
+      .messages({
+        "alternatives.match": "Repay amount must be a non-negative integer string or number.",
+      }),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Liquidation Argument Validation Error: " + error.message);
+  }
+}
