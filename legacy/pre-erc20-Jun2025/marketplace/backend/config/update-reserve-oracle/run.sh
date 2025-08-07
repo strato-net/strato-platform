@@ -47,7 +47,7 @@ fi
 ask_to_continue() {
   echo -n "Review the output above; Press Enter to continue to the next update (or type 'q' to quit): "
   read continue_input
-  
+
   if [[ "$continue_input" == "q" || "$continue_input" == "Q" ]]; then
     echo "Aborting remaining updates."
     exit 0
@@ -61,7 +61,7 @@ run_update() {
   local name=$3
   echo "Updating $name..."
   USERNAME=$USERNAME PASSWORD=$PASSWORD ORACLE_ADDRESS=$oracle RESERVE_ADDRESS=$reserve node updateOracleOnReserve.js 2>&1 | tee -a "$log_file"
-  
+
   # Check if the node command was successful
   if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "ERROR: Update for $name failed! Check $log_file for details."

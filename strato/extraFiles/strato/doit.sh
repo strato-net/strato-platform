@@ -118,23 +118,23 @@ function newnode {
   vmMinLogLevel=LevelInfo
   p2pMinLogLevel=LevelInfo
 
-  if ${API_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  if ${API_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false};
   then apiDebugMode=LevelDebug
   fi
 
-  if ${SEQUENCER_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  if ${SEQUENCER_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false};
   then seqMinLogLevel=LevelDebug
   fi
 
-  if ${SLIPSTREAM_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  if ${SLIPSTREAM_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false};
   then slipMinLogLevel=LevelDebug
   fi
 
-  if ${VM_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  if ${VM_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false};
   then vmMinLogLevel=LevelDebug
   fi
 
-  if ${P2P_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  if ${P2P_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false};
   then p2pMinLogLevel=LevelDebug
   fi
 

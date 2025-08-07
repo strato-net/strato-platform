@@ -34,7 +34,7 @@ fi
 if [ "${MP_IS_BOOTNODE}" = "false" ]; then
   if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
     cp ./config/template.deploy.tpl.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
-    sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g' 
+    sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g'
   fi
 else
   if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
@@ -50,7 +50,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
 
   # Generating the ./config/generated.config.yaml - an intermediate step to avoid removing CONFIG var (that would break the non-docker deployment)
   cp ./config/template.config.yaml /tmp/tmp.config.yaml
-  
+
   # Validate the env vars
   # TODO: check if EVERY env var is provided (in the for loop - refactor)
   if [ -z "${MP_SERVER_HOST}" ]; then
@@ -65,37 +65,37 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     echo "MP_SERVER_HOST must not contain the trailing slash"
     exit 112
   fi
-  
+
   if [ -z "${MP_SERVER_SSL}" ]; then
     echo "ssl is empty but is a required value"
     exit 12
   fi
-  
+
   if [ -z "${NODE_LABEL}" ]; then
     echo "NODE_LABEL is empty but is a required value"
     exit 13
   fi
-  
+
   if [[ "${STRATO_NODE_PROTOCOL}" == *":"* ]]; then
     echo "STRATO_NODE_PROTOCOL should be one of: 'http', 'https'"
     exit 17
   fi
-  
+
   if [ "${STRATO_NODE_HOST}" == "http"* ]; then
     echo "STRATO_NODE_HOST must not include the protocol and can only include hostname and port"
     exit 18
   fi
-  
+
   if [ -z "${OAUTH_CLIENT_ID}" ]; then
     echo "OAUTH_CLIENT_ID is empty but is a required value"
     exit 15
   fi
-  
+
   if [ -z "${OAUTH_CLIENT_SECRET}" ]; then
     echo "OAUTH_CLIENT_SECRET is empty but is a required value"
     exit 16
   fi
-  
+
   # Create /etc/hosts record to resolve STRATO_HOST to STRATO_LOCAL_IP
   if [ -n "${STRATO_LOCAL_IP}" ]; then
     _STRATO_NODE_HOSTNAME=$(echo "${STRATO_NODE_HOST}" | cut -d ":" -f 1)
@@ -103,7 +103,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     echo "${_ETC_HOSTS_RECORD}" >> /etc/hosts
     echo "Record was added to /etc/hosts: '${_ETC_HOSTS_RECORD}'"
   fi
-  
+
   [[ "${MP_SERVER_SSL}" = "true" ]] && SERVER_PROTOCOL="https" || SERVER_PROTOCOL="http"
   SERVER_URL="${SERVER_PROTOCOL}://${MP_SERVER_HOST}"
 
@@ -132,7 +132,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml
-  
+
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
     echo "deploy file exists - secondary node - nothing to deploy"
     cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
@@ -144,10 +144,10 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
       until [ ! -f ./_deploy_blocked_while_I_exist ]; do sleep 1; done
       echo "_deploy_blocked_while_I_exist file removed, continue with deploy script..."
     fi
-    
+
     CONFIG=generated yarn deploy
   fi
-  
+
 else
   # This container was already running before
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
@@ -159,7 +159,7 @@ else
   else
     echo "Error: the config.yaml file is provided but the deploy file is missing, please check the docker volume for /config"
     exit 51
-  fi  
+  fi
 fi
 
 # Replace Base code collection address in Solidity contracts

@@ -15,4 +15,4 @@ export ALCHEMY_API_KEY
 
 # Build and start the service
 npm run build
-node dist/index.js 
+node dist/index.js

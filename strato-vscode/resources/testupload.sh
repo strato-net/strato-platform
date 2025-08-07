@@ -5,7 +5,7 @@ if [ $1 == "true" ] #If script is to be executed on test network...
 then
   stratoURL=[TEST_NODE]
 elif [ $2 == "true" ] #If script is to be executed on production network...
-then 
+then
   stratoURL=[PROD_NODE]
 fi
 keycloakURL=$(echo $stratoURL | sed 's/http/&s/')

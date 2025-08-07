@@ -17,7 +17,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   cp /tmp/openid.tpl.lua /tmp/openid.lua
   sed -i 's*<client_id>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
   sed -i 's*<client_secret>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
-  
+
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
   mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
 fi

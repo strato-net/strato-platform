@@ -19,7 +19,7 @@ if [ -z "${POSTGRES_USER}" ]; then
   echo "POSTGRES_USER is empty but is a required value"
   exit 13
 fi
-  
+
 if [ -z "${POSTGRES_PASSWORD}" ]; then
   echo "POSTGRES_PASSWORD is empty but is a required value"
   exit 14

@@ -15,19 +15,19 @@ cd /var/lib/identity
 function runIdentityServer {
   # if alternative log in methods are provided then use them
   mkdir -p logs
-  
+
   minLogLevel=LevelInfo
   if [ "${IDENTITYPROVIDER_DEBUG:-false}" == true ]; then
     minLogLevel=LevelDebug
   fi
-  
+
   echo "Environment variables:
   identity-provider:
   --minLogLevel="${minLogLevel}" \
   --port="${identityProviderPort}"
   --vaultProxyUrl="${vaultProxyUrl}"
   "
-  
+
   if [ -n "${vaultProxyUrl}" ]; then
       vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
   fi
@@ -36,7 +36,7 @@ function runIdentityServer {
   fi
   if [ -n "${cacheSize}" ]; then
       csFlag="--cacheSize=${cacheSize}"
-  fi  
+  fi
   RED='\033[0;31m'
   NC='\033[0m' # No Color
   OAUTH_DISCOVERY_URL=$(yq '.[0].discoveryUrl // "" ' /identity-provider/idconf.yaml )
@@ -52,7 +52,7 @@ function runIdentityServer {
     --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
     --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
-  
+
   set +x
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
   started=$(date +%s)
@@ -68,15 +68,15 @@ function runIdentityServer {
   done
   echo 'vault-proxy is available'
   set -x
-  
+
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
     "${vpFlag}" "${sgFlag}" "${csFlag}" &>> logs/identity-provider-server
-  
+
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
-  
+
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
     echo -e "${Green}Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy...${NC}"
@@ -104,7 +104,7 @@ function runIdentityServer {
               echo "done"
             fi
           done
-  
+
           FILE_NAME="/var/lib/identity/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
           echo "Tail of logs for crashed process:"
           echo "+tail -n 20 ${FILE_NAME}"

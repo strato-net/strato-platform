@@ -6,7 +6,7 @@ ORACLE_MODE=${ORACLE_MODE:-false}
 # Checking the container mode (payment server or oracle service)
 if [ "$ORACLE_MODE" = "true" ]; then
   echo "Running the container in Oracle service mode"
-  
+
   export DOCKERIZED="true"
   export SALE_UPDATE=${SALE_UPDATE:-false}
 
@@ -72,9 +72,9 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   if [ ! -f "${CONFIG_DIR_PATH}/oracle_config.yaml" ]; then
     # Running container for the first time
-  
+
     cp ./config/template.oracle_config.yaml /tmp/tmp.oracle_config.yaml
-  
+
     # Replace placeholders in Oracle config template
     sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.oracle_config.yaml
@@ -91,10 +91,10 @@ if [ "$ORACLE_MODE" = "true" ]; then
     sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.oracle_config.yaml
-  
+
     mv /tmp/tmp.oracle_config.yaml ./config/generated.oracle_config.yaml
     cp ./config/generated.oracle_config.yaml ${CONFIG_DIR_PATH}/oracle_config.yaml
-  
+
     if [ -f "${CONFIG_DIR_PATH}/oracle_deploy.yaml" ]; then
       cat ${CONFIG_DIR_PATH}/oracle_deploy.yaml
       echo 'oracle_deploy.yaml already exists for oracle but there is no config file. Exiting.'
@@ -127,7 +127,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
       fi
     fi
   fi
-  
+
   echo 'Starting the submit-price script...'
   yarn submit-price
 
@@ -189,10 +189,10 @@ else
 
   if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     # Running container for the first time
-    
+
     # Generating the ./config/generated.config.yaml - an intermediate step to avoid removing CONFIG var (that would break the non-docker deployment)
     cp ./config/template.config.yaml /tmp/tmp.config.yaml
-  
+
     # Validate the env vars
     # TODO: check if EVERY env var is provided (in the for loop - refactor)
     if [ -z "${SERVER_HOST}" ]; then
@@ -203,17 +203,17 @@ else
       echo "SERVER_HOST must not contain the trailing slash"
       exit 112
     fi
-      
+
     if [ -z "${OAUTH_CLIENT_ID}" ]; then
       echo "OAUTH_CLIENT_ID is empty but is a required value"
       exit 15
     fi
-      
+
     if [ -z "${OAUTH_CLIENT_SECRET}" ]; then
       echo "OAUTH_CLIENT_SECRET is empty but is a required value"
       exit 16
     fi
-  
+
     if [ -z "${USDST_ADDRESS}" ]; then
       echo "USDST_ADDRESS is empty but is a required value"
       exit 17
@@ -223,7 +223,7 @@ else
       echo "USDST_FEE_RECIPIENT is empty but is a required value"
       exit 18
     fi
-  
+
     sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
@@ -279,10 +279,10 @@ else
     sed -i 's*<redemptions_redeem_text_value>*'"${REDEMPTIONS_REDEEM_TEXT_VALUE}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<redemptions_service_name_value>*'"${REDEMPTIONS_SERVICE_NAME_VALUE}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<redemptions_service_url_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
-  
+
     mv /tmp/tmp.config.yaml ./config/generated.config.yaml
     cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
-  
+
     if [ -f "${CONFIG_DIR_PATH}/deploy.yaml" ]; then
       cat ${CONFIG_DIR_PATH}/deploy.yaml
       echo 'deploy.yaml already exists but there is no config file. Exiting.'
