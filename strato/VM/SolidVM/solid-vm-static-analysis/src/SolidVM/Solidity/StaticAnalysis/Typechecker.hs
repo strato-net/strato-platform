@@ -415,7 +415,7 @@ simpleType' x =
          ]
 
 arrayType' :: SourceAnnotation Text -> Type'
-arrayType' x = Function (Static (SVMType.Int Nothing Nothing) x) (topType' x) x [] [] False
+arrayType' x = Function (MultiVariate (Static (SVMType.Int Nothing Nothing) x) x) (topType' x) x [] [] False
 
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
@@ -586,13 +586,11 @@ toFunctionType :: SVMType.Type -> SourceAnnotation Text -> Type'
 toFunctionType (SVMType.Array t _) x = case toFunctionType t x of
   f@Function{} -> case functionArgType f of
     Product ts y -> f{functionArgType = Product ((Static (SVMType.Int Nothing Nothing) x):ts) y}
-    u@(Static _ y) -> f{functionArgType = Product [Static (SVMType.Int Nothing Nothing) x,u] y}
     _ -> Bottom $ x :| []
   _ -> Bottom $ x :| []
 toFunctionType (SVMType.Mapping _ k v) x = case toFunctionType v x of
   f@Function{} -> case functionArgType f of
     Product ts y -> f{functionArgType = Product ((Static k x):ts) y}
-    t@(Static _ y) -> f{functionArgType = Product [Static (SVMType.Int Nothing Nothing) x,t] y}
     _ -> Bottom $ x :| []
   _ -> Bottom $ x :| []
 toFunctionType SVMType.Variadic x = Function (Product [] x) (topType' x) x [] [] False
@@ -2074,7 +2072,12 @@ tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
-tcExpr (Unitary x "delete" a) = deleteArgs x ~> tcExpr a !> pure (Product [] x)
+tcExpr (Unitary x "delete" a) = do
+  t <- tcExpr a
+  t' <- typecheck (deleteArgs x) t
+  pure $ case t' of
+    Bottom _ -> Bottom $ (("Cannot delete state variables of type " <> (showType' t)) <$ x) :| []
+    _ -> Product [] x
 tcExpr (Unitary _ _ a) = tcExpr a
 tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
