@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchBatchPrices } from './adapters/genericRestAdapter';
-import { pushAssetPrices, getRoundDuration } from './utils/oraclePusher';
+import { pushAssetPrices, getUpdateInterval } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
 import { Asset } from './types';
 
@@ -187,11 +187,11 @@ export async function startCronScheduler(): Promise<void> {
     const configLoader = new ConfigLoader();
     const resolvedFeeds = configLoader.getResolvedFeeds();
     
-    // Read round duration from contract
-    const roundDurationSeconds = await getRoundDuration();
-    const roundDurationMinutes = Math.ceil(roundDurationSeconds / 60);
+    // Read update interval from environment
+    const updateIntervalSeconds = await getUpdateInterval();
+    const updateIntervalMinutes = Math.ceil(updateIntervalSeconds / 60);
     
-    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (round duration: ${roundDurationMinutes} minutes)`);
+    logInfo('CronScheduler', `Starting Oracle Service with ${resolvedFeeds.length} feeds (update interval: ${updateIntervalMinutes} minutes from env: ${process.env.UPDATE_INTERVAL_MINUTES || '15'})`);
 
     // Single cron job that processes all feeds in parallel
     const jobFunction = async () => {
@@ -203,9 +203,9 @@ export async function startCronScheduler(): Promise<void> {
         }
     };
 
-    // Schedule the job based on round duration from contract
-    const cronSchedule = `*/${roundDurationMinutes} * * * *`;
-    logInfo('CronScheduler', `Scheduling oracle updates every ${roundDurationMinutes} minutes (cron: ${cronSchedule})`);
+    // Schedule the job based on update interval from contract
+    const cronSchedule = `*/${updateIntervalMinutes} * * * *`;
+    logInfo('CronScheduler', `Scheduling oracle updates every ${updateIntervalMinutes} minutes (cron: ${cronSchedule})`);
     
     cron.schedule(cronSchedule, jobFunction);
     

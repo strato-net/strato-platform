@@ -9,14 +9,15 @@ A high-performance, production-ready price oracle service for the Mercata lendin
 - **Single Blockchain Transaction**: All assets updated in one transaction (7 assets = 1 TX)
 - **Instance Identification**: Each oracle instance has unique ID and logging
 - **Basic Health Checks**: Simple health endpoint with service status
+- **Configurable Update Interval**: Update frequency configurable via environment variable (1-60 minutes)
 
-### **Enhanced Price Oracle Contract**
-- **Round-Based System**: 15-minute rounds for price collection and averaging
-- **Simple Averaging**: Arithmetic mean of all oracle submissions per asset
-- **Multi-Node Support**: Multiple oracle nodes can submit in same round
-- **Early Finalization**: Rounds complete automatically when all authorized oracles submit
-- **Configurable Parameters**: Round duration adjustable by owner
-- **Storage Cleanup**: Automatic cleanup of old rounds to prevent unbounded growth
+### **Simple Price Oracle Contract**
+- **Direct Price Updates**: Immediate price updates without round-based consensus
+- **Batch Updates**: Multiple assets updated in single transaction
+- **Authorized Oracle System**: Only authorized oracle addresses can submit prices
+- **Price Validation**: Ensures prices are greater than zero
+- **Timestamp Tracking**: Records when each price was last updated
+- **Owner Controls**: Owner can authorize/revoke oracle addresses
 
 ### **API Optimization**
 - **Batch API Calls**: Multiple assets fetched in single API requests
@@ -44,14 +45,14 @@ A high-performance, production-ready price oracle service for the Mercata lendin
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Cron Job      │    │  API Sources    │    │  Round System   │
-│   (Every 15m)   │───▶│  (Parallel)     │───▶│  (Submit)       │
+│   Cron Job      │    │  API Sources    │    │  Price Oracle   │
+│   (Every 15m)   │───▶│  (Parallel)     │───▶│  (Batch Update) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Feed Logger    │    │  Batch Adapter  │    │  Complete Round │
-│  (Tree Format)  │    │  (Cost Optim.)  │    │  (Averaging)    │
+│  Feed Logger    │    │  Batch Adapter  │    │  Direct Update  │
+│  (Tree Format)  │    │  (Cost Optim.)  │    │  (No Consensus) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -75,8 +76,8 @@ COINMARKETCAP_API_KEY=your-coinmarketcap-key
 METALS_API_KEY=your-metals-dev-key
 METALPRICE_API_KEY=your-metalprice-api-key
 
-# Update Interval Configuration (in minutes)
-MIN_UPDATE_INTERVAL_MINUTES=15
+# Oracle Update Configuration
+UPDATE_INTERVAL_MINUTES=15  # Update interval in minutes (1-60, default: 15)
 
 # Instance Configuration
 INSTANCE_ID=oracle-1

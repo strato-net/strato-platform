@@ -35,34 +35,17 @@ const createCirrusClient = () => {
     });
 };
 
-// Function to read round duration from contract using cirrus
-export async function getRoundDuration(): Promise<number> {
-    try {
-        const accessToken = await oauthClient().getAccessToken();
-        const cirrus = createCirrusClient();
-        
-        const response = await cirrus.get(`/BlockApps-Mercata-PriceOracle`, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-            params: {
-                address: `eq.${process.env.PRICE_ORACLE_ADDRESS}`,
-                select: "roundDuration"
-            }
-        });
-
-        const roundDuration = response.data?.[0]?.roundDuration;
-        if (roundDuration && typeof roundDuration === 'number') {
-            return roundDuration;
-        }
-        
-        // Fallback to default 15 minutes (900 seconds)
-        return 900;
-    } catch (error) {
-        logError('OraclePusher', new Error(`Error reading round duration: ${error}`));
-        // Fallback to default 15 minutes (900 seconds)
-        return 900;
+// Function to get update interval from environment variable
+export async function getUpdateInterval(): Promise<number> {
+    const updateIntervalMinutes = parseInt(process.env.UPDATE_INTERVAL_MINUTES || '15');
+    const updateIntervalSeconds = updateIntervalMinutes * 60;
+    
+    // Validate the interval (minimum 1 minute, maximum 60 minutes)
+    if (updateIntervalMinutes < 1 || updateIntervalMinutes > 60) {
+        throw new Error(`Invalid UPDATE_INTERVAL_MINUTES: ${updateIntervalMinutes}. Must be between 1 and 60 minutes.`);
     }
+    
+    return updateIntervalSeconds;
 }
 
 async function callListAndWait(callListArgs: CallListArg[], retryCount: number = 0): Promise<TransactionResult> {
@@ -124,7 +107,7 @@ export async function pushAssetPrices(assets: string[], prices: number[]): Promi
     try {
         const callListArgs: CallListArg[] = [{
             contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
-            method: "submitPrices",
+            method: "setAssetPrices",
             args: { assets, priceValues: prices },
         }];
 
