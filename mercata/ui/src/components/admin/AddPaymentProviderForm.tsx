@@ -38,8 +38,14 @@ const AddPaymentProviderForm = () => {
   const onSubmit = async (data: AddPaymentProviderFormValues) => {
     setLoading(true);
     try {
+      // Remove 0x prefix if present before sending to backend
+      let address = data.providerAddress.toLowerCase();
+      if (address.startsWith('0x')) {
+        address = address.slice(2);
+      }
+      
       const result = await addPaymentProvider({
-        providerAddress: data.providerAddress,
+        providerAddress: address,
         name: data.name,
         endpoint: data.endpoint,
       });
@@ -114,8 +120,8 @@ const AddPaymentProviderForm = () => {
               rules={{
                 required: "Provider address is required",
                 pattern: {
-                  value: /^0x[a-fA-F0-9]{40}$/,
-                  message: "Please enter a valid Ethereum address"
+                  value: /^(0x)?[a-fA-F0-9]{40}$/i,
+                  message: "Please enter a valid address (40 hex characters, with or without 0x prefix)"
                 }
               }}
               render={({ field }) => (
@@ -123,12 +129,12 @@ const AddPaymentProviderForm = () => {
                   <FormLabel>Provider Address</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="0x... (e.g., service-signer address)"
+                      placeholder="e.g., 3dc1e4bdb54f6cce80c92d5d494160545a78db35"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    The blockchain address of the payment provider (service signer)
+                    The address of the payment provider (40 hex characters, 0x prefix optional)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

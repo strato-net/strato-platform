@@ -31,8 +31,10 @@ const PaymentProvidersTable = () => {
       setRefreshing(true);
       const onRampData = await get();
       
-      // Convert the paymentProviders object to an array
+      // Get providers
       const providersList = onRampData?.paymentProviders || [];
+      
+      // Show all providers including zero addresses
       const formattedProviders = providersList.map(provider => ({
         key: provider.key || provider.providerAddress,
         value: provider.value || provider
@@ -66,12 +68,22 @@ const PaymentProvidersTable = () => {
         title: "Success",
         description: result.message || "Payment provider removed successfully",
       });
-      fetchProviders();
+      
+      // Add a small delay to ensure the blockchain state is updated
+      setTimeout(() => {
+        fetchProviders();
+      }, 1000);
     } catch (error: any) {
       console.error("Error deleting provider:", error);
+      // Handle the specific error from backend about provider being in use
+      const errorMessage = error?.response?.data?.message || 
+                          error?.response?.data?.error || 
+                          error?.message || 
+                          "Failed to delete payment provider";
+      
       toast({
-        title: "Error",
-        description: error?.response?.data?.message || error?.message || "Failed to delete payment provider",
+        title: "Cannot Remove Provider",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -85,6 +97,7 @@ const PaymentProvidersTable = () => {
   }, []);
 
   const formatAddress = (address: string) => {
+    if (!address) return "N/A";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
@@ -162,16 +175,20 @@ const PaymentProvidersTable = () => {
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">Endpoint:</span>
                             <span className="truncate max-w-[200px]">
-                              {provider.value.endpoint}
+                              {provider.value.endpoint || "N/A"}
                             </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(provider.value.endpoint, '_blank')}
-                              className="h-6 w-6 p-0"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
+                            {provider.value.endpoint && 
+                             provider.value.endpoint !== "0000000000000000000000000000000000000000" && 
+                             provider.value.endpoint.startsWith("http") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(provider.value.endpoint, '_blank')}
+                                className="h-6 w-6 p-0"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>

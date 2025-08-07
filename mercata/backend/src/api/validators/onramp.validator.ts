@@ -134,10 +134,10 @@ export function validateAddPaymentProviderArgs(args: any) {
 
   const schema = Joi.object({
     providerAddress: Joi.string()
-      .pattern(/^0x[a-fA-F0-9]{40}$/)
+      .pattern(/^(0x)?[a-fA-F0-9]{40}$/i)
       .required()
       .messages({
-        "string.pattern.base": "Provider address must be a valid Ethereum address (0x followed by 40 hex characters).",
+        "string.pattern.base": "Provider address must be 40 hex characters (with or without 0x prefix).",
         "any.required": "Provider address is required.",
       }),
     name: Joi.string()
@@ -171,10 +171,10 @@ export function validateRemovePaymentProviderArgs(args: any) {
 
   const schema = Joi.object({
     providerAddress: Joi.string()
-      .pattern(/^0x[a-fA-F0-9]{40}$/)
+      .pattern(/^(0x)?[a-fA-F0-9]{40}$/i)
       .required()
       .messages({
-        "string.pattern.base": "Provider address must be a valid Ethereum address (0x followed by 40 hex characters).",
+        "string.pattern.base": "Provider address must be 40 hex characters (with or without 0x prefix).",
         "any.required": "Provider address is required.",
       }),
   }).strict();

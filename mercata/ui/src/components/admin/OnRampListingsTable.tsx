@@ -51,6 +51,7 @@ const OnRampListingsTable = () => {
 
   const formatAddress = (address: string) => {
     if (!address) return "N/A";
+    // STRATO addresses don't have 0x prefix
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 

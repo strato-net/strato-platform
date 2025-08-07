@@ -20,8 +20,14 @@ export const addPaymentProvider = async (
 ) => {
   const { providerAddress, name, endpoint } = providerData;
   
+  // Remove 0x prefix if present for STRATO
+  let normalizedAddress = providerAddress.toLowerCase();
+  if (normalizedAddress.startsWith('0x')) {
+    normalizedAddress = normalizedAddress.slice(2);
+  }
+  
   const args = {
-    provider: providerAddress,
+    provider: normalizedAddress,
     name,
     endpoint,
   };
@@ -33,7 +39,9 @@ export const addPaymentProvider = async (
     args
   });
 
-  const result = await postAndWaitForTx(accessToken, tx);
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
   
   return {
     success: true,
@@ -47,8 +55,34 @@ export const removePaymentProvider = async (
   accessToken: string,
   providerAddress: string
 ) => {
+  // First, check if the provider is being used in any listings
+  const onRampData = await get(accessToken);
+  const listings = onRampData?.listings || [];
+  
+  // Remove 0x prefix if present for STRATO
+  let normalizedAddress = providerAddress.toLowerCase();
+  if (normalizedAddress.startsWith('0x')) {
+    normalizedAddress = normalizedAddress.slice(2);
+  }
+  
+  // Check if this provider is being used in any active listing
+  const isProviderInUse = listings.some((listing: any) => {
+    const listingInfo = listing.ListingInfo;
+    if (!listingInfo || !listingInfo.providers) return false;
+    
+    return listingInfo.providers.some((provider: any) => {
+      const address = provider.providerAddress || provider.key || provider;
+      const providerAddr = address.toLowerCase().replace(/^0x/, '');
+      return providerAddr === normalizedAddress;
+    });
+  });
+  
+  if (isProviderInUse) {
+    throw new Error("Cannot remove payment provider: It is currently being used in active listings");
+  }
+  
   const args = {
-    provider: providerAddress,
+    provider: normalizedAddress,
   };
 
   const tx = buildFunctionTx({
@@ -58,7 +92,9 @@ export const removePaymentProvider = async (
     args
   });
 
-  const result = await postAndWaitForTx(accessToken, tx);
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
   
   return {
     success: true,
