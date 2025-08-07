@@ -45,7 +45,7 @@ import { useState, useEffect } from "react";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [projectId, setProjectId] = useState('UNSET');
+  const [projectId, setProjectId] = useState('PROJECT_ID_UNSET');
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 

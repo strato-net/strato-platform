@@ -7,7 +7,7 @@ class ConfigController {
       res.json({
         success: true,
         data: {
-          projectId: process.env.WAGMI_PROJECT_ID || 'UNSET',
+          projectId: process.env.WAGMI_PROJECT_ID || 'PROJECT_ID_UNSET',
         }
       });
     } catch (error) {
