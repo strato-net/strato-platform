@@ -82,7 +82,7 @@ local USER_ID
 local ISSUER
 
 if ngx.req.get_headers()["Authorization"] then
-  
+
   local auth_header = ngx.req.get_headers()["Authorization"]
   local identity_providers = config["identity_providers_keyed"]
   ISSUER = get_access_token_issuer_unverified(auth_header)
@@ -111,7 +111,7 @@ if ngx.req.get_headers()["Authorization"] then
 
   if not isEmpty(verify_res[PROVIDER_DATA['USER_ID_CLAIM']]) then
     USER_ID = verify_res[PROVIDER_DATA['USER_ID_CLAIM']]
-  else 
+  else
     ngx.status = 500
     user_err_msg = 'Could not authenticate the request. Unexpected format of bearer token for that issuer.'
     ngx.log(ngx.STDERR, user_err_msg .. ' Error details: Failed to find claim \''..PROVIDER_DATA['USER_ID_CLAIM']..'\' in payload of the token.')

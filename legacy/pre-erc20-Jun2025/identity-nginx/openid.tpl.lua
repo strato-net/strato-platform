@@ -148,7 +148,7 @@ if ngx.req.get_headers()["Authorization"] then
   if verify_res['email'] then
     email = verify_res['email']
   end
-  
+
   if verify_res['company'] ~= nil then
     ngx.req.set_uri_args({company = verify_res['company']})
   end
