@@ -143,7 +143,7 @@ const Admin = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Payment Providers Column */}
               <div className="space-y-6">
-                <div className="bg-background border rounded-lg p-6">
+                <div className="bg-card border rounded-lg p-6">
                   <PaymentProvidersTable />
                   
                   <div className="mt-6">
@@ -164,7 +164,7 @@ const Admin = () => {
 
               {/* OnRamp Listings Column */}
               <div className="space-y-6">
-                <div className="bg-background border rounded-lg p-6">
+                <div className="bg-card border rounded-lg p-6">
                   <OnRampListingsTable />
                   
                   <div className="mt-6">

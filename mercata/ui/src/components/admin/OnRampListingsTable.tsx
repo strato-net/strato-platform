@@ -191,7 +191,7 @@ const OnRampListingsTable = () => {
               {listings.map((listing) => (
                 <div
                   key={listing.key}
-                  className="p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                  className="p-4 rounded-lg bg-card hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-2 flex-1">
