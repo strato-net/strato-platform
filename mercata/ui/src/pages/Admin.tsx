@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard } from 'lucide-react';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
@@ -11,6 +11,7 @@ import ListAssetForm from '@/components/admin/ListAssetForm';
 import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
+import AddPaymentProviderForm from '@/components/admin/AddPaymentProviderForm';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -78,9 +79,10 @@ const Admin = () => {
               </TabsTrigger>
               <TabsTrigger value="listing" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Settings className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">List Assets</span>
-                <span className="sm:hidden">Assets</span>
+                <span className="hidden sm:inline">Setup OnRamp</span>
+                <span className="sm:hidden">OnRamp</span>
               </TabsTrigger>
+
             </TabsList>
           </div>
 
@@ -138,9 +140,21 @@ const Admin = () => {
           <TabsContent value="listing" className="space-y-6">
             <Card>
               <CardHeader>
+                <CardTitle>Add Payment Provider</CardTitle>
+                <CardDescription>
+                  Configure new payment providers for fiat-to-crypto transactions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AddPaymentProviderForm />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
                 <CardTitle>List Assets for Sale</CardTitle>
                 <CardDescription>
-                  List tokens for direct purchase with fiat
+                  List tokens for direct purchase with fiat using configured payment providers
                 </CardDescription>
               </CardHeader>
               <CardContent>
