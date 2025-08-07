@@ -285,11 +285,32 @@ const SwapDialog = ({
             {toAmount} {toAsset?._symbol || ""}
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Exchange rate:</span>
-          <span>
-            1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
-          </span>
+        
+        {/* Calculation Breakdown */}
+        <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+          <div className="text-sm font-semibold text-gray-700">Calculation Breakdown:</div>
+          
+          <div className="text-xs space-y-1 text-gray-600">
+            <div className="flex justify-between">
+              <span>Swap fee:</span>
+              <span>{SWAP_FEE} USDST</span>
+            </div>
+                          <div className="flex justify-between">
+                <span>Price Impact:</span>
+                <span className="text-red-600">
+                  {fromAmount && toAmount && exchangeRate && parseFloat(fromAmount) > 0 && parseFloat(exchangeRate) > 0
+                    ? (() => {
+                        const actualRate = parseFloat(toAmount) / parseFloat(fromAmount); // What you actually get
+                        const unitRate = parseFloat(exchangeRate); // Theoretical pool rate
+                        const diff = ((actualRate - unitRate) / unitRate) * 100; // This should be negative
+                        const rounded = Math.round(diff * 100) / 100; // Round to 2 decimal places
+                        return `${formatAmount(rounded.toString())}%`;
+                      })()
+                    : "---"
+                  }
+                </span>
+              </div>
+          </div>
         </div>
       </div>
       <DialogFooter>
