@@ -13,7 +13,7 @@ function parsePoolConfigs() {
     if (!poolConfigsStr) {
       throw new Error("POOL_CONFIGS environment variable is required");
     }
-    
+
     const config = JSON.parse(poolConfigsStr);
     return config.pools || [];
   } catch (error) {
@@ -29,7 +29,7 @@ function savePoolAddresses(poolAddresses, poolConfigs) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `pool-addresses-${timestamp}.json`;
   const filepath = path.join(__dirname, filename);
-  
+
   const data = {
     timestamp: new Date().toISOString(),
     totalPools: poolAddresses.length,
@@ -41,7 +41,7 @@ function savePoolAddresses(poolAddresses, poolConfigs) {
       config: config
     }))
   };
-  
+
   fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
   console.log(`Pool addresses saved to: ${filepath}`);
   return filepath;
@@ -54,42 +54,42 @@ async function createMultiplePools() {
   try {
     const poolConfigs = parsePoolConfigs();
     const poolFactoryAddress = getEnvVar("POOL_FACTORY_ADDRESS");
-    
+
     if (!poolFactoryAddress) {
       throw new Error("POOL_FACTORY_ADDRESS environment variable is required");
     }
-    
+
     console.log(`Creating ${poolConfigs.length} pools...`);
-    
+
     const poolAddresses = [];
-    
+
     for (let i = 0; i < poolConfigs.length; i++) {
       const config = poolConfigs[i];
       console.log(`\nCreating pool ${i + 1}/${poolConfigs.length}...`);
       console.log(`Token A: ${config.tokenA}`);
       console.log(`Token B: ${config.tokenB}`);
-      
+
       try {
         const poolAddress = await createPool(
           config.tokenA,
           config.tokenB,
           poolFactoryAddress
         );
-        
+
         poolAddresses.push(poolAddress);
         console.log(`✅ Pool ${i + 1} created successfully at: ${poolAddress}`);
-        
+
       } catch (error) {
         console.error(`❌ Failed to create pool ${i + 1}:`, error.message);
         // Continue with other pools even if one fails
         poolAddresses.push(null);
       }
     }
-    
+
     // Save successful pool addresses
     const successfulPools = poolAddresses.filter(addr => addr !== null);
     const successfulConfigs = poolConfigs.filter((_, index) => poolAddresses[index] !== null);
-    
+
     if (successfulPools.length > 0) {
       const filepath = savePoolAddresses(successfulPools, successfulConfigs);
       console.log(`\n🎉 Successfully created ${successfulPools.length}/${poolConfigs.length} pools`);
@@ -97,7 +97,7 @@ async function createMultiplePools() {
     } else {
       console.log("\n❌ No pools were created successfully");
     }
-    
+
     return {
       totalRequested: poolConfigs.length,
       successful: successfulPools.length,
@@ -105,7 +105,7 @@ async function createMultiplePools() {
       addresses: successfulPools,
       filepath: successfulPools.length > 0 ? savePoolAddresses(successfulPools, successfulConfigs) : null
     };
-    
+
   } catch (error) {
     console.error("Error creating multiple pools:", error.message);
     throw error;
@@ -119,14 +119,14 @@ async function main() {
     console.log(`Total pools requested: ${result.totalRequested}`);
     console.log(`Successfully created: ${result.successful}`);
     console.log(`Failed: ${result.failed}`);
-    
+
     if (result.addresses.length > 0) {
       console.log("\n📍 Pool addresses:");
       result.addresses.forEach((address, index) => {
         console.log(`Pool ${index + 1}: ${address}`);
       });
     }
-    
+
   } catch (error) {
     console.error("Fatal error:", error.message);
     process.exit(1);

@@ -357,7 +357,7 @@ class DeployDapp extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <AnchorButton 
+        <AnchorButton
           onClick={() => {
             mixpanelWrapper.track("deploy_dapp_open_click");
             this.props.deployDappOpenModal();
@@ -484,7 +484,7 @@ class DeployDapp extends Component {
                   <AddMember handler={this.updateMembers} publicKey={this.props.publicKey}/>
                 </div>
               </div>
-              
+
               <div className="row">
                 <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">

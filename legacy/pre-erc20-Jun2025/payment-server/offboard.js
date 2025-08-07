@@ -42,7 +42,7 @@ describe('Payment Server - Offboard Stripe Seller', function () {
 
   // Offboard seller from the Stripe payment service
   it('Offboard Seller from Stripe ExternalPaymentService', async () => {
-    const sellerCommonName = process.env.SELLER_NAME ?? 
+    const sellerCommonName = process.env.SELLER_NAME ??
       assert.fail('Seller common name must be provided as a command-line argument.');
 
     try {

@@ -96,7 +96,7 @@ class MarketplaceController {
     const inventoryDataCopy = JSON.parse(JSON.stringify(inventoryData));
     // Create a set of token names from constants.tokensArray
     const tokensNamesSet = new Set(constants.tokensArray.map(token => token.name.toLowerCase()));
-    
+
     // Partition items into four buckets:
     // Bucket 1: Items with name 'gold' or 'goldst'
     // Bucket 2: Items with a truthy 'sale' property
@@ -106,7 +106,7 @@ class MarketplaceController {
     const bucketSale = [];
     const bucketTokenNames = [];
     const bucketRest = [];
-    
+
     inventoryDataCopy.forEach(item => {
       const name = item.name?.toLowerCase();
       if (name === 'gold' || name === 'goldst') {
@@ -119,7 +119,7 @@ class MarketplaceController {
         bucketRest.push(item);
       }
     });
-    
+
     return [...bucketGold, ...bucketSale, ...bucketTokenNames, ...bucketRest];
   }
 

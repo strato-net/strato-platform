@@ -97,7 +97,7 @@ const InventoryCard = ({
   const price = inventory?.price
     ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
     : undefined;
-  
+
   const saleQuantity = (
     stratsAddress === inventory.originAddress
       ? new BigNumber(inventory.saleQuantity).dividedBy(100)

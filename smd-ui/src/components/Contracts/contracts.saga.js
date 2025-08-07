@@ -7,7 +7,7 @@ import {
 import { env } from "../../env";
 import { handleErrors } from "../../lib/handleErrors";
 
-import { 
+import {
   selectContractInstance,
   fetchState,
   fetchAccount,
@@ -39,7 +39,7 @@ export async function getContracts(chainid, limit, offset, searchTerm) {
   // if (searchTerm && isValidContractAddress(searchTerm)) {
   //   const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
   //   const { _contractName } = await fetchJson(detailUrl);
-    
+
   //   if (_contractName) params.set("name", searchTerm);
 
   //   const listUrl = `${contractsUrl}?${params}`;

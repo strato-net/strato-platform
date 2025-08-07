@@ -45,7 +45,7 @@ describe('CreateBlocUser: saga', () => {
           .call.fn(createBlocUserApiCall).put.like({ action: { type: CREATE_BLOC_USER_SUCCESS } })
           .run().then((result) => { done() });
       });
-  
+
       test('failure', (done) => {
         fetch.mockReject(JSON.stringify(error));
         expectSaga(createBlocUser, formData)

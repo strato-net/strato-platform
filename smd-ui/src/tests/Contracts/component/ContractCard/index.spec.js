@@ -78,7 +78,7 @@ describe('ContractCard: index', () => {
     test('instance selection', () => {
       const props = {
         contract: {
-          name: 'Greeter', 
+          name: 'Greeter',
           contract: {
             "instances": [
               {

@@ -1,7 +1,7 @@
 const db = require('./connection');
 
 
-// TODO: BIGINT has a precision of 64. But some of these fields actually have a precision of a 1000. 
+// TODO: BIGINT has a precision of 64. But some of these fields actually have a precision of a 1000.
 // Need a better representation. Sequelize does not currently support this.
 const BlockDataRef = db.sequelize.define('block_data_ref', {
   id: {

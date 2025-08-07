@@ -53,7 +53,7 @@ import {
 } from '../../helpers/constants';
 
 const UserProfile = ({ user }) => {
-  
+
   const [activeTab, setActiveTab] = useState('1');
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
@@ -180,7 +180,7 @@ const UserProfile = ({ user }) => {
   }, [routeMatch]);
 
   // Inventories For Sale fetch
-  useEffect(() => {    
+  useEffect(() => {
     if(user?.address){
       inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined, '', user.address);
     }

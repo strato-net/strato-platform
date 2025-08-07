@@ -12,7 +12,7 @@ function getUserCount() {
   Transaction.count(
       {
         distinct: true,
-        col: 'from_address', 
+        col: 'from_address',
         where: {
           origin: { [db.Sequelize.Op.eq]: 'API' },
           from_address: { [db.Sequelize.Op.ne]: '0000000000000000000000000000000000000000' },

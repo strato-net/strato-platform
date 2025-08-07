@@ -51,7 +51,7 @@ class Chains extends Component {
 
   searchByChainId() {
     this.props.fetchChains(0, 0, this.state.chainId)
-    
+
   }
 
   onUserClick(label, chainIds, index) {
@@ -164,8 +164,8 @@ class Chains extends Component {
           <div className="col-sm-2">
             {
               this.state.useChainIdSearch ?
-              <button 
-                className='pt-button pt-icon-search' 
+              <button
+                className='pt-button pt-icon-search'
                 onClick={() => this.searchByChainId()}
                 >
                   Search
@@ -186,7 +186,7 @@ class Chains extends Component {
               label="Search by Shard ID"
               />
           </div>
-          
+
         </div>
         <div className="container-fluid pt-dark">
           <div className="row">

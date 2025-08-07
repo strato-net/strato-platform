@@ -14,7 +14,7 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message,
       };
-    
+
     case actionDescriptors.fetchBridgeableTokens:
       return {
         ...state,
@@ -28,7 +28,7 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
-      
+
     case actionDescriptors.addHash:
       return {
         ...state,

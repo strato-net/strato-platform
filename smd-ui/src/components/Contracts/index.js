@@ -231,7 +231,7 @@ const connected = connect(mapStateToProps, {
   selectChain,
   fetchChainIds,
   fetchChainDetailSelect,
-  fetchContracts, 
+  fetchContracts,
   changeContractFilter
 })(formed);
 

@@ -84,7 +84,7 @@ describe('Payment Tests', function () {
   /////////////////////////////////////////
 
   /*////////////////////////////////*
- Flow: 
+ Flow:
 1. Seller creates Inventory
 2. Buyer will have the shipping address created
 3. Buyer will proceed with creating payment session

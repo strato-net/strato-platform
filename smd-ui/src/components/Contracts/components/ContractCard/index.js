@@ -21,9 +21,9 @@ class ContractCard extends Component {
   constructor(props) {
     super(props);
     // If search term exists and matches an instance, start open
-    const hasSearchMatch = this.props.contract.searchTerm && 
+    const hasSearchMatch = this.props.contract.searchTerm &&
       this.props.contract.contract && this.props.contract.contract.instances &&
-      this.props.contract.contract.instances.some(instance => 
+      this.props.contract.contract.instances.some(instance =>
         instance.address.toLowerCase() === this.props.contract.searchTerm.toLowerCase()
       );
     this.state = { isOpen: hasSearchMatch };
@@ -53,9 +53,9 @@ class ContractCard extends Component {
     }, false);
 
     // Filter instances based on search term if present
-    const filteredInstances = searchTerm ? 
-      instances.filter(instance => 
-        re.test(instance.address) && 
+    const filteredInstances = searchTerm ?
+      instances.filter(instance =>
+        re.test(instance.address) &&
         instance.address.toLowerCase() === searchTerm.toLowerCase()
       ) :
       instances.filter(instance => re.test(instance.address));
@@ -144,7 +144,7 @@ class ContractCard extends Component {
                   }
                 </pre>
               </td>
-              
+
             </tr>
           );
         })
@@ -167,7 +167,7 @@ class ContractCard extends Component {
           </div>
           <div className="row">
             <div className="col-sm-12">
-              {typeof instance.state !== 'string' ?  
+              {typeof instance.state !== 'string' ?
                 <table className="pt-table pt-condensed pt-striped smd-full-width">
                   <thead>
                     <tr>
@@ -180,19 +180,19 @@ class ContractCard extends Component {
                     {symbolTable}
                   </tbody>
                 </table>
-              : <div className='warning'> 
+              : <div className='warning'>
                   <h4>Error</h4>
                   <div>
                     {instance.state}
                   </div>
-                </div> 
+                </div>
                 }
             </div>
           </div>
         </div>
       );
     }
-    
+
     return (
       <div className="row">
         <div className="col-sm-6">
@@ -201,9 +201,9 @@ class ContractCard extends Component {
               <div className="col-sm-4"><h4>{name}</h4></div>
               <div className="col-sm-8 text-right">
                 <div className="pt-button-group">
-                    <Button 
-                      type="Button" 
-                      className="pt-intent-primary pt-icon-th" 
+                    <Button
+                      type="Button"
+                      className="pt-intent-primary pt-icon-th"
                       onClick={() => {
                         this.props.history.push('/contracts/' + name + '/query')
                       }}

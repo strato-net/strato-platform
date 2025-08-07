@@ -51,15 +51,15 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     <body>
         <div class="container">
             <h2>Hello <strong>${customerFirstName},</strong></h2>
-            
+
             <p>Thank you for shopping with us. Your recent order on the BlockApps Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
-            
+
             <ul>
                 ${concatenatedOrderString}
             </ul>
-            
+
             <p>If you have any questions or need assistance with your order, please feel free to contact our customer support team at sales@blockapps.net.</p>
-            
+
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
@@ -104,7 +104,7 @@ function generateHtmlContentNickel(customerFirstName, nickel) {
             }
             p {
                 margin: 10px 0;
-                font-size: 16px; 
+                font-size: 16px;
             }
             .signature {
                 display: flex;
@@ -128,15 +128,15 @@ function generateHtmlContentNickel(customerFirstName, nickel) {
     <body>
         <div class="container">
             <h2>Hi <strong>${customerFirstName},</strong></h2>
-            
+
             <p>STRATO Mercata Materials has received your deposit of $${nickel.orderTotal} for your reservation of ${weight}kg of ${itemName}. When our current bulk purchasing round is fully subscribed, you will receive an email. You will then have 72 hours to transfer the remainder of the money you committed. If you fail to pay your full balance, you will lose your deposit.</p>
-            
+
             <p>Nickel prices may change between now and then, so make sure you keep an eye on the prices to ensure they are still at levels you would be happy to buy at. Your deposit should constitute roughly 20% of the full purchase price, but market fluctuations may change that ratio. You can track current nickel spot prices on <a href="https://www.lme.com/en/metals/non-ferrous/lme-nickel#Trading+day+summary" target="_blank">the LME website</a>.</p>
-            
+
             <p>You may receive a full refund for your deposit (net fees from the payment processor) at any time up until the buying window opens. If you wish for a refund, please send us an email.</p>
-            
+
             <p>Thank you for your commitment!</p>
-            
+
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 

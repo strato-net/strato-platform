@@ -107,7 +107,7 @@ const getUserName = async (baseUrl, address, token) => {
         }
       }
     );
-  
+
     return res.data[0].commonName;
   } catch (error) {
     console.log("error", error);

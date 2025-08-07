@@ -90,7 +90,7 @@ const reducer = function (state = initialState, action) {
         isToasts: action.toasts,
         toastsMessage: action.toastsMessage
       };
-    case UPDATE_TOAST: 
+    case UPDATE_TOAST:
       return {
         ...state,
         isToasts: action.toasts,

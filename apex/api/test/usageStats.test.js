@@ -26,7 +26,7 @@ describe('Tests - Usage statistics', async function () {
     nock.cleanAll()
   })
 
-  
+
   it('Usage stats are being created', async function () {
     const stat1 = await models.UsageStat.findOne({
       order: [['createdAt', 'DESC']],
@@ -78,7 +78,7 @@ describe('Tests - Usage statistics', async function () {
     assert.isObject(stat1.contractCountsByType, 'contractCountsByType of UsageStat is expected to always be object')
 
   })
-  
+
   it('Usage stats are being submitted', async function () {
     nock(process.env.STATS_DEBUG_CUSTOM_SERVER_URL)
         .persist()
@@ -104,7 +104,7 @@ describe('Tests - Usage statistics', async function () {
         .persist()
         .post(posix.join(config.statistics.blockappsStatServerApiPath, 'stats/'))
         .reply(404, {success: true});
-    
+
     await statsDaemon.collectStats()
     const unsubmittedStats1 = await models.UsageStat.findAll({
       where: {submitted: false},
@@ -119,14 +119,14 @@ describe('Tests - Usage statistics', async function () {
     })
     assert.equal(unsubmittedStats1.length, unsubmittedStats2.length, 'Number of unsubmitted stats should not change if statserver couldn not be reached')
   })
-  
-  
+
+
   it('Usage stats do not include contract types if STATS_SUBMIT_CONTRACT_TYPES_ENABLED disabled', async function () {
     nock(process.env.STATS_DEBUG_CUSTOM_SERVER_URL)
         .persist()
         .post(posix.join(config.statistics.blockappsStatServerApiPath, 'stats/'), /"contractCountsByType":null/gi)
         .reply(200, {success: true});
-    
+
     await statsDaemon.collectStats()
     const unsubmittedStats1 = await models.UsageStat.findAll({
       where: {submitted: false},
@@ -143,7 +143,7 @@ describe('Tests - Usage statistics', async function () {
     assert.equal(unsubmittedStats2.length, 0, 'The stat was expected to contain the "contractCountsByType":null substring (since STATS_SUBMIT_CONTRACT_TYPES_ENABLED=false) in order to be successfully submitted into mock statserver')
   })
 
-  
+
   it('Request body has all expected data values when submitting to Statserver', async function () {
     const listOfStatProps = [
       'id',
@@ -184,11 +184,11 @@ describe('Tests - Usage statistics', async function () {
         }
         const litmusTestArray = listOfStatProps.filter(
             (propName) =>
-                has(stat, propName) && 
+                has(stat, propName) &&
                 (
-                    !!stat[propName] || 
+                    !!stat[propName] ||
                     stat[propName] === 0 ||
-                    typeof stat[propName] === 'string' || 
+                    typeof stat[propName] === 'string' ||
                     (propName === 'contractCountsByType' && (stat[propName] === null || typeof stat[propName] === 'object'))
                 )
         )

@@ -90,7 +90,7 @@ class ContractQuery extends Component {
     this.props.queryCirrus(this.props.match.params.name, this.props.contractQuery.queryString);
     this.setState({tableName: this.props.match.params.name})
   }
-  
+
   componentWillMount() {
     this.props.clearQueryString();
     // this.props.queryCirrusVars(this.props.match.params.name);
@@ -118,7 +118,7 @@ class ContractQuery extends Component {
   handleEventNameChange(event) {
     this.setState({eventName: event})
   }
-  
+
   buildTableName(contractName, orgName=undefined, appName=undefined, history=false, eventName=undefined) {
     let historyPrefix = ""
     let orgPrefix = ""
@@ -145,17 +145,17 @@ class ContractQuery extends Component {
     this.props.queryCirrus(finalTableName, this.props.contractQuery.queryString)
   }
 
-  
+
   render() {
     const self = this;
     const name = this.props.match.params.name;
 
-    let selectFields = this.props.contractQuery && this.props.contractQuery.queryResults && 
+    let selectFields = this.props.contractQuery && this.props.contractQuery.queryResults &&
       Object.keys(this.props.contractQuery.queryResults[0] || [])
       .map((propertyName) => {
         return (<option key={name + '-field-' + propertyName} value={propertyName}>{propertyName}</option>);
       });
-    let columns = this.props.contractQuery && this.props.contractQuery.queryResults && 
+    let columns = this.props.contractQuery && this.props.contractQuery.queryResults &&
       Object.keys(self.props.contractQuery.queryResults[0] || []).map((propertyName) => {
         if (propertyName == "chainId") {
           propertyName = "Shard ID"
@@ -165,7 +165,7 @@ class ContractQuery extends Component {
           key={'column-'+propertyName}
           name={propertyName}
           renderCell={
-            (row) => 
+            (row) =>
               <Cell truncated={true} tooltip={
                 self.props.contractQuery.queryResults[row][propertyName]}>
                 <TruncatedFormat>
@@ -178,8 +178,8 @@ class ContractQuery extends Component {
     })
 
     if(this.props.contractQuery.vars) {
-      selectFields 
-      
+      selectFields
+
     }
 
     const tags = this.props.contractQuery.tags.map((tag, i) => {
@@ -335,26 +335,26 @@ class ContractQuery extends Component {
           this.props.contractQuery.queryResults &&
             this.props.contractQuery.queryResults.length > 0 ?
             <div className="col-sm-12">
-              <Table 
+              <Table
                 numRows={this.props.contractQuery.queryResults ?
                   this.props.contractQuery.queryResults.length : 0}
                 className='pt-striped'
                   >
                 {columns}
               </Table>
-            </div> 
-            : <NonIdealState 
-              visual="pt-icon-folder-open" 
-              title="No Results" 
+            </div>
+            : <NonIdealState
+              visual="pt-icon-folder-open"
+              title="No Results"
               description={
                 <div>
                   <p>
-                    There was no data found in the selected table name. 
+                    There was no data found in the selected table name.
                   </p>
                   <hr/>
                   <p>
                     Try adding the Organization that created this Contract or the App Name that this Contract is a part of.
-                  </p>  
+                  </p>
                 </div>
               } />
         }

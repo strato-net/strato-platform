@@ -66,7 +66,7 @@ describe('Customer Address Database Tests', function () {
     expect(res.statusCode).toBe(200);
     expect(res.body.data).toHaveLength(0);
   });
-  
+
   it('Able to delete created addresses given an addressId', async () => {
     const res = await request(app)
       .delete(`/customer/address/id/${testId}`);

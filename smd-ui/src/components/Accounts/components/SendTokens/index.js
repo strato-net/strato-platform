@@ -336,7 +336,7 @@ class SendTokens extends Component {
       : [];
     return (
       <div className="smd-pad-16">
-        <AnchorButton 
+        <AnchorButton
           onClick={() => {
             mixpanelWrapper.track("send_ether_open_click");
             // TODO: remove public mode
@@ -344,9 +344,9 @@ class SendTokens extends Component {
             this.props.fetchChainIds();
             this.props.sendTokensOpenModal();
             this.props.reset();
-          }} 
+          }}
           className="pt-intent-primary pt-icon-add"
-          text={"Send Tokens"} 
+          text={"Send Tokens"}
         />
         <form>
           <Dialog

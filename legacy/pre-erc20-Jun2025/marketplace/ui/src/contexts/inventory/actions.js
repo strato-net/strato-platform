@@ -897,7 +897,7 @@ const actions = {
         });
         // actions.setMessage(dispatch, 'Item has been Staked Successfully', true);
         return true;
-      } 
+      }
       dispatch({
         type: actionDescriptors.stakeAfterBridgeFailed,
         error: body.error,

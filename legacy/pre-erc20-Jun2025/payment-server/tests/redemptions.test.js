@@ -56,7 +56,7 @@ describe('Redemption Tests', function () {
     expect(res.body.id).not.toBeNull();
     testId = res.body.id;
   });
-  
+
   it('Able to get a redemption request from the given Id', async () => {
     const res = await request(app)
       .get(`/redemption/${testId}`);

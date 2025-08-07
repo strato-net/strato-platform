@@ -27,7 +27,7 @@ export function createChainApiCall(label, members, balances, integrations, src, 
       method: 'POST',
       credentials: "include",
       headers: {
-        'Content-Type': 'application/json' 
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         "contract": contractName,
@@ -38,7 +38,7 @@ export function createChainApiCall(label, members, balances, integrations, src, 
         "src": src,
         "label": label,
         "metadata": {
-          VM: vm ? 'SolidVM' : 'EVM' 
+          VM: vm ? 'SolidVM' : 'EVM'
         }
       })
     }

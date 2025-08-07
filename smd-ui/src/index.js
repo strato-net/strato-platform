@@ -117,7 +117,7 @@ const rootReducer = combineReducers({
   createChain: createChainReducer,
   oauthAccounts: oauthAccountsReducer,
   search: searchQueryReducer,
-  appMetadata: appMetadataReducer, 
+  appMetadata: appMetadataReducer,
   peers: peersReducer,
 });
 

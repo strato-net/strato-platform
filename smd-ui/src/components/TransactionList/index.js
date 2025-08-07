@@ -22,7 +22,7 @@ class TransactionList extends Component {
   render() {
     const self = this;
     let txRows = this.props.transactions !== undefined && this.props.transactions.slice(0, 5).map(
-      function (tx, i) {        
+      function (tx, i) {
         return (
           <tr
             key={i}

@@ -11,7 +11,7 @@ import { handleErrors } from '../../lib/handleErrors';
 // createKeccakHash('keccak256').digest()
 
 export function getPeersIdentityCall(peers) {
-  
+
     const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=in.(";
     const addresses = [];
     // for (let i = 0; i < peers.length; i++) {

@@ -41,9 +41,9 @@ class TransactionTable extends Component {
     this.props.clearQuery();
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   };
-  
+
   render() {
-    const { handleSubmit, history} = this.props; 
+    const { handleSubmit, history} = this.props;
     const handleClick = function(hash) {
       mixpanelWrapper.track('transactions_row_click');
       history.push(`/transactions/${hash}`);

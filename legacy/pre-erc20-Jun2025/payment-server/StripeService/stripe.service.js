@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
-    // TODO implement orderDetail to create actual order line items 
+    // TODO implement orderDetail to create actual order line items
     static initiatePayment(marketplaceUrl, checkoutHash, orderDetails, CONNECTED_ACCOUNT_ID = '') {
         try {
             const encodedMarketplaceUrl = encodeURIComponent(marketplaceUrl);

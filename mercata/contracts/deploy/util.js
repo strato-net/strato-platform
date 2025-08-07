@@ -8,7 +8,7 @@ const axios = require('axios');
 const getTokenFromNameAndPassword = async () => {
     const GLOBAL_ADMIN_NAME = getEnvVar('GLOBAL_ADMIN_NAME');
     const GLOBAL_ADMIN_PASSWORD = getEnvVar('GLOBAL_ADMIN_PASSWORD');
-    
+
     // Validate environment variables
     if (!GLOBAL_ADMIN_NAME || !GLOBAL_ADMIN_PASSWORD) {
             throw new Error(
@@ -38,7 +38,7 @@ const callListAndWait = async (callListArgs) => {
     if (!tokenString) {
         throw new Error('Failed to acquire token.');
     }
-    console.log('Token acquired:', tokenString.slice(0, 10), '...');//printing the first 10 characters of the token 
+    console.log('Token acquired:', tokenString.slice(0, 10), '...');//printing the first 10 characters of the token
     const token = { token: tokenString };
 
 
@@ -47,7 +47,7 @@ const callListAndWait = async (callListArgs) => {
     const responseArray = Array.isArray(pendingTxResultList)
       ? pendingTxResultList
       : [pendingTxResultList];
-  
+
     // Poll until there are no pending transactions.
     const predicate = (results) =>
       results.filter((r) => r.status === 'Pending').length === 0;
@@ -64,7 +64,7 @@ const callListAndWait = async (callListArgs) => {
       3600000
     );
 
-    
+
     return finalResults;
   };
 
@@ -88,10 +88,10 @@ const createContractArgs = async (contractArgs) => {
         'Deploying new ' + contractArgs.name + ' contract via rest.createContract...'
       );
       const response = await rest.createContract(token, contractArgs, options);
-  
+
       // Ensure response is an array so that we can safely call .map()
       const responseArray = Array.isArray(response) ? response : [response];
-  
+
       // 5. Poll until the new contract appears in the database.
       const predicate = (results) =>
         results.filter((r) => r.status === 'Pending').length === 0;
@@ -107,7 +107,7 @@ const createContractArgs = async (contractArgs) => {
         { config, isAsync: true },
         3600000
       );
-      
+
       const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
       if (final.status !== 'Success') {
         throw new Error(`Error: contract deployment failed.`);
@@ -130,18 +130,18 @@ const saveCreateTXDataAsFile = async (contractName, final) => {
         transactionHash: final.hash,
         status: final.status
       };
-      
+
       const deploymentDir = path.join(__dirname, 'deployment-logs');
       if (!fs.existsSync(deploymentDir)) {
         fs.mkdirSync(deploymentDir, { recursive: true });
       }
-      
+
       const filename = `${contractName}-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
       const filePath = path.join(deploymentDir, filename);
-      
+
       const content = JSON.stringify(deploymentInfo, null, 2);
       fs.writeFileSync(filePath, content);
-      
+
       console.log(`Deployment information saved to: ${filePath}`);
 
 }
@@ -152,13 +152,13 @@ const saveCallListTXDataAsFile = async (callInfo) => {
     if (!fs.existsSync(deploymentDir)) {
       fs.mkdirSync(deploymentDir, { recursive: true });
     }
-    
+
     const filename = `${callInfo.operation}-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
     const filePath = path.join(deploymentDir, filename);
-    
+
     const content = JSON.stringify(callInfo, null, 2);
     fs.writeFileSync(filePath, content);
-    
+
     console.log(`Deployment information saved to: ${filePath}`);
 
 }
@@ -179,14 +179,14 @@ function getEnvVar(name) {
 
 /**
  * Performs a Cirrus search query using username/password authentication.
- * 
+ *
  * @param {string} tableName - The Cirrus table name to query (e.g., 'BlockApps-Mercata-Pool')
  * @param {Object} params - Query parameters for the Cirrus search
  * @returns {Promise<Array>} - The search results
  */
 const cirrusSearch = async (tableName, params = {}) => {
   const tokenString = await getTokenFromNameAndPassword();
-  
+
   if (!tokenString) {
     throw new Error('Failed to acquire token for Cirrus search.');
   }
@@ -195,9 +195,9 @@ const cirrusSearch = async (tableName, params = {}) => {
   const baseUrl = config.nodes[0].url;
   const cirrusUrl = `${baseUrl}/cirrus/search/${tableName}`;
   console.log('Cirrus URL:', cirrusUrl);
-  const headers = { 
-    Authorization: `Bearer ${tokenString}`, 
-    "Content-Type": "application/json" 
+  const headers = {
+    Authorization: `Bearer ${tokenString}`,
+    "Content-Type": "application/json"
   };
 
   try {

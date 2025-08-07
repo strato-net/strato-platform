@@ -129,7 +129,7 @@ const Stake = ({ user }) => {
     };
     fetchBridgeableTokenss();
   }, []);
-  
+
   const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
 
   const linkUrl = window.location.href;

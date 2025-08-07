@@ -187,19 +187,19 @@ async function fetchCurrentERC20TokenPrice(name, apiKey) {
       throw new Error("Invalid price data format from API");
     }
     console.log(`Received ${responseData.data.length} token entries`);
-    
+
     // Find the token data entry matching the given symbol
     const tokenEntry = responseData.data.find(entry => entry.symbol === name);
     if (!tokenEntry || !tokenEntry.prices || tokenEntry.prices.length === 0) {
       throw new Error("No price data available for token");
     }
-    
+
     // Use the first available price data
     const priceData = tokenEntry.prices[0];
     const price = parseFloat(priceData.value);
     // Convert the ISO date string to a Unix timestamp in seconds
     const timestamp = Math.floor(new Date(priceData.lastUpdatedAt).getTime() / 1000);
-    
+
     console.log(`Fetched price for ${name}: $${price} at timestamp ${timestamp}`);
     return { price, timestamp };
   } catch (error) {

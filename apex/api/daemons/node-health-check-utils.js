@@ -180,7 +180,7 @@ async function getStratoMetadata() {
 }
 
 // TODO rewrite this guy!
-// Should return an object like: 
+// Should return an object like:
 // {
 //   'core-api': true,
 //   slipstream: true,
@@ -248,7 +248,7 @@ async function getStratoMetadata() {
     }
     return newReturn;
   }
-  
+
   return ret;
 }
 
@@ -436,9 +436,9 @@ async function checkSystemInfo() {
         ],
         raw: true,
       });
-      
+
       const prevSysInfo = prevMetrics ? JSON.parse(prevMetrics.additionalInfo) : {};
-  
+
     // MEMORY
     const useLevel = (1 - memdata.available / memdata.total) * 100;
     const previousMemoryAlert = prevSysInfo.memory?.use?.isHealthy === false;
@@ -462,13 +462,13 @@ async function checkSystemInfo() {
 
     const currentLoad = metadataLoad.currentLoad;
     const cpuCount = os.cpus().length;
-    
+
     //covert loads to percents
     const avgLoads = os.loadavg()?.map(load => (load / cpuCount) * (100/2));
-    
+
     //grab 15 min load
     const avgLoad = (avgLoads == null || avgLoads.length < 3) ? 0 : avgLoads[2];
-    
+
     const previousCpuCurrentLoadAlert = prevSysInfo.cpu?.currentLoad?.isHealthy === false;
     const previousCpuAvgLoadAlert = prevSysInfo.cpu?.avgLoad?.isHealthy === false;
 
@@ -499,7 +499,7 @@ async function checkSystemInfo() {
         `Average CPU load is high (${avgLoad.toFixed(2)})`
       );
     }
-    
+
 
     // 12/17/24 - comment out current CPU load alarm
     // if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
@@ -517,7 +517,7 @@ async function checkSystemInfo() {
         const prevFsAlert = prevFsInfo?.use?.isHealthy === false;
         const diskSpaceAlert = fs.use >= config.healthCheck.diskspaceUsedAlertLevel ||
                                (prevFsAlert && fs.use >= config.healthCheck.diskspaceUsedCloseLevel);
-        
+
         fsData.push({
           name: fs.fs,
           size: fs.size,

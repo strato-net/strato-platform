@@ -21,7 +21,7 @@ export function deployDappApiCall(label, members, balances, integrations, src, c
       method: 'POST',
       credentials: "include",
       headers: {
-        'Content-Type': 'application/json' 
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         "args": args,
@@ -32,7 +32,7 @@ export function deployDappApiCall(label, members, balances, integrations, src, c
         "contract": contract,
         "label": label,
         "metadata": {
-          VM: vm ? 'SolidVM' : 'EVM' 
+          VM: vm ? 'SolidVM' : 'EVM'
         }
       })
     }

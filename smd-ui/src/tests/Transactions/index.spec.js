@@ -33,7 +33,7 @@ describe('Transactions: index', () => {
       ).dive().dive().dive();
       expect(wrapper).toMatchSnapshot();
     });
-    
+
     test('without values', () => {
       const props = {
         chainIds: [],

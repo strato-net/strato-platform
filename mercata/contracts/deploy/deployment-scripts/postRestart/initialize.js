@@ -37,7 +37,7 @@ async function initialize() {
         select: "address",
         limit: 1,
       });
-      
+
       if (data && data.length > 0) {
         poolAddr = data[0].address;
         console.log("Queried existing pool at:", poolAddr);

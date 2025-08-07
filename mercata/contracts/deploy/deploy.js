@@ -12,38 +12,38 @@ const { uploadDappContract } = require('./contract');
 async function main() {
   try {
     console.log('Starting contract deployment process...');
-    
+
     // Check for required environment variables
     const requiredVars = ['GLOBAL_ADMIN_NAME', 'GLOBAL_ADMIN_PASSWORD'];
     const missingVars = requiredVars.filter(varName => !process.env[varName]);
-    
+
     if (missingVars.length > 0) {
       console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
       console.error('Please set them in your .env file and try again');
       process.exit(1);
     }
-    
+
     // Get admin credentials
     const username = process.env.GLOBAL_ADMIN_NAME;
     const password = process.env.GLOBAL_ADMIN_PASSWORD;
-    
+
     console.log(`Authenticating as ${username}...`);
     const token = await auth.getUserToken(username, password);
     const tokenObj = { token };
-    
+
     // Get user info
     console.log(`Authenticated as ${username}`);
-    
+
     // Set options
-    const options = { 
+    const options = {
       config,
       logger: console
     };
-    
+
     // Deploy the contract
     console.log(`Using contracts directory: ${config.contractsDir}`);
     const deployedContract = await uploadDappContract(tokenObj, options);
-    
+
     console.log('\n====== Deployment Successful ======');
     console.log(`Contract: ${deployedContract.name}`);
     console.log(`Address: ${deployedContract.address}`);
@@ -62,10 +62,10 @@ async function main() {
     console.log(`Admin Registry: ${deployedContract.managers.adminRegistry}`);
 
     console.log('===================================\n');
-    
+
     // Return the deployed contract address for scripting
     console.log(`DEPLOYED_CONTRACT_ADDRESS=${deployedContract.address}`);
-    
+
     // Helpful .env snippet so the operator can paste straight into their environment
     console.log('\n# ------------------------');
     console.log('# Paste these into your .env');
@@ -90,7 +90,7 @@ async function main() {
       console.log(`${k}=${v}`);
     });
     console.log('# ------------------------\n');
-    
+
     return deployedContract;
   } catch (error) {
     console.error('Deployment failed:', error);

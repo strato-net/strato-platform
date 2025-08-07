@@ -163,7 +163,7 @@ describe('Accounts: action', () => {
     });
 
     test('success', () => {
-      let data = oauthAccounts; 
+      let data = oauthAccounts;
       expect(fetchOauthAccountsSuccess(data)).toMatchSnapshot();
     });
 

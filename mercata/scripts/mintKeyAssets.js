@@ -102,4 +102,4 @@ require("dotenv").config();
     console.error("Mint transaction failed:", err.response?.data || err.message || err);
     process.exit(1);
   }
-})(); 
+})();

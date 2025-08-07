@@ -4,22 +4,22 @@ import RedemptionsController from './redemptions.controller.js';
 const router = express.Router();
 
 router.get(
-  '/outgoing/:commonName', 
+  '/outgoing/:commonName',
   RedemptionsController.getOutgoingRedemptionRequests
 );
 
 router.get(
-  '/incoming/:commonName', 
+  '/incoming/:commonName',
   RedemptionsController.getIncomingRedemptionRequests
 );
 
 router.get(
-  '/all', 
+  '/all',
   RedemptionsController.getAllRedemptionRequests
 );
 
 router.post(
-  '/create', 
+  '/create',
   RedemptionsController.createRedemption
 );
 
@@ -29,7 +29,7 @@ router.get(
 );
 
 router.delete(
-  '/id/:id', 
+  '/id/:id',
   RedemptionsController.deleteRedemptions
 );
 

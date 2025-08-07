@@ -28,7 +28,7 @@ const Transaction = ({ user }) => {
       const stratAddress = await marketplaceActions.fetchStratsAddress(
         marketplaceDispatch
       );
-  
+
       setStratAddress(stratAddress);
     };
 

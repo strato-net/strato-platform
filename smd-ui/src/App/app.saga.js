@@ -18,7 +18,7 @@ import { env } from '../env';
 const metadataUrl = env.STRATO_URL + '/metadata'
 
 export function getHealthApi() {
-  
+
   return fetch(
     env.HEALTH_URL,
     {
@@ -40,7 +40,7 @@ export function getHealthApi() {
 export function getMetadataApi() {
 
   const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
-  
+
   return fetch(
     metadataUrl,
     {

@@ -1,4 +1,4 @@
-// TODO HANDLE MetaMask 
+// TODO HANDLE MetaMask
 document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('paymentSelection');
     const button = form.querySelector('button[type="submit"]');
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Handle form submission
     form.addEventListener('submit', (event) => {
-        event.preventDefault(); 
+        event.preventDefault();
         const selectedOption = form.querySelector('input[name="option"]:checked');
 
         if (selectedOption) {
@@ -73,9 +73,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         currency: selectedOption.value,
-                        orderHash: orderHash, 
+                        orderHash: orderHash,
                     })
                 })
                 .then(response => response.json())

@@ -43,16 +43,16 @@ router.post("/notify", async (req, res) => {
     // if (method === "sms" || method === "both") {
       //   notificationPromises.push(sendSMS(numbers, message));
       // }
-      
+
       // Send notifications
       await Promise.all(notificationPromises);
-      
+
     if (emails.length !== usernames.length){
       res.status(207).send("Did best effort, but unable to find the emails of " + (usernames.length - emails.length) + " of the users");
     } else {
       res.status(200).send("All notifications sent successfully");
     }
-    
+
   } catch (error) {
     console.error("Error sending notifications:", error);
     res.status(500).send("Internal Server Error");

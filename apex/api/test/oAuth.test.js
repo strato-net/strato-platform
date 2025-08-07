@@ -58,7 +58,7 @@ describe('OAuth tests', function () {
     }
     // should not have succeeded
     assert(false, `Should have thrown error: ${status} instead got ${JSON.stringify(result)}`);
-    
+
   });
 
 

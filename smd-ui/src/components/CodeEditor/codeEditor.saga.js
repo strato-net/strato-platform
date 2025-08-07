@@ -25,7 +25,7 @@ export function tokenizeSource(source) {
       headers: {
         "Content-Type": "application/json"
       },
-      body 
+      body
     })
     .then(function (res) {
       if (res.ok) {

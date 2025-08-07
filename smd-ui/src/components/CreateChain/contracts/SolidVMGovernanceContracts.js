@@ -71,7 +71,7 @@ contract MajorityRules {
 
   mapping(string => mapping(string => mapping (string => uint))) addVotes;
   mapping(string => mapping(string => mapping (string => uint))) removeVotes;
-  
+
   struct chainMember {
     string o;
     string u;

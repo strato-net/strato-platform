@@ -38,8 +38,8 @@ describe('Stripe Endpoint Tests', function() {
   //   const res = await request(app)
   //     .post('/stripe/checkout')
   //     .set('referer', 'http://0.0.0.0')
-  //     .send({ 
-  //       paymentTypes: ['card', 'us_bank_account'], 
+  //     .send({
+  //       paymentTypes: ['card', 'us_bank_account'],
   //       cartData: {
   //         buyerOrganization: 'TestOrg',
   //         orderList: [{
@@ -53,13 +53,13 @@ describe('Stripe Endpoint Tests', function() {
   //         tax: 0,
   //         user: 'user',
   //         email: 'user'
-  //       }, 
+  //       },
   //       orderDetail: [{
   //         productName: 'Test',
   //         unitPrice: '123',
   //         quantity: 1
   //       }],
-  //       accountId: testAccountId 
+  //       accountId: testAccountId
   //     });
   //   expect(res.statusCode).toBe(200);
   // });

@@ -47,7 +47,7 @@ const BridgeWalletModal = ({
   const queryParams = new URLSearchParams(location.search);
 
   const { bridgeableTokens } = useEthState();
-  
+
   useEffect(() => {
     const fetchBridgeableTokenss = async () => {
       await ethActions.fetchBridgeableTokens(ethDispatch);

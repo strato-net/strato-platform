@@ -26,15 +26,15 @@ function getBlocks() {
         where: {
           pow_verified: true,
           is_confirmed: true
-        }, 
-        raw: true, 
-        limit: 15, 
-        order: [['number', 'DESC']] 
+        },
+        raw: true,
+        limit: 15,
+        order: [['number', 'DESC']]
       }
     ).then(blocks => {
       // New block. Emit some information
       if(globalBlocks.length === 0) {
-        globalBlocks = blocks;         
+        globalBlocks = blocks;
       }
 
       if(blocks.length > 0 && lastBlockNumber.compare(bigInt(blocks[0].number)) < 0) {
@@ -46,7 +46,7 @@ function getBlocks() {
 
         // reverse the blocks (so the graphs are L2R instead of R2L)
         for(var i = blocks.length-1; i >=0 ; i--) {
-          
+
           let rIndex = blocks.length - i - 1 //do not use this as an index
           let block = blocks[i]
 
@@ -63,13 +63,13 @@ function getBlocks() {
           })
 
           blockIds.push(block.id)
-          
+
         }
 
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, LAST_BLOCK_NUMBER, lastBlockNumber.toString())
-      
+
         difficulty = blockDifficulty
-        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, BLOCKS_DIFFICULTY, difficulty)        
+        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, BLOCKS_DIFFICULTY, difficulty)
 
         propagationDelay = blockPropagation
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, BLOCKS_PROPAGATION, propagationDelay)
@@ -79,7 +79,7 @@ function getBlocks() {
             globalBlocks = blocks
           });
       }
-      
+
     })
 }
 
@@ -118,19 +118,19 @@ function getBlockTransactionCount(blockIds) {
 
 function calculatePropagation(prevBlock, currentBlock) {
   let previous = prevBlock
-  
+
   if(previous == null) {
-    //look in globalBlocks for prevBlock  
+    //look in globalBlocks for prevBlock
     const filtered = globalBlocks.filter((block)=> {
       return block.number === currentBlock.number - 1
     })
     if(filtered.length === 0) {
       return 0
-    }  
+    }
     previous = filtered[0]
   }
   return moment(currentBlock.timestamp).diff(moment(previous.timestamp),'seconds')
-  
+
 }
 
 

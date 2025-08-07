@@ -75,7 +75,7 @@ const StakeInventoryCard = ({
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
     : inventory?.quantity / Math.pow(10, decimals);
-    
+
   const stakeQuantity = (inventory.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, decimals);
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories

@@ -58,7 +58,7 @@ async function handleCertificateRegistered(event, token) {
 
     // Fetch certificates based on transaction hash
     const userQueryResponse = await axios.get(
-      `https://${baseUrl}/cirrus/search/Certificate`, 
+      `https://${baseUrl}/cirrus/search/Certificate`,
       {
         params: {
           userAddress: `eq.${encodeURIComponent(queryBody[0].userAddress)}`,
@@ -84,7 +84,7 @@ async function handleCertificateRegistered(event, token) {
 
     const getReward = await getRewards(["handleCertificateRegistered"]);
     const reward = getReward["handleCertificateRegistered"];
-    
+
     if (!reward || reward <= 0) {
       console.error("Failed to get reward amount from Google Sheet");
       return;
@@ -111,7 +111,7 @@ async function handleCertificateRegistered(event, token) {
     const body = await response.data;
     const purchaserName = await getUserName(baseUrl, queryBody[0].userAddress, token)
     sendEmail(baseUrl, notificationUrl, 'newRegistration', purchaserName, token );
-    
+
     console.log("New registration reward successful:", body);
   } catch (error) {
     console.error("Error handling CertificateRegistered event:", error);

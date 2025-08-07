@@ -48,7 +48,7 @@ class MetaMaskController {
             next(error);
         }
     }
-    
+
     static async onboardingStatus(req, res, next) {
         try {
             if (!req.query.username) {
@@ -57,7 +57,7 @@ class MetaMaskController {
 
             const query = 'SELECT * FROM metamask WHERE username = $1;'
             const query_result = await client.query(query, [req.query.username])
-            
+
             if (query_result.rows.length === 1) {
                 res.status(200).json({
                     onboarded: true,
@@ -72,7 +72,7 @@ class MetaMaskController {
         } catch (error) {
             console.error('DB Error:', error.message);
             next(error);
-        }    
+        }
     }
 
     static async checkout(req, res, next) {
@@ -86,11 +86,11 @@ class MetaMaskController {
     }
 
     static async getTxParams(req, res, next) {
-        try {            
-            const { checkout_total, currency, username } = req.query; 
+        try {
+            const { checkout_total, currency, username } = req.query;
             const query = 'SELECT eth_address FROM metamask WHERE username = $1';
             const query_result = await client.query(query, [username])
-            
+
             if (query_result.rows.length === 0) {
                 res.status(500).json({
                     error: "This user has not been onboarded through MetaMask yet."
@@ -115,7 +115,7 @@ class MetaMaskController {
                         console.log(`eth_amount: ${eth_amount}`)
                         const amount_in_wei = parseEther(eth_amount).toString(16) // amount in wei, hex-encoded
                         console.log(`amount_in_wei: ${amount_in_wei}`)
-                        
+
                         res.status(200).json({
                             to: seller_address,
                             value: amount_in_wei,
@@ -144,7 +144,7 @@ class MetaMaskController {
     }
 
     static async completeCheckout(req, res, next) {
-        const { checkout_total, currency, checkoutHash } = req.body; 
+        const { checkout_total, currency, checkoutHash } = req.body;
         const checkoutEvent = await getCheckoutEvent(checkoutHash);
 
         // Call completeOrder
@@ -157,7 +157,7 @@ class MetaMaskController {
           currency: currency,
           createdDate: checkoutEvent[0].createdDate,
           comments: PAYMENT_RECEIVED_MESSAGE,
-        } 
+        }
         const returnStatus = await completeOrder(METAMASK_CONTRACT_ADDRESS, callArgs);
         res.status(200).json({
             assets: returnStatus,

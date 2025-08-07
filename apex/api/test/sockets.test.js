@@ -77,7 +77,7 @@
 // const peersPreloader = dataPreloader(GET_PEERS);
 // const peersEmitter = dataEmitter(GET_PEERS);
 // const healthStatusPreloader = dataPreloader(GET_HEALTH);
-// const healthStatusEmitter = dataEmitter(GET_HEALTH); 
+// const healthStatusEmitter = dataEmitter(GET_HEALTH);
 // const nodeUptimePreloader = dataPreloader(GET_NODE_UPTIME)
 // const nodeUptimeEmitter = dataEmitter(GET_NODE_UPTIME);
 // const systemInfoPreloader = dataPreloader(GET_SYSTEM_INFO)
@@ -88,7 +88,7 @@
 // const getTransactionsTypeEmitter = dataEmitter(TRANSACTIONS_TYPE);
 // const usersCountPreloader = dataPreloader(USERS_COUNT);
 // const usersCountEmitter = dataEmitter(USERS_COUNT);
-	  
+
 // //copied from init.js
 // function registerRoomAllocation(socket, room, preloadCb, cb_data) {
 // 	socket.on(`SUBSCRIBE/${room}`, (data) => {
@@ -165,7 +165,7 @@
 // 	}
 // 	let mockClient;
 // 	let mockServer;
-// 	// setup ws client before tests 
+// 	// setup ws client before tests
 // 	before((done) => {
 // 		// init ws server to serve messages
 // 		mockServer = io_server.listen("9000");
@@ -186,7 +186,7 @@
 // 		mockClient.on("connect", socket => {
 // 			//setup client to listen for PRELOAD, and EVENT messages
 // 			subscribeClientToEvents(socket);
-// 			done(); //indicates to mocha that server is done setting up 
+// 			done(); //indicates to mocha that server is done setting up
 // 		});
 // 	});
 // 	// destroy websockets after tests

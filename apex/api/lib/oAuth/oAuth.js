@@ -12,7 +12,7 @@ async function createKey(accessToken, userParams = null) {
       err.status = RestStatus.BAD_REQUEST;
       throw err;
     }
-    
+
     // Create blockchain user
     try {
 
@@ -23,7 +23,7 @@ async function createKey(accessToken, userParams = null) {
       });
       //faucet user so they can do stuff
       await waitFaucet(userAccount.address);
-      
+
       return {
         status: RestStatus.OK,
         user: userAccount

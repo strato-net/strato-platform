@@ -66,7 +66,7 @@ class ValueInput extends Component {
           </div>
         </div>
         {this.props.balance
-            ? <div className="balance">Balance: {balance} {this.state.denomination}</div> 
+            ? <div className="balance">Balance: {balance} {this.state.denomination}</div>
             : null}
       </div>
     );

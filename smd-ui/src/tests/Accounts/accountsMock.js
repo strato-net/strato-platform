@@ -206,7 +206,7 @@ export const indexAccountsMock = {
 };
 
 export const getBalanceMock = [
-  {  
+  {
     "contractRoot":"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
     "next":"/eth/v1.2/account?address=199f32fd8c50933d2cef8e36281146b28306f7f6&index=4",
     "kind":"AddressStateRef",
@@ -222,7 +222,7 @@ export const getBalanceMock = [
 
 // These values are randomly generated.
 export const oauthAccounts = [
-  { 
+  {
     record_id: "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
     address: "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
     chainId: "",
@@ -242,7 +242,7 @@ export const oauthAccounts = [
     publicKey: "-----BEGIN PUBLIC KEY-----\nVRBEESfuZn6/YKyN8YQfL6uwbLFUPZFWTwZZswyXv6KRDbpXwBcQuoNuB5AIiQ9saR4yxBJRhaHLSQEZ/JzJBABTSxEWEtibIneBx0h8eAjVA3Zrpio9RMq/==\n-----END PUBLIC KEY-----\n",
     userAddress: "bzvlsnw1xpmipq866nuxkyjxb2crh0jcw1t8olbj",
   },
-  { 
+  {
     record_id: "2pija4bap2id714a805tju8kgfti0g4zz92xb2p2",
     address: "2pija4bap2id714a805tju8kgfti0g4zz92xb2p2",
     chainId: "",

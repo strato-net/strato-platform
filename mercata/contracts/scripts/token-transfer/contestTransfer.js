@@ -22,7 +22,7 @@ const TOKEN_ADDRESSES = {
 function getTokenAmountsFromEnv() {
   const amounts = {};
   const tokens = ['USDST', 'bCSPXST', 'SILVST', 'GOLDST', 'WBTCST', 'ETHST'];
-  
+
   tokens.forEach(token => {
     try {
       const amount = getEnvVar(token);
@@ -36,13 +36,13 @@ function getTokenAmountsFromEnv() {
       // Token amount not set in env, skip it
     }
   });
-  
+
   return amounts;
 }
 
 function createTransferCalls(userAddress, tokenAmounts) {
   const calls = [];
-  
+
   Object.entries(tokenAmounts).forEach(([token, weiAmount]) => {
     calls.push({
       contract: { address: TOKEN_ADDRESSES[token], name: "ERC20" },
@@ -53,7 +53,7 @@ function createTransferCalls(userAddress, tokenAmounts) {
       }
     });
   });
-  
+
   return calls;
 }
 
@@ -72,17 +72,17 @@ function generateTransferReport(userAddress, tokenAmounts, results) {
     failedTransfers: [],
     errors: []
   };
-  
+
   const tokenEntries = Object.entries(tokenAmounts);
-  
+
   results.forEach((result, index) => {
     const [token, weiAmount] = tokenEntries[index];
-    
+
     if (result.status === 'Success') {
       report.summary.successfulTransfers++;
       report.summary.totalAmountTransferred += parseFloat(ethers.formatEther(weiAmount));
       report.summary.tokensProcessed.add(token);
-      
+
       report.successfulTransfers.push({
         recipientAddress: userAddress,
         token: token,
@@ -115,9 +115,9 @@ function generateTransferReport(userAddress, tokenAmounts, results) {
       report.errors.push(`${token} transfer to ${userAddress} failed with status ${result.status}`);
     }
   });
-  
+
   report.summary.tokensProcessed = Array.from(report.summary.tokensProcessed);
-  
+
   return report;
 }
 
@@ -126,12 +126,12 @@ function saveTransferReport(report) {
   if (!fs.existsSync(reportDir)) {
     fs.mkdirSync(reportDir, { recursive: true });
   }
-  
+
   const filename = `contest-transfer-report-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   const filePath = path.join(reportDir, filename);
-  
+
   fs.writeFileSync(filePath, JSON.stringify(report, null, 2));
-  
+
   return filePath;
 }
 
@@ -139,22 +139,22 @@ async function transferTokens() {
   try {
     const userAddress = getEnvVar('USER_ADDRESS');
     const tokenAmounts = getTokenAmountsFromEnv();
-    
+
     if (Object.keys(tokenAmounts).length === 0) {
       console.log('No token amounts found in environment variables');
       return;
     }
-    
+
     console.log(`Transferring to ${userAddress}:`);
-    
+
     const transferCalls = createTransferCalls(userAddress, tokenAmounts);
     console.log(`Executing ${transferCalls.length} transfers...`);
-    
+
     const results = await callListAndWait(transferCalls);
-    
+
     const report = generateTransferReport(userAddress, tokenAmounts, results);
     const reportPath = saveTransferReport(report);
-    
+
     console.log(`\nResults: ${report.summary.successfulTransfers}/${report.summary.totalTransfers} successful`);
     if (report.failedTransfers.length > 0) {
       console.log('\nFailed transfers:');
@@ -164,9 +164,9 @@ async function transferTokens() {
         console.log(msg);
       });
     }
-    
+
     console.log(`\nTransfer report saved to: ${reportPath}`);
-    
+
   } catch (error) {
     console.error('Script failed:', error.message);
     throw error;
@@ -177,7 +177,7 @@ if (require.main === module) {
   console.error('Set environment variables:');
   console.error('  USER_ADDRESS - Target user address');
   console.error('  USDST, bCSPXST, SILVST, GOLDST, WBTCST, ETHST - Token amounts (in token units, not wei)');
-  
+
   (async () => {
     try {
       await transferTokens();
@@ -193,4 +193,4 @@ module.exports = {
   getTokenAmountsFromEnv,
   createTransferCalls,
   generateTransferReport
-}; 
+};

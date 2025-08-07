@@ -1,7 +1,7 @@
 export const SEO = {
   TITLE_META: `STRATO Mercata Marketplace`,
-  DESCRIPTION_META: `Join the STRATO Mercata marketplace for buying, selling, and investing in  
-    fractionalized assets. Expand your collection or find buyers for your rare carbon,  
+  DESCRIPTION_META: `Join the STRATO Mercata marketplace for buying, selling, and investing in
+    fractionalized assets. Expand your collection or find buyers for your rare carbon,
     metals, art, collectibles, and clothing.`,
   IMAGE_META: `STRATO Mercata Marketplace Banner`,
   SEO_ROUTES: [

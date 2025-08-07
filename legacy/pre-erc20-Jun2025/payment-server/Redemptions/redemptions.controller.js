@@ -230,15 +230,15 @@ class RedemptionsController {
             const query = `
                 INSERT INTO redemptions (
                     redemption_id,
-                    quantity, 
-                    ownerComments, 
-                    issuerComments, 
-                    ownerCommonName, 
-                    issuerCommonName, 
-                    assetAddresses, 
+                    quantity,
+                    ownerComments,
+                    issuerComments,
+                    ownerCommonName,
+                    issuerCommonName,
+                    assetAddresses,
                     assetName,
                     status,
-                    shippingAddressId 
+                    shippingAddressId
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
                 ) RETURNING redemption_id;

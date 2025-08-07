@@ -25,7 +25,7 @@ export default class ContractSource extends Component {
         const codeHash = this.props.contract.codeHash ? this.props.contract.codeHash.digest : ''
         const vm = 'SolidVM'
         return (
-            <Button 
+            <Button
                 intent='intent'
                 onClick={() => {this.toggleModalOpen()}}
                 iconName='pt-icon-document-open'
@@ -48,7 +48,7 @@ export default class ContractSource extends Component {
                             <HexText
                                 value={address}
                             />
-                        </div>   
+                        </div>
                     </div>
                     <div className='row'>
                         <div className="col-sm-3 text-right">
@@ -61,10 +61,10 @@ export default class ContractSource extends Component {
                                 this.props.contract.chainId ?
                                 <HexText
                                     value={this.props.contract.chainId}
-                                /> 
+                                />
                                 : 'Main Chain'
                             }
-                        </div>   
+                        </div>
                     </div>
                     <div className='row'>
                         <div className="col-sm-3 text-right">
@@ -76,7 +76,7 @@ export default class ContractSource extends Component {
                             <HexText
                                 value={codeHash}
                             />
-                        </div>   
+                        </div>
                     </div>
                     <div className='row'>
                         <div className="col-sm-3 text-right">
@@ -86,7 +86,7 @@ export default class ContractSource extends Component {
                         </div>
                         <div className="col-sm-9 smd-pad-4">
                             {vm}
-                        </div>   
+                        </div>
                     </div>
                     <div className='row'>
                         <div className='col-sm-12'>

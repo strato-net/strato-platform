@@ -2349,7 +2349,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const asset = assets[0];
 
-    // Stake the Asset 
+    // Stake the Asset
     const stakeArgs = {
       reserve,
       escrowAddress,

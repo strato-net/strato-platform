@@ -118,7 +118,7 @@ const ItemActions = ({
     );
   };
 
-  const isBridgeableToken = (inventoryRoot) => {   
+  const isBridgeableToken = (inventoryRoot) => {
     return (
       Array.isArray(bridgeableTokens) &&
       bridgeableTokens.find(

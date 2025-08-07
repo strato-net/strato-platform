@@ -103,7 +103,7 @@ const getServiceToken = async (req = null) => {
 const getUserToken = async (username, password, req = null) => {
   const oauth = req ? req.app.oauth : await oauthUtil.init(config.nodes[0].oauth)
   const userTokenData = CACHED_DATA[`${username}`]
-  
+
   if (
       userTokenData
       && userTokenData.token

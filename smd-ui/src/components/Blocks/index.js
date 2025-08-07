@@ -5,7 +5,7 @@ import ReactGA from 'react-ga4';
 import { connect } from 'react-redux';
 import { reduxForm } from 'redux-form';
 class Blocks extends Component {
-  
+
   componentDidMount() {
     mixpanelWrapper.track('blocks_loaded');
     ReactGA.send({hitType: "pageview", page: "/blocks", title: "Blocks"});

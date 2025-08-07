@@ -183,7 +183,7 @@ const GlobalTransaction = ({
             color: TRANSACTION_STATUS_TEXT[text],
           }}
           className={`
-        bg-${TRANSACTION_STATUS_COLOR[text]} 
+        bg-${TRANSACTION_STATUS_COLOR[text]}
         min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}
         >
           {text}

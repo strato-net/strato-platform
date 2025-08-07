@@ -16,7 +16,7 @@ async function getLatestHealth() {
       ],
       raw: true,
     }),
-    
+
     models.CurrentHealth.findOne({
       where: {
         processName: "StallStat",
@@ -30,7 +30,7 @@ async function getLatestHealth() {
       ],
       raw: true,
     }),
-    
+
     models.CurrentHealth.findOne({
       where: {
         processName: "SystemInfoStat",
@@ -43,7 +43,7 @@ async function getLatestHealth() {
       ],
       raw: true,
     }),
-    
+
     models.CurrentHealth.findOne({
       where: {
         processName: "SyncStat",
@@ -56,7 +56,7 @@ async function getLatestHealth() {
       ],
       raw: true,
     }),
-    
+
     models.CurrentHealth.findOne({
       where: {
         processName: "NetworkHealthStat",
@@ -70,7 +70,7 @@ async function getLatestHealth() {
       raw: true,
     })
   ]);
-  
+
   return [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo];
 }
 

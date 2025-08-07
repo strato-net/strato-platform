@@ -26,14 +26,14 @@ const stratoChainUrl = env.STRATO_URL + "/chain";
 // const blocChainUrl = env.BLOC_URL + "/chain";
 
 export function getChainsApi(limit, offset, chainid) {
-  const url = createUrl(stratoChainUrl, { 
-    query: { 
-      limit : limit ? limit : undefined, 
-      offset: limit ? offset : undefined, 
+  const url = createUrl(stratoChainUrl, {
+    query: {
+      limit : limit ? limit : undefined,
+      offset: limit ? offset : undefined,
       chainid
     }
   })
-  
+
   return fetch(
     url,
     {
@@ -74,9 +74,9 @@ export function getChainDetailApi(chainid) {
     })
 }
 export function getChainDetailApiWithQuery(query, queryField) {
-  const options = { 
-    query: { 
-      [queryField]: query 
+  const options = {
+    query: {
+      [queryField]: query
     }
   };
   const url = createUrl(stratoChainUrl, options);

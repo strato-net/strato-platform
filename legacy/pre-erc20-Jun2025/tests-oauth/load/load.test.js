@@ -21,13 +21,13 @@ describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoad
 
   before(async () => {
     console.log('Obtaining User Token');
-    
+
     const USERNAME = 'user1'
     const PASSWORD = '1234'
-    
+
     const userToken = await utils.getUserToken(USERNAME, PASSWORD)
     const userArgs = { token: userToken };
-    
+
     console.log('Creating User');
     user = await createUser(userArgs, options);
     console.log(`
@@ -62,9 +62,9 @@ describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoad
     await utils.waitResult(initialNonce, user, batchSize, batchCount, config);
 
     const transactionEndTimeinSec = moment().diff(startTime, 'seconds');
-    
+
     let resultJson, resultText;
-    
+
     resultJson = {
       transactions: {
         transaction_time: transactionEndTimeinSec,

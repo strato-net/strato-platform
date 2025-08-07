@@ -226,4 +226,4 @@ require("dotenv").config();
     }
     console.log(`Liquidity added ✔ tx hash ${res2[2].hash}`);
   }
-})(); 
+})();

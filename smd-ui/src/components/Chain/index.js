@@ -15,7 +15,7 @@ class Chain extends Component {
   }
 
   showMembers(chain) {
-    if (chain && chain.info && chain.info.members && chain.info.members.length > 0) { 
+    if (chain && chain.info && chain.info.members && chain.info.members.length > 0) {
       const members = chain.info.members;
       return members.map((member, index) => {
         const { orgName, orgUnit, commonName, access } = member
@@ -70,7 +70,7 @@ class Chain extends Component {
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
           <div className="col-sm-2">
             <h5>
-              Dapp Integrations: 
+              Dapp Integrations:
             </h5>
           </div>
           <div className="col-sm-6">
@@ -80,13 +80,13 @@ class Chain extends Component {
           </div>
           </div>
           {
-            this.props.chain && this.props.chain.info && 
-            Object.entries(this.props.chain.info.parentChains).length > 0 && 
+            this.props.chain && this.props.chain.info &&
+            Object.entries(this.props.chain.info.parentChains).length > 0 &&
             Object.entries(this.props.chain.info.parentChains).map(([label, chainId]) => {
               return <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">&nbsp; &nbsp;
                       <strong className='col-sm-2 text-right '>{label}:</strong>
                       <HexText value={chainId} className="col-sm-8"/>
-                    </div> 
+                    </div>
 
             })
           }

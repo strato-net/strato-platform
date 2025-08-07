@@ -5,7 +5,7 @@ import Stripe from 'stripe';
 const router = express.Router();
 
 router.get(
-  '/onboard', 
+  '/onboard',
   StripeServiceController.stripeOnboarding
 );
 
@@ -15,7 +15,7 @@ router.get(
 );
 
 router.get(
-  '/status', 
+  '/status',
   StripeServiceController.stripeConnectStatus
 );
 

@@ -4,12 +4,12 @@ import CustomerAddressController from './customerAddress.controller.js';
 const router = express.Router();
 
 router.get(
-  '/address/:commonName', 
+  '/address/:commonName',
   CustomerAddressController.getAddresses
 );
 
 router.post(
-  '/address', 
+  '/address',
   CustomerAddressController.addAddress
 );
 
@@ -19,7 +19,7 @@ router.get(
 );
 
 router.delete(
-  '/address/id/:id', 
+  '/address/id/:id',
   CustomerAddressController.deleteAddress
 );
 

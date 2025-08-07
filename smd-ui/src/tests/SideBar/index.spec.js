@@ -57,7 +57,7 @@ describe('SideBar: index', () => {
       wrapper.find('NavLink').at(6).simulate('click');
       expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
     });
-    
+
     test('eighth position /external-storage', () => {
       wrapper.find('NavLink').at(1).simulate('click');
       expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();

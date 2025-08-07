@@ -15,7 +15,7 @@ async function cleanOnce() {
   // const mDateApiCallCounter = moment().subtract(config.statistics.apiCallCounterRetentionHours, "hours");
 
   winston.info('Cleaning the historical DB Data (HealthStats, StallStats');
-  
+
   // We could use Promise.allSettled but do we really want to destroy data in multiple tables in parallel?
   try {
     const destroyedCount = await models.HealthStat.destroy({
@@ -42,7 +42,7 @@ async function cleanOnce() {
   } catch(err) {
     winston.error('Cleanup - StallStats: Failed with error: ' + err.message);
   }
-  
+
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
   // try {
   //   const destroyedCount = await models.ApiCallCount.destroy({

@@ -11,9 +11,9 @@ function getTransactions() {
   Transaction
     .findAll(
       {
-        raw: true, 
-        limit: 15, 
-        order: [['id', 'DESC']] 
+        raw: true,
+        limit: 15,
+        order: [['id', 'DESC']]
       }
     ).then(function (currentTransactions) {
       currentTransactions.forEach(t => { t.hash = t.tx_hash; t.transactionType = parseTransactionType(t); });

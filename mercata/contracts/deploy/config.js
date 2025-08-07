@@ -21,16 +21,16 @@ const config = {
       }
     }
   ],
-  
+
   // Contract configuration
   contractsDir: process.env.CONTRACTS_DIR || path.join(__dirname, "../concrete"),
   mainFile: process.env.MAIN_FILE || 'BaseCodeCollection.sol',
   appName: process.env.APP_NAME || 'Mercata',
-  
+
   // Transaction parameters – can be overridden with env vars
   gasPrice: parseInt(process.env.GAS_PRICE || '10', 10), // in Wei
   gasLimit: parseInt(process.env.GAS_LIMIT || '5000000', 10),
-  
+
   // Helper function to resolve paths
   resolvePath: (filePath) => path.resolve(process.cwd(), filePath)
 };

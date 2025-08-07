@@ -32,7 +32,7 @@ describe('Blocks: index', () => {
       ).dive().dive().dive();
       expect(wrapper).toMatchSnapshot();
     });
-    
+
     test('without values', () => {
       const props = {
         chainIds: [],

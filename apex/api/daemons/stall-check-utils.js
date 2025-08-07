@@ -69,7 +69,7 @@ async function getVmBlocksValid() {
     if (!process.env['PROMETHEUS_HOST']) {
       throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
     }
-  
+
     const options = {
         method: 'GET',
         url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=vm_blocks_valid`,
@@ -100,7 +100,7 @@ async function getBaggerPending() {
     if (!process.env['PROMETHEUS_HOST']) {
       throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
     }
-    
+
     const options = {
         method: 'GET',
         url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=vm_bagger_txs`,

@@ -270,12 +270,12 @@ const submitOraclePricePeriodically = async () => {
 
 // Function to update sale prices periodically
 const updateSalePricePeriodically = async () => {
-  const getMetalAccessToken = async () => 
+  const getMetalAccessToken = async () =>
       await oauthHelper.getUserToken(
           process.env.METALS_USERNAME,
           process.env.METALS_PASSWORD
       );
-  const getErc20AccessToken = async () => 
+  const getErc20AccessToken = async () =>
       await oauthHelper.getUserToken(
           process.env.TOKENS_USERNAME,
           process.env.TOKENS_PASSWORD
@@ -386,8 +386,8 @@ async function main() {
     const healthy = isLoopRecent && !errorFlagRaised;
     const respJson = JSON.stringify({
       health: healthy,
-      message: !isLoopRecent && errorFlagRaised ? "check the daemon and errors" : 
-               !isLoopRecent ? "check the daemon" : 
+      message: !isLoopRecent && errorFlagRaised ? "check the daemon and errors" :
+               !isLoopRecent ? "check the daemon" :
                errorFlagRaised ? "check errors" : "ok",
       lastLoopTimestamp: new Date(lastLoopTimestamp).toISOString(),
     })
@@ -420,7 +420,7 @@ async function main() {
     while (true) {
       try {
         lastLoopTimestamp = Date.now(); // Update the timestamp at the start of each loop
-        
+
         const now = new Date();
         const currentDate = now.toISOString().split("T")[0]; // e.g., "2025-02-24"
 

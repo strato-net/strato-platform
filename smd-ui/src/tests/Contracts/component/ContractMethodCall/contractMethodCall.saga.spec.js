@@ -22,7 +22,7 @@ import { methodCallArgs } from './contractMethodCallMock'
 
 describe('ContractMethodCall: saga', () => {
 
-  
+
 
   test('watch states', () => {
     const gen = watchMethodCall();

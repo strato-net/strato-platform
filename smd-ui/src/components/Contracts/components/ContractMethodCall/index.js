@@ -369,7 +369,7 @@ class ContractMethodCall extends Component {
 
                         <HexText value={this.props.methodCallModal.result[0].hash}/>
                       </div>
-                    </div>                   
+                    </div>
                         }
                     <div className="row">
                       <div className="col-sm-3 text-right">
@@ -379,7 +379,7 @@ class ContractMethodCall extends Component {
                       </div>
                       <div className="col-sm-9 smd-pad-4">
                         {this.props.methodCallModal.result[0].status == "Success" || this.props.methodCallModal.result[0].status == "Pending" ? this.props.methodCallModal.result[0].status : 'Failed'}
-                      </div>                  
+                      </div>
                     </div>
                     { typeof(this.props.methodCallModal.result) == "string" &&
                       <div className="row">
@@ -390,7 +390,7 @@ class ContractMethodCall extends Component {
                         </div>
                         <div className="col-sm-9 smd-pad-4">
                           {this.props.methodCallModal.result}
-                        </div>                  
+                        </div>
                       </div>
                     }
                     {this.props.methodCallModal.result[0].status == "Success" &&
@@ -403,7 +403,7 @@ class ContractMethodCall extends Component {
                           </div>
                           <div className="col-sm-9 smd-pad-4">
                             {this.props.methodCallModal.result[0].txResult.time}s
-                          </div>                  
+                          </div>
                         </div>
                         <div className="row">
                           <div className="col-sm-3 text-right">
@@ -419,7 +419,7 @@ class ContractMethodCall extends Component {
                               </pre>
                               : "No Returned Values"
                             }
-                          </div>                  
+                          </div>
                         </div>
                         <div className="row">
                           <div className="col-sm-3 text-right">
@@ -429,7 +429,7 @@ class ContractMethodCall extends Component {
                           </div>
                           <div className="col-sm-9 smd-pad-4">
                             <HexText value={this.props.methodCallModal.result[0].txResult.blockHash} />
-                          </div>                  
+                          </div>
                         </div>
                       </div>
                     }

@@ -2,7 +2,7 @@ import {
     USDST_ADDRESS,
   } from "./constants.js";
   import BigNumber from "bignumber.js";
-  
+
 // Define the function
 function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     return `
@@ -56,15 +56,15 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     <body>
         <div class="container">
             <h2>Hello <strong>${customerFirstName},</strong></h2>
-            
+
             <p>Thank you for shopping with us. Your recent order on the BlockApps Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
-            
+
             <ul>
                 ${concatenatedOrderString}
             </ul>
-            
+
             <p>If you have any questions or need assistance with your order, please feel free to contact our customer support team at sales@blockapps.net.</p>
-            
+
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
@@ -130,9 +130,9 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     <body>
         <div class="container">
             <h2>Hello <strong>${customerFirstName},</strong></h2>
-            
+
             <p>Your recent order on the BlockApps Mercata Marketplace has been canceled due to a payment failure:</p><br><br>
-            
+
             <ul>
                 <p><b>
                 ${cancellationReason}
@@ -140,14 +140,14 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
             </ul><br><br>
 
             <p>Below are the details of your order:</p>
-            
+
             <ul>
                 ${concatenatedOrderString}
             </ul>
 
-            
+
             <p>If you have any questions or need assistance with your order, please feel free to contact our customer support team at sales@blockapps.net.</p>
-            
+
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
@@ -163,10 +163,10 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
   // Generating Email Confirmation HTML
   const buildConcatenatedOrderString =  (username, orderData, assetData, isCanceled = false) => {
     let customerFirstName = username;
-    
+
     // Construct Email with order details
     let concatenatedOrderString = '';
-    let orderTotal = 0; 
+    let orderTotal = 0;
     for (let i = 0; i < orderData.length; i++) {
       let orderItem = orderData[i];
 
@@ -175,29 +175,29 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
       const unitPrice = new BigNumber(orderItem.unitPrice);
       const quantity = new BigNumber(orderItem.qty);
       const multiplier = new BigNumber(10).pow(decimalPlaces);
-    
+
       let itemName = decodeURIComponent(orderItem.name);
       let itemPrice = unitPrice.multipliedBy(multiplier);
       let itemQty = quantity.dividedBy(multiplier);
-      let itemTotal = (itemPrice.multipliedBy(itemQty)); 
-  
-      concatenatedOrderString += `${itemName}:\n`; 
-      concatenatedOrderString += `$${itemTotal.toFixed(2)} <br>`; 
-      concatenatedOrderString += `Qty: ${itemQty.toFixed(2)} &nbsp; $${itemPrice.toFixed(2)} each<br><br>`; 
-      orderTotal += parseFloat(itemTotal); 
+      let itemTotal = (itemPrice.multipliedBy(itemQty));
+
+      concatenatedOrderString += `${itemName}:\n`;
+      concatenatedOrderString += `$${itemTotal.toFixed(2)} <br>`;
+      concatenatedOrderString += `Qty: ${itemQty.toFixed(2)} &nbsp; $${itemPrice.toFixed(2)} each<br><br>`;
+      orderTotal += parseFloat(itemTotal);
       if (i === orderData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
     }
-    
+
     if(isCanceled){
         return generateHtmlContentForCancellation(customerFirstName, concatenatedOrderString, cancellationReason);
     }else{
         return generateHtmlContent(customerFirstName, concatenatedOrderString);
     }
-        
+
   };
 
   // Export the function

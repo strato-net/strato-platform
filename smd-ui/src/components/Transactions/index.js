@@ -30,7 +30,7 @@ class Transactions extends Component {
     mixpanelWrapper.track("transactions_loaded");
     ReactGA.send({hitType: "pageview", page: "/transactions", title: "Transactions"});
   }
-  
+
   render() {
     return (
       <div className="container-fluid pt-dark">

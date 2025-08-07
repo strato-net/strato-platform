@@ -232,7 +232,7 @@ function getBridgeableTokensAddress(cirrusData) {
     acc[item.data.name] = item.address;
     return acc;
   }, {});
-  
+
   // Update tokensArray with addresses
   const {tokensArray} = constants;
   tokensArray.forEach(token => {

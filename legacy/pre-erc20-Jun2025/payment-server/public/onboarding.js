@@ -34,9 +34,9 @@ function metaMaskOnboardingStatus() {
 
 function handleWalletSubmission(event) {
     event.preventDefault();
-    
+
     const formData = new FormData(event.target);
-    
+
     formData.forEach((value, key) => {
         if (key === 'option') {
             selectedOptions.push(value);

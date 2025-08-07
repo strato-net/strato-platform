@@ -14,10 +14,10 @@ function toWei(amount) {
   const parts = amount.toString().split('.');
   const wholePart = parts[0];
   const decimalPart = parts[1] || '';
-  
+
   // Pad decimal part to 18 digits
   const paddedDecimal = decimalPart.padEnd(18, '0').slice(0, 18);
-  
+
   return wholePart + paddedDecimal;
 }
 
@@ -28,7 +28,7 @@ function saveResults(poolConfigs, batchCalls, batchResults) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `pool-population-results-${timestamp}.json`;
   const filepath = path.join(__dirname, filename);
-  
+
   const results = {
     timestamp: new Date().toISOString(),
     summary: {
@@ -57,7 +57,7 @@ function saveResults(poolConfigs, batchCalls, batchResults) {
       error: batchResults[index]?.status !== "Success" ? batchResults[index]?.error || "Unknown error" : null
     }))
   };
-  
+
   fs.writeFileSync(filepath, JSON.stringify(results, null, 2));
   console.log(`\n📄 Results saved to: ${filepath}`);
   return filepath;
@@ -66,7 +66,7 @@ function saveResults(poolConfigs, batchCalls, batchResults) {
 // Pool addresses from your deployment
 const POOL_ADDRESSES = {
   WBTCST: "55d9e1551f52dcc3d3c233e002a0a4421fb81ff8",
-  GOLDST: "34d7caf576cf9493f054d9eced99dcd463eba4b7", 
+  GOLDST: "34d7caf576cf9493f054d9eced99dcd463eba4b7",
   SILVST: "f115302afd125d048caedd47353f01d1a5e9dba8",
   USDTST: "50160ce5184913cada2660ab51a4f464f904d5eb",
   USDCST: "d86cb1d4d55328b0837d32ecf2c78ac2ff490b3a",
@@ -85,7 +85,7 @@ const POOL_CONFIGS = [
     tokenBMintAmount: toWei("200000") // 200,000 USDST
   },
   {
-    name: "GOLDST-USDST", 
+    name: "GOLDST-USDST",
     tokenA: "cdc93d30182125e05eec985b631c7c61b3f63ff0", // GOLDST
     tokenB: USDST_ADDRESS,
     poolAddress: POOL_ADDRESSES.GOLDST,
@@ -131,13 +131,13 @@ const POOL_CONFIGS = [
  */
 function generateBatchCalls() {
   const batchCalls = [];
-  
+
   console.log("Generating batch calls for all pools...");
-  
+
   for (let i = 0; i < POOL_CONFIGS.length; i++) {
     const config = POOL_CONFIGS[i];
     console.log(`Processing pool ${i + 1}/${POOL_CONFIGS.length}: ${config.name}`);
-    
+
     // Mint tokenA for this pool
     batchCalls.push({
       contract: { address: config.tokenA, name: "Token" },
@@ -147,7 +147,7 @@ function generateBatchCalls() {
         amount: config.tokenAMintAmount,
       },
     });
-    
+
     // Mint USDST (tokenB) for this pool
     batchCalls.push({
       contract: { address: config.tokenB, name: "Token" },
@@ -157,7 +157,7 @@ function generateBatchCalls() {
         amount: config.tokenBMintAmount,
       },
     });
-    
+
     // Approve tokenA for pool (using minted amount)
     batchCalls.push({
       contract: { address: config.tokenA, name: "Token" },
@@ -167,7 +167,7 @@ function generateBatchCalls() {
         value: config.tokenAMintAmount,
       },
     });
-    
+
     // Approve USDST (tokenB) for pool (using minted amount)
     batchCalls.push({
       contract: { address: config.tokenB, name: "Token" },
@@ -177,7 +177,7 @@ function generateBatchCalls() {
         value: config.tokenBMintAmount,
       },
     });
-    
+
     // Add liquidity to pool (using minted amounts)
     batchCalls.push({
       contract: { address: config.poolAddress, name: "Pool" },
@@ -188,7 +188,7 @@ function generateBatchCalls() {
       },
     });
   }
-  
+
   return batchCalls;
 }
 
@@ -197,12 +197,12 @@ function generateBatchCalls() {
  */
 async function populatePools() {
   console.log(`Populating ${POOL_CONFIGS.length} pools with token minting and liquidity...`);
-  
+
   // Verify all pool addresses exist
   for (const config of POOL_CONFIGS) {
     console.log(`Pool: ${config.name} at ${config.poolAddress}`);
   }
-  
+
   return POOL_CONFIGS.map(config => config.poolAddress);
 }
 
@@ -211,11 +211,11 @@ if (require.main === module) {
     try {
       const poolAddresses = await populatePools();
       console.log("Pool addresses:", poolAddresses);
-      
+
       const batchCalls = generateBatchCalls();
-      
+
       console.log(`Executing ${batchCalls.length} batch operations for ${POOL_CONFIGS.length} pools...`);
-      
+
       const batchResults = await callListAndWait(batchCalls);
 
       // Log the result of each batch call, counting failures
@@ -241,14 +241,14 @@ if (require.main === module) {
       } else {
         console.log("All batch transactions completed successfully.");
       }
-      
+
       // Save results to file
       const resultsFile = saveResults(POOL_CONFIGS, batchCalls, batchResults);
-      
+
       console.log("Pool population completed successfully!");
       console.log("Pool addresses:", poolAddresses);
       console.log(`Results saved to: ${resultsFile}`);
-      
+
     } catch (error) {
       console.error("Pool population failed:", error.message);
       process.exit(1);

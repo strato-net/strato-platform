@@ -33,10 +33,10 @@ class TransactionView extends Component {
       default:
           break
     }
-    const parsedArgs = tx.args || [] 
+    const parsedArgs = tx.args || []
     return (
       <div className="container-fluid pt-dark ">
-        
+
         <div className="row">
           <div className="col-sm-9">
             <div className="h3">

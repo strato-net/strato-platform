@@ -34,7 +34,7 @@ import { accounts, cirrus, state, contractInfoResponse } from './contractCardMoc
 
 describe('ContractCard: saga', () => {
 
-  // fetch accounts test 
+  // fetch accounts test
   test('watch accounts', () => {
     const gen = watchAccount();
     expect(gen.next().value).toEqual(takeEvery(FETCH_ACCOUNT_REQUEST, fetchAccount))
@@ -51,7 +51,7 @@ describe('ContractCard: saga', () => {
     expect(gen.next().value).toEqual(takeEvery(FETCH_CONTRACT_INFO_REQUEST, fetchContractInfo))
   })
 
-  
+
   describe('fetch contract info - sagas', () => {
 
     test('success', () => {

@@ -56,7 +56,7 @@ class PeersCard extends Component {
 }
 
 export function mapStateToProps(state) {
-  return { 
+  return {
     node: state.node,
     peerIds: state.peers,
   };

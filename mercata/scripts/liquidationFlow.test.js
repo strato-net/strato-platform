@@ -374,4 +374,4 @@ require("dotenv").config();
     console.error("FAILED:", err.message || err);
     process.exit(1);
   }
-})(); 
+})();

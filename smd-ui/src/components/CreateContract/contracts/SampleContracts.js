@@ -210,7 +210,7 @@ contract Permit {
     adrs = _adrs;
     permissions = _permissions;
   }
-  
+
   function setPermissions(uint _permissions) {
     require(owner == msg.sender);
     permissions = _permissions;
@@ -230,7 +230,7 @@ contract PermissionManager {
 
   Permit[] permits;
 
-  enum EventLogType { 
+  enum EventLogType {
     NULL,
     GRANT,
     REVOKE,
@@ -405,7 +405,7 @@ contract PermissionManager {
     }
     return (result);
   }
-  
+
   // STUB base function - must be overriden
   function canModifyMap(address _address) returns (bool) {
     return false;

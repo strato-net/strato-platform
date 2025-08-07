@@ -21,7 +21,7 @@ const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres') ?
         require: true,
         rejectUnauthorized: true,
         ca: fs.readFileSync(path.join(__dirname,'../dbCert/us-east-1-bundle.cer')).toString()
-    } 
+    }
     : false
 
 let client;
@@ -78,7 +78,7 @@ const connectToDB = async () => {
                     paymentSessionId TEXT,
                     sellerCommonName TEXT REFERENCES stripe_accounts(commonName),
                     status TEXT,
-                    createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+                    createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
                 CREATE TABLE IF NOT EXISTS metamask (
@@ -104,7 +104,7 @@ const connectToDB = async () => {
                 process.exit(1);
             }
         })
-} 
+}
 
 if (host && password) {
     await connectToDB();

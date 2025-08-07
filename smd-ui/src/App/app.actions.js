@@ -10,7 +10,7 @@ export const fetchHealth = function () {
       type: GET_HEALTH_REQUEST,
     }
 };
-  
+
 export const fetchHealthSuccess = function (health) {
     return {
         type: GET_HEALTH_SUCCESS,
@@ -29,7 +29,7 @@ export const fetchMetadata = function () {
       type: GET_METADATA_REQUEST,
     }
 };
-  
+
 export const fetchMetadataSuccess = function ({metadata, nodeInfo}) {
     return {
         type: GET_METADATA_SUCCESS,

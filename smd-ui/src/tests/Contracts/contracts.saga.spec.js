@@ -62,7 +62,7 @@ describe('Contracts: saga', () => {
           .put.like({ action: { type: FETCH_CONTRACTS_SUCCESSFUL } })
           .run().then(() => done());
       });
-      
+
       test('failure', (done) => {
         fetch.mockReject(JSON.stringify(contracts));
         expectSaga(fetchContracts, {

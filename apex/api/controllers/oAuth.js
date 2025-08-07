@@ -16,10 +16,10 @@ async function createUserKey(req, res, next) {
     err.status = RestStatus.BAD_REQUEST;
     return next(err);
   }
-  
+
   const token_payload = jwt_decode(accessToken)
   const username = token_payload['preferred_username'] || token_payload['email'] || token_payload['sub'] || 'Logged in user'
-  
+
   try {
     const response = await getOrCreateKey(accessToken);
     const userKeyData = Object.assign({}, response.user, { username: username });

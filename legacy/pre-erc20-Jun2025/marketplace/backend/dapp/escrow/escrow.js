@@ -284,12 +284,12 @@ async function userCataRewards(user, userCommonName, options) {
   const reserveAddresses = reserves.map((reserve) => reserve.address);
   const pageSize = 10;
   let totalCataRewardSum = 0;
-  
+
   // Function to fetch paginated data
   const fetchPaginatedRewards = async () => {
     for (let i = 0; i < reserveAddresses.length; i += pageSize) {
       const paginatedReserves = reserveAddresses.slice(i, i + pageSize);
-  
+
       const searchOptionsTotalCataReward = {
         ...options,
         query: {
@@ -298,23 +298,23 @@ async function userCataRewards(user, userCommonName, options) {
           reserve: `in.(${paginatedReserves.join(',')})`,
         },
       };
-  
+
       const totalCataRewardResult = await rest.search(
         user,
         { name: contractName },
         searchOptionsTotalCataReward
       );
-  
+
       if (totalCataRewardResult && totalCataRewardResult.length > 0) {
         totalCataRewardSum += totalCataRewardResult[0].sum
           ? totalCataRewardResult[0].sum / 10 ** 18
           : 0;
       }
     }
-    
+
     return totalCataRewardSum;
   };
-  
+
   const totalCataReward = await fetchPaginatedRewards();
 
   const activeReserveAddresses = reserves

@@ -43,7 +43,7 @@ async function executeCheck() {
   try {
     const [healthInfo, stallInfo, systemInfo, syncInfo] =
         await utils.getLatestHealth();
-    
+
     if (healthInfo && stallInfo && systemInfo && syncInfo) {
       ({ health, healthIssues } = utils.consolidateHealthData(
           healthInfo,
@@ -63,13 +63,13 @@ async function executeCheck() {
       ACTIVE_EMAIL_WARNING_FLAG = true
       winston.warn(`Node appears to require admin's attention. Active email warning flag raised. Attempting to send an email...`);
       const _ = await emailer.sendEmail(
-          to=process.env['ADMIN_EMAIL'], 
+          to=process.env['ADMIN_EMAIL'],
           subject="STRATO Mercata node requires attention",
           text=`Your STRATO Mercata node is unhealthy or has warnings. ${healthIssues}. Please visit STRATO Management Dashboard at '/smd' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.`,
           html=`<p>Your STRATO Mercata node is unhealthy or has warnings.<br/>${healthIssues}.<br/>Please visit STRATO Management Dashboard at '/smd' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.</p>`
       )
       winston.warn(`Email notification about node health was successfully sent to ${process.env['ADMIN_EMAIL']}`)
-      // 
+      //
     }
   } else {
     if (ACTIVE_EMAIL_WARNING_FLAG) {

@@ -638,7 +638,7 @@ class CreateChain extends Component {
                   <AddMember handler={this.updateMembers} publicKey={this.props.publicKey} />
                 </div>
               </div>
-              
+
               <div className="row">
                 <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">

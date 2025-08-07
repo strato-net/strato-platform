@@ -59,5 +59,5 @@ describe('UploadData: index', () => {
     expect(props.closeModal).toHaveBeenCalled();
     expect(props.closeModal).toHaveBeenCalledTimes(1);
   });
-  
+
 });

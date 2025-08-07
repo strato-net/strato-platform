@@ -69,7 +69,7 @@ class AddMember extends Component {
       commonName: this.state.commonName,
       access: this.state.access
     }
-    
+
     let errors = validate(data);
     this.setState({ errors });
 

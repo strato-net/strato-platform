@@ -38,7 +38,7 @@ export default {
   testnetNetworkId: '7596898649924658542',
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
-  
+
   prodUSDSTAddress: '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
   testnetUSDSTAddress: '3aea6a1bd049bbf57f2e64a4f68a264ebfafcba9',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',

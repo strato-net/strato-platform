@@ -54,7 +54,7 @@ class AddIntegration extends Component {
       name: this.state.name,
       chainId: this.state.chainId,
     }
-    
+
     let errors = validate(data);
     this.setState({ errors });
 

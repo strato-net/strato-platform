@@ -3,7 +3,7 @@ import {
     SEARCH_QUERY_REQUEST,
     SEARCH_QUERY_FAILURE,
   } from './searchresults.actions';
-  
+
 const initialState = {
     searchQuery: '',
     searchResults: undefined,
@@ -34,5 +34,5 @@ const initialState = {
         return state;
     }
   };
-  
+
   export default reducer;

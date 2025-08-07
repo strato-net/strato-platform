@@ -47,7 +47,7 @@ class ValidatorsCard extends Component {
 }
 
 export function mapStateToProps(state) {
-  return { 
+  return {
     validators: state.appMetadata.metadata ? state.appMetadata.metadata.validators : []
   };
 }

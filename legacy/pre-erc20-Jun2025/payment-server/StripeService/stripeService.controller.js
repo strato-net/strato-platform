@@ -1,14 +1,14 @@
 import Joi from '@hapi/joi';
 import stripeService from './stripe.service.js';
-import { 
-  getStripeAccountForUser, 
+import {
+  getStripeAccountForUser,
   getStripePaymentFromToken,
   getStripePaymentsFromTokens,
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
   emitOnboardSeller,
-  getCheckoutEvent, 
+  getCheckoutEvent,
   checkSellerOnboarded,
   validateAndGetOrderDetails ,
   completeOrder,
@@ -33,7 +33,7 @@ class StripeServiceController {
       const { username, redirectUrl } = req.query;
 
       const userAccount = await getStripeAccountForUser(username);
-      
+
       if (!userAccount) {
         // Generate a new Stripe Account Id
         let userStripeAccount = await stripeService.generateStripeAccountId();
@@ -41,7 +41,7 @@ class StripeServiceController {
         // Insert new Stripe Account Id for user in DB
         const insertResult = await insertStripeAccount(username, userStripeAccount.id);
 
-        // Generate and return Stripe connect link 
+        // Generate and return Stripe connect link
         const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userStripeAccount.id);
         res.redirect(`${connectLink.url}`);
       } else {
@@ -62,7 +62,7 @@ class StripeServiceController {
       const { username, redirectUrl } = req.query;
 
       const userAccount = await getStripeAccountForUser(username);
-      
+
       if (!userAccount) {
         throw new Error(`User has not onboarded to this payment server yet.`);
       }
@@ -95,7 +95,7 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeStatusArgs(req.query);
-      
+
       const { username } = req.query;
 
       const userAccount = await getStripeAccountForUser(username);
@@ -129,7 +129,7 @@ class StripeServiceController {
       // Skip all the extra work if the session already exists
       if (paymentDetails && paymentDetails.status === "OPEN") {
         const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
-        
+
         // Redirect to Stripe payment session
         res.redirect(`${session.url}`);
         return next();
@@ -156,7 +156,7 @@ class StripeServiceController {
 
       // Seller account payment setup status verification
       const sellerStripeAccount = await stripeService.getStripeConnectAccountDetail(sellerAccount);
-      if (sellerStripeAccount.charges_enabled !== true || 
+      if (sellerStripeAccount.charges_enabled !== true ||
           sellerStripeAccount.details_submitted !== true ||
           sellerStripeAccount.payouts_enabled !== true) {
         throw new Error(`Seller has not enabled payments on Stripe yet.`);
@@ -203,7 +203,7 @@ class StripeServiceController {
           currency: 'USD',
           createdDate:  Math.floor(Date.now() / 1000),
           comments: PAYMENT_RECEIVED_MESSAGE,
-        } 
+        }
         returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
@@ -215,14 +215,14 @@ class StripeServiceController {
           const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
           const orderString = prepareOrderData(checkoutEvent, assetData);
           const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
-      
+
           await sendEmail(checkoutEvent[0].purchasersCommonName, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
         } catch (emailError) {
           console.error("Error sending email confirmation for credit card:", emailError);
         }
 
-        
+
 
       } else if (session.payment_status === 'unpaid' && session.status === 'complete') {
         // ACH payment
@@ -239,19 +239,19 @@ class StripeServiceController {
           currency: 'USD',
           createdDate:  Math.floor(Date.now() / 1000),
           comments: "",
-        } 
+        }
         returnStatus = await generateIntermediateOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(checkoutHash, "INITIALIZED");
-        
+
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
         try {
           const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
           const orderString = prepareOrderData(checkoutEvent, assetData);
           const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
-      
+
           await sendEmail(checkoutEvent[0].purchasersCommonName, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
         } catch (emailError) {
@@ -287,7 +287,7 @@ class StripeServiceController {
         purchaser: checkoutEvent[0].purchaser,
         saleAddresses: checkoutEvent[0].saleAddresses,
         quantities: checkoutEvent[0].quantitiesToBePurchased,
-      } 
+      }
 
       const cancelOrderStatus = await discardCheckoutQuantity(STRIPE_CONTRACT_ADDRESS, callArgs);
       console.log("cancelOrderStatus", cancelOrderStatus);
@@ -305,7 +305,7 @@ class StripeServiceController {
 
   static async stripeOrderStatus(req, res, next) {
     try {
-      
+
       const { orderHashes } = req.query;
 
       // Get all statuses from tokens and recheck status from Stripe if ACH initialized
@@ -328,7 +328,7 @@ class StripeServiceController {
               currency: 'USD',
               createdDate: Math.floor(Date.now() / 1000),
               comments: PAYMENT_RECEIVED_MESSAGE,
-            } 
+            }
             try {
               const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
             } catch (err) {
@@ -346,8 +346,8 @@ class StripeServiceController {
             statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
           }
           else{
-          /////////////////////////////////// ACH Cancellation Flow ////////////////////////////////////////////////////////////////  
-          
+          /////////////////////////////////// ACH Cancellation Flow ////////////////////////////////////////////////////////////////
+
           const intent = await stripeService.getPaymentIntent(session.payment_intent, p.accountid);
           const ERROR_MESSAGE = intent?.last_payment_error?.message;
           const paymentErrorAndRequiresPaymentMethod = ERROR_MESSAGE && intent.status === 'requires_payment_method';
@@ -356,7 +356,7 @@ class StripeServiceController {
           if(paymentErrorAndRequiresPaymentMethod)
             {
               const checkoutEvent = await getCheckoutEvent(p.orderhash);
-              
+
               const callArgs = {
                 orderHash: checkoutEvent[0].checkoutHash,
                 orderId: checkoutEvent[0].checkoutId,
@@ -366,8 +366,8 @@ class StripeServiceController {
                 currency: 'USD',
                 createdDate: Math.floor(Date.now() / 1000),
                 comments: ERROR_MESSAGE,
-              } 
-        
+              }
+
               try {
                 const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
                 console.log("cancelOrderStatus", cancelOrderStatus);
@@ -375,7 +375,7 @@ class StripeServiceController {
                 // this is left empty without any logging because it will flood the payment server with useless
                 // error logs
               }
-        
+
               // Update payment status in DB
               const updateResult = await updateStripePayment(p.orderHash, "CANCELED");
             }

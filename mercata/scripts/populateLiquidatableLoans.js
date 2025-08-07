@@ -116,4 +116,4 @@ require("dotenv").config();
   console.log("Crashing GOLD price to $1000 to make loans liquidatable…");
   await send(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.GOLDST, price: "1000000000000000000000" }));
   console.log("All loans should now have health-factor < 1. Ready for UI testing.");
-})(); 
+})();

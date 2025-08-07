@@ -163,7 +163,7 @@ const Inventory = ({ user }) => {
   }, []);
 
   const bridgeableAddresses = bridgeableTokens?.map((token) => token.address);
-  
+
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } =
     useRedemptionState();

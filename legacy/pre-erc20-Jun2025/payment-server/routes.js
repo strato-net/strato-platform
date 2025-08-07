@@ -20,6 +20,6 @@ router.use('/ping', async function (req, res) {
       res.status(errorFlagRaised ? 500 : 200).json({success: !errorFlagRaised, message: 'pong'})
     }
 )
-  
+
 
 export default router;

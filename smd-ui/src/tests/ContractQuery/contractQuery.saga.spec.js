@@ -91,7 +91,7 @@ describe('ContractQuery: saga', () => {
         xabi : {
           vars : {
             x : {
-              val : 0, 
+              val : 0,
             },
             y : {
               val : 1,
@@ -113,7 +113,7 @@ describe('ContractQuery: saga', () => {
       // expect(gen.next(queryCirrusVarsMock).value).toEqual(put(queryCirrusVarsSuccess(queryCirrusVarsMock.xabi.vars)));
       // expect(gen.throw(error).value).toEqual(put(queryCirrusVarsFailure(error)));
       expect(gen.next().done).toBe(true);
-      
+
     })
     describe('fetch queryCirrusVars', () => {
 

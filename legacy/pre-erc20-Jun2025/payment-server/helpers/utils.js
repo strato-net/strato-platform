@@ -127,7 +127,7 @@ const getStripeAccountForUser = async (commonName) => {
 const getStripePaymentFromToken = async (orderHash) => {
   const query = `
     SELECT sa.accountId, sp.paymentSessionId, sp.status
-    FROM stripe_payments sp 
+    FROM stripe_payments sp
     JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
     WHERE orderHash = $1`;
   const values = [ orderHash ];
@@ -138,7 +138,7 @@ const getStripePaymentFromToken = async (orderHash) => {
 const getStripePaymentsFromTokens = async (orderHashes) => {
   const query = `
     SELECT sa.accountId, sp.orderHash, sp.paymentSessionId, sp.status
-    FROM stripe_payments sp 
+    FROM stripe_payments sp
     JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
     WHERE orderHash = ANY ($1)`;
   const values = [ orderHashes ];
@@ -220,7 +220,7 @@ const getCheckoutEvent = async (checkoutHash) => {
   const tableArgs = {
     name: CHECKOUT_EVENT_TABLE,
   };
-  
+
   const searchOptions = {
     ...DEFAULT_OPTIONS,
     query: {
@@ -254,10 +254,10 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses, decimals) =
   // Get Sale Contracts
   const saleAddressQuery = saleAddresses.map(addr => `address.eq.${addr}`);
   const saleContracts = await rest.search(
-    await ADMIN.getUser(), 
-    { 
-      name: `${TABLE_PREFIX}Sale` 
-    }, 
+    await ADMIN.getUser(),
+    {
+      name: `${TABLE_PREFIX}Sale`
+    },
     {
       ...DEFAULT_OPTIONS,
       query: {
@@ -268,10 +268,10 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses, decimals) =
   // Get Asset Contracts
   const assetAddressQuery = saleContracts.map(s => `address.eq.${s.assetToBeSold}`);
   const assetContracts = await rest.search(
-    await ADMIN.getUser(), 
-    { 
+    await ADMIN.getUser(),
+    {
       name: `${TABLE_PREFIX}Asset`
-    }, 
+    },
     {
       ...DEFAULT_OPTIONS,
       query: {
@@ -283,7 +283,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses, decimals) =
   const sellerCommonName = assetContracts[0].ownerCommonName;
   const openSaleCheck = saleContracts.every(s => s.isOpen === true);
   const sameOwnerCheck = assetContracts.every(a => a.ownerCommonName === sellerCommonName);
-  
+
   // If it passes the checks, return order details else throw error
   if (openSaleCheck && sameOwnerCheck) {
     let orderDetails = [];

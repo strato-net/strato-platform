@@ -82,13 +82,13 @@ class CustomerAddressController {
 
       const query = `
         INSERT INTO customer_address (
-          commonName, 
-          name, 
-          zipcode, 
-          state, 
-          city, 
-          addressLine1, 
-          addressLine2, 
+          commonName,
+          name,
+          zipcode,
+          state,
+          city,
+          addressLine1,
+          addressLine2,
           country
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8

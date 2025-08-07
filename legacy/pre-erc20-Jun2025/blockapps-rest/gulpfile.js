@@ -27,13 +27,13 @@ function compile() {
 
 function generate() {
     return merge([
-	
+
 	src(['lib/**/*.js', '!**/test/', '!**/test/**'])
 	    .pipe(sourcemaps.init())
 	    .pipe(babel({ presets: ['@babel/preset-env', 'minify'] }))
 	    .pipe(sourcemaps.write('.', { sourceRoot: '/lib' }))
 	    .pipe(dest('dist')),
-	
+
 	src('./lib/**/*.d.ts')
 	    .pipe(dest('./dist/'))
     ]);

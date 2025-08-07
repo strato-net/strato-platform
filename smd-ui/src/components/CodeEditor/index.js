@@ -239,11 +239,11 @@ class CodeEditor extends Component {
                 position={Position.BOTTOM}
                 content={
                   <div>
-                  <Button className="pt-intent-primary smd-margin-8" 
-                    text="SolidVM" 
+                  <Button className="pt-intent-primary smd-margin-8"
+                    text="SolidVM"
                     onClick={() => {this.compileCode("SolidVM")}}/>
-                  <Button className="pt-intent-primary smd-margin-8" 
-                    text="EVM" 
+                  <Button className="pt-intent-primary smd-margin-8"
+                    text="EVM"
                     onClick={() => {this.compileCode("EVM")}}/>
                   </div>
                 }
@@ -257,7 +257,7 @@ class CodeEditor extends Component {
                 </Button>
               {/* </Popover> */}
             </div>
-          
+
             <CreateContract
               onChangeEditorContractName={this.props.contractNameChange}
               contractNameFromEditor={this.props.codeEditorData.contractName}
@@ -305,14 +305,14 @@ export function mapStateToProps(state) {
 }
 
 const formed = reduxForm({ form: 'CodeEditor' })(CodeEditor);
-export default withRouter(connect(mapStateToProps, 
-  { onCompileFileLocally, 
-    onChangeFileName, 
-    contractNameChange, 
-    compileCodeFromEditor, 
-    changeCreateActionState, 
-    addNewFileTab, 
-    removeTab, 
+export default withRouter(connect(mapStateToProps,
+  { onCompileFileLocally,
+    onChangeFileName,
+    contractNameChange,
+    compileCodeFromEditor,
+    changeCreateActionState,
+    addNewFileTab,
+    removeTab,
     onTabChange,
     fetchChainDetailSelect,
     selectChain,

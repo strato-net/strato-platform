@@ -42,4 +42,4 @@ if (require.main === module) {
   })();
 }
 
-module.exports = { mintToken }; 
+module.exports = { mintToken };

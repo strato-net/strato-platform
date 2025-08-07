@@ -11,7 +11,7 @@ import {
   fetchUserPubKeySuccess,
   fetchUserPubKeyFailure,
 } from './user.actions';
-import { handleErrors } from '../../lib/handleErrors'; 
+import { handleErrors } from '../../lib/handleErrors';
 import { env } from '../../env';
 
 const oauthUserUrl = env.APEX_URL + "/user";
@@ -36,7 +36,7 @@ function getOrCreateOauthUserApi() {
     .catch(function (error) {
       throw error;
     });
-    
+
 }
 
 function fetchUserPubKeyRequest() {

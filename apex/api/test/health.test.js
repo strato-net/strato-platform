@@ -56,7 +56,7 @@ describe('Tests - Node-level Health Check', function () {
     assert.equal(Math.abs(currentStat.dataValues.lastFailureTimestamp - currentStat.dataValues.latestCheckTimestamp) < config.healthCheck.requestTimeout, true, 'Last Failure Timestamp')
 
   })
-/* 
+/*
   it('HealthStat update - FAILURE - Data not recent', async function () {
     let testObj = prometheusCorrectResponse;
     const currentTime = Date.now();
@@ -108,7 +108,7 @@ describe('Tests - Node-level Health Check', function () {
   })
 
   it('StallStat update -- FAILURE', async function () {
-    
+
     const lastP = 1;
     const thisP = 1;
     const lastV = 0;
@@ -132,7 +132,7 @@ describe('Tests - Node-level Health Check', function () {
   })
 
   it('StallStat update -- SUCCESS', async function () {
-    
+
     const lastP = 1;
     const thisP = 0;
     const lastV = 0;
@@ -155,9 +155,9 @@ describe('Tests - Node-level Health Check', function () {
     assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp')
 
   })
-  
+
   it('StallStat update -- SUCCESS - Has Currently Pending', async function () {
-    
+
     const lastP = 1;
     const thisP = 1;
     const lastV = 0;
@@ -170,19 +170,19 @@ describe('Tests - Node-level Health Check', function () {
         processName: "StallStat",
       },
     });
-    
+
     assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
     assert.equal(currentStat.dataValues.validBlocksIncreased, true, 'validBlocksIncreased')
     assert.equal(currentStat.dataValues.hasPendingTxs, true, 'hasPendingTxs')
     const currentTime = Date.now();
     assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
-    
+
     assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp')
-    
+
   })
-  
+
   it('StallStat update -- SUCCESS - Zero pending', async function () {
-    
+
     const lastP = 0;
     const lastV = 0;
     const thisP = 0;
