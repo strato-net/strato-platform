@@ -7,7 +7,7 @@ class ConfigController {
       res.json({
         success: true,
         data: {
-          projectId: process.env.WAGMI_PROJECT_ID || 'strato-mercata',
+          projectId: process.env.WAGMI_PROJECT_ID || 'UNSET',
         }
       });
     } catch (error) {
