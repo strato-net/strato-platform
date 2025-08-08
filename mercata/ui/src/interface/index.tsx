@@ -203,7 +203,7 @@ export interface OnRampContextType {
   providers: PaymentProvider[];
   listings: Listing[];
   
-  fetchOnRampData: () => Promise<OnrampApiResponse>;
+  get: () => Promise<OnrampApiResponse>;
   buy: (payload: BuyPayload, userAddress: string) => Promise<{ url: string }>;
   sell: (payload: SellPayload) => Promise<any>;
   lock: (body: any) => Promise<{ url: string }>;

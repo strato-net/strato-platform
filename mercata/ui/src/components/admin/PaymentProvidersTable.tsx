@@ -20,7 +20,7 @@ const PaymentProvidersTable = forwardRef<{refresh: () => void}>((props, ref) => 
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<{ address: string; name: string } | null>(null);
-  const { providers, loading, fetchOnRampData, removePaymentProvider } = useOnRampContext();
+  const { providers, loading, get, removePaymentProvider } = useOnRampContext();
 
   // Format providers for display - ensure we always have PaymentProviderValue structure
   const formattedProviders = providers.map(provider => ({
@@ -58,13 +58,13 @@ const PaymentProvidersTable = forwardRef<{refresh: () => void}>((props, ref) => 
 
   useEffect(() => {
     if (providers.length === 0 && !loading) {
-      fetchOnRampData();
+      get();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   useImperativeHandle(ref, () => ({
-    refresh: fetchOnRampData
-  }), [fetchOnRampData]);
+    refresh: get
+  }), [get]);
 
   const formatAddress = (address: string) => {
     if (!address) return "N/A";

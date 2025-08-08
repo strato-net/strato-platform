@@ -21,7 +21,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
   const [providers, setProviders] = useState<PaymentProvider[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
 
-  const fetchOnRampData = useCallback(async () => {
+  const get = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -80,21 +80,21 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addPaymentProvider = useCallback(async (providerData: AddPaymentProviderData) => {
     const res = await api.post("/onramp/addPaymentProvider", providerData);
-    await fetchOnRampData();
+    await get();
     return res.data;
-  }, [fetchOnRampData]);
+  }, [get]);
 
   const removePaymentProvider = useCallback(async (providerAddress: string) => {
     const res = await api.post("/onramp/removePaymentProvider", { providerAddress });
-    await fetchOnRampData();
+    await get();
     return res.data;
-  }, [fetchOnRampData]);
+  }, [get]);
 
   const cancelListing = useCallback(async (token: string) => {
     const res = await api.post("/onramp/cancelListing", { token });
-    await fetchOnRampData();
+    await get();
     return res.data;
-  }, [fetchOnRampData]);
+  }, [get]);
 
   return (
     <OnRampContext.Provider
@@ -105,7 +105,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         onRampData,
         providers,
         listings,
-        fetchOnRampData,
+        get,
         buy,
         sell,
         lock,

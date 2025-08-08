@@ -23,7 +23,7 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<{ token: string; symbol: string } | null>(null);
   const { toast } = useToast();
-  const { listings: contextListings, fetchOnRampData, cancelListing, loading: contextLoading } = useOnRampContext();
+  const { listings: contextListings, get, cancelListing, loading: contextLoading } = useOnRampContext();
 
   // Filter and format listings from context
   const formattedListings = contextListings
@@ -36,14 +36,14 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
 
   useEffect(() => {
     if (contextListings.length === 0 && !contextLoading) {
-      fetchOnRampData();
+      get();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Expose the refresh function to parent components
   useImperativeHandle(ref, () => ({
-    refresh: fetchOnRampData
-  }), [fetchOnRampData]);
+    refresh: get
+  }), [get]);
 
   const handleDeleteClick = (token: string, symbol: string) => {
     setListingToDelete({ token, symbol: symbol || "Unknown" });
