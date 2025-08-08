@@ -50,37 +50,35 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     }
   }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
 
+  // Consolidated polling handler
+  const handlePollingUpdate = (amount: string) => {
+    if (amount && parseFloat(amount) > 0) {
+      startPolling?.();
+    } else {
+      stopPolling?.();
+    }
+  };
+
   const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setBorrowDisplayAmount(addCommasToInput(value));
       setBorrowAmount(value);
-      
-      // Smart polling based on amount - only use parent polling functions
-      if (value && parseFloat(value) > 0) {
-        startPolling?.();
-      } else {
-        stopPolling?.();
-      }
+      handlePollingUpdate(value);
     }
   };
 
   const handleBorrowPercentage = (percentageAmount: string) => {
     setBorrowAmount(percentageAmount);
     setBorrowDisplayAmount(addCommasToInput(percentageAmount));
-    
-    // Start polling when percentage is selected
-    if (percentageAmount && parseFloat(percentageAmount) > 0) {
-      startPolling?.();
-    }
+    handlePollingUpdate(percentageAmount);
   };
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
     setBorrowAmount("");
     setBorrowDisplayAmount("");
-    // Stop polling after borrow action
-    stopPolling?.();
+    handlePollingUpdate("");
   };
 
   useEffect(()=>{
@@ -125,10 +123,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
                 const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
                 setBorrowAmount(availableToBorrowFormatted);
                 setBorrowDisplayAmount(addCommasToInput(availableToBorrowFormatted));
-                // Start polling when max is clicked
-                if (safeParseFloat(availableToBorrowFormatted) > 0) {
-                  startPolling?.();
-                }
+                handlePollingUpdate(availableToBorrowFormatted);
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
               className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"

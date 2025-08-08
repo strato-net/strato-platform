@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useSwapPolling } from "@/hooks/useSmartPolling";
+import { usePoolPolling, useExchangeRate, useSwapCalculation, useSwapStateCleanup } from "@/hooks/useSmartPolling";
 
 // Constants
 const DEFAULT_SLIPPAGE = 4; // 4%
@@ -402,21 +402,27 @@ const SwapWidget = () => {
   const swapInputAbortRef = useRef<AbortController | null>(null);
   const lastCalculatedFromRef = useRef<string>("");
 
-  // Use specialized swap polling hook
-  const { startPolling, stopPolling } = useSwapPolling({
+  // Use individual focused hooks for better performance and control
+  const { lastData: poolData, startPolling, stopPolling } = usePoolPolling({
     fromAsset,
     toAsset,
-    fromAmount,
-    editingField,
     getPoolByTokenPair,
-    calculateSwap,
     setPool,
-    setToAsset,
-    setToAmount,
-    setExchangeRate,
-    lastCalculatedFromRef,
     interval: POLL_INTERVAL
   });
+
+  // Individual focused hooks for different responsibilities
+  useExchangeRate({ poolData, fromAsset, setExchangeRate });
+  useSwapCalculation({ 
+    poolData, 
+    fromAsset, 
+    fromAmount, 
+    editingField, 
+    calculateSwap, 
+    setToAmount, 
+    lastCalculatedFromRef 
+  });
+  useSwapStateCleanup({ poolData, setPool, setToAsset, setToAmount, setExchangeRate });
 
   // Fee warning logic
   const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
@@ -527,14 +533,8 @@ const SwapWidget = () => {
     }
   }, [fromAmount, startPolling, stopPolling]);
 
-  // Start/stop polling based on amount changes
-  useEffect(() => {
-    if (fromAmount && parseFloat(fromAmount) > 0) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
-  }, [fromAmount, startPolling, stopPolling]);
+
+
 
   // Cleanup on unmount
   useEffect(() => {

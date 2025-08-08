@@ -113,6 +113,7 @@ export interface SwappableToken {
   _symbol: string;
   balance?: string;
   _totalSupply: string;
+  images?: Array<{ value: string }>;
   "BlockApps-Mercata-ERC20-_balances": {
     key: string;
     value: string;
@@ -515,4 +516,37 @@ export interface SwapPollingConfig {
   setExchangeRate: (rate: string) => void;
   lastCalculatedFromRef: React.MutableRefObject<string>; 
   interval?: number;
+}
+
+// New interfaces for focused hooks
+export interface PoolPollingConfig {
+  fromAsset: any;
+  toAsset: any;
+  getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
+  setPool: (pool: any) => void;
+  interval?: number;
+}
+
+export interface ExchangeRateConfig {
+  poolData: any;
+  fromAsset: any;
+  setExchangeRate: (rate: string) => void;
+}
+
+export interface SwapCalculationConfig {
+  poolData: any;
+  fromAsset: any;
+  fromAmount: string;
+  editingField: 'from' | 'to' | null;
+  calculateSwap: (params: any) => Promise<string>;
+  setToAmount: (amount: string) => void;
+  lastCalculatedFromRef: React.MutableRefObject<string>;
+}
+
+export interface SwapStateCleanupConfig {
+  poolData: any;
+  setPool: (pool: any) => void;
+  setToAsset: (asset: any) => void;
+  setToAmount: (amount: string) => void;
+  setExchangeRate: (rate: string) => void;
 }

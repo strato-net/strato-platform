@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard } from "lucide-react";
 import { useOnRampPolling } from "@/hooks/useSmartPolling";
+import { safeParseUnits, safeParseFloat } from "@/utils/numberUtils";
 
 interface PaymentProvider {
   name: string;
@@ -52,7 +53,7 @@ export const DepositForm = () => {
   // Use the optimized polling hook
   const { startPolling, stopPolling, fetchData } = useOnRampPolling(
     get,
-    (amount) => amount && parseFloat(amount) > 0
+    (amount) => amount && safeParseFloat(amount) > 0
   );
 
   // Load initial data
@@ -66,31 +67,40 @@ export const DepositForm = () => {
     });
   }, [fetchData]);
 
+  // Optimized amount validation
+  const validateAmount = (value: string): { isValid: boolean; error?: string } => {
+    if (!value?.trim()) return { isValid: false, error: "Amount is required" };
+    if (!/^\d*\.?\d*$/.test(value)) return { isValid: false, error: "Invalid number format" };
+    if (value.includes('e') || value.includes('E')) return { isValid: false, error: "Scientific notation not allowed" };
+    if (value.includes('.') && value.split('.')[1].length > 18) return { isValid: false, error: "Too many decimal places (max 18)" };
+    
+    const parsedValue = safeParseFloat(value);
+    if (isNaN(parsedValue) || parsedValue <= 0) return { isValid: false, error: "Amount must be greater than 0" };
+    if (parsedValue > 1e12) return { isValid: false, error: "Amount too large" };
+    
+    return { isValid: true };
+  };
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setAmount(value);
-    
-    // Smart polling based on amount
-    value && parseFloat(value) > 0 ? startPolling() : stopPolling();
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      setAmount(value);
+      const isValid = validateAmount(value).isValid && safeParseFloat(value) > 0;
+      isValid ? startPolling() : stopPolling();
+    }
   };
 
   const handleDeposit = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      });
+    const validation = validateAmount(amount);
+    if (!validation.isValid) {
+      toast({ title: "Invalid amount", description: validation.error || "Please enter a valid amount", variant: "destructive" });
       return;
     }
     if (!selectedListing || !selectedProvider) {
-      toast({
-        title: "No Listing or Provider",
-        description: "Payment provider or listing not available.",
-        variant: "destructive",
-      });
+      toast({ title: "No Listing or Provider", description: "Payment provider or listing not available.", variant: "destructive" });
       return;
     }
+
     setLoading(true);
     try {
       const { url: stripeUrl } = await buy({
@@ -109,9 +119,15 @@ export const DepositForm = () => {
     }
   };
 
-  const exceedsMax = selectedListing?.amount
-    ? Number(amount) > Number(ethers.formatUnits(selectedListing.amount, 18)) || Number(amount) < 0.5
-    : false;
+  // Optimized BigInt validation
+  const exceedsMax = selectedListing?.amount ? (() => {
+    try {
+      const inputAmountWei = safeParseUnits(amount, 18);
+      const maxAmountWei = BigInt(selectedListing.amount);
+      const minAmountWei = safeParseUnits("0.5", 18);
+      return inputAmountWei > maxAmountWei || inputAmountWei < minAmountWei;
+    } catch { return true; }
+  })() : false;
 
   return (
     <div className="space-y-4">
@@ -119,7 +135,8 @@ export const DepositForm = () => {
         <Label htmlFor="amount">Amount of USDST to purchase</Label>
         <Input
           id="amount"
-          type="number"
+          type="text"
+          inputMode="decimal"
           placeholder="e.g. 7"
           value={amount}
           onChange={handleAmountChange}
