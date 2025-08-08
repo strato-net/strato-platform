@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useDebounce } from "@/hooks/useDebounce";
 import { usePoolPolling, useExchangeRate, useSwapCalculation, useSwapStateCleanup } from "@/hooks/useSmartPolling";
 
 // Constants
@@ -49,7 +50,7 @@ interface TokenSelectorProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
+const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
       <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
@@ -116,6 +117,8 @@ const TokenSelector = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenS
   </Popover>
 );
 
+export const TokenSelector = React.memo(TokenSelectorComponent);
+
 interface TokenInputProps {
   amount: string;
   onChange: (value: string) => void;
@@ -159,17 +162,15 @@ const TokenInput = ({
 }: TokenInputProps) => {
 
   // Get pool balance
-  const getPoolBalance = () => {
+  const poolBalance = useMemo(() => {
     if (!pool || !asset) return "0";
     return pool.tokenA?.address === asset.address
       ? pool.tokenABalance || "0"
       : pool.tokenB?.address === asset.address
         ? pool.tokenBBalance || "0"
         : "0";
-  };
-
-  const poolBalance = getPoolBalance();
-
+  }, [pool, asset?.address]);
+      
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
@@ -398,6 +399,9 @@ const SwapWidget = () => {
   const [oracleDisplayFromSymbol, setOracleDisplayFromSymbol] = useState("");
   const [oracleDisplayToSymbol, setOracleDisplayToSymbol] = useState("");
 
+  const debouncedFromAmount = useDebounce(fromAmount, 300);
+  const debouncedToAmount = useDebounce(toAmount, 300);
+
   // Refs
   const swapInputAbortRef = useRef<AbortController | null>(null);
   const lastCalculatedFromRef = useRef<string>("");
@@ -425,8 +429,8 @@ const SwapWidget = () => {
   useSwapStateCleanup({ poolData, setPool, setToAsset, setToAmount, setExchangeRate });
 
   // Fee warning logic
-  const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
-  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+  const feeAmount = useMemo(() => safeParseUnits(SWAP_FEE, DECIMALS), [SWAP_FEE]);
+  const usdstBalanceBigInt = useMemo(() => BigInt(usdstBalance || "0"), [usdstBalance]);
   
   // Safely parse input amounts
   const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
@@ -434,11 +438,12 @@ const SwapWidget = () => {
   // Fee warning checks
   const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
 
-  const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n && (() => {
+  const isLowBalanceWarning = useMemo(() => {
+    if (fromAsset?.address !== usdstAddress || fromAmountWei <= 0n) return false;
     const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
     const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
     return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-  })();
+  }, [fromAsset, fromAmountWei, usdstBalanceBigInt, feeAmount]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -446,23 +451,31 @@ const SwapWidget = () => {
   }, [userAddress, fetchUsdstBalance]);
 
   useEffect(()=>{
-    if(swappableTokens){
+    if(swappableTokens.length > 0 && !fromAsset) {
       initialTokenSetup()
     }
   },[])
   
   const initialTokenSetup = async () => {
+    if (!swappableTokens.length) return;
+    const token = swappableTokens[0];
+    setFromBalanceLoading(true);
     try {
-      setFromBalanceLoading(true)
-      const balance = await getTokenBalance(swappableTokens[0].address);
-      setFromAsset({...swappableTokens[0], balance})
-      setFromBalanceLoading(false)
+      const balance = await getTokenBalance(token.address);
+      setFromAsset({ ...token, balance });
     } catch (error) {
-      setFromBalanceLoading(false)
       console.log(error);
-      
+
+    } finally {
+      setFromBalanceLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (pairableTokens.length === 1 && !toAsset) {
+      getTokenBalanceFromContext(pairableTokens[0], false);
+    }
+  }, [pairableTokens, toAsset]);
   
 
   // Fetch pairable tokens when from asset changes
@@ -549,8 +562,10 @@ const SwapWidget = () => {
   const getTokenBalanceFromContext = async (asset: SwappableToken, isFrom: boolean) => {
     try {
       if (isFrom) {
+        setFromAsset({ ...asset, balance: fromAsset?.balance ?? "0" });
         setFromBalanceLoading(true);
       } else {
+        setToAsset({ ...asset, balance: toAsset?.balance ?? "0" });
         setToBalanceLoading(true);
       }
 
@@ -699,15 +714,6 @@ const SwapWidget = () => {
       return;
     }
 
-    if (pool && value && Number(value) !== 0) {
-      await calculateSwapAmount(value, isFromInput);
-    } else {
-      if (isFromInput) {
-        setToAmount("");
-      } else {
-        setFromAmount("");
-      }
-    }
   };
 
   const handleSwapAssets = () => {
@@ -863,12 +869,19 @@ const SwapWidget = () => {
   };
 
 useEffect(() => {
-  if (fromAmount && fromAsset && toAsset && pool) {
-    calculateSwapAmount(fromAmount, true);
+  if (debouncedFromAmount && fromAsset && toAsset && pool) {
+    calculateSwapAmount(debouncedFromAmount, true);
   }
-}, [fromAsset, toAsset, fromAmount, pool]);
+}, [fromAsset, toAsset, debouncedFromAmount, pool]);
 
-const handleMaxClick = (isFrom: boolean) => {
+// Debounced effect for toAmount (if you want to support reverse calculation)
+useEffect(() => {
+  if (debouncedToAmount && fromAsset && toAsset && pool) {
+    calculateSwapAmount(debouncedToAmount, false);
+  }
+}, [fromAsset, toAsset, debouncedToAmount, pool]);
+
+const handleMaxClick = useCallback((isFrom: boolean) => {
   const asset = isFrom ? fromAsset : toAsset;
   if (!asset) return;
 
@@ -888,7 +901,7 @@ const handleMaxClick = (isFrom: boolean) => {
   
 
   handleAmountChange(isFrom, formatted); // will auto-calculate the other amount
-};
+},[fromAsset, toAsset, usdstAddress, SWAP_FEE, handleAmountChange]);
 
   return (
     <div className="space-y-6">
