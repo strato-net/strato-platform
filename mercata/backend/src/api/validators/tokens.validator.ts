@@ -1,14 +1,5 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField } from "./common.validators";
-
-const valueField = Joi.string()
-  .pattern(/^\d+$/)
-  .required()
-  .label("value")
-  .messages({
-    "string.empty": `"value" is required`,
-    "string.pattern.base": `"value" must be a valid numeric string`,
-  });
+import { ethereumAddressField, numericStringField } from "./common.validators";
 
 // Schema definitions
 const addressSchema = Joi.object({
@@ -22,33 +13,28 @@ const createTokensSchema = Joi.object({
   files: Joi.array().items(Joi.string()).required(),
   fileNames: Joi.array().items(Joi.string()).required(),
   symbol: Joi.string().required(),
-  initialSupply: Joi.string()
-    .pattern(/^\d+$/)
-    .required()
-    .messages({
-      'string.pattern.base': '"initialSupply" must be a string of digits',
-    }),
+  initialSupply: numericStringField("initialSupply"),
   customDecimals: Joi.number().integer().min(0).max(18).required(),
 });
 
 const transferItemSchema = Joi.object({
   address: ethereumAddressField("address"),
   to: ethereumAddressField("to"),
-  value: valueField,
+  value: numericStringField("value"),
 });
 
 
 const approveArgsSchema = Joi.object({
   address: ethereumAddressField("address"),
   spender: ethereumAddressField("spender"),
-  value: valueField,
+  value: numericStringField("value"),
 });
 
 const transferFromArgsSchema = Joi.object({
   address: ethereumAddressField("address"),
   from: ethereumAddressField("from"),
   to: ethereumAddressField("to"),
-  value: valueField,
+  value: numericStringField("value"),
 });
 
 
