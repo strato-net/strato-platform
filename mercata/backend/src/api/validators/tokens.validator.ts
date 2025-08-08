@@ -58,7 +58,7 @@ const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
 export function validateAddressArgs(args: any) {
   const { error } = addressSchema.validate(args);
   if (error) {
-    throw new Error("Address Argument Validation Error");
+    throw new Error("Address Argument Validation Error: " + error.message);
   }
 }
 
