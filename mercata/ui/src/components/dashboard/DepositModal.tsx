@@ -41,7 +41,7 @@ export const DepositForm = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { get, buy } = useOnRampContext();
+  const { fetchOnRampData, buy } = useOnRampContext();
 
   const [selectedListing, setSelectedListing] = useState<ListingInfo | null>(null);
   const [availablePaymentProviders, setAvailablePaymentProviders] = useState<PaymentProvider[]>([]);
@@ -51,7 +51,7 @@ export const DepositForm = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await get();
+        const data = await fetchOnRampData();
         const listings = data?.listings || [];
         const usdstListing = listings.find(
           (listing) => listing.ListingInfo._name === "USDST"
@@ -79,7 +79,7 @@ export const DepositForm = () => {
       }
     };
     fetchData();
-  }, [toast, get]);
+  }, [toast, fetchOnRampData]);
 
   const handleDeposit = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {

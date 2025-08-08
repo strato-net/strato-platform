@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AddPaymentProviderForm from './AddPaymentProviderForm';
 import PaymentProvidersTable from './PaymentProvidersTable';
@@ -13,9 +13,6 @@ const OnRampTab = () => {
     paymentProvidersTableRef.current?.refresh();
   }, []);
   
-  const handleListingsUpdate = useCallback(() => {
-    onRampListingsTableRef.current?.refresh();
-  }, []);
   return (
     <div className="space-y-6">
       {/* First Row - Configuration Forms */}

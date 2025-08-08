@@ -191,11 +191,14 @@ export interface OnRampContextType {
   token: OnRampToken | null;
   loading: boolean;
   error: string | null;
+  onRampData: OnrampApiResponse | null;
+  providers: PaymentProvider[];
+  listings: Listing[];
   
-  get: () => Promise<OnrampApiResponse>;
+  fetchOnRampData: () => Promise<OnrampApiResponse>;
   buy: (payload: BuyPayload, userAddress: string) => Promise<{ url: string }>;
-  sell: (body) => Promise<void>;
-  lock: (body) => Promise<{ url: string }>;
+  sell: (body: any) => Promise<void>;
+  lock: (body: any) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<void>;
   addPaymentProvider: (providerData: {
     providerAddress: string;

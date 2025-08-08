@@ -19,52 +19,43 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const OnRampListingsTable = forwardRef((props, ref) => {
-  const [listings, setListings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<{ token: string; symbol: string } | null>(null);
   const { toast } = useToast();
-  const { get, cancelListing } = useOnRampContext();
+  const { listings: contextListings, fetchOnRampData, cancelListing, loading: contextLoading } = useOnRampContext();
+
+  // Filter and format listings from context
+  const formattedListings = contextListings
+    .filter(listing => listing.ListingInfo && listing.ListingInfo.id !== "0")
+    .map(listing => ({
+      key: listing.key || listing.ListingInfo.id,
+      ListingInfo: listing.ListingInfo
+    }));
 
   const fetchListings = async () => {
     try {
       setRefreshing(true);
-      const onRampData = await get();
-      
-      // Get the listings from the OnRamp data
-      const listingsList = onRampData?.listings || [];
-      
-      // Filter out empty listings and format them
-      const formattedListings = listingsList
-        .filter(listing => listing.ListingInfo && listing.ListingInfo.id !== "0")
-        .map(listing => ({
-          key: listing.key || listing.ListingInfo.id,
-          ListingInfo: listing.ListingInfo
-        }));
-      
-      setListings(formattedListings);
+      await fetchOnRampData();
     } catch (error) {
+      // Error is already handled by axios interceptor
       console.error("Error fetching listings:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch onramp listings",
-        variant: "destructive",
-      });
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchListings();
-  }, []);
+    // Fetch data on mount if not already loaded
+    if (contextListings.length === 0 && !contextLoading) {
+      fetchOnRampData();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Expose the refresh function to parent components
   useImperativeHandle(ref, () => ({
-    refresh: fetchListings
-  }), []);
+    refresh: fetchOnRampData
+  }), [fetchOnRampData]);
 
   const handleDeleteClick = (token: string, symbol: string) => {
     setListingToDelete({ token, symbol: symbol || "Unknown" });
@@ -95,30 +86,9 @@ const OnRampListingsTable = forwardRef((props, ref) => {
         fetchListings();
       }, 500);
     } catch (error: any) {
-      // Handle the specific error from backend
-      let errorMessage = "Failed to cancel listing";
-      
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.response?.data) {
-        const responseData = error.response.data;
-        if (typeof responseData === 'string') {
-          errorMessage = responseData;
-        } else if (responseData.error && typeof responseData.error === 'object' && responseData.error.message) {
-          // Handle the error handler format: {error: {message, status, type}}
-          errorMessage = responseData.error.message;
-        } else if (responseData.message && typeof responseData.message === 'string') {
-          errorMessage = responseData.message;
-        }
-      } else if (error?.message && typeof error.message === 'string') {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Cannot Cancel Listing",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Error is already handled by axios interceptor which shows a toast
+      // The interceptor will display the specific error message from backend
+      console.error("Error cancelling listing:", error);
     } finally {
       setDeleteDialogOpen(false);
       setListingToDelete(null);
@@ -157,7 +127,7 @@ const OnRampListingsTable = forwardRef((props, ref) => {
     return (price * (1 + margin)).toFixed(2);
   };
 
-  if (loading) {
+  if (contextLoading && contextListings.length === 0) {
     return (
       <Card className="border-0">
         <CardHeader>
@@ -197,7 +167,7 @@ const OnRampListingsTable = forwardRef((props, ref) => {
       </CardHeader>
       <CardContent>
         <div className="h-80 overflow-y-auto border rounded-md">
-          {listings.length === 0 ? (
+          {formattedListings.length === 0 ? (
             <div className="p-4">
               <Alert>
                 <AlertDescription>
@@ -207,7 +177,7 @@ const OnRampListingsTable = forwardRef((props, ref) => {
             </div>
           ) : (
             <div className="space-y-2 p-2">
-              {listings.map((listing) => {
+              {formattedListings.map((listing) => {
                 const info = listing.ListingInfo;
                 const priceWithMargin = calculatePriceWithMargin(info.tokenOracleValue, info.marginBps);
                 

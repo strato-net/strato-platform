@@ -43,7 +43,7 @@ const ListAssetForm = () => {
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
-  const { get, sell } = useOnRampContext();
+  const { providers, fetchOnRampData, sell } = useOnRampContext();
 
   const form = useForm<OnRampListingFormValues>({
     defaultValues: {
@@ -63,7 +63,7 @@ const ListAssetForm = () => {
 
   const fetchData = async () => {
     try {
-      const data = await get();
+      const data = await fetchOnRampData();
       // Extract and flatten payment providers from the onramp data
       if (data.paymentProviders) {
         const flattenedProviders = data.paymentProviders

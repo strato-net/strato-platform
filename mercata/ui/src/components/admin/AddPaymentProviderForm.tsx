@@ -41,14 +41,9 @@ const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
   const onSubmit = async (data: AddPaymentProviderFormValues) => {
     setLoading(true);
     try {
-      // Remove 0x prefix if present before sending to backend
-      let address = data.providerAddress.toLowerCase();
-      if (address.startsWith('0x')) {
-        address = address.slice(2);
-      }
       
       const result = await addPaymentProvider({
-        providerAddress: address,
+        providerAddress: data.providerAddress.toLowerCase(),
         name: data.name,
         endpoint: data.endpoint,
       });
@@ -75,26 +70,7 @@ const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
         }, 500);
       }
     } catch (error: any) {
-      let errorMessage = "Failed to add payment provider. Please try again.";
-      if (error?.response?.data) {
-        const responseData = error.response.data;
-        if (typeof responseData === 'string') {
-          errorMessage = responseData;
-        } else if (responseData.error && typeof responseData.error === 'object' && responseData.error.message) {
-          // Handle the error handler format: {error: {message, status, type}}
-          errorMessage = responseData.error.message;
-        } else if (responseData.message && typeof responseData.message === 'string') {
-          errorMessage = responseData.message;
-        }
-      } else if (error?.message && typeof error.message === 'string') {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      console.error("Error adding payment provider:", error);
     } finally {
       setLoading(false);
     }

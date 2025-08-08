@@ -1,24 +1,48 @@
 // src/context/OnRampContext.tsx
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import {api} from "@/lib/axios";
 import { 
   BuyPayload,
   OnrampApiResponse,
-  OnRampContextType 
+  OnRampContextType,
+  PaymentProvider,
+  Listing 
 } from "@/interface";
 import { safeParseUnits } from "@/utils/numberUtils";
 
 const OnRampContext = createContext<OnRampContextType | undefined>(undefined);
 
 export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [onRampData, setOnRampData] = useState<OnrampApiResponse | null>(null);
+  const [providers, setProviders] = useState<PaymentProvider[]>([]);
+  const [listings, setListings] = useState<Listing[]>([]);
 
-
-  const get = async (): Promise<OnrampApiResponse> => {
-    const res = await api.get("/onramp");
-    return res.data;
-  };
+  const fetchOnRampData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get("/onramp");
+      const data = res.data;
+      setOnRampData(data);
+      
+      // Set providers
+      const providersList = data?.paymentProviders || [];
+      setProviders(providersList);
+      
+      // Set listings
+      const listingsList = data?.listings || [];
+      setListings(listingsList);
+      
+      return data;
+    } catch (err: any) {
+      setError(err?.message || "Failed to fetch OnRamp data");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const buy = async (payload: BuyPayload, userAddress: string): Promise<{ url: string }> => {
     const weiAmount = safeParseUnits(payload.amount, 18).toString();
@@ -36,13 +60,13 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   };
 
-  const sell = async (payload) => {
+  const sell = async (payload: any) => {
     const weiAmount = safeParseUnits(payload.amount, 18).toString() ;
     const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
     return res.data;
   };
 
-  const lock = async (body): Promise<{ url: string }> => {
+  const lock = async (body: any): Promise<{ url: string }> => {
     const res = await api.post("/onramp/lock", body);
     return res.data;
   };
@@ -52,36 +76,54 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   };
 
-  const addPaymentProvider = async (providerData: {
+  const addPaymentProvider = useCallback(async (providerData: {
     providerAddress: string;
     name: string;
     endpoint: string;
   }) => {
     const res = await api.post("/onramp/addPaymentProvider", providerData);
     // Ensure we return a consistent format
-    if (typeof res.data === 'string') {
-      return { message: res.data };
-    }
-    return res.data;
-  };
+    const result = typeof res.data === 'string' 
+      ? { message: res.data }
+      : res.data;
+    
+    // Refresh data after successful add
+    setTimeout(() => {
+      fetchOnRampData();
+    }, 500);
+    
+    return result;
+  }, [fetchOnRampData]);
 
-  const removePaymentProvider = async (providerAddress: string) => {
+  const removePaymentProvider = useCallback(async (providerAddress: string) => {
     const res = await api.post("/onramp/removePaymentProvider", { providerAddress });
     // Ensure we return a consistent format
-    if (typeof res.data === 'string') {
-      return { message: res.data };
-    }
-    return res.data;
-  };
+    const result = typeof res.data === 'string'
+      ? { message: res.data }
+      : res.data;
+    
+    // Refresh data after successful remove
+    setTimeout(() => {
+      fetchOnRampData();
+    }, 500);
+    
+    return result;
+  }, [fetchOnRampData]);
 
-  const cancelListing = async (token: string) => {
+  const cancelListing = useCallback(async (token: string) => {
     const res = await api.post("/onramp/cancelListing", { token });
     // Ensure we return a consistent format
-    if (typeof res.data === 'string') {
-      return { message: res.data };
-    }
-    return res.data;
-  };
+    const result = typeof res.data === 'string'
+      ? { message: res.data }
+      : res.data;
+    
+    // Refresh data after successful cancel
+    setTimeout(() => {
+      fetchOnRampData();
+    }, 500);
+    
+    return result;
+  }, [fetchOnRampData]);
 
   return (
     <OnRampContext.Provider
@@ -89,8 +131,11 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         token: null,
         loading,
         error,
+        onRampData,
+        providers,
+        listings,
         
-        get,
+        fetchOnRampData,
         buy,
         sell,
         lock,

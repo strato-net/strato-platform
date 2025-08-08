@@ -17,38 +17,25 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const PaymentProvidersTable = forwardRef((props, ref) => {
-  const [providers, setProviders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<{ address: string; name: string } | null>(null);
   const { toast } = useToast();
-  const { get, removePaymentProvider } = useOnRampContext();
+  const { providers, loading, fetchOnRampData, removePaymentProvider } = useOnRampContext();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchProviders = async () => {
+  // Format providers for display
+  const formattedProviders = providers.map(provider => ({
+    key: provider.key,
+    value: provider.value || provider
+  }));
+
+  const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      const onRampData = await get();
-      
-      // Get providers
-      const providersList = onRampData?.paymentProviders || [];
-      
-      // Show all providers including zero addresses
-      const formattedProviders = providersList.map(provider => ({
-        key: provider.key || provider.providerAddress,
-        value: provider.value || provider
-      }));
-      
-      setProviders(formattedProviders);
+      await fetchOnRampData();
     } catch (error: any) {
-      console.error("Error fetching providers:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch payment providers",
-        variant: "destructive",
-      });
+      console.error("Error refreshing providers:", error);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -77,37 +64,9 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
         description: successMessage,
       });
       
-      // Refresh providers after a short delay
-      setTimeout(() => {
-        fetchProviders();
-      }, 500);
+      // Data will be refreshed automatically by the context
     } catch (error: any) {
-      // Handle the specific error from backend about provider being in use
-      let errorMessage = "Failed to delete payment provider";
-      
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.response?.data) {
-        const responseData = error.response.data;
-        if (typeof responseData === 'string') {
-          errorMessage = responseData;
-        } else if (responseData.error && typeof responseData.error === 'object' && responseData.error.message) {
-          // Handle the error handler format: {error: {message, status, type}}
-          errorMessage = responseData.error.message;
-        } else if (responseData.message && typeof responseData.message === 'string') {
-          errorMessage = responseData.message;
-        } else if (responseData.error && typeof responseData.error === 'string') {
-          errorMessage = responseData.error;
-        }
-      } else if (error?.message && typeof error.message === 'string') {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Cannot Remove Provider",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      console.error("Error deleting provider:", error);
     } finally {
       setDeleteDialogOpen(false);
       setProviderToDelete(null);
@@ -115,13 +74,15 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
   };
 
   useEffect(() => {
-    fetchProviders();
-  }, []);
+    // Fetch data on mount if not already loaded
+    if (providers.length === 0 && !loading) {
+      fetchOnRampData();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
-  // Expose the refresh function to parent components
   useImperativeHandle(ref, () => ({
-    refresh: fetchProviders
-  }), []);
+    refresh: fetchOnRampData
+  }), [fetchOnRampData]);
 
   const formatAddress = (address: string) => {
     if (!address) return "N/A";
@@ -155,7 +116,7 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchProviders}
+              onClick={handleRefresh}
               disabled={refreshing}
             >
               {refreshing ? (
@@ -168,7 +129,7 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
         </CardHeader>
         <CardContent>
           <div className="h-80 overflow-y-auto border rounded-md">
-            {providers.length === 0 ? (
+            {formattedProviders.length === 0 ? (
               <div className="p-4">
                 <Alert>
                   <AlertDescription>
@@ -178,8 +139,7 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
               </div>
             ) : (
               <div className="space-y-2 p-2">
-                {providers.map((provider) => {
-                  // Skip invalid providers
+                {formattedProviders.map((provider) => {
                   if (!provider || !provider.value) {
                     return null;
                   }
