@@ -9,6 +9,7 @@ import {
   calculateSwap,
   calculateSwapReverse,
   getSwapHistory,
+  setPoolRates,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -22,6 +23,7 @@ import {
   validateQueryParams,
   validateCalculateSwapArgs,
   validateSwapHistoryArgs,
+  validateSetPoolRatesArgs,
 } from "../validators/swapping.validator";
 
 class SwappingController {
@@ -264,6 +266,23 @@ class SwappingController {
 
       const swapHistory = await getSwapHistory(accessToken, params.poolAddress, query as Record<string, string | undefined>);
       res.status(RestStatus.OK).json(swapHistory);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Admin operations
+  static async setPoolRates(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateSetPoolRatesArgs(body);
+
+      const result = await setPoolRates(accessToken, body);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

@@ -45,4 +45,8 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
 // Query params: select, order, offset, limit, block_timestamp, transaction_hash, etc.
 router.get("/swap-history/:poolAddress", authHandler.authorizeRequest(true), SwappingController.getSwapHistory);
 
+// ----- Admin Operations -----
+// Set pool rates (admin only)
+router.post("/swap-pools/set-rates", authHandler.authorizeRequest(), SwappingController.setPoolRates);
+
 export default router;
