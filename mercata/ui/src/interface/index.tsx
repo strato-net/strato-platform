@@ -211,6 +211,12 @@ export interface OnRampContextType {
   addPaymentProvider: (providerData: AddPaymentProviderData) => Promise<any>;
   removePaymentProvider: (providerAddress: string) => Promise<any>;
   cancelListing: (token: string) => Promise<any>;
+  updateListing: (payload: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }) => Promise<any>;
 }
 
 export interface RawWithdrawData {

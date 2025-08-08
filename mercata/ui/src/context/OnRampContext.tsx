@@ -96,6 +96,17 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   }, [get]);
 
+  const updateListing = useCallback(async (payload: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }) => {
+    const res = await api.post("/onramp/updateListing", payload);
+    await get();
+    return res.data;
+  }, [get]);
+
   return (
     <OnRampContext.Provider
       value={{
@@ -113,6 +124,7 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         addPaymentProvider,
         removePaymentProvider,
         cancelListing,
+        updateListing,
         
       }}
     >
