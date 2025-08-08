@@ -18,6 +18,10 @@ contract record RewardsEngine is Ownable {
     // DATA STRUCTURES
     // ═════════════════════════════════════════════════════════════════════════
 
+    struct RewardsEngineArgs {
+        address[] initialRewardTokens;
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
     // ═════════════════════════════════════════════════════════════════════════
@@ -31,7 +35,15 @@ contract record RewardsEngine is Ownable {
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(
+        RewardsEngineArgs memory args,
+        address initialOwner
+    ) Ownable(initialOwner) {
+        _ownershipGranted = true;
+        for (uint i = 0; i < args.initialRewardTokens.length; i++) {
+            _addRewardToken(args.initialRewardTokens[i]);
+        }
+        _ownershipGranted = false;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
