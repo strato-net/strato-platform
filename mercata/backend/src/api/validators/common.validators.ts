@@ -41,14 +41,24 @@ export const ethereumAddressField = (label: string) =>
       "any.required": `"${label}" is required`,
     });
 
-export const numericStringField = (label: string) =>
+export const numericStringField = (label: string, { allowZero = false } = {}) =>
   Joi.string()
     .trim()
     .pattern(/^\d+$/)
     .required()
+    .custom((value, helpers) => {
+      try {
+        const big = BigInt(value);
+        if (!allowZero && big <= 0n) return helpers.error("number.positive");
+        return value; // Keep the original string
+      } catch {
+        return helpers.error("string.pattern.base");
+      }
+    }, "Positive numeric string check")
     .messages({
       "string.empty": `"${label}" is required`,
       "string.base": `"${label}" must be a string`,
-      "string.pattern.base": `${label} must be a numeric string (integers only)`,
-      "any.required": `${label} is required`,
+      "string.pattern.base": `"${label}" must be a numeric string (integers only)`,
+      "number.positive": `"${label}" must be greater than 0`,
+      "any.required": `"${label}" is required`,
     });
