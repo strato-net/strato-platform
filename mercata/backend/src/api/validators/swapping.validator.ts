@@ -1,20 +1,10 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField } from "./common.validators";
-
-const numericString = (label: string) =>
-  Joi.string()
-    .pattern(/^\d+$/)
-    .required()
-    .messages({
-      "string.pattern.base": `${label} must be a numeric string (integers only)`,
-      "any.required": `${label} is required`,
-    });
-
+import { ethereumAddressField, numericStringField } from "./common.validators";
 
 // Validator functions
 export function validatePoolAddressArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: ethereumAddressField.label("poolAddress"),
+    poolAddress: ethereumAddressField("poolAddress"),
   });
 
   const { error } = schema.validate(args);
@@ -25,7 +15,7 @@ export function validatePoolAddressArgs(args: any) {
 
 export function validateTokenAddressArgs(args: any) {
   const schema = Joi.object({
-    tokenAddress: ethereumAddressField.label("tokenAddress"),
+    tokenAddress: ethereumAddressField("tokenAddress"),
   });
 
   const { error } = schema.validate(args);
@@ -36,8 +26,8 @@ export function validateTokenAddressArgs(args: any) {
 
 export function validateTokenPairArgs(args: any) {
   const schema = Joi.object({
-    tokenAddress1: ethereumAddressField.label("tokenAddress1"),
-    tokenAddress2: ethereumAddressField.label("tokenAddress2"),
+    tokenAddress1: ethereumAddressField("tokenAddress1"),
+    tokenAddress2: ethereumAddressField("tokenAddress2"),
   });
 
   const { error } = schema.validate(args);
@@ -48,8 +38,8 @@ export function validateTokenPairArgs(args: any) {
 
 export function validateCreatePoolsArgs(args: any) {
   const schema = Joi.object({
-    tokenA: ethereumAddressField.label("tokenA"),
-    tokenB: ethereumAddressField.label("tokenB"),
+    tokenA: ethereumAddressField("tokenA"),
+    tokenB: ethereumAddressField("tokenB"),
   });
 
   const { error } = schema.validate(args);
@@ -60,8 +50,8 @@ export function validateCreatePoolsArgs(args: any) {
 
 export function validateAddLiquidityArgs(args: any) {
   const schema = Joi.object({
-    tokenBAmount: numericString("TokenBAmount"),
-    maxTokenAAmount: numericString("MaxTokenAAmount"),
+    tokenBAmount: numericStringField("TokenBAmount"),
+    maxTokenAAmount: numericStringField("MaxTokenAAmount"),
   });
 
   const { error } = schema.validate(args);
@@ -72,7 +62,7 @@ export function validateAddLiquidityArgs(args: any) {
 
 export function validateRemoveLiquidityArgs(args: any) {
   const schema = Joi.object({
-    lpTokenAmount: numericString("LpTokenAmount"),
+    lpTokenAmount: numericStringField("LpTokenAmount"),
   });
 
   const { error } = schema.validate(args);
@@ -83,10 +73,10 @@ export function validateRemoveLiquidityArgs(args: any) {
 
 export function validateSwapArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: ethereumAddressField.label("poolAddress"),
+    poolAddress: ethereumAddressField("poolAddress"),
     isAToB: Joi.boolean().required(),
-    amountIn: numericString("AmountIn"),
-    minAmountOut: numericString("MinAmountOut"),
+    amountIn: numericStringField("AmountIn"),
+    minAmountOut: numericStringField("MinAmountOut"),
   });
 
   const { error } = schema.validate(args);
@@ -97,9 +87,9 @@ export function validateSwapArgs(args: any) {
 
 export function validateCalculateSwapArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: ethereumAddressField.label("poolAddress"),
+    poolAddress: ethereumAddressField("poolAddress"),
     isAToB: Joi.string().valid("true", "false").required(),
-    amountIn: numericString("AmountIn"),
+    amountIn: numericStringField("AmountIn"),
     reverse: Joi.string().valid("true", "false").optional(),
   });
 
@@ -120,7 +110,7 @@ export function validateQueryParams(query: any) {
 
 export function validateSwapHistoryArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: ethereumAddressField.label("poolAddress"),
+    poolAddress: ethereumAddressField("poolAddress"),
   });
 
   const { error } = schema.validate(args);

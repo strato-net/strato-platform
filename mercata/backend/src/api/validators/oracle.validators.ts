@@ -3,7 +3,7 @@ import { ethereumAddressField } from "./common.validators";
 
 export function validateGetPriceQuery(query: any) {
   const schema = Joi.object({
-    asset: ethereumAddressField.label("asset"),
+    asset: ethereumAddressField("asset"),
   })
 
   const { error, value } = schema.validate(query, { abortEarly: false });
@@ -17,7 +17,7 @@ export function validateGetPriceQuery(query: any) {
 
 export function validateSetPriceInput(body: any) {
   const schema = Joi.object({
-    token: ethereumAddressField.label("token"),
+    token: ethereumAddressField("token"),
     price: Joi.string()
       .pattern(/^\d+$/) // Only numeric strings (integer)
       .required()
@@ -38,7 +38,7 @@ export const validateGetPriceHistoryInput = (
   assetAddress: string,
 ) => {
   const paramsSchema = Joi.object({
-    assetAddress: ethereumAddressField.label("assetAddress"),
+    assetAddress: ethereumAddressField("assetAddress"),
   });
 
   const paramValidation = paramsSchema.validate({ assetAddress });
