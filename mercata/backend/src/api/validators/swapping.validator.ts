@@ -1,46 +1,47 @@
 import Joi from "@hapi/joi";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 // Validator functions
 export function validatePoolAddressArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: Joi.string().required(),
+    poolAddress: validateAddressField("poolAddress"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Pool Address Argument Validation Error");
+    throw new Error("Pool Address Argument Validation Error: " + error.message);
   }
 }
 
 export function validateTokenAddressArgs(args: any) {
   const schema = Joi.object({
-    tokenAddress: Joi.string().required(),
+    tokenAddress: validateAddressField("tokenAddress"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Token Address Argument Validation Error");
+    throw new Error("Token Address Argument Validation Error:" + error.message);
   }
 }
 
 export function validateTokenPairArgs(args: any) {
   const schema = Joi.object({
-    tokenAddress1: Joi.string().required(),
-    tokenAddress2: Joi.string().required(),
+    tokenAddress1: validateAddressField("tokenAddress1"),
+    tokenAddress2: validateAddressField("tokenAddress2"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Token Pair Argument Validation Error");
+    throw new Error("Token Pair Argument Validation Error:" + error.message);
   }
 }
 
 export function validateCreatePoolsArgs(args: any) {
   const schema = Joi.object({
-    tokenA: Joi.string().required(),
-    tokenB: Joi.string().required(),
+    tokenA: validateAddressField("tokenA"),
+    tokenB: validateAddressField("tokenB"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Create Pool Argument Validation Error: " + error.message);
@@ -49,10 +50,10 @@ export function validateCreatePoolsArgs(args: any) {
 
 export function validateAddLiquidityArgs(args: any) {
   const schema = Joi.object({
-    tokenBAmount: Joi.string().required(),
-    maxTokenAAmount: Joi.string().required(),
+    tokenBAmount: numericStringField("TokenBAmount"),
+    maxTokenAAmount: numericStringField("MaxTokenAAmount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Add Liquidity Argument Validation Error: " + error.message);
@@ -61,9 +62,9 @@ export function validateAddLiquidityArgs(args: any) {
 
 export function validateRemoveLiquidityArgs(args: any) {
   const schema = Joi.object({
-    lpTokenAmount: Joi.string().required(),
+    lpTokenAmount: numericStringField("LpTokenAmount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Remove Liquidity Argument Validation Error: " + error.message);
@@ -72,12 +73,12 @@ export function validateRemoveLiquidityArgs(args: any) {
 
 export function validateSwapArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: Joi.string().required(),
+    poolAddress: validateAddressField("poolAddress"),
     isAToB: Joi.boolean().required(),
-    amountIn: Joi.string().required(),
-    minAmountOut: Joi.string().required(),
+    amountIn: numericStringField("AmountIn"),
+    minAmountOut: numericStringField("MinAmountOut"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Swap Argument Validation Error: " + error.message);
@@ -86,12 +87,12 @@ export function validateSwapArgs(args: any) {
 
 export function validateCalculateSwapArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: Joi.string().required(),
+    poolAddress: validateAddressField("poolAddress"),
     isAToB: Joi.string().valid("true", "false").required(),
-    amountIn: Joi.string().required(),
+    amountIn: numericStringField("AmountIn"),
     reverse: Joi.string().valid("true", "false").optional(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Calculate Swap Argument Validation Error: " + error.message);
@@ -100,7 +101,7 @@ export function validateCalculateSwapArgs(args: any) {
 
 export function validateQueryParams(query: any) {
   const schema = Joi.object().pattern(Joi.string(), Joi.string());
-  
+
   const { error } = schema.validate(query);
   if (error) {
     throw new Error("Query Parameter Validation Error: " + error.message);
@@ -109,9 +110,9 @@ export function validateQueryParams(query: any) {
 
 export function validateSwapHistoryArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: Joi.string().required(),
+    poolAddress: validateAddressField("poolAddress"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Swap History Argument Validation Error: " + error.message);
