@@ -8,9 +8,85 @@ import "../Lending/LiquidityPool.sol";
 contract record RewardsEngine is Ownable {
 
     // ═════════════════════════════════════════════════════════════════════════
+    // EVENTS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    event RewardTokenAdded(address indexed token);
+    event RewardTokenRemoved(address indexed token);
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // DATA STRUCTURES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // STATE VARIABLES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // Reward tokens storage using O(1) pattern
+    Token[] public record rewardTokens;
+    mapping(address => uint) public record rewardTokenMap;
+
+
+    // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
     constructor(address initialOwner) Ownable(initialOwner) {
     }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // REWARD TOKEN MANAGEMENT CAPABILITIES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function addRewardToken(address tokenAddress) external onlyOwner {
+        _addRewardToken(tokenAddress);
+    }
+
+    function removeRewardToken(address tokenAddress) external onlyOwner {
+        _removeRewardToken(tokenAddress);
+    }
+
+    function addRewardTokens(address[] calldata tokenAddresses) external onlyOwner {
+        for (uint i = 0; i < tokenAddresses.length; i++) {
+            _addRewardToken(tokenAddresses[i]);
+        }
+    }
+
+    function removeRewardTokens(address[] calldata tokenAddresses) external onlyOwner {
+        for (uint i = 0; i < tokenAddresses.length; i++) {
+            _removeRewardToken(tokenAddresses[i]);
+        }
+    }
+
+    function _addRewardToken(address tokenAddress) internal {
+        require(tokenAddress != address(0), "RewardsEngine: Invalid token address");
+        require(rewardTokenMap[tokenAddress] == 0, "RewardsEngine: Token already added");
+
+        rewardTokens.push(Token(tokenAddress));
+        rewardTokenMap[tokenAddress] = rewardTokens.length;
+
+        emit RewardTokenAdded(tokenAddress);
+    }
+
+    function _removeRewardToken(address tokenAddress) internal {
+        require(tokenAddress != address(0), "RewardsEngine: Invalid token address");
+        uint index = rewardTokenMap[tokenAddress];
+        require(index > 0, "RewardsEngine: Token not found");
+
+        uint arrayIndex = index - 1;
+        uint lastIndex = rewardTokens.length - 1;
+
+        if (arrayIndex != lastIndex) {
+            Token lastToken = rewardTokens[lastIndex];
+            rewardTokens[arrayIndex] = lastToken;
+            rewardTokenMap[address(lastToken)] = index;
+        }
+
+        rewardTokens.pop();
+        delete rewardTokenMap[tokenAddress];
+
+        emit RewardTokenRemoved(tokenAddress);
+    }
+
+
 }
