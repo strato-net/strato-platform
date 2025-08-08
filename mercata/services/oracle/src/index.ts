@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import { startCronScheduler } from './cronScheduler';
 import { logInfo, logError } from './utils/logger';
 import { validateConfig } from './utils/validateConfig';
+import { healthMonitor } from './utils/healthMonitor';
 import express from 'express';
 import * as packageJson from '../package.json';
 
@@ -42,7 +43,16 @@ process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
 // Start health check server
 const app = express();
 const PORT = process.env.HEALTH_PORT || 3000;
-app.get('/health', (req, res) => res.status(200).json({ status: 'OK', version: packageJson.version }));
+
+app.get('/health', (req, res) => {
+    const status = healthMonitor.getStatus();
+    const statusCode = healthMonitor.isHealthy() ? 200 : 503;
+    res.status(statusCode).json({
+        ...status,
+        version: packageJson.version
+    });
+});
+
 app.listen(PORT, () => {
     logInfo('HealthCheck', `/health endpoint listening on port ${PORT}`);
 });

@@ -45,4 +45,9 @@ export interface CallListArg {
     contract: { address: string; name: string };
     method: string;
     args: Record<string, any>;
+}
+
+export interface RetryConfig {
+    maxAttempts: number;
+    logPrefix: string;
 } 

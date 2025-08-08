@@ -1,32 +1,26 @@
-import axios from 'axios';
-import { logError } from '../utils/logger';
+import { apiRequest } from '../utils/apiClient';
 import { SourceConfig, BatchPriceResult, Asset } from '../types';
+import { logError } from '../utils/logger';
 
 export async function fetchGenericPrice(asset: Asset, sourceConfig: SourceConfig): Promise<{
     price: number;
     feedTimestamp: string;
 }> {
-    try {
-        const apiKey = getApiKey(sourceConfig);
-        const url = buildUrl(sourceConfig, asset, apiKey);
-        const requestOptions = buildRequestOptions(sourceConfig, url, apiKey, asset);
-        
-        const response = await axios(requestOptions);
-        
-        const priceUSD = extractPrice(response.data, sourceConfig, asset);
-        const feedTimestamp = extractTimestamp(response.data, sourceConfig);
+    const apiKey = getApiKey(sourceConfig);
+    const url = buildUrl(sourceConfig, asset, apiKey);
+    const requestOptions = buildRequestOptions(sourceConfig, url, apiKey, asset);
+    
+    const response = await apiRequest(requestOptions, { logPrefix: 'GenericRestAdapter' });
+    
+    const priceUSD = extractPrice(response.data, sourceConfig, asset);
+    const feedTimestamp = extractTimestamp(response.data, sourceConfig);
 
-        if (!priceUSD || isNaN(parseFloat(priceUSD))) {
-            throw new Error(`Invalid price data received for ${asset.name}: ${priceUSD}`);
-        }
-
-        const price = Math.floor(parseFloat(priceUSD) * 1e18);
-        return { price, feedTimestamp };
-
-    } catch (error) {
-        logError('GenericAdapter', error as Error);
-        throw error;
+    if (!priceUSD || isNaN(parseFloat(priceUSD))) {
+        throw new Error(`Invalid price data received for ${asset.name}: ${priceUSD}`);
     }
+
+    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+    return { price, feedTimestamp };
 }
 
 // Helper functions for simplified configuration
@@ -134,75 +128,6 @@ function extractTimestamp(data: any, sourceConfig: SourceConfig): string {
     return extractNestedProperty(data, sourceConfig.timestamp) || new Date().toISOString();
 }
 
-function replacePlaceholders(template: string, params: Record<string, any>, apiKey: string = ''): string {
-    let result = template;
-    
-    // Replace API parameters
-    for (const [key, value] of Object.entries(params)) {
-        if (typeof value === 'object') {
-            // Handle object parameters (like addresses array)
-            result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), JSON.stringify(value));
-        } else {
-            result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), String(value));
-        }
-    }
-    
-    // Replace API key
-    if (apiKey) {
-        result = result.replace(/\$\{API_KEY\}/g, apiKey);
-    }
-    
-    return result;
-}
-
-/**
- * Recursively replaces placeholders in objects, arrays, and strings
- * Handles special cases like exact placeholder matches for object values
- */
-function replacePlaceholdersInObject(obj: any, params: Record<string, any>, apiKey: string = ''): any {
-    if (typeof obj === 'string') {
-        let result = obj;
-        
-        for (const [key, value] of Object.entries(params)) {
-            if (typeof value === 'object') {
-                // Handle exact placeholder matches for object values
-                if (result === `\${${key}}`) {
-                    return value;
-                } else {
-                    result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), JSON.stringify(value));
-                }
-            } else {
-                result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), String(value));
-            }
-        }
-        
-        if (apiKey) {
-            result = result.replace(/\$\{API_KEY\}/g, apiKey);
-        }
-        
-        return result;
-    } else if (Array.isArray(obj)) {
-        return obj.map(item => replacePlaceholdersInObject(item, params, apiKey));
-    } else if (typeof obj === 'object' && obj !== null) {
-        const result: any = {};
-        for (const [key, value] of Object.entries(obj)) {
-            result[key] = replacePlaceholdersInObject(value, params, apiKey);
-        }
-        return result;
-    } else {
-        return obj;
-    }
-}
-
-function validatePriceBounds(asset: Asset, price: number, minPrice?: number, maxPrice?: number): void {
-    if (minPrice !== undefined && price < minPrice) {
-        throw new Error(`Price ${price} for ${asset.name} is below minimum bound ${minPrice}`);
-    }
-    if (maxPrice !== undefined && price > maxPrice) {
-        throw new Error(`Price ${price} for ${asset.name} is above maximum bound ${maxPrice}`);
-    }
-}
-
 export function extractNestedProperty(obj: any, path: string): any {
     if (!path) return undefined;
     // Use bracket notation to handle both object properties and array indices
@@ -214,18 +139,19 @@ export function extractNestedProperty(obj: any, path: string): any {
 }
 
 export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConfig): Promise<BatchPriceResult> {
-    try {
-        const apiKey = getApiKey(sourceConfig);
-        const url = buildBatchUrl(sourceConfig, assets, apiKey);
-        const requestOptions = buildBatchRequestOptions(sourceConfig, url, apiKey, assets);
-        
-        const response = await axios(requestOptions);
-        return parseBatchResponse(response.data, sourceConfig, assets);
-        
-    } catch (error) {
-        logError('GenericRestAdapter', error as Error);
-        throw error;
+    const apiKey = getApiKey(sourceConfig);
+    const url = buildBatchUrl(sourceConfig, assets, apiKey);
+    const requestOptions = buildBatchRequestOptions(sourceConfig, url, apiKey, assets);
+    
+    const response = await apiRequest(requestOptions, { logPrefix: 'GenericRestAdapter' });
+    
+    // Check for API error responses that don't throw HTTP errors
+    if (response.data && response.data.success === false) {
+        const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
+        throw new Error(`${sourceConfig.url}: ${errorMessage}`);
     }
+    
+    return parseBatchResponse(response.data, sourceConfig, assets);
 }
 
 function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: string): string {
@@ -389,7 +315,7 @@ function parseBatchResponse(
                     result[asset.name] = { price, feedTimestamp };
                 }
             } catch (error) {
-                console.warn(`Failed to parse price for ${asset.name}: ${error}`);
+                logError('GenericRestAdapter', new Error(`Failed to parse price for ${asset.name}: ${error}`));
             }
         });
     }

@@ -3,6 +3,7 @@ import { logInfo, logError, logFeedUpdate } from './utils/logger';
 import { fetchBatchPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices, getUpdateInterval } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
+import { healthMonitor } from './utils/healthMonitor';
 import { Asset } from './types';
 
 // Process all feeds in parallel and combine results
@@ -138,14 +139,16 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
                 logError('CronScheduler', new Error(`Failed to fetch ${feed.name} from ${sourceName}: ${errorMessage}`));
             }
         });
-        
-        if (allSuccessfulSources.length === 0) {
-            throw new Error(`No valid prices received for ${feed.name} from any source`);
-        }
 
         // Log summary of source results
         const successfulSourceNames = allSuccessfulSources.map(s => s.name);
         logInfo('CronScheduler', `${feed.name}: ${successfulSourceNames.length}/${resolvedFeed.sources.length} sources succeeded. Successful: [${successfulSourceNames.join(', ')}]. Failed: [${failedSources.join(', ')}]`);
+
+        // Mark service as unhealthy if any source fails
+        if (failedSources.length > 0) {
+            const error = `Source failures for feed ${feed.name}: [${failedSources.join(', ')}]`;
+            healthMonitor.recordFailure(error);
+        }
 
         // Calculate average prices for each asset across sources
         const assetPrices: Record<string, number> = {};

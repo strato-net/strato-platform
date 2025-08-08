@@ -28,10 +28,10 @@ export async function validateConfig(): Promise<boolean> {
         try {
             const isValid = await oauthClient().validateToken();
             if (!isValid) {
-                warnings.push('OAuth connection test failed - check credentials');
+                errors.push('OAuth authentication failed - check credentials');
             }
         } catch (error) {
-            warnings.push(`OAuth connection test error: ${(error as Error).message}`);
+            errors.push(`OAuth authentication error: ${(error as Error).message}`);
         }
     } else {
         errors.push('Incomplete OAuth configuration');

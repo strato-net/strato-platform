@@ -11,6 +11,7 @@ class OAuthClient {
     private accessToken: string | null = null;
     private tokenExpiry: number | null = null;
     private tokenEndpoint: string | null = null;
+    private userAddress: string | null = null;
 
     constructor() {
         this.discoveryUrl = process.env.OAUTH_DISCOVERY_URL!;
@@ -85,45 +86,45 @@ class OAuthClient {
                 throw new Error('No access token in response');
             }
         } catch (error: any) {
-            logError('OAuth', new Error(`Error getting access token: ${error.response?.data || error.message}`));
-            
-            // Try fallback to client credentials if password grant fails
-            try {
-                const tokenData = new URLSearchParams();
-                tokenData.append('grant_type', 'client_credentials');
-
-                const fallbackResponse = await axios.post(await this.getTokenEndpoint(), tokenData, {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Accept': 'application/json',
-                        'Authorization': 'Basic ' + Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64')
-                    },
-                    timeout: 10000
-                });
-
-                if (fallbackResponse.data.access_token) {
-                    this.accessToken = fallbackResponse.data.access_token;
-                    const expiresIn = fallbackResponse.data.expires_in || 3600;
-                    this.tokenExpiry = Date.now() + (expiresIn * 1000 * 0.9);
-                    
-                    return this.accessToken!;
-                }
-            } catch (fallbackError: any) {
-                logError('OAuth', new Error(`Fallback also failed: ${fallbackError.message}`));
-            }
-            
-            throw new Error(`OAuth authentication failed: ${error.message}`);
+            const errorMessage = error.response?.data?.error_description || error.response?.data?.error || error.message;
+            logError('OAuth', new Error(`Error getting access token: ${errorMessage}`));
+            throw new Error(`OAuth authentication failed: ${errorMessage}`);
         }
     }
 
     async validateToken(): Promise<boolean> {
         try {
             const token = await this.getAccessToken();
+            if (token) {
+                // Cache user address during validation
+                await this.getUserAddress();
+            }
             return !!token;
-        } catch (error: any) {
-            logError('OAuth', new Error(`Token validation failed: ${error.message}`));
-            return false;
+        } catch (error) {
+            // Re-throw the error so validateConfig can catch it
+            throw error;
         }
+    }
+
+    async getUserAddress(): Promise<string> {
+        if (this.userAddress) {
+            return this.userAddress;
+        }
+
+        const accessToken = await this.getAccessToken();
+        const response = await axios.get(
+            `${process.env.STRATO_NODE_URL}/strato/v2.3/key`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000
+            }
+        );
+
+        this.userAddress = response.data.address;
+        return this.userAddress!;
     }
 
 
