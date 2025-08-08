@@ -37,7 +37,7 @@ all_develop: build_develop docker-compose eks
 
 mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe docker-compose
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+build_all: strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
@@ -122,6 +122,17 @@ build_common:
 	cd strato && stack install \
 		--test --no-run-tests \
 
+build_common_docker: build_buildbase
+build_common_docker:
+	@echo building haskell libraries and creating directories
+	mkdir -p ${HIGHWAYDIR}
+	mkdir -p ${STRATODIR}
+	mkdir -p ${VAULTDIR}
+	mkdir -p ${IDENTITYDIR}
+	cd strato && stack build \
+		--test --no-run-tests \
+		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
 build_common_profiled: build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
@@ -162,7 +173,7 @@ hoogle_serve:
 
 hoogle: hoogle_generate hoogle_serve
 
-highway: build_common 
+highway: build_common_docker
 	@echo Now building highway...
 	cp strato/highway/doit.sh ${HIGHWAYDIR}
 	docker build --target highway --tag ${REPO_URL}highway:${VERSION} --file Dockerfile.multi ${FAKEROOT}
@@ -174,6 +185,12 @@ highway-nginx:
 
 strato: build_common
 	@echo Now building core-strato...
+	cp -fr strato/extraFiles/* ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+
+strato_docker: build_common_docker
+	@echo Now building core-strato for docker...
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
