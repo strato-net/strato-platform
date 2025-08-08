@@ -31,7 +31,9 @@ endif
 
 $(info )
 
-all: build_all docker-compose eks
+all: mercata
+
+docker: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
