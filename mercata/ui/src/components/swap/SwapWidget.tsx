@@ -344,7 +344,7 @@ const SwapDialog = ({
               )}
               <div className="flex justify-between">
                 <span>Max Slippage</span>
-                <span className={`${slippage > 5 ? 'text-yellow-600' : autoSlippage ? 'text-blue-600' : 'text-black'}`}>
+                <span className={`${slippage > 5 || slippage < 1 ? 'text-yellow-600' : autoSlippage ? 'text-blue-600' : 'text-black'}`}>
                   {slippage}%
                 </span>
               </div>
