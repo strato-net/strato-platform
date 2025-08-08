@@ -1,0 +1,16 @@
+
+containers="strato-nginx-1 strato-mercata-ui-1 strato-smd-1 strato-mercata-backend-1 strato-kafka-1 strato-apex-1 strato-postgrest-1 strato-postgres-1 strato-prometheus-1 strato-docs-1 strato-zookeeper-1 strato-redis-1"
+
+for container in $containers
+do
+	docker kill $container
+	docker rm $container
+done
+
+volumes="strato_kafkadata strato_pgdata strato_prometheusdata strato_redisdata strato_zookeeperdata"
+
+for volume in $volumes
+do
+	docker volume rm $volume
+done
+
