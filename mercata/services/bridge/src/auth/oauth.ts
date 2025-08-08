@@ -116,9 +116,9 @@ class OAuthUtil {
         response: error?.response?.data,
         status: error?.response?.status,
         config: {
-          tokenEndpoint: this.tokenEndpoint,
+          tokenEndpoint: "[REDACTED]",
           scope: this.scope,
-          clientId: this.clientId,
+          clientId: "[REDACTED]",
         },
       });
       throw new Error(

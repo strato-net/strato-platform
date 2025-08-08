@@ -9,6 +9,9 @@ module SolidVM.Model.Value
     Typo (..),
     ValList (..),
     IndexType (..),
+    rlpEncodeVariable,
+    rlpEncodeValue,
+    rlpEncodeValues,
     createVar,
     coerceType,
     apSnoc,
@@ -72,25 +75,6 @@ instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
 
--- Util functions to help display variables within the IO monad, since it reads from an IO ref to get the variable's value
--- Uncomment when needed
--- showVariable :: MonadIO m => Variable -> m String
--- showVariable (Variable v) = do
---   val <- liftIO $ readIORef v
---   showValue val
--- showVariable (Constant c) = showValue c
-
--- showValue :: MonadIO m => Value -> m String
--- Only implemented useful show for Arrays, as they are the most commonly used values that use IORefs
--- showValue (SArray _ vc) = do
---   ss <- mapM showVariable vc
---   let s :: String
---       s = foldl insertComma "SArray: " ss
---   return s
--- showValue v = return $ show v
-
--- insertComma :: String -> String -> String
--- insertComma a b = a ++ ", " ++ b
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
 --sometimes it is a proper type.
@@ -169,6 +153,26 @@ instance RLPSerializable Value where
   rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = todo "Value/rlpDecode" x
+
+rlpEncodeVariable :: MonadIO m => Variable -> m RLPObject
+rlpEncodeVariable (Variable r) = rlpEncodeValue =<< liftIO (readIORef r)
+rlpEncodeVariable (Constant v) = rlpEncodeValue v
+
+rlpEncodeValue :: MonadIO m => Value -> m RLPObject
+rlpEncodeValue (SInteger i) = pure $ rlpEncode i
+rlpEncodeValue (SString s) = pure $ rlpEncode s
+rlpEncodeValue (SDecimal decimal) = pure $ rlpEncode $ show decimal
+rlpEncodeValue (SBool b) = pure $ rlpEncode b
+rlpEncodeValue (SAccount a _) = pure $ rlpEncode a
+rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
+rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
+rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue (SArray _ v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue _ = pure $ RLPArray []
+
+rlpEncodeValues :: MonadIO m => [Value] -> m RLPObject
+rlpEncodeValues [x] = rlpEncodeValue x
+rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 
 -- coerceFromInt is useful to force integer literals
 -- to assume the type that was intended for them, once

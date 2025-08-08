@@ -8,6 +8,7 @@ import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
 import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
+import PercentageButtons from "../ui/PercentageButtons";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -15,9 +16,11 @@ interface BorrowFormProps {
   onBorrow: (amount: string) => void;
   usdstBalance: string;
   collateralInfo: CollateralData[] | null;
+  startPolling?: () => void;
+  stopPolling?: () => void;
 }
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralInfo }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralInfo, startPolling, stopPolling }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowDisplayAmount, setBorrowDisplayAmount] = useState("");
   const [riskLevel, setRiskLevel] = useState(0);
@@ -48,23 +51,35 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     }
   }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
 
+  // Consolidated polling handler
+  const handlePollingUpdate = (amount: string) => {
+    if (amount && parseFloat(amount) > 0) {
+      startPolling?.();
+    } else {
+      stopPolling?.();
+    }
+  };
+
   const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, '');
     if (/^\d*\.?\d*$/.test(value)) {
       setBorrowDisplayAmount(addCommasToInput(value));
       setBorrowAmount(value);
+      handlePollingUpdate(value);
     }
   };
 
   const handleBorrowPercentage = (percentageAmount: string) => {
     setBorrowAmount(percentageAmount);
     setBorrowDisplayAmount(addCommasToInput(percentageAmount));
+    handlePollingUpdate(percentageAmount);
   };
 
   const handleBorrow = () => {
     onBorrow(borrowAmount);
     setBorrowAmount("");
     setBorrowDisplayAmount("");
+    handlePollingUpdate("");
   };
 
   useEffect(()=>{
@@ -109,6 +124,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
                 const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
                 setBorrowAmount(availableToBorrowFormatted);
                 setBorrowDisplayAmount(addCommasToInput(availableToBorrowFormatted));
+                handlePollingUpdate(availableToBorrowFormatted);
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
               className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
@@ -128,29 +144,14 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
         </div>
-        <div className="flex gap-2">
-          {[10, 25, 50, 100].map((percentage) => {
-            const maxAvailable = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
-            const percentageAmount = percentage === 100 
-              ? maxAvailable 
-              : (safeParseFloat(maxAvailable) * (percentage / 100)).toFixed(18);
-            const isDisabled = safeParseFloat(maxAvailable) === 0;
-            
-            return (
-              <Button
-                key={percentage}
-                variant="outline"
-                size="sm"
-                onClick={() => handleBorrowPercentage(percentageAmount)}
-                disabled={isDisabled}
-                className={`flex-1 transition-all duration-200 ${!isDisabled ? 'hover:scale-105' : ''}`}
-                title={isDisabled ? "No amount available to borrow" : `Set to ${percentage}% of available amount`}
-              >
-                {percentage}%
-              </Button>
-            );
-          })}
-        </div>
+        <PercentageButtons
+          value={borrowAmount}
+          maxValue={loans?.maxAvailableToBorrowUSD || "0"}
+          onChange={(val) => {
+            handleBorrowPercentage(val);
+          }}
+          className="mt-2"
+        />
       </div>
 
       {/* Risk Level */}
@@ -181,8 +182,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         onClick={handleBorrow}
         disabled={
           !borrowAmount ||
-          isNaN(Number(borrowAmount)) || 
-          Number(borrowAmount) <= 0 ||
+          safeParseUnits(borrowAmount, 18) <= 0n ||
           borrowLoading ||
           safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
           (() => {

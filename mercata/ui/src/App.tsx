@@ -26,11 +26,11 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 
 // Import dashboard components
-import BridgePage from "./pages/BridgePage";
+
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { metaMaskWallet } from "@rainbow-me/rainbowkit/wallets";
+import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
 import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
@@ -39,39 +39,69 @@ import { TransactionProvider } from "@/context/TransactionContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import Borrow from "./pages/Borrow";
+import { getConfig } from "./lib/config";
+import { useState, useEffect } from "react";
 
 const queryClient = new QueryClient();
 
-const projectId = "YOUR_PROJECT_ID"; //project_id required for v2wallet connect
-const appName = "Mercata";
+const App = () => {
+  const [projectId, setProjectId] = useState('PROJECT_ID_UNSET');
+  const [wagmiConfig, setWagmiConfig] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-const chains = [mainnet, polygon, sepolia] as const;
-const transports = {
-  [mainnet.id]: http(),
-  [polygon.id]: http(),
-  [sepolia.id]: http(),
-};
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const configData = await getConfig();
+        setProjectId(configData.projectId);
+      } catch (error) {
+        console.error('Failed to fetch config:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-const connectors = connectorsForWallets(
-  [
-    {
-      groupName: "Recommended",
-      wallets: [metaMaskWallet],
-    },
-  ],
-  { projectId, appName }
-);
+    fetchConfig();
+  }, []);
 
-const config = createConfig({
-  connectors,
-  chains,
-  transports,
-  ssr: true,
-});
+  useEffect(() => {
+    if (!loading) {
+      const appName = "Mercata";
+      const chains = [mainnet, polygon, sepolia] as const;
+      const transports = {
+        [mainnet.id]: http(),
+        [polygon.id]: http(),
+        [sepolia.id]: http(),
+      };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <WagmiProvider config={config}>
+      const connectors = connectorsForWallets(
+        [
+          {
+            groupName: "Recommended",
+            wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
+          },
+        ],
+        { projectId, appName }
+      );
+
+      const config = createConfig({
+        connectors,
+        chains,
+        transports,
+        ssr: true,
+      });
+
+      setWagmiConfig(config);
+    }
+  }, [projectId, loading]);
+
+  if (loading || !wagmiConfig) {
+    return <div>Loading configuration...</div>;
+  }
+
+    return (
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={wagmiConfig}>
       <RainbowKitProvider>
         <UserProvider>
           <UserTokensProvider>
@@ -164,13 +194,14 @@ const App = () => (
                                       </ProtectedRoute>
                                     }
                                   />
-                                  <Route
-                                    path="/dashboard/bridge"
-                                    element={<BridgePage />}
-                                  />
+
                                   <Route
                                     path="/dashboard/bridge-transactions"
-                                    element={<BridgeTransactionsPage />}
+                                    element={
+                                      <ProtectedRoute>
+                                        <BridgeTransactionsPage />
+                                      </ProtectedRoute>
+                                    }
                                   />
 
                                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -191,7 +222,8 @@ const App = () => (
       </RainbowKitProvider>
     </WagmiProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
 

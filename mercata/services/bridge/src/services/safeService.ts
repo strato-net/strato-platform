@@ -57,7 +57,6 @@ async function* safeTransactionGenerator(
   let safeTransactionData: MetaTransactionData;
 
   if (type === "eth") {
-    console.log("eth transfer called. in safe service....", amount, toAddress);
     safeTransactionData = {
       to: toAddress,
       value: amount.toString(), // already in wei
@@ -108,7 +107,6 @@ async function* safeTransactionGenerator(
 }
 
 export const checkEthTransaction = async (transactionHash: string) => {
-  console.log("checkEthTransaction  bridgeOut flow called.....", transactionHash);
   const apiKit = new SafeApiKit({
     chainId,
   });
@@ -131,13 +129,11 @@ export const checkEthTransaction = async (transactionHash: string) => {
 };
 
 export const checkEthTransactionBatch = async (txList: any[]): Promise<{ txHash: string }[]> => {
-  console.log("checkEthTransactionBatch called .......", txList);
   const confirmed: { txHash: string }[] = [];
   const apiKit = new SafeApiKit({ chainId });
 
   for (const tx of txList) {
     const transactionHash = tx.hash.replace("0x", "");
-    console.log("🔍 Checking transaction:", transactionHash);
 
     let transaction = null;
 
@@ -156,9 +152,9 @@ export const checkEthTransactionBatch = async (txList: any[]): Promise<{ txHash:
     if (transaction?.safeTxHash) {
       const safeTxHash = transaction.safeTxHash.toString().replace(/^0x/, "");
       confirmed.push({ txHash: safeTxHash });
-      console.log("✅ Confirmed:", safeTxHash);
+      console.log("✅ Confirmed");
     } else {
-      console.warn("⚠️ Not confirmed:", transactionHash);
+      console.warn("⚠️ Not confirmed");
     }
   }
 

@@ -117,3 +117,16 @@ export function validateSwapHistoryArgs(args: any) {
     throw new Error("Swap History Argument Validation Error: " + error.message);
   }
 }
+
+export function validateSetPoolRatesArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: Joi.string().required(),
+    swapFeeRate: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
+    lpSharePercent: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Set Pool Rates Argument Validation Error: " + error.message);
+  }
+}
