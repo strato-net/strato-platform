@@ -45,4 +45,10 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
 // Query params: select, order, offset, limit, block_timestamp, transaction_hash, etc.
 router.get("/swap-history/:poolAddress", authHandler.authorizeRequest(true), SwappingController.getSwapHistory);
 
+// ----- Fees -----
+// Get swap fee rate from PoolFactory
+router.get("/fees/swap-rate", authHandler.authorizeRequest(true), SwappingController.getSwapFeeRate);
+
+
+
 export default router;

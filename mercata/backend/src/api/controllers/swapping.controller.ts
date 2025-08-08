@@ -9,6 +9,7 @@ import {
   calculateSwap,
   calculateSwapReverse,
   getSwapHistory,
+  getSwapFeeRate,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -268,6 +269,23 @@ class SwappingController {
       next(error);
     }
   }
+
+  // Fees
+  static async getSwapFeeRate(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getSwapFeeRate(accessToken);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+
 }
 
 export default SwappingController;

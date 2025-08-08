@@ -14,6 +14,11 @@ type SwapContextType = {
   setFromAsset: (asset: SwappableToken | undefined) => void;
   setToAsset: (asset: SwappableToken | undefined) => void;
   setPool: (pool: LiquidityPool | null) => void;
+  // Fee data
+  swapFeeRate: string;
+  swapFeeRatePercent: number;
+  feesLoading: boolean;
+  feesError: string | null;
   // Functions
   refetchSwappableTokens: () => void;
   fetchPairableTokens: (tokenAddress: string) => void;
@@ -72,6 +77,11 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [pool, setPool] = useState<LiquidityPool | null>(null);
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
   const [swapHistoryCount, setSwapHistoryCount] = useState(0);
+  // Fee state
+  const [swapFeeRate, setSwapFeeRate] = useState<string>("---");
+  const [swapFeeRatePercent, setSwapFeeRatePercent] = useState<number>(0.00);
+  const [feesLoading, setFeesLoading] = useState<boolean>(false);
+  const [feesError, setFeesError] = useState<string | null>(null);
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -98,6 +108,23 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       setError(err.response?.data?.message || err.message || 'Failed to fetch pairable tokens');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchFees = useCallback(async () => {
+    setFeesLoading(true);
+    setFeesError(null);
+    try {
+      const response = await api.get('/fees/swap-rate');
+      const data = response.data;
+      
+      setSwapFeeRate(data.swapFeeRatePercent?.toString() || "???");
+      setSwapFeeRatePercent(data.swapFeeRatePercent || 0);
+    } catch (err) {
+      setFeesError('Failed to fetch fees from Cirrus');
+      console.error('Error fetching fees:', err);
+    } finally {
+      setFeesLoading(false);
     }
   }, []);
 
@@ -252,7 +279,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const response = await api.get(`/swap-history/${poolAddress}`, { params });
 
     // Convert timestamp strings back to Date objects
-  const data = response.data.data.map((item: any) => ({
+  const data = response.data.data.map((item: SwapHistoryEntry & { timestamp: string }) => ({
     ...item,
     timestamp: new Date(item.timestamp)
   }));
@@ -278,7 +305,8 @@ const refreshSwapHistory = useCallback(
 
   useEffect(() => {
     fetchSwappableTokens();
-  }, [fetchSwappableTokens]);
+    fetchFees();
+  }, [fetchSwappableTokens, fetchFees]);
 
   return (
     <SwapContext.Provider
@@ -294,6 +322,11 @@ const refreshSwapHistory = useCallback(
         setFromAsset,
         setToAsset,
         setPool,
+        // Fee data
+        swapFeeRate,
+        swapFeeRatePercent,
+        feesLoading,
+        feesError,
         // Functions
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,

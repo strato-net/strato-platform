@@ -15,8 +15,9 @@ import { formatUnits } from "ethers";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { usdstAddress } from "@/lib/constants";
 import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
+import { SWAP_FEE } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -251,6 +252,8 @@ interface SwapDialogProps {
   exchangeRate: string;
   onConfirm: () => void;
   isLoading: boolean;
+  swapFeeRate: string;
+  slippage: number;
 }
 
 const SwapDialog = ({
@@ -262,8 +265,13 @@ const SwapDialog = ({
   toAsset,
   exchangeRate,
   onConfirm,
-  isLoading
-}: SwapDialogProps) => (
+  isLoading,
+  swapFeeRate,
+  slippage
+}: SwapDialogProps) => {
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  return (
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent>
       <DialogHeader>
@@ -273,30 +281,45 @@ const SwapDialog = ({
         </DialogDescription>
       </DialogHeader>
       <div className="py-4 space-y-4">
-        <div className="flex justify-between">
-          <span className="text-gray-600">You pay:</span>
+        <div 
+          className="flex justify-between cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+          onClick={() => setShowBreakdown(!showBreakdown)}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600">You pay</span>
+            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showBreakdown ? 'rotate-180' : ''}`} />
+          </div>
           <span className="font-semibold">
-            {fromAmount} {fromAsset?._symbol || ""}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">You receive:</span>
-          <span className="font-semibold">
-            {toAmount} {toAsset?._symbol || ""}
+            {(parseFloat(fromAmount || "0") + parseFloat(SWAP_FEE)).toString()} {fromAsset?._symbol || ""}
           </span>
         </div>
         
-        {/* Calculation Breakdown */}
-        <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-          <div className="text-sm font-semibold text-gray-700">Calculation Breakdown:</div>
-          
-          <div className="text-xs space-y-1 text-gray-600">
-            <div className="flex justify-between">
-              <span>Swap fee:</span>
-              <span>{SWAP_FEE} USDST</span>
-            </div>
-                          <div className="flex justify-between">
-                <span>Price Impact:</span>
+        {/* Calculation Breakdown - Collapsible */}
+        {showBreakdown && (
+          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+            <div className="text-sm font-semibold text-gray-700">Calculation Breakdown</div>
+            
+            <div className="text-xs space-y-1 text-gray-600">
+              <div className="flex justify-between">
+                <span>Network fee</span>
+                <span>{SWAP_FEE} USDST</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Swap fee ({swapFeeRate}%)</span>
+                <span>
+                  {fromAmount && fromAsset?._symbol
+                    ? (() => {
+                        const inputAmount = parseFloat(fromAmount);
+                        const feeRate = parseFloat(swapFeeRate) / 100; // Convert percentage to decimal
+                        const feeAmount = inputAmount * feeRate;
+                        return `${formatAmount(feeAmount.toString())} ${fromAsset._symbol}`;
+                      })()
+                    : "---- USDST"
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Price Impact</span>
                 <span className="text-red-600">
                   {fromAmount && toAmount && exchangeRate && parseFloat(fromAmount) > 0 && parseFloat(exchangeRate) > 0
                     ? (() => {
@@ -310,7 +333,21 @@ const SwapDialog = ({
                   }
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span>Max Slippage</span>
+                <span className={`${slippage > 5 || slippage < 1 ? 'text-yellow-600' : 'text-blue-600'}`}>
+                  {slippage}%
+                </span>
+              </div>
+            </div>
           </div>
+        )}
+        
+        <div className="flex justify-between p-2">
+          <span className="text-gray-600">You receive</span>
+          <span className="font-semibold">
+            {toAmount} {toAsset?._symbol || ""}
+          </span>
         </div>
       </div>
       <DialogFooter>
@@ -323,7 +360,8 @@ const SwapDialog = ({
       </DialogFooter>
     </DialogContent>
   </Dialog>
-);
+  );
+};
 
 interface SlippageControlProps {
   slippage: number;
@@ -391,7 +429,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 const SwapWidget = () => {
-  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance, refreshSwapHistory } = useSwapContext();
+  const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance, refreshSwapHistory, swapFeeRate } = useSwapContext();
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
@@ -1039,7 +1077,7 @@ const handleMaxClick = (isFrom: boolean) => {
         </div>
         <div className="my-3"></div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Transaction Fee</span>
+          <span className="text-gray-600">Network Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST</span>
         </div>
         
@@ -1081,6 +1119,8 @@ const handleMaxClick = (isFrom: boolean) => {
         exchangeRate={formatAmount(exchangeRate)}
         onConfirm={handleSwap}
         isLoading={swapLoading}
+        swapFeeRate={swapFeeRate}
+        slippage={slippage}
       />
     </div>
   );

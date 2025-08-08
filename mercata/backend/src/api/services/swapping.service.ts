@@ -3,6 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import { poolFactory } from "../../config/config";
 import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { SwapHistoryEntry } from "../../types";
@@ -336,6 +337,41 @@ export const calculateSwapReverse = async (
 
   return getRequiredInput(BigInt(amountIn), inputReserve, outputReserve);
 };
+
+/**
+ * Get swap fee rate from PoolFactory contract
+ * @param accessToken - User access token
+ * @returns Object containing swap fee rate and other fee parameters
+ */
+export const getSwapFeeRate = async (accessToken: string) => {
+  try {
+    // Fetch PoolFactory data from Cirrus
+    const { data: poolFactoryData } = await cirrus.get(accessToken, `/${PoolFactory}`, {
+      params: {
+        select: "address,swapFeeRate,lpSharePercent",
+        address: `eq.${poolFactory}`,
+      },
+    });
+
+    if (!poolFactoryData?.length) {
+      throw new Error("PoolFactory data not found");
+    }
+
+    const factory = poolFactoryData[0];
+    
+    return {
+      swapFeeRate: factory.swapFeeRate || 30, // Default to 30 basis points (0.30%)
+      lpSharePercent: factory.lpSharePercent || 7000, // Default to 70%
+      swapFeeRatePercent: (factory.swapFeeRate || 30) / 100, // Convert to percentage
+      address: factory.address
+    };
+  } catch (error) {
+    console.error("Error fetching swap fee rate:", error);
+    throw error;
+  }
+};
+
+
 
 export const getTradingVolume24hForPools = async (
   accessToken: string,
