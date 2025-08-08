@@ -25,10 +25,17 @@ const DepositsPage = () => {
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Add visibility state to prevent flashing
+  const [isComponentMounted, setIsComponentMounted] = useState(false);
+
   useEffect(() => {
+    // Set mounted state immediately to prevent flash
+    setIsComponentMounted(true);
+    
+    // Fetch data
     fetchTokens();
     fetchAllActiveTokens();
-  }, [userAddress]);
+  }, [userAddress, fetchTokens, fetchAllActiveTokens]);
 
   useEffect(() => {
     if (!tokens || tokens.length === 0) return;
@@ -61,6 +68,32 @@ const DepositsPage = () => {
     setTotalBalance(netBalance);
   }, [tokens, loans]);
 
+  // Don't render anything until component is properly mounted
+  if (!isComponentMounted) {
+    return null;
+  }
+
+  // Show loading state while data is being fetched
+  if (loading || allActiveLoading) {
+    return (
+      <div className="h-screen bg-gray-50 overflow-hidden">
+        <DashboardSidebar />
+        <MobileSidebar 
+          isOpen={isMobileSidebarOpen} 
+          onClose={() => setIsMobileSidebarOpen(false)} 
+        />
+        <div className="h-screen flex flex-col transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
+          <DashboardHeader title="Deposits" onMenuClick={() => setIsMobileSidebarOpen(true)} />
+          <main className="flex-1 p-6 overflow-y-auto">
+            <div className="flex justify-center items-center h-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
       <DashboardSidebar />
@@ -85,7 +118,14 @@ const DepositsPage = () => {
               <ExchangeCart />
             </div>
             <div className="flex-1 min-w-0 max-w-full">
-              <AssetsList loading={loading} tokens={tokens} inActiveTokens={inactiveTokens} isDashboard={false} />
+              {/* Render AssetsList when data is loaded */}
+              <AssetsList 
+                loading={loading} 
+                tokens={tokens} 
+                inActiveTokens={inactiveTokens} 
+                isDashboard={false}
+                shouldPreventFlash={true}
+              />
             </div>
           </div>
           {/* Assets List */}

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { LiquidityPool, SwappableToken, SwapHistoryEntry } from '@/interface';
+import { LiquidityPool, SwappableToken, SwapHistoryEntry, SetPoolRatesData } from '@/interface';
 import {api} from '@/lib/axios';
 
 type SwapContextType = {
@@ -60,7 +60,8 @@ type SwapContextType = {
   fetchSwapHistory: (poolAddress: string, params?: Record<string, string>) => Promise<{ data: SwapHistoryEntry[]; totalCount: number }>;
   refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
   swapHistory: SwapHistoryEntry[];
-  swapHistoryCount: number
+  swapHistoryCount: number;
+  setPoolRates: (data: SetPoolRatesData) => Promise<void>;
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
@@ -303,6 +304,20 @@ const refreshSwapHistory = useCallback(
   [pool?.address, fetchSwapHistory]
 );
 
+  const setPoolRates = useCallback(async (data: SetPoolRatesData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post('/swap-pools/set-rates', data);
+      return response.data;
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to update pool rates');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSwappableTokens();
     fetchFees();
@@ -346,7 +361,8 @@ const refreshSwapHistory = useCallback(
         fetchSwapHistory,
         refreshSwapHistory,
         swapHistory,
-        swapHistoryCount
+        swapHistoryCount,
+        setPoolRates
       }}
     >
       {children}
