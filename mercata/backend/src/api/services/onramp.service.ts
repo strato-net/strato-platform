@@ -177,8 +177,12 @@ export const get = async (accessToken: string) => {
       console.log("Error fetching token info:", err);
     }
 
-    // Enhance listings
-    const enhancedListings = listings.map((listing: any) => {
+    // Filter out listings with ZERO_ADDRESS and enhance remaining listings
+    const filteredListings = (listings || []).filter((listing: any) => 
+      listing.key !== ZERO_ADDRESS && listing.value?.token !== ZERO_ADDRESS
+    );
+    
+    const enhancedListings = filteredListings.map((listing: any) => {
       const { key: id, value: info } = listing;
 
       if (!info) {
