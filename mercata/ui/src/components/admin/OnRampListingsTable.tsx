@@ -6,6 +6,7 @@ import { Loader2, RefreshCw, DollarSign, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOnRampContext } from "@/context/OnRampContext";
+import { PaymentProviderValue } from "@/interface";
 import { formatUnits } from "viem";
 import {
   AlertDialog,
@@ -18,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const OnRampListingsTable = forwardRef((props, ref) => {
+const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
   const [refreshing, setRefreshing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<{ token: string; symbol: string } | null>(null);
@@ -75,7 +76,7 @@ const OnRampListingsTable = forwardRef((props, ref) => {
         title: "Success",
         description: successMessage,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Error is already handled by axios interceptor which shows a toast
       // The interceptor will display the specific error message from backend
       console.error("Error cancelling listing:", error);
@@ -110,7 +111,7 @@ const OnRampListingsTable = forwardRef((props, ref) => {
     return `${(parseFloat(marginBps) / 100).toFixed(2)}%`;
   };
 
-  const calculatePriceWithMargin = (oraclePrice: any, marginBps: string) => {
+  const calculatePriceWithMargin = (oraclePrice: { price: string } | null, marginBps: string) => {
     if (!oraclePrice?.price) return null;
     const price = parseFloat(oraclePrice.price);
     const margin = parseFloat(marginBps) / 10000; // Convert basis points to decimal
@@ -237,9 +238,9 @@ const OnRampListingsTable = forwardRef((props, ref) => {
                             <span className="font-medium">Payment Providers:</span>
                             <div className="flex flex-wrap gap-1">
                               {info.providers && info.providers.length > 0 ? (
-                                info.providers.map((provider: any, index: number) => (
+                                info.providers.map((provider: PaymentProviderValue, index: number) => (
                                   <Badge key={index} variant="secondary" className="text-xs">
-                                    {provider.name || formatAddress(provider.providerAddress || provider)}
+                                    {provider.name || formatAddress(provider.providerAddress || "Unknown")}
                                   </Badge>
                                 ))
                               ) : (

@@ -419,7 +419,7 @@ export interface ListingInfo {
   providers: PaymentProviderValue[];
   _name: string;
   _symbol: string;
-  tokenOracleValue: string | null;
+  tokenOracleValue: { price: string } | null;
 }
 
 export interface Listing {

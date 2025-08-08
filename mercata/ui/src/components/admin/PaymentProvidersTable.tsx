@@ -16,24 +16,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const PaymentProvidersTable = forwardRef((props, ref) => {
+const PaymentProvidersTable = forwardRef<{refresh: () => void}>((props, ref) => {
+  const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<{ address: string; name: string } | null>(null);
-  const { toast } = useToast();
   const { providers, loading, fetchOnRampData, removePaymentProvider } = useOnRampContext();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Format providers for display
+  // Format providers for display - ensure we always have PaymentProviderValue structure
   const formattedProviders = providers.map(provider => ({
     key: provider.key,
-    value: provider.value || provider
-  }));
+    value: provider.value
+  })).filter(provider => provider.value); // Filter out providers without value
 
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
       await fetchOnRampData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error refreshing providers:", error);
     } finally {
       setRefreshing(false);
@@ -59,7 +59,7 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
         title: "Success",
         description: successMessage,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting provider:", error);
     } finally {
       setDeleteDialogOpen(false);
@@ -68,7 +68,6 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
   };
 
   useEffect(() => {
-    // Fetch data on mount if not already loaded
     if (providers.length === 0 && !loading) {
       fetchOnRampData();
     }
@@ -168,7 +167,7 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteClick(provider.key, provider.value?.name || "Unknown")}
+                        onClick={() => handleDeleteClick(provider.key, provider.value.name || "Unknown")}
                         className="text-destructive hover:text-destructive ml-2"
                         title="Remove provider"
                       >
