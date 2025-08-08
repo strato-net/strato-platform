@@ -26,6 +26,7 @@ import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
 import HexText from '../HexText';
 import { useEffect, useState } from 'react';
+import { changeContractFilter } from '../Contracts/contracts.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -38,7 +39,41 @@ class CreateContract extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.isToasts) {
+    if (nextProps.isToasts && nextProps.contractAddress) {
+      // Show custom toast with clickable contract address
+      const toastContent = (
+        <div>
+          <span>Contract Deployed: </span>
+          <a 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              // Navigate to contracts page and search for this address
+              this.props.history.push('/contracts');
+              // Add a small delay to ensure the Contracts component is mounted before setting the filter
+              setTimeout(() => {
+                this.props.changeContractFilter(nextProps.contractAddress);
+                // Also trigger the search by fetching contracts with the filter
+                this.props.fetchContracts(this.props.selectedChain, 10, 0, nextProps.contractAddress);
+              }, 100);
+              // Dismiss the toast
+              toasts.dismiss();
+            }}
+            style={{ color: '#48aff0', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            {nextProps.contractAddress}
+          </a>
+        </div>
+      );
+      
+      toasts.show({ 
+        message: toastContent,
+        timeout: 8000, // Give users more time to click the link
+        intent: 'success'
+      });
+      this.props.resetError();
+    } else if (nextProps.isToasts && nextProps.toastsMessage) {
+      // Show regular toast for non-deployment messages
       toasts.show({ message: nextProps.toastsMessage });
       this.props.resetError();
     }
@@ -499,6 +534,22 @@ class CreateContract extends Component {
                   </pre>
                 </div>
               </div>}
+              {this.props.contractAddress && <div className="row">
+                <div className="col-sm-12">
+                  <hr />
+                  <h5>Contract Deployed Successfully!</h5>
+                  <div className="row">
+                    <div className="col-sm-3 text-right">
+                      <label className="pt-label smd-pad-4">
+                        Contract Address:
+                      </label>
+                    </div>
+                    <div className="col-sm-9 smd-pad-4">
+                      <HexText value={this.props.contractAddress} classes="small" />
+                    </div>
+                  </div>
+                </div>
+              </div>}
             </div>
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
@@ -562,6 +613,7 @@ export function mapStateToProps(state) {
     toastsError: state.createContract.error,
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
+    contractAddress: state.createContract.contractAddress,
     initialValues: {
       address: state.user.oauthUser ? state.user.oauthUser.address : state.user.address || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
@@ -589,7 +641,8 @@ const connected = connect(mapStateToProps, {
   resetError,
   fetchChainIds,
   getLabelIds,
-  updateUsingSampleContract
+  updateUsingSampleContract,
+  changeContractFilter
 })(formed);
 
 export default withRouter(connected);

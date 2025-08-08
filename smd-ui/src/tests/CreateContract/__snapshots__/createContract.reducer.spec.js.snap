@@ -201,6 +201,7 @@ exports[`CreateContract: reducer create contract on success 1`] = `
 Object {
   "abi": undefined,
   "contract": "",
+  "contractAddress": undefined,
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,
@@ -289,6 +290,7 @@ exports[`CreateContract: reducer create contract on success without status 1`] =
 Object {
   "abi": undefined,
   "contract": "",
+  "contractAddress": undefined,
   "contractCompileErrors": undefined,
   "contractName": undefined,
   "createDisabled": true,

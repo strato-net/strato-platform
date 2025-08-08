@@ -52,6 +52,7 @@ tests:
       - aeson
       - blockapps-data
       - bytestring
+      - containers
       - hspec
       - json-stream
       - labeled-error

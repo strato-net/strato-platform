@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getAdmin, isUserAdmin, addAdmin, removeAdmin } from "../services/user.service";
+import { validateUserAddress } from "../validators/common.validators";
 
 class UserController {
   static async me(
@@ -43,10 +44,7 @@ class UserController {
       const { accessToken } = req;
       const { userAddress } = req.body;
 
-      if (!userAddress) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
-        return;
-      }
+      validateUserAddress(userAddress);
 
       const result = await addAdmin(accessToken, userAddress);
       res.status(RestStatus.CREATED).json({ 
@@ -70,10 +68,7 @@ class UserController {
       const { accessToken } = req;
       const { userAddress } = req.body;
 
-      if (!userAddress) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
-        return;
-      }
+      validateUserAddress(userAddress);
 
       const result = await removeAdmin(accessToken, userAddress);
       res.status(RestStatus.OK).json({ 

@@ -15,7 +15,7 @@ import {
 import { useAccount, useChainId } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { roundToDecimals } from "@/utils/numberUtils";
+import { roundToDecimals, safeParseUnits } from "@/utils/numberUtils";
 import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 
@@ -356,7 +356,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet }) => {
         )}
         <PercentageButtons
           value={amount}
-          maxValue={tokenBalance}
+          maxValue={safeParseUnits(tokenBalance,18).toString()}
           onChange={handlePercentageClick}
           className="mt-2"
         />

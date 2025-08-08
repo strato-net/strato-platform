@@ -30,7 +30,6 @@ import { mintVouchersForDeposits } from "../utils/voucherMinting";
 const showTestnet = process.env.SHOW_TESTNET === "true";
 
 const checkDepositStatus = async (txHash: string): Promise<any | null> => {
-  console.log("checking deposit status for .......", txHash);
   const strippedHash = txHash.toLowerCase().replace(/^0x/, "");
   let data;
   for (let i = 0; i < 3; i++) {
@@ -67,13 +66,7 @@ export const bridgeIn = async (
 ) => {
   const bridgeContract = new BridgeContractCall();
 
-  console.log("bridgeIn contract call 1st step", {
-    txHash: ethHash.toString().replace("0x", ""),
-    token: tokenAddress.toLowerCase().replace("0x", ""),
-    from: fromAddress.toLowerCase().replace("0x", ""),
-    amount: amount.toString(),
-    to: toAddress.toLowerCase().replace("0x", ""),
-  });
+
 
   const depositResponse = await bridgeContract.deposit({
     txHash: ethHash.toString().replace("0x", ""),
@@ -93,13 +86,7 @@ export const bridgeOut = async (
   toAddress: string,
   userAddress: string
 ) => {
-  console.log("bridgeOut contract call 1st step", {
-    token: tokenAddress.toLowerCase().replace("0x", ""),
-    from: fromAddress.toLowerCase().replace("0x", ""),
-    amount: amount.toString(),
-    to: toAddress.toLowerCase().replace("0x", ""),
-    mercataUser: userAddress.toLowerCase().replace("0x", ""),
-  });
+
 
   const isTestnet = process.env.SHOW_TESTNET === "true";
   const tokenContract = isTestnet
@@ -126,11 +113,6 @@ export const bridgeOut = async (
   const {
     value: { hash },
   } = await generator.next();
-
-  console.log(
-    "txhash for withdraw contract ....",
-    hash.toString().replace("0x", "")
-  );
 
   const bridgeContract = new BridgeContractCall();
   await bridgeContract.withdraw({
@@ -160,11 +142,8 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
   if (!config.safe?.address) return;
 
   const txBatch = txList.map((tx) => tx.result.transactionHash);
-  console.log("txBatch....", txBatch);
 
   const depositStatus = await fetchDepositInitiatedTransactions(txBatch);
-
-  console.log("depositStatus....", depositStatus);
 
   // ⚠️ TEMPORARY FIX: Filter out deposits with invalid token addresses from previous testnet deployment
   const INVALID_TOKEN_ADDRESSES = [
@@ -177,16 +156,12 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
     const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
     
     if (isInvalid) {
-      console.warn(`Skipping deposit with invalid token address: ${deposit.txHash} (token: ${tokenAddress})`);
     }
     
     return !isInvalid;
   });
 
-  console.log("validDeposits after filtering....", validDeposits);
-
   if (validDeposits.length === 0) {
-    console.log("No valid deposits to process");
     return;
   }
 
@@ -196,10 +171,7 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
       deposits: validDeposits,
     });
 
-    console.log("batchConfirmDeposits result:", result);
-
     if (result && result.status === "Success") {
-      console.log("✅ Bridge deposits confirmed successfully, minting vouchers...");
       
       try {
         await mintVouchersForDeposits(validDeposits);
@@ -216,15 +188,12 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
 
 // get the possible data from alchemy and verify in this call
 export const confirmBridgeIn = async (tx: any) => {
-  console.log("confirmBridgeIn called.....", tx);
-  console.log("confirmbridgeIn tx.hash", tx.hash);
   if (!config.safe?.address) {
     return null;
   }
 
   // Check deposit status from Mercata endpoint
   const depositStatus = await checkDepositStatus(tx.hash);
-  console.log("depositStatus checked ...", depositStatus);
 
   if (!depositStatus) {
     return null;
@@ -240,19 +209,12 @@ export const confirmBridgeIn = async (tx: any) => {
   const isInvalidToken = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
   
   if (isInvalidToken) {
-    console.warn(`Skipping single deposit with invalid token address: ${depositStatus.txHash} (token: ${tokenAddress})`);
     return null;
   }
 
   try {
     const bridgeContract = new BridgeContractCall();
-    console.log({
-      txHash: depositStatus.txHash.toString().replace("0x", ""),
-      token: depositStatus.token.toLowerCase().replace("0x", ""),
-      to: config.safe.address.toLowerCase().replace("0x", ""),
-      amount: depositStatus.amount.toString(),
-      mercataUser: depositStatus.mercataUser.toLowerCase().replace("0x", ""),
-    });
+
     await bridgeContract.confirmDeposit({
       txHash: depositStatus.txHash.toString().replace("0x", ""),
       token: depositStatus.token.toLowerCase().replace("0x", ""),
@@ -267,11 +229,8 @@ export const confirmBridgeIn = async (tx: any) => {
 };
 
 export const confirmBridgeOut = async (tx: any) => {
-  console.log("confirmBridgeOut called.....", tx);
-  console.log("confirmBridgeOut tx.hash", tx.hash);
   const transactionHash = tx.hash;
   const transaction = await checkEthTransaction(transactionHash);
-  console.log("transaction checked ....", transaction);
   if (!transaction) {
     return null;
   }
@@ -285,10 +244,7 @@ export const confirmBridgeOut = async (tx: any) => {
 };
 
 export const confirmBridgeOutSafePolling = async (txs: string[]) => {
-  console.log("confirmBridgeOutSafePolling ", txs);
-  
-  if (!txs || txs.length === 0) {
-    console.log("No withdrawal transactions to process");
+    if (!txs || txs.length === 0) {
     return;
   }
   
