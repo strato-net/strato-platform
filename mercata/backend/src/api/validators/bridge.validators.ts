@@ -1,4 +1,5 @@
 import Joi from "@hapi/joi";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 export function validateBridgeIn(args: any) {
   if (!args || typeof args !== "object") {
@@ -20,37 +21,9 @@ export function validateBridgeIn(args: any) {
 
   // Step 2: Full format and logical validation
   const finalSchema = Joi.object({
-    fromAddress: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "fromAddress must be a valid Ethereum address.",
-      }),
-
-    amount: Joi.string()
-      .pattern(/^\d+$/)
-      .required()
-      .custom((value, helpers) => {
-        try {
-          const big = BigInt(value);
-          if (big <= 0n) return helpers.error("any.invalid");
-          return value;
-        } catch {
-          return helpers.error("any.invalid");
-        }
-      }, "Positive amount check")
-      .messages({
-        "string.pattern.base": "Amount must be a numeric string.",
-        "any.invalid": "Amount must be greater than 0.",
-      }),
-
-    tokenAddress: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "tokenAddress must be a valid Ethereum address.",
-      }),
-
+    fromAddress: validateAddressField("fromAddress"),
+    amount: numericStringField("amount"),
+    tokenAddress: validateAddressField("tokenAddress"),
     ethHash: Joi.string()
       .required()
       .custom((value, helpers) => {
@@ -96,36 +69,9 @@ export function validateBridgeOut(args: any) {
 
   // Step 2: Format and logic checks
   const finalSchema = Joi.object({
-    toAddress: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "toAddress must be a valid Ethereum address.",
-      }),
-
-    amount: Joi.string()
-      .pattern(/^\d+$/)
-      .required()
-      .custom((value, helpers) => {
-        try {
-          const big = BigInt(value);
-          if (big <= 0n) return helpers.error("any.invalid");
-          return value;
-        } catch {
-          return helpers.error("any.invalid");
-        }
-      }, "Positive amount check")
-      .messages({
-        "string.pattern.base": "Amount must be a numeric string.",
-        "any.invalid": "Amount must be greater than 0.",
-      }),
-
-    tokenAddress: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "tokenAddress must be a valid Ethereum address.",
-      }),
+    toAddress: validateAddressField("toAddress"),
+    amount: numericStringField("amount"),
+    tokenAddress: validateAddressField("tokenAddress"),
   }).strict();
 
   const { error } = finalSchema.validate(args);

@@ -1,8 +1,9 @@
 import Joi from "@hapi/joi";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 // Schema definitions
 const addressSchema = Joi.object({
-  address: Joi.string().required(),
+  address: validateAddressField("address"),
 });
 
 const createTokensSchema = Joi.object({
@@ -12,41 +13,43 @@ const createTokensSchema = Joi.object({
   files: Joi.array().items(Joi.string()).required(),
   fileNames: Joi.array().items(Joi.string()).required(),
   symbol: Joi.string().required(),
-  initialSupply: Joi.string()
-    .pattern(/^\d+$/)
-    .required()
-    .messages({
-      'string.pattern.base': '"initialSupply" must be a string of digits',
-    }),
+  initialSupply: numericStringField("initialSupply"),
   customDecimals: Joi.number().integer().min(0).max(18).required(),
 });
 
 const transferItemSchema = Joi.object({
-  address: Joi.string().required(),
-  to: Joi.string().required(),
-  value: Joi.string().pattern(/^\d+$/).required(),
+  address: validateAddressField("address"),
+  to: validateAddressField("to"),
+  value: numericStringField("value"),
 });
 
 
 const approveArgsSchema = Joi.object({
-  address: Joi.string().required(),
-  spender: Joi.string().required(),
-  value: Joi.string().pattern(/^\d+$/).required(),
+  address: validateAddressField("address"),
+  spender: validateAddressField("spender"),
+  value: numericStringField("value"),
 });
 
 const transferFromArgsSchema = Joi.object({
-  address: Joi.string().required(),
-  from: Joi.string().required(),
-  to: Joi.string().required(),
-  value: Joi.string().pattern(/^\d+$/).required(),
+  address: validateAddressField("address"),
+  from: validateAddressField("from"),
+  to: validateAddressField("to"),
+  value: numericStringField("value"),
 });
 
+
 const setStatusArgsSchema = Joi.object({
-  address: Joi.string().required(),
-  status: Joi.number().integer().min(1).max(3).required().messages({
-    'number.min': 'Status must be 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)',
-    'number.max': 'Status must be 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)',
-  }),
+  address: validateAddressField("address"),
+  status: Joi.number()
+    .integer()
+    .valid(1, 2, 3)
+    .required()
+    .messages({
+      "any.only": `"status" must be one of 1 (PENDING), 2 (ACTIVE), or 3 (LEGACY)`,
+      "number.base": `"status" must be a number`,
+      "number.integer": `"status" must be an integer`,
+      "any.required": `"status" is required`,
+    }),
 });
 
 const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
@@ -55,7 +58,7 @@ const queryParamsSchema = Joi.object().pattern(Joi.string(), Joi.string());
 export function validateAddressArgs(args: any) {
   const { error } = addressSchema.validate(args);
   if (error) {
-    throw new Error("Address Argument Validation Error");
+    throw new Error("Address Argument Validation Error: " + error.message);
   }
 }
 
@@ -71,7 +74,7 @@ export function validateCreateTokensArgs(args: any) {
 export function validateTransferItemArgs(args: any) {
   const { error } = transferItemSchema.validate(args);
   if (error) {
-    throw new Error("Transfer Item Argument Validation Error");
+    throw new Error("Transfer Item Argument Validation Error: " + error.message);
   }
 }
 

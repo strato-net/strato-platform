@@ -370,6 +370,12 @@ export interface LiquidityPool {
   _symbol?: string;
 }
 
+export interface SetPoolRatesData {
+  poolAddress: string;
+  swapFeeRate: number;
+  lpSharePercent: number;
+}
+
 export type NewLoanData = {
   principalBalance: string;
   interestOwed: string;
