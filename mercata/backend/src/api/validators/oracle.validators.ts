@@ -1,9 +1,9 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField, numericStringField } from "./common.validators";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 export function validateGetPriceQuery(query: any) {
   const schema = Joi.object({
-    asset: ethereumAddressField("asset"),
+    asset: validateAddressField("asset"),
   })
 
   const { error, value } = schema.validate(query, { abortEarly: false });
@@ -17,7 +17,7 @@ export function validateGetPriceQuery(query: any) {
 
 export function validateSetPriceInput(body: any) {
   const schema = Joi.object({
-    token: ethereumAddressField("token"),
+    token: validateAddressField("token"),
     price: numericStringField("price"),
   });
 
@@ -32,7 +32,7 @@ export const validateGetPriceHistoryInput = (
   assetAddress: string,
 ) => {
   const paramsSchema = Joi.object({
-    assetAddress: ethereumAddressField("assetAddress"),
+    assetAddress: validateAddressField("assetAddress"),
   });
 
   const paramValidation = paramsSchema.validate({ assetAddress });

@@ -1,5 +1,5 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField, numericStringField } from "./common.validators";
+import { validateAddressField, numericStringField } from "./common.validators";
 export function validateBuyArgs(args: any) {
   
   if (!args || typeof args !== "object") {
@@ -20,9 +20,9 @@ export function validateBuyArgs(args: any) {
 
   // Post-normalization validation
   const finalSchema = Joi.object({
-    token: ethereumAddressField("token"),
+    token: validateAddressField("token"),
     amount: numericStringField("amount"),
-    paymentProviderAddress: ethereumAddressField("paymentProviderAddress"),
+    paymentProviderAddress: validateAddressField("paymentProviderAddress"),
   }).strict();
 
   const { error } = finalSchema.validate(args);
@@ -50,7 +50,7 @@ export function validateSellArgs(args: any) {
   }
 
   const finalSchema = Joi.object({
-    token: ethereumAddressField("token"),
+    token: validateAddressField("token"),
     amount:numericStringField("amount"),
     marginBps: Joi.string()
       .pattern(/^\d+$/)

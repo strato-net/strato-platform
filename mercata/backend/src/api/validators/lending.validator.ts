@@ -1,5 +1,5 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField, numericStringField } from "./common.validators";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 // Validator functions with inline schemas
 export function validateDepositLiquidityArgs(args: any) {
@@ -48,7 +48,7 @@ export function validateRepayArgs(args: any) {
 
 export function validateSupplyCollateralArgs(args: any) {
   const schema = Joi.object({
-    asset: ethereumAddressField("asset"),
+    asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
   
@@ -60,7 +60,7 @@ export function validateSupplyCollateralArgs(args: any) {
 
 export function validateWithdrawCollateralArgs(args: any) {
   const schema = Joi.object({
-    asset: ethereumAddressField("asset"),
+    asset: validateAddressField("asset"),
     amount: numericStringField("amount"),
   });
   
@@ -95,7 +95,7 @@ export function validateLiquidationArgs(args: any) {
         "any.required": "Loan ID is required.",
       }),
 
-    collateralAsset: ethereumAddressField("collateralAsset"),
+    collateralAsset: validateAddressField("collateralAsset"),
     repayAmount: Joi.alternatives()
       .try(
         Joi.string().regex(/^\d+$/),

@@ -1,5 +1,5 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField, numericStringField } from "./common.validators";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 export function validateBridgeIn(args: any) {
   if (!args || typeof args !== "object") {
@@ -21,9 +21,9 @@ export function validateBridgeIn(args: any) {
 
   // Step 2: Full format and logical validation
   const finalSchema = Joi.object({
-    fromAddress: ethereumAddressField("fromAddress"),
+    fromAddress: validateAddressField("fromAddress"),
     amount: numericStringField("amount"),
-    tokenAddress: ethereumAddressField("tokenAddress"),
+    tokenAddress: validateAddressField("tokenAddress"),
     ethHash: Joi.string()
       .required()
       .custom((value, helpers) => {
@@ -69,9 +69,9 @@ export function validateBridgeOut(args: any) {
 
   // Step 2: Format and logic checks
   const finalSchema = Joi.object({
-    toAddress: ethereumAddressField("toAddress"),
+    toAddress: validateAddressField("toAddress"),
     amount: numericStringField("amount"),
-    tokenAddress: ethereumAddressField("tokenAddress"),
+    tokenAddress: validateAddressField("tokenAddress"),
   }).strict();
 
   const { error } = finalSchema.validate(args);

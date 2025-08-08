@@ -18,7 +18,7 @@ export function validateUserAddress(address: any): void {
   }
 }
 
-export const ethereumAddressField = (label: string) =>
+export const validateAddressField = (label: string) =>
   Joi.string()
     .trim()
     .custom((value, helpers) => {

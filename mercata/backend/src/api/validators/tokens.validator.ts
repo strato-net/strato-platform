@@ -1,9 +1,9 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField, numericStringField } from "./common.validators";
+import { validateAddressField, numericStringField } from "./common.validators";
 
 // Schema definitions
 const addressSchema = Joi.object({
-  address: ethereumAddressField("address"),
+  address: validateAddressField("address"),
 });
 
 const createTokensSchema = Joi.object({
@@ -18,28 +18,28 @@ const createTokensSchema = Joi.object({
 });
 
 const transferItemSchema = Joi.object({
-  address: ethereumAddressField("address"),
-  to: ethereumAddressField("to"),
+  address: validateAddressField("address"),
+  to: validateAddressField("to"),
   value: numericStringField("value"),
 });
 
 
 const approveArgsSchema = Joi.object({
-  address: ethereumAddressField("address"),
-  spender: ethereumAddressField("spender"),
+  address: validateAddressField("address"),
+  spender: validateAddressField("spender"),
   value: numericStringField("value"),
 });
 
 const transferFromArgsSchema = Joi.object({
-  address: ethereumAddressField("address"),
-  from: ethereumAddressField("from"),
-  to: ethereumAddressField("to"),
+  address: validateAddressField("address"),
+  from: validateAddressField("from"),
+  to: validateAddressField("to"),
   value: numericStringField("value"),
 });
 
 
 const setStatusArgsSchema = Joi.object({
-  address: ethereumAddressField("address"),
+  address: validateAddressField("address"),
   status: Joi.number()
     .integer()
     .valid(1, 2, 3)
