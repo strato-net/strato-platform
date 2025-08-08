@@ -1,9 +1,10 @@
 import Joi from "@hapi/joi";
+import { ethereumAddressField, numericStringField } from "./common.validators";
 
 // Validator functions with inline schemas
 export function validateDepositLiquidityArgs(args: any) {
   const schema = Joi.object({
-    amount: Joi.string().pattern(/^\d+$/).required(),
+    amount: numericStringField("amount"),
   });
   
   const { error } = schema.validate(args);
@@ -14,7 +15,7 @@ export function validateDepositLiquidityArgs(args: any) {
 
 export function validateWithdrawLiquidityArgs(args: any) {
   const schema = Joi.object({
-    amount: Joi.string().pattern(/^\d+$/).required(),
+    amount: numericStringField("amount"),
   });
   
   const { error } = schema.validate(args);
@@ -25,7 +26,7 @@ export function validateWithdrawLiquidityArgs(args: any) {
 
 export function validateBorrowArgs(args: any) {
   const schema = Joi.object({
-    amount: Joi.string().pattern(/^\d+$/).required(),
+    amount: numericStringField("amount"),
   });
   
   const { error } = schema.validate(args);
@@ -36,7 +37,7 @@ export function validateBorrowArgs(args: any) {
 
 export function validateRepayArgs(args: any) {
   const schema = Joi.object({
-    amount: Joi.string().pattern(/^\d+$/).required(),
+    amount: numericStringField("amount"),
   });
   
   const { error } = schema.validate(args);
@@ -47,8 +48,8 @@ export function validateRepayArgs(args: any) {
 
 export function validateSupplyCollateralArgs(args: any) {
   const schema = Joi.object({
-    asset: Joi.string().required(),
-    amount: Joi.string().pattern(/^\d+$/).required(),
+    asset: ethereumAddressField("asset"),
+    amount: numericStringField("amount"),
   });
   
   const { error } = schema.validate(args);
@@ -59,8 +60,8 @@ export function validateSupplyCollateralArgs(args: any) {
 
 export function validateWithdrawCollateralArgs(args: any) {
   const schema = Joi.object({
-    asset: Joi.string().required(),
-    amount: Joi.string().pattern(/^\d+$/).required(),
+    asset: ethereumAddressField("asset"),
+    amount: numericStringField("amount"),
   });
   
   const { error } = schema.validate(args);
@@ -94,13 +95,7 @@ export function validateLiquidationArgs(args: any) {
         "any.required": "Loan ID is required.",
       }),
 
-    collateralAsset: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .optional()
-      .messages({
-        "string.pattern.base": "Invalid collateral asset address format.",
-      }),
-
+    collateralAsset: ethereumAddressField("collateralAsset"),
     repayAmount: Joi.alternatives()
       .try(
         Joi.string().regex(/^\d+$/),
