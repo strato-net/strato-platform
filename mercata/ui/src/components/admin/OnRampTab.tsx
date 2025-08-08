@@ -13,6 +13,10 @@ const OnRampTab = () => {
     paymentProvidersTableRef.current?.refresh();
   }, []);
   
+  const handleListingsUpdate = useCallback(() => {
+    onRampListingsTableRef.current?.refresh();
+  }, []);
+  
   return (
     <div className="space-y-6">
       {/* First Row - Configuration Forms */}
@@ -42,7 +46,7 @@ const OnRampTab = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ListAssetForm />
+              <ListAssetForm onSuccess={handleListingsUpdate} />
             </CardContent>
           </Card>
         </div>

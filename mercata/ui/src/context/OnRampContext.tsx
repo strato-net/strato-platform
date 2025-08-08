@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback } from "react";
 import {api} from "@/lib/axios";
 import { 
   BuyPayload,
+  SellPayload,
   OnrampApiResponse,
   OnRampContextType,
   PaymentProvider,
@@ -61,8 +62,8 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   };
 
-  const sell = async (payload: any) => {
-    const weiAmount = safeParseUnits(payload.amount, 18).toString() ;
+  const sell = async (payload: SellPayload) => {
+    const weiAmount = safeParseUnits(payload.amount, 18).toString();
     const res = await api.post("/onramp/sell", {...payload, amount: weiAmount});
     return res.data;
   };

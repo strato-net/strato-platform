@@ -26,7 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useOnRampContext } from "@/context/OnRampContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
-import { ApprovedToken, PaymentProvider, PaymentProviderValue, Token } from "@/interface";
+import { ApprovedToken, PaymentProvider, PaymentProviderValue, SellPayload } from "@/interface";
 
 interface OnRampListingFormValues {
   tokenAddress: string;
@@ -35,15 +35,19 @@ interface OnRampListingFormValues {
   selectedProviders: string[];
 }
 
-const ListAssetForm = () => {
+interface ListAssetFormProps {
+  onSuccess?: () => void;
+}
+
+const ListAssetForm = ({ onSuccess }: ListAssetFormProps) => {
   const [loading, setLoading] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProviderValue[]>([]);
   const [approvedTokens, setApprovedTokens] = useState<ApprovedToken[]>([]);
 
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
-  const { providers, fetchOnRampData, sell } = useOnRampContext();
+  const { fetchTokens } = useUserTokens();
+  const { fetchOnRampData, sell } = useOnRampContext();
 
   const form = useForm<OnRampListingFormValues>({
     defaultValues: {
@@ -59,7 +63,7 @@ const ListAssetForm = () => {
     if (userAddress) {
       fetchTokens();
     }
-  }, [userAddress]);
+  }, [userAddress, fetchTokens]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
     try {
@@ -95,6 +99,22 @@ const ListAssetForm = () => {
 
       const selectedToken = approvedTokens.find((t) => t.token === data.tokenAddress);
 
+      // Remove 0x prefix from addresses if present (STRATO doesn't use 0x prefix)
+      const formatAddress = (address: string) => {
+        return address.startsWith('0x') ? address.slice(2) : address;
+      };
+
+      // Prepare the payload for the sell function
+      const sellPayload: SellPayload = {
+        token: formatAddress(data.tokenAddress),
+        amount: data.amount,
+        marginBps: data.marginBps,
+        providerAddresses: data.selectedProviders.map(formatAddress),
+      };
+
+      // Call the sell function from OnRamp context
+      await sell(sellPayload);
+
       toast({
         title: "Asset Listed Successfully",
         description: `${selectedToken?._symbol} listing created with ${data.amount} tokens available`,
@@ -102,8 +122,13 @@ const ListAssetForm = () => {
 
       form.reset();
       fetchData();
+      
+      // Call the success callback to refresh listings table
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: { message?: string } } };
+      console.error("Error creating listing:", error);
       // Error toast is now handled globally by axios interceptor
     } finally {
       setLoading(false);
