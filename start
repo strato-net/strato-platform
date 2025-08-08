@@ -14,9 +14,9 @@ then
 	exit
 fi
 
-if [ -e ~/secrets/oauth_credentials ]
+if [ -e ~/.secrets/oauth_credentials ]
 then
-    source ~/secrets/oauth_credentials
+    source ~/.secrets/oauth_credentials
 else
     export DEFAULT_OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
     read -e -p "Enter the OAUTH_DISCOVERY_URL [${DEFAULT_OAUTH_DISCOVERY_URL}]: " OAUTH_DISCOVERY_URL
@@ -25,6 +25,12 @@ else
 
     read -e -p "Enter the OAUTH_CLIENT_ID: " OAUTH_CLIENT_ID
     read -s -e -p "Enter the OAUTH_CLIENT_SECRET: " OAUTH_CLIENT_SECRET
+    read -e -p "Save OAUTH credentials in "~/.secrets/"? (y/N)" SHOULD_SAVE
+    if [ "$SHOULD_SAVE" = "y" ]
+    then
+	mkdir -p ~/.secrets
+	echo -e "OAUTH_DISCOVERY_URL=$OAUTH_DISCOVERY_URL\nOAUTH_CLIENT_ID=$OAUTH_CLIENT_ID\nOAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET" > ~/.secrets/oauth_credentials
+    fi
 fi
 
 export OAUTH_DISCOVERY_URL
