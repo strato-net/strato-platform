@@ -254,6 +254,7 @@ interface SwapDialogProps {
   isLoading: boolean;
   swapFeeRate: string;
   slippage: number;
+  autoSlippage: boolean;
 }
 
 const SwapDialog = ({
@@ -267,7 +268,8 @@ const SwapDialog = ({
   onConfirm,
   isLoading,
   swapFeeRate,
-  slippage
+  slippage,
+  autoSlippage
 }: SwapDialogProps) => {
   const [showBreakdown, setShowBreakdown] = useState(false);
 
@@ -290,7 +292,7 @@ const SwapDialog = ({
             <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showBreakdown ? 'rotate-180' : ''}`} />
           </div>
           <span className="font-semibold">
-            {(parseFloat(fromAmount || "0") + parseFloat(SWAP_FEE)).toString()} {fromAsset?._symbol || ""}
+            {fromAmount} {fromAsset?._symbol || ""}
           </span>
         </div>
         
@@ -318,24 +320,29 @@ const SwapDialog = ({
                   }
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span>Price Impact</span>
-                <span className="text-red-600">
-                  {fromAmount && toAmount && exchangeRate && parseFloat(fromAmount) > 0 && parseFloat(exchangeRate) > 0
-                    ? (() => {
-                        const actualRate = parseFloat(toAmount) / parseFloat(fromAmount); // What you actually get
-                        const unitRate = parseFloat(exchangeRate); // Theoretical pool rate
-                        const diff = ((actualRate - unitRate) / unitRate) * 100; // This should be negative
-                        const rounded = Math.round(diff * 100) / 100; // Round to 2 decimal places
-                        return `${formatAmount(rounded.toString())}%`;
-                      })()
-                    : "---"
-                  }
-                </span>
-              </div>
+              {fromAmount && toAmount && exchangeRate && parseFloat(fromAmount) > 0 && parseFloat(exchangeRate) > 0 && (() => {
+                const actualRate = parseFloat(toAmount) / parseFloat(fromAmount);
+                const unitRate = parseFloat(exchangeRate);
+                const diff = ((actualRate - unitRate) / unitRate) * 100;
+                const rounded = Math.round(diff * 100) / 100;
+                return rounded !== 0; // Only show if price impact is not 0
+              })() && (
+                <div className="flex justify-between">
+                  <span>Price Impact</span>
+                  <span className="text-yellow-600">
+                    {(() => {
+                      const actualRate = parseFloat(toAmount) / parseFloat(fromAmount);
+                      const unitRate = parseFloat(exchangeRate);
+                      const diff = ((actualRate - unitRate) / unitRate) * 100;
+                      const rounded = Math.round(diff * 100) / 100;
+                      return `${formatAmount(Math.abs(rounded).toString())}%`;
+                    })()}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Max Slippage</span>
-                <span className={`${slippage > 5 || slippage < 1 ? 'text-yellow-600' : 'text-blue-600'}`}>
+                <span className={`${slippage > 5 ? 'text-yellow-600' : autoSlippage ? 'text-blue-600' : 'text-black'}`}>
                   {slippage}%
                 </span>
               </div>
@@ -1121,6 +1128,7 @@ const handleMaxClick = (isFrom: boolean) => {
         isLoading={swapLoading}
         swapFeeRate={swapFeeRate}
         slippage={slippage}
+        autoSlippage={autoSlippage}
       />
     </div>
   );
