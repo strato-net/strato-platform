@@ -2,7 +2,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, DollarSign, Trash2 } from "lucide-react";
+import { Loader2, DollarSign, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOnRampContext } from "@/context/OnRampContext";
@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
-  const [refreshing, setRefreshing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<{ token: string; symbol: string } | null>(null);
   const { toast } = useToast();
@@ -34,17 +33,6 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
       ListingInfo: listing.ListingInfo
     }));
 
-  const fetchListings = async () => {
-    try {
-      setRefreshing(true);
-      await fetchOnRampData();
-    } catch (error) {
-      // Error is already handled by axios interceptor
-      console.error("Error fetching listings:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   useEffect(() => {
     if (contextListings.length === 0 && !contextLoading) {
@@ -140,21 +128,7 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
     <>
     <Card className="border-0">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>OnRamp Listings</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchListings}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        <CardTitle>OnRamp Listings</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-80 overflow-y-auto border rounded-md">

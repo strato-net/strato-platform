@@ -1,7 +1,7 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOnRampContext } from "@/context/OnRampContext";
@@ -21,7 +21,6 @@ const PaymentProvidersTable = forwardRef<{refresh: () => void}>((props, ref) => 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<{ address: string; name: string } | null>(null);
   const { providers, loading, fetchOnRampData, removePaymentProvider } = useOnRampContext();
-  const [refreshing, setRefreshing] = useState(false);
 
   // Format providers for display - ensure we always have PaymentProviderValue structure
   const formattedProviders = providers.map(provider => ({
@@ -29,16 +28,6 @@ const PaymentProvidersTable = forwardRef<{refresh: () => void}>((props, ref) => 
     value: provider.value
   })).filter(provider => provider.value); // Filter out providers without value
 
-  const handleRefresh = async () => {
-    try {
-      setRefreshing(true);
-      await fetchOnRampData();
-    } catch (error: unknown) {
-      console.error("Error refreshing providers:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const handleDeleteClick = (providerAddress: string, providerName: string) => {
     setProviderToDelete({ address: providerAddress, name: providerName || "Unknown Provider" });
@@ -104,21 +93,7 @@ const PaymentProvidersTable = forwardRef<{refresh: () => void}>((props, ref) => 
     <>
       <Card className="border-0">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Payment Providers</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={refreshing}
-            >
-              {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+          <CardTitle>Payment Providers</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-80 overflow-y-auto border rounded-md">
