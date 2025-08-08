@@ -71,6 +71,11 @@ export async function checkout(
     });
 
     addLock(token, amount, sessionId);
+    
+    pollAndFulfillSession(sessionId, token, amount).catch(err => {
+      console.error(`Error in background fulfillment for session ${sessionId}:`, err);
+    });
+    
     return { sessionId, url };
   } catch (error) {
     removeLock(token, amount);
@@ -78,17 +83,51 @@ export async function checkout(
   }
 }
 
-export async function handleStripeWebhook(session: Stripe.Checkout.Session): Promise<void> {
+async function pollAndFulfillSession(sessionId: string, token: string, tokenAmount: string): Promise<void> {
+  const maxAttempts = 126; // Poll for up to 21 minutes
+  const pollInterval = 10000; // 10 seconds
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid') {
+        try {
+          await handleSessionFulfillment(session);
+        } catch (error) {
+          console.error(`Failed to fulfill session ${sessionId}:`, error);
+        }
+        return;
+      } else if (session.payment_status === 'unpaid' && session.status === 'expired') {
+        removeLock(token, tokenAmount, sessionId);
+        return;
+      }
+      
+    } catch (error) {
+      console.error(`Error polling session ${sessionId}:`, error);
+      if (attempt === maxAttempts - 1) {
+        removeLock(token, tokenAmount, sessionId);
+      }
+    }
+  }
+}
+
+async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promise<void> {
   const token = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
-  const amount = session.metadata?.amount;
   const tokenAmount = session.metadata?.tokenAmount;
-  const stripeSessionId = session.id;
+  const sessionId = session.id;
   
-  if (!token || !buyerAddress || !amount || !tokenAmount) {
-    console.error("Missing required metadata in session");
-    removeLock(token || '', tokenAmount || '', stripeSessionId);
-    return;
+  if (!token || !buyerAddress || !tokenAmount) {
+    console.error("Missing required metadata in session", sessionId);
+    removeLock(token || '', tokenAmount || '', sessionId);
+    throw new Error("Missing required metadata");
+  }
+
+  if (session.payment_status !== 'paid') {
+    throw new Error(`Session ${sessionId} payment status is not 'paid': ${session.payment_status}`);
   }
 
   try {
@@ -99,23 +138,17 @@ export async function handleStripeWebhook(session: Stripe.Checkout.Session): Pro
       method: "fulfillListing",
       args: { token, buyer: buyerAddress, amount: tokenAmount },
     });
-    // Set large gas params if more lucrative tx problem persists
-    // fulfillTx.txParams.gasLimit = 999999999999999;
-    // fulfillTx.txParams.gasPrice = 1000000000;
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
     );
 
     if (status === "Success") {
-      console.log(`Order ${token} confirmed on-chain: ${hash}`);
+      console.log(`Order ${token} confirmed on-chain: ${hash} for session ${sessionId}`);
     } else {
-      console.error(`On-chain confirmation failed (${status}): ${hash}`);
+      throw new Error(`On-chain confirmation failed (${status}): ${hash}`);
     }
-  } catch (err) {
-    console.error("Error confirming order on-chain:", err);
   } finally {
-    removeLock(token, tokenAmount, stripeSessionId);
+    removeLock(token, tokenAmount, sessionId);
   }
-
 }

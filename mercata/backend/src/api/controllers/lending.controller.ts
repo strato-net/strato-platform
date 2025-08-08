@@ -24,7 +24,9 @@ import {
   validateSupplyCollateralArgs,
   validateWithdrawCollateralArgs,
   validateConfigureAssetArgs,
+  validateLiquidationArgs,
 } from "../validators/lending.validator";
+import { validateUserAddress } from "../validators/common.validators";
 
 class LendingController {
   static async get(
@@ -152,10 +154,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address } = req;
-      if (!address) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
-        return;
-      }
+      validateUserAddress(address);
 
       const result = await collateralAndBalance(accessToken, address as string);
       res.status(RestStatus.OK).json(result);
@@ -171,10 +170,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address } = req;
-      if (!address) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
-        return;
-      }
+      validateUserAddress(address);
 
       const result = await liquidityAndBalance(accessToken, address as string);
       res.status(RestStatus.OK).json(result);
@@ -190,10 +186,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address } = req;
-      if (!address) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
-        return;
-      }
+      validateUserAddress(address);
       
       const result = await getLoan(accessToken, address as string);
       res.status(RestStatus.OK).json(result);
@@ -206,6 +199,7 @@ class LendingController {
     try {
       const { accessToken } = req;
       const id = req.params.id;
+      validateLiquidationArgs({id, ...req.body});
 
       const result = await executeLiquidationService(accessToken, id, req.body || {});
       res.status(RestStatus.OK).json(result);

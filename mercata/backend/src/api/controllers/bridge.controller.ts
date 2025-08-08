@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { BridgeService } from "../services/bridge.service";
+import { validateBridgeIn, validateBridgeOut } from "../validators/bridge.validators";
 
 // Extend Express Request type to include user
 interface AuthenticatedRequest extends Request {
@@ -22,6 +23,7 @@ export class BridgeController {
   ) => {
     try {
       const { accessToken, body } = req;
+      validateBridgeIn(body);
 
       // Process bridge transaction
       const result = await this.bridgeService.bridgeIn({
@@ -45,6 +47,7 @@ export class BridgeController {
   ) => {
     try {
       const { accessToken, body } = req;
+      validateBridgeOut(body);
 
       // Process bridge transaction
       const result = await this.bridgeService.bridgeOut({

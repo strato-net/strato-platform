@@ -48,9 +48,6 @@ function isERC20Token(tokenAddress: string): boolean {
 async function waitForTransactionMined(ethHash: string, maxWaitTime: number = 60000): Promise<boolean> {
   const startTime = Date.now();
   const pollInterval = 2000; // Check every 2 seconds
-  
-  console.log(`⏳ Waiting for transaction to be mined: ${ethHash}`);
-
   while (Date.now() - startTime < maxWaitTime) {
     try {
       const receipt = await alchemy.core.getTransactionReceipt(ethHash);
@@ -58,10 +55,8 @@ async function waitForTransactionMined(ethHash: string, maxWaitTime: number = 60
       if (receipt) {
         // Check if transaction was successful (status === 1 means success)
         if (receipt.status === 1) {
-          console.log(`✅ Transaction is mined and successful!`);
           return true;
         } else {
-          console.log(`❌ Transaction failed on blockchain (status: ${receipt.status})`);
           return false;
         }
       }
@@ -73,7 +68,6 @@ async function waitForTransactionMined(ethHash: string, maxWaitTime: number = 60
     await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
-  console.log(`⏰ Timeout reached - transaction not mined within ${maxWaitTime}ms`);
   return false;
 }
 

@@ -267,21 +267,16 @@ const LendingPoolSection = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const rawMax = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
-                        const exchangeRateWei = BigInt(liquidityInfo?.withdrawable?.exchangeRate || "1000000000000000000");
-                        const userMTokenBalanceWei = BigInt(liquidityInfo?.withdrawable?.userBalance || "0");
+                        const maxWithdrawableUSDST = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
                         const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
                         const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
 
-                        if (!rawMax || usdstBalanceWei < feeWei) return;
+                        if (!maxWithdrawableUSDST || usdstBalanceWei < feeWei) return;
 
-                        const maxWithdrawableViaMToken = (userMTokenBalanceWei * exchangeRateWei) / (10n ** 18n);
-                        const rawMaxWei = BigInt(rawMax);
-                        const safeMaxWei = rawMaxWei < maxWithdrawableViaMToken ? rawMaxWei : maxWithdrawableViaMToken;
+                        const maxWithdrawableWei = BigInt(maxWithdrawableUSDST);
+                        if (maxWithdrawableWei <= 0n) return;
 
-                        if (safeMaxWei <= 0n) return;
-
-                        const formatted = formatUnits(safeMaxWei, 18);
+                        const formatted = formatUnits(maxWithdrawableWei, 18);
                         const [w, f = ""] = formatted.split(".");
                         const clamped = f.length > 18 ? `${w}.${f.slice(0, 18)}` : formatted;
                         const clampedClean = clamped.replace(/\.?0+$/, "");
@@ -298,14 +293,28 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                       : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
-                        ? formatBalance(liquidityInfo.withdrawable.maxWithdrawableUSDST || 0n, "USDST", 18, 2, 2)
+                        ? formatBalance(liquidityInfo.withdrawable.maxWithdrawableUSDST || 0n, undefined, 18, 2)
                         : "0.00"}{" "}
-                    ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
+                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
                   </div>
+                  {/* Withdraw Amount Warning */}
+                  {(() => {
+                    const withdrawAmountWei = withdrawAmount ? safeParseUnits(withdrawAmount, 18) : 0n;
+                    const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+                    
+                    // Check if withdraw amount exceeds withdrawable limit
+                    const isInsufficientWithdrawable = withdrawAmountWei > 0n && withdrawAmountWei > maxWithdrawableWei;
+                    
+                    return isInsufficientWithdrawable ? (
+                      <p className="text-red-600 text-sm mt-1">
+                        Insufficient balance - amount exceeds withdrawable limit ({formatBalance(maxWithdrawableWei, "USDST", 18, 2)} available)
+                      </p>
+                    ) : null;
+                  })()}
                   {/* Fee Warning */}
                   {(() => {
                     const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");

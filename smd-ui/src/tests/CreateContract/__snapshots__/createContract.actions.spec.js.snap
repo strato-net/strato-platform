@@ -134,6 +134,7 @@ Object {
 
 exports[`CreateContract: action create contract success 1`] = `
 Object {
+  "contractAddress": undefined,
   "isOpen": true,
   "response": Array [
     Object {
@@ -285,6 +286,7 @@ Object {
 
 exports[`CreateContract: action create contract without status 1`] = `
 Object {
+  "contractAddress": undefined,
   "isOpen": true,
   "response": Object {},
   "spinning": false,
