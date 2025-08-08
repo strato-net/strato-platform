@@ -46,7 +46,6 @@ const OnRampListingsTable = forwardRef((props, ref) => {
   };
 
   useEffect(() => {
-    // Fetch data on mount if not already loaded
     if (contextListings.length === 0 && !contextLoading) {
       fetchOnRampData();
     }
@@ -68,23 +67,14 @@ const OnRampListingsTable = forwardRef((props, ref) => {
     try {
       const result = await cancelListing(listingToDelete.token);
       
-      // Ensure description is a string
-      let successMessage = "Listing cancelled successfully";
-      if (result?.message) {
-        successMessage = typeof result.message === 'string' 
-          ? result.message 
-          : JSON.stringify(result.message);
-      }
+      const successMessage = typeof result === 'string' 
+        ? result 
+        : result?.message || "Listing cancelled successfully";
       
       toast({
         title: "Success",
         description: successMessage,
       });
-      
-      // Refresh listings after a short delay
-      setTimeout(() => {
-        fetchListings();
-      }, 500);
     } catch (error: any) {
       // Error is already handled by axios interceptor which shows a toast
       // The interceptor will display the specific error message from backend

@@ -51,20 +51,14 @@ const PaymentProvidersTable = forwardRef((props, ref) => {
     try {
       const result = await removePaymentProvider(providerToDelete.address);
       
-      // Ensure description is a string
-      let successMessage = "Payment provider removed successfully";
-      if (result?.message) {
-        successMessage = typeof result.message === 'string' 
-          ? result.message 
-          : JSON.stringify(result.message);
-      }
+      const successMessage = typeof result === 'string' 
+        ? result 
+        : result?.message || "Payment provider removed successfully";
       
       toast({
         title: "Success",
         description: successMessage,
       });
-      
-      // Data will be refreshed automatically by the context
     } catch (error: any) {
       console.error("Error deleting provider:", error);
     } finally {

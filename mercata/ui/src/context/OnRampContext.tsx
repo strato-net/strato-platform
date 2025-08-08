@@ -6,7 +6,8 @@ import {
   OnrampApiResponse,
   OnRampContextType,
   PaymentProvider,
-  Listing 
+  Listing,
+  AddPaymentProviderData 
 } from "@/interface";
 import { safeParseUnits } from "@/utils/numberUtils";
 
@@ -76,53 +77,22 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   };
 
-  const addPaymentProvider = useCallback(async (providerData: {
-    providerAddress: string;
-    name: string;
-    endpoint: string;
-  }) => {
+  const addPaymentProvider = useCallback(async (providerData: AddPaymentProviderData) => {
     const res = await api.post("/onramp/addPaymentProvider", providerData);
-    // Ensure we return a consistent format
-    const result = typeof res.data === 'string' 
-      ? { message: res.data }
-      : res.data;
-    
-    // Refresh data after successful add
-    setTimeout(() => {
-      fetchOnRampData();
-    }, 500);
-    
-    return result;
+    await fetchOnRampData();
+    return res.data;
   }, [fetchOnRampData]);
 
   const removePaymentProvider = useCallback(async (providerAddress: string) => {
     const res = await api.post("/onramp/removePaymentProvider", { providerAddress });
-    // Ensure we return a consistent format
-    const result = typeof res.data === 'string'
-      ? { message: res.data }
-      : res.data;
-    
-    // Refresh data after successful remove
-    setTimeout(() => {
-      fetchOnRampData();
-    }, 500);
-    
-    return result;
+    await fetchOnRampData();
+    return res.data;
   }, [fetchOnRampData]);
 
   const cancelListing = useCallback(async (token: string) => {
     const res = await api.post("/onramp/cancelListing", { token });
-    // Ensure we return a consistent format
-    const result = typeof res.data === 'string'
-      ? { message: res.data }
-      : res.data;
-    
-    // Refresh data after successful cancel
-    setTimeout(() => {
-      fetchOnRampData();
-    }, 500);
-    
-    return result;
+    await fetchOnRampData();
+    return res.data;
   }, [fetchOnRampData]);
 
   return (
@@ -134,7 +104,6 @@ export const OnRampProvider = ({ children }: { children: React.ReactNode }) => {
         onRampData,
         providers,
         listings,
-        
         fetchOnRampData,
         buy,
         sell,

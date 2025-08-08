@@ -200,11 +200,7 @@ export interface OnRampContextType {
   sell: (body: any) => Promise<void>;
   lock: (body: any) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<void>;
-  addPaymentProvider: (providerData: {
-    providerAddress: string;
-    name: string;
-    endpoint: string;
-  }) => Promise<any>;
+  addPaymentProvider: (providerData: AddPaymentProviderData) => Promise<any>;
   removePaymentProvider: (providerAddress: string) => Promise<any>;
   cancelListing: (token: string) => Promise<any>;
 }
@@ -401,6 +397,12 @@ export interface PaymentProviderValue {
 export interface PaymentProvider {
   key: string;
   value: PaymentProviderValue;
+}
+
+export interface AddPaymentProviderData {
+  providerAddress: string;
+  name: string;
+  endpoint: string;
 }
 export interface ApprovedToken {
   token: string;

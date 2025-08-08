@@ -10,7 +10,6 @@ import axios from "axios";
 const contractAddress = constants.onRamp!;
 const { OnRamp, onRampSelectFields, Token } = constants;
 
-// Add a payment provider
 export const addPaymentProvider = async (
   accessToken: string,
   providerData: {
@@ -21,14 +20,8 @@ export const addPaymentProvider = async (
 ) => {
   const { providerAddress, name, endpoint } = providerData;
   
-  // Remove 0x prefix if present for STRATO
-  let normalizedAddress = providerAddress.toLowerCase();
-  if (normalizedAddress.startsWith('0x')) {
-    normalizedAddress = normalizedAddress.slice(2);
-  }
-  
   const args = {
-    provider: normalizedAddress,
+    provider: providerAddress.toLowerCase(),
     name,
     endpoint,
   };
@@ -51,20 +44,12 @@ export const addPaymentProvider = async (
   };
 };
 
-// Remove a payment provider
-// Cancel a listing
 export const cancelListing = async (
   accessToken: string,
   token: string
 ) => {
-  // Remove 0x prefix if present for STRATO
-  let normalizedToken = token.toLowerCase();
-  if (normalizedToken.startsWith('0x')) {
-    normalizedToken = normalizedToken.slice(2);
-  }
-  
   const args = {
-    token: normalizedToken,
+    token: token.toLowerCase(),
   };
 
   const tx = buildFunctionTx({
@@ -92,13 +77,7 @@ export const removePaymentProvider = async (
   // First, check if the provider is being used in any listings
   const onRampData = await get(accessToken);
   const listings = onRampData?.listings || [];
-  
-  // Remove 0x prefix if present for STRATO
-  let normalizedAddress = providerAddress.toLowerCase();
-  if (normalizedAddress.startsWith('0x')) {
-    normalizedAddress = normalizedAddress.slice(2);
-  }
-  
+
   // Check if this provider is being used in any active listing
   const isProviderInUse = listings.some((listing: any) => {
     const listingInfo = listing.ListingInfo;
@@ -107,7 +86,7 @@ export const removePaymentProvider = async (
     return listingInfo.providers.some((provider: any) => {
       const address = provider.providerAddress || provider.key || provider;
       const providerAddr = address.toLowerCase().replace(/^0x/, '');
-      return providerAddr === normalizedAddress;
+      return providerAddr === providerAddress.toLowerCase();
     });
   });
   
@@ -116,7 +95,7 @@ export const removePaymentProvider = async (
   }
   
   const args = {
-    provider: normalizedAddress,
+    provider: providerAddress.toLowerCase(),
   };
 
   const tx = buildFunctionTx({

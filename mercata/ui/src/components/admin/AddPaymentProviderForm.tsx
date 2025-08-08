@@ -48,13 +48,9 @@ const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
         endpoint: data.endpoint,
       });
       
-      // Ensure description is a string
-      let successMessage = "Payment provider added successfully!";
-      if (result?.message) {
-        successMessage = typeof result.message === 'string' 
-          ? result.message 
-          : JSON.stringify(result.message);
-      }
+      const successMessage = typeof result === 'string' 
+        ? result 
+        : result?.message || "Payment provider added successfully!";
       
       toast({
         title: "Success",
@@ -63,11 +59,8 @@ const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
       
       form.reset();
       
-      // Call the onSuccess callback after a short delay to ensure blockchain state is updated
       if (onSuccess) {
-        setTimeout(() => {
-          onSuccess();
-        }, 500);
+        onSuccess();
       }
     } catch (error: any) {
       console.error("Error adding payment provider:", error);
@@ -78,8 +71,6 @@ const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
 
   return (
     <div className="space-y-6">
-
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
