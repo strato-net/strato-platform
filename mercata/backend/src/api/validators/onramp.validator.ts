@@ -1,4 +1,5 @@
 import Joi from "@hapi/joi";
+import { ethereumAddressField, numericStringField } from "./common.validators";
 export function validateBuyArgs(args: any) {
   
   if (!args || typeof args !== "object") {
@@ -19,32 +20,9 @@ export function validateBuyArgs(args: any) {
 
   // Post-normalization validation
   const finalSchema = Joi.object({
-    token: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "Token address must be a valid Ethereum address.",
-      }),
-    amount: Joi.string()
-      .pattern(/^\d+$/)
-      .required()
-      .custom((value, helpers) => {
-        const big = BigInt(value);
-        if (big <= 0n) {
-          return helpers.error("any.invalid");
-        }
-        return value;
-      }, "Positive amount check")
-      .messages({
-        "string.pattern.base": "Amount must be a numeric string.",
-        "any.invalid": "Amount must be greater than 0.",
-      }),
-    paymentProviderAddress: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "Payment provider address must be a valid Ethereum address.",
-      }),
+    token: ethereumAddressField("token"),
+    amount: numericStringField("amount"),
+    paymentProviderAddress: ethereumAddressField("paymentProviderAddress"),
   }).strict();
 
   const { error } = finalSchema.validate(args);
@@ -72,25 +50,8 @@ export function validateSellArgs(args: any) {
   }
 
   const finalSchema = Joi.object({
-    token: Joi.string()
-      .pattern(/^[a-fA-F0-9]{40}$/)
-      .required()
-      .messages({
-        "string.pattern.base": "Token address must be a valid Ethereum address.",
-      }),
-
-    amount: Joi.string()
-      .pattern(/^\d+$/)
-      .required()
-      .custom((value, helpers) => {
-        if (BigInt(value) <= 0n) return helpers.error("any.invalid");
-        return value;
-      }, "positive amount check")
-      .messages({
-        "string.pattern.base": "Amount must be a numeric string.",
-        "any.invalid": "Amount must be greater than 0.",
-      }),
-
+    token: ethereumAddressField("token"),
+    amount:numericStringField("amount"),
     marginBps: Joi.string()
       .pattern(/^\d+$/)
       .required()

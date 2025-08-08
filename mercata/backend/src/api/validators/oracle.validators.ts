@@ -1,5 +1,5 @@
 import Joi from "@hapi/joi";
-import { ethereumAddressField } from "./common.validators";
+import { ethereumAddressField, numericStringField } from "./common.validators";
 
 export function validateGetPriceQuery(query: any) {
   const schema = Joi.object({
@@ -18,13 +18,7 @@ export function validateGetPriceQuery(query: any) {
 export function validateSetPriceInput(body: any) {
   const schema = Joi.object({
     token: ethereumAddressField("token"),
-    price: Joi.string()
-      .pattern(/^\d+$/) // Only numeric strings (integer)
-      .required()
-      .messages({
-        "string.pattern.base": "Price must be a valid integer string",
-        "any.required": "Price is required",
-      }),
+    price: numericStringField("price"),
   });
 
   const { error, value } = schema.validate(body);
