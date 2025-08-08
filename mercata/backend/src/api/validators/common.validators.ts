@@ -43,9 +43,12 @@ export const ethereumAddressField = (label: string) =>
 
 export const numericStringField = (label: string) =>
   Joi.string()
+    .trim()
     .pattern(/^\d+$/)
     .required()
     .messages({
+      "string.empty": `"${label}" is required`,
+      "string.base": `"${label}" must be a string`,
       "string.pattern.base": `${label} must be a numeric string (integers only)`,
       "any.required": `${label} is required`,
     });
