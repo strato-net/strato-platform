@@ -145,36 +145,23 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
 
   const depositStatus = await fetchDepositInitiatedTransactions(txBatch);
 
-  // ⚠️ TEMPORARY FIX: Filter out deposits with invalid token addresses from previous testnet deployment
-  const INVALID_TOKEN_ADDRESSES = [
-    "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
-    "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
-  ];
-  
-  const validDeposits = depositStatus.filter((deposit: any) => {
-    const tokenAddress = deposit.token.toLowerCase().replace("0x", "");
-    const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
-    
-    if (isInvalid) {
-    }
-    
-    return !isInvalid;
-  });
+  console.log("depositStatus....", depositStatus);
 
-  if (validDeposits.length === 0) {
+  if (depositStatus.length === 0) {
+    console.log("No deposits to process");
     return;
   }
 
   try {
     const bridgeContract = new BridgeContractCall();
     const result = await bridgeContract.batchConfirmDeposits({
-      deposits: validDeposits,
+      deposits: depositStatus,
     });
 
     if (result && result.status === "Success") {
       
       try {
-        await mintVouchersForDeposits(validDeposits);
+        await mintVouchersForDeposits(depositStatus);
       } catch (voucherError) {
         console.error("Failed to mint vouchers (bridge deposits still succeeded):", voucherError);
       }
@@ -196,19 +183,6 @@ export const confirmBridgeIn = async (tx: any) => {
   const depositStatus = await checkDepositStatus(tx.hash);
 
   if (!depositStatus) {
-    return null;
-  }
-
-  // ⚠️ TEMPORARY FIX: Skip deposits with invalid token addresses from previous testnet deployment
-  const INVALID_TOKEN_ADDRESSES = [
-    "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
-    "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
-  ];
-  
-  const tokenAddress = depositStatus.token.toLowerCase().replace("0x", "");
-  const isInvalidToken = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
-  
-  if (isInvalidToken) {
     return null;
   }
 
