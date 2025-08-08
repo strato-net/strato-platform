@@ -550,7 +550,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         )}
         <PercentageButtons
           value={amount}
-          maxValue={tokenBalance}
+          maxValue={safeParseUnits(tokenBalance,18).toString()}
           onChange={handlePercentageClick}
           className="mt-2"
         />
