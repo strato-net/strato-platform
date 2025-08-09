@@ -32,6 +32,9 @@ local authenticate_opts = {
   revoke_tokens_on_logout = true
 }
 
+-- Clear any x-user-access-token header coming from the client, for security reasons
+ngx.req.clear_header("X-USER-ACCESS-TOKEN")
+
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
 if ngx.req.get_headers()["Authorization"] then
   local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
