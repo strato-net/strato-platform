@@ -32,7 +32,6 @@
     "express": "^5.1.0",
     "http-status-codes": "^2.3.0",
     "jose": "^6.0.12",
-    "jwt-decode": "^4.0.0",
     "winston": "^3.11.0"
   }
 }

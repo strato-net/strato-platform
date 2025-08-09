@@ -1,7 +1,7 @@
 import axios from "axios";
 import { clientSecret, clientId, openIdTokenEndpoint, openIdJwks } from "../config/config";
-import { createLocalJWKSet, jwtVerify } from "jose";
-import { strato, eth } from "./mercataApiHelper";
+import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from "jose";
+import { strato } from "./mercataApiHelper";
 import { TokenCache, StratoKeyResponse } from "../types/types";
 import { StratoPaths } from "../config/constants";
 
@@ -132,7 +132,7 @@ export async function createOrGetKey(token: string): Promise<string> {
 /**
  * Fetches both token endpoint and JWKS from the OpenID Connect discovery document
  */
-export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined): Promise<{ tokenEndpoint: string; jwks: any }> {
+export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined): Promise<{ tokenEndpoint: string; jwks: JSONWebKeySet }> {
   try {
     if (!openIdDiscoveryUrl) {
       throw new Error("OpenID Discovery URL is not defined");
@@ -149,9 +149,9 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
     }
 
     const jwksResponse = await axios.get(jwks_uri);
-    const jwks = jwksResponse.data as any;
+    const jwks = jwksResponse.data as JSONWebKeySet;
 
-    if (!jwks || !Array.isArray((jwks as any).keys)) {
+    if (!jwks || !Array.isArray(jwks.keys)) {
       throw new Error("Invalid JWKS response from OpenID provider");
     }
 
@@ -164,32 +164,16 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
 }
 
 /**
- * Fetches the token endpoint from the OpenID Connect discovery document
- */
-export async function fetchOpenIdTokenEndpoint(openIdDiscoveryUrl: string | undefined): Promise<string> {
-  const { tokenEndpoint } = await fetchOpenIdConfig(openIdDiscoveryUrl);
-  return tokenEndpoint;
-}
-
-/**
- * Fetches the JWKS from the OpenID Connect discovery document
- */
-export async function fetchOpenIdJwks(openIdDiscoveryUrl: string | undefined): Promise<any> {
-  const { jwks } = await fetchOpenIdConfig(openIdDiscoveryUrl);
-  return jwks;
-}
-
-/**
  * JWT verification using cached JWKS
  */
 let cachedJwksVerifier: any | undefined;
 
-export async function verifyAccessTokenSignature(token: string): Promise<any> {
+export async function verifyAccessTokenSignature(token: string): Promise<JWTPayload> {
   if (!openIdJwks) {
     throw new Error("JWKS not initialized");
   }
   if (!cachedJwksVerifier) {
-    cachedJwksVerifier = createLocalJWKSet(openIdJwks as any);
+    cachedJwksVerifier = createLocalJWKSet(openIdJwks);
   }
   const { payload } = await jwtVerify(token, cachedJwksVerifier);
   return payload;

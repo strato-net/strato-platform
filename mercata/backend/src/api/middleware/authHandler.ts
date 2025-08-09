@@ -1,6 +1,6 @@
 import { Request, RequestHandler } from "express";
 import RestStatus from "http-status-codes";
-import { JwtPayload } from "jwt-decode";
+import { JWTPayload } from "jose";
 import { verifyAccessTokenSignature } from "../../utils/authHelper";
 import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
 // ————————————————————————————————————————————————————————————————
@@ -25,7 +25,7 @@ function getTokenFromHeader(req: Request): string | null {
   return null;
 }
 
-interface CustomJwtPayload extends JwtPayload {
+interface CustomJwtPayload extends JWTPayload {
   preferred_username: string;
 }
 
@@ -51,7 +51,7 @@ class AuthHandler {
           // Verify JWT signature and extract payload using cached JWKS (loaded at startup)
           let payload: CustomJwtPayload;
           try {
-            payload = await verifyAccessTokenSignature(token);
+            payload = await verifyAccessTokenSignature(token) as CustomJwtPayload;
           } catch (err) {
             res.status(RestStatus.UNAUTHORIZED).json({ error: "Invalid or expired access token" });
             return next(err);
