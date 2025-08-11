@@ -1,4 +1,5 @@
 import { fetchOpenIdConfig } from "../utils/authHelper";
+import { JSONWebKeySet } from "jose";
 
 // Load local .env files when not in production
 if (process.env.NODE_ENV !== "production") {
@@ -21,7 +22,7 @@ if (!process.env.NODE_URL) {
 
 // TODO: potentially add the TTL for cached values, to update values after a period of time
 export let openIdTokenEndpoint: string | undefined;
-export let openIdJwks: any | undefined;
+export let openIdJwks: JSONWebKeySet | undefined;
 /**
  * Init function to be called from the App.js to make sure the app is served after the token endpoint is asynchronously fetched from OpenID Discovery URL 
  */

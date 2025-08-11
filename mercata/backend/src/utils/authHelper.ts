@@ -1,11 +1,9 @@
 import axios from "axios";
 import { clientSecret, clientId, openIdTokenEndpoint, openIdJwks } from "../config/config";
+import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from "jose";
 import { strato } from "./mercataApiHelper";
 import { TokenCache, StratoKeyResponse } from "../types/types";
 import { StratoPaths } from "../config/constants";
-
-// Dynamic imports for jose library to handle ES Module compatibility
-let jose: any;
 
 const CACHED_TOKEN: TokenCache = {};
 
@@ -134,7 +132,7 @@ export async function createOrGetKey(token: string): Promise<string> {
 /**
  * Fetches both token endpoint and JWKS from the OpenID Connect discovery document
  */
-export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined): Promise<{ tokenEndpoint: string; jwks: any }> {
+export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined): Promise<{ tokenEndpoint: string; jwks: JSONWebKeySet }> {
   try {
     if (!openIdDiscoveryUrl) {
       throw new Error("OpenID Discovery URL is not defined");
@@ -151,7 +149,7 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
     }
 
     const jwksResponse = await axios.get(jwks_uri);
-    const jwks = jwksResponse.data;
+    const jwks = jwksResponse.data as JSONWebKeySet;
 
     if (!jwks || !Array.isArray(jwks.keys)) {
       throw new Error("Invalid JWKS response from OpenID provider");
@@ -170,19 +168,13 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
  */
 let cachedJwksVerifier: any | undefined;
 
-export async function verifyAccessTokenSignature(token: string): Promise<any> {
+export async function verifyAccessTokenSignature(token: string): Promise<JWTPayload> {
   if (!openIdJwks) {
     throw new Error("JWKS not initialized");
   }
-  
-  // Dynamic import of jose library
-  if (!jose) {
-    jose = await import("jose");
-  }
-  
   if (!cachedJwksVerifier) {
-    cachedJwksVerifier = jose.createLocalJWKSet(openIdJwks);
+    cachedJwksVerifier = createLocalJWKSet(openIdJwks);
   }
-  const { payload } = await jose.jwtVerify(token, cachedJwksVerifier);
+  const { payload } = await jwtVerify(token, cachedJwksVerifier);
   return payload;
 }
