@@ -2639,20 +2639,6 @@ runTheConstructors from to hsh cc contractName' argVals = do
         box
           ["running constructor: " ++ labelToString contractName' ++ "(" ++ intercalate ", " (map (labelToString . snd) argTypeNames) ++ ")"]
 
-  -- argVals <- case argExps of
-  --   (CC.OrderedArgs []) -> do
-  --     when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
-  --     return $ OrderedVals []
-  --   (CC.NamedArgs []) -> do
-  --     when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
-  --     return $ NamedVals []
-  --   _ ->
-  --     argsToVals
-  --       contract'
-  --       ( fromMaybe (invalidArguments ("arguments provided for missing constructor in contract " ++ labelToString contractName') argPairs) $
-  --           CC._constructor contract'
-  --       )
-  --       argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
   zipped <-
     case argVals of
