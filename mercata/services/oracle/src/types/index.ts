@@ -29,6 +29,7 @@ export interface SourceConfig {
     timestamp?: string; // Timestamp parsing pattern
     batchMode?: boolean;
     apiKeyEnvVar?: string; // Environment variable name for API key
+    symbolMapping?: Record<string, string>; // Mapping from asset symbols to API-specific keys
 }
 
 export interface SourcesConfig {

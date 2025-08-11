@@ -57,6 +57,12 @@ function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: stri
             } else if (param === 'symbols') {
                 const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
                 queryParams.append('symbols', symbols);
+            } else if (param === 'metals') {
+                const metals = assets.map(asset => {
+                    const symbol = asset.name.split('-')[0];
+                    return sourceConfig.symbolMapping?.[symbol] || symbol;
+                }).join(',');
+                queryParams.append('metals', metals);
             } else if (param.startsWith('currency=')) {
                 queryParams.append('currency', param.split('=')[1]);
             } else if (param.startsWith('convert=')) {
@@ -166,7 +172,8 @@ function parseBatchResponse(
             
             if (parsePattern.includes('metals.{metal}')) {
                 // Metals.dev format
-                const metalKey = asset.name.split('-')[0] === 'XAU' ? 'gold' : 'silver';
+                const symbol = asset.name.split('-')[0];
+                const metalKey = sourceConfig.symbolMapping?.[symbol] || symbol;
                 priceUSD = parseFloat(data.metals[metalKey]);
                 feedTimestamp = data.timestamps?.metal || new Date().toISOString();
             } else {

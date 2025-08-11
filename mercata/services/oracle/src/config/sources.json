@@ -19,10 +19,15 @@
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
-    "params": "api_key,currency=USD,unit=toz",
+    "params": "api_key,currency=USD,unit=toz,metals",
     "parse": "metals.{metal}",
     "timestamp": "timestamps.metal",
-    "apiKeyEnvVar": "METALS_DEV_API_KEY"
+    "batchMode": true,
+    "apiKeyEnvVar": "METALS_DEV_API_KEY",
+    "symbolMapping": {
+      "XAU": "gold",
+      "XAG": "silver"
+    }
   },
   "MetalsAPI": {
     "url": "https://metals-api.com/api/latest",
