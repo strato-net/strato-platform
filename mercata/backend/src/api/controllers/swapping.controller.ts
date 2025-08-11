@@ -90,9 +90,11 @@ class SwappingController {
     const { accessToken, body, params } = req;
     validateAddLiquidityArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const liquidityParams = {
       ...body,
-      poolAddress: params.poolAddress
+      poolAddress: params.poolAddress,
+      deadline
     };
 
     const result = await addLiquidity(accessToken, liquidityParams);
@@ -104,9 +106,11 @@ class SwappingController {
     const { accessToken, body, params } = req;
     validateRemoveLiquidityArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const removeLiquidityParams = {
       ...body,
-      poolAddress: params.poolAddress
+      poolAddress: params.poolAddress,
+      deadline
     };
 
     const result = await removeLiquidity(accessToken, removeLiquidityParams);
@@ -119,7 +123,8 @@ class SwappingController {
     const { accessToken, body } = req;
     validateSwapArgs(body);
 
-    const result = await swap(accessToken, body);
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+    const result = await swap(accessToken, { ...body, deadline });
     res.status(200).json(result);
     return next();
   }
