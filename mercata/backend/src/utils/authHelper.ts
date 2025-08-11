@@ -1,7 +1,6 @@
 import axios from "axios";
-import { clientSecret, clientId, openIdTokenEndpoint, openIdJwks } from "../config/config";
-import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from "jose";
-import { strato } from "./mercataApiHelper";
+import { clientSecret, clientId, openIdTokenEndpoint } from "../config/config";
+import { strato, eth } from "./mercataApiHelper";
 import { TokenCache, StratoKeyResponse } from "../types/types";
 import { StratoPaths } from "../config/constants";
 
@@ -99,7 +98,7 @@ async function createKey(token: string): Promise<string | null> {
 // DEPRECATED: Identity Server and proxy are deprecated as of May 26th 2025
 // /**
 //  * Hit the identity endpoint to create the key.
-//  * We fire‐and‐forget any errors here so they don’t block you.
+//  * We fire‐and‐forget any errors here so they don't block you.
 //  */
 // async function createKeyViaIdentity(token: string): Promise<void> {
 //   try {
@@ -130,51 +129,24 @@ export async function createOrGetKey(token: string): Promise<string> {
 }
 
 /**
- * Fetches both token endpoint and JWKS from the OpenID Connect discovery document
+ * Fetches the token endpoint from the OpenID Connect discovery document
  */
-export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined): Promise<{ tokenEndpoint: string; jwks: JSONWebKeySet }> {
+export async function fetchOpenIdTokenEndpoint(openIdDiscoveryUrl: string | undefined): Promise<string> {
   try {
     if (!openIdDiscoveryUrl) {
       throw new Error("OpenID Discovery URL is not defined");
     }
     
-    const discoveryResponse = await axios.get(openIdDiscoveryUrl);
-    const { token_endpoint, jwks_uri } = discoveryResponse.data;
+    const response = await axios.get(openIdDiscoveryUrl);
+    const { token_endpoint } = response.data;
     
     if (!token_endpoint) {
       throw new Error("Token endpoint not found in OpenID discovery document");
     }
-    if (!jwks_uri) {
-      throw new Error("JWKS URI not found in OpenID discovery document");
-    }
-
-    const jwksResponse = await axios.get(jwks_uri);
-    const jwks = jwksResponse.data as JSONWebKeySet;
-
-    if (!jwks || !Array.isArray(jwks.keys)) {
-      throw new Error("Invalid JWKS response from OpenID provider");
-    }
-
-    console.debug("Successfully fetched OpenID configuration and JWKS");
-    return { tokenEndpoint: token_endpoint, jwks };
+    console.debug("Successfully fetched the token endpoint from OpenID Discovery");
+    return token_endpoint;
   } catch (error) {
     console.error("Failed to fetch OpenID discovery data:", error);
     throw new Error("Failed to fetch OpenID discovery data");
   }
-}
-
-/**
- * JWT verification using cached JWKS
- */
-let cachedJwksVerifier: any | undefined;
-
-export async function verifyAccessTokenSignature(token: string): Promise<JWTPayload> {
-  if (!openIdJwks) {
-    throw new Error("JWKS not initialized");
-  }
-  if (!cachedJwksVerifier) {
-    cachedJwksVerifier = createLocalJWKSet(openIdJwks);
-  }
-  const { payload } = await jwtVerify(token, cachedJwksVerifier);
-  return payload;
 }
