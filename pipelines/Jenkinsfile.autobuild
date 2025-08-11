@@ -165,11 +165,11 @@ pipeline {
                   sh '''#!/bin/bash -le
                     set -x
                     docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                    docker compose -f docker-compose.allDocker.push.yml push 2>&1
+                    docker compose -f docker-compose.push.yml push 2>&1
                     docker compose -f docker-compose.vault.push.yml push 2>&1
                     docker compose -f docker-compose.highway.push.yml push 2>&1
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-                    docker compose -f docker-compose.allDocker.push.ecr.yml push 2>&1
+                    docker compose -f docker-compose.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     
@@ -185,18 +185,18 @@ pipeline {
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
-                archiveArtifacts artifacts: "docker-compose.allDocker.yml, docker-compose.vault.yml, docker-compose.highway.yml, docker-compose.allDocker.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.highway.ecr.yml"
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.highway.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.highway.ecr.yml"
                 withCredentials([
                     usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                 ]) {
                   sh '''#!/bin/bash -le
                     set -x
-                    version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.allDocker.yml)
+                    version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
-                    aws s3 cp docker-compose.allDocker.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.highway.yml s3://blockapps-build-artifacts/${version}/
-                    aws s3 cp docker-compose.allDocker.ecr.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
                   '''
                 }
