@@ -54,6 +54,7 @@ router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.sel
 router.post("/onramp/addPaymentProvider", authHandler.authorizeRequest(), OnRampController.addPaymentProvider);
 router.post("/onramp/removePaymentProvider", authHandler.authorizeRequest(), OnRampController.removePaymentProvider);
 router.post("/onramp/cancelListing", authHandler.authorizeRequest(), OnRampController.cancelListing);
+router.post("/onramp/updateListing", authHandler.authorizeRequest(), OnRampController.updateListing);
 
 // ----- Bridge Routes -----
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);

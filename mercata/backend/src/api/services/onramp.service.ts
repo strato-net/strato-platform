@@ -70,6 +70,42 @@ export const cancelListing = async (
   };
 };
 
+export const updateListing = async (
+  accessToken: string,
+  body: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }
+) => {
+  const { token, amount, marginBps, providerAddresses } = body;
+  
+  const args = {
+    token: token.toLowerCase(),
+    amount,
+    marginBps,
+    providerAddresses: providerAddresses.map(addr => addr.toLowerCase()),
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "updateListing",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: "Listing updated successfully",
+  };
+};
+
 export const removePaymentProvider = async (
   accessToken: string,
   providerAddress: string

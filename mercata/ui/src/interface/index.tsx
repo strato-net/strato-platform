@@ -211,6 +211,12 @@ export interface OnRampContextType {
   addPaymentProvider: (providerData: AddPaymentProviderData) => Promise<any>;
   removePaymentProvider: (providerAddress: string) => Promise<any>;
   cancelListing: (token: string) => Promise<any>;
+  updateListing: (payload: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }) => Promise<any>;
 }
 
 export interface RawWithdrawData {
@@ -368,6 +374,12 @@ export interface LiquidityPool {
   apy?: string;
   _name?: string;
   _symbol?: string;
+}
+
+export interface SetPoolRatesData {
+  poolAddress: string;
+  swapFeeRate: number;
+  lpSharePercent: number;
 }
 
 export type NewLoanData = {

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { get, sell, buy, addPaymentProvider, removePaymentProvider, cancelListing } from "../services/onramp.service";
-import { validateBuyArgs, validateSellArgs, validateAddPaymentProviderArgs, validateRemovePaymentProviderArgs } from "../validators/onramp.validator";
+import { get, sell, buy, addPaymentProvider, removePaymentProvider, cancelListing, updateListing } from "../services/onramp.service";
+import { validateBuyArgs, validateSellArgs, validateAddPaymentProviderArgs, validateRemovePaymentProviderArgs, validateUpdateListingArgs } from "../validators/onramp.validator";
 
 class OnRampController {
   static async get(
@@ -98,6 +98,22 @@ class OnRampController {
       }
 
       const result = await cancelListing(accessToken, body.token);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateListing(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateUpdateListingArgs(body);
+
+      const result = await updateListing(accessToken, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

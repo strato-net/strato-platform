@@ -2,12 +2,16 @@ import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, DollarSign, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, DollarSign, Trash2, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOnRampContext } from "@/context/OnRampContext";
 import { PaymentProviderValue } from "@/interface";
 import { formatUnits } from "viem";
+import { safeParseUnits } from "@/utils/numberUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,12 +22,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<{ token: string; symbol: string } | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [listingToEdit, setListingToEdit] = useState<{ ListingInfo: any } | null>(null);
+  const [editForm, setEditForm] = useState({
+    amount: "",
+    marginBps: "",
+    selectedProviders: [] as string[]
+  });
+  const [editLoading, setEditLoading] = useState(false);
   const { toast } = useToast();
-  const { listings: contextListings, get, cancelListing, loading: contextLoading } = useOnRampContext();
+  const { listings: contextListings, get, cancelListing, updateListing, loading: contextLoading, providers } = useOnRampContext();
 
   // Filter and format listings from context
   const formattedListings = contextListings
@@ -50,6 +70,29 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
     setDeleteDialogOpen(true);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditClick = (listing: { ListingInfo: any }) => {
+    const info = listing.ListingInfo;
+    setListingToEdit(listing);
+    
+    // Convert amount from wei to human readable format
+    const humanReadableAmount = formatAmount(info.amount);
+    
+    // Convert margin from basis points to percentage  
+    const marginPercentage = (parseFloat(info.marginBps) / 100).toString();
+    
+    // Get selected provider addresses
+    const providerAddresses = info.providers?.map((p: PaymentProviderValue) => p.providerAddress) || [];
+    
+    setEditForm({
+      amount: humanReadableAmount,
+      marginBps: marginPercentage,
+      selectedProviders: providerAddresses
+    });
+    
+    setEditDialogOpen(true);
+  };
+
   const handleCancelListing = async () => {
     if (!listingToDelete) return;
     
@@ -71,6 +114,61 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
     } finally {
       setDeleteDialogOpen(false);
       setListingToDelete(null);
+    }
+  };
+
+  const handleUpdateListing = async () => {
+    if (!listingToEdit || !editForm.amount || !editForm.marginBps || editForm.selectedProviders.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields and select at least one payment provider.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setEditLoading(true);
+    
+    try {
+      // Convert percentage to basis points (e.g., 5.00% -> 500 basis points)
+      const marginBasisPoints = Math.round(parseFloat(editForm.marginBps) * 100).toString();
+      
+      // Convert human readable amount to wei (assuming 18 decimals)
+      const weiAmount = safeParseUnits(editForm.amount, 18).toString();
+      
+      const result = await updateListing({
+        token: listingToEdit.ListingInfo.token,
+        amount: weiAmount,
+        marginBps: marginBasisPoints,
+        providerAddresses: editForm.selectedProviders
+      });
+      
+      const successMessage = typeof result === 'string' 
+        ? result 
+        : result?.message || "Listing updated successfully";
+      
+      toast({
+        title: "Success",
+        description: successMessage,
+      });
+      
+      setEditDialogOpen(false);
+      setListingToEdit(null);
+      setEditForm({
+        amount: "",
+        marginBps: "",
+        selectedProviders: []
+      });
+      
+    } catch (error: unknown) {
+      console.error("Error updating listing:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update listing. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -227,15 +325,25 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
                         </div>
                       </div>
                       
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteClick(info.token, info._symbol)}
-                        className="text-destructive hover:text-destructive ml-2"
-                        title="Cancel listing"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditClick(listing)}
+                          title="Edit listing"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteClick(info.token, info._symbol)}
+                          className="text-destructive hover:text-destructive"
+                          title="Cancel listing"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -273,6 +381,99 @@ const OnRampListingsTable = forwardRef<{refresh: () => void}>((props, ref) => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Edit Listing Dialog */}
+    <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Listing</DialogTitle>
+          <DialogDescription>
+            Update the details for {listingToEdit?.ListingInfo?._symbol || "this"} listing
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          {/* Amount Field */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-amount">Amount ({listingToEdit?.ListingInfo?._symbol})</Label>
+            <Input
+              id="edit-amount"
+              type="number"
+              step="0.0001"
+              min="0"
+              value={editForm.amount}
+              onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
+              placeholder="Enter amount"
+            />
+          </div>
+
+          {/* Margin Field */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-margin">Margin (%)</Label>
+            <Input
+              id="edit-margin"
+              type="number"
+              step="0.01"
+              min="0"
+              value={editForm.marginBps}
+              onChange={(e) => setEditForm(prev => ({ ...prev, marginBps: e.target.value }))}
+              placeholder="Enter margin percentage (e.g. 5.00 for 5%)"
+            />
+          </div>
+
+          {/* Payment Providers */}
+          <div className="space-y-2">
+            <Label>Payment Providers</Label>
+            <div className="space-y-2 max-h-32 overflow-y-auto border rounded p-2">
+              {providers.map((provider) => (
+                <div key={provider.value.providerAddress} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`edit-provider-${provider.value.providerAddress}`}
+                    checked={editForm.selectedProviders.includes(provider.value.providerAddress)}
+                    onCheckedChange={(checked) => {
+                      setEditForm(prev => ({
+                        ...prev,
+                        selectedProviders: checked
+                          ? [...prev.selectedProviders, provider.value.providerAddress]
+                          : prev.selectedProviders.filter(addr => addr !== provider.value.providerAddress)
+                      }));
+                    }}
+                  />
+                  <Label htmlFor={`edit-provider-${provider.value.providerAddress}`} className="text-sm">
+                    {provider.value.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setEditDialogOpen(false)}
+            disabled={editLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleUpdateListing}
+            disabled={editLoading}
+          >
+            {editLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              "Update Listing"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 });
