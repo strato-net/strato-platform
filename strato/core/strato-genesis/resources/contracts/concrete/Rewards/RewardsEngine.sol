@@ -41,7 +41,6 @@ contract record RewardsEngine is Ownable {
 
     struct EligiblePool {
         bool enabled;
-        address poolAddress;
         address token;
         RewardBalance accruedRewardBalance;
     }
@@ -55,8 +54,7 @@ contract record RewardsEngine is Ownable {
     mapping(address => uint) public record rewardTokenMap;
 
     // Eligible pools management: tracks which pools users can earn rewards from
-    EligiblePool[] public record eligiblePools;
-    mapping(address => uint) public record eligiblePoolMap;
+    mapping(address => EligiblePool) public record eligiblePools;
 
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -174,50 +172,35 @@ contract record RewardsEngine is Ownable {
     function _addEligiblePool(address poolAddress, address token) internal {
         require(poolAddress != address(0), "RewardsEngine: Invalid pool address");
         require(token != address(0), "RewardsEngine: Invalid token address");
-        require(eligiblePoolMap[poolAddress] == 0, "RewardsEngine: Pool already added");
+        require(eligiblePools[poolAddress].token == address(0), "RewardsEngine: Pool already added");
 
-        eligiblePools.push(EligiblePool({
+        eligiblePools[poolAddress] = EligiblePool({
             enabled: true,
-            poolAddress: poolAddress,
             token: token,
             accruedRewardBalance: RewardBalance({
                 balance: 0,
                 createdAt: block.timestamp,
                 modifiedAt: block.timestamp
             })
-        }));
-        eligiblePoolMap[poolAddress] = eligiblePools.length;
+        });
 
         emit EligiblePoolAdded(poolAddress, token);
     }
 
     function _removeEligiblePool(address poolAddress) internal {
         require(poolAddress != address(0), "RewardsEngine: Invalid pool address");
-        uint index = eligiblePoolMap[poolAddress];
-        require(index > 0, "RewardsEngine: Pool not found");
+        require(eligiblePools[poolAddress].token != address(0), "RewardsEngine: Pool not found");
 
-        uint arrayIndex = index - 1;
-        uint lastIndex = eligiblePools.length - 1;
-
-        if (arrayIndex != lastIndex) {
-            EligiblePool memory lastPool = eligiblePools[lastIndex];
-            eligiblePools[arrayIndex] = lastPool;
-            eligiblePoolMap[lastPool.poolAddress] = index;
-        }
-
-        eligiblePools.pop();
-        delete eligiblePoolMap[poolAddress];
+        delete eligiblePools[poolAddress];
 
         emit EligiblePoolRemoved(poolAddress);
     }
 
     function _setEligiblePoolEnabled(address poolAddress, bool enabled) internal {
         require(poolAddress != address(0), "RewardsEngine: Invalid pool address");
-        uint index = eligiblePoolMap[poolAddress];
-        require(index > 0, "RewardsEngine: Pool not found");
+        require(eligiblePools[poolAddress].token != address(0), "RewardsEngine: Pool not found");
 
-        uint arrayIndex = index - 1;
-        eligiblePools[arrayIndex].enabled = enabled;
+        eligiblePools[poolAddress].enabled = enabled;
 
         if (enabled) {
             emit EligiblePoolEnabled(poolAddress);
@@ -229,16 +212,11 @@ contract record RewardsEngine is Ownable {
     function _modifyEligiblePoolAddress(address oldPoolAddress, address newPoolAddress) internal {
         require(oldPoolAddress != address(0), "RewardsEngine: Invalid old pool address");
         require(newPoolAddress != address(0), "RewardsEngine: Invalid new pool address");
-        require(eligiblePoolMap[newPoolAddress] == 0, "RewardsEngine: New pool address already exists");
+        require(eligiblePools[newPoolAddress].token == address(0), "RewardsEngine: New pool address already exists");
+        require(eligiblePools[oldPoolAddress].token != address(0), "RewardsEngine: Pool not found");
 
-        uint index = eligiblePoolMap[oldPoolAddress];
-        require(index > 0, "RewardsEngine: Pool not found");
-
-        uint arrayIndex = index - 1;
-        eligiblePools[arrayIndex].poolAddress = newPoolAddress;
-
-        eligiblePoolMap[newPoolAddress] = index;
-        delete eligiblePoolMap[oldPoolAddress];
+        eligiblePools[newPoolAddress] = eligiblePools[oldPoolAddress];
+        delete eligiblePools[oldPoolAddress];
 
         emit EligiblePoolAddressModified(oldPoolAddress, newPoolAddress);
     }
