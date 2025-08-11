@@ -26,7 +26,7 @@ contract record RewardsEngine is Ownable {
     // STATE VARIABLES
     // ═════════════════════════════════════════════════════════════════════════
 
-    // Reward tokens storage using O(1) pattern
+    // Reward token management: tracks which tokens can be distributed as rewards
     Token[] public record rewardTokens;
     mapping(address => uint) public record rewardTokenMap;
 
