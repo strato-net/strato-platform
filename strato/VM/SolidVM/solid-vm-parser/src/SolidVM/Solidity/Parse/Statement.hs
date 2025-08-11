@@ -439,6 +439,9 @@ numberUnit = do
     <|> (reserved "finney" >> return Finney)
     <|> (reserved "ether" >> return Ether)
 
+parseArg :: SolidityParser Expression
+parseArg = literal >>= (<$ eof)
+
 parseArgs :: SolidityParser [Expression]
 parseArgs = (try $ parens $ commaSep literal) <|> parseCreateArgs
 

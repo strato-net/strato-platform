@@ -9,6 +9,7 @@ import {
   calculateSwap,
   calculateSwapReverse,
   getSwapHistory,
+  setPoolRates,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -22,6 +23,7 @@ import {
   validateQueryParams,
   validateCalculateSwapArgs,
   validateSwapHistoryArgs,
+  validateSetPoolRatesArgs,
 } from "../validators/swapping.validator";
 
 class SwappingController {
@@ -88,9 +90,11 @@ class SwappingController {
     const { accessToken, body, params } = req;
     validateAddLiquidityArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const liquidityParams = {
       ...body,
-      poolAddress: params.poolAddress
+      poolAddress: params.poolAddress,
+      deadline
     };
 
     const result = await addLiquidity(accessToken, liquidityParams);
@@ -102,9 +106,11 @@ class SwappingController {
     const { accessToken, body, params } = req;
     validateRemoveLiquidityArgs(body);
 
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const removeLiquidityParams = {
       ...body,
-      poolAddress: params.poolAddress
+      poolAddress: params.poolAddress,
+      deadline
     };
 
     const result = await removeLiquidity(accessToken, removeLiquidityParams);
@@ -117,7 +123,8 @@ class SwappingController {
     const { accessToken, body } = req;
     validateSwapArgs(body);
 
-    const result = await swap(accessToken, body);
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+    const result = await swap(accessToken, { ...body, deadline });
     res.status(200).json(result);
     return next();
   }
@@ -264,6 +271,23 @@ class SwappingController {
 
       const swapHistory = await getSwapHistory(accessToken, params.poolAddress, query as Record<string, string | undefined>);
       res.status(RestStatus.OK).json(swapHistory);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Admin operations
+  static async setPoolRates(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateSetPoolRatesArgs(body);
+
+      const result = await setPoolRates(accessToken, body);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

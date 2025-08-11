@@ -115,7 +115,6 @@ const App = () => {
                           <BridgeProvider>
                             <TooltipProvider>
                               <Toaster />
-                              {/* <Sonner /> */}
                               <BrowserRouter>
                                 <UsdstBalanceBox />
                                 <Routes>

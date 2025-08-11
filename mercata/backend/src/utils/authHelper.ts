@@ -98,7 +98,7 @@ async function createKey(token: string): Promise<string | null> {
 // DEPRECATED: Identity Server and proxy are deprecated as of May 26th 2025
 // /**
 //  * Hit the identity endpoint to create the key.
-//  * We fire‐and‐forget any errors here so they don’t block you.
+//  * We fire‐and‐forget any errors here so they don't block you.
 //  */
 // async function createKeyViaIdentity(token: string): Promise<void> {
 //   try {

@@ -377,8 +377,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr = do
                 blockHeaderTimestamp $ blockHeader genesisBlock,
               A._blockNumber =
                 blockHeaderBlockNumber $ blockHeader genesisBlock,
-              A._transactionHash =
-                unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
+              A._transactionHash = rlpHash a,
               A._transactionSender = Ad.Address 0,
               A._actionData =
                 OMap.singleton (a,

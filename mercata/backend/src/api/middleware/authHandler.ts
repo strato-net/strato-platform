@@ -8,9 +8,13 @@ import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
 
 async function getTokenFromHeader(req: Request): Promise<string | null> {
   const headerToken = req.headers["x-user-access-token"] as string | undefined;
+  // When running in dockerized prod mode, the jwt from x-user-access-token header can be trusted (validated and set at the edge in nginx)
+
   if (headerToken) return headerToken;
 
   const auth = req.headers["authorization"];
+  // When running in dockerized prod mode, the authorization header is always empty (cleared explicitly by nginx) - this is only used for local development (for direct api calls to npm server)
+
   if (typeof auth === "string") {
     const [bearer, token] = auth.split(" ");
     if (bearer === "Bearer" && token) return token;
@@ -37,10 +41,14 @@ class AuthHandler {
         let token = await getTokenFromHeader(req);
 
         if (!token && allowAnonAccess) {
+          // The token obtained from the trusted oauth2 server can be trusted here, but is still always verified further in a resource server.
+
           token = await getServiceToken();
         }
 
         if (token) {
+          // NOTE: implement the JWT validation (signature verification) here if the deployment is not behind the nginx reverse proxy which does the full verification at the edge.
+
           let payload: CustomJwtPayload;
           try {
             payload = jwtDecode(token);

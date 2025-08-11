@@ -1439,10 +1439,10 @@ parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
 createFuncArgs :: SourceAnnotation Text -> Type'
-createFuncArgs x = Product [stringType' x, stringType' x, stringType' x] x
+createFuncArgs x = Product [stringType' x, stringType' x, Static SVMType.Variadic x] x
 
 saltCreateArgs :: SourceAnnotation Text -> Type'
-saltCreateArgs x = Product [stringType' x, stringType' x, stringType' x, stringType' x] x
+saltCreateArgs x = Product [stringType' x, stringType' x, stringType' x, Static SVMType.Variadic x] x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx

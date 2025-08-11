@@ -31,8 +31,6 @@ import Control.Monad (forM, when)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
 import Data.Foldable (asum)
 import Data.IORef
@@ -92,7 +90,7 @@ data Value
   | SStructDef SolidString
   | SStruct SolidString (Map SolidString Variable)
   | STuple (Vector Variable)
-  | SArray SVMType.Type (Vector Variable)
+  | SArray (Vector Variable)
   | SMap SVMType.Type (Map Value Variable)
   | SFunction SolidString CC.Func
   | SBuiltinFunction SolidString (Maybe Value)
@@ -167,7 +165,7 @@ rlpEncodeValue (SAccount a _) = pure $ rlpEncode a
 rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
 rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
 rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
-rlpEncodeValue (SArray _ v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue (SArray v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
 rlpEncodeValue _ = pure $ RLPArray []
 
 rlpEncodeValues :: MonadIO m => [Value] -> m RLPObject
@@ -199,9 +197,7 @@ coerceType ct xt = \case
   SInteger i -> coerceFromInt ct (defaultValue ct xt) i
   SString s -> case xt of
     SVMType.String {} -> SString s
-    SVMType.Bytes {} -> case B16.decode (BC.pack s) of
-      Right bs -> SString . BC.unpack $ B.takeWhile (/= 0) bs
-      _ -> SString s
+    SVMType.Bytes {} -> SString s
     SVMType.Decimal {} -> SDecimal (read s :: Decimal)
     _ -> typeError "string literal must be string or bytes" (xt, s)
   v -> v
@@ -233,14 +229,14 @@ createVar :: MonadIO m => Value -> m Variable
 createVar val = createVar' =<< case val of
   SStruct n m -> SStruct n <$> traverse toVar m
   STuple vs -> STuple <$> traverse toVar vs
-  SArray t vs -> SArray t <$> traverse toVar vs
+  SArray vs -> SArray <$> traverse toVar vs
   SMap t m -> SMap t <$> traverse toVar m
   SPush v mv -> SPush v <$> traverse toVar mv
   _ -> pure val
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
 defaultValue :: CC.Contract -> SVMType.Type -> Value
-defaultValue _ (SVMType.Array valType _) = SArray valType V.empty
+defaultValue _ (SVMType.Array _ _) = SArray V.empty
 defaultValue _ (SVMType.Mapping _ _ valType) = SMap valType $ M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
@@ -262,6 +258,7 @@ defaultValue ctract (SVMType.UnknownLabel name _) =
               sdef = (\(a, b, _) -> (a, b)) <$> sdef'
           return . SStruct name . M.map initializeField . M.fromList $ sdef
       ]
+defaultValue _ SVMType.Variadic = STuple V.empty
 defaultValue _ x = todo "defaultValue" x
 
 createDefaultValue ::
@@ -270,7 +267,7 @@ createDefaultValue ::
   CC.Contract ->
   SVMType.Type ->
   m Value
-createDefaultValue _ _ (SVMType.Array valType _) = return $ SArray valType V.empty
+createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
 createDefaultValue _ _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
 createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False

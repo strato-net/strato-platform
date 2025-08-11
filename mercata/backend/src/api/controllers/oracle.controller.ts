@@ -5,6 +5,7 @@ import {
   getPrice,
   getPriceHistory,
 } from "../services/oracle.service";
+import { validateGetPriceHistoryInput, validateGetPriceQuery, validateSetPriceInput } from "../validators/oracle.validators";
 
 class OracleController {
   static async getPrice(
@@ -14,7 +15,7 @@ class OracleController {
   ): Promise<void> {
     try {
       const { accessToken, query } = req;
-      const asset = typeof query.asset === "string" ? query.asset : undefined;
+      const asset = typeof query.asset === "string" ? query.asset : undefined;  
 
       const result = await getPrice(accessToken, asset);
       res.status(RestStatus.OK).json(result);
@@ -30,6 +31,7 @@ class OracleController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
+      validateSetPriceInput(body);
       const result = await setPrice(accessToken, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -45,11 +47,8 @@ class OracleController {
     try {
       const { accessToken, params, query } = req;
       const { assetAddress } = params;
-      
-      if (!assetAddress) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Asset address is required" });
-        return;
-      }
+
+      validateGetPriceHistoryInput(assetAddress);
 
       const result = await getPriceHistory(accessToken, assetAddress, query as Record<string, string | undefined>);
       res.status(RestStatus.OK).json(result);

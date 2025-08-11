@@ -16,6 +16,7 @@ import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants"
 import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
+import { useBalancePolling } from "@/hooks/useSmartPolling";
 
 const Borrow = () => {
   const { userAddress } = useUser();
@@ -44,6 +45,12 @@ const Borrow = () => {
     repayLoan: repayLoanFn
   } = useLendingContext();
 
+  // Use the new smart polling hook for balance updates
+  const { startPolling, stopPolling } = useBalancePolling(
+    userAddress || "",
+    fetchUsdstBalance,
+    (amount) => amount && parseFloat(amount) > 0
+  );
 
   useEffect(() => {
     document.title = "Borrow Assets | STRATO Mercata";
@@ -231,6 +238,8 @@ const Borrow = () => {
                       onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
                       collateralInfo={eligibleCollateral}
+                      startPolling={startPolling}
+                      stopPolling={stopPolling}
                     />
                   </TabsContent>
                   <TabsContent value="repay">

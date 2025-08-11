@@ -36,6 +36,7 @@ export async function createCheckoutSession({
   tokenAddress,
   buyerAddress,
   baseUrl,
+  marginBps,
 }: CheckoutSessionParams): Promise<{ sessionId: string; url: string }> {
   // Fetch token symbol from Cirrus
   const tokenSymbol = await getTokenSymbol(tokenAddress);
@@ -63,6 +64,7 @@ export async function createCheckoutSession({
       buyerAddress,
       amount: amount.toString(),
       tokenAmount,
+      marginBps,
     },
     success_url: `${baseUrl}/dashboard?success=true`,
     cancel_url: `${baseUrl}/dashboard?success=false`,

@@ -21,11 +21,11 @@ local authenticate_opts = {
   token_endpoint_auth_method = "client_secret_post",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token), enc_id_token (required for https://openid.net/specs/openid-connect-rpinitiated-1_0.html, strictly followed by Keycloak 26.0.2+)
-  session_contents = {access_token=true, enc_id_token=true}, -- comment out to keep everything
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
+  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
-  access_token_expires_leeway = 3,
+  access_token_expires_leeway = 120,
   logout_path = "/auth/logout",
   post_logout_redirect_uri = node_host_with_protocol,
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI

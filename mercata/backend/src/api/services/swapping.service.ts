@@ -3,6 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
+import { poolFactory } from "../../config/config";
 import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { SwapHistoryEntry } from "../../types";
@@ -123,11 +124,12 @@ export const addLiquidity = async (
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
+    deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, tokenBAmount, maxTokenAAmount } = params;
-    
+    const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -157,6 +159,7 @@ export const addLiquidity = async (
         args: {
           tokenBAmount,
           maxTokenAAmount,
+          deadline
         },
       }
     ]);
@@ -176,11 +179,12 @@ export const removeLiquidity = async (
   removeLiquidityParams: {
     poolAddress: string;
     lpTokenAmount: string;
+    deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, lpTokenAmount } = removeLiquidityParams;
-    
+    const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
     });
@@ -213,6 +217,7 @@ export const removeLiquidity = async (
         lpTokenAmount,
         minTokenBAmount,
         minTokenAAmount,
+        deadline
       },
     });
 
@@ -236,11 +241,12 @@ export const swap = async (
     isAToB: boolean;
     amountIn: string;
     minAmountOut: string;
+    deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, isAToB, amountIn, minAmountOut } = swapParams;
-    
+    const { poolAddress, isAToB, amountIn, minAmountOut, deadline } = swapParams;
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -267,6 +273,7 @@ export const swap = async (
           isAToB,
           amountIn,
           minAmountOut,
+          deadline,
         },
       }
     ]);
@@ -434,5 +441,50 @@ export const getSwapHistory = async (
   } catch (error) {
     console.error('Error fetching swap history:', error);
     throw new Error('Failed to fetch swap history');
+  }
+};
+
+export const setPoolRates = async (
+  accessToken: string,
+  setPoolRatesParams: {
+    poolAddress: string;
+    swapFeeRate: number;
+    lpSharePercent: number;
+  }
+) => {
+  try {
+    const { poolAddress, swapFeeRate, lpSharePercent } = setPoolRatesParams;
+    
+    // Verify the pool exists
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + poolAddress,
+      select: "address,_owner",
+    });
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+
+    // Call setPoolFeeParameters on PoolFactory instead of calling Pool directly
+    const tx = buildFunctionTx({
+      contractName: extractContractName(PoolFactory),
+      contractAddress: poolFactory,
+      method: "setPoolFeeParameters",
+      args: {
+        poolAddress: poolAddress,
+        newSwapFeeRate: swapFeeRate.toString(),
+        newLpSharePercent: lpSharePercent.toString(),
+      },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return {
+      status,
+      hash,
+    };
+  } catch (error) {
+    throw error;
   }
 };

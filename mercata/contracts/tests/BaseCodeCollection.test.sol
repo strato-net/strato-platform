@@ -5,14 +5,6 @@ contract User {
         variadic result = address(a).call(f, args);
         return result;
     }
-    
-    function callApprove(address a, address to, uint amount) public returns (bool) {
-        return ERC20(a).approve(to, amount);
-    }
-    
-    function callSwap(address a, bool isAToB, uint amountIn, uint minAmountOut) public returns (uint) {
-        return Pool(a).swap(isAToB, amountIn, minAmountOut);
-    }
 }
 
 contract Describe_Mercata {
@@ -61,15 +53,15 @@ contract Describe_Mercata {
         // require(p2 != address(0), "Failed to create pool 2");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
         require(ERC20(t2).approve(address(p1), 10000000e18), "Approval failed for t2");
-        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18);
+        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18, block.timestamp);
         require(l1 > 0, "Failed to add liquidity to pool 1");
         // uint l2 = Pool(p2).addLiquidity(4000e18, 10000000e18);
         // require(l2 > 0, "Failed to add liquidity to pool 2");
-        require(u1.callApprove(t1, p1, 1e18), "Approval failed for u1");
-        uint o1 = u1.callSwap(p1, true, 1e18, 2000e18);
+        require(u1.do(t1, "approve", p1, 1e18), "Approval failed for u1");
+        uint o1 = u1.do(p1, "swap", true, 1e18, 2000e18, block.timestamp);
         require(o1 > 2490e18, "Swap 1 returned less money than expected: " + string(o1));
-        require(u1.callApprove(t2, p1, o1), "Approval failed for u1");
-        uint o2 = u1.callSwap(p1, false, o1, 990e15);
+        require(u1.do(t2, "approve", p1, o1), "Approval failed for u1");
+        uint o2 = u1.do(p1, "swap", false, o1, 990e15, block.timestamp);
         require(o2 > 994e15, "Swap returned less money than expected: " + string(o2));
     }
 
@@ -89,10 +81,10 @@ contract Describe_Mercata {
         require(p1 != address(0), "Failed to create pool 1");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
         require(ERC20(t2).approve(address(p1), 10000000e18), "Approval failed for t2");
-        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18);
+        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18, block.timestamp);
         require(l1 > 0, "Failed to add liquidity to pool 1");
-        require(u1.callApprove(t1, p1, u1t1Amt), "Approval failed for u1");
-        uint o1 = u1.callSwap(p1, true, u1t1Amt, 2000e18);
+        require(u1.do(t1, "approve", p1, u1t1Amt), "Approval failed for u1");
+        uint o1 = u1.do(p1, "swap", true, u1t1Amt, 2000e18, block.timestamp);
         require(o1 > 0, "Swap 1 returned less money than expected: " + string(o1));
     }
 

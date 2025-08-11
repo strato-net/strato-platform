@@ -113,6 +113,7 @@ export interface SwappableToken {
   _symbol: string;
   balance?: string;
   _totalSupply: string;
+  images?: Array<{ value: string }>;
   "BlockApps-Mercata-ERC20-_balances": {
     key: string;
     value: string;
@@ -187,16 +188,35 @@ export interface BuyPayload {
   paymentProviderAddress: string;
 }
 
+export interface SellPayload {
+  token: string;
+  amount: string;
+  marginBps: string;
+  providerAddresses: string[];
+}
+
 export interface OnRampContextType {
   token: OnRampToken | null;
   loading: boolean;
   error: string | null;
+  onRampData: OnrampApiResponse | null;
+  providers: PaymentProvider[];
+  listings: Listing[];
   
   get: () => Promise<OnrampApiResponse>;
   buy: (payload: BuyPayload, userAddress: string) => Promise<{ url: string }>;
-  sell: (body) => Promise<void>;
-  lock: (body) => Promise<{ url: string }>;
+  sell: (payload: SellPayload) => Promise<any>;
+  lock: (body: any) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<void>;
+  addPaymentProvider: (providerData: AddPaymentProviderData) => Promise<any>;
+  removePaymentProvider: (providerAddress: string) => Promise<any>;
+  cancelListing: (token: string) => Promise<any>;
+  updateListing: (payload: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }) => Promise<any>;
 }
 
 export interface RawWithdrawData {
@@ -356,6 +376,12 @@ export interface LiquidityPool {
   _symbol?: string;
 }
 
+export interface SetPoolRatesData {
+  poolAddress: string;
+  swapFeeRate: number;
+  lpSharePercent: number;
+}
+
 export type NewLoanData = {
   principalBalance: string;
   interestOwed: string;
@@ -392,6 +418,12 @@ export interface PaymentProvider {
   key: string;
   value: PaymentProviderValue;
 }
+
+export interface AddPaymentProviderData {
+  providerAddress: string;
+  name: string;
+  endpoint: string;
+}
 export interface ApprovedToken {
   token: string;
   _name: string;
@@ -407,7 +439,7 @@ export interface ListingInfo {
   providers: PaymentProviderValue[];
   _name: string;
   _symbol: string;
-  tokenOracleValue: string | null;
+  tokenOracleValue: { price: string } | null;
 }
 
 export interface Listing {
@@ -478,4 +510,74 @@ export interface HealthImpactData {
   newHealthFactor: number;
   healthImpact: number;
   isHealthy: boolean;
+}
+
+/*-------- Polling Interfaces --------*/
+
+export interface PollingConfig {
+  fetchFn: () => Promise<any>;
+  shouldPoll?: (amount: string) => boolean;
+  onDataUpdate?: (data: any) => void;
+  interval?: number;
+  autoStart?: boolean;
+  transformData?: (data: any) => any;
+  onError?: (error: any) => void;
+  enabled?: boolean;
+}
+
+export interface PollingReturn {
+  startPolling: () => void;
+  stopPolling: () => void;
+  isPolling: boolean;
+  fetchData: () => Promise<any>;
+  lastData: any;
+  error: any;
+}
+
+export interface SwapPollingConfig {
+  fromAsset?: any; 
+  toAsset?: any; 
+  fromAmount: string; 
+  editingField: 'from' | 'to' | null;
+  getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
+  calculateSwap: (params: any) => Promise<any>;
+  setPool: (pool: any) => void; 
+  setToAsset: (asset: any) => void; 
+  setToAmount: (amount: string) => void; 
+  setExchangeRate: (rate: string) => void;
+  lastCalculatedFromRef: React.MutableRefObject<string>; 
+  interval?: number;
+}
+
+// New interfaces for focused hooks
+export interface PoolPollingConfig {
+  fromAsset: any;
+  toAsset: any;
+  getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
+  setPool: (pool: any) => void;
+  interval?: number;
+}
+
+export interface ExchangeRateConfig {
+  poolData: any;
+  fromAsset: any;
+  setExchangeRate: (rate: string) => void;
+}
+
+export interface SwapCalculationConfig {
+  poolData: any;
+  fromAsset: any;
+  fromAmount: string;
+  editingField: 'from' | 'to' | null;
+  calculateSwap: (params: any) => Promise<string>;
+  setToAmount: (amount: string) => void;
+  lastCalculatedFromRef: React.MutableRefObject<string>;
+}
+
+export interface SwapStateCleanupConfig {
+  poolData: any;
+  setPool: (pool: any) => void;
+  setToAsset: (asset: any) => void;
+  setToAmount: (amount: string) => void;
+  setExchangeRate: (rate: string) => void;
 }
