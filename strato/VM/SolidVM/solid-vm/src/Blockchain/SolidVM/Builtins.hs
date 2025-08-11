@@ -22,10 +22,10 @@ push (SReference apt) _ (OrderedVals [av]) = do
   setVar (Constant (SReference lenPath)) newLen
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen
-push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
+push (SArray vec) (Just (Variable ref)) (OrderedVals [av]) = do
   newVar <- createVar av
   let newArr = V.snoc vec newVar
-  setVar (Variable ref) (SArray varType newArr)
+  setVar (Variable ref) (SArray newArr)
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
 push _ _ argVals = do
   invalidArguments "push" argVals

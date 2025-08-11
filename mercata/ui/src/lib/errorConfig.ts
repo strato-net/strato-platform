@@ -38,6 +38,9 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/onramp/sell": "Sell Error",
   "/onramp/lock": "Lock Error",
   "/onramp/unlock": "Unlock Error",
+  "/onramp/addPaymentProvider": "Add Payment Provider Error",
+  "/onramp/removePaymentProvider": "Remove Payment Provider Error",
+  "/onramp/cancelListing": "Cancel Listing Error",
   
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",

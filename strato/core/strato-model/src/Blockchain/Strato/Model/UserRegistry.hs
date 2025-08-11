@@ -82,11 +82,11 @@ contract record User {
         _;
     }
 
-    function createContract(string contractName, string contractSrc, string args) public authenticated {
+    function createContract(string contractName, string contractSrc, variadic args) public authenticated {
         create(contractName, contractSrc, args);
     }
 
-    function createSaltedContract(string salt, string contractName, string contractSrc, string args) public authenticated {
+    function createSaltedContract(string salt, string contractName, string contractSrc, variadic args) public authenticated {
         create2(salt, contractName, contractSrc, args);
     }
 

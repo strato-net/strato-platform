@@ -42,7 +42,6 @@ export const DepositForm = () => {
   const [amount, setAmount] = useState("1");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
   const { get, buy } = useOnRampContext();
   const { userAddress } = useUser();
 

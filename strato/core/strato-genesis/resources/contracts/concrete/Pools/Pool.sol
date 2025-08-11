@@ -188,9 +188,11 @@ contract record Pool is Ownable {
     /// @dev The user must approve both tokens for transfer before calling this function
     function addLiquidity(
         uint256 tokenBAmount,
-        uint256 maxTokenAAmount
+        uint256 maxTokenAAmount,
+        uint256 deadline
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
+        require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         
         if (totalLiquidity > 0) {
@@ -237,9 +239,11 @@ contract record Pool is Ownable {
     function removeLiquidity(
         uint256 lpTokenAmount, 
         uint256 minTokenBAmount,
-        uint256 minTokenAAmount
+        uint256 minTokenAAmount,
+        uint256 deadline
     ) external returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
+        require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
         uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
@@ -291,9 +295,11 @@ contract record Pool is Ownable {
     function swap(
         bool isAToB,
         uint256 amountIn,
-        uint256 minAmountOut
+        uint256 minAmountOut,
+        uint256 deadline
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
+        require(block.timestamp <= deadline, "EXPIRED");
 
         Token inputToken = isAToB ? tokenA : tokenB;
         Token outputToken = isAToB ? tokenB : tokenA;

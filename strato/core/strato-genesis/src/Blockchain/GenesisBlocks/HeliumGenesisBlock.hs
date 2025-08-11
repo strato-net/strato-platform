@@ -22,6 +22,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Event
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
 import           Blockchain.Strato.Model.Validator
 import qualified Data.Aeson                                      as JSON
@@ -31,11 +32,17 @@ import qualified Data.ByteString.Lazy                            as BL
 import           Data.List                                       (find)
 import qualified Data.Map.Strict                                 as M
 import           Data.Maybe                                      (mapMaybe)
+import qualified Data.Sequence                                   as S
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable
 import           Text.RawString.QQ
+
+list :: b -> (a -> [a] -> b) -> [a] -> b
+list onEmpty onCons as = case as of
+  [] -> onEmpty
+  (a:as') -> onCons a as'
 
 gramsToOz :: Integer -> Integer
 gramsToOz n = (10000 * n) `div` 283495
@@ -44,7 +51,7 @@ assetMap :: M.Map Address GA.Asset
 assetMap = foldr (\k -> M.insert (GA.root k) k) M.empty GA.assets
 
 usdstAsset :: GA.Asset
-usdstAsset = head $ filter ((== "USDST") . GA.name) GA.assets
+usdstAsset = list (error "usdstAsset: No asset named USDST found") const $ filter ((== "USDST") . GA.name) GA.assets
 
 usdstAddress :: Address
 usdstAddress = GA.root usdstAsset
@@ -200,7 +207,15 @@ genesisBlock  =
             , mToken
             , rewardsManager
             ],
-        genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")]
+        genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")],
+        genesisInfoEvents = M.fromList $
+          (assetToEvents <$> GA.assets)
+          ++ [ adminEvents
+             , collateralVaultEvents
+             , lendingPoolEvents
+             , liquidityPoolEvents
+             , poolConfiguratorEvents
+             ]
         }
 
 createdByBlockApps :: Address -> [(B.ByteString, BasicValue)]
@@ -236,34 +251,39 @@ oneE18 = 1_000_000_000_000_000_000
 omega :: Integer
 omega = 2_000_000 * oneE18
 
+assetBalances :: GA.Asset -> [(Address, Integer)]
+assetBalances GA.Asset{..} =
+  M.toList
+    . foldr (uncurry $ M.insertWith (+)) M.empty
+    . concatMap (\(o, q) ->
+        let mEscrowBalance = correctQuantity decimals name . GE.collateralQuantity
+                         <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
+         in case mEscrowBalance of
+              Nothing -> [(o, q)]
+              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (collateralVaultAddress, escrowBalance)])
+    . concatMap (\case
+      (GA.Balance _ o c q)
+        | root == usdstAddress &&  c == "mercata_usdst" ->
+            [(blockappsAddress, correctQuantity decimals name q)]
+        | root == goldstRoot ->
+            let goldstBalance = correctQuantity decimals name q
+                goldOzBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldOunceRoot assetMap
+                goldGmBalance = maybe 0 (\a -> maybe 0 (\b -> gramsToOz $ correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldGramRoot assetMap
+             in [(o, goldstBalance + goldOzBalance + goldGmBalance)]
+        | root == goldOunceRoot -> []
+        | root == goldGramRoot -> []
+        | root == silvstRoot ->
+            let silvstBalance = correctQuantity decimals name q
+                altSilvstBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup altSilvstRoot assetMap
+             in [(o, silvstBalance + altSilvstBalance)]
+        | root == altSilvstRoot -> []
+        | otherwise ->
+            [(o, correctQuantity decimals name q)]
+    ) . filter ((>0) . GA.quantity) $ M.elems balances
+
 assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
-assetToAccountInfos GA.Asset{..} =
-  let accountBalances' = M.toList . foldr (uncurry $ M.insertWith (+)) M.empty
-        . concatMap (\(o, q) ->
-            let mEscrowBalance = correctQuantity decimals name . GE.collateralQuantity
-                             <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
-             in case mEscrowBalance of
-                  Nothing -> [(o, q)]
-                  Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (collateralVaultAddress, escrowBalance)])
-        . concatMap (\case
-          (GA.Balance _ o c q)
-            | root == usdstAddress &&  c == "mercata_usdst" ->
-                [(blockappsAddress, correctQuantity decimals name q)]
-            | root == goldstRoot ->
-                let goldstBalance = correctQuantity decimals name q
-                    goldOzBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldOunceRoot assetMap
-                    goldGmBalance = maybe 0 (\a -> maybe 0 (\b -> gramsToOz $ correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldGramRoot assetMap
-                 in [(o, goldstBalance + goldOzBalance + goldGmBalance)]
-            | root == goldOunceRoot -> []
-            | root == goldGramRoot -> []
-            | root == silvstRoot ->
-                let silvstBalance = correctQuantity decimals name q
-                    altSilvstBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup altSilvstRoot assetMap
-                 in [(o, silvstBalance + altSilvstBalance)]
-            | root == altSilvstRoot -> []
-            | otherwise ->
-                [(o, correctQuantity decimals name q)]
-        ) . filter ((>0) . GA.quantity) $ M.elems balances
+assetToAccountInfos asset@GA.Asset{..} =
+  let accountBalances' = assetBalances asset
       allBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
    in case allBalances of
@@ -297,6 +317,15 @@ assetToAccountInfos GA.Asset{..} =
                        ]
                   else [])
 
+assetToEvents :: GA.Asset -> (Address, S.Seq Event)
+assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "Token" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
+    ("Transfer", [("from", show $ Address 0),("to", show blockappsAddress),("value", show totalSupply)]) :
+    ((\(a,b) -> ("Transfer", [("from", show blockappsAddress),("to", show a),("value", show b)])) <$> allBalances)
+  )
+  where
+    allBalances = assetBalances asset
+    totalSupply = sum $ snd <$> allBalances
+
 rateStrategy :: AccountInfo
 rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 (CodeAtAccount mercataAddress "RateStrategy") $ createdByBlockApps mercataAddress
 
@@ -317,11 +346,27 @@ collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAcc
       ]
   ) combinedEscrows
 
+collateralVaultEvents :: (Address, S.Seq Event)
+collateralVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CollateralVault" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (collateralVaultAddress, S.fromList $
+  map (\GE.Escrow{..} ->
+      ("CollateralAdded", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
+  ) combinedEscrows
+  )
+
 liquidityPool :: AccountInfo
 liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount mercataAddress "LiquidityPool") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   , (".mToken", BContract "Token" $ unspecifiedChain mTokenAddress)
   ]
+
+liquidityPoolEvents :: (Address, S.Seq Event)
+liquidityPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "LiquidityPool" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (liquidityPoolAddress, S.fromList $
+  [("Deposited", [("user", show blockappsAddress),("amount", show omega),("mTokenMinted", show omega)])]
+  ++ concatMap (\(bwr, amt) -> (if amt > 0
+    then [("Borrowed", [("user", show bwr),("amount", show amt)])]
+    else [])
+  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  )
 
 lendingPool :: AccountInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
@@ -357,10 +402,43 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   ] else [])
   ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
 
+lendingPoolEvents :: (Address, S.Seq Event)
+lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "LendingPool" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (lendingPoolAddress, S.fromList $
+  map (\GR.Reserve{..} -> ("AssetConfigured",
+    [("asset", show assetRootAddress),
+     ("ltv", "7500"),
+     ("liquidationThreshold", "8000"),
+     ("liquidationBonus", "10500"),
+     ("interestRate", "500"),
+     ("reserveFactor", "1000")
+    ])
+  ) GR.reserves
+  ++ [("Deposited", [("user", show blockappsAddress),("asset", show usdstAddress),("amount", show omega)])]
+  ++ map (\GE.Escrow{..} ->
+      ("SuppliedCollateral", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
+  ) combinedEscrows
+  ++ concatMap (\(bwr, amt) -> (if amt > 0
+    then [("Borrowed", [("user", show bwr),("asset", show usdstAddress),("amount", show amt)])]
+    else [])
+  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  )
+
 poolConfigurator :: AccountInfo
 poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 (CodeAtAccount mercataAddress "PoolConfigurator") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   ]
+
+poolConfiguratorEvents :: (Address, S.Seq Event)
+poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "PoolConfigurator" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolConfiguratorAddress, S.fromList $
+  map (\GR.Reserve{..} -> ("AssetConfigured",
+    [("asset", show assetRootAddress),
+     ("ltv", "7500"),
+     ("liquidationThreshold", "8000"),
+     ("liquidationBonus", "10500"),
+     ("interestRate", "500")
+    ])
+  ) GR.reserves
+  )
 
 lendingRegistry :: AccountInfo
 lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAccount mercataAddress "LendingRegistry") $ ownedByBlockApps mercataAddress ++
@@ -410,6 +488,11 @@ adminRegistry :: AccountInfo
 adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount mercataAddress "AdminRegistry") $ ownedByBlockApps mercataAddress
   ++ [(".isAdmin<a:" <> addrBS blockappsAddress <> ">", BBool True)]
   ++ [(".isAdmin<a:" <> addrBS poolFactoryAddress <> ">", BBool True)]
+
+adminEvents :: (Address, S.Seq Event)
+adminEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "AdminRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (adminRegistryAddress, S.fromList $
+    [("AdminAdded", [("admin", show blockappsAddress)])]
+  )
 
 feeCollector :: AccountInfo
 feeCollector = SolidVMContractWithStorage feeCollectorAddress 0 (CodeAtAccount mercataAddress "FeeCollector") $ ownedByBlockApps mercataAddress
