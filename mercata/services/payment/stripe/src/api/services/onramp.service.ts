@@ -67,7 +67,8 @@ export async function checkout(
       tokenAmount: amount,
       tokenAddress: listing.token,
       buyerAddress,
-      baseUrl
+      baseUrl,
+      marginBps: listing.marginBps
     });
 
     addLock(token, amount, sessionId);
@@ -118,9 +119,10 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
   const token = session.metadata?.token;
   const buyerAddress = session.metadata?.buyerAddress;
   const tokenAmount = session.metadata?.tokenAmount;
+  const expectedMarginBps = session.metadata?.marginBps;
   const sessionId = session.id;
   
-  if (!token || !buyerAddress || !tokenAmount) {
+  if (!token || !buyerAddress || !tokenAmount || !expectedMarginBps) {
     console.error("Missing required metadata in session", sessionId);
     removeLock(token || '', tokenAmount || '', sessionId);
     throw new Error("Missing required metadata");
@@ -136,8 +138,16 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
       contractName: OnRamp,
       contractAddress,
       method: "fulfillListing",
-      args: { token, buyer: buyerAddress, amount: tokenAmount },
+      args: { 
+        token, 
+        buyer: buyerAddress, 
+        amount: tokenAmount,
+        expectedMarginBps: expectedMarginBps
+      },
     });
+    // Set large gas params if more lucrative tx problem persists
+    // fulfillTx.txParams.gasLimit = 999999999999999;
+    // fulfillTx.txParams.gasPrice = 1000000000;
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, fulfillTx)
@@ -149,6 +159,7 @@ async function handleSessionFulfillment(session: Stripe.Checkout.Session): Promi
       throw new Error(`On-chain confirmation failed (${status}): ${hash}`);
     }
   } finally {
+    removeLock(token, tokenAmount, sessionId);
     removeLock(token, tokenAmount, sessionId);
   }
 }
