@@ -85,8 +85,8 @@ findDefault = \case
   TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n "" 0x0
   TStruct n fs -> SStruct n . M.fromList $ (BC.unpack *** Constant . findDefault) <$> fs
-  a@(TArray t ml) -> SArray (basicTypeToType a) $ maybe V.empty (\l -> V.fromList $ Constant (findDefault t) <$ [0..l-1]) ml
-  m@TMapping{} -> SMap (basicTypeToType m) M.empty
+  TArray t ml -> SArray $ maybe V.empty (\l -> V.fromList $ Constant (findDefault t) <$ [0..l-1]) ml
+  TMapping _ v -> SMap (basicTypeToType v) M.empty
   Todo msg -> todo "findDefault/todo" msg
 
 toBasic :: Value -> Maybe MS.BasicValue
@@ -126,7 +126,7 @@ setVal (SReference dst) (SReference src) = do
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
     setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
-setVal (SReference dst) (SArray _ fs) = do
+setVal (SReference dst) (SArray fs) = do
   let len = length fs
   setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
   forM_ [0 .. len - 1] $ \i -> do
@@ -195,7 +195,7 @@ getVar (Constant (SStruct s ma)) = do
       )
       ma
   return $ SStruct s resolved
-getVar (Constant (SArray typ vc)) = do
+getVar (Constant (SArray vc)) = do
   resolved <-
     V.mapM
       ( \var -> do
@@ -203,7 +203,7 @@ getVar (Constant (SArray typ vc)) = do
           return $ Constant v
       )
       vc
-  return $ SArray typ resolved
+  return $ SArray resolved
 getVar (Constant (STuple vct)) = do
   resolved <-
     V.mapM
@@ -235,12 +235,12 @@ forceLoadVar (SReference a) = do
     TStruct n ts -> do
       vs <- traverse (\(t,_) -> (BC.unpack t,) . Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.Field t))) ts
       return . SStruct n $ M.fromList vs
-    t@(TArray _ ml) -> do
+    TArray _ ml -> do
       arrLen <- case ml of
         Just l -> pure $ fromIntegral l
         Nothing -> fmap fromIntegral . getInt . Constant . SReference . apSnoc a $ MS.Field "length"
       vs <- traverse (\i -> Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.ArrayIndex i))) [0..arrLen-1]
-      pure . SArray (basicTypeToType t) $ V.fromList vs
+      pure . SArray $ V.fromList vs
     TMapping{} -> typeError "forceLoadVar/mapping" (SReference a)
     _ -> pure $ findDefault typeHint
 forceLoadVar v = pure v
@@ -312,7 +312,7 @@ showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "(" ++ intercalate ", " strings ++ ")"
-showSM (SArray _ v) = do
+showSM (SArray v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "[" ++ intercalate ", " strings ++ "]"
@@ -364,7 +364,7 @@ jsonSM = go False
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)
       return $ "[" ++ intercalate ", " strings ++ "]"
-    go _ (SArray _ v) = do
+    go _ (SArray v) = do
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)
       return $ "[" ++ intercalate ", " strings ++ "]"

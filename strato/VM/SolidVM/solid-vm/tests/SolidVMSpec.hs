@@ -2939,7 +2939,7 @@ contract qq {
   it "can accept bytes32 arguments" . runTest $ do
     runCall
       "set"
-      ["\"deadbeef00000000000000000000000000000000000000000000000000000000\""]
+      ["\"\xde\xad\xbe\xef\""]
       [r|
 contract qq {
   bytes32 bs;
@@ -2950,7 +2950,7 @@ contract qq {
       `shouldReturn` Just "()"
     getFields ["bs"] `shouldReturn` [BString "\xde\xad\xbe\xef"]
 
-  it "should not compute remote arguments" $
+  it "should not compute remote arguments" $ do
     runTest
       ( do
           runCall
@@ -5921,7 +5921,7 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|]
-      `shouldReturn` Just "(\"fa26db7ca85ead399216e7c6316bc50ed24393c3122b582735e7f3b0f91b93f0\")"
+      `shouldReturn` Just "(\"2a4aec41b4652949f203748247b8b6f20f70f24b5a2a94c77eaa5167635186cd\")"
 
   it "cant use  a commented pragma" . runTest $ do
     runCall'
@@ -8124,8 +8124,8 @@ contract qq {
   account b;
 
   constructor() {
-    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
-    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", 4);
   }
 }|]
     getFields ["b"]
@@ -8144,7 +8144,7 @@ contract qq {
   account a;
 
   constructor() {
-    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
   }
 }|]
       )
@@ -8886,8 +8886,8 @@ contract qq {
   account b;
 
   constructor() {
-    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
-    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", 4);
   }
 }|]
     getFields ["b"]
