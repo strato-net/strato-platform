@@ -26,8 +26,8 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
 # API Keys
 ALCHEMY_API_KEY=your-alchemy-key
 COINMARKETCAP_API_KEY=your-coinmarketcap-key
-METALS_API_KEY=your-metals-dev-key
-METALPRICE_API_KEY=your-metalprice-api-key
+METALS_DEV_API_KEY=your-metals-dev-key
+METALS_API_API_KEY=your-metals-api-key
 
 # Oracle Configuration
 UPDATE_INTERVAL_MINUTES=15  # Update interval in minutes (1-60, default: 15)

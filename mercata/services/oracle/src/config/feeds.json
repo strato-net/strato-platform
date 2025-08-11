@@ -7,7 +7,7 @@
     },
     {
       "name": "metals-batch",
-      "sources": ["Metals.dev", "MetalPriceAPI"],
+      "sources": ["Metals.dev", "MetalsAPI"],
       "assets": ["XAU", "XAG"]
     }
   ]

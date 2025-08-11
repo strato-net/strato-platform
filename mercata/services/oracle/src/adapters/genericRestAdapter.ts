@@ -2,130 +2,9 @@ import { apiRequest } from '../utils/apiClient';
 import { SourceConfig, BatchPriceResult, Asset } from '../types';
 import { logError } from '../utils/logger';
 
-export async function fetchGenericPrice(asset: Asset, sourceConfig: SourceConfig): Promise<{
-    price: number;
-    feedTimestamp: string;
-}> {
-    const apiKey = getApiKey(sourceConfig);
-    const url = buildUrl(sourceConfig, asset, apiKey);
-    const requestOptions = buildRequestOptions(sourceConfig, url, apiKey, asset);
-    
-    const response = await apiRequest(requestOptions, { logPrefix: 'GenericRestAdapter' });
-    
-    const priceUSD = extractPrice(response.data, sourceConfig, asset);
-    const feedTimestamp = extractTimestamp(response.data, sourceConfig);
-
-    if (!priceUSD || isNaN(parseFloat(priceUSD))) {
-        throw new Error(`Invalid price data received for ${asset.name}: ${priceUSD}`);
-    }
-
-    const price = Math.floor(parseFloat(priceUSD) * 1e18);
-    return { price, feedTimestamp };
-}
-
 // Helper functions for simplified configuration
 function getApiKey(sourceConfig: SourceConfig): string {
     return sourceConfig.apiKeyEnvVar ? process.env[sourceConfig.apiKeyEnvVar] || '' : '';
-}
-
-function buildUrl(sourceConfig: SourceConfig, asset: Asset, apiKey: string): string {
-    let url = sourceConfig.url;
-    
-    // Replace API key placeholder
-    if (apiKey) {
-        url = url.replace(/\$\{API_KEY\}/g, apiKey);
-    }
-    
-    // Add URL parameters
-    if (sourceConfig.params) {
-        const params = sourceConfig.params.split(',').map(p => p.trim());
-        const queryParams = new URLSearchParams();
-        
-        params.forEach(param => {
-            if (param === 'api_key' && apiKey) {
-                queryParams.append('api_key', apiKey);
-            } else if (param === 'symbol') {
-                queryParams.append('symbol', asset.name.split('-')[0]); // Extract symbol from asset name
-            } else if (param.startsWith('currency=')) {
-                queryParams.append('currency', param.split('=')[1]);
-            } else if (param.startsWith('convert=')) {
-                queryParams.append('convert', param.split('=')[1]);
-            } else if (param.startsWith('base=')) {
-                queryParams.append('base', param.split('=')[1]);
-            } else if (param.startsWith('currencies=')) {
-                queryParams.append('currencies', param.split('=')[1]);
-            } else if (param.startsWith('unit=')) {
-                queryParams.append('unit', param.split('=')[1]);
-            }
-        });
-        
-        if (queryParams.toString()) {
-            url += '?' + queryParams.toString();
-        }
-    }
-    
-    return url;
-}
-
-function buildRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: string, asset: Asset): any {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    };
-
-    // Add authorization headers
-    if (sourceConfig.headers) {
-        const headerNames = sourceConfig.headers.split(',').map(h => h.trim());
-        headerNames.forEach(headerName => {
-            if (headerName === 'X-CMC_PRO_API_KEY' && apiKey) {
-                headers[headerName] = apiKey;
-            }
-        });
-    }
-
-    const requestOptions: any = {
-        method: sourceConfig.method || 'GET',
-        url,
-        headers
-    };
-
-    // Handle POST request body
-    if (sourceConfig.body && sourceConfig.method === 'POST') {
-        if (sourceConfig.body === 'addresses') {
-            requestOptions.data = {
-                addresses: [{
-                    network: "eth-mainnet",
-                    address: asset.tokenAddress
-                }]
-            };
-        }
-    }
-
-    return requestOptions;
-}
-
-function extractPrice(data: any, sourceConfig: SourceConfig, asset: Asset): string {
-    const parsePattern = sourceConfig.parse;
-    let pricePath = parsePattern;
-    
-    // Replace placeholders in parse pattern
-    if (parsePattern.includes('{symbol}')) {
-        const symbol = asset.name.split('-')[0];
-        pricePath = parsePattern.replace(/\{symbol\}/g, symbol);
-    } else if (parsePattern.includes('{metal}')) {
-        const metal = asset.name.split('-')[0] === 'XAU' ? 'gold' : 'silver';
-        pricePath = parsePattern.replace(/\{metal\}/g, metal);
-    }
-    
-    return extractNestedProperty(data, pricePath);
-}
-
-function extractTimestamp(data: any, sourceConfig: SourceConfig): string {
-    if (!sourceConfig.timestamp) {
-        return new Date().toISOString();
-    }
-    
-    return extractNestedProperty(data, sourceConfig.timestamp) || new Date().toISOString();
 }
 
 export function extractNestedProperty(obj: any, path: string): any {
@@ -170,9 +49,14 @@ function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: stri
         params.forEach(param => {
             if (param === 'api_key' && apiKey) {
                 queryParams.append('api_key', apiKey);
+            } else if (param === 'access_key' && apiKey) {
+                queryParams.append('access_key', apiKey);
             } else if (param === 'symbol') {
                 const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
                 queryParams.append('symbol', symbols);
+            } else if (param === 'symbols') {
+                const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
+                queryParams.append('symbols', symbols);
             } else if (param.startsWith('currency=')) {
                 queryParams.append('currency', param.split('=')[1]);
             } else if (param.startsWith('convert=')) {
