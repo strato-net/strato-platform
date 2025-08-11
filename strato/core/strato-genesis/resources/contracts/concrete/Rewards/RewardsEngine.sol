@@ -23,8 +23,14 @@ contract record RewardsEngine is Ownable {
     // DATA STRUCTURES
     // ═════════════════════════════════════════════════════════════════════════
 
+    struct InitialEligiblePool {
+        address poolAddress;
+        address token;
+    }
+
     struct RewardsEngineArgs {
         address[] initialRewardTokens;
+        InitialEligiblePool[] initialEligiblePools;
     }
 
     struct EligiblePool {
@@ -57,6 +63,9 @@ contract record RewardsEngine is Ownable {
         _ownershipGranted = true;
         for (uint i = 0; i < args.initialRewardTokens.length; i++) {
             _addRewardToken(args.initialRewardTokens[i]);
+        }
+        for (uint i = 0; i < args.initialEligiblePools.length; i++) {
+            _addEligiblePool(args.initialEligiblePools[i].poolAddress, args.initialEligiblePools[i].token);
         }
         _ownershipGranted = false;
     }
