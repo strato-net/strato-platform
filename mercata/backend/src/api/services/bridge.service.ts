@@ -1,4 +1,13 @@
 import axios from 'axios';
+import {
+  TESTNET_ERC20_TOKEN_CONTRACTS,
+  MAINNET_ERC20_TOKEN_CONTRACTS,
+  TESTNET_ETH_STRATO_TOKEN_MAPPING,
+  MAINNET_ETH_STRATO_TOKEN_MAPPING,
+} from '../../config/bridge.config';
+import safeTransactionGenerator from './safe.service';
+import BridgeContractCall from '../../utils/bridgeContractCall';
+import sendEmail from './email.service';
 
 interface BridgeInParams {
   amount: string;
@@ -72,8 +81,6 @@ export class BridgeService {
 
       return response.data;
     } catch (error: any) {
-  
-      
       // Extract error message from axios error response
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
@@ -83,6 +90,63 @@ export class BridgeService {
         throw new Error('Unknown error occurred');
       }
     }
+  }
+
+  public async bridgeOutDirect(
+    tokenAddress: string,
+    fromAddress: string,
+    amount: string,
+    toAddress: string,
+    userAddress: string
+  ): Promise<any> {
+    const isTestnet = process.env.SHOW_TESTNET === "true";
+    const tokenContract = isTestnet
+      ? TESTNET_ERC20_TOKEN_CONTRACTS
+      : MAINNET_ERC20_TOKEN_CONTRACTS;
+
+    const tokenMapping = isTestnet
+      ? TESTNET_ETH_STRATO_TOKEN_MAPPING
+      : MAINNET_ETH_STRATO_TOKEN_MAPPING;
+
+    const ethTokenAddress: any =
+      Object.entries(tokenMapping).find(
+        ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
+      )?.[0] || null;
+
+    const isERC20 = tokenContract.find((token: any) => token === ethTokenAddress);
+
+    const generator = await safeTransactionGenerator(
+      amount,
+      toAddress,
+      isERC20 ? "erc20" : "eth",
+      ethTokenAddress
+    );
+    const {
+      value: { hash },
+    } = await generator.next();
+
+    const bridgeContract = new BridgeContractCall();
+    await bridgeContract.withdraw({
+      txHash: hash.toString().replace("0x", ""),
+      token: tokenAddress.toLowerCase().replace("0x", ""),
+      from: fromAddress.toLowerCase().replace("0x", ""),
+      amount: amount.toString(),
+      to: toAddress.toLowerCase().replace("0x", ""),
+      mercataUser: userAddress.toLowerCase().replace("0x", ""),
+    });
+
+    const {
+      value: { success },
+    } = await generator.next();
+
+    const markPendindResponse =
+      await bridgeContract.markWithdrawalPendingApproval({
+        txHash: hash.toString().replace("0x", ""),
+      });
+
+    sendEmail(hash.toString());
+
+    return markPendindResponse;
   }
 
   public async getBalance(params: {

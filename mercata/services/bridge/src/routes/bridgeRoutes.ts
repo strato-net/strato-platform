@@ -4,8 +4,8 @@ import { verifyAccessToken } from '../middlewares';
 
 const router = Router();
 
-router.post('/bridgeIn',verifyAccessToken(), BridgeController.bridgeIn);
-router.post('/bridgeOut',verifyAccessToken(), BridgeController.bridgeOut);
+// router.post('/bridgeIn',verifyAccessToken(), BridgeController.bridgeIn);
+// router.post('/bridgeOut',verifyAccessToken(), BridgeController.bridgeOut);
 router.post('/stratoTokenBalance',verifyAccessToken(), BridgeController.stratoTokenBalance);
 router.get('/bridgeInTokens', BridgeController.getBridgeInTokens);
 router.get('/bridgeOutTokens', BridgeController.getBridgeOutTokens);
