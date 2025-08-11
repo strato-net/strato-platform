@@ -41,7 +41,7 @@ pipeline {
           set -x
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started -b strato-erc20-revamp
-          cp docker-compose.yml strato-getting-started/
+          cp docker-compose.allDocker.yml strato-getting-started/docker-compose.yml
           cp docker-compose.vault.yml strato-getting-started/
           cp docker-compose.highway.yml strato-getting-started/
         '''
