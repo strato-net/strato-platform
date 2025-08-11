@@ -1,6 +1,5 @@
 import { Request, RequestHandler } from "express";
 import RestStatus from "http-status-codes";
-import { JWTPayload } from "jose";
 import { verifyAccessTokenSignature } from "../../utils/authHelper";
 import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
 // ————————————————————————————————————————————————————————————————
@@ -25,8 +24,9 @@ function getTokenFromHeader(req: Request): string | null {
   return null;
 }
 
-interface CustomJwtPayload extends JWTPayload {
+interface CustomJwtPayload {
   preferred_username: string;
+  [key: string]: any;
 }
 
 // ————————————————————————————————————————————————————————————————
