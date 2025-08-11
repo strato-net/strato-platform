@@ -207,14 +207,14 @@ contract record OnRamp is Ownable {
         emit ListingCanceled(listing.id);
     }
 
-    function fulfillListing(address token, address buyer, uint256 amount) external onlyProvider(token) {
+    function fulfillListing(address token, address buyer, uint256 amount, uint256 expectedMarginBps) external onlyProvider(token) {
         require(amount > 0, "Invalid amount");
         require(listings[token].amount >= amount, "Not enough available tokens");
 
         IERC20(listings[token].token).transfer(buyer, amount);
         listings[token].amount -= amount;
 
-        uint256 totalFiat = calculatePrice(listings[token].token, amount, listings[token].marginBps);
+        uint256 totalFiat = calculatePrice(listings[token].token, amount, expectedMarginBps);
         emit ListingFulfilled(listings[token].id, buyer, amount, totalFiat);
 
         if (listings[token].amount == 0) {
