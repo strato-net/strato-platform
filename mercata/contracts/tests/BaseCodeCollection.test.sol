@@ -1,5 +1,3 @@
-pragma solidvm 12.0;
-
 import "../concrete/BaseCodeCollection.sol";
 
 contract User {
