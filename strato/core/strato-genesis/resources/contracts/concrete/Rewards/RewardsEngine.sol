@@ -43,6 +43,7 @@ contract record RewardsEngine is Ownable {
         bool enabled;
         address poolAddress;
         address token;
+        RewardBalance accruedRewardBalance;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -71,7 +72,8 @@ contract record RewardsEngine is Ownable {
             _addRewardToken(args.initialRewardTokens[i]);
         }
         for (uint i = 0; i < args.initialEligiblePools.length; i++) {
-            _addEligiblePool(args.initialEligiblePools[i].poolAddress, args.initialEligiblePools[i].token);
+            _addEligiblePool( args.initialEligiblePools[i].poolAddress
+			    , args.initialEligiblePools[i].token);
         }
         _ownershipGranted = false;
     }
@@ -177,7 +179,12 @@ contract record RewardsEngine is Ownable {
         eligiblePools.push(EligiblePool({
             enabled: true,
             poolAddress: poolAddress,
-            token: token
+            token: token,
+            accruedRewardBalance: RewardBalance({
+                balance: 0,
+                createdAt: block.timestamp,
+                modifiedAt: block.timestamp
+            })
         }));
         eligiblePoolMap[poolAddress] = eligiblePools.length;
 
