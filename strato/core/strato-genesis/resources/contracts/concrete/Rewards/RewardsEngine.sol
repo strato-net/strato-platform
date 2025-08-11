@@ -23,6 +23,12 @@ contract record RewardsEngine is Ownable {
     // DATA STRUCTURES
     // ═════════════════════════════════════════════════════════════════════════
 
+    struct RewardBalance {
+        uint balance;
+        uint createdAt;
+        uint modifiedAt;
+    }
+
     struct InitialEligiblePool {
         address poolAddress;
         address token;
