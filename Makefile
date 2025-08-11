@@ -125,7 +125,6 @@ build_common:
 		--test --no-run-tests \
 
 build_common_docker: build_buildbase
-build_common_docker:
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
