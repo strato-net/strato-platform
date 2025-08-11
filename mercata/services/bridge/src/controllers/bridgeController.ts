@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import BigNumber from "bignumber.js";
 import { Alchemy, Network } from 'alchemy-sdk';
 import logger from "../utils/logger";
-import { bridgeIn, stratoTokenBalance, bridgeOut, userWithdrawalStatus, userDepositStatus, getBridgeInTokens, getBridgeOutTokens } from "../services/bridgeService";
+import { stratoTokenBalance, userWithdrawalStatus, userDepositStatus, getBridgeInTokens, getBridgeOutTokens } from "../services/bridgeService";
 import { 
   config, 
   TESTNET_ETH_STRATO_TOKEN_MAPPING, 
@@ -196,135 +196,136 @@ function validateTransactionDetails(
 }
 
 class BridgeController {
-  static async bridgeIn(
-    req: CustomRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { fromAddress, amount, tokenAddress, ethHash } = req.body;
+  // COMMENTED OUT - MOVED TO BACKEND
+  // static async bridgeIn(
+  //   req: CustomRequest,
+  //   res: Response,
+  //   next: NextFunction
+  // ): Promise<void> {
+  //   try {
+  //     const { fromAddress, amount, tokenAddress, ethHash } = req.body;
 
-      // Validate required fields
-      if (!ethHash) {
-        res.status(400).json({ 
-          success: false, 
-          message: 'Missing ethHash parameter' 
-        });
-        return;
-      }
+  //     // Validate required fields
+  //     if (!ethHash) {
+  //       res.status(400).json({ 
+  //         success: false, 
+  //         message: 'Missing ethHash parameter' 
+  //       });
+  //       return;
+  //     }
 
-      // Fetch transaction details from Alchemy API
-      let transactionDetails;
-      try {
-        transactionDetails = await fetchTransactionDetails(ethHash);
-      } catch (error: any) {
-        res.status(400).json({ 
-          success: false, 
-          message: `Failed to fetch transaction details: ${error.message}` 
-        });
-        return;
-      }
+  //     // Fetch transaction details from Alchemy API
+  //     let transactionDetails;
+  //     try {
+  //         transactionDetails = await fetchTransactionDetails(ethHash);
+  //       } catch (error: any) {
+  //         res.status(400).json({ 
+  //           success: false, 
+  //         message: `Failed to fetch transaction details: ${error.message}` 
+  //       });
+  //         return;
+  //       }
 
-      // Validate transaction details
-      const expectedToAddress = config.safe.address || '';
+  //     // Validate transaction details
+  //     const expectedToAddress = config.safe.address || '';
       
-      const validationErrors = validateTransactionDetails(
-        transactionDetails,
-        amount,
-        tokenAddress,
-        expectedToAddress
-      );
+  //     const validationErrors = validateTransactionDetails(
+  //         transactionDetails,
+  //         amount,
+  //         tokenAddress,
+  //         expectedToAddress
+  //       );
 
-      if (validationErrors.length > 0) {
-        res.status(400).json({ 
-          success: false, 
-          message: 'Invalid amount or tokenAddress',
-          errors: validationErrors
-        });
-        return;
-      }
+  //       if (validationErrors.length > 0) {
+  //         res.status(400).json({ 
+  //         success: false, 
+  //         message: 'Invalid amount or tokenAddress',
+  //         errors: validationErrors
+  //       });
+  //         return;
+  //       }
 
-      const { userAddress } = req.user || {};
-      if (!userAddress) {
-        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
-        return;
-      }
+  //     const { userAddress } = req.user || {};
+  //       if (!userAddress) {
+  //         res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+  //         return;
+  //       }
 
-      const toAddress = config.safe.address || '';
+  //     const toAddress = config.safe.address || '';
   
-      const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
+  //     const stratoTokenAddress = ETH_STRATO_TOKEN_MAPPING[tokenAddress as keyof typeof ETH_STRATO_TOKEN_MAPPING] || tokenAddress;
       
-      // Convert to 18 decimal places regardless of token's native decimals
-      const amountInWei = new BigNumber(amount).multipliedBy(10 ** 18).toString();
+  //     // Convert to 18 decimal places regardless of token's native decimals
+  //       const amountInWei = new BigNumber(amount).multipliedBy(10 ** 18).toString();
     
-      const bridgeInResponse = await bridgeIn(
-        ethHash,
-        stratoTokenAddress,
-        fromAddress,
-        amountInWei,
-        toAddress,
-        userAddress
-      );
+  //     const bridgeInResponse = await bridgeIn(
+  //         ethHash,
+  //         stratoTokenAddress,
+  //         fromAddress,
+  //         amountInWei,
+  //         toAddress,
+  //         userAddress
+  //       );
       
-      res.json({
-        success: true,
-        bridgeInResponse,
-      });
-    } catch (error: any) {
-      logger.error("Error in bridgeIn:", error?.message);
+  //     res.json({
+  //         success: true,
+  //         bridgeInResponse,
+  //       });
+  //   } catch (error: any) {
+  //       logger.error("Error in bridgeIn:", error?.message);
       
-      // Return the error message in HTTP response instead of using next(error)
-      const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
-      });
-    }
-  }
+  //     // Return the error message in HTTP response instead of using next(error)
+  //       const errorMessage = error?.message || error?.toString() || 'Unknown error';
+  //       res.status(400).json({ 
+  //         success: false, 
+  //         message: errorMessage 
+  //       });
+  //   }
+  // }
 
 
-  static async bridgeOut(
-    req: CustomRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const {  amount, tokenAddress, toAddress } = req.body;
+  // static async bridgeOut(
+  //   req: CustomRequest,
+  //   res: Response,
+  //   next: NextFunction
+  // ): Promise<void> {
+  //   try {
+  //     const {  amount, tokenAddress, toAddress } = req.body;
 
-      const { userAddress } = req.user || {};
-      if (!userAddress) {
-        res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
-        return;
-      }
+  //     const { userAddress } = req.user || {};
+  //     if (!userAddress) {
+  //       res.status(401).json({ success: false, message: 'Unauthorized: Missing user address' });
+  //       return;
+  //     }
 
-      const fromAddress = config.safe.address || '';
+  //     const fromAddress = config.safe.address || '';
       
-      // Convert to destination token's native decimals
-      const tokenDecimals = getTokenDecimals(tokenAddress);
-      const bridgeOutResponse = await bridgeOut(
-        tokenAddress,
-        fromAddress,
-        new BigNumber(amount).multipliedBy(10 ** tokenDecimals).toString(),
-        toAddress,
-        userAddress
-      );
+  //     // Convert to destination token's native decimals
+  //     const tokenDecimals = getTokenDecimals(tokenAddress);
+  //     const bridgeOutResponse = await bridgeOut(
+  //       tokenAddress,
+  //       fromAddress,
+  //       new BigNumber(amount).multipliedBy(10 ** tokenDecimals).toString(),
+  //       toAddress,
+  //       userAddress
+  //     );
 
-      res.json({
-        success: true,
-        bridgeOutResponse,
-      });
-    } catch (error: any) {
-      // Extract just the error message for logging
-      const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      console.error("Error in bridgeOut controller 2 :", errorMessage);
+  //     res.json({
+  //       success: true,
+  //       bridgeOutResponse,
+  //     });
+  //   } catch (error: any) {
+  //     // Extract just the error message for logging
+  //     const errorMessage = error?.message || error?.toString() || 'Unknown error';
+  //     console.error("Error in bridgeOut controller 2 :", errorMessage);
       
-      // Return the error message in HTTP response instead of using next(error)
-      res.status(400).json({ 
-        success: false, 
-        message: errorMessage 
-      });
-    }
-  }
+  //     // Return the error message in HTTP response instead of using next(error)
+  //     res.status(400).json({ 
+  //       success: false, 
+  //       message: errorMessage 
+  //     });
+  //   }
+  // }
 
   static async stratoTokenBalance(
     req: CustomRequest,

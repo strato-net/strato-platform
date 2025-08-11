@@ -53,8 +53,10 @@ router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.buy)
 router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.sell);
 
 // ----- Bridge Routes -----
-router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
-router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
+// Bridge-in and Bridge-out functionality moved to direct function calls
+// Other bridge functionality remains
+// router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn); // COMMENTED OUT - MOVED TO DIRECT FUNCTION CALLS
+// router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut); // COMMENTED OUT - MOVED TO DIRECT FUNCTION CALLS
 router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(), bridgeController.getBalance);
 router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(), bridgeController.getBridgeInTokens);
 router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(), bridgeController.getBridgeOutTokens);

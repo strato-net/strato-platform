@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { BridgeService } from "../services/bridge.service";
-import { validateBridgeIn, validateBridgeOut } from "../validators/bridge.validators";
+import { validateBridgeIn,validateBridgeOut } from "../validators/bridge.validators";
 
 // Extend Express Request type to include user
 interface AuthenticatedRequest extends Request {
@@ -16,53 +16,55 @@ export class BridgeController {
     this.bridgeService = new BridgeService();
   }
 
-  public bridgeIn = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken, body } = req;
-      validateBridgeIn(body);
+  // COMMENTED OUT - MOVED TO DIRECT FUNCTION CALLS
+  // public bridgeIn = async (
+  //   req: AuthenticatedRequest,
+  //   res: Response,
+  //   next: NextFunction
+  // ) => {
+  //   try {
+  //     const { accessToken, body } = req;
+  //     validateBridgeIn(body);
 
-      // Process bridge transaction
-      const result = await this.bridgeService.bridgeIn({
-        ...body,
-        accessToken,
-      });
+  //     // Process bridge transaction
+  //     const result = await this.bridgeService.bridgeIn({
+  //       ...body,
+  //       accessToken,
+  //     });
 
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
+  //     res.json({
+  //       success: true,
+  //       data: result,
+  //     });
+  //   } catch (error: any) {
+  //     next(error);
+  //   }
+  // };
 
-  public bridgeOut = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken, body } = req;
-      validateBridgeOut(body);
+  // COMMENTED OUT - MOVED TO DIRECT FUNCTION CALLS
+  // public bridgeOut = async (
+  //   req: AuthenticatedRequest,
+  //   res: Response,
+  //   next: NextFunction
+  // ) => {
+  //   try {
+  //     const { accessToken, body } = req;
+  //     validateBridgeOut(body);
 
-      // Process bridge transaction
-      const result = await this.bridgeService.bridgeOut({
-        ...body,
-        accessToken,
-      });
+  //     // Process bridge transaction
+  //     const result = await this.bridgeService.bridgeOut({
+  //       ...body,
+  //       accessToken,
+  //     });
 
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
+  //     res.json({
+  //       success: true,
+  //       data: result,
+  //     });
+  //   } catch (error: any) {
+  //     next(error);
+  //   }
+  // };
 
   public getBalance = async (
     req: AuthenticatedRequest,

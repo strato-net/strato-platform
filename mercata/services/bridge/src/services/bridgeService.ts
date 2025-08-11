@@ -56,87 +56,86 @@ export const stratoTokenBalance = async (
   };
 };
 
-export const bridgeIn = async (
-  ethHash: string,
-  tokenAddress: string,
-  fromAddress: string,
-  amount: string,
-  toAddress: string,
-  userAddress: string
-) => {
-  const bridgeContract = new BridgeContractCall();
+// COMMENTED OUT - MOVED TO BACKEND
+// export const bridgeIn = async (
+//   ethHash: string,
+//   tokenAddress: string,
+//   fromAddress: string,
+//   amount: string,
+//   toAddress: string,
+//   userAddress: string
+// ) => {
+//   const bridgeContract = new BridgeContractCall();
+
+//   const depositResponse = await bridgeContract.deposit({
+//     txHash: ethHash.toString().replace("0x", ""),
+//     token: tokenAddress.toLowerCase().replace("0x", ""),
+//     from: fromAddress.toLowerCase().replace("0x", ""),
+//     amount: amount.toString(),
+//     to: toAddress.toLowerCase().replace("0x", ""),
+//     mercataUser: userAddress.toLowerCase().replace("0x", ""),
+//   });
+//   return depositResponse;
+// };
+
+// export const bridgeOut = async (
+//   tokenAddress: string,
+//   fromAddress: string,
+//   amount: string,
+//   toAddress: string,
+//   userAddress: string
+// ) => {
 
 
+//   const isTestnet = process.env.SHOW_TESTNET === "true";
+//   const tokenContract = isTestnet
+//     ? TESTNET_ERC20_TOKEN_CONTRACTS
+//     : MAINNET_ERC20_TOKEN_CONTRACTS;
 
-  const depositResponse = await bridgeContract.deposit({
-    txHash: ethHash.toString().replace("0x", ""),
-    token: tokenAddress.toLowerCase().replace("0x", ""),
-    from: fromAddress.toLowerCase().replace("0x", ""),
-    amount: amount.toString(),
-    to: toAddress.toLowerCase().replace("0x", ""),
-    mercataUser: userAddress.toLowerCase().replace("0x", ""),
-  });
-  return depositResponse;
-};
+//   const tokenMapping = isTestnet
+//     ? TESTNET_ETH_STRATO_TOKEN_MAPPING
+//     : MAINNET_ETH_STRATO_TOKEN_MAPPING;
 
-export const bridgeOut = async (
-  tokenAddress: string,
-  fromAddress: string,
-  amount: string,
-  toAddress: string,
-  userAddress: string
-) => {
+//   const ethTokenAddress: any =
+//     Object.entries(tokenMapping).find(
+//       ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
+//     )?.[0] || null;
 
+//   const isERC20 = tokenContract.find((token: any) => token === ethTokenAddress);
 
-  const isTestnet = process.env.SHOW_TESTNET === "true";
-  const tokenContract = isTestnet
-    ? TESTNET_ERC20_TOKEN_CONTRACTS
-    : MAINNET_ERC20_TOKEN_CONTRACTS;
+//   const generator = await safeTransactionGenerator(
+//     amount,
+//     toAddress,
+//     isERC20 ? "erc20" : "eth",
+//     ethTokenAddress
+//   );
+//   const {
+//     value: { hash },
+//   } = await generator.next();
 
-  const tokenMapping = isTestnet
-    ? TESTNET_ETH_STRATO_TOKEN_MAPPING
-    : MAINNET_ETH_STRATO_TOKEN_MAPPING;
+//   const bridgeContract = new BridgeContractCall();
+//   await bridgeContract.withdraw({
+//     txHash: hash.toString().replace("0x", ""),
+//     token: tokenAddress.toLowerCase().replace("0x", ""),
+//     from: fromAddress.toLowerCase().replace("0x", ""),
+//     amount: amount.toString(),
+//     to: toAddress.toLowerCase().replace("0x", ""),
+//     mercataUser: userAddress.toLowerCase().replace("0x", ""),
+//   });
 
-  const ethTokenAddress: any =
-    Object.entries(tokenMapping).find(
-      ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
-    )?.[0] || null;
+//   const {
+//     value: { success },
+//   } = await generator.next();
 
-  const isERC20 = tokenContract.find((token: any) => token === ethTokenAddress);
+//   const markPendindResponse =
+//     await bridgeContract.markWithdrawalPendingApproval({
+//       txHash: hash.toString().replace("0x", ""),
+//     });
 
-  const generator = await safeTransactionGenerator(
-    amount,
-    toAddress,
-    isERC20 ? "erc20" : "eth",
-    ethTokenAddress
-  );
-  const {
-    value: { hash },
-  } = await generator.next();
+//   sendEmail(hash.toString());
 
-  const bridgeContract = new BridgeContractCall();
-  await bridgeContract.withdraw({
-    txHash: hash.toString().replace("0x", ""),
-    token: tokenAddress.toLowerCase().replace("0x", ""),
-    from: fromAddress.toLowerCase().replace("0x", ""),
-    amount: amount.toString(),
-    to: toAddress.toLowerCase().replace("0x", ""),
-    mercataUser: userAddress.toLowerCase().replace("0x", ""),
-  });
-
-  const {
-    value: { success },
-  } = await generator.next();
-
-  const markPendindResponse =
-    await bridgeContract.markWithdrawalPendingApproval({
-      txHash: hash.toString().replace("0x", ""),
-    });
-
-  sendEmail(hash.toString());
-
-  return markPendindResponse;
-};
+//   return markPendindResponse;
+// };
 
 export const confirmBridgeinSafePolling = async (txList: any[]) => {
   if (!config.safe?.address) return;
