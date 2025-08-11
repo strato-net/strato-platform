@@ -221,5 +221,25 @@ contract record RewardsEngine is Ownable {
         emit EligiblePoolAddressModified(oldPoolAddress, newPoolAddress);
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // REWARD CALCULATION CAPABILITIES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // TODO: Add proper access control modifier to restrict calls to eligible pools only
+    function deposited(address poolAddress, address token, address userAddress) public {
+        // TODO: Implement reward calculation logic
+        // TODO: Validate that the calling pool is eligible and enabled
+        // TODO: Validate that the token matches the pool's token
+        // TODO: Calculate and update user rewards
+    }
+
+    // TODO: Add proper access control modifier to restrict calls to eligible pools only
+    function withdrawn(address poolAddress, address token, address userAddress) public {
+        // TODO: Implement reward calculation logic
+        // TODO: Validate that the calling pool is eligible and enabled
+        // TODO: Validate that the token matches the pool's token
+        // TODO: Calculate and update user rewards
+    }
+
 
 }
