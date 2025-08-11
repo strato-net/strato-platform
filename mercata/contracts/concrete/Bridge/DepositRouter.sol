@@ -17,7 +17,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
         address indexed token,
         uint256 amount,
         address indexed sender,
-        bytes32 indexed stratoAddress,
+        address indexed stratoAddress,
         uint256 nonce
     );
 
@@ -31,7 +31,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
     function deposit(
         address token,
         uint256 amount,
-        bytes32 stratoAddress
+        address stratoAddress
     ) external whenNotPaused nonReentrant {
         require(allowedTokens[token], "Token not allowed");
         require(amount >= minDepositAmount[token], "Below minimum");
@@ -56,7 +56,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
 
     // using address(0) for ETH
     function depositETH(
-        bytes32 stratoAddress
+        address stratoAddress
     ) external payable whenNotPaused nonReentrant {
         require(allowedTokens[address(0)], "ETH not allowed");
         require(msg.value >= minDepositAmount[address(0)], "Below minimum");
