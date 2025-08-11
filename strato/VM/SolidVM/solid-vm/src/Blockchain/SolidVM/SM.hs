@@ -746,10 +746,10 @@ getCurrentFunctionName = do
     (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
-getLocal :: MonadSM m => SolidString -> m (Maybe Variable)
+getLocal :: MonadSM m => SolidString -> m (Maybe (SVMType.Type, Variable))
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
-  return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
+  return . M.lookup name $ localVariables currentCallInfo
 
 setLocal :: MonadSM m => SolidString -> Variable -> m ()
 setLocal name val = do
