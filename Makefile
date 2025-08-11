@@ -125,17 +125,18 @@ build_common:
 		--test --no-run-tests \
 
 build_common_docker: build_buildbase
-	@echo building haskell libraries and creating directories
+	@echo building haskell libraries and creating directories in docker
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
+		--docker \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_profiled: build_buildbase
-	@echo building haskell libraries and creating directories
+	@echo building haskell libraries and creating directories (profiled)
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
@@ -145,7 +146,7 @@ build_common_profiled: build_buildbase
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_fast: build_buildbase
-	@echo building haskell libraries and creating directories
+	@echo building haskell libraries and creating directories (fast)
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
@@ -208,7 +209,7 @@ profile: build_common_profiled
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 
-vault-wrapper: build_common
+vault-wrapper: build_common_docker
 	@echo Now building vault-wrapper...
 	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
