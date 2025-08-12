@@ -26,6 +26,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Control.Arrow ((&&&), (***))
+import Control.Monad (unless)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Data.List
@@ -184,8 +185,9 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
                       fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
                       fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
                     ]
-
-            E.where_ (foldl1 (E.&&.) criteria)
+            
+            unless (null criteria) $
+              E.where_ (foldl1 (E.&&.) criteria)
 
             E.limit $ appFetchLimit
 
