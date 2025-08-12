@@ -22,46 +22,48 @@ const BridgeWidget = () => {
   const showTestnet = config?.showTestnet ?? false;
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Bridge Assets</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex items-center gap-2"
-          onClick={() => navigate("/dashboard/bridge-transactions")}
-        >
-          <History className="h-4 w-4" />
-          View Transactions
-        </Button>
-      </div>
-      
-      <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
-        <Tabs
-          activeKey={activeTab}
-          items={[
-            {
-              key: 'bridgeIn',
-              label: 'Bridge In',
-            },
-            {
-              key: 'bridgeOut',
-              label: 'Bridge Out',
-            },
-          ]}
-          onChange={(value) => setActiveTab(value)}
-          className="custom-tabs"
-          style={{
-            '--ant-primary-color': '#3b82f6',
-            '--ant-primary-color-hover': '#2563eb',
-          } as React.CSSProperties}
-        />
-        <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
-          {activeTab === 'bridgeIn' ? (
-            <BridgeIn showTestnet={showTestnet} />
-          ) : (
-            <BridgeOut showTestnet={showTestnet} />
-          )}
+    <div className="w-full space-y-6">
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">Bridge your digital assets</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={() => navigate("/dashboard/bridge-transactions")}
+          >
+            <History className="h-4 w-4" />
+            View Transactions
+          </Button>
+        </div>
+        
+        <div className="space-y-4">
+          <Tabs
+            activeKey={activeTab}
+            items={[
+              {
+                key: 'bridgeIn',
+                label: 'Bridge In',
+              },
+              {
+                key: 'bridgeOut',
+                label: 'Bridge Out',
+              },
+            ]}
+            onChange={(value) => setActiveTab(value)}
+            className="custom-tabs"
+            style={{
+              '--ant-primary-color': '#3b82f6',
+              '--ant-primary-color-hover': '#2563eb',
+            } as React.CSSProperties}
+          />
+          <div className="pt-4">
+            {activeTab === 'bridgeIn' ? (
+              <BridgeIn showTestnet={showTestnet} />
+            ) : (
+              <BridgeOut showTestnet={showTestnet} />
+            )}
+          </div>
         </div>
       </div>
     </div>

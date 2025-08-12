@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Database, Book, ArrowRightLeft, Send, Shield, X, Activity } from 'lucide-react';
+import { LayoutDashboard, Wallet, Database, Book, ArrowRightLeft, Send, Shield, X, Activity, Link2 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import MERCATALOGO from '@/assets/mercata.png';
 
@@ -18,6 +18,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
+    { icon: <Link2 size={20} />, label: 'Bridge Assets', path: '/dashboard/bridge' },
     { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
     { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },

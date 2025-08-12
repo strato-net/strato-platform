@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
@@ -28,6 +29,7 @@ import NotFound from "./pages/NotFound";
 // Import dashboard components
 
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
+import BridgeAssets from "./pages/BridgeAssets";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
@@ -66,32 +68,48 @@ const App = () => {
 
   useEffect(() => {
     if (!loading) {
-      const appName = "Mercata";
-      const chains = [mainnet, polygon, sepolia] as const;
-      const transports = {
-        [mainnet.id]: http(),
-        [polygon.id]: http(),
-        [sepolia.id]: http(),
-      };
+      try {
+        const appName = "Mercata";
+        const chains = [mainnet, polygon, sepolia] as const;
+        const transports = {
+          [mainnet.id]: http(),
+          [polygon.id]: http(),
+          [sepolia.id]: http(),
+        };
 
-      const connectors = connectorsForWallets(
-        [
-          {
-            groupName: "Recommended",
-            wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
+        const connectors = connectorsForWallets(
+          [
+            {
+              groupName: "Recommended",
+              wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
+            },
+          ],
+          { projectId, appName }
+        );
+
+        const config = createConfig({
+          connectors,
+          chains,
+          transports,
+          ssr: true,
+        });
+
+        setWagmiConfig(config);
+      } catch (error) {
+        console.error('Error setting up wallet config:', error);
+        // Still set a minimal config to prevent app from breaking
+        const config = createConfig({
+          connectors: [],
+          chains: [mainnet, polygon, sepolia] as const,
+          transports: {
+            [mainnet.id]: http(),
+            [polygon.id]: http(),
+            [sepolia.id]: http(),
           },
-        ],
-        { projectId, appName }
-      );
-
-      const config = createConfig({
-        connectors,
-        chains,
-        transports,
-        ssr: true,
-      });
-
-      setWagmiConfig(config);
+          ssr: true,
+        });
+        setWagmiConfig(config);
+      }
     }
   }, [projectId, loading]);
 
@@ -100,9 +118,10 @@ const App = () => {
   }
 
     return (
-    <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={wagmiConfig}>
-      <RainbowKitProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <WagmiProvider config={wagmiConfig}>
+        <RainbowKitProvider>
         <UserProvider>
           <UserTokensProvider>
             <LendingProvider>
@@ -184,6 +203,14 @@ const App = () => {
                                     }
                                   />
                                   <Route
+                                    path="/dashboard/bridge"
+                                    element={
+                                      <ProtectedRoute>
+                                        <BridgeAssets />
+                                      </ProtectedRoute>
+                                    }
+                                  />
+                                  <Route
                                     path="/dashboard/admin"
                                     element={
                                       <ProtectedRoute>
@@ -219,8 +246,9 @@ const App = () => {
           </UserTokensProvider>
         </UserProvider>
       </RainbowKitProvider>
-    </WagmiProvider>
-  </QueryClientProvider>
+        </WagmiProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 
