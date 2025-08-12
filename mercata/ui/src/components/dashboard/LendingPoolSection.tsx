@@ -402,7 +402,7 @@ const LendingPoolSection = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Utilization Rate</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}%</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Available Liquidity</span>
