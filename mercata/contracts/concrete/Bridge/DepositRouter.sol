@@ -168,7 +168,7 @@ contract DepositRouter is
         return (allowedTokens[token], minDepositAmount[token]);
     }
 
-    function gnosisSafe() public view returns (address) {
+    function getGnosisSafe() public view returns (address) {
         return gnosisSafe;
     }
 
