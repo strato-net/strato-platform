@@ -1,17 +1,23 @@
 pragma solidity ^0.8.26;
 
-import "../../node_modules/@openzeppelin/contracts/access/Ownable.sol";
-import "../../node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "../../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../node_modules/@openzeppelin/contracts/utils/Pausable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
+contract DepositRouter is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
     //https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
     IPermit2 public constant PERMIT2 =
         IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
-    address public immutable gnosisSafe;
+    address private gnosisSafe;
     uint256 public depositId;
 
     mapping(address => bool) public allowedTokens;
@@ -28,8 +34,21 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
     event TokenAllowlistUpdated(address indexed token, bool allowed);
     event MinDepositAmountSet(address indexed token, uint256 minAmount);
 
-    constructor(address _gnosisSafe) Ownable(msg.sender) {
-        gnosisSafe = _gnosisSafe;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address gnosisSafe_,
+        address owner_
+    ) public initializer {
+        __Ownable_init(owner_);
+        __ReentrancyGuard_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
+
+        gnosisSafe = gnosisSafe_;
     }
 
     function deposit(
@@ -148,6 +167,18 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
     ) external view returns (bool allowed, uint256 minAmount) {
         return (allowedTokens[token], minDepositAmount[token]);
     }
+
+    function gnosisSafe() public view returns (address) {
+        return gnosisSafe;
+    }
+
+    function version() external pure virtual returns (string memory) {
+        return "1.0.0";
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }
 
 // see https://github.com/dragonfly-xyz/useful-solidity-patterns/blob/main/patterns/permit2/Permit2Vault.sol
