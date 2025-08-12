@@ -43,7 +43,7 @@ export VAULT_URL=https://vault.blockapps.net:8093
 ####################################
 
 function cleanup {
-    docker compose -p strato down -v -t 0 --remove-orphans
+    docker compose -p strato -f docker-compose.dev.yml down -v -t 0 --remove-orphans
     killall blockapps-vault-proxy-server
 }
 
@@ -65,7 +65,7 @@ export blocHost=$STRATO_HOSTNAME:3000
 
 mkdir $1
 
-docker compose -p strato up -d
+docker compose -p strato -f docker-compose.dev.yml up -d
 
 sleep 10
 
