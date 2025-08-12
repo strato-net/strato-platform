@@ -34,6 +34,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
         address stratoAddress
     ) external whenNotPaused nonReentrant {
         require(allowedTokens[token], "Token not allowed");
+        require(token != address(0), "Use depositETH()");
         require(amount >= minDepositAmount[token], "Below minimum");
 
         depositNonce++;
