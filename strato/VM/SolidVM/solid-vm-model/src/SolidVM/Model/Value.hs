@@ -91,7 +91,7 @@ data Value
   | SStruct SolidString (Map SolidString Variable)
   | STuple (Vector Variable)
   | SArray (Vector Variable)
-  | SMap SVMType.Type (Map Value Variable)
+  | SMap (Map Value Variable)
   | SFunction SolidString CC.Func
   | SBuiltinFunction SolidString (Maybe Value)
   | SBuiltinVariable SolidString
@@ -188,6 +188,7 @@ coerceFromInt ct (SEnumVal tipe _ _) n' =
     enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
+coerceFromInt _ SNULL n = if n == 0 then SNULL else SInteger n
 coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
@@ -230,14 +231,14 @@ createVar val = createVar' =<< case val of
   SStruct n m -> SStruct n <$> traverse toVar m
   STuple vs -> STuple <$> traverse toVar vs
   SArray vs -> SArray <$> traverse toVar vs
-  SMap t m -> SMap t <$> traverse toVar m
+  SMap m -> SMap <$> traverse toVar m
   SPush v mv -> SPush v <$> traverse toVar mv
   _ -> pure val
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
 defaultValue :: CC.Contract -> SVMType.Type -> Value
 defaultValue _ (SVMType.Array _ _) = SArray V.empty
-defaultValue _ (SVMType.Mapping _ _ valType) = SMap valType $ M.empty
+defaultValue _ (SVMType.Mapping _ _ _) = SMap M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
 defaultValue _ (SVMType.Address _) = (SAccount $ unspecifiedChain (Address 0)) False
@@ -268,7 +269,7 @@ createDefaultValue ::
   SVMType.Type ->
   m Value
 createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
-createDefaultValue _ _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
+createDefaultValue _ _ (SVMType.Mapping _ _ _) = return $ SMap M.empty
 createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
 createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
@@ -331,7 +332,7 @@ data BasicType
   | TContract SolidString
   | TStruct SolidString [(B.ByteString, BasicType)]
   | TArray BasicType (Maybe Word)
-  | TMapping BasicType BasicType
+  | TMapping
   | Todo String
   deriving (Show, Eq)
 

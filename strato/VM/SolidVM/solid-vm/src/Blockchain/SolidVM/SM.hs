@@ -820,10 +820,7 @@ hintFromType = \case
   SVMType.Array t ml -> do
     t' <- hintFromType t
     pure $ TArray t' ml
-  SVMType.Mapping _ k v -> do
-    k' <- hintFromType k
-    v' <- hintFromType v
-    pure $ TMapping k' v'
+  SVMType.Mapping{} -> pure TMapping
   tt'' -> todo "hintFromType" tt''
 
 getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type
