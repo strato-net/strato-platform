@@ -109,7 +109,7 @@ export class BridgeService {
           destChainId: destChainId,
           token: params.tokenAddress,
           amount: params.amount,
-          // user: params.userAddress, // Use the actual user address from the token
+           user: params.userAddress, // Use the actual user address from the token
           dest: params.toAddress
         },
       });

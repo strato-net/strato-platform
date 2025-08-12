@@ -46,14 +46,13 @@ export class BridgeController {
     next: NextFunction
   ) => {
     try {
-      const { accessToken, body, address: userAddress } = req;
+      const { accessToken, body } = req;
       validateBridgeOut(body);
-
       // Process bridge transaction
       const result = await this.bridgeService.bridgeOut({
         ...body,
         accessToken,
-        userAddress,
+        userAddress: req.address,
       });
 
       res.json({
@@ -137,7 +136,6 @@ export class BridgeController {
   ) => {
     try {
       let result = await this.bridgeService.getEthereumConfig();
-
       result.data = {
         ...result.data,
         showTestnet: process.env.NODE_ENV !== "production" ? true : false,
