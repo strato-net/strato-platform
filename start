@@ -8,12 +8,6 @@ then
 	exit
 fi
 
-if [ -e $1 ]
-then
-	echo "error!  directory $1 already exists"
-	exit
-fi
-
 if [ -e ~/.secrets/oauth_credentials ]
 then
     source ~/.secrets/oauth_credentials
@@ -43,7 +37,7 @@ export VAULT_URL=https://vault.blockapps.net:8093
 ####################################
 
 function cleanup {
-    docker compose -p strato down -v -t 0 --remove-orphans
+    docker compose -p strato down # -v -t 0 --remove-orphans
     killall blockapps-vault-proxy-server
 }
 
@@ -63,22 +57,29 @@ export STRATO_HOSTNAME
 export NODE_HOST="localhost:8080"
 export blocHost=$STRATO_HOSTNAME:3000
 
-mkdir $1
+mkdir -p $1
 
 docker compose -p strato up -d
 
 sleep 10
 
-PGPASSWORD=api createdb -h localhost -U postgres cirrus
-
 cd $1
 
-mkdir logs
+mkdir -p logs
 
-blockapps-vault-proxy-server --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --VAULT_URL=$VAULT_URL & > logs/blockapps-vault-proxy-server
+echo "######## starting blockapps-vault-proxy-server"
 
-echo "Running setup"
-strato-setup -p api -K localhost --network=helium > logs/strato-setup 2>&1
-echo "Setup complete"
+blockapps-vault-proxy-server --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --VAULT_URL=$VAULT_URL > logs/blockapps-vault-proxy-server 2>&1 &
 
+if [ ! -e .ethereumH/ethconf.yaml ]
+then
+    echo "######## running first time setup"
+    PGPASSWORD=api createdb -h localhost -U postgres cirrus
+
+    echo "Running setup"
+    strato-setup -p api -K localhost --network=helium > logs/strato-setup 2>&1
+    echo "Setup complete"
+fi
+
+echo "######## convoking"
 convoke
