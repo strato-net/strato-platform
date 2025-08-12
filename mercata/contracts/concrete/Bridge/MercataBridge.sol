@@ -1,5 +1,5 @@
 /*  ─────────────────────────────────────────────────────────────────────────
-    MercataEthBridge  –  STRATO <-> External EVM value tunnel
+    MercataBridge  –  STRATO <-> External EVM value tunnel
     ------------------------------------------------------------------------
     TRUST MODEL
       • Funds on external chain live in a multisig wallet.
@@ -26,7 +26,7 @@ import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 
 /* ───────────────────────────────────────────────────────────────────────── */
-contract record MercataEthBridge is Ownable, ReentrancyGuard {
+contract record MercataBridge is Ownable, ReentrancyGuard {
 /* --------------------------------------------------------------------- */
 /*                            ─  ENUMS  ─                               */
 /* --------------------------------------------------------------------- */
