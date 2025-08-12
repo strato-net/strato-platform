@@ -9,15 +9,15 @@ import { useBridgeContext } from '@/context/BridgeContext';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const { config, fetchBridgeConfig } = useBridgeContext();
+  const { config, fetchEthereumConfig } = useBridgeContext();
   const navigate = useNavigate();
   
   useEffect(() => {
     // Fetch bridge config on component mount
-    fetchBridgeConfig().catch((error) => {
+    fetchEthereumConfig().catch((error) => {
       console.error('Failed to fetch bridge config:', error);
     });
-  }, [fetchBridgeConfig]);
+  }, [fetchEthereumConfig]);
 
   const showTestnet = config?.showTestnet ?? false;
 

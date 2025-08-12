@@ -129,13 +129,18 @@ export class BridgeController {
     }
   }
 
-  public getBridgeConfig = async (
+  public getEthereumConfig = async (
     req: Request,
     res: Response,
     next: NextFunction
   ) => {
     try {
-      const result = await this.bridgeService.getBridgeConfig();
+      let result = await this.bridgeService.getEthereumConfig();
+
+      result.data = {
+        ...result.data,
+        showTestnet: process.env.NODE_ENV !== "production" ? true : false,
+      };
 
       res.json({
         success: true,

@@ -35,9 +35,8 @@ interface BridgeResponse {
   data?: any;
 }
 
-interface BridgeConfig {
-  showTestnet: boolean;
-  safeAddress: string;
+interface EthereumConfig {
+  ethereumAddress: string;
 }
 
 type BridgeContextType = {
@@ -46,7 +45,7 @@ type BridgeContextType = {
   bridgeOutTokens: Token[];
   loading: boolean;
   error: string | null;
-  config: BridgeConfig | null;
+  config: EthereumConfig | null;
   
   // Bridge In Functions
   fetchBridgeInTokens: () => Promise<Token[]>;
@@ -58,7 +57,7 @@ type BridgeContextType = {
   getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
   
   // Bridge Config Functions
-  fetchBridgeConfig: () => Promise<BridgeConfig>;
+  fetchEthereumConfig: () => Promise<EthereumConfig>;
   
   // Utility Functions
   formatBalance: (value: bigint | string, decimals: number) => string;
@@ -71,7 +70,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useState<BridgeConfig | null>(null);
+  const [config, setConfig] = useState<EthereumConfig | null>(null);
 
   const formatBalance = useCallback((value: bigint | string, decimals: number): string => {
     if (typeof value === 'bigint') {
@@ -84,17 +83,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const fetchBridgeConfig = useCallback(async (): Promise<BridgeConfig> => {
+  const fetchEthereumConfig = useCallback(async (): Promise<EthereumConfig> => {
     setLoading(true);
     
     try {
-      const response = await api.get(`/bridge/config`);
-      let bridgeConfig = response.data.data.data;
-      if (!bridgeConfig) {
-        bridgeConfig = response.data;
+      const response = await api.get(`/bridge/ethereumConfig`);
+      let ethereumConfig = response.data.data.data;
+      if (!ethereumConfig) {
+        ethereumConfig = response.data;
       }
-      setConfig(bridgeConfig);
-      return bridgeConfig;
+      setConfig(ethereumConfig);
+      return ethereumConfig;
     } catch (err) {
       throw err ;
     } finally {
@@ -210,7 +209,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         fetchBridgeOutTokens,
         bridgeOut,
         getBalance,
-        fetchBridgeConfig,
+        fetchEthereumConfig,
         formatBalance,
       }}
     >

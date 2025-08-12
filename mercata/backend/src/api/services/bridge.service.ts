@@ -246,10 +246,10 @@ export class BridgeService {
     }
   }
 
-  public async getBridgeConfig(): Promise<any> {
+  public async getEthereumConfig(): Promise<any> {
     try {
       const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/config`
+        `${BRIDGE_API_BASE_URL}/api/bridge/ethereumConfig`
       );
       return response.data;
     } catch (error: any) {

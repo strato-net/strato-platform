@@ -477,15 +477,14 @@ class BridgeController {
     }
   }
 
-  static async getBridgeConfig(
-    req: Request,
+  static async getEthereumConfig(
+    req: Request, 
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const config = {
-        showTestnet: process.env.SHOW_TESTNET === 'true',
-        safeAddress: process.env.SAFE_ADDRESS
+        ethereumAddress: process.env.ETHEREUM_ADDRESS
       };
 
       res.json({

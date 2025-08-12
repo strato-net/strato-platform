@@ -382,6 +382,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       let hash: `0x${string}` | undefined;
 
       // MetaMask transaction - handle wallet errors with toasts
+      // ethererun contract call 385-424
       try {
         if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
           const txHash = await sendTransactionAsync({
