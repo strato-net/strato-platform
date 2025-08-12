@@ -58,7 +58,6 @@ fromBasic = \case
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
-  MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
 
 findDefault :: BasicType -> Value
@@ -84,7 +83,6 @@ toBasic = \case
   SAccount a _ -> Just $ MS.BAccount a
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
-  SMappingSentinel -> Just $ MS.BMappingSentinel
   SUserDefined _ _ x -> toBasic x
   _ -> Nothing
 

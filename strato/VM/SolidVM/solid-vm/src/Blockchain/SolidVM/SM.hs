@@ -467,10 +467,10 @@ getVariableOfName name = do
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
 
       maybeFreeFunction :: Maybe Variable
-      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
+      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name . Just) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction =
@@ -512,7 +512,7 @@ getVariableOfName name = do
                        "verifySignature"
                      ]
           )
-          $ t "builtin function" $ Constant $ SBuiltinFunction name Nothing
+          $ t "builtin function" $ Constant $ SFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable =
