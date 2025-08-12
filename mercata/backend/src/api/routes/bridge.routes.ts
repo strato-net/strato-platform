@@ -8,8 +8,8 @@ const router = Router();
 router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridgeOut);
 
 // ----- Bridge Configuration -----
-router.get("/bridgeableTokens", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
-router.get("/ethereumConfig", authHandler.authorizeRequest(false), BridgeController.getEthereumConfig);
+router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
+router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
 
 // ----- Bridge Status -----
 router.get("/status/:status", authHandler.authorizeRequest(), BridgeController.getBridgeStatus);

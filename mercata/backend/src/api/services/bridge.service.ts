@@ -4,7 +4,7 @@ import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 
-const { MercataBridge } = constants;
+const { MercataBridge, Token } = constants;
 
 export const bridgeOut = async (
   accessToken: string,
@@ -75,12 +75,14 @@ export const getBridgeStatus = async (
 };
 
 export const getBridgeableTokens = async (
-  accessToken: string
+  accessToken: string,
+  chainId: string
 ) => {
   try {
     const params = {
-      select: `assets:${MercataBridge}-assets(stratoToken,extToken,extDecimals,chainId,enabled)`,
-      "assets.enabled": "eq.true"
+      select: `assets:${MercataBridge}-assets(*)`,
+      "assets.enabled": "eq.true",
+      "assets.chainId": `eq.${chainId}`
     };
 
     const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
@@ -91,31 +93,52 @@ export const getBridgeableTokens = async (
 
     const assets = bridgeData[0].assets || [];
     
+    if (assets.length === 0) {
+      return [];
+    }
+
+    // Get token addresses from assets
+    const tokenAddresses = assets.map((asset: any) => asset.stratoToken);
+    
+    // Fetch token metadata
+    const tokenParams = {
+      select: "address,_name,_symbol",
+      address: `in.(${tokenAddresses.join(",")})`
+    };
+
+    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, { params: tokenParams });
+    
+    // Create a map of token addresses to their metadata
+    const tokenMap = new Map();
+    tokenData.forEach((token: any) => {
+      tokenMap.set(token.address, { name: token._name, symbol: token._symbol });
+    });
+    
     return assets.map((asset: any) => ({
-      address: asset.stratoToken,
-      extToken: asset.extToken,
-      extDecimals: asset.extDecimals,
-      chainId: asset.chainId,
-      bridgeable: true
+      ...asset,
+      stratoTokenName: tokenMap.get(asset.stratoToken)?._name || "",
+      stratoTokenSymbol: tokenMap.get(asset.stratoToken)?._symbol || ""
     }));
   } catch (error) {
     throw error;
   }
 };
 
-export const getEthereumConfig = async () => {
+export const getNetworkConfigs = async (accessToken: string) => {
   try {
-    return {
-      chainId: "1",
-      networkName: "Ethereum Mainnet",
-      rpcUrl: process.env.ETH_RPC_URL || "https://mainnet.infura.io/v3/your-project-id",
-      blockExplorer: "https://etherscan.io",
-      nativeCurrency: {
-        name: "Ether",
-        symbol: "ETH",
-        decimals: 18
+    const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, {
+      params: {
+        select: `chains:${MercataBridge}-chains(*)`,
+        "chains.enabled": "eq.true"
       }
-    };
+    });
+
+    if (!bridgeData || !Array.isArray(bridgeData) || bridgeData.length === 0) {
+      throw new Error("No bridge data found");
+    }
+
+    const chains = bridgeData[0].chains || [];
+    return chains;
   } catch (error) {
     throw error;
   }

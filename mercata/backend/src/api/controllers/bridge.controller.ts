@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { 
   bridgeOut, 
   getBridgeableTokens,
-  getEthereumConfig, 
+  getNetworkConfigs, 
   getBridgeStatus 
 } from "../services/bridge.service";
 import { validateBridgeOut } from "../validators/bridge.validators";
@@ -35,20 +35,28 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const result = await getBridgeableTokens(accessToken);
+      const { chainId } = req.params;
+      
+      if (!chainId) {
+        res.status(400).json({ error: "chainId parameter is required" });
+        return;
+      }
+      
+      const result = await getBridgeableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
       next(error);
     }
   }
 
-  static async getEthereumConfig(
+  static async getNetworkConfigs(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const result = await getEthereumConfig();
+      const { accessToken } = req;
+      const result = await getNetworkConfigs(accessToken);
       const configData = {
         ...result,
         showTestnet: process.env.NODE_ENV !== "production" ? true : false,
