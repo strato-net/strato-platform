@@ -32,7 +32,7 @@ The name of the smart contract will be `RewardsEngine`
   - Remove reward tokens (batch operation that calls 'Remove reward token' in a
     loop)
 
-### Multipliers management
+### Multipliers management (PARTIALLY IMPLEMENTED)
 
   Because we have different `Reward tokens`, one `Action` can requires applying
   different multiplications per each reward.
@@ -58,6 +58,8 @@ The name of the smart contract will be `RewardsEngine`
   factor for every Reward token we have, and fail otherwise. When we remove a
   multiplier, we need to check that it is not referenced by other existing
   `Action` and fail otherwise.
+
+  <!-- TODO: Add validation to prevent removing multipliers that are referenced by existing Actions (requires Action Management to be implemented first) -->
 
 ### Action Management
 
