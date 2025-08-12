@@ -14,6 +14,8 @@ contract record RewardsEngine is Ownable {
     event RewardTokenRemoved(address indexed token);
     event MultiplierAdded(string indexed name);
     event MultiplierRemoved(string indexed name);
+    event ActionAdded(string indexed actionType, address indexed asset, string multiplierName);
+    event ActionRemoved(string indexed actionType, address indexed asset);
 
     // ═════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -26,6 +28,13 @@ contract record RewardsEngine is Ownable {
     struct Multiplier {
         string name;
         mapping(address => uint256) factors; // rewardToken -> factor
+    }
+
+    struct Action {
+        string actionType;
+        address asset;
+        string multiplierName;
+        address owner;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -46,6 +55,9 @@ contract record RewardsEngine is Ownable {
     string[] public record multiplierNames;
     mapping(string => uint) public record multiplierMap;
     mapping(string => Multiplier) public record multipliers;
+
+    // Action management: nested mapping from actionType -> asset -> Action
+    mapping(string => mapping(address => Action)) public record actions;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -151,7 +163,7 @@ contract record RewardsEngine is Ownable {
     ) external onlyOwner {
         require(names.length == tokenAddresses.length, "RewardsEngine: Array length mismatch");
         require(names.length == factors.length, "RewardsEngine: Array length mismatch");
-        
+
         for (uint i = 0; i < names.length; i++) {
             _addMultiplier(names[i], tokenAddresses[i], factors[i]);
         }
@@ -188,10 +200,10 @@ contract record RewardsEngine is Ownable {
 
         multiplierNames.push(name);
         multiplierMap[name] = multiplierNames.length;
-        
+
         Multiplier storage multiplier = multipliers[name];
         multiplier.name = name;
-        
+
         for (uint i = 0; i < tokenAddresses.length; i++) {
             multiplier.factors[tokenAddresses[i]] = factors[i];
         }
@@ -203,6 +215,9 @@ contract record RewardsEngine is Ownable {
         require(bytes(name).length > 0, "RewardsEngine: Empty multiplier name");
         uint index = multiplierMap[name];
         require(index > 0, "RewardsEngine: Multiplier not found");
+
+        // TODO: Check that no existing actions reference this multiplier
+        // This requires tracking multiplier usage or iterating through all actions
 
         uint arrayIndex = index - 1;
         uint lastIndex = multiplierNames.length - 1;
@@ -218,6 +233,68 @@ contract record RewardsEngine is Ownable {
         delete multipliers[name];
 
         emit MultiplierRemoved(name);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // ACTION MANAGEMENT CAPABILITIES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function addAction(
+        string calldata actionType,
+        address asset,
+        string calldata multiplierName,
+        address owner
+    ) external onlyOwner {
+        _addAction(actionType, asset, multiplierName, owner);
+    }
+
+    function removeAction(
+        string calldata actionType,
+        address asset
+    ) external onlyOwner {
+        _removeAction(actionType, asset);
+    }
+
+    function _addAction(
+        string calldata actionType,
+        address asset,
+        string calldata multiplierName,
+        address owner
+    ) internal {
+        require(bytes(actionType).length > 0, "RewardsEngine: Empty action type");
+        require(asset != address(0), "RewardsEngine: Invalid asset address");
+        require(bytes(multiplierName).length > 0, "RewardsEngine: Empty multiplier name");
+        require(owner != address(0), "RewardsEngine: Invalid owner address");
+
+        // Check that multiplier exists
+        require(multiplierMap[multiplierName] > 0, "RewardsEngine: Multiplier not found");
+
+        // Check that the (actionType, asset) tuple is unique
+        require(bytes(actions[actionType][asset].actionType).length == 0, "RewardsEngine: Action already exists");
+
+        actions[actionType][asset] = Action({
+            actionType: actionType,
+            asset: asset,
+            multiplierName: multiplierName,
+            owner: owner
+        });
+
+        emit ActionAdded(actionType, asset, multiplierName);
+    }
+
+    function _removeAction(
+        string calldata actionType,
+        address asset
+    ) internal {
+        require(bytes(actionType).length > 0, "RewardsEngine: Empty action type");
+        require(asset != address(0), "RewardsEngine: Invalid asset address");
+
+        // Check that action exists
+        require(bytes(actions[actionType][asset].actionType).length > 0, "RewardsEngine: Action not found");
+
+        delete actions[actionType][asset];
+
+        emit ActionRemoved(actionType, asset);
     }
 
 }

@@ -61,7 +61,7 @@ The name of the smart contract will be `RewardsEngine`
 
   <!-- TODO: Add validation to prevent removing multipliers that are referenced by existing Actions (requires Action Management to be implemented first) -->
 
-### Action Management
+### Action Management (IMPLEMENTED)
 
   We want to store different `Action`s that can happen in the system and that
   will trigger rewards evaluation.
