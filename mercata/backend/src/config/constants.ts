@@ -1,4 +1,4 @@
-import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry } from "./config";
+import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry, mercataBridge } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -24,7 +24,7 @@ export const constants = (() => {
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
-  const MercataEthBridge = `${CONTRACT_PREFIX}MercataEthBridge`;
+  const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
   const Event = "event";
   
   const tokenSelectFields = [
@@ -106,6 +106,21 @@ export const constants = (() => {
     "price::text",
     "timestamp::text"
   ];
+
+  const mercataBridgeSelectFields = [
+    "address",
+    "tokenFactory",
+    "relayer",
+    "depositsPaused",
+    "withdrawalsPaused",
+    "withdrawalCounter",
+    "WITHDRAWAL_ABORT_DELAY",
+    `deposits:${MercataBridge}-deposits(srcChainId,srcTxHash,token,user,amount,bridgeStatus)`,
+    `withdrawals:${MercataBridge}-withdrawals(id,destChainId,token,user,dest,amount,requestedAt,bridgeStatus)`,
+    `tokenLimits:${MercataBridge}-tokenLimits(token,maxPerTx)`,
+    `chains:${MercataBridge}-chains(chainId,custody,depositRouter,lastProcessedBlock,enabled)`,
+    `assets:${MercataBridge}-assets(stratoToken,extToken,extDecimals,chainId,enabled)`,
+  ];
   return {
     poolFactory,
     lendingRegistry,
@@ -126,7 +141,9 @@ export const constants = (() => {
     LendingRegistry,
     PoolConfigurator,
     AdminRegistry,
-    MercataEthBridge,
+    MercataBridge,
+    mercataBridgeSelectFields,
+    mercataBridge,
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,

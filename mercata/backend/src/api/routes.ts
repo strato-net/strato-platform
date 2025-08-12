@@ -6,16 +6,15 @@ import authHandler from "./middleware/authHandler";
 
 import TokensController from "./controllers/tokens.controller";
 import OnRampController from "./controllers/onramp.controller";
-import { BridgeController } from "./controllers/bridge.controller";
 import OracleController from "./controllers/oracle.controller";
 import ConfigController from "./controllers/config.controller";
 import userRoutes from "./routes/user.routes";
 import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
+import bridgeRoutes from "./routes/bridge.routes";
 
 const router = Router();
-const bridgeController = new BridgeController();
 
 // ----- User Routes -----
 router.use("/user", userRoutes);
@@ -57,14 +56,7 @@ router.post("/onramp/cancelListing", authHandler.authorizeRequest(), OnRampContr
 router.post("/onramp/updateListing", authHandler.authorizeRequest(), OnRampController.updateListing);
 
 // ----- Bridge Routes -----
-router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
-router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
-// router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(), bridgeController.getBalance);
-router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(), bridgeController.getBridgeInTokens);
-router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(), bridgeController.getBridgeOutTokens);
-router.get("/bridge/ethereumConfig", bridgeController.getEthereumConfig);
-router.get("/bridge/depositStatus/:status", authHandler.authorizeRequest(), bridgeController.userDepositStatus);
-router.get("/bridge/withdrawalStatus/:status", authHandler.authorizeRequest(), bridgeController.userWithdrawalStatus);
+router.use("/bridge", bridgeRoutes);
 
 // ----- Health Check -----
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {

@@ -1,320 +1,122 @@
-import axios from 'axios';
-import { 
-  fetchDepositInitiatedStatus, 
-  fetchWithdrawalInitiatedStatus,
-  fetchDepositInitiatedTransactions
-} from './cirrusService';
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 
-interface BridgeInParams {
-  amount: string;
-  fromAddress: string;
-  accessToken: string;
-  tokenAddress: string;
-  ethHash: string;
-}
+const { MercataBridge } = constants;
 
-interface BridgeOutParams {
-  amount: string;
-  toAddress: string;
-  tokenAddress: string;
-  accessToken: string;
-  userAddress: string;
-}
+export const bridgeOut = async (
+  accessToken: string,
+  body: Record<string, string | undefined>
+) => {
+  try {
+    const { destChainId, token, amount, destAddress } = body;
 
-const BRIDGE_API_BASE_URL = process.env.BRIDGE_API_BASE_URL || 'http://localhost:3003';
-
-export class BridgeService {
-  public async bridgeIn(params: BridgeInParams): Promise<any> {
-    try {
-      const response = await axios.post(
-        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeIn`,
-        {
-          fromAddress: params.fromAddress,
-          amount: params.amount,
-          tokenAddress: params.tokenAddress,
-          ethHash: params.ethHash || ''
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${params.accessToken}`
-          }
-        }
-      );
-  
-      return {
-        status: response.data.status,
-        hash: response.data.hash,
-      };
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
+    const bridgeContractName = extractContractName(MercataBridge);
+    const bridgeContractAddress = constants.mercataBridge;
+    
+    if (!bridgeContractAddress) {
+      throw new Error("Bridge contract address not configured");
     }
+
+    const tx = buildFunctionTx({
+      contractName: bridgeContractName,
+      contractAddress: bridgeContractAddress,
+      method: "requestWithdrawal",
+      args: {
+        destChainId,
+        token,
+        amount,
+        destAddress
+      },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return {
+      status,
+      hash,
+      message: "Withdrawal request submitted successfully"
+    };
+  } catch (error) {
+    throw error;
   }
-  
+};
 
-  public async bridgeOut(params: BridgeOutParams): Promise<any> {
-    try {
-      // Comment out the existing API call
-      /*
-      const response = await axios.post(
-        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeOut`,
-        {
-          amount: params.amount,
-          toAddress: params.toAddress,
-          tokenAddress: params.tokenAddress,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${params.accessToken}`
-          }
-        }
-      );
-
-      return response.data;
-      */
-
-      // New contract call to emit WithdrawalRequested event
-      const bridgeContractName = extractContractName(constants.MercataEthBridge);
-      const bridgeContractAddress = process.env.BRIDGE_ADDRESS;
-      
-      if (!bridgeContractAddress) {
-        throw new Error("Bridge contract address not configured");
-      }
-
-      // Generate a unique ID for the withdrawal request
-      const withdrawalId = Date.now().toString();
-      
-      // Assuming destChainId is 1 for Ethereum mainnet (you may need to adjust this)
-      const destChainId = "1";
-      
-      const tx = buildFunctionTx({
-        contractName: bridgeContractName,
-        contractAddress: bridgeContractAddress,
-        method: "requestWithdrawal", // change method name
-        args: {
-          id: withdrawalId,
-          destChainId: destChainId,
-          token: params.tokenAddress,
-          amount: params.amount,
-           user: params.userAddress, // Use the actual user address from the token
-          dest: params.toAddress
-        },
-      });
-
-      const { status, hash } = await postAndWaitForTx(params.accessToken, () =>
-        strato.post(params.accessToken, StratoPaths.transactionParallel, tx)
-      );
-
-      return {
-        status,
-        hash,
-        withdrawalId,
-        message: "Withdrawal request submitted successfully"
-      };
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
+export const getBridgeStatus = async (
+  accessToken: string,
+  userAddress: string,
+  rawParams: Record<string, string | undefined> = {}
+) => {
+  try {
+    if (!userAddress) {
+      throw new Error('User address is required');
     }
-  }
 
-  public async getBalance(params: {
-    accessToken: string;
-    tokenAddress: string;
-  }): Promise<any> {
-    try {
-      // Balance endpoint
-      const response = await axios.post(
-        `${BRIDGE_API_BASE_URL}/api/bridge/stratoTokenBalance`,
-        {
-          tokenAddress: params.tokenAddress,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${params.accessToken}`
-          }
-        }
-      );
+    const params = {
+      select: `withdrawals:${MercataBridge}-withdrawals(id,destChainId,token,user,dest,amount,requestedAt,bridgeStatus)`,
+      "withdrawals.user": `eq.${userAddress}`,
+    };
 
-      // divide balance by 10^18
-      const balance = response.data.data.balance;
-      return {
-        balance: balance.toString(),
-      };
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
+    const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
+
+    if (!bridgeData || !Array.isArray(bridgeData) || bridgeData.length === 0) {
+      return [];
     }
-  }
 
-  public async getUserDepositStatus(params: {
-    accessToken: string;
-    status: string;
-    limit?: number;
-    orderBy?: string;
-    orderDirection?: string;
-    pageNo?: string;
-    userAddress?: string;
-  }): Promise<any> {
-    try {
-      // Call cirrus function directly instead of external bridge service
-      const result = await fetchDepositInitiatedStatus(
-        params.accessToken,
-        params.status,
-        params.limit,
-        params.orderBy,
-        params.orderDirection,
-        params.pageNo,
-        params.userAddress
-      );
-      
-      if (!result) {
-        throw new Error('Failed to fetch deposit status');
-      }
-      
-      return result;
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
-    }
+    const withdrawals = bridgeData[0].withdrawals || [];
+    return withdrawals;
+  } catch (error) {
+    throw error;
   }
+};
 
-  public async getUserWithdrawalStatus(params: {
-    accessToken: string;
-    status: string;
-    limit?: number;
-    orderBy?: string;
-    orderDirection?: string;
-    pageNo?: string;
-    userAddress?: string;
-  }): Promise<any> {
-    try {
-      // Call cirrus function directly instead of external bridge service
-      const result = await fetchWithdrawalInitiatedStatus(
-        params.accessToken,
-        params.status,
-        params.limit,
-        params.orderBy,
-        params.orderDirection,
-        params.pageNo,
-        params.userAddress
-      );
-      
-      if (!result) {
-        throw new Error('Failed to fetch withdrawal status');
-      }
-      
-      return result;
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
-    }
-  }
-  
-  public async getBridgeInTokens(params: {
-    accessToken: string;
-    type: string;
-  }): Promise<any> {
-    try {
-      const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeInTokens`,
-        {
-          headers: {
-            'Authorization': `Bearer ${params.accessToken}`
-          }
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
-    }
-  }
+export const getBridgeableTokens = async (
+  accessToken: string
+) => {
+  try {
+    const params = {
+      select: `assets:${MercataBridge}-assets(stratoToken,extToken,extDecimals,chainId,enabled)`,
+      "assets.enabled": "eq.true"
+    };
 
-  public async getBridgeOutTokens(params: {
-    accessToken: string;
-  }): Promise<any> {
-    try {
-      const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/bridgeOutTokens`,
-        {
-          headers: {
-            'Authorization': `Bearer ${params.accessToken}`
-          }
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
-    }
-  }
+    const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
 
-  public async getEthereumConfig(): Promise<any> {
-    try {
-      const response = await axios.get(
-        `${BRIDGE_API_BASE_URL}/api/bridge/ethereumConfig`
-      );
-      return response.data;
-    } catch (error: any) {
-      // Extract error message from axios error response
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Unknown error occurred');
-      }
+    if (!bridgeData || !Array.isArray(bridgeData) || bridgeData.length === 0) {
+      return [];
     }
-  }
 
-}
+    const assets = bridgeData[0].assets || [];
+    
+    return assets.map((asset: any) => ({
+      address: asset.stratoToken,
+      extToken: asset.extToken,
+      extDecimals: asset.extDecimals,
+      chainId: asset.chainId,
+      bridgeable: true
+    }));
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getEthereumConfig = async () => {
+  try {
+    return {
+      chainId: "1",
+      networkName: "Ethereum Mainnet",
+      rpcUrl: process.env.ETH_RPC_URL || "https://mainnet.infura.io/v3/your-project-id",
+      blockExplorer: "https://etherscan.io",
+      nativeCurrency: {
+        name: "Ether",
+        symbol: "ETH",
+        decimals: 18
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
