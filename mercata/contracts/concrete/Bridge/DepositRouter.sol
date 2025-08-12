@@ -7,8 +7,12 @@ import "../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import "../../node_modules/@openzeppelin/contracts/utils/Pausable.sol";
 
 contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
+    //https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
+    IPermit2 public constant PERMIT2 =
+        IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+
     address public immutable gnosisSafe;
-    uint256 public depositNonce;
+    uint256 public depositId;
 
     mapping(address => bool) public allowedTokens;
     mapping(address => uint256) public minDepositAmount;
@@ -18,7 +22,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
         uint256 amount,
         address indexed sender,
         address indexed stratoAddress,
-        uint256 nonce
+        uint256 depositId
     );
 
     event TokenAllowlistUpdated(address indexed token, bool allowed);
@@ -31,28 +35,41 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
     function deposit(
         address token,
         uint256 amount,
-        address stratoAddress
+        address stratoAddress,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
     ) external whenNotPaused nonReentrant {
         require(allowedTokens[token], "Token not allowed");
         require(token != address(0), "Use depositETH()");
         require(amount >= minDepositAmount[token], "Below minimum");
 
-        depositNonce++;
+        depositId++;
 
-        SafeERC20.safeTransferFrom(
-            IERC20(token),
+        IPermit2.PermitTransferFrom memory permit = IPermit2
+            .PermitTransferFrom({
+                permitted: IPermit2.TokenPermissions({
+                    token: token,
+                    amount: amount
+                }),
+                nonce: nonce,
+                deadline: deadline
+            });
+
+        IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
+            .SignatureTransferDetails({
+                to: gnosisSafe,
+                requestedAmount: amount
+            });
+
+        PERMIT2.permitTransferFrom(
+            permit,
+            transferDetails,
             msg.sender,
-            gnosisSafe,
-            amount
+            signature
         );
 
-        emit DepositRouted(
-            token,
-            amount,
-            msg.sender,
-            stratoAddress,
-            depositNonce
-        );
+        emit DepositRouted(token, amount, msg.sender, stratoAddress, depositId);
     }
 
     // using address(0) for ETH
@@ -62,7 +79,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
         require(allowedTokens[address(0)], "ETH not allowed");
         require(msg.value >= minDepositAmount[address(0)], "Below minimum");
 
-        depositNonce++;
+        depositId++;
 
         (bool success, ) = gnosisSafe.call{value: msg.value}("");
         require(success, "ETH transfer failed");
@@ -72,7 +89,7 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
             msg.value,
             msg.sender,
             stratoAddress,
-            depositNonce
+            depositId
         );
     }
 
@@ -131,4 +148,30 @@ contract DepositRouter is Ownable, ReentrancyGuard, Pausable {
     ) external view returns (bool allowed, uint256 minAmount) {
         return (allowedTokens[token], minDepositAmount[token]);
     }
+}
+
+// see https://github.com/dragonfly-xyz/useful-solidity-patterns/blob/main/patterns/permit2/Permit2Vault.sol
+interface IPermit2 {
+    struct TokenPermissions {
+        address token;
+        uint256 amount;
+    }
+
+    struct PermitTransferFrom {
+        TokenPermissions permitted;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct SignatureTransferDetails {
+        address to;
+        uint256 requestedAmount;
+    }
+
+    function permitTransferFrom(
+        PermitTransferFrom memory permit,
+        SignatureTransferDetails calldata transferDetails,
+        address owner,
+        bytes calldata signature
+    ) external;
 }
