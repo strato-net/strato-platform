@@ -66,7 +66,7 @@ import Control.Applicative
 import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
-import Control.Lens hiding (Context, assign, from, to, uncons, unsnoc)
+import Control.Lens hiding (Context, assign, from, to, uncons)
 import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
