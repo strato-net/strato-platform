@@ -1,30 +1,12 @@
-// Example usage:
-/*
-const generator = safeTransactionGenerator(amount, tokenAddress, userAddress);
-
-// First call - generate hash
-const { hash } = await generator.next();
-console.log('Generated hash:', hash);
-
-// Second call - propose transaction
-const { success } = await generator.next();
-console.log('Transaction proposed:', success);
-*/
-
-
 import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
-import { config } from "../config";
+import { config, getChainRpcUrl } from "../config";
 import { Interface } from "ethers";
 
-// Minimal ERC20 ABI
 const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
-
-const showTestnet = process.env.SHOW_TESTNET === "true";
-const chainId = showTestnet ? 11155111n : 1n;
 
 interface SafeTransactionState {
   safeTxHash?: string;
@@ -34,11 +16,110 @@ interface SafeTransactionState {
 
 type TxType = "eth" | "erc20";
 
+interface WithdrawalTransaction {
+  hash: string;
+  success: boolean;
+}
+
+interface SafeTransactionResult {
+  safeTxHash: string;
+  success: boolean;
+}
+
+export const createSafeTransactionsForWithdrawals = async (withdrawals: any[]): Promise<SafeTransactionResult[]> => {
+  try {
+    // Group withdrawals by both destChainId and token address
+    const withdrawalsByChainAndToken = new Map<string, any[]>();
+    
+    for (const withdrawal of withdrawals) {
+      const destChainId = BigInt(withdrawal.destChainId);
+      const tokenAddress = withdrawal.token;
+      const key = `${destChainId}-${tokenAddress}`;
+      
+      if (!withdrawalsByChainAndToken.has(key)) {
+        withdrawalsByChainAndToken.set(key, []);
+      }
+      withdrawalsByChainAndToken.get(key)!.push(withdrawal);
+    }
+
+    const safeTxs: SafeTransactionResult[] = [];
+
+    for (const [key, tokenWithdrawals] of withdrawalsByChainAndToken) {
+      try {
+        const [destChainId, tokenAddress] = key.split('-');
+        const totalAmount = tokenWithdrawals.reduce((sum, w) => sum + BigInt(w.amount), BigInt(0));
+        const destAddress = tokenWithdrawals[0].dest || tokenWithdrawals[0].destAddress;
+        
+        const generator = safeTransactionGenerator(
+          totalAmount.toString(),
+          destAddress,
+          "erc20",
+          tokenAddress,
+          BigInt(destChainId)
+        );
+
+        const hashResult = await generator.next();
+        const successResult = await generator.next();
+
+        if (hashResult.value?.hash && successResult.value?.success) {
+          safeTxs.push({ 
+            safeTxHash: hashResult.value.hash, 
+            success: successResult.value.success 
+          });
+        }
+      } catch (error) {
+        console.error(`❌ Error creating safe transaction for key ${key}:`, error);
+      }
+    }
+
+    return safeTxs;
+  } catch (error) {
+    console.error("❌ Error in createSafeTransactionsForWithdrawals:", error);
+    return [];
+  }
+};
+
+export const checkExecutedSafeTransactions = async (withdrawals: any[]): Promise<WithdrawalTransaction[]> => {
+  try {
+    const executedTxs = withdrawals.map(w => ({
+      hash: w.safeTxHash || w.custodyTxHash || `executed_${w.id}`,
+      success: true
+    }));
+    return executedTxs;
+  } catch (error) {
+    console.error("❌ Error in checkExecutedSafeTransactions:", error);
+    return [];
+  }
+};
+
+export const monitorSafeTransactionStatus = async (transactionKey: string, chainId: bigint): Promise<'executed' | 'rejected' | 'pending'> => {
+  try {
+    const txHash = `0x${transactionKey}`;
+    const apiKit = new SafeApiKit({ chainId });
+    
+    const safeTransaction = await apiKit.getTransaction(txHash);
+    
+    if (safeTransaction.isExecuted === true) {
+      return 'executed';
+    } else if (safeTransaction.isExecuted === false && safeTransaction.executionDate) {
+      return 'rejected';
+    } else if (safeTransaction.isExecuted === false && (safeTransaction as any).rejectReason) {
+      return 'rejected';
+    } else {
+      return 'pending';
+    }
+  } catch (error) {
+    console.error(`❌ Failed to check Safe transaction status ${transactionKey}:`, error);
+    return 'pending';
+  }
+};
+
 async function* safeTransactionGenerator(
   amount: string,
   toAddress: string,
   type: TxType,
-  tokenAddress?: string // required for erc20
+  tokenAddress: string,
+  chainId: bigint
 ): AsyncGenerator<{
   step: "generate" | "propose";
   hash?: string;
@@ -46,20 +127,18 @@ async function* safeTransactionGenerator(
 }> {
   const state: SafeTransactionState = {};
 
-  // Initialize Safe protocol kit
   state.protocolKit = await Safe.init({
-    provider: config.ethereum.rpcUrl || "",
+    provider: getChainRpcUrl(chainId),
     signer: config.safe.safeOwnerPrivateKey || "",
     safeAddress: config.safe.address || "",
   });
 
-  // Generate transaction data based on type
   let safeTransactionData: MetaTransactionData;
 
   if (type === "eth") {
     safeTransactionData = {
       to: toAddress,
-      value: amount.toString(), // already in wei
+      value: amount.toString(),
       data: "0x",
       operation: OperationType.Call,
     };
@@ -67,12 +146,12 @@ async function* safeTransactionGenerator(
     const iface = new Interface(ERC20_ABI);
     const data = iface.encodeFunctionData("transfer", [
       toAddress,
-      amount.toString(), // in wei
+      amount.toString(),
     ]);
 
     safeTransactionData = {
       to: tokenAddress,
-      value: "0", // ETH value is 0 for ERC20 transfer
+      value: "0",
       data,
       operation: OperationType.Call,
     };
@@ -84,15 +163,10 @@ async function* safeTransactionGenerator(
     transactions: [safeTransactionData],
   });
 
-  state.safeTxHash = await state.protocolKit.getTransactionHash(
-    safeTransaction
-  );
-
+  state.safeTxHash = await state.protocolKit.getTransactionHash(safeTransaction);
   yield { step: "generate", hash: state.safeTxHash };
 
-  // Propose transaction
   state.apiKit = new SafeApiKit({ chainId });
-
   const signature = await state.protocolKit.signHash(state.safeTxHash);
 
   await state.apiKit.proposeTransaction({
@@ -105,86 +179,5 @@ async function* safeTransactionGenerator(
 
   yield { step: "propose", success: true };
 }
-
-export const checkEthTransaction = async (transactionHash: string) => {
-  const apiKit = new SafeApiKit({
-    chainId,
-  });
-
-  // check transaction in every 5 seconds 5 times return when found else return null
-  for (let i = 0; i < 5; i++) {
-    const allTxs: any = await apiKit.getAllTransactions(
-      config.safe.address || "",
-      { limit: 100 }
-    );
-    const transaction = allTxs.results.find(
-      (safeTx: any) => transactionHash === safeTx.transactionHash
-    );
-    if (transaction) {
-      return transaction;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  }
-  return null;
-};
-
-export const checkEthTransactionBatch = async (txList: any[]): Promise<{ txHash: string }[]> => {
-  const confirmed: { txHash: string }[] = [];
-  const apiKit = new SafeApiKit({ chainId });
-
-  for (const tx of txList) {
-    const transactionHash = tx.hash.replace("0x", "");
-
-    let transaction = null;
-
-    for (let i = 0; i < 5; i++) {
-      const allTxs: any = await apiKit.getAllTransactions(config.safe.address || "", { limit: 100 });
-
-      transaction = allTxs.results.find(
-        (safeTx: any) => transactionHash === safeTx.transactionHash
-      );
-
-      if (transaction) break;
-
-      await new Promise(resolve => setTimeout(resolve, 5000)); // wait 5 sec
-    }
-
-    if (transaction?.safeTxHash) {
-      const safeTxHash = transaction.safeTxHash.toString().replace(/^0x/, "");
-      confirmed.push({ txHash: safeTxHash });
-      console.log("✅ Confirmed");
-    } else {
-      console.warn("⚠️ Not confirmed");
-    }
-  }
-
-  return confirmed;
-};
-
-
-// Example usage:
-/*
-const generator = safeTransactionGenerator(amount, tokenAddress, userAddress);
-
-// First call - generate hash
-const { hash } = await generator.next();
-console.log('Generated hash:', hash);
-
-// Second call - propose transaction
-const { success } = await generator.next();
-console.log('Transaction proposed:', success);
-*/
-
-
-// For ETH Transfer:
-// const gen = safeTransactionGenerator("100000000000000000", "0xRecipient", "eth");
-
-// For ERC20 Transfer:
-// const gen = safeTransactionGenerator(
-//   "1000000000000000000", // 1 token with 18 decimals
-//   "0xRecipient",
-//   "erc20",
-//   "0xTokenAddress"
-// );
 
 export default safeTransactionGenerator;

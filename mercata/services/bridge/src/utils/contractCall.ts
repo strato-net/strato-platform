@@ -1,5 +1,6 @@
-import axios from "axios";
-import { getBAUserToken } from "../auth";
+import { buildFunctionTx } from "./txBuilder";
+import { postAndWaitForTx } from "./txHelper";
+import { strato } from "./mercataApiHelper";
 
 export const contractCall = async (
   contractName: string,
@@ -7,103 +8,16 @@ export const contractCall = async (
   method: string,
   args: any,
 ) => {
-  const accessToken = await getBAUserToken();
+  const tx = buildFunctionTx({
+    contractName,
+    contractAddress,
+    method,
+    args,
+  });
 
-  const txPayload = {
-    txs: [
-      {
-        payload: {
-          contractName,
-          contractAddress,
-          method,
-          args,
-        },
-        type: "FUNCTION",
-      },
-    ],
-    txParams: {
-      gasLimit: 150000,
-      gasPrice: 30000000000,
-    },
-  };
-
-  let response;
-  try {
-    response = await axios.post(
-      `${process.env.NODE_URL}/strato/v2.3/transaction/parallel?resolve=true`,
-      txPayload,
-      {
-        headers: {
-          accept: "application/json;charset=utf-8",
-          "content-type": "application/json;charset=utf-8",
-          authorization: `Bearer ${accessToken}`,
-        },
-        timeout: 30000,
-        maxContentLength: 50 * 1024 * 1024,
-        maxBodyLength: 50 * 1024 * 1024,
-      }
-    );
-
-    if (response.status !== 200) {
-      throw new Error(`Strato error: ${response.statusText}`);
-    }
-  } catch (error: any) {
-    // Handle blockchain errors and preserve the original error message
-    if (error.response?.status === 422) {
-      const errorData = error.response.data;
-      
-      if (errorData && typeof errorData === 'string') {
-        // Look for Solidity error messages in the response
-        const solidityMatch = errorData.match(/SString "([^"]+)"/);
-        
-        if (solidityMatch) {
-          console.log("solidityMatch errrorrr in contract call",solidityMatch[1]);
-          throw solidityMatch[1]; // Throw just the original blockchain error
-      
-        }
-      }
-    }
-    throw error; // Re-throw other errors
-  }
-
-  if (!response.data || !Array.isArray(response.data)) {
-    throw new Error("Strato response data is empty or invalid");
-  }
-
-  const result = response.data[0];
-  if (!result || !result.hash) {
-    throw new Error("Missing transaction result or hash");
-  }
-
-
-  // Check if the transaction is already complete from the initial response
-  if (result.status && result.status !== "Pending") {
-    console.log("Transaction already complete, returning result directly");
-    return result;
-  }
-
-  const txHash = result.hash;
-
-  const predicate = (results: any[]) =>
-    results.every((r) => r.status !== "Pending");
-
-  const action = async () => {
-    const res = await axios.post(`${process.env.NODE_URL}/bloc/v2.2/transactions/results`, [txHash], {
-      headers: {
-        accept: "application/json;charset=utf-8",
-        "content-type": "application/json;charset=utf-8",
-        authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    console.log("🚀 res", res.data);
-        
-    return res.data;
-  };
-
-  const finalResult = await until(predicate, action);
-
-  return finalResult[0];
+  return await postAndWaitForTx(() => 
+    strato.post("/transaction/parallel?resolve=true", tx)
+  );
 };
 
 export const until = async (

@@ -1,388 +1,176 @@
-import axios from 'axios';
 import { config } from '../config';
-import { getBAUserToken } from '../auth';
-import { confirmBridgeinSafePolling, confirmBridgeOutSafePolling } from '../services/bridgeService';
-import SafeApiKit from "@safe-global/api-kit";
-import BridgeContractCall from '../utils/bridgeContractCall';
-import safeTransactionGenerator from '../services/safeService';
-import sendEmail from '../services/emailService';
-import { TESTNET_ERC20_TOKEN_CONTRACTS, MAINNET_ERC20_TOKEN_CONTRACTS } from '../config';
-import { TESTNET_ETH_STRATO_TOKEN_MAPPING, MAINNET_ETH_STRATO_TOKEN_MAPPING } from '../config';
+import { contractCall } from '../utils/contractCall';
+import {
+  getLastProcessedBlock,
+  getEnabledChains,
+  isTokenEnabled
+} from '../services/cirrusService';
+import { depositBatch } from '../services/bridgeService';
+import {
+  getCurrentBlockNumber,
+  getChainLogs,
+  isChainConfigured
+} from '../utils/rpcApiHelper';
 
-const NODE_URL = process.env.NODE_URL;
+const DEPOSIT_EVENT_SIGNATURE =
+  '0x' +
+  'DepositInitiated(uint256,string,address,uint256,address)'
+    .split('')
+    .map((c) => c.charCodeAt(0).toString(16).padStart(2, '0'))
+    .join('');
 
-const apiKit = new SafeApiKit({ chainId: process.env.SHOW_TESTNET === 'true' ? 11155111n : 1n });
-
-const ALCHEMY_URL = process.env.SHOW_TESTNET === 'true' ? 'https://eth-sepolia.g.alchemy.com/v2' : 'https://eth-mainnet.g.alchemy.com/v2';
-
-const SEARCH_URL = "BlockApps-Mercata-MercataEthBridge";
-// const MERCATA_URL = "MercataEthBridge" ;
-const stripHexPrefix = (hashes: string[]): string[] =>
-  hashes.map(hash => hash.replace('0x', '')
-);
-
-// Comment out the existing batch processing function
-/*
-export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
-  const poll = async () => {
-    try {
-      const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-depositStatus?value=eq.1&order=block_timestamp.desc&address=eq.${config.bridge.address}`; //fetchong depositInitiated 
-
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
-      });
-
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
-
-      // Step 1: Extract txHashes
-      const txHashes = data.map(({ key }: { key: string }) => `0x${key}`);
-      // Step 2: Batch call to get receipts
-      const batch = txHashes.map((hash, i) => ({
-        jsonrpc: '2.0',
-        id: hash,
-        method: 'eth_getTransactionReceipt',
-        params: [hash],
-      }));
-
-      const { data: batchResponses } = await axios.post(`${ALCHEMY_URL}/${config.alchemy.apiKey}`, batch);
-
-      // Step 3: Extract valid transactionHashes from receipts
-      const completedTxHashes = batchResponses.filter((res: any) => res?.result?.status === "0x1");
-
-      if (!completedTxHashes.length) {
-        return;
-      }
-
-      await confirmBridgeinSafePolling(completedTxHashes);
-    } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
-      // Don't stop polling on errors, let it retry on next interval
-    }
-  };
-
-  // Run once now, then every specified interval
-  await poll();
-  setInterval(poll, pollingInterval);
-};
-*/
-
-// New function that processes transactions one by one
-export const startDepositTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
-  const poll = async () => {
-    try {
-      const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-depositStatus?value=eq.1&order=block_timestamp.desc&address=eq.${config.bridge.address}`; //fetchong depositInitiated 
-
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
-      });
-
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
-
-      // Process each transaction individually instead of in batch
-      for (const transaction of data) {
-        try {
-          const txHash = `0x${transaction.key}`;
-          
-          // Get transaction receipt for this specific transaction
-          const receiptResponse = await axios.post(`${ALCHEMY_URL}/${config.alchemy.apiKey}`, {
-            jsonrpc: '2.0',
-            id: txHash,
-            method: 'eth_getTransactionReceipt',
-            params: [txHash],
-          });
-
-          const receipt = receiptResponse.data?.result;
-          
-          // Check if transaction is completed
-          if (receipt && receipt.status === "0x1") {
-            // Call confirmBridgeinSafePolling for single transaction
-            await confirmBridgeinSafePolling([txHash]);
-            console.log(`✅ Processed completed transaction: ${txHash}`);
-          } else {
-            console.log(`⏳ Transaction ${txHash} not yet completed`);
-          }
-          
-        } catch (err: any) {
-          console.error(`❌ Failed to process transaction ${transaction.key}:`, err);
-        }
-      }
-      
-    } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
-      // Don't stop polling on errors, let it retry on next interval
-    }
-  };
-
-  // Run once now, then every specified interval
-  await poll();
-  setInterval(poll, pollingInterval);
+const updateLastProcessedBlock = async (
+  chainId: number,
+  blockNumber: number
+): Promise<void> => {
+  try {
+    await contractCall('MercataBridge', config.bridge.address!, 'setLastProcessedBlock', {
+      chainId: chainId,
+      lastProcessedBlock: blockNumber
+    });
+    console.log(`✅ Updated last processed block for chain ${chainId} to ${blockNumber}`);
+  } catch (error) {
+    console.error(`❌ Failed to update last processed block for chain ${chainId}:`, error);
+  }
 };
 
-// Comment out the existing batch processing function
-/*
-export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
+const parseDepositEvent = (log: any) => {
+  try {
+    const srcChainId = parseInt(log.topics[1], 16);
+    const srcTxHash = log.data.substring(0, 66);
+    const token = '0x' + log.data.substring(66, 106);
+    const amount = log.data.substring(106, 170);
+    const user = '0x' + log.data.substring(170, 210);
 
-  const poll = async () => {
-    try {
-      const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.2&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
-      
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
-      });
-
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
-
-      // Step 1: Extract txHashes
-      const txHashes = data.map(({ key }: { key: string }) => `0x${key}`);
-      const approvedTxHashes = [];
-      
-      for (const txHash of txHashes) {
-        try {
-          const safeTransaction = await apiKit.getTransaction(txHash);
-          if(safeTransaction.isExecuted === true){
-            approvedTxHashes.push(txHash);
-          }
-        } catch (err) {
-          console.error(`❌ Failed to process transaction ${txHash}:`, err);
-        }
-      }
-      
-      const strippedHashes = stripHexPrefix(approvedTxHashes);
-      await confirmBridgeOutSafePolling(strippedHashes);
-    } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
-      // Don't stop polling on errors, let it retry on next interval
-    }
-  };
-
-  await poll();
-  setInterval(poll, pollingInterval);
-};
-*/
-
-// New function that processes withdrawal transactions one by one
-export const startWithdrawalTxPolling = async (pollingInterval: number = 5 * 60 * 1000) => {
-
-  const poll = async () => {
-    try {
-      const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.2&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
-      
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
-      });
-
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
-
-      // Process each withdrawal transaction individually instead of in batch
-      for (const transaction of data) {
-        try {
-          const txHash = `0x${transaction.key}`;
-          
-          // Check Safe transaction status for this specific transaction
-          try {
-            const safeTransaction = await apiKit.getTransaction(txHash);
-            if(safeTransaction.isExecuted === true){
-              // Process this individual withdrawal transaction
-              const strippedHash = txHash.replace('0x', '');
-              await confirmBridgeOutSafePolling([strippedHash]);
-              console.log(`✅ Processed approved withdrawal transaction: ${txHash}`);
-            } else {
-              console.log(`⏳ Withdrawal transaction ${txHash} not yet executed`);
-            }
-          } catch (err) {
-            console.error(`❌ Failed to check Safe transaction ${txHash}:`, err);
-          }
-          
-        } catch (err: any) {
-          console.error(`❌ Failed to process withdrawal transaction ${transaction.key}:`, err);
-        }
-      }
-      
-    } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
-      // Don't stop polling on errors, let it retry on next interval
-    }
-  };
-
-  await poll();
-  setInterval(poll, pollingInterval);
+    return {
+      srcChainId,
+      srcTxHash,
+      token,
+      amount,
+      user
+    };
+  } catch (error) {
+    console.error('❌ Failed to parse deposit event:', error);
+    return null;
+  }
 };
 
-export const fetchWithdrawalRequestedTransactions = async (withdrawalInterval: number) => {
-  const poll = async () => {
-    try {
-      const url = `${NODE_URL}/cirrus/search/${SEARCH_URL}-withdrawStatus?value=eq.0&order=block_timestamp.desc&address=eq.${config.bridge.address}`;
-      //  console.log("url for withdrawal requested transactions", url);
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${await getBAUserToken()}` },
-      });
-
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
-
-      // Extract txHashes and process each withdrawal request
-      const processedTransactions = [];
-      
-      for (const transaction of data) {
-        try {
-          const txHash = `0x${transaction.key}`;
-          
-          // Get transaction details from the bridge contract
-          const bridgeContract = new BridgeContractCall();
-          
-          // Extract transaction details (you may need to adjust these based on your data structure)
-          const tokenAddress = transaction.token || transaction.tokenAddress;
-          const fromAddress = transaction.from || transaction.fromAddress;
-          const amount = transaction.amount;
-          const toAddress = transaction.to || transaction.toAddress;
-          const userAddress = transaction.mercataUser || transaction.userAddress;
-          
-          if (!tokenAddress || !fromAddress || !amount || !toAddress || !userAddress) {
-            console.error(`❌ Missing required fields for transaction ${txHash}:`, transaction);
-            continue;
-          }
-
-          // Determine if it's testnet
-          const isTestnet = process.env.SHOW_TESTNET === "true";
-          const tokenContract = isTestnet
-            ? TESTNET_ERC20_TOKEN_CONTRACTS
-            : MAINNET_ERC20_TOKEN_CONTRACTS;
-
-          const tokenMapping = isTestnet
-            ? TESTNET_ETH_STRATO_TOKEN_MAPPING
-            : MAINNET_ETH_STRATO_TOKEN_MAPPING;
-
-          const ethTokenAddress: any =
-            Object.entries(tokenMapping).find(
-              ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
-            )?.[0] || null;
-
-          const isERC20 = tokenContract.find((token: any) => token === ethTokenAddress);
-
-          // Generate Safe transaction
-          const generator = await safeTransactionGenerator(
-            amount,
-            toAddress,
-            isERC20 ? "erc20" : "eth",
-            ethTokenAddress
-          );
-          
-          const {
-            value: { hash },
-          } = await generator.next();
-
-          // // Call bridge contract withdraw method
-          // await bridgeContract.withdraw({
-          //   txHash: hash.toString().replace("0x", ""),
-          //   token: tokenAddress.toLowerCase().replace("0x", ""),
-          //   from: fromAddress.toLowerCase().replace("0x", ""),
-          //   amount: amount.toString(),
-          //   to: toAddress.toLowerCase().replace("0x", ""),
-          //   mercataUser: userAddress.toLowerCase().replace("0x", ""),
-          // });
-
-          // Mark withdrawal as pending approval
-          const markPendingResponse = await bridgeContract.confirmWithdrawal({
-            txHash: hash.toString().replace("0x", ""),
-          });
-
-          // Send email notification
-          sendEmail(hash.toString());
-
-          processedTransactions.push({
-            originalTxHash: txHash,
-            safeTxHash: hash.toString(),
-            status: 'proposed',
-            response: markPendingResponse
-          });
-
-          console.log(`✅ Successfully proposed Safe transaction for ${txHash}: ${hash.toString()}`);
-          
-        } catch (err: any) {
-          console.error(`❌ Failed to process transaction ${transaction.key}:`, err);
-          processedTransactions.push({
-            originalTxHash: `0x${transaction.key}`,
-            status: 'failed',
-            error: err.message
-          });
-        }
-      }
-      
-      console.log(`📊 Processed ${processedTransactions.length} withdrawal requested transactions`);
-      
-    } catch (e: any) {
-      console.error('❌ Polling error:', e.message);
-      // Don't stop polling on errors, let it retry on next interval
+const validateDepositEvent = async (depositData: any): Promise<boolean> => {
+  try {
+    const isTokenValid = await isTokenEnabled(depositData.token);
+    if (!isTokenValid) {
+      console.log(`❌ Token ${depositData.token} not enabled in bridge`);
+      return false;
     }
-  };
-
-  await poll();
-  setInterval(poll, withdrawalInterval);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to validate deposit event:', error);
+    return false;
+  }
 };
 
-export const checkDepositInitiatedOnEthContract = async (pollingInterval: number = 5 * 60 * 1000) => {
-  const poll = async () => {
-    try {
-      console.log('🔍 Checking for initiated deposits on Ethereum contract...');
-      
-      // For now, assume there is an Ethereum contract and fetch from there
-      // This would typically involve monitoring Ethereum events or transactions
-      // that indicate a deposit has been initiated
-      
-      // Example: Check for DepositInitiated events on Ethereum
-      // This is a placeholder implementation - you'll need to adapt it based on your actual Ethereum contract
-      
+const pollChainForDeposits = async (chain: any) => {
+  try {
+    const chainId = chain.chainId;
+    const depositRouter = chain.depositRouter;
+
+    if (!depositRouter) {
+      console.log(`⚠️ No deposit router configured for chain ${chainId}`);
+      return;
+    }
+
+    console.log(`🔍 Polling chain ${chainId} (${chain.chainName}) for deposit events...`);
+
+    const lastProcessedBlock = await getLastProcessedBlock(chainId);
+
+    if (!isChainConfigured(chainId)) {
+      console.log(`⚠️ No RPC URL configured for chain ${chainId}`);
+      return;
+    }
+
+    const currentBlock = await getCurrentBlockNumber(chainId);
+
+    if (currentBlock <= lastProcessedBlock) {
+      console.log(`⏳ No new blocks to process for chain ${chainId}`);
+      return;
+    }
+
+    const logs = await getChainLogs(
+      chainId,
+      lastProcessedBlock + 1,
+      currentBlock,
+      depositRouter,
+      DEPOSIT_EVENT_SIGNATURE
+    );
+
+    if (logs.length === 0) {
+      console.log(`📝 No deposit events found for chain ${chainId}`);
+      await updateLastProcessedBlock(chainId, currentBlock);
+      return;
+    }
+
+    console.log(`📝 Found ${logs.length} deposit events for chain ${chainId}`);
+
+    for (const log of logs) {
       try {
-        // Get transaction details from the bridge contract
-        const bridgeContract = new BridgeContractCall();
-        
-        // Example: Process a deposit (you'll need to replace this with actual logic)
-        // to detect when deposits are initiated on Ethereum
-        
-                // For demonstration purposes, this shows how you would call the deposit method
-        // when you detect an initiated deposit:
-       
-        // Based on contract function: deposit(uint256 srcChainId, string ethTxHash, address token, uint256 amount, address user)
-        const depositResponse = await bridgeContract.depositInitiated({
-          srcChainId: 1, // Ethereum mainnet chain ID (adjust as needed)
-          ethTxHash: "example_hash", // Replace with actual ethTxHash from Ethereum
-          token: "0x0000000000000000000000000000000000000000", // Replace with actual token address
-          amount: "1000000000000000000", // Replace with actual amount in wei
-          user: "0x0000000000000000000000000000000000000000", // Replace with actual user address
-        });
-        
-        console.log('✅ Deposit marked as initiated:', depositResponse);
-        
-        
-        // TODO: Implement actual Ethereum contract monitoring logic here
-        // This could involve:
-        // 1. Monitoring Ethereum events for DepositInitiated
-        // 2. Checking transaction status on Ethereum
-        // 3. Fetching transaction details from Ethereum blockchain
-        // 4. Calling the bridge contract deposit method with the fetched data
-        
-        console.log('📝 Placeholder: Ethereum contract monitoring not yet implemented');
-        
-      } catch (err: any) {
-        console.error('❌ Failed to process Ethereum deposit:', err);
+        const depositData = parseDepositEvent(log);
+
+        if (!depositData) {
+          console.log('❌ Failed to parse deposit event');
+          continue;
+        }
+
+        const isValid = await validateDepositEvent(depositData);
+
+        if (!isValid) {
+          console.log('❌ Deposit event validation failed');
+          continue;
+        }
+
+        await depositBatch([
+          {
+            srcChainId: depositData.srcChainId,
+            srcTxHash: depositData.srcTxHash,
+            token: depositData.token,
+            amount: depositData.amount,
+            user: depositData.user
+          }
+        ]);
+
+        console.log(`✅ Deposited: ${depositData.srcTxHash} from chain ${chainId}`);
+      } catch (error) {
+        console.error('❌ Failed to process deposit event:', error);
       }
-      
+    }
+
+    await updateLastProcessedBlock(chainId, currentBlock);
+  } catch (error) {
+    console.error(`❌ Error polling chain ${chain.chainId}:`, error);
+  }
+};
+
+export const startMultiChainDepositPolling = async () => {
+  const pollingInterval = config.polling.ethereumDepositInterval || 5 * 60 * 1000;
+  const poll = async () => {
+    try {
+      console.log('🔍 Starting multi-chain deposit polling...');
+      const enabledChains = await getEnabledChains();
+
+      if (enabledChains.length === 0) {
+        console.log('⚠️ No enabled chains found');
+        return;
+      }
+
+      console.log(`📝 Found ${enabledChains.length} enabled chains to poll`);
+
+      for (const chain of enabledChains) {
+        await pollChainForDeposits(chain);
+      }
     } catch (e: any) {
-      console.error('❌ Ethereum deposit polling error:', e.message);
-      // Don't stop polling on errors, let it retry on next interval
+      console.error('❌ Multi-chain deposit polling error:', e.message);
     }
   };
 
-  // Run once now, then every specified interval
   await poll();
   setInterval(poll, pollingInterval);
 };
