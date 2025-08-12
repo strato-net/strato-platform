@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToggleLeft, ToggleRight, HelpCircle } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +45,8 @@ const LiquidityWithdrawModal = ({
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [singleTokenWithdraw, setSingleTokenWithdraw] = useState(false);
+  const [withdrawTokenChoice, setWithdrawTokenChoice] = useState<'tokenA' | 'tokenB'>('tokenA');
 
   const { removeLiquidity, fetchTokenBalances } = useSwapContext();
   const { toast } = useToast();
@@ -73,6 +82,8 @@ const LiquidityWithdrawModal = ({
 
   const handleClose = () => {
     setWithdrawPercent('');
+    setSingleTokenWithdraw(false);
+    setWithdrawTokenChoice('tokenA');
     onClose();
   };
 
@@ -88,10 +99,19 @@ const LiquidityWithdrawModal = ({
       const percentScaled = BigInt(Math.round(percent * 100));
       const calculatedAmount = (value * percentScaled) / BigInt(10000);
 
-      await removeLiquidity({
-        poolAddress: selectedPool.address,
-        lpTokenAmount: calculatedAmount.toString(),
-      });
+      if (singleTokenWithdraw) {
+        // For single token withdrawal, specify which token to receive
+        await removeLiquidity({
+          poolAddress: selectedPool.address,
+          lpTokenAmount: calculatedAmount.toString(),
+          singleToken: withdrawTokenChoice === 'tokenA' ? selectedPool.tokenA.address : selectedPool.tokenB.address,
+        });
+      } else {
+        await removeLiquidity({
+          poolAddress: selectedPool.address,
+          lpTokenAmount: calculatedAmount.toString(),
+        });
+      }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -216,6 +236,93 @@ const LiquidityWithdrawModal = ({
               )}
             </div>
           </div>
+
+          {/* Single Token Toggle */}
+          <div className="flex justify-end">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => {
+                      setSingleTokenWithdraw(!singleTokenWithdraw);
+                      setWithdrawTokenChoice('tokenA');
+                    }}>
+                    {singleTokenWithdraw ? (
+                      <ToggleRight className="h-4 w-4 text-strato-blue" />
+                    ) : (
+                      <ToggleLeft className="h-4 w-4 text-gray-500" />
+                    )}
+                    <span className="text-xs font-medium">
+                      Single Token
+                    </span>
+                    <HelpCircle className="h-3 w-3 text-gray-400" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">
+                    <strong>Single Token Withdrawal</strong>
+                  </p>
+                  <p className="text-xs mt-1">
+                    Withdraw your liquidity as a single token type. The protocol will automatically swap your share of the other token at the current pool rate. This may result in slippage depending on the withdrawal size and pool liquidity.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          {/* Token Selection for Single Token Withdraw */}
+          {singleTokenWithdraw && (
+            <div className="rounded-lg border p-3 bg-blue-50">
+              <span className="text-sm text-gray-600 mb-2 block">Receive token as:</span>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={withdrawTokenChoice === 'tokenA' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setWithdrawTokenChoice('tokenA')}
+                  className={withdrawTokenChoice === 'tokenA' ? 'bg-strato-blue' : ''}
+                >
+                  <div className="flex items-center gap-2">
+                    {selectedPool?.tokenA?.images?.[0]?.value ? (
+                      <img
+                        src={selectedPool.tokenA.images[0].value}
+                        alt={selectedPool.tokenA.name}
+                        className="w-4 h-4 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-medium bg-blue-500">
+                        {selectedPool?.tokenA?.symbol?.slice(0, 2)}
+                      </div>
+                    )}
+                    {selectedPool?.tokenA?.symbol}
+                  </div>
+                </Button>
+                <Button
+                  type="button"
+                  variant={withdrawTokenChoice === 'tokenB' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setWithdrawTokenChoice('tokenB')}
+                  className={withdrawTokenChoice === 'tokenB' ? 'bg-strato-blue' : ''}
+                >
+                  <div className="flex items-center gap-2">
+                    {selectedPool?.tokenB?.images?.[0]?.value ? (
+                      <img
+                        src={selectedPool.tokenB.images[0].value}
+                        alt={selectedPool.tokenB.name}
+                        className="w-4 h-4 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-medium bg-green-500">
+                        {selectedPool?.tokenB?.symbol?.slice(0, 2)}
+                      </div>
+                    )}
+                    {selectedPool?.tokenB?.symbol}
+                  </div>
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-lg bg-gray-50 p-3">
             <div className="flex justify-between items-center text-sm">

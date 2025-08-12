@@ -23,6 +23,7 @@ import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
+import PoolDetail from "./pages/PoolDetail";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 
@@ -183,6 +184,14 @@ const App = () => {
                                     element={
                                       <ProtectedRoute>
                                         <Pools />
+                                      </ProtectedRoute>
+                                    }
+                                  />
+                                  <Route
+                                    path="/dashboard/pools/:poolAddress"
+                                    element={
+                                      <ProtectedRoute>
+                                        <PoolDetail />
                                       </ProtectedRoute>
                                     }
                                   />

@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToggleLeft, ToggleRight, HelpCircle } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +61,7 @@ const LiquidityDepositModal = ({
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [singleTokenDeposit, setSingleTokenDeposit] = useState(false);
 
   const { addLiquidity, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
   const { toast } = useToast();
@@ -93,6 +101,7 @@ const LiquidityDepositModal = ({
   const handleClose = () => {
     setToken1Amount('');
     setToken2Amount('');
+    setSingleTokenDeposit(false);
     onClose();
   };
 
@@ -101,11 +110,11 @@ const LiquidityDepositModal = ({
 
     const decimals = 18;
     const token1AmountWei = safeParseUnits(token1Amount, decimals);
-    const token2AmountWei = safeParseUnits(token2Amount, decimals);
+    const token2AmountWei = singleTokenDeposit ? BigInt(0) : safeParseUnits(token2Amount, decimals);
     const token1Balance = BigInt(tokenABalance || "0");
     const token2Balance = BigInt(tokenBBalance || "0");
 
-    if (token1AmountWei > token1Balance || token2AmountWei > token2Balance) {
+    if (token1AmountWei > token1Balance || (!singleTokenDeposit && token2AmountWei > token2Balance)) {
       toast({
         title: "Error",
         description: "Insufficient balance",
@@ -119,16 +128,26 @@ const LiquidityDepositModal = ({
       setDepositLoading(true);
       
       const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
-      const tokenAAmount = isInitialLiquidity 
-        ? safeParseUnits(token1Amount, 18)
-        : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
-      const tokenBAmount = safeParseUnits(token2Amount, 18);
+      
+      if (singleTokenDeposit) {
+        // For single token deposit, only provide token A
+        await addLiquidity({
+          poolAddress: selectedPool.address,
+          maxTokenAAmount: token1AmountWei.toString(),
+          tokenBAmount: "0",
+        });
+      } else {
+        const tokenAAmount = isInitialLiquidity 
+          ? safeParseUnits(token1Amount, 18)
+          : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
+        const tokenBAmount = safeParseUnits(token2Amount, 18);
 
-      await addLiquidity({
-        poolAddress: selectedPool.address,
-        maxTokenAAmount: tokenAAmount.toString(),
-        tokenBAmount: tokenBAmount.toString(),
-      });
+        await addLiquidity({
+          poolAddress: selectedPool.address,
+          maxTokenAAmount: tokenAAmount.toString(),
+          tokenBAmount: tokenBAmount.toString(),
+        });
+      }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -183,6 +202,7 @@ const LiquidityDepositModal = ({
       if (token === 'token1') {
         setToken1Amount(value);
         if (
+          !singleTokenDeposit &&
           value &&
           selectedPool?.aToBRatio &&
           BigInt(safeParseUnits(selectedPool.aToBRatio, 18)) > BigInt(0)
@@ -324,14 +344,53 @@ const LiquidityDepositModal = ({
               })()}
             </div>
 
+            {/* Single Token Toggle */}
+            <div className="flex justify-end">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div 
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+                      onClick={() => {
+                        setSingleTokenDeposit(!singleTokenDeposit);
+                        if (!singleTokenDeposit) {
+                          setToken2Amount('');
+                        } else if (token1Amount) {
+                          // Re-calculate token2 amount when disabling single token mode
+                          handleInputChange(token1Amount, 'token1');
+                        }
+                      }}>
+                      {singleTokenDeposit ? (
+                        <ToggleRight className="h-4 w-4 text-strato-blue" />
+                      ) : (
+                        <ToggleLeft className="h-4 w-4 text-gray-500" />
+                      )}
+                      <span className="text-xs font-medium">
+                        Single Token
+                      </span>
+                      <HelpCircle className="h-3 w-3 text-gray-400" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      <strong>Single-Sided Liquidity Provision</strong>
+                    </p>
+                    <p className="text-xs mt-1">
+                      Deposit only one token type. The protocol will automatically swap half of your deposit to the other token at the current pool rate to maintain balance. This may result in slippage depending on pool size.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
             {/* Second Token */}
-            <div className="rounded-lg border p-3">
+            <div className={`rounded-lg border p-3 ${singleTokenDeposit ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Amount</span>
+                <span className="text-sm text-gray-500">Amount {singleTokenDeposit && '(Not Required)'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Input
-                  disabled={balanceLoading}
+                  disabled={balanceLoading || singleTokenDeposit}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                     safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
@@ -457,9 +516,9 @@ const LiquidityDepositModal = ({
               disabled={
                 depositLoading || 
                 !token1Amount || 
-                !token2Amount || 
+                (!singleTokenDeposit && !token2Amount) || 
                 safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ||
-                safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ||
+                (!singleTokenDeposit && safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0")) ||
                 BigInt(usdstBalance || "0") < safeParseUnits("0.3", 18)
               } 
               type="submit" 

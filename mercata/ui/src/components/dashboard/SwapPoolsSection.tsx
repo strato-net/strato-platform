@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
@@ -14,6 +15,7 @@ import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 
 
 const SwapPoolsSection = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<LiquidityPool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -77,14 +79,16 @@ const SwapPoolsSection = () => {
     }
   };
 
-  const handleOpenDepositModal = async (pool: LiquidityPool) => {
+  const handleOpenDepositModal = async (pool: LiquidityPool, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (operationInProgressRef.current) return;
     
     setSelectedPool(pool);
     setIsDepositModalOpen(true);
   };
 
-  const handleOpenWithdrawModal = async (pool: LiquidityPool): Promise<void> => {
+  const handleOpenWithdrawModal = async (pool: LiquidityPool, e?: React.MouseEvent): Promise<void> => {
+    if (e) e.stopPropagation();
     if (operationInProgressRef.current) return;
 
     setSelectedPool(pool);
@@ -155,7 +159,16 @@ const SwapPoolsSection = () => {
           </div>
         ) : (
           filteredPools.map((pool, id) => (
-            <Card key={id} className="hover:shadow-md transition-shadow">
+            <Card 
+              key={id} 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={(e) => {
+                // Only navigate if not clicking on buttons
+                if (!(e.target as HTMLElement).closest('button')) {
+                  navigate(`/dashboard/pools/${pool.address}`);
+                }
+              }}
+            >
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center">
@@ -205,7 +218,7 @@ const SwapPoolsSection = () => {
                       <Button
                         size="sm"
                         className="bg-strato-blue hover:bg-strato-blue/90"
-                        onClick={() => handleOpenDepositModal(pool)}
+                        onClick={(e) => handleOpenDepositModal(pool, e)}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Deposit</span>
@@ -215,7 +228,7 @@ const SwapPoolsSection = () => {
                         size="sm"
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
-                        onClick={() => handleOpenWithdrawModal(pool)}
+                        onClick={(e) => handleOpenWithdrawModal(pool, e)}
                         disabled={!pool.lpToken.balances?.length}
                         title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
                       >
