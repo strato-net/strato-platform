@@ -37,6 +37,13 @@ contract record RewardsEngine is Ownable {
         address owner;
     }
 
+    struct UserBalance {
+        uint256 balance;           // accrued reward over time
+        uint256 createdAt;         // timestamp when UserBalance was created
+        uint256 modifiedAt;        // timestamp when balance was last modified
+        uint256 lastSeenAmount;    // last seen amount for a given Action (for estimate feature)
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
     // ═════════════════════════════════════════════════════════════════════════
@@ -58,6 +65,9 @@ contract record RewardsEngine is Ownable {
 
     // Action management: nested mapping from actionType -> asset -> Action
     mapping(string => mapping(address => Action)) public record actions;
+
+    // User balances: actionType -> asset -> rewardToken -> userAddress -> UserBalance
+    mapping(string => mapping(address => mapping(address => mapping(address => UserBalance)))) public record balances;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -279,6 +289,9 @@ contract record RewardsEngine is Ownable {
             owner: owner
         });
 
+        // Initialize balances structure for this action
+        // Note: UserBalance structs will be created on-demand when users interact with the system
+
         emit ActionAdded(actionType, asset, multiplierName);
     }
 
@@ -291,6 +304,10 @@ contract record RewardsEngine is Ownable {
 
         // Check that action exists
         require(bytes(actions[actionType][asset].actionType).length > 0, "RewardsEngine: Action not found");
+
+        // TODO: Clean up existing user balances for this action
+        // This would require iterating through all users, which is gas-expensive
+        // For now, we leave existing balances orphaned but inaccessible
 
         delete actions[actionType][asset];
 

@@ -106,7 +106,7 @@ The name of the smart contract will be `RewardsEngine`
   Thus `actions` should be mapping from `type` to mapping from `asset` to
   `action`.
 
-### User Balance and time-based accrued rewards
+### User Balance and time-based accrued rewards (IMPLEMENTED)
 
   We need to store user balances per each `Reward Token` per each `Action`.
   Time-based rewards accrue continuously based on differently per each action.
