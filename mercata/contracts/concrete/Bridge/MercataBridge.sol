@@ -139,6 +139,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
     /*  ADMIN  */
     event TokenLimitUpdated(address indexed token, uint256 maxPerTx);
     event RelayerUpdated   (address indexed oldRelayer, address indexed newRelayer);
+    event TokenFactoryUpdated(address indexed oldFactory, address indexed newFactory);
     event PauseToggled     (bool depositsPaused, bool withdrawalsPaused);
     event ChainUpdated(uint256 indexed chainId, address custody, address router, uint256 lastProcessedBlock, bool enabled, string chainName);
     event AssetUpdated(address indexed stratoToken, uint256 chainId, address extToken, uint256 extDecimals, bool enabled, string extName, string extSymbol);
@@ -183,6 +184,13 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         relayer = newRelayer;
     }
 
+    /* update token factory */
+    function setTokenFactory(address newFactory) external onlyOwner {
+        require(newFactory != address(0), "MB: zero");
+        address old = address(tokenFactory);
+        tokenFactory = TokenFactory(newFactory);
+        emit TokenFactoryUpdated(old, newFactory);
+    }
     /* independent pause toggles */
     function setPause(bool _deposits, bool _withdrawals) external onlyOwner {
         depositsPaused    = _deposits;
