@@ -91,7 +91,7 @@ contract record Mercata {
         Ownable(poolConfigurator).transferOwnership(msg.sender);
 
         // Create Services
-        mercataEthBridge = new MercataEthBridge(msg.sender, address(tokenFactory));
+        mercataEthBridge = new MercataEthBridge(address(tokenFactory), msg.sender, msg.sender);
         onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
 
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
