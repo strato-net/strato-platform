@@ -138,6 +138,8 @@ export const bridgeOut = async (
   return markPendindResponse;
 };
 
+// Comment out the existing batch processing function
+/*
 export const confirmBridgeinSafePolling = async (txList: any[]) => {
   if (!config.safe?.address) return;
 
@@ -152,7 +154,7 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
   ];
   
   const validDeposits = depositStatus.filter((deposit: any) => {
-    const tokenAddress = deposit.token.toLowerCase().replace("0x", "");
+    const tokenAddress = deposit.token.toLowerCase().replace("0x", ""),
     const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
     
     if (isInvalid) {
@@ -183,6 +185,75 @@ export const confirmBridgeinSafePolling = async (txList: any[]) => {
     }
   } catch (error) {
     console.error("Error in BatchconfirmDeposit for tx:", error);
+  }
+};
+*/
+
+// New function that processes deposits one by one and calls depositCompleted contract method
+export const confirmBridgeinSafePolling = async (txList: any[]) => {
+  if (!config.safe?.address) return;
+
+  // Process each transaction individually instead of in batch
+  for (const tx of txList) {
+    try {
+      const txHash = tx.result?.transactionHash || tx;
+      
+      // Get deposit status for this specific transaction
+      const depositStatus = await fetchDepositInitiatedTransactions([txHash]);
+      
+      if (!depositStatus || depositStatus.length === 0) {
+        console.log(`⚠️ No deposit status found for transaction: ${txHash}`);
+        continue;
+      }
+
+      const deposit = depositStatus[0]; // Get the first (and only) deposit
+
+      // ⚠️ TEMPORARY FIX: Filter out deposits with invalid token addresses from previous testnet deployment
+      const INVALID_TOKEN_ADDRESSES = [
+        "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
+        "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
+      ];
+      
+      const tokenAddress = deposit.token.toLowerCase().replace("0x", "");
+      const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
+      
+      if (isInvalid) {
+        console.log(`⚠️ Skipping invalid token address: ${tokenAddress}`);
+        continue;
+      }
+
+      try {
+        const bridgeContract = new BridgeContractCall();
+        
+        // Call depositCompleted contract method for single deposit
+        const result = await bridgeContract.depositCompleted({
+          txHash: deposit.txHash.toString().replace("0x", ""),
+          token: deposit.token.toLowerCase().replace("0x", ""),
+          to: config.safe.address.toLowerCase().replace("0x", ""),
+          amount: deposit.amount.toString(),
+          mercataUser: deposit.mercataUser.toLowerCase().replace("0x", ""),
+        });
+
+        if (result && result.status === "Success") {
+          console.log(`✅ Successfully completed deposit for transaction: ${txHash}`);
+          
+          try {
+            // Mint vouchers for this single deposit
+            await mintVouchersForDeposits([deposit]);
+          } catch (voucherError) {
+            console.error(`Failed to mint vouchers for transaction ${txHash} (deposit still succeeded):`, voucherError);
+          }
+        } else {
+          console.error(`❌ Deposit completion failed for transaction ${txHash}:`, result?.status || "Unknown error");
+        }
+        
+      } catch (error) {
+        console.error(`❌ Error completing deposit for transaction ${txHash}:`, error);
+      }
+      
+    } catch (err: any) {
+      console.error(`❌ Failed to process transaction in confirmBridgeinSafePolling:`, err);
+    }
   }
 };
 
@@ -243,6 +314,8 @@ export const confirmBridgeOut = async (tx: any) => {
   });
 };
 
+// Comment out the existing batch processing function
+/*
 export const confirmBridgeOutSafePolling = async (txs: string[]) => {
     if (!txs || txs.length === 0) {
     return;
@@ -252,6 +325,37 @@ export const confirmBridgeOutSafePolling = async (txs: string[]) => {
   await bridgeContract.batchConfirmWithdrawals({
     txHashes: txs,
   });
+};
+*/
+
+// New function that processes withdrawal confirmations one by one
+export const confirmBridgeOutSafePolling = async (txs: string[]) => {
+  if (!txs || txs.length === 0) {
+    return;
+  }
+  
+  // Process each withdrawal transaction individually instead of in batch
+  for (const txHash of txs) {
+    try {
+      console.log(`🔄 Processing withdrawal confirmation for transaction: ${txHash}`);
+      
+      const bridgeContract = new BridgeContractCall();
+      
+      // Call confirmWithdrawal contract method for single withdrawal
+      const result = await bridgeContract.finaliseWithdrawal({
+        txHash: txHash,
+      });
+
+      if (result && result.status === "Success") {
+        console.log(`✅ Successfully confirmed withdrawal for transaction: ${txHash}`);
+      } else {
+        console.error(`❌ Withdrawal confirmation failed for transaction ${txHash}:`, result?.status || "Unknown error");
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error confirming withdrawal for transaction ${txHash}:`, error);
+    }
+  }
 };
 
 export const userDepositStatus = async (

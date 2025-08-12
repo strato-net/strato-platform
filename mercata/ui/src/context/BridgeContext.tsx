@@ -185,9 +185,9 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const formattedTokenAddress = tokenAddress.startsWith("0x")
-        ? tokenAddress
-        : `0x${tokenAddress}`;
-      const response = await api.get(`/bridge/balance/${formattedTokenAddress}`);
+        ? tokenAddress.substring(2) // Remove 0x prefix
+        : tokenAddress;
+      const response = await api.get(`/tokens/balance?address=eq.${formattedTokenAddress}`);
       return { balance: response.data.data.balance };
     } catch (err) {
       throw err;

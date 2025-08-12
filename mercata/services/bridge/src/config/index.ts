@@ -44,6 +44,8 @@ export const config = {
   polling: {
     bridgeInInterval: 100 * 1000, // 100 seconds for bridge-in (dev/testing)
     bridgeOutInterval: 3 * 60 * 1000, // 3 minutes for bridge-out
+    withdrawalInterval: 10 * 1000, // 10 seconds for withdrawal
+    ethereumDepositInterval: 2 * 60 * 1000, // 2 minutes for Ethereum deposit monitoring
   },
 } as const;
 

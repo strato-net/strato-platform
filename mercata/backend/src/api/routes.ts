@@ -59,7 +59,7 @@ router.post("/onramp/updateListing", authHandler.authorizeRequest(), OnRampContr
 // ----- Bridge Routes -----
 router.post("/bridge/bridgeIn", authHandler.authorizeRequest(), bridgeController.bridgeIn);
 router.post("/bridge/bridgeOut", authHandler.authorizeRequest(), bridgeController.bridgeOut);
-router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(), bridgeController.getBalance);
+// router.get("/bridge/balance/:tokenAddress", authHandler.authorizeRequest(), bridgeController.getBalance);
 router.get("/bridge/bridgeInTokens", authHandler.authorizeRequest(), bridgeController.getBridgeInTokens);
 router.get("/bridge/bridgeOutTokens", authHandler.authorizeRequest(), bridgeController.getBridgeOutTokens);
 router.get("/bridge/ethereumConfig", bridgeController.getEthereumConfig);

@@ -24,6 +24,7 @@ export const constants = (() => {
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
+  const MercataEthBridge = `${CONTRACT_PREFIX}MercataEthBridge`;
   const Event = "event";
   
   const tokenSelectFields = [
@@ -125,6 +126,7 @@ export const constants = (() => {
     LendingRegistry,
     PoolConfigurator,
     AdminRegistry,
+    MercataEthBridge,
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,

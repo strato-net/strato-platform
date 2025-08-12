@@ -46,13 +46,14 @@ export class BridgeController {
     next: NextFunction
   ) => {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateBridgeOut(body);
 
       // Process bridge transaction
       const result = await this.bridgeService.bridgeOut({
         ...body,
         accessToken,
+        userAddress,
       });
 
       res.json({

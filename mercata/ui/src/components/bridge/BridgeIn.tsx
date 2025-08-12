@@ -22,6 +22,7 @@ import { parseEther, createPublicClient, http } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { useUser } from '@/context/UserContext';
 import BridgeWalletStatus from './BridgeWalletStatus';
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { safeParseUnits } from "@/utils/numberUtils";
@@ -49,6 +50,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
   const { toast } = useToast();
+  const { userAddress } = useUser(); // Get user's STRATO address from context
 
   const {
     bridgeInTokens,
@@ -372,6 +374,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       return;
     }
 
+    // Validate user address is available
+    if (!userAddress) {
+      toast({
+        title: "Error",
+        description: "User address not available. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     toast({
       title: "Preparing transaction...",
@@ -430,7 +442,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
       const receipt = await client.waitForTransactionReceipt({ hash });
 
+      // Comment out the API call as requested
       // Only call bridgeInAPI after transaction is mined
+      /*
       if (receipt.status === "success") {
         await bridgeInAPI({
           amount,
@@ -438,6 +452,64 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           tokenAddress: tokenAddress || "",
           ethHash: hash,
         });
+      }
+      */
+
+      // New: Call smart contract instead of API
+      if (receipt.status === "success") {
+        try {
+          // Bridge contract address - get from config (ethereumAddress from API)
+          const ethereumBridgeInContractAddress = config?.ethereumAddress;
+          
+          if (!ethereumBridgeInContractAddress) {
+            throw new Error("Bridge contract address not available from config");
+          }
+
+          // Call the bridge contract with the required parameters
+          const bridgeContractHash = await writeContractAsync({
+            address: ethereumBridgeInContractAddress as `0x${string}`,
+            abi: [
+              {
+                name: "deposit",
+                type: "function",
+                stateMutability: "nonpayable",
+                inputs: [
+                  { name: "amount", type: "uint256" },
+                  { name: "tokenAddress", type: "address" },
+                  { name: "ethHash", type: "string" },
+                  { name: "fromAddress", type: "address" },
+                  { name: "stratoAddress", type: "string" },
+                ],
+                outputs: [],
+              },
+            ],
+            functionName: "deposit",
+            args: [
+              parseUnits(amount, selectedToken?.decimals || 18), // amount
+              tokenAddress as `0x${string}`, // tokenAddress
+              hash, // ethHash
+              address as `0x${string}`, // fromAddress (MetaMask address)
+              userAddress, // stratoAddress (user's address in our app) - keep as string
+            ],
+            chain: showTestnet ? sepolia : mainnet,
+            account: address as `0x${string}`,
+          });
+
+          console.log("Bridge contract transaction hash:", bridgeContractHash);
+          
+          toast({
+            title: "Bridge Initiated",
+            description: `Bridge transaction submitted with hash: ${bridgeContractHash}`,
+          });
+
+        } catch (contractError: any) {
+          console.error("Bridge contract error:", contractError);
+          toast({
+            title: "Bridge Contract Error",
+            description: contractError?.message || "Failed to call bridge contract",
+            variant: "destructive",
+          });
+        }
       }
 
       if (receipt.status === "success") {

@@ -3,7 +3,7 @@ import { validateAddressField, numericStringField } from "./common.validators";
 
 export function validateGetPriceQuery(query: any) {
   const schema = Joi.object({
-    asset: validateAddressField("asset"),
+    asset: validateAddressField("asset").optional(),
   })
 
   const { error, value } = schema.validate(query, { abortEarly: false });

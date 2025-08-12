@@ -11,6 +11,16 @@ class BridgeContractCall {
     return depositResponse;
   }
 
+  async depositInitiated(args: any) {
+    const depositInitiatedResponse = await contractCall(bridgeContractName, bridgeContractAddress, "deposit", args);
+    return depositInitiatedResponse;
+  }
+
+  async depositCompleted(args: any) {
+    const depositCompletedResponse = await contractCall(bridgeContractName, bridgeContractAddress, "depositCompleted", args);
+    return depositCompletedResponse;
+  }
+
   async withdraw(args: any) {
     const withdrawResponse = await contractCall(bridgeContractName, bridgeContractAddress, "withdraw", args);
     return withdrawResponse;
@@ -32,9 +42,14 @@ class BridgeContractCall {
   }
 
   async batchConfirmWithdrawals(args: any) {
-    const batchConfirmWithdrawalsResponse = await contractCall(bridgeContractName, bridgeContractAddress, "batchConfirmWithdrawals", args);
-    return batchConfirmWithdrawalsResponse;
+    const batchConfirmWithdrawalResponse = await contractCall(bridgeContractName, bridgeContractAddress, "batchConfirmWithdrawals", args);
+    return batchConfirmWithdrawalResponse;
   } 
+
+  async finaliseWithdrawal(args: any) {
+    const finaliseWithdrawalResponse = await contractCall(bridgeContractName, bridgeContractAddress, "finaliseWithdrawal", args);
+    return finaliseWithdrawalResponse;
+  }
 
   async batchConfirmDeposits(args: any) {  
     const response = await contractCall(
