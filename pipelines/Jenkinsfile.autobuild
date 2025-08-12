@@ -203,57 +203,57 @@ pipeline {
               }
             }
             
-//            stage('Test Sync') {
-//              // only test sync for prs wanting to merge into develop
-//              when {
-//                beforeAgent true
-//                allOf {
-//                  branch "PR-*"
-//                  environment(name: "CHANGE_TARGET", value: "develop")
-//                  expression {
-//                    sh(script: '''
-//                      echo "[Test Sync check] Checking for strato/ changes..."
-//                      git fetch origin develop --quiet
-//                      if git diff --name-only origin/develop...HEAD | grep '^strato/'; then
-//                        echo "[Test Sync check] Detected changes in strato/"
-//                      else
-//                        echo "[Test Sync check] No changes in strato/, skipping"
-//                      fi
-//                    ''', returnStatus: true)
-//
-//                    return sh(
-//                      script: 'git diff --name-only origin/develop...HEAD | grep -q "^strato/"',
-//                      returnStatus: true
-//                    ) == 0
-//                  }
-//                }
-//              }
-//              agent { label "testsync" }
-//              steps {
-//                script {
-//                  currentBuild.description = "${MAIN_AGENT_NAME}/${env.NODE_NAME} //${BUILD_USER}"
-//                }
-//                withCredentials([
-//                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-//                ]) {
-//                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-//                }
-//                unstash 'stratoGettingStarted'
-//                dir("strato-getting-started"){
-//                  sh 'sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
-//                  sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
-//                  sh 'sudo ./strato --wipe'
-//                  sh 'sudo ./vault --wipe'
-//                  sh './run-vault.sh'
-//                  // run again but connecting to helium (testnet) this time
-//                  sh 'sed -i "s|useCustomGenesis=true|useCustomGenesis=false|" run.sh'
-//                  sh "sed -i 's|./strato --single|network=helium ./strato|' run.sh"
-//                  sh './run.sh'
-//                  sh './check_availability.sh'
-//                  script{
-//                    lib.runSyncTester()
-//                  }
-//                }
+            stage('Test Sync') {
+              // only test sync for prs wanting to merge into develop
+              when {
+                beforeAgent true
+                allOf {
+                  branch "PR-*"
+                  environment(name: "CHANGE_TARGET", value: "develop")
+                  expression {
+                    sh(script: '''
+                      echo "[Test Sync check] Checking for strato/ changes..."
+                      git fetch origin develop --quiet
+                      if git diff --name-only origin/develop...HEAD | grep '^strato/'; then
+                        echo "[Test Sync check] Detected changes in strato/"
+                      else
+                        echo "[Test Sync check] No changes in strato/, skipping"
+                      fi
+                    ''', returnStatus: true)
+
+                    return sh(
+                      script: 'git diff --name-only origin/develop...HEAD | grep -q "^strato/"',
+                      returnStatus: true
+                    ) == 0
+                  }
+                }
+              }
+              agent { label "testsync" }
+              steps {
+                script {
+                  currentBuild.description = "${MAIN_AGENT_NAME}/${env.NODE_NAME} //${BUILD_USER}"
+                }
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                ]) {
+                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                }
+                unstash 'stratoGettingStarted'
+                dir("strato-getting-started"){
+                  sh 'sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
+                  sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
+                  sh 'sudo ./strato --wipe'
+                  sh 'sudo ./vault --wipe'
+                  sh './run-vault.sh'
+                  // run again but connecting to helium (testnet) this time
+                  sh 'sed -i "s|useCustomGenesis=true|useCustomGenesis=false|" run.sh'
+                  sh "sed -i 's|./strato --single|network=helium ./strato|' run.sh"
+                  sh './run.sh'
+                  sh './check_availability.sh'
+                  script{
+                    lib.runSyncTester()
+                  }
+                }
 /* TODO: uncomment to enable the slipstream data integrity test, when the 'strato/indexer/slipstream/integrity_tests/slipstream_sync.py' is updated to not rely on the testnet2-specific contracts (e.g. BlockApps-Mercata-PaymentService.Order) */
 //                unstash 'slipstream_integrity_tests'
 //                dir('strato/indexer/slipstream/integrity_tests') {
@@ -265,76 +265,76 @@ pipeline {
 //                    sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATA_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATA_LOCALHOST_SECRET}' 'strato-devel' 'mercata' 40 30 'https://node2.mercata-testnet.blockapps.net'"
 //                  }
 //                }
-//              }
-//              post {
-//                always {
-//                  sh 'sudo docker system prune -fa' // remove older unused images to save diskspace
-//                  dir('strato-getting-started') {
-//                    sh 'sudo rm -rf strato_logs*'
-//                    sh 'sudo ./fetchlogs'
-//                    sh 'sudo chmod 777 strato_logs.zip'
-//                    sh 'mv strato_logs.zip strato_logs_testsync.zip'
-//                    archiveArtifacts artifacts: 'strato_logs_testsync.zip', fingerprint: true, allowEmptyArchive: true
-//                    sh 'sudo rm -rf strato_logs_testsync.zip'
-//                  }
-//                }
-//              }
-//            }
-//            
-//            stage('Deploy to Testnet') {
-//              // only deploy if building develop branch
-//              when {
-//                beforeAgent true
-//                allOf {
-//                  branch "develop"
-//                }
-//              }
-//              agent { label "testnet-build1" }
-//              steps {
-//                withCredentials([
-//                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-//                ]) {
-//                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-//                }
-//                unstash 'stratoGettingStarted'
-//                dir("strato-getting-started"){
-//                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
-//                    writeFile file: "strato-run.sh", text: """#!/bin/bash
-//                        NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
-//                          network='helium' \\
-//                          OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
-//                          OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
-//                          OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
-//                          ssl='true' \\
-//                          BRIDGE_API_BASE_URL=https://bridge.mercata-testnet.blockapps.net \\
-//                          ./strato
-//                    """
-//                    sh "sudo ./strato --pull"
-//                    sh "sudo ./strato --wipe"
-//                    sh "sudo ./strato-run.sh"
-//                    script {
-//                      lib.waitLocalNodeIsSynced()
-//                    }
-//                  }
-//                }
-//              }
-//              post {
-//                success {
-//                  script {
-//                    def VERSION = sh(
-//                        returnStdout: true,
-//                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
-//                    ).trim()
-//                    slackSend(
-//                        channel: '#engineering',
-//                        color: 'good',
-//                        message: "buildtest.mercata-testnet.blockapps.net was redeployed from develop with STRATO v.${VERSION}"
-//                    )
-//                  }
-//                  
-//                }
-//              }
-//            } /////////////////////
+              }
+              post {
+                always {
+                  sh 'sudo docker system prune -fa' // remove older unused images to save diskspace
+                  dir('strato-getting-started') {
+                    sh 'sudo rm -rf strato_logs*'
+                    sh 'sudo ./fetchlogs'
+                    sh 'sudo chmod 777 strato_logs.zip'
+                    sh 'mv strato_logs.zip strato_logs_testsync.zip'
+                    archiveArtifacts artifacts: 'strato_logs_testsync.zip', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo rm -rf strato_logs_testsync.zip'
+                  }
+                }
+              }
+            }
+            
+            stage('Deploy to Testnet') {
+              // only deploy if building develop branch
+              when {
+                beforeAgent true
+                allOf {
+                  branch "develop"
+                }
+              }
+              agent { label "testnet-build1" }
+              steps {
+                withCredentials([
+                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                ]) {
+                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                }
+                unstash 'stratoGettingStarted'
+                dir("strato-getting-started"){
+                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
+                    writeFile file: "strato-run.sh", text: """#!/bin/bash
+                        NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
+                          network='helium' \\
+                          OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
+                          OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
+                          OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
+                          ssl='true' \\
+                          BRIDGE_API_BASE_URL=https://bridge.mercata-testnet.blockapps.net \\
+                          ./strato
+                    """
+                    sh "sudo ./strato --pull"
+                    sh "sudo ./strato --wipe"
+                    sh "sudo ./strato-run.sh"
+                    script {
+                      lib.waitLocalNodeIsSynced()
+                    }
+                  }
+                }
+              }
+              post {
+                success {
+                  script {
+                    def VERSION = sh(
+                        returnStdout: true,
+                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
+                    ).trim()
+                    slackSend(
+                        channel: '#engineering',
+                        color: 'good',
+                        message: "buildtest.mercata-testnet.blockapps.net was redeployed from develop with STRATO v.${VERSION}"
+                    )
+                  }
+                  
+                }
+              }
+            }
             
           }
         }
