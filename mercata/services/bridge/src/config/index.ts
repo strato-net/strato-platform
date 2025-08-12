@@ -44,7 +44,7 @@ dotenv.config();
  * - Chain RPC URLs are validated at startup based on enabled chains from Cirrus
  */
 
-export const config = {
+const createConfig = () => ({
   auth: {
     baUsername: process.env.BA_USERNAME,
     baPassword: process.env.BA_PASSWORD,
@@ -72,7 +72,9 @@ export const config = {
     withdrawalInterval: 10 * 1000,
     ethereumDepositInterval: 2 * 60 * 1000,
   },
-} as const;
+});
+
+export const config = createConfig();
 
 /**
  * Get RPC URL for a specific chain ID
@@ -148,7 +150,11 @@ export const validateChainRpcUrls = async (): Promise<void> => {
     const missingChainRpcUrls: string[] = [];
     
     for (const chain of enabledChains) {
-      const chainId = chain.chainId;
+      const chainId = chain?.chainId;
+      if (!chainId) {
+        continue;
+      }
+      
       const envVarName = `CHAIN_${chainId}_RPC_URL`;
       
       if (!process.env[envVarName]) {

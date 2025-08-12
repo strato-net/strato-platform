@@ -1,24 +1,28 @@
 import { config } from '../config';
 import OAuthUtil from './oauth';
 
+// Validation function to check config at runtime
+const validateConfig = () => {
+  if (!config.auth?.clientId) {
+    throw new Error('CLIENT_ID is not configured');
+  }
+  if (!config.auth?.clientSecret) {
+    throw new Error('CLIENT_SECRET is not configured');
+  }
+  if (!config.auth?.openIdDiscoveryUrl) {
+    throw new Error('OPENID_DISCOVERY_URL is not configured');
+  }
+};
 
-// OAuth configuration
-if (!config.auth.clientId) {
-  throw new Error('CLIENT_ID is not configured');
-}
-if (!config.auth.clientSecret) {
-  throw new Error('CLIENT_SECRET is not configured');
-}
-if (!config.auth.openIdDiscoveryUrl) {
-  throw new Error('OPENID_DISCOVERY_URL is not configured');
-}
-
-const oauthConfig = {
-  clientId: config.auth.clientId,
-  clientSecret: config.auth.clientSecret,
-  openIdDiscoveryUrl: config.auth.openIdDiscoveryUrl,
-  scope: "openid email profile",
-  tokenField: "access_token"
+const getOAuthConfig = () => {
+  validateConfig();
+  return {
+    clientId: config.auth.clientId!,
+    clientSecret: config.auth.clientSecret!,
+    openIdDiscoveryUrl: config.auth.openIdDiscoveryUrl!,
+    scope: "openid email profile",
+    tokenField: "access_token"
+  };
 };
 
 interface TokenData {
@@ -45,7 +49,7 @@ export const initOpenIdConfig = async () => {
   }
 
   try {
-    oauthInstance = await OAuthUtil.init(oauthConfig);
+    oauthInstance = await OAuthUtil.init(getOAuthConfig());
     oauthInitialized = true;
   } catch (error) {
     console.error("❌ Failed to initialize OAuth client:", error);
@@ -88,7 +92,7 @@ export const getBAUserToken = async (): Promise<string> => {
     );
 
     // Type assertion for token object
-    const token = tokenObj.token[oauthConfig.tokenField] as string;
+    const token = tokenObj.token[getOAuthConfig().tokenField] as string;
     const expiresAt = Math.floor((tokenObj.token.expires_at as number) / 1000);
     
     // Cache the new token
