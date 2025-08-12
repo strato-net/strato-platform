@@ -84,12 +84,16 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         address depositRouter; // contract users interact with on L1/L2
         uint256 lastProcessedBlock;
         bool    enabled;       // quick toggle
+        string  chainName;
     }
+
     struct AssetInfo {
         address extToken;      // token address on external chain
         uint256 extDecimals;   // decimals of extToken
         uint256 chainId;       // back-pointer to ChainInfo
         bool    enabled;       // toggle
+        string  extName;       // external token name
+        string  extSymbol;     // external token symbol
     }
 
     mapping(uint256 => ChainInfo) public record chains;   
@@ -136,8 +140,9 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
     event TokenLimitUpdated(address indexed token, uint256 maxPerTx);
     event RelayerUpdated   (address indexed oldRelayer, address indexed newRelayer);
     event PauseToggled     (bool depositsPaused, bool withdrawalsPaused);
-    event ChainUpdated(uint256 indexed chainId, address custody, address router, uint256 lastProcessedBlock, bool enabled);
-    event AssetUpdated(address indexed stratoToken, uint256 chainId, address extToken, uint256 extDecimals, bool enabled);
+    event ChainUpdated(uint256 indexed chainId, address custody, address router, uint256 lastProcessedBlock, bool enabled, string chainName);
+    event AssetUpdated(address indexed stratoToken, uint256 chainId, address extToken, uint256 extDecimals, bool enabled, string extName, string extSymbol);
+    event AssetMetadataUpdated(address indexed stratoToken, string extName, string extSymbol);   
     event LastProcessedBlockUpdated(uint256 indexed chainId, uint256 lastProcessedBlock);
 
 /* --------------------------------------------------------------------- */
@@ -194,9 +199,22 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         emit TokenLimitUpdated(token, maxPerTx);
     }
 
-    function setChain(uint256 chainId, address custody, address router, uint256 lastProcessedBlock, bool enabled) external onlyOwner {
-        chains[chainId] = ChainInfo(custody, router, lastProcessedBlock, enabled);
-        emit ChainUpdated(chainId, custody, router, lastProcessedBlock, enabled);
+    function setChain(
+        uint256 chainId,
+        address custody,
+        address router,
+        uint256 lastProcessedBlock,
+        bool enabled,
+        string calldata chainName
+    ) external onlyOwner {
+        ChainInfo storage c = chains[chainId];
+        c.custody = custody;
+        c.depositRouter = router;
+        c.lastProcessedBlock = lastProcessedBlock;
+        c.enabled = enabled;
+        c.chainName = chainName;
+
+        emit ChainUpdated(chainId, custody, router, lastProcessedBlock, enabled, chainName);
     }
 
     function setLastProcessedBlock(uint256 chainId, uint256 lastProcessedBlock) external onlyRelayer
@@ -206,10 +224,37 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         emit LastProcessedBlockUpdated(chainId, lastProcessedBlock);
     }
 
-    function setAsset(address stratoToken, uint256 chainId, address extToken, uint256 extDecimals, bool enabled) external onlyOwner {
+    function setAsset(
+        address stratoToken,
+        uint256 chainId,
+        address extToken,
+        uint256 extDecimals,
+        bool enabled,
+        string calldata extName,
+        string calldata extSymbol
+    ) external onlyOwner {
         require(chains[chainId].custody != address(0), "MB: chain missing");
-        assets[stratoToken] = AssetInfo(extToken, extDecimals, chainId, enabled);
-        emit AssetUpdated(stratoToken, chainId, extToken, extDecimals, enabled);
+
+        AssetInfo storage a = assets[stratoToken];
+        a.extToken    = extToken;
+        a.extDecimals = extDecimals;
+        a.chainId     = chainId;
+        a.enabled     = enabled;
+        a.extName     = extName;
+        a.extSymbol   = extSymbol;
+
+        emit AssetUpdated(stratoToken, chainId, extToken, extDecimals, enabled, extName, extSymbol);
+    }
+
+    function setAssetMetadata(
+        address stratoToken,
+        string calldata extName,
+        string calldata extSymbol
+    ) external onlyOwner {
+        require(assets[stratoToken].extToken != address(0), "MB: asset missing");
+        assets[stratoToken].extName   = extName;
+        assets[stratoToken].extSymbol = extSymbol;
+        emit AssetMetadataUpdated(stratoToken, extName, extSymbol);
     }
 
 /* ===================================================================== */
