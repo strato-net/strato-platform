@@ -69,6 +69,7 @@ import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Data.String (fromString)
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
@@ -291,7 +292,7 @@ main = do
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
             useWalletsByDefault = flags_useWalletsByDefault
           }
-  run 3000 $ app env theDoc urlMap
+  runSettings (setPort 3000 $ setHost (fromString "127.0.0.1") defaultSettings) $ app env theDoc urlMap
 
 app :: BlocEnv -> Swagger -> Metadata.UrlMap -> Application
 app blocEnv theDoc urlMap =
