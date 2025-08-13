@@ -2,14 +2,15 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import { api } from '@/lib/axios';
 
 interface Token {
-  name: string;
-  symbol: string;
-  tokenAddress: string;
-  decimals: number;
-  icon: string;
-  chainId: number;
-  exchangeTokenSymbol?: string;
-  exchangeTokenName?: string;
+  stratoTokenAddress: string;
+  stratoTokenName: string;
+  stratoTokenSymbol: string;
+  chainId: string;
+  enabled: boolean;
+  extName: string;
+  extToken: string;
+  extSymbol: string;
+  extDecimals: string;
 }
 
 interface BridgeInParams {
@@ -21,8 +22,9 @@ interface BridgeInParams {
 
 interface BridgeOutParams {
   amount: string;
-  toAddress: string;
-  tokenAddress: string;
+  destAddress: string;
+  token: string;
+  destChainId: string;
 }
 
 interface BalanceResponse {
@@ -35,29 +37,33 @@ interface BridgeResponse {
   data?: any;
 }
 
-interface EthereumConfig {
-  ethereumAddress: string;
+
+interface NetworkConfig {
+  chainId: string;
+  chainInfo: {
+    custody: string;
+    enabled: boolean;
+    chainName: string;
+    depositRouter: string;
+    lastProcessedBlock: string;
+  };
 }
 
 type BridgeContextType = {
   // State
-  bridgeInTokens: Token[];
-  bridgeOutTokens: Token[];
   loading: boolean;
   error: string | null;
-  config: EthereumConfig | null;
+
   
-  // Bridge In Functions
-  fetchBridgeInTokens: () => Promise<Token[]>;
+  // Bridge Functions
+  getBridgeableTokens: (chainId: string) => Promise<Token[]>;
   bridgeIn: (params: BridgeInParams) => Promise<BridgeResponse>;
-  
-  // Bridge Out Functions
-  fetchBridgeOutTokens: () => Promise<Token[]>;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
   
   // Bridge Config Functions
-  fetchEthereumConfig: () => Promise<EthereumConfig>;
+
+  getNetworkConfig: () => Promise<NetworkConfig[]>;
   
   // Utility Functions
   formatBalance: (value: bigint | string, decimals: number) => string;
@@ -66,11 +72,9 @@ type BridgeContextType = {
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider = ({ children }: { children: ReactNode }) => {
-  const [bridgeInTokens, setBridgeInTokens] = useState<Token[]>([]);
-  const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useState<EthereumConfig | null>(null);
+
 
   const formatBalance = useCallback((value: bigint | string, decimals: number): string => {
     if (typeof value === 'bigint') {
@@ -83,40 +87,42 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const fetchEthereumConfig = useCallback(async (): Promise<EthereumConfig> => {
+ 
+
+  const getNetworkConfig = useCallback(async (): Promise<NetworkConfig[]> => {
     setLoading(true);
-    
+    console.log("Fetching network config");
     try {
-      const response = await api.get(`/bridge/ethereumConfig`);
-      let ethereumConfig = response.data.data.data;
-      if (!ethereumConfig) {
-        ethereumConfig = response.data;
-      }
-      setConfig(ethereumConfig);
-      return ethereumConfig;
+      const response = await api.get(`/bridge/networkConfigs`);
+      return response.data;
+      console.log("Network config:", response.data);
     } catch (err) {
-      throw err ;
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchBridgeInTokens = useCallback(async (): Promise<Token[]> => {
+  const getBridgeableTokens = useCallback(async (chainId: string): Promise<Token[]> => {
     setLoading(true);
     
     try {
-      const response = await api.get(`/bridge/bridgeInTokens`);
-      // Get tokens from the correct path
-      let tokens = response.data.data.data.bridgeInTokens;
-      // Ensure tokens is always an array
-      if (!Array.isArray(tokens)) {
-        tokens = [];
-      }
+      console.log(`🔍 Fetching bridgeable tokens for chainId: ${chainId}`);
+      const response = await api.get(`/bridge/bridgeableTokens/${chainId}`);
       
-      setBridgeInTokens(tokens);
+      console.log('📡 Raw API Response:', response);
+      console.log('📡 Response Data:', response.data);
+      console.log('📡 Response Status:', response.status);
+      
+      // Transform the response to match expected Token interface
+      let tokens = response.data || [];
+      console.log('🔄 Tokens before transformation:', tokens);
+   
+      
+      console.log('✅ Final transformed tokens:', tokens);
       return tokens;
     } catch (err) {
-      setBridgeInTokens([]);
+      console.error('❌ Error fetching bridgeable tokens:', err);
       return [];
     } finally {
       setLoading(false);
@@ -135,29 +141,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       };
     } catch (err) {
       throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchBridgeOutTokens = useCallback(async (): Promise<Token[]> => {
-    setLoading(true);
-    
-    try {
-      const response = await api.get(`/bridge/bridgeOutTokens`);
-      // Get tokens from the correct path
-      let tokens = response.data.data.data.bridgeOutTokens;
-      
-      // Ensure tokens is always an array
-      if (!Array.isArray(tokens)) {
-        tokens = [];
-      }
-      
-      setBridgeOutTokens(tokens);
-      return tokens;
-    } catch (err) {
-      setBridgeOutTokens([]);
-      return [];
     } finally {
       setLoading(false);
     }
@@ -199,17 +182,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   return (
     <BridgeContext.Provider
       value={{
-        bridgeInTokens,
-        bridgeOutTokens,
         loading,
         error,
-        config,
-        fetchBridgeInTokens,
+        getBridgeableTokens,
         bridgeIn,
-        fetchBridgeOutTokens,
         bridgeOut,
         getBalance,
-        fetchEthereumConfig,
+        getNetworkConfig,
         formatBalance,
       }}
     >

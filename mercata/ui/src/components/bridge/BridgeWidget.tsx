@@ -3,23 +3,55 @@ import { Tabs } from 'antd';
 import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useBridgeContext } from "@/context/BridgeContext";
 import BridgeIn from './BridgeIn';
 import BridgeOut from './BridgeOut';
-import { useBridgeContext } from '@/context/BridgeContext';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const { config, fetchEthereumConfig } = useBridgeContext();
+  const [showTestnet, setShowTestnet] = useState(false);
+  const [chainId, setChainId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  
-  useEffect(() => {
-    // Fetch bridge config on component mount
-    fetchEthereumConfig().catch((error) => {
-      console.error('Failed to fetch bridge config:', error);
-    });
-  }, [fetchEthereumConfig]);
+  const { getNetworkConfig } = useBridgeContext();
 
-  const showTestnet = config?.showTestnet ?? false;
+  // Fetch network configuration on component mount
+  useEffect(() => {
+    const fetchNetworkConfig = async () => {
+      try {
+        setLoading(true);
+        const networkConfig = await getNetworkConfig();
+        
+        console.log('Raw network config response:', networkConfig);
+        
+        // Extract chainId from the first chain in the response
+        if (networkConfig && networkConfig.length > 0) {
+          const firstChain = networkConfig[0];
+          const extractedChainId = firstChain.chainId;
+          setChainId(extractedChainId);
+          console.log(`Successfully extracted chain ID: ${extractedChainId}`);
+        } else {
+          console.log('No chains found in network config');
+          setChainId(null);
+        }
+      } catch (error) {
+        console.error('Error fetching network config:', error);
+        setChainId(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNetworkConfig();
+  }, [getNetworkConfig]);
+
+  if (loading) {
+    return (
+      <div className="w-full flex items-center justify-center py-8">
+        <div className="text-gray-500">Loading bridge configuration...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -35,7 +67,6 @@ const BridgeWidget = () => {
           View Transactions
         </Button>
       </div>
-      
       <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
         <Tabs
           activeKey={activeTab}
@@ -58,9 +89,9 @@ const BridgeWidget = () => {
         />
         <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
           {activeTab === 'bridgeIn' ? (
-            <BridgeIn showTestnet={showTestnet} />
+            <BridgeIn showTestnet={showTestnet} networkChainId={chainId} />
           ) : (
-            <BridgeOut showTestnet={showTestnet} />
+            <BridgeOut showTestnet={showTestnet} networkChainId={chainId} />
           )}
         </div>
       </div>

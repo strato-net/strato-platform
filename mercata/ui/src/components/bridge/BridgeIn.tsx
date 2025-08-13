@@ -30,21 +30,23 @@ import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/n
 import { parseUnits } from "ethers";
 
 interface Token {
-  name: string;
-  symbol: string;
-  tokenAddress: string;
-  decimals: number;
-  icon: string;
-  chainId: number;
-  exchangeTokenSymbol?: string;
-  exchangeTokenName?: string;
+  stratoTokenAddress: string;
+  stratoTokenName: string;
+  stratoTokenSymbol: string;
+  chainId: string;
+  enabled: boolean;
+  extName: string;
+  extToken: string;
+  extSymbol: string;
+  extDecimals: string;
 }
 
 interface BridgeInProps {
   showTestnet: boolean;
+  networkChainId: string | null;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet, networkChainId }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { sendTransactionAsync } = useSendTransaction();
@@ -53,15 +55,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   const { userAddress } = useUser(); // Get user's STRATO address from context
 
   const {
-    bridgeInTokens,
     loading: contextLoading,
-    fetchBridgeInTokens,
     bridgeIn: bridgeInAPI,
     formatBalance,
+    getBridgeableTokens,
   } = useBridgeContext();
 
-  const { config } = useBridgeContext();
-  const safeAddress = config?.safeAddress;
+
+  const safeAddress = "bdjfbejf";
 
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [amount, setAmount] = useState("");
@@ -75,20 +76,33 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     showTestnet ? "Sepolia" : "Ethereum"
   );
   const [toChain, setToChain] = useState<string>("STRATO");
+  const [bridgeInTokens, setBridgeInTokens] = useState<Token[]>([]);
 
   // Expected network validation - use chainId from selected token
   // This needs to be computed every time chainId or selectedToken changes
-  const isCorrectNetwork = isConnected && chainId && selectedToken?.chainId && chainId === selectedToken.chainId;
+  const isCorrectNetwork = isConnected && chainId && selectedToken?.chainId && chainId === parseInt(selectedToken.chainId);
   
 
   // Fetch network tokens
   useEffect(() => {
     const loadBridgeInTokens = async () => {
       try {
-        const tokens = await fetchBridgeInTokens();
+        // Use the networkChainId prop passed from BridgeWidget
+        if (!networkChainId) {
+          console.log("No networkChainId available yet");
+          return;
+        }
+        
+        console.log("Using networkChainId from props:", networkChainId);
+        
+        // Fetch bridgeable tokens with the networkChainId from props
+        const tokens = await getBridgeableTokens(networkChainId);
+        setBridgeInTokens(tokens);
+        
         if (!selectedToken && tokens.length > 0) {
           setSelectedToken(tokens[0]);
         }
+        
       } catch (error: any) {
         console.error("Error fetching bridge in tokens:", error);
         toast({
@@ -100,7 +114,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
     };
 
     loadBridgeInTokens();
-  }, [fetchBridgeInTokens, toast]);
+  }, [getBridgeableTokens, networkChainId, toast]);
 
   // Clear balance error when token changes or connection status changes
   useEffect(() => {
@@ -110,10 +124,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   // Network validation - following existing error handling pattern
   useEffect(() => {
     if (isConnected && chainId && selectedToken?.chainId) {
-      if (chainId !== selectedToken.chainId) {
+      if (chainId !== parseInt(selectedToken.chainId)) {
         setNetworkError(getNetworkErrorMessage({
-          networkName: selectedToken.name,
-          tokenSymbol: selectedToken.symbol,
+          networkName: selectedToken.extName,
+          tokenSymbol: selectedToken.extSymbol,
           direction: "in"
         }));
       } else {
@@ -131,28 +145,28 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   // Balance fetching hooks
   const { data: nativeBalance, refetch: refetchNativeBalance, isError: isNativeBalanceError, isLoading: isNativeBalanceLoading } = useBalance({
     address,
-    chainId: selectedToken?.chainId,
+    chainId: selectedToken?.chainId ? parseInt(selectedToken.chainId) : undefined,
     query: {
       enabled:
         isConnected &&
         !!address &&
         !!selectedToken?.chainId &&
-        selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH"),
+        selectedToken?.extSymbol === (showTestnet ? "SepoliaETH" : "ETH"),
       refetchInterval: false,
     },
   });
 
   const { data: tokenBalanceData, refetch: refetchTokenBalance, isError: isTokenBalanceError, isLoading: isTokenBalanceLoading } = useBalance({
     address,
-    token: selectedToken?.tokenAddress as `0x${string}` | undefined,
-    chainId: selectedToken?.chainId,
+    token: selectedToken?.extToken as `0x${string}` | undefined,
+    chainId: selectedToken?.chainId ? parseInt(selectedToken.chainId) : undefined,
     query: {
       enabled:
         isConnected &&
         !!address &&
         !!selectedToken?.chainId &&
         !!selectedToken &&
-        selectedToken.symbol !== (showTestnet ? "SepoliaETH" : "ETH"),
+        selectedToken.extSymbol !== (showTestnet ? "SepoliaETH" : "ETH"),
       refetchInterval: false,
     },
   });
@@ -180,15 +194,15 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
         // Check if we should be loading based on wagmi hook states
         const shouldBeLoading = isConnected && address && selectedToken && (
-          (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
-          (selectedToken?.symbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
+          (selectedToken?.extSymbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
+          (selectedToken?.extSymbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
         );
 
         if (mounted && shouldBeLoading) {
           setIsBalanceLoading(true);
         }
 
-        if (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
+        if (selectedToken?.extSymbol === (showTestnet ? "SepoliaETH" : "ETH")) {
           if (nativeBalance) {
             const formattedBalance = formatBalance(
               nativeBalance.value,
@@ -219,7 +233,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
               clearTimeout(loadingTimeout); // Clear timeout
             }
           }
-        } else if (selectedToken?.tokenAddress) {
+        } else if (selectedToken?.extToken) {
           if (tokenBalanceData) {
             const formattedBalance = formatBalance(
               tokenBalanceData.value,
@@ -232,7 +246,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             }
           } else if (isInitialFetch && isConnected && address && isTokenBalanceError) {
             // Only show error if the hook is actually in error state
-            const errorMessage = `Failed to fetch ${selectedToken.symbol} balance. Please check your wallet connection.`;
+            const errorMessage = `Failed to fetch ${selectedToken.extSymbol} balance. Please check your wallet connection.`;
             if (mounted) {
               setBalanceError(errorMessage);
               toast({
@@ -267,8 +281,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
         if (mounted) {
           // Only stop loading if the hooks are not loading
           const shouldBeLoading = isConnected && address && selectedToken && (
-            (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
-            (selectedToken?.symbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
+            (selectedToken?.extSymbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
+            (selectedToken?.extSymbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
           );
           
           if (!shouldBeLoading) {
@@ -325,7 +339,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
 
     if (numericAmount > numericBalance) {
       setAmountError(
-        `Insufficient balance. Maximum amount: ${tokenBalance} ${selectedToken?.symbol}`
+        `Insufficient balance. Maximum amount: ${tokenBalance} ${selectedToken?.extSymbol}`
       );
       return false;
     }
@@ -348,7 +362,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
   };
 
   const handleBridgeIn = async () => {
-    const tokenAddress = selectedToken?.tokenAddress;
+    const tokenAddress = selectedToken?.stratoTokenAddress;
     const tokenChainId = selectedToken?.chainId;
 
     // Network validation - following existing error handling pattern
@@ -356,8 +370,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       toast({
         title: "Wrong Network",
         description: getNetworkErrorMessage({
-          networkName: selectedToken?.name || "network",
-          tokenSymbol: selectedToken?.symbol || "tokens",
+          networkName: selectedToken?.extName || "network",
+          tokenSymbol: selectedToken?.extSymbol || "tokens",
           direction: "in"
         }),
         variant: "destructive",
@@ -404,7 +418,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           hash = txHash as `0x${string}`;
         } else {
           const txHash = await writeContractAsync({
-            address: tokenAddress as `0x${string}`,
+            address: selectedToken.extToken as `0x${string}`,
             abi: [
               {
                 name: "transfer",
@@ -418,7 +432,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
               },
             ],
             functionName: "transfer",
-            args: [safeAddress as `0x${string}`, parseUnits(amount, 6)],
+            args: [safeAddress as `0x${string}`, parseUnits(amount, parseInt(selectedToken.extDecimals))],
             chain: showTestnet ? sepolia : mainnet,
             account: address as `0x${string}`,
           });
@@ -459,7 +473,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       if (receipt.status === "success") {
         try {
           // Bridge contract address - get from config (ethereumAddress from API)
-          const ethereumBridgeInContractAddress = config?.ethereumAddress;
+          const ethereumBridgeInContractAddress = "0x0000000000000000000000000000000000000000";
           
           if (!ethereumBridgeInContractAddress) {
             throw new Error("Bridge contract address not available from config");
@@ -485,8 +499,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             ],
             functionName: "deposit",
             args: [
-              parseUnits(amount, selectedToken?.decimals || 18), // amount
-              tokenAddress as `0x${string}`, // tokenAddress
+              parseUnits(amount, parseInt(selectedToken.extDecimals)), // amount
+              selectedToken.extToken as `0x${string}`, // tokenAddress
               hash, // ethHash
               address as `0x${string}`, // fromAddress (MetaMask address)
               userAddress, // stratoAddress (user's address in our app) - keep as string
@@ -521,7 +535,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           setTokenBalance(formattedBalance);
         } else {
           const balance = await client.readContract({
-            address: tokenAddress as `0x${string}`,
+            address: selectedToken.extToken as `0x${string}`,
             abi: [
               {
                 name: "balanceOf",
@@ -534,13 +548,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             functionName: "balanceOf",
             args: [address as `0x${string}`],
           });
-          const formattedBalance = formatBalance(balance, 6);
+          const formattedBalance = formatBalance(balance, parseInt(selectedToken.extDecimals));
           setTokenBalance(formattedBalance);
         }
 
         toast({
           title: "Transaction Successful",
-          description: `Successfully transferred ${amount} ${selectedToken?.symbol}`,
+          description: `Successfully transferred ${amount} ${selectedToken?.extSymbol}`,
         });
       }
     } catch (error) {
@@ -579,9 +593,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       <div className="space-y-1.5">
         <Label htmlFor="asset">Select Asset</Label>
         <Select
-          value={selectedToken?.symbol || ""}
+          value={selectedToken?.extSymbol || ""}
           onValueChange={(value) => {
-            const token = bridgeInTokens?.find((t) => t.symbol === value);
+            const token = bridgeInTokens.find((t) => t.extSymbol === value);
             if (token) {
               setSelectedToken(token);
             }
@@ -590,14 +604,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
           <SelectTrigger id="from-token">
             <SelectValue>
               {selectedToken
-                ? `${selectedToken.name} (${selectedToken.symbol})`
+                ? `${selectedToken.extName} (${selectedToken.extSymbol})`
                 : "Select asset"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {bridgeInTokens.map((token) => (
-              <SelectItem key={token.symbol} value={token.symbol}>
-                {token.name} ({token.symbol})
+              <SelectItem key={token.extSymbol} value={token.extSymbol}>
+                {token.extName} ({token.extSymbol})
               </SelectItem>
             ))}
           </SelectContent>
@@ -642,7 +656,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
                 onClick={() => {
                   setBalanceError("");
                   // Trigger balance refetch
-                  if (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
+                  if (selectedToken?.extSymbol === (showTestnet ? "SepoliaETH" : "ETH")) {
                     refetchNativeBalance();
                   } else {
                     refetchTokenBalance();
@@ -657,14 +671,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
             tokenBalance && (
               <div className="space-y-2">
                 <div className="text-sm text-gray-500">
-                  Balance: {tokenBalance} {selectedToken?.symbol}
+                  Balance: {tokenBalance} {selectedToken?.extSymbol}
                 </div>
-                {selectedToken?.exchangeTokenSymbol && (
+                {selectedToken?.stratoTokenSymbol && (
                   <div className="text-sm">
                     <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
                       You will receive {amount ? `${amount} ` : ""}{" "}
-                      {selectedToken?.exchangeTokenName} (
-                      {selectedToken?.exchangeTokenSymbol}) on STRATO network
+                      {selectedToken?.stratoTokenName} (
+                      {selectedToken?.stratoTokenSymbol}) on STRATO network
                     </p>
                   </div>
                 )}
