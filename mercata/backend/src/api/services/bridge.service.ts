@@ -58,7 +58,7 @@ export const getBridgeStatus = async (
 
     const params = {
       select: `withdrawals:${MercataBridge}-withdrawals(id,destChainId,token,user,dest,amount,requestedAt,bridgeStatus)`,
-      "withdrawals.user": `eq.${userAddress}`,
+      "value->>user": `eq.${userAddress}`,
     };
 
     const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
@@ -81,8 +81,8 @@ export const getBridgeableTokens = async (
   try {
     const params = {
       select: `assets:${MercataBridge}-assets(*)`,
-      "assets.enabled": "eq.true",
-      "assets.chainId": `eq.${chainId}`
+      "value->>enabled": "eq.true",
+      "value->>chainId": `eq.${chainId}`
     };
 
     const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
@@ -129,7 +129,7 @@ export const getNetworkConfigs = async (accessToken: string) => {
     const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, {
       params: {
         select: `chains:${MercataBridge}-chains(*)`,
-        "chains.enabled": "eq.true"
+        "value->>enabled": "eq.true"
       }
     });
 
