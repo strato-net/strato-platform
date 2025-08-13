@@ -11,7 +11,7 @@ import {
   getChainLogs,
   isChainConfigured
 } from '../services/rpcService';
-import { logInfo, logError, logChainSync } from '../utils/logger';
+import { logError } from '../utils/logger';
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
 const DEPOSIT_EVENT_SIGNATURE = '0x8f678ca000000000000000000000000000000000000000000000000000000000';

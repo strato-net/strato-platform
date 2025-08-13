@@ -1,9 +1,6 @@
-import dotenv from 'dotenv';
 import { logInfo, logError } from './logger';
 import { getEnabledChains, getEnabledAssets } from '../services/cirrusService';
 import { config } from '../config';
-
-dotenv.config();
 
 export async function validateBridgeConfig(): Promise<boolean> {
     const errors: string[] = [];

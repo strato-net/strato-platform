@@ -1,7 +1,4 @@
-import dotenv from 'dotenv';
 import { logError } from "../utils/logger";
-
-dotenv.config();
 
 const config = {
   auth: {
@@ -23,10 +20,10 @@ const config = {
     contractAddress: process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e",
   },
   polling: {
-    bridgeInInterval: 100 * 1000,
-    bridgeOutInterval: 3 * 60 * 1000,
-    withdrawalInterval: 10 * 1000,
-    ethereumDepositInterval: 2 * 60 * 1000,
+    bridgeInInterval: 5 * 60 * 1000,    // 5 minutes (was 100 seconds)
+    bridgeOutInterval: 5 * 60 * 1000,   // 5 minutes (was 3 minutes)
+    withdrawalInterval: 2 * 60 * 1000,  // 2 minutes (was 10 seconds)
+    ethereumDepositInterval: 5 * 60 * 1000, // 5 minutes (was 2 minutes)
   },
   strato: {
     gas: {

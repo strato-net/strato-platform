@@ -5,8 +5,8 @@ import {
   createSafeTransactionsForWithdrawals, 
   checkExecutedSafeTransactions 
 } from "./safeService";
-import { mintVouchersForDeposits } from "../utils/voucherMinting";
-import { logInfo, logError, logBridgeTransaction } from "../utils/logger";
+
+import { logInfo, logError } from "../utils/logger";
 
 export const depositBatch = async (deposits: any[]) => {
   if (!config.bridge.address) {

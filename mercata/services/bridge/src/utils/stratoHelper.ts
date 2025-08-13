@@ -5,8 +5,7 @@ import {
   FunctionInput, 
   BuiltTx, 
   TxResult, 
-  TxResponse, 
-  PollingOptions 
+  TxResponse
 } from "../types";
 
 // ============================================================================
@@ -40,7 +39,7 @@ export const until = async <T>(
   { 
     timeout = config.strato.polling.defaultTimeout, 
     interval = config.strato.polling.defaultInterval 
-  }: PollingOptions = {}
+  }: { timeout?: number; interval?: number } = {}
 ): Promise<T> => {
   const deadline = Date.now() + timeout;
   

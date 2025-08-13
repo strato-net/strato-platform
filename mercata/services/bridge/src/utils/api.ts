@@ -5,6 +5,13 @@ import { config } from '../config';
 import { RetryConfig, ClientOptions, ApiClient } from '../types';
 
 export const extractErrorMessage = (error: any): string => {
+  // Check for Cloudflare challenge
+  if (error.response?.data && typeof error.response.data === 'string') {
+    if (error.response.data.includes('Just a moment') || error.response.data.includes('Cloudflare')) {
+      return 'Cloudflare challenge detected - service temporarily blocked';
+    }
+  }
+  
   // API response errors
   if (error.response?.data) {
     const { data } = error.response;
@@ -36,6 +43,12 @@ const retry = async <T>(
       
       if (i < maxAttempts) {
         logError(logPrefix, new Error(`Attempt ${i}/${maxAttempts} failed: ${lastError.message}`));
+        
+        // Add exponential backoff for Cloudflare challenges
+        if (lastError.message.includes('Cloudflare challenge')) {
+          const backoffDelay = Math.min(1000 * Math.pow(2, i - 1), 30000); // Max 30 seconds
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        }
       }
     }
   }
@@ -62,6 +75,8 @@ const createClient = (
     const headers = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      'User-Agent': 'Mercata-Bridge-Service/1.0.0',
+      'X-Requested-With': 'XMLHttpRequest',
       ...config?.headers,
     };
     

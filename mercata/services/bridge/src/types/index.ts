@@ -40,35 +40,6 @@ export interface TxResponse {
   hash: string;
 }
 
-export type PollingPredicate<T> = (result: T) => boolean;
-export type PollingAction<T> = () => Promise<T>;
-
-export interface PollingOptions {
-  timeout?: number;
-  interval?: number;
-}
-
-// ---------------- Bridge Event Types ----------------
-export interface BridgeInEvent {
-  type: string;
-  data: {
-    transactionHash: string;
-    from: string;
-    to: string;
-    value: string;
-  };
-}
-
-export interface BridgeOutEvent {
-  type: string;
-  data: {
-    transactionHash: string;
-    from: string;
-    to: string;
-    value: string;
-  };
-}
-
 // ---------------- API Types ----------------
 export interface RetryConfig {
   maxAttempts?: number;
