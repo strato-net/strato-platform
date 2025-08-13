@@ -86,29 +86,23 @@ export const getBridgeableTokens = async (
       return [];
     }
 
-    // Get token addresses from assets
-    const tokenAddresses = assets.map((asset: any) => asset.assetInfo?.stratoToken).filter(Boolean);
-    
-    // Fetch token metadata
-    const tokenParams = {
-      select: "address,_name,_symbol",
-      address: `in.(${tokenAddresses.join(",")})`
-    };
-
-    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, { params: tokenParams });
-    
-    // Create a map of token addresses to their metadata
-    const tokenMap = new Map();
-    tokenData.forEach((token: any) => {
-      tokenMap.set(token.address, { name: token._name, symbol: token._symbol });
+    // Get token addresses and fetch metadata
+    const tokenAddresses = assets.map((asset: any) => asset.stratoTokenAddress).filter(Boolean);
+    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, { 
+      params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
     });
     
-    return assets.map((asset: any) => ({
-      stratoTokenAddress: asset.stratoTokenAddress,
-      stratoTokenName: tokenMap.get(asset.assetInfo?.stratoToken)?._name || "",
-      stratoTokenSymbol: tokenMap.get(asset.assetInfo?.stratoToken)?._symbol || "",
-      ...asset.assetInfo
-    }));
+    // Create token metadata map
+    const tokenMap = new Map(tokenData.map((token: any) => [token.address, { name: token._name, symbol: token._symbol }]));
+    return assets.map((asset: any) => {
+      const tokenInfo = tokenMap.get(asset.stratoTokenAddress) as { name: string; symbol: string } | undefined;
+      return {
+        stratoTokenAddress: asset.stratoTokenAddress,
+        stratoTokenName: tokenInfo?.name || "",
+        stratoTokenSymbol: tokenInfo?.symbol || "",
+        ...asset.assetInfo
+      };
+    });
   } catch (error) {
     throw error;
   }
