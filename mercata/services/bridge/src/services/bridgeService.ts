@@ -1,11 +1,12 @@
 import { config } from "../config";
-import { contractCall } from "../utils/contractCall";
+import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { 
   createSafeTransactionsForWithdrawals, 
   checkExecutedSafeTransactions 
 } from "./safeService";
 import { mintVouchersForDeposits } from "../utils/voucherMinting";
+import { logInfo, logError, logBridgeTransaction } from "../utils/logger";
 
 export const depositBatch = async (deposits: any[]) => {
   if (!config.bridge.address) {
@@ -19,26 +20,27 @@ export const depositBatch = async (deposits: any[]) => {
     const amounts = deposits.map(deposit => deposit.amount);
     const users = deposits.map(deposit => deposit.user);
 
-    const result = await contractCall(
-      'MercataBridge',
-      config.bridge.address,
-      "depositBatch",
-      {
+    const result = await execute({
+      contractName: 'MercataBridge',
+      contractAddress: config.bridge.address,
+      method: "depositBatch",
+      args: {
         srcChainIds: srcChainIds,
         srcTxHashes: srcTxHashes,
         tokens: tokens,
         amounts: amounts,
         users: users
       }
-    );
+    });
 
     if (result?.status === "Success") {
-      console.log(`✅ Deposited ${deposits.length} deposits`);
+      logInfo('BridgeService', `Successfully deposited ${deposits.length} deposits`);
     } else {
-      console.error(`❌ Failed to deposit:`, result?.status);
+      throw new Error(`Failed to deposit batch: ${result?.status}`);
     }
   } catch (error) {
-    console.error(`❌ Error depositing:`, error);
+    logError('BridgeService', error as Error, { operation: 'depositBatch', depositCount: deposits.length });
+    throw error;
   }
 };
 
@@ -51,23 +53,24 @@ export const confirmDepositBatch = async (deposits: any[]) => {
     const srcChainIds = deposits.map(deposit => deposit.srcChainId);
     const srcTxHashes = deposits.map(deposit => deposit.srcTxHash);
 
-    const result = await contractCall(
-      'MercataBridge',
-      config.bridge.address,
-      "confirmDepositBatch",
-      {
+    const result = await execute({
+      contractName: 'MercataBridge',
+      contractAddress: config.bridge.address,
+      method: "confirmDepositBatch",
+      args: {
         srcChainIds: srcChainIds,
         srcTxHashes: srcTxHashes
       }
-    );
+    });
 
     if (result?.status === "Success") {
-      console.log(`✅ Confirmed ${deposits.length} deposits`);
+      logInfo('BridgeService', `Successfully confirmed ${deposits.length} deposits`);
     } else {
-      console.error(`❌ Failed to confirm deposits:`, result?.status);
+      throw new Error(`Failed to confirm deposits: ${result?.status}`);
     }
   } catch (error) {
-    console.error(`❌ Error confirming deposits:`, error);
+    logError('BridgeService', error as Error, { operation: 'confirmDepositBatch', depositCount: deposits.length });
+    throw error;
   }
 };
 
@@ -83,32 +86,38 @@ export const confirmWithdrawalBatch = async (withdrawals: any[]) => {
       const withdrawalIds = withdrawals.map(w => w.id || w.withdrawalId);
       const custodyTxHashes = safeTxs.map(tx => tx.safeTxHash);
 
-      const result = await contractCall(
-        'MercataBridge',
-        config.bridge.address,
-        "confirmWithdrawalBatch",
-        {
+      const result = await execute({
+        contractName: 'MercataBridge',
+        contractAddress: config.bridge.address,
+        method: "confirmWithdrawalBatch",
+        args: {
           ids: withdrawalIds,
           custodyTxHashes: custodyTxHashes
         }
-      );
+      });
 
       if (result?.status === "Success") {
-        console.log(`✅ Successfully confirmed ${withdrawals.length} withdrawals`);
+        logInfo('BridgeService', `Successfully confirmed ${withdrawals.length} withdrawals`);
         
+        // Send emails for successful withdrawals
         for (const withdrawal of withdrawals) {
           try {
             sendEmail(withdrawal.id || withdrawal.withdrawalId);
           } catch (emailError) {
-            console.error(`❌ Failed to send email for withdrawal ${withdrawal.id}:`, emailError);
+            // Don't fail the whole operation for email errors
+            logError('BridgeService', emailError as Error, { 
+              operation: 'sendEmail', 
+              withdrawalId: withdrawal.id || withdrawal.withdrawalId 
+            });
           }
         }
       } else {
-        console.error(`❌ Failed to confirm withdrawals:`, result?.status || "Unknown error");
+        throw new Error(`Failed to confirm withdrawals: ${result?.status || "Unknown error"}`);
       }
     }
   } catch (error) {
-    console.error("❌ Error in confirmWithdrawalBatch:", error);
+    logError('BridgeService', error as Error, { operation: 'confirmWithdrawalBatch', withdrawalCount: withdrawals.length });
+    throw error;
   }
 };
 
@@ -124,24 +133,25 @@ export const finaliseWithdrawalBatch = async (withdrawals: any[]) => {
       const withdrawalIds = withdrawals.map(w => w.id || w.withdrawalId);
       const custodyTxHashes = executedTxs.map(tx => tx.hash);
 
-      const result = await contractCall(
-        'MercataBridge',
-        config.bridge.address,
-        "finaliseWithdrawalBatch",
-        {
+      const result = await execute({
+        contractName: 'MercataBridge',
+        contractAddress: config.bridge.address,
+        method: "finaliseWithdrawalBatch",
+        args: {
           ids: withdrawalIds,
           custodyTxHashes: custodyTxHashes
         }
-      );
+      });
 
       if (result?.status === "Success") {
-        console.log(`✅ Successfully finalized ${withdrawals.length} withdrawals`);
+        logInfo('BridgeService', `Successfully finalized ${withdrawals.length} withdrawals`);
       } else {
-        console.error(`❌ Failed to finalize withdrawals:`, result?.status || "Unknown error");
+        throw new Error(`Failed to finalize withdrawals: ${result?.status || "Unknown error"}`);
       }
     }
   } catch (error) {
-    console.error("❌ Error in finaliseWithdrawalBatch:", error);
+    logError('BridgeService', error as Error, { operation: 'finaliseWithdrawalBatch', withdrawalCount: withdrawals.length });
+    throw error;
   }
 };
 
@@ -153,21 +163,22 @@ export const handleRejectedWithdrawalBatch = async (withdrawals: any[]) => {
   try {
     const withdrawalIds = withdrawals.map(w => w.id || w.withdrawalId);
 
-    const result = await contractCall(
-      'MercataBridge',
-      config.bridge.address,
-      "abortWithdrawalBatch",
-      {
+    const result = await execute({
+      contractName: 'MercataBridge',
+      contractAddress: config.bridge.address,
+      method: "abortWithdrawalBatch",
+      args: {
         ids: withdrawalIds
       }
-    );
+    });
 
     if (result?.status === "Success") {
-      console.log(`✅ Successfully aborted ${withdrawals.length} rejected withdrawals`);
+      logInfo('BridgeService', `Successfully aborted ${withdrawals.length} rejected withdrawals`);
     } else {
-      console.error(`❌ Failed to abort rejected withdrawals:`, result?.status || "Unknown error");
+      throw new Error(`Failed to abort rejected withdrawals: ${result?.status || "Unknown error"}`);
     }
   } catch (error) {
-    console.error("❌ Error in handleRejectedWithdrawalBatch:", error);
+    logError('BridgeService', error as Error, { operation: 'handleRejectedWithdrawalBatch', withdrawalCount: withdrawals.length });
+    throw error;
   }
 };

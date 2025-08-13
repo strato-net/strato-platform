@@ -1,6 +1,6 @@
 import sgMail from '@sendgrid/mail';
 import { MailDataRequired } from '@sendgrid/mail';
-import logger from '../utils/logger';
+import { logInfo } from '../utils/logger';
 import { config } from '../config';
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
@@ -19,7 +19,7 @@ const sendEmail = async (txHash: string) => {
   };
 
   await sgMail.send(msg);
-  logger.info('Transaction notification email sent successfully to:', emailAddresses?.join(', ') || '');
+  logInfo('EmailService', `Transaction notification email sent successfully to: ${emailAddresses?.join(', ') || ''}`);
 }
 
 export default sendEmail;

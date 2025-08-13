@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { contractCall } from '../utils/contractCall';
+import { execute } from '../utils/stratoHelper';
 import {
   getLastProcessedBlock,
   getEnabledChains,
@@ -10,27 +10,28 @@ import {
   getCurrentBlockNumber,
   getChainLogs,
   isChainConfigured
-} from '../utils/rpcApiHelper';
+} from '../services/rpcService';
+import { logInfo, logError, logChainSync } from '../utils/logger';
 
-const DEPOSIT_EVENT_SIGNATURE =
-  '0x' +
-  'DepositInitiated(uint256,string,address,uint256,address)'
-    .split('')
-    .map((c) => c.charCodeAt(0).toString(16).padStart(2, '0'))
-    .join('');
+// DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
+const DEPOSIT_EVENT_SIGNATURE = '0x8f678ca000000000000000000000000000000000000000000000000000000000';
 
 const updateLastProcessedBlock = async (
   chainId: number,
   blockNumber: number
 ): Promise<void> => {
   try {
-    await contractCall('MercataBridge', config.bridge.address!, 'setLastProcessedBlock', {
-      chainId: chainId,
-      lastProcessedBlock: blockNumber
+    await execute({
+      contractName: 'MercataBridge',
+      contractAddress: config.bridge.address!,
+      method: 'setLastProcessedBlock',
+      args: {
+        chainId: chainId,
+        lastProcessedBlock: blockNumber
+      }
     });
-    console.log(`✅ Updated last processed block for chain ${chainId} to ${blockNumber}`);
   } catch (error) {
-    console.error(`❌ Failed to update last processed block for chain ${chainId}:`, error);
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -50,22 +51,16 @@ const parseDepositEvent = (log: any) => {
       user
     };
   } catch (error) {
-    console.error('❌ Failed to parse deposit event:', error);
-    return null;
+    return null; // Return null for unparseable events
   }
 };
 
 const validateDepositEvent = async (depositData: any): Promise<boolean> => {
   try {
     const isTokenValid = await isTokenEnabled(depositData.token);
-    if (!isTokenValid) {
-      console.log(`❌ Token ${depositData.token} not enabled in bridge`);
-      return false;
-    }
-    return true;
+    return isTokenValid;
   } catch (error) {
-    console.error('❌ Failed to validate deposit event:', error);
-    return false;
+    return false; // Return false for validation errors
   }
 };
 
@@ -75,24 +70,19 @@ const pollChainForDeposits = async (chain: any) => {
     const depositRouter = chain.depositRouter;
 
     if (!depositRouter) {
-      console.log(`⚠️ No deposit router configured for chain ${chainId}`);
-      return;
+      return; // Skip chains without deposit router
     }
-
-    console.log(`🔍 Polling chain ${chainId} (${chain.chainName}) for deposit events...`);
 
     const lastProcessedBlock = await getLastProcessedBlock(chainId);
 
     if (!isChainConfigured(chainId)) {
-      console.log(`⚠️ No RPC URL configured for chain ${chainId}`);
-      return;
+      return; // Skip chains without RPC configuration
     }
 
     const currentBlock = await getCurrentBlockNumber(chainId);
 
     if (currentBlock <= lastProcessedBlock) {
-      console.log(`⏳ No new blocks to process for chain ${chainId}`);
-      return;
+      return; // No new blocks to process
     }
 
     const logs = await getChainLogs(
@@ -104,73 +94,56 @@ const pollChainForDeposits = async (chain: any) => {
     );
 
     if (logs.length === 0) {
-      console.log(`📝 No deposit events found for chain ${chainId}`);
       await updateLastProcessedBlock(chainId, currentBlock);
       return;
     }
 
-    console.log(`📝 Found ${logs.length} deposit events for chain ${chainId}`);
-
+    // Process deposit events
+    const validDeposits: any[] = [];
     for (const log of logs) {
-      try {
-        const depositData = parseDepositEvent(log);
-
-        if (!depositData) {
-          console.log('❌ Failed to parse deposit event');
-          continue;
-        }
-
-        const isValid = await validateDepositEvent(depositData);
-
-        if (!isValid) {
-          console.log('❌ Deposit event validation failed');
-          continue;
-        }
-
-        await depositBatch([
-          {
-            srcChainId: depositData.srcChainId,
-            srcTxHash: depositData.srcTxHash,
-            token: depositData.token,
-            amount: depositData.amount,
-            user: depositData.user
-          }
-        ]);
-
-        console.log(`✅ Deposited: ${depositData.srcTxHash} from chain ${chainId}`);
-      } catch (error) {
-        console.error('❌ Failed to process deposit event:', error);
+      const depositData = parseDepositEvent(log);
+      if (!depositData) {
+        continue;
       }
+
+      const isValid = await validateDepositEvent(depositData);
+      if (!isValid) {
+        continue;
+      }
+
+      validDeposits.push(depositData);
+    }
+
+    // Batch process valid deposits
+    if (validDeposits.length > 0) {
+      await depositBatch(validDeposits);
     }
 
     await updateLastProcessedBlock(chainId, currentBlock);
   } catch (error) {
-    console.error(`❌ Error polling chain ${chain.chainId}:`, error);
+    logError('AlchemyPolling', error as Error, { operation: 'pollChainForDeposits', chain });
   }
 };
 
-export const startMultiChainDepositPolling = async () => {
-  const pollingInterval = config.polling.ethereumDepositInterval || 5 * 60 * 1000;
+export const startMultiChainDepositPolling = () => {
+  const pollingInterval = config.polling.bridgeInInterval || 100 * 1000;
+
   const poll = async () => {
     try {
-      console.log('🔍 Starting multi-chain deposit polling...');
       const enabledChains = await getEnabledChains();
 
       if (enabledChains.length === 0) {
-        console.log('⚠️ No enabled chains found');
         return;
       }
-
-      console.log(`📝 Found ${enabledChains.length} enabled chains to poll`);
 
       for (const chain of enabledChains) {
         await pollChainForDeposits(chain);
       }
     } catch (e: any) {
-      console.error('❌ Multi-chain deposit polling error:', e.message);
+      logError('AlchemyPolling', e as Error, { operation: 'startMultiChainDepositPolling' });
     }
   };
 
-  await poll();
+  poll();
   setInterval(poll, pollingInterval);
 };

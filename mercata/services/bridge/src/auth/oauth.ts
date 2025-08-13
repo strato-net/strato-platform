@@ -9,20 +9,8 @@ interface OAuthConfig {
   tokenField?: string;
 }
 
-interface TokenData {
-  access_token: string;
-  expires_in: number;
-  refresh_expires_in: number;
-  refresh_token: string;
-  token_type: string;
-  session_state: string;
-  scope: string;
-  expires_at: number;
-  [key: string]: string | number; // Allow dynamic string indexing
-}
-
 interface TokenResponse {
-  token: TokenData;
+  token: any;
 }
 
 class OAuthUtil {
@@ -71,12 +59,6 @@ class OAuthUtil {
 
       return oauth;
     } catch (error: any) {
-      console.error("❌ OAuth Initialization Error:", {
-        error: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        stack: error?.stack,
-      });
       throw new Error(
         `Failed to initialize OAuth: ${error?.message || "Unknown error"}`
       );
@@ -111,16 +93,15 @@ class OAuthUtil {
         token: tokenData,
       };
     } catch (error: any) {
-      console.error("❌ Token Request Error:", {
-        error: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        config: {
-          tokenEndpoint: "[REDACTED]",
-          scope: this.scope,
-          clientId: "[REDACTED]",
-        },
-      });
+      // Check if it's an axios error with response data
+      if (error.response?.data) {
+        const contentType = error.response.headers['content-type'] || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`OAuth endpoint returned non-JSON content (${contentType}). Response: ${error.response.data.substring(0, 200)}...`);
+        }
+        throw new Error(`OAuth error: ${JSON.stringify(error.response.data)}`);
+      }
+      
       throw new Error(
         `Failed to get access token: ${error?.message || "Unknown error"}`
       );

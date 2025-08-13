@@ -1,59 +1,15 @@
 import dotenv from 'dotenv';
-import logger from '../utils/logger';
-import fetch from "node-fetch";
-import { getEnabledChains } from '../services/cirrusService';
+import { logError } from "../utils/logger";
 
 dotenv.config();
 
-/**
- * Bridge Service Configuration
- * 
- * This service provides dynamic configuration for the Mercata Bridge, reading
- * chain and asset information from the Cirrus bridge contract.
- * 
- * Environment Variables Required:
- * 
- * Authentication:
- * - BA_USERNAME: BlockApps username
- * - BA_PASSWORD: BlockApps password  
- * - CLIENT_SECRET: OAuth client secret
- * - CLIENT_ID: OAuth client ID
- * - OPENID_DISCOVERY_URL: OpenID discovery endpoint
- * 
- * Blockchain:
- * - ALCHEMY_API_KEY: Alchemy API key (used for all chains)
- * - BRIDGE_ADDRESS: MercataBridge contract address
- * 
- * Chain RPC URLs (dynamically validated based on enabled chains from Cirrus):
- * - CHAIN_${chainId}_RPC_URL: RPC URL for each enabled chain (required)
- * - Example: CHAIN_11155111_RPC_URL for Sepolia, CHAIN_1_RPC_URL for mainnet
- * - All enabled chains from the bridge contract must have corresponding RPC URLs
- * 
- * Safe Wallet:
- * - SAFE_ADDRESS: Gnosis Safe wallet address
- * - SAFE_OWNER_ADDRESS: Safe owner address
- * - SAFE_OWNER_PRIVATE_KEY: Safe owner private key
- * 
- * Voucher:
- * - VOUCHER_CONTRACT_ADDRESS: Voucher contract address (optional, has default)
- * 
- * Usage:
- * - Chain information is fetched dynamically from Cirrus
- * - RPC URLs are constructed using CHAIN_${chainId}_RPC_URL + ALCHEMY_API_KEY
- * - All bridge operations filter by the specific bridge contract address
- * - Chain RPC URLs are validated at startup based on enabled chains from Cirrus
- */
-
-const createConfig = () => ({
+const config = {
   auth: {
     baUsername: process.env.BA_USERNAME,
     baPassword: process.env.BA_PASSWORD,
     clientSecret: process.env.CLIENT_SECRET,
     clientId: process.env.CLIENT_ID,
     openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
-  },
-  alchemy: {
-    apiKey: process.env.ALCHEMY_API_KEY,
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
@@ -72,173 +28,56 @@ const createConfig = () => ({
     withdrawalInterval: 10 * 1000,
     ethereumDepositInterval: 2 * 60 * 1000,
   },
-});
+  strato: {
+    gas: {
+      limit: 32_100_000_000,
+      price: 1,
+    },
+    polling: {
+      defaultTimeout: 60_000,
+      defaultInterval: 5_000,
+    },
+    tx: {
+      type: "FUNCTION" as const,
+    },
+  },
+  api: {
+    nodeUrl: process.env.NODE_URL,
+    errorCodes: {
+      ECONNREFUSED: 'Connection refused',
+      ENOTFOUND: 'DNS lookup failed',
+      ETIMEDOUT: 'Request timeout',
+    },
+    defaults: {
+      timeout: 60_000,
+      maxAttempts: 2,
+    },
+  },
+};
 
-export const config = createConfig();
+export { config };
 
-/**
- * Get RPC URL for a specific chain ID
- * 
- * Constructs the full RPC URL by combining the base URL from environment
- * variables with the Alchemy API key.
- * 
- * @param chainId - The chain ID (number or bigint)
- * @returns The complete RPC URL with API key
- * @throws Error if CHAIN_${chainId}_RPC_URL is not configured
- * 
- * @example
- * // For Sepolia (chain ID 11155111)
- * getChainRpcUrl(11155111) // Returns: "https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY"
- * 
- * @example
- * // For Ethereum mainnet (chain ID 1)  
- * getChainRpcUrl(1) // Returns: "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY"
- */
 export const getChainRpcUrl = (chainId: number | bigint): string => {
   const chainIdStr = chainId.toString();
   const rpcUrl = process.env[`CHAIN_${chainIdStr}_RPC_URL`];
   
   if (!rpcUrl) {
-    throw new Error(`No RPC URL configured for chain ${chainIdStr}. Please set CHAIN_${chainIdStr}_RPC_URL environment variable.`);
+    throw new Error(`CHAIN_${chainIdStr}_RPC_URL environment variable is not configured`);
   }
   
-  return config.alchemy.apiKey ? `${rpcUrl}/${config.alchemy.apiKey}` : rpcUrl;
+  return rpcUrl;
 };
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'BA_USERNAME',
-  'BA_PASSWORD',
-  'CLIENT_SECRET',
-  'CLIENT_ID',
-  'OPENID_DISCOVERY_URL',
-  'ALCHEMY_API_KEY',
-  'BRIDGE_ADDRESS',
+  'BA_USERNAME', 'BA_PASSWORD', 'CLIENT_SECRET', 'CLIENT_ID', 'OPENID_DISCOVERY_URL',
+  'BRIDGE_ADDRESS', 'SAFE_ADDRESS', 'SAFE_OWNER_ADDRESS', 'SAFE_OWNER_PRIVATE_KEY'
 ];
 
-const missingEnvVars = requiredEnvVars.filter(
-  (envVar) => !process.env[envVar]
-);
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  const error = `Missing required environment variables: ${missingEnvVars.join(
-    ', '
-  )}`;
-  logger.error(error);
+  const error = `Missing required environment variables: ${missingEnvVars.join(', ')}`;
+  logError('Config', error, { missingEnvVars });
   throw new Error(error);
 }
-
-/**
- * Validate chain RPC URLs based on enabled chains from Cirrus
- * 
- * Fetches the list of enabled chains from the bridge contract via Cirrus
- * and validates that all required RPC URL environment variables are configured.
- * This ensures the application has all necessary RPC endpoints for the
- * chains that are actually enabled in the bridge.
- * 
- * @throws Error if any enabled chain is missing its RPC URL configuration
- * @throws Error if Cirrus is unavailable or returns invalid data
- * 
- * @example
- * // If Cirrus returns chains [11155111, 1], validates:
- * // - CHAIN_11155111_RPC_URL is set
- * // - CHAIN_1_RPC_URL is set
- */
-export const validateChainRpcUrls = async (): Promise<void> => {
-  try {
-    const enabledChains = await getEnabledChains();
-    const missingChainRpcUrls: string[] = [];
-    
-    for (const chain of enabledChains) {
-      const chainId = chain?.chainId;
-      if (!chainId) {
-        continue;
-      }
-      
-      const envVarName = `CHAIN_${chainId}_RPC_URL`;
-      
-      if (!process.env[envVarName]) {
-        missingChainRpcUrls.push(envVarName);
-      }
-    }
-    
-    if (missingChainRpcUrls.length > 0) {
-      const error = `Missing RPC URL environment variables for enabled chains: ${missingChainRpcUrls.join(', ')}`;
-      logger.error(error);
-      throw new Error(error);
-    }
-    
-    logger.info(`✅ All RPC URLs configured for ${enabledChains.length} enabled chains`);
-  } catch (error) {
-    logger.error('❌ Failed to validate chain RPC URLs:', error);
-    throw error;
-  }
-};
-
-let keyCache: Map<string, string> = new Map(); // Cache for all JWKS keys
-let isInitialized = false;
-
-/**
- * Initialize OAuth configuration
- * 
- * Fetches OpenID discovery configuration and pre-caches all JWKS keys
- * for efficient JWT validation. This function should be called once
- * at application startup.
- * 
- * @throws Error if OpenID discovery URL is not configured
- * @throws Error if OpenID configuration is invalid
- * @throws Error if JWKS cannot be fetched or parsed
- */
-export const initializeOAuth = async () => {
-  if (isInitialized) {
-    return;
-  }
-
-  if (!config.auth.openIdDiscoveryUrl) {
-    throw new Error("OpenID discovery URL not configured");
-  }
-
-  try {
-    const response = await fetch(config.auth.openIdDiscoveryUrl);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch OpenID configuration: ${response.status} ${response.statusText}`);
-    }
-    
-    const discovery = await response.json();
-
-    if (!discovery.jwks_uri || !discovery.issuer) {
-      throw new Error("Invalid OpenID configuration - missing jwks_uri or issuer");
-    }
-
-    // Pre-fetch and cache all JWKS keys
-    const jwksResponse = await fetch(discovery.jwks_uri);
-    if (!jwksResponse.ok) {
-      throw new Error(`Failed to fetch JWKS: ${jwksResponse.status} ${jwksResponse.statusText}`);
-    }
-    
-    const jwks = await jwksResponse.json();
-    if (!jwks.keys || !Array.isArray(jwks.keys)) {
-      throw new Error("Invalid JWKS response - missing keys array");
-    }
-
-    // Cache all keys by their key ID
-    for (const key of jwks.keys) {
-      if (key.kid && key.n && key.e) {
-        // Convert JWK to PEM format
-        const jwkToPem = require('jwk-to-pem');
-        try {
-          const pem = jwkToPem(key);
-          keyCache.set(key.kid, pem);
-        } catch (error) {
-          console.warn(`⚠️ Failed to convert key ${key.kid} to PEM:`, error);
-        }
-      }
-    }
-
-    isInitialized = true;
-  } catch (error) {
-    console.error("❌ Failed to initialize OAuth config:", error);
-    throw error;
-  }
-};

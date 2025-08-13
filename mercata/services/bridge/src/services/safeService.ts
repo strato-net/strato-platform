@@ -68,14 +68,14 @@ export const createSafeTransactionsForWithdrawals = async (withdrawals: any[]): 
           });
         }
       } catch (error) {
-        console.error(`❌ Error creating safe transaction for key ${key}:`, error);
+        // Continue with other transactions even if one fails
+        continue;
       }
     }
 
     return safeTxs;
   } catch (error) {
-    console.error("❌ Error in createSafeTransactionsForWithdrawals:", error);
-    return [];
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -87,8 +87,7 @@ export const checkExecutedSafeTransactions = async (withdrawals: any[]): Promise
     }));
     return executedTxs;
   } catch (error) {
-    console.error("❌ Error in checkExecutedSafeTransactions:", error);
-    return [];
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -109,7 +108,7 @@ export const monitorSafeTransactionStatus = async (transactionKey: string, chain
       return 'pending';
     }
   } catch (error) {
-    console.error(`❌ Failed to check Safe transaction status ${transactionKey}:`, error);
+    // Return pending on error to avoid blocking the process
     return 'pending';
   }
 };

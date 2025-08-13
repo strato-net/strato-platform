@@ -1,5 +1,6 @@
 import { config } from "../config";
-import { contractCall } from "./contractCall";
+import { execute } from "./stratoHelper";
+import { logInfo, logError } from "./logger";
 
 /**
  * Mint vouchers for a user address
@@ -16,29 +17,25 @@ export const mintVouchers = async (userAddress: string, voucherCount: number = 1
 
   const voucherAmount = (voucherCount * Math.pow(10, 18)).toString();
 
-  console.log(`🎫 Minting ${voucherCount} vouchers for user: ${userAddress}`);
-
   try {
-    const result = await contractCall(
-      "Voucher",
-      voucherContractAddress,
-      "mint",
-      {
+    const result = await execute({
+      contractName: "Voucher",
+      contractAddress: voucherContractAddress,
+      method: "mint",
+      args: {
         to: userAddress,
         amount: voucherAmount,
       }
-    );
+    });
 
     if (result.status === "Success") {
-      console.log(`Successfully minted ${voucherCount} vouchers for ${userAddress}, tx: ${result.hash}`);
+      logInfo('VoucherMinting', `Successfully minted ${voucherCount} vouchers for ${userAddress}, tx: ${result.hash}`);
       return result;
     } else {
-      console.error(`Failed to mint vouchers for ${userAddress}:`, result.status);
       throw new Error(`Voucher minting failed: ${result.status}`);
     }
   } catch (error) {
-    console.error(`Error minting vouchers for ${userAddress}:`, error);
-    throw error;
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -47,17 +44,17 @@ export const mintVouchers = async (userAddress: string, voucherCount: number = 1
  * @param deposits - Array of deposit objects with mercataUser addresses
  */
 export const mintVouchersForDeposits = async (deposits: any[]) => {
-  console.log(`Minting vouchers for ${deposits.length} successful bridge-in deposits`);
+  logInfo('VoucherMinting', `Minting vouchers for ${deposits.length} successful bridge-in deposits`);
 
   const mintPromises = deposits.map(async (deposit) => {
     try {
       await mintVouchers(deposit.mercataUser, 10);
-      console.log(`Vouchers minted for deposit ${deposit.txHash}`);
     } catch (error) {
-      console.error(`Failed to mint vouchers for deposit ${deposit.txHash}:`, error);
+      // Don't fail the whole operation for individual voucher minting errors
+      logError('VoucherMinting', error as Error, { depositTxHash: deposit.txHash });
     }
   });
 
   await Promise.allSettled(mintPromises);
-  console.log(`🎉 Voucher minting completed for all deposits`);
+  logInfo('VoucherMinting', `Voucher minting completed for all deposits`);
 }; 

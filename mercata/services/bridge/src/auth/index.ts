@@ -1,5 +1,6 @@
-import { config } from '../config';
-import OAuthUtil from './oauth';
+import OAuthUtil from "./oauth";
+import { config } from "../config";
+import { logError } from "../utils/logger";
 
 // Validation function to check config at runtime
 const validateConfig = () => {
@@ -52,7 +53,7 @@ export const initOpenIdConfig = async () => {
     oauthInstance = await OAuthUtil.init(getOAuthConfig());
     oauthInitialized = true;
   } catch (error) {
-    console.error("❌ Failed to initialize OAuth client:", error);
+    logError('Auth', error as Error, { operation: 'initOpenIdConfig' });
     throw error;
   }
 };

@@ -1,4 +1,4 @@
-import { cirrus } from "../utils/mercataApiHelper";
+import { cirrus } from "../utils/api";
 import { config } from "../config";
 
 const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
@@ -18,8 +18,7 @@ export const getLastProcessedBlock = async (chainId: number): Promise<number> =>
     }
     return 0;
   } catch (error) {
-    console.error('❌ Failed to get last processed block:', error);
-    return 0;
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -42,8 +41,7 @@ export const getEnabledChains = async (): Promise<any[]> => {
     }
     return [];
   } catch (error) {
-    console.error('❌ Failed to get enabled chains:', error);
-    return [];
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -58,12 +56,14 @@ export const getEnabledAssets = async (): Promise<any[]> => {
     });
     
     if (Array.isArray(data) && data.length > 0) {
-      return data.map(item => item.value);
+      return data.map(item => ({
+        ...item.value,
+        stratoToken: item.key
+      }));
     }
     return [];
   } catch (error) {
-    console.error('❌ Failed to get enabled assets:', error);
-    return [];
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -83,8 +83,7 @@ export const getAssetInfo = async (stratoTokenAddress: string): Promise<any | nu
     }
     return null;
   } catch (error) {
-    console.error('❌ Failed to get asset info:', error);
-    return null;
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -101,8 +100,7 @@ export const getWithdrawalsByStatus = async (status: string): Promise<any[]> => 
     
     return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error('❌ Failed to get withdrawals by status:', error);
-    return [];
+    throw error; // Let the caller handle logging
   }
 };
 
@@ -119,7 +117,6 @@ export const isTokenEnabled = async (tokenAddress: string): Promise<boolean> => 
     
     return Array.isArray(data) && data.length > 0;
   } catch (error) {
-    console.error('❌ Failed to validate token:', error);
-    return false;
+    throw error; // Let the caller handle logging
   }
 };

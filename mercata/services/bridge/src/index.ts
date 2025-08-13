@@ -4,11 +4,12 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import logger from "./utils/logger";
+import { logInfo, logError } from "./utils/logger";
+import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { initializeMercataPolling } from "./polling/mercataPolling";
-import { initializeOAuth, validateChainRpcUrls } from "./config";
 import { initOpenIdConfig } from "./auth";
+import { healthMonitor } from "./utils/healthMonitor";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -16,13 +17,42 @@ const port = process.env.PORT || 3003;
 app.use(cors());
 app.use(bodyParser.json());
 
-app.get("/health", (_, res) => res.status(200).json({ status: "ok" }));
+// Global error handler
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logError('BridgeService', error, { operation: 'request' });
+  
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get("/health", (_, res) => {
+  const status = healthMonitor.getStatus();
+  res.status(healthMonitor.isHealthy() ? 200 : 503).json(status);
+});
 
 app.listen(port, async () => {
-  await initializeOAuth();
-  await initOpenIdConfig();
-  await validateChainRpcUrls();
-  await startMultiChainDepositPolling();
-  await initializeMercataPolling();
-  logger.info(`Bridge service listening on port ${port}`);
+  try {
+    logInfo('BridgeService', 'Starting bridge service...');
+    
+    // Validate configuration before starting
+    const configValid = await validateBridgeConfig();
+    if (!configValid) {
+      const error = new Error('Configuration validation failed - service cannot start');
+      logError('BridgeService', error);
+      process.exit(1);
+    }
+    
+    // Initialize OAuth
+    await initOpenIdConfig();
+    
+    // Start polling services
+    startMultiChainDepositPolling();
+    await initializeMercataPolling();
+    
+    logInfo('BridgeService', `Bridge service started successfully on port ${port}`);
+  } catch (error) {
+    logError('BridgeService', error as Error, { operation: 'startup' });
+    process.exit(1);
+  }
 });
